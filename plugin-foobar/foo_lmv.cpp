@@ -369,6 +369,83 @@ void VizSession::pump() {
     }
 }
 
+// ---- Now-playing banner (Plan 0097 Phase 5, ADR-0110) ------------------
+//
+// foobar hands a component the exact metadata, so this side does no guessing:
+// it renders one string through titleformat and pushes it over the C ABI. The
+// core owns everything after that - the fade, the layout, the truncation - and
+// learns nothing about where the string came from.
+
+// The script is a CONTRACT, not a display choice: the core takes one string and
+// splits it at the first " - ", so this has to produce that shape. The square
+// brackets drop the whole "artist - " chunk when the field is missing, which is
+// what stops a title-only track reading as "? - Title".
+constexpr char kNowPlayingScript[] = "[%artist% - ]%title%";
+
+// Compiled once, on first use. titleformat compilation is not free and this
+// runs on every track change.
+const titleformat_object::ptr &now_playing_script() {
+    static titleformat_object::ptr script;
+    if (script.is_empty()) {
+        titleformat_compiler::get()->compile_safe(script, kNowPlayingScript);
+    }
+    return script;
+}
+
+// Push `track` into the core's banner.
+//
+// MAIN THREAD ONLY, and that is the real-time rule here rather than a style
+// note: lmv_set_now_playing COPIES the string, and an allocation on the
+// visualisation_stream thread is exactly what the ABI's threading contract
+// forbids. Every caller below is a play_callback or a window message - foobar
+// delivers both on the main thread, the same one the render timer runs on.
+void announce(const metadb_handle_ptr &track) {
+    // Gated on the ABI handshake: lmv_set_now_playing is v5, so a core older
+    // than this shim does not have it.
+    if (!g_abi_ok || g_session.handle == nullptr || track.is_empty()) return;
+    pfc::string8 text;
+    track->format_title(nullptr, text, now_playing_script(), nullptr);
+    if (text.is_empty()) return; // nothing to announce is not an error
+    lmv_set_now_playing(g_session.handle,
+                        reinterpret_cast<const uint8_t *>(text.get_ptr()),
+                        text.get_length());
+}
+
+// Announce whatever is playing right now, if anything.
+//
+// A statically registered play_callback gets no replay of the current state, so
+// a panel added or a window opened *during* a track would otherwise show
+// nothing until the next one. The core ignores a string it already holds, so
+// this cannot double-trigger against a real track change.
+void announce_current() {
+    metadb_handle_ptr track;
+    if (playback_control::get()->get_now_playing(track)) announce(track);
+}
+
+class play_callback_lmv : public play_callback_static {
+public:
+    // Track changes only. A stop needs no notification: the banner is transient
+    // and removes itself, so there is no stale state for one to clear.
+    unsigned get_flags() override { return flag_on_playback_new_track; }
+
+    void on_playback_new_track(metadb_handle_ptr p_track) override {
+        announce(p_track);
+    }
+
+    // The rest of the interface, deliberately empty.
+    void on_playback_starting(play_control::t_track_command, bool) override {}
+    void on_playback_stop(play_control::t_stop_reason) override {}
+    void on_playback_seek(double) override {}
+    void on_playback_pause(bool) override {}
+    void on_playback_edited(metadb_handle_ptr) override {}
+    void on_playback_dynamic_info(const file_info &) override {}
+    void on_playback_dynamic_info_track(const file_info &) override {}
+    void on_playback_time(double) override {}
+    void on_volume_change(float) override {}
+};
+
+play_callback_static_factory_t<play_callback_lmv> g_play_callback_factory;
+
 bool VizSession::claim(HWND host) {
     if (owner != nullptr) return false; // another host drives the core
     if (stream.is_empty()) {
@@ -387,6 +464,8 @@ bool VizSession::claim(HWND host) {
     visible = true;
     timer_ms = 0;
     sync_render_timer(); // starts the render timer at the right cadence
+    // A host that claims mid-track fires no play_callback of its own, so ask.
+    announce_current();
     return true;
 }
 
