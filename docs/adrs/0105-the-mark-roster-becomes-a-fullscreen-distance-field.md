@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0091](../plans/0091-the-figure-fills-the-frame.md)
+> **Related plan(s):** [0091](../plans/done/0091-the-figure-fills-the-frame.md)
 
 ## Context
 

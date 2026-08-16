@@ -8,7 +8,7 @@
 
 Six star reference images arrived with a question attached: *can we introduce paths and path
 morphing, SVG-like?* Five of the six turned out to be the existing `star` arm wanting three
-parameters ([Plan 0091](../plans/0091-the-figure-fills-the-frame.md) Phase 5), so the references
+parameters ([Plan 0091](../plans/done/0091-the-figure-fills-the-frame.md) Phase 5), so the references
 themselves do **not** motivate this. What motivates it is the general capability the question names:
 every silhouette this engine can draw is one of a closed roster, and a roster answers only the asks
 someone has already had.

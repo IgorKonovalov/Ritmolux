@@ -20,8 +20,8 @@ codebase serve both frontends.
 | [![A luminous sea-green rosette of fine particle filaments on black](docs/images/gallery/attractor.png)](docs/preset-guide.md) | [![A radial spectrum readout: coloured spokes radiating from a dark centre](docs/images/gallery/spectrum.png)](docs/preset-guide.md) | [![A bold gold rose window of nested twelve-pointed stars](docs/images/gallery/star_pattern.png)](docs/preset-guide.md) |
 | `attractor` | `spectrum` | `star_pattern` |
 
-Nine built-in rendering systems, all driven by editable text presets —
-**[see all nine, and how to write one](docs/preset-guide.md)**.
+Ten built-in rendering systems, all driven by editable text presets —
+**[see them, and how to write one](docs/preset-guide.md)**.
 
 > Every picture in this repository is a **headless render of the engine**, captured by the `shot`
 > CLI under a synthesized audio clip — not a screenshot of the application window. There is no
@@ -78,7 +78,7 @@ packaging/           # What a `v*` tag ships: macos/bundle.sh (build, lipo, sign
                      #   READ-ME-FIRST.md testers get in each zip. See ADR-0038.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements (the numbers behind "lightweight").
-├── preset-guide.md  # START HERE for presets: the illustrated entrance — the nine systems, one
+├── preset-guide.md  # START HERE for presets: the illustrated entrance — the systems, one
 │                    #   picture each, and the loop you work in.
 ├── preset-tuning-walkthrough.md  # One preset tuned over five steps, with the picture AND the
 │                    #   --report row that changed at each one.
@@ -221,7 +221,7 @@ reaction-diffusion, attractor, spectrum readout, ballistic emitter — seeded in
 per-user directory that both the standalone app and the foobar plugin share.
 
 **Start with [`docs/preset-guide.md`](docs/preset-guide.md)** — the illustrated
-entrance: a complete preset in ten lines, what each of the nine systems looks
+entrance: a complete preset in ten lines, what each built-in system looks
 like and when to reach for it, and the loop you work in. Then
 [`docs/preset-tuning-walkthrough.md`](docs/preset-tuning-walkthrough.md) tunes
 one preset over five steps, showing the picture **and the `--report` row** that

@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0091](../plans/0091-the-figure-fills-the-frame.md)
+> **Related plan(s):** [0091](../plans/done/0091-the-figure-fills-the-frame.md)
 
 ## Context
 
@@ -120,6 +120,38 @@ Rejected on this project's own rule: a live backlog entry whose premise is false
 than a closed one, because it sends the next reader to do work that is already unnecessary — and
 here the work in question is a composite redesign that the entry itself prices as the reason it is
 Low priority. The correction goes in the entry.
+
+## Outcome (2026-08-16) — one Negative was falsified by measurement, and the open path came back negative
+
+Plan 0091 Phase 1 (`e2dd537`) put both of this ADR's unsettled claims on a rendered probe. Recorded
+here rather than in the body, which is append-only once accepted. Both probes live in
+`core/tests/layer.rs`, so neither number is recalled.
+
+- **"It is scoped to field scenes" is WRONG, and the mechanism this ADR gave for it is not what the
+  code does.** The Negative bullet says a `swarm` or `emitter` in a multiply slot cannot darken
+  "because its alpha *is* its brightness". It is not: `swarm.rs` emits `vec4(color * g, g)` where
+  `g` is the mark's **geometric** falloff, independent of its colour, and `layer_blend.rs:138`
+  un-premultiplies (`straight = b.rgb / max(b.a, 1e-4)`) before the mode runs. So a black particle
+  has full coverage and a zero operand — the darkening condition **met**, not failed. Measured
+  (`a_dark_particle_layer_in_a_multiply_slot`): a frozen swarm at `brightness = 0` takes a light
+  chain from display luma **174.1 to 0.9**, *darker* than the field route's 18.9. **The real
+  difference between the two routes is footprint, not capability** — a field darkens every pixel, a
+  particle darkens only inside its marks. The authoring trap this ADR asked the docs to name is
+  therefore a different trap, and the one they now carry: in a multiply slot the darkening operand
+  is the layer's colour, so `brightness` runs **backwards**.
+- **"Whether multiply reaches the *backdrop* is unmeasured" — it does not, and the answer is
+  negative in the clean way** (`a_multiply_layer_meets_a_lit_backdrop`). The backdrop is composited
+  *underneath* the finished chain, so no blend mode sees it. At the default `occlude = 1` the frame
+  is **byte-identical** over a lit backdrop and over a black one: the backdrop is not darkened, it
+  is **absent**, held out by coverage. At `occlude = 0` it is added *after* the junction and becomes
+  a floor — the same multiply layer reaching **18.9** over black reaches only **171.3** over a lit
+  sky, where the sky alone reads 196.9. **Consequence for authoring: a two-tone graphic takes its
+  light ground from the CHAIN, never from `bg_*`.**
+
+The Decision itself is unaffected — two-tone graphics are still a `multiply` layer over a lighter
+ground, and the composite is still not redesigned. What moved is that the route is **wider** than
+this ADR claimed. `presets/README.md`, `docs/preset-palettes.md` and design-backlog 0069 all carry
+the corrected version; 0069 stays live on its untouched occlusion half.
 
 ## Notes
 

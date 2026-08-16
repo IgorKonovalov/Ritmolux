@@ -20,7 +20,7 @@ next to the preset files themselves. That is the one place they are maintained;
 this document does not duplicate them.
 
 > **New to presets? Start with [`docs/preset-guide.md`](preset-guide.md)** — the illustrated
-> entrance: what each of the nine systems looks like, which of these three references owns which
+> entrance: what each built-in system looks like, which of these three references owns which
 > surface, and the loop you work in. Come back here for the grammar. The quickstart below overlaps
 > the guide's opening on purpose; where they disagree, the guide is the newer one
 > ([ADR-0101](adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).

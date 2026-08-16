@@ -1,11 +1,73 @@
 # 0091 — The figure fills the frame
 
-> **Status:** in-progress
+> **Status:** done (2026-08-16)
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) (the mark roster becomes a fullscreen distance field), [0106](../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md) (two-tone graphics come from a multiply layer)
+> **Related ADRs:** [0105](../../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) (the mark roster becomes a fullscreen distance field), [0106](../../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md) (two-tone graphics come from a multiply layer)
 > **Corrects:** design-backlog 0069 (premise falsified in part — corrected in place, not archived)
+
+## Close (2026-08-16)
+
+**Phases 1-5 landed** — `e2dd537`, `7f93b3e`, `78d1671`, `080a7ef`, `82c7471`. Mode 4 review:
+**no blockers, no majors, three minors.** Verified at the close rather than taken on report:
+`fmt` + `clippy --workspace --all-targets -D warnings` clean, and the golden suite passes against
+the **committed** baselines (not merely re-blessed) — so the plan's own "the particle path moves
+zero pixels" contract is proved, not asserted. `check-doc-links.mjs` and
+`check-backlog-claims.mjs` both green (22 reductions, 13 live entries, 3 unprobeable).
+
+What the plan bought, and what it corrected:
+
+- **Phase 2 is the phase that earned it.** The exterior was measured against a numerically sampled
+  outline and both cheap arms were exactly as wrong as `marks.rs:33-37` implied — `polygon` 0.326
+  and `star` 1.057 out in sprite-local units. Both are now **exact outside**, with each arm keeping
+  its original expression verbatim for `d <= 1` so the sprite path is bit-for-bit unchanged.
+  `star`'s **interior** stays approximate knowingly, with the error stated as a function of the
+  point count (0.00075 at 3, 0.066 at 5, 0.138 at 7, 0.248 at 12) and bounded from *both* sides —
+  the lower bound fires if it ever becomes exact, because that would mean the sprite's arithmetic
+  moved.
+- **Phase 1 falsified one of ADR-0106's own consequences.** A particle layer *can* darken; the ADR's
+  stated mechanism ("a particle's alpha is its brightness") is not what `swarm.rs` does. Measured at
+  luma 0.9, darker than the field route's 18.9 — the difference between the routes is **footprint,
+  not capability**. It also settled the path the ADR left open: multiply does **not** reach the
+  backdrop, so a two-tone graphic's light ground must come from the chain. Both are a dated
+  `Outcome` on [ADR-0106](../../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md).
+- **ADR-0105's claim that the three reactivity asks need no new mechanism holds**, and Phase 4 says
+  so rather than pretending to build them: `color_center` scrolls the rings (checked across a full
+  cycle *including the wrap step*, on a cyclic gradient), `scale` breathes monotonically (14 → 26 →
+  41 px), `palette_steps` steps between whole figures. The one thing built is the `gamma` response
+  exponent, and its **direction is the opposite of `ink_gamma`'s** — below 1 tightens the rings
+  toward the centre, which is the reference's direction. Documented as a table, in three places.
+- **The ADR-0037 test bites, and it was confirmed in the reverted direction** — substituting a
+  literal `1.0` for the target's aspect renders the disc 29x14 at 240x120 and the test fails on both
+  orientations. That is the first time this family's aspect claim has been proved by reversal rather
+  than asserted, on a bug that has shipped three times here.
+
+**Phase 6 (`human`) carries forward** under the rule the phase itself names — it gates nothing below
+it, and it is now item 6 in [`docs/content-brief.md`](../../content-brief.md).
+
+**Phase 7 was not started, and it is deliberately off the roster** — see the note on that phase
+below. It is now [design-backlog 0095](../../design-backlog.md).
+
+The three minors, none of which blocked the close:
+
+1. **The user-facing docs still said "nine systems"** in five files (`README.md`, `presets/README.md`,
+   `docs/presets.md`, `docs/preset-guide.md`, `docs/capturing.md`). `shape_field` is the tenth and
+   loads today. Repaired at the close with count-free phrasing, which is this project's own stated
+   preference precisely because a count re-drifts. What could **not** be repaired is
+   `docs/preset-guide.md`'s section 2, where every entry is a real shipped preset with a committed
+   render — the plan deliberately ships no content, so that entry is owed by the first
+   `shape_field` world and is recorded in the content brief.
+2. **`core/tests/distinctness.rs`'s family roster does not carry `ShapeField`**, and its comment
+   still says it "covers all nine families". Harmless today — the report needs two shipped presets
+   in a family before it can say anything, and this family has zero — but the omission is exactly
+   what that comment warns about ("a new `SystemKind` will not appear here and nothing will fail").
+   Add it when the first world lands; a count in a comment is the thing that entry itself calls a
+   terrible thing to write down.
+3. **`the_edge_bows_inward_and_no_valley_radius_can_imitate_it` asserts only its first half.** The
+   bowed-versus-straight comparison is asserted; the *exclusivity* claim in the test's own name is
+   computed into `closest_straight` and **printed, never asserted**. The doc comment is honest that
+   it is a measurement, but the name reads as a property. Either assert a bar or rename it.
 
 ## TL;DR
 
@@ -55,12 +117,12 @@ representation. That is Phase 5. The sixth (a cartoon star **with eyes**) is the
 machinery this plan does not build, and it is multi-shape composition rather than a path.
 
 The path-and-morphing question is real and is being interviewed separately; it is **not** folded in
-here. Two facts shaped that split: [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)'s
+here. Two facts shaped that split: [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)'s
 biarc chain is already a path representation, so Plan 0087 is building half of it and a second
 representation invented here would collide with it; and the half that is genuinely missing is
 **fill**, not path — the line renderer strokes, and every one of these references is a filled
 silhouette. Two other things in that batch are separately filed rather than absorbed: the chrome
-shading on the sparkle pair ([backlog 0092](../design-backlog.md)) is a lighting decision, and the
+shading on the sparkle pair ([backlog 0092](../../design-backlog.md)) is a lighting decision, and the
 hand-drawn wobble is noise displacement — neither is a path feature.
 
 ## Decision
@@ -211,7 +273,7 @@ flowchart TD
   that arrived after this plan was drafted. **Five of the six are this arm wanting parameters it
   does not have** — a sharp seven-pointer, an irregular nine-pointed "bang", two concave-edged
   four-point sparkles, and a hand-drawn six-pointer. The roster does not grow by a name
-  ([ADR-0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)'s closed-roster
+  ([ADR-0105](../../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)'s closed-roster
   consequence is about silhouettes, not about how many knobs an arm has).
 - **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/render/scenes/marks/tests.rs`,
   `core/src/render/scenes/shape_field.rs`, `presets/README.md`.
@@ -239,6 +301,10 @@ flowchart TD
 
 ### Phase 6 — The look gate
 
+> **CARRIED FORWARD 2026-08-16** — not run at the close. It gates nothing below it, exactly as the
+> last bullet of this phase provides for, and it is item 6 in
+> [`docs/content-brief.md`](../../content-brief.md) with all three verdicts intact.
+
 - **Owner skill:** human
 - **What:** Judge the figures **in motion, in the running app**, against both reference batches —
   and judge the beat-latched band count specifically, since that is the one the engine cannot answer
@@ -259,6 +325,22 @@ flowchart TD
     7 both followed. It gates nothing below it.
 
 ### Phase 7 — The converging fan, and it must earn itself
+
+> **NOT STARTED, AND TAKEN OFF THE ROSTER 2026-08-16 — filed as
+> [design-backlog 0095](../../design-backlog.md).** This phase was written as a cut point that had
+> to earn itself, and nothing earned it: no preset asks for the fan, the user asked twice about the
+> heart and not once about the floor, and the phase's own first bullet says it owes a fresh ADR
+> before any code. A not-started phase held open to keep a plan alive would make the roster lie.
+>
+> **Phase 1's answer, which this phase was ordered after precisely so it could hear it, narrows what
+> the fan can be for.** The fan would live on the backdrop, and the backdrop is composited
+> *underneath* the finished chain: at `occlude = 1` it is absent, and at `occlude = 0` it is a
+> **floor** the chain cannot darken past (measured, 171.3 against 18.9 over black). So a fan floor
+> and a multiply-darkened figure over it — the reference collage, which is the whole reason this
+> phase exists — cannot both be had this way. The floor's own dark stripes must come from the
+> backdrop's palette stops, or the floor must be drawn **in the chain** as a scene, which is the
+> alternative this phase listed as rejected and which Phase 1's measurement promotes. Whoever picks
+> the backlog entry up designs against that, not against this phase's premise.
 
 - **Owner skill:** dev
 - **What:** The reference collage's floor: stripes converging to a vanishing point. **This is the
