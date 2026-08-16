@@ -110,6 +110,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node scripts/check-doc-links.mjs
+      # And the index-row gate (ADR-0116): every row inside a marked roster
+      # region stays a pointer, held to 320 bytes. The rows this catches are
+      # written by the architect close ceremony, which runs the same check - so
+      # this job is the backstop for the case where it did not, exactly as it is
+      # for the two checks either side of it. docs/adrs/README.md had reached
+      # 188,820 bytes, 16 % of the corpus it indexes, under a convention that
+      # had already been written down and had already failed.
+      - run: node scripts/check-index-rows.mjs
       # The same job carries the backlog-claim gate (ADR-0108), for the same
       # reason and at the same cost: it re-runs the probes each live entry in
       # docs/design-backlog.md carries beside its claims about this repo. That
