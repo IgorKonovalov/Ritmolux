@@ -1029,10 +1029,12 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 > sharp star's tiny inradius had forced `color_span` down to `0.037`. Re-rendered with
 > `palette_steps` bound, the same five silhouettes come back **crisp**.
 >
-> **So the trigger is answered and the answer is no.** Nothing in that gate says the flat sparkle
-> was the disappointing one; the sparkles were never fairly judged. This entry stays filed on its
-> original evidence — two reference images — and wants a *fresh* look verdict on a fair probe
-> before anyone plans lighting off it.
+> **So the trigger is answered and the answer is no.** The re-judge ran on a fair probe the same
+> day and the verdict was *"objectively good, yes to all"* on all five silhouettes
+> ([backlog 0100](design-backlog.md) carries the one soft edge, and it is about edge wobble rather
+> than shading). Nothing in that gate says the flat sparkle was the disappointing one. **This entry
+> stays filed on its original evidence — two reference images — and the Phase 6 trigger is spent.**
+> A future lighting plan needs a fresh want, not this one.
 
 - **Raised:** 2026-08-13, from the second of two user reference batches, alongside
   [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
@@ -1566,3 +1568,63 @@ the interpolation entirely.
 `palette_steps` and is unaffected by construction. It earns its place because of what it cost: a
 user look verdict was misattributed twice, and the entry that nearly absorbed the blame
 ([0092](design-backlog.md)) is a composite-scale piece of work.
+
+---
+
+## 0100 — "hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever for it
+
+**Raised by:** `architect`, from Plan 0091 Phase 6's star look gate (2026-08-16).
+**Owner if taken:** `architect` then `dev`. **Low priority and the user said so in the same breath
+as passing it** — this entry exists because the *reason* it fell slightly short is specific and
+worth not rediscovering.
+
+- **Verified 2026-08-16** — the only per-spike variation the arm has is a tip-radius scale, drawn
+  from an index hash: `present: rt = 1\.0 \+ jitter in: core/src/render/scenes/marks.rs`
+- **Verified 2026-08-16** — and there is no seed or phase input to re-scatter it:
+  `absent: star_seed in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+Plan 0091 Phase 5 shipped three `star` shape params against a batch of six reference images. Phase 6
+judged them, and the verdict was **yes on all five silhouettes**, with one soft exception: the
+hand-drawn six-pointer *"maybe"* reads as hand-drawn, *"but it's fine also"*.
+
+That soft edge has a specific cause. `star_jitter` varies each spike's **tip radius** — one scalar
+per spike, drawn from `mark_spike_hash01(index)`. A hand-drawn figure does not vary that way: its
+spikes are roughly the right length and its **edges wander** — the line between tip and valley is
+not straight or cleanly bowed, it wobbles along its length. That is **displacement along the edge**,
+a different quantity from the one the arm exposes, and `star_curve` cannot supply it either because
+it bows the whole edge as one smooth quadratic.
+
+Two smaller consequences of the same shape, both real and neither urgent:
+
+- **There is no lever to re-scatter the jitter while keeping its amount.** The pattern is a pure
+  function of the spike index, so a preset that wants *this much* irregularity in a *different*
+  arrangement cannot ask for it. That is the price of the determinism rule the arm correctly follows
+  (a `sin`-based hash would differ between GPUs), but a `star_seed` input would keep determinism and
+  restore the choice.
+- **A jittered star's exterior is the roster's least accurate field** — up to 0.54 out, because the
+  angular fold measures against a point's own spike when a longer neighbour may be nearer
+  (Plan 0091 Phase 5 measured it). Edge displacement would make that worse, so anything built here
+  should be judged against that number rather than assumed free.
+
+### A record defect, worth one line
+
+[Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) line 124 says this item was **"separately
+filed rather than absorbed"**. It was not — no entry existed until this one, five days later, and
+the claim was never checked. It is the same class
+[ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for, one
+level up: a plan asserting something about the backlog rather than about the code.
+
+### What a fix would be
+
+Not obvious, and that is why this is filed rather than planned. A displacement term needs a
+coordinate along the edge and a noise source that is cheap in a fragment shader and stable across
+GPUs — the same constraints that made the tip jitter an integer hash. It is plausibly a
+`star_wobble` amplitude plus a frequency, evaluated on the folded edge parameter the arm already
+computes.
+
+### Priority
+
+**Low.** The look gate passed the silhouette. Take it when someone wants a *deliberately* rough
+figure rather than a slightly irregular one, and read the exterior-accuracy number first.

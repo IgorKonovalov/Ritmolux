@@ -214,16 +214,23 @@ Three riders:
 > - **`gamma`'s useful range is bounded by a measured wall, not by its clamp.** Past roughly `1.5`
 >   on a wrapping palette and `3` on a single sweep, the exterior compresses past the pixel grid and
 >   the corners break into moire. The `0.05..20` clamp is far outside anything usable.
-> - **The star silhouettes were rejected, and then the rejection was diagnosed — it was the PROBE,
->   not the params.** The user's verdict was that they looked *"dirty and upscaled"*. That is
->   neither silhouette nor shading: the probes drew their figures through **8 to 32 of the palette's
->   256 LUT texels**, with silhouette edge transitions of **1.31 texels**, because a sharp star's
->   tiny inradius forces `color_span` down near `0.037`
->   ([backlog 0099](design-backlog.md)). Re-rendered with `palette_steps` bound — which snaps the
->   coordinate to a band centre so no edge is ever interpolated — **the same five silhouettes come
->   back crisp**, and all five reference shapes read.
->   **So the three star params are not convicted; they were never fairly judged.** A re-judge on the
->   corrected probes is worth one sitting, and it is the cheapest open item in this file.
+> - **The star silhouettes PASS — verdict 2026-08-16, on the second re-judge.** *"It looks
+>   objectively good, and I can say yes to all, except maybe drawn by hand, but it's fine also."*
+>   All three Phase 5 params reach their reference shapes: `star_valley` on the sharp seven-pointer,
+>   `star_jitter` on the irregular bang, `star_curve` on both concave sparkles, and all three
+>   together on the six-pointer. **The one soft edge is filed as
+>   [backlog 0100](design-backlog.md)** — "hand-drawn" is *edge wobble*, displacement along the line
+>   between tip and valley, and the arm only varies each spike's tip *radius*. Different quantity,
+>   no lever for it, and the user passed it anyway.
+>
+>   **Getting to that verdict took two corrected probes, and both corrections were mine.** The first
+>   rejection (*"dirty and upscaled"*) was the probe drawing its figure through **8-32 of the
+>   palette's 256 LUT texels** with a **1.31-texel** edge ([backlog 0099](design-backlog.md)). The
+>   second attempt came back with **blunt tips** because the band boundary sat at 1.35x the outline,
+>   so it drew a *dilated* silhouette — and an outward offset rounds convex corners, the same
+>   mechanism as the heart's notch running the other way. Only with the boundary exactly on `d = 1`
+>   was the shape itself visible. **Twice a probe artifact impersonated a shape defect**, which is
+>   why the user's precise wording was worth more than the rejection.
 > - **Two engine gaps came out of it** and are filed:
 >   [backlog 0096](design-backlog.md) (the scene draws offset contours where the reference wants
 >   scaled copies — the reason a nested figure's inner notch rounds off) and
@@ -234,12 +241,21 @@ Three riders:
 > `palette_steps` reads as a response or a strobe — the probe set for it was built and never run —
 > and which of the three star params is mis-shaped.
 >
-> **That question is now answered — it was the probe** (see above), which also settles
-> [backlog 0092](design-backlog.md)'s trigger **negatively**: nothing in this gate says the flat
-> sparkle was the disappointing one, so lighting must not be planned off it. What remains is the
-> cheaper job it turned into: **re-judge the five star silhouettes on the corrected probes** and
-> say whether the three params reach the reference shapes. A named miss there is still the useful
-> outcome, and it is now a question about the shapes rather than about the rendering.
+> **The star question is closed** (see above), and it settles
+> [backlog 0092](design-backlog.md)'s trigger **negatively and now conclusively**: the silhouettes
+> were judged good on a fair probe, so nothing in this gate says the flat sparkle was the
+> disappointing one. **Lighting must not be planned off this trigger.**
+>
+> **Only one question is still open on this item: does a beat-latched `palette_steps` read as a
+> response or as a strobe.** The probe set for it was built (`p2a`-`p2e`) and has never been run.
+> `p2a` against `p2b` on one track is the whole test — same mechanism, half the rate — and it
+> decides whether a beat-driven band count is available to every future `shape_field` world or
+> whether the fallback (`scale`, `gamma`, or `color_span`) is the permanent answer.
+>
+> **There is also now a content opportunity rather than a question.** The five star silhouettes are
+> judged good and **no star world ships**. Authoring one is ordinary lane work against a surface
+> that has been verified rather than assumed — and it would pay off `docs/preset-guide.md`'s missing
+> tenth gallery entry at the same time, which is still owed.
 
 **This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
 `shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it
