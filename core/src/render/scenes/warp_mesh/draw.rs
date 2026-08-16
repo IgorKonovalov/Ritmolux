@@ -11,6 +11,25 @@
 //! bundle's own counts, which are bounded by
 //! [`MAX_WAVE_POINTS`](crate::milk::MAX_WAVE_POINTS) and its siblings.
 //!
+//! # Two blend modes, and why the geometry is ordered
+//!
+//! MilkDrop chooses per element: `bAdditiveWaves` and a custom element's own
+//! `additive` pick between `dst = src + dst` and `dst = src*a + dst*(1-a)`. Both
+//! are honoured here, by **partitioning each buffer** — additive producers first,
+//! over-blended ones after — and handing the split index to the two-pipeline
+//! draw ([`LineRenderer::draw_split`](crate::render::scenes::lines::LineRenderer::draw_split)).
+//!
+//! Reading both as additive is what saturated the frame to flat colour inside
+//! half a second, and it is not a small error: an additive seam **sums** where
+//! alpha-over **replaces**, so N overlapping producers land at N rather than at
+//! ≤ 1. That bites hardest on the **28.5 % of the corpus that sets
+//! `fDecay >= 1.0`** (2 949 of 10 347, measured 2026-08-16), where the field is a
+//! perfect integrator and nothing brings the sum back down.
+//!
+//! The order within each half is the order MilkDrop draws in — waveform, custom
+//! waves, custom shapes, borders, motion vectors — because an over-blended stroke
+//! must land on top of what it covers.
+//!
 //! # The coordinate space, once
 //!
 //! MilkDrop places everything in **uv**: `0..1` across the frame with `y = 0` at
@@ -22,11 +41,6 @@
 //!
 //! # What is approximated, stated
 //!
-//! - **Alpha reads as intensity.** This engine's draw seam is additive with
-//!   saturating coverage (ADR-0056); MilkDrop's waveform can be additive or
-//!   alpha-blended, chosen per preset. Multiplying the colour by the alpha is the
-//!   additive reading of the same number, and it is what every producer here
-//!   does.
 //! - **A dot is a very short segment.** `wave_usedots` draws points; the line
 //!   renderer draws quads between endpoints, and its across-the-stroke falloff
 //!   makes a near-zero-length one a round dot.
@@ -61,14 +75,27 @@ pub struct ShapeVertex {
     pub alpha: f32,
 }
 
-/// The two buffers a frame's draw layer fills. Sized once at preset load.
+/// The two buffers a frame's draw layer fills, each **partitioned by blend
+/// mode**. Sized once at preset load.
+///
+/// Additive geometry occupies `..n_additive` and over-blended geometry the rest,
+/// which is what lets one buffer and one render pass serve two pipelines — see
+/// the module docs. Producers are appended through [`push_segment`](Self::push_segment)
+/// and [`push_triangle`](Self::push_triangle) rather than to the vectors
+/// directly, so the invariant is maintained in one place.
 #[derive(Default)]
 pub struct DrawGeometry {
     /// Every line: the waveform, custom waves, shape outlines, borders, motion
-    /// vectors. One batch, one draw.
+    /// vectors.
     pub segments: Vec<SegmentInstance>,
+    /// How many leading entries of [`segments`](Self::segments) blend additively.
+    pub segments_additive: usize,
     /// Every filled shape's triangles, as a plain list.
     pub triangles: Vec<ShapeVertex>,
+    /// How many leading entries of [`triangles`](Self::triangles) blend
+    /// additively. Always a multiple of 3 — a triangle's three vertices share one
+    /// blend mode.
+    pub triangles_additive: usize,
 }
 
 impl DrawGeometry {
@@ -76,12 +103,45 @@ impl DrawGeometry {
     /// reuse that keeps the per-frame path allocation-free.
     pub fn clear(&mut self) {
         self.segments.clear();
+        self.segments_additive = 0;
         self.triangles.clear();
+        self.triangles_additive = 0;
     }
 
     /// Whether anything was built this frame.
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty() && self.triangles.is_empty()
+    }
+
+    /// Append one segment into its blend mode's half.
+    ///
+    /// An additive one is **inserted** at the partition rather than pushed, which
+    /// is `O(n)` in the over-blended tail. That is deliberate and it is cheap:
+    /// the whole layer is a few hundred segments of CPU geometry (see the module
+    /// docs), and the alternative — two vectors concatenated per frame — would
+    /// either allocate or need a third buffer. Neither is worth it at this size,
+    /// and this keeps the draw order MilkDrop's within each half.
+    fn push_segment(&mut self, segment: SegmentInstance, additive: bool) {
+        if additive {
+            self.segments.insert(self.segments_additive, segment);
+            self.segments_additive += 1;
+        } else {
+            self.segments.push(segment);
+        }
+    }
+
+    /// Append one triangle — three vertices, one blend mode. See
+    /// [`push_segment`](Self::push_segment) for why the additive case inserts.
+    fn push_triangle(&mut self, vertices: [ShapeVertex; 3], additive: bool) {
+        if additive {
+            for (offset, vertex) in vertices.into_iter().enumerate() {
+                self.triangles
+                    .insert(self.triangles_additive + offset, vertex);
+            }
+            self.triangles_additive += 3;
+        } else {
+            self.triangles.extend_from_slice(&vertices);
+        }
     }
 }
 
@@ -124,40 +184,122 @@ pub fn build(
     let Some(runtime) = runtime else {
         return;
     };
-    let exposure = deposit_exposure(dt);
+    let exposure = Exposure::new(dt);
     waveform_figure(geometry, out, waveform, time, exposure, aspect);
     custom_waves(geometry, runtime, waveform, exposure, aspect);
     custom_shapes(geometry, runtime, exposure, aspect);
+    // The two borders and the motion-vector grid are **always** alpha-blended in
+    // the reference — neither has an additive flag to read — so they go to the
+    // over half unconditionally.
     borders(geometry, out, exposure, aspect);
     motion_vectors(geometry, out, exposure, aspect);
 }
 
-/// **What one frame of the draw layer is worth**, and it is a rate rather than a
-/// constant.
+/// **What one frame of the draw layer is worth**, which depends on how the
+/// producer that drew it blends. Both cases are a rate rather than a constant,
+/// and for the same reason.
 ///
-/// MilkDrop deposits its waveform once per rendered frame into a buffer that
-/// decays once per rendered frame, so the two are in step by construction. Here
-/// the field decays **per second** (`decay` is rate-converted like every other
-/// MilkDrop factor), which means a 60 Hz display would deposit twice the light
-/// per second that a 30 Hz one does into a buffer that fades at the same rate —
-/// and the accumulation would be a stop brighter for no reason but the refresh.
-///
-/// Scaling each frame's contribution by `dt * NOMINAL_FPS` puts them back in
-/// step: a second of wall clock deposits the same total light at any refresh,
-/// which is the same property ADR-0019 buys everywhere else in this engine and
-/// the same normalization ADR-0065 applied to the attractor's deposit when a
-/// tier capacity turned out to be a brightness.
-fn deposit_exposure(dt: f32) -> f32 {
-    if !dt.is_finite() || dt <= 0.0 {
-        return 1.0;
-    }
-    (dt * crate::milk::NOMINAL_FPS).clamp(0.0, 4.0)
+/// MilkDrop deposits once per rendered frame into a buffer that decays once per
+/// rendered frame, so the two are in step by construction. Here the field decays
+/// **per second** (`decay` is rate-converted like every other MilkDrop factor),
+/// which means a 60 Hz display would deposit twice the light per second that a
+/// 30 Hz one does into a buffer that fades at the same rate — and the picture
+/// would differ with the refresh, which ADR-0019 exists to prevent. `rate` is how
+/// many nominal frames of wall clock this frame is, and both branches of
+/// [`scale`](Self::scale) convert through it.
+#[derive(Clone, Copy)]
+pub struct Exposure {
+    /// `dt * NOMINAL_FPS`: how many nominal frames of wall clock this frame is.
+    rate: f32,
 }
 
-/// Colour times alpha, which is the additive reading of MilkDrop's blend — see
-/// the module docs. `wave_brighten` normalizes to the brightest channel first,
-/// which is what the reference's `bMaximizeWaveColor` does.
-fn light(r: f32, g: f32, b: f32, a: f32, brighten: bool, exposure: f32) -> [f32; 3] {
+impl Exposure {
+    /// From this frame's `dt`. A degenerate frame is worth one nominal frame
+    /// rather than nothing.
+    pub fn new(dt: f32) -> Self {
+        let rate = if dt.is_finite() && dt > 0.0 {
+            (dt * crate::milk::NOMINAL_FPS).clamp(0.0, 4.0)
+        } else {
+            1.0
+        };
+        Self { rate }
+    }
+
+    /// The producer's effective alpha this frame — its colour is premultiplied
+    /// by this, and it is the coverage the fragment writes.
+    ///
+    /// # The two conversions
+    ///
+    /// **Additive** light composes by *addition* across frames, so `n` frames
+    /// deposit `n * a` and the rate conversion is the plain product `a * rate`.
+    ///
+    /// **Alpha-over** composes by *repeated interpolation*: `n` frames of
+    /// `dst = src*a + dst*(1-a)` leave `1 - (1-a)^n` of the way travelled, so the
+    /// conversion is `1 - (1-a)^rate`. At `rate = 1` it is exactly `a`, which is
+    /// what makes 60 Hz the reference's own cadence rather than an approximation
+    /// of it; at `rate = 2` a 30 Hz frame travels as far as two 60 Hz ones, which
+    /// is the property ADR-0019 asks for.
+    ///
+    /// Note that the alpha-over branch is **bounded by 1** for every `rate`,
+    /// which is the whole reason this is worth two pipelines: the sum of N
+    /// over-blended producers is still ≤ 1, where N additive ones is N.
+    fn scale(self, alpha: f32, additive: bool) -> f32 {
+        let a = alpha.clamp(0.0, 1.0);
+        if additive {
+            a * self.rate
+        } else {
+            1.0 - (1.0 - a).powf(self.rate)
+        }
+    }
+}
+
+/// A producer's premultiplied colour and its coverage, both already scaled by
+/// [`Exposure::scale`].
+///
+/// The two are returned together because both seams need coverage to equal the
+/// light's own footprint: additively so a dim deposit does not occlude a lit
+/// backdrop (ADR-0056), and over-blended because the coverage *is* the blend's
+/// alpha.
+#[derive(Clone, Copy)]
+struct Light {
+    /// Premultiplied colour: the producer's RGB times its effective alpha.
+    rgb: [f32; 3],
+    /// **The alpha the fragment writes**, which is not the same number in the two
+    /// seams and that difference is ADR-0056's rule rather than an inconsistency.
+    ///
+    /// Over-blended, coverage *is* the blend's alpha — a `wave_a = 0.1` stroke
+    /// must replace a tenth of what is under it, so it is the effective alpha.
+    ///
+    /// Additive, it is **`1.0`**: "a dimmed stroke still covers its own
+    /// footprint", so brightness lives in [`rgb`](Self::rgb) and the geometry's
+    /// own falloff is the whole footprint. Passing the effective alpha here
+    /// instead would make a dim additive stroke *narrower* rather than darker,
+    /// and could exceed 1 at a long `dt`.
+    coverage: f32,
+}
+
+impl Light {
+    /// Whether this producer writes anything worth a draw call.
+    fn is_dark(&self) -> bool {
+        self.rgb.iter().all(|c| *c <= 0.0001)
+    }
+}
+
+/// One point of a stroked figure: where it is, and what it deposits there.
+type Point = ([f32; 2], Light);
+
+/// Colour and coverage for one producer. `wave_brighten` normalizes to the
+/// brightest channel first, which is what the reference's `bMaximizeWaveColor`
+/// does.
+fn light(
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+    brighten: bool,
+    exposure: Exposure,
+    additive: bool,
+) -> Light {
     let (mut r, mut g, mut b) = (r, g, b);
     if brighten {
         let peak = r.max(g).max(b);
@@ -168,17 +310,21 @@ fn light(r: f32, g: f32, b: f32, a: f32, brighten: bool, exposure: f32) -> [f32;
             b *= k;
         }
     }
-    let a = a.clamp(0.0, 1.0) * exposure;
-    [r * a, g * a, b * a]
+    let a = exposure.scale(a, additive);
+    Light {
+        rgb: [r * a, g * a, b * a],
+        coverage: if additive { 1.0 } else { a },
+    }
 }
 
 /// Push a polyline, flagging the interior joins so the strokes meet cleanly
 /// (ADR-0041).
 fn polyline(
     geometry: &mut DrawGeometry,
-    points: &[([f32; 2], [f32; 3])],
+    points: &[Point],
     width: f32,
     closed: bool,
+    additive: bool,
 ) {
     let n = points.len();
     if n < 2 {
@@ -186,7 +332,7 @@ fn polyline(
     }
     let last = if closed { n } else { n - 1 };
     for i in 0..last {
-        let Some((a, colour)) = points.get(i) else {
+        let Some((a, light)) = points.get(i) else {
             continue;
         };
         let Some((b, _)) = points.get((i + 1) % n) else {
@@ -199,26 +345,34 @@ fn polyline(
         if closed || i + 2 < n {
             joined |= JOINED_B;
         }
-        geometry.segments.push(SegmentInstance {
-            a: *a,
-            b: *b,
-            color: *colour,
-            width,
-            joined,
-        });
+        geometry.push_segment(
+            SegmentInstance {
+                a: *a,
+                b: *b,
+                color: light.rgb,
+                width,
+                alpha: light.coverage,
+                joined,
+            },
+            additive,
+        );
     }
 }
 
 /// Push each point as its own dot.
-fn dots(geometry: &mut DrawGeometry, points: &[([f32; 2], [f32; 3])], width: f32) {
-    for (p, colour) in points {
-        geometry.segments.push(SegmentInstance {
-            a: *p,
-            b: [p[0] + DOT_LENGTH, p[1]],
-            color: *colour,
-            width,
-            joined: 0,
-        });
+fn dots(geometry: &mut DrawGeometry, points: &[Point], width: f32, additive: bool) {
+    for (p, light) in points {
+        geometry.push_segment(
+            SegmentInstance {
+                a: *p,
+                b: [p[0] + DOT_LENGTH, p[1]],
+                color: light.rgb,
+                width,
+                alpha: light.coverage,
+                joined: 0,
+            },
+            additive,
+        );
     }
 }
 
@@ -237,9 +391,10 @@ fn waveform_figure(
     out: &FrameOutputs,
     waveform: &[f32; WAVE_SAMPLES],
     time: f32,
-    exposure: f32,
+    exposure: Exposure,
     aspect: f32,
 ) {
+    let additive = out.wave_additive >= 0.5;
     let colour = light(
         out.wave_r,
         out.wave_g,
@@ -247,8 +402,9 @@ fn waveform_figure(
         out.wave_a,
         out.wave_brighten >= 0.5,
         exposure,
+        additive,
     );
-    if colour.iter().all(|c| *c <= 0.0001) {
+    if colour.is_dark() {
         return;
     }
     let width = if out.wave_thick >= 0.5 { THICK } else { THIN };
@@ -281,10 +437,10 @@ fn waveform_figure(
     }
     let sample = |i: usize| trace.get(i).copied().unwrap_or(0.0);
 
-    let mut points: [([f32; 2], [f32; 3]); 256] = [([0.0; 2], colour); 256];
+    let mut points: [Point; 256] = [([0.0; 2], colour); 256];
     let mut used = 0usize;
     let mut closed = false;
-    let push = |uv: (f32, f32), points: &mut [([f32; 2], [f32; 3]); 256], used: &mut usize| {
+    let push = |uv: (f32, f32), points: &mut [Point; 256], used: &mut usize| {
         if let Some(slot) = points.get_mut(*used) {
             slot.0 = uv_to_world(uv.0, uv.1, aspect);
             *used += 1;
@@ -346,7 +502,13 @@ fn waveform_figure(
                 let s = sample(i).abs() * 0.15;
                 push((u, cy + s), &mut points, &mut used);
             }
-            polyline(geometry, points.get(..used).unwrap_or(&[]), width, false);
+            polyline(
+                geometry,
+                points.get(..used).unwrap_or(&[]),
+                width,
+                false,
+                additive,
+            );
             used = 0;
             for i in 0..count {
                 let u = i as f32 / (count - 1).max(1) as f32;
@@ -374,9 +536,9 @@ fn waveform_figure(
 
     let built = points.get(..used).unwrap_or(&[]);
     if out.wave_usedots >= 0.5 {
-        dots(geometry, built, width);
+        dots(geometry, built, width, additive);
     } else {
-        polyline(geometry, built, width, closed);
+        polyline(geometry, built, width, closed, additive);
     }
 }
 
@@ -386,7 +548,7 @@ fn custom_waves(
     geometry: &mut DrawGeometry,
     runtime: &mut MilkRuntime,
     waveform: &[f32; WAVE_SAMPLES],
-    exposure: f32,
+    exposure: Exposure,
     aspect: f32,
 ) {
     for index in 0..runtime.wave_count() {
@@ -397,7 +559,7 @@ fn custom_waves(
             continue;
         }
         let count = spec.count.max(2) as usize;
-        let mut points: Vec<([f32; 2], [f32; 3])> = Vec::with_capacity(count);
+        let mut points: Vec<Point> = Vec::with_capacity(count);
         for i in 0..count {
             let t = i as f32 / (count - 1).max(1) as f32;
             // The audio at this point along the wave — MilkDrop's `value1`.
@@ -410,14 +572,22 @@ fn custom_waves(
             };
             points.push((
                 uv_to_world(point.x, point.y, aspect),
-                light(point.r, point.g, point.b, point.a, false, exposure),
+                light(
+                    point.r,
+                    point.g,
+                    point.b,
+                    point.a,
+                    false,
+                    exposure,
+                    spec.additive,
+                ),
             ));
         }
         let width = if spec.thick { THICK } else { THIN };
         if spec.use_dots {
-            dots(geometry, &points, width);
+            dots(geometry, &points, width, spec.additive);
         } else {
-            polyline(geometry, &points, width, false);
+            polyline(geometry, &points, width, false, spec.additive);
         }
     }
 }
@@ -426,7 +596,7 @@ fn custom_waves(
 fn custom_shapes(
     geometry: &mut DrawGeometry,
     runtime: &mut MilkRuntime,
-    exposure: f32,
+    exposure: Exposure,
     aspect: f32,
 ) {
     for index in 0..runtime.shape_count() {
@@ -437,10 +607,22 @@ fn custom_shapes(
             let Some(shape) = runtime.run_shape_instance(index, instance) else {
                 break;
             };
+            // Per **instance**, not per element: `additive` is one of the
+            // registers the shape's own per-frame program may write, so one
+            // shape's copies can blend differently from each other.
+            let additive = shape.additive >= 0.5;
             let sides = (shape.sides.max(3.0) as u32).clamp(3, MAX_SHAPE_SIDES);
             let centre = uv_to_world(shape.x, shape.y, aspect);
-            let inner = light(shape.r, shape.g, shape.b, shape.a, false, exposure);
-            let outer = light(shape.r2, shape.g2, shape.b2, shape.a2, false, exposure);
+            let inner = light(shape.r, shape.g, shape.b, shape.a, false, exposure, additive);
+            let outer = light(
+                shape.r2,
+                shape.g2,
+                shape.b2,
+                shape.a2,
+                false,
+                exposure,
+                additive,
+            );
             // The perimeter, in world space. `rad` is in frame-heights, so the
             // aspect only enters through the centre — which is what keeps a
             // shape round rather than stretched.
@@ -452,23 +634,28 @@ fn custom_shapes(
                 ]
             };
             // A triangle fan, emitted as a plain list so the whole draw layer is
-            // one buffer and one draw.
+            // one buffer, in the blend mode this instance asked for.
             for i in 0..sides {
-                geometry.triangles.push(ShapeVertex {
-                    pos: centre,
-                    color: inner,
-                    alpha: shape.a.clamp(0.0, 1.0),
-                });
-                geometry.triangles.push(ShapeVertex {
-                    pos: point(i),
-                    color: outer,
-                    alpha: shape.a2.clamp(0.0, 1.0),
-                });
-                geometry.triangles.push(ShapeVertex {
-                    pos: point((i + 1) % sides),
-                    color: outer,
-                    alpha: shape.a2.clamp(0.0, 1.0),
-                });
+                geometry.push_triangle(
+                    [
+                        ShapeVertex {
+                            pos: centre,
+                            color: inner.rgb,
+                            alpha: inner.coverage,
+                        },
+                        ShapeVertex {
+                            pos: point(i),
+                            color: outer.rgb,
+                            alpha: outer.coverage,
+                        },
+                        ShapeVertex {
+                            pos: point((i + 1) % sides),
+                            color: outer.rgb,
+                            alpha: outer.coverage,
+                        },
+                    ],
+                    additive,
+                );
             }
             // ...and the outline, through the same line batch as everything else.
             if shape.border_a > 0.0001 {
@@ -479,22 +666,22 @@ fn custom_shapes(
                     shape.border_a,
                     false,
                     exposure,
+                    additive,
                 );
-                let outline: Vec<([f32; 2], [f32; 3])> =
-                    (0..sides).map(|i| (point(i), colour)).collect();
+                let outline: Vec<Point> = (0..sides).map(|i| (point(i), colour)).collect();
                 let width = if shape.thick_outline >= 0.5 || spec.thick {
                     THICK
                 } else {
                     THIN
                 };
-                polyline(geometry, &outline, width, true);
+                polyline(geometry, &outline, width, true, additive);
             }
         }
     }
 }
 
 /// The inner and outer borders: two rectangles inset from the frame edge.
-fn borders(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32, aspect: f32) {
+fn borders(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: Exposure, aspect: f32) {
     for (size, r, g, b, a, inset) in [
         (out.ob_size, out.ob_r, out.ob_g, out.ob_b, out.ob_a, 0.0),
         (
@@ -509,7 +696,7 @@ fn borders(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32, aspec
         if a <= 0.0001 || size <= 0.0 {
             continue;
         }
-        let colour = light(r, g, b, a, false, exposure);
+        let colour = light(r, g, b, a, false, exposure, false);
         // The rectangle sits at the middle of its own band, and the stroke is the
         // band's whole width — which is how a border of `size` reads as a band of
         // `size` rather than as a hairline.
@@ -521,11 +708,11 @@ fn borders(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32, aspec
             (1.0 - edge, 1.0 - edge),
             (edge, 1.0 - edge),
         ];
-        let points: Vec<([f32; 2], [f32; 3])> = corners
+        let points: Vec<Point> = corners
             .iter()
             .map(|(u, v)| (uv_to_world(*u, *v, aspect), colour))
             .collect();
-        polyline(geometry, &points, half * 2.0, true);
+        polyline(geometry, &points, half * 2.0, true, false);
     }
 }
 
@@ -536,7 +723,12 @@ fn borders(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32, aspec
 /// the same `mv_*` vocabulary at the positions the preset names, with `mv_l`
 /// setting the length — the figure a preset asks for, without a second
 /// evaluation of the per-vertex program per grid point.
-fn motion_vectors(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32, aspect: f32) {
+fn motion_vectors(
+    geometry: &mut DrawGeometry,
+    out: &FrameOutputs,
+    exposure: Exposure,
+    aspect: f32,
+) {
     if out.mv_a <= 0.0001 {
         return;
     }
@@ -545,20 +737,24 @@ fn motion_vectors(geometry: &mut DrawGeometry, out: &FrameOutputs, exposure: f32
     if nx == 0 || ny == 0 {
         return;
     }
-    let colour = light(out.mv_r, out.mv_g, out.mv_b, out.mv_a, false, exposure);
+    let colour = light(out.mv_r, out.mv_g, out.mv_b, out.mv_a, false, exposure, false);
     let len = out.mv_l * 0.02;
     for iy in 0..ny {
         for ix in 0..nx {
             let u = (ix as f32 + 0.5 + out.mv_dx) / nx as f32;
             let v = (iy as f32 + 0.5 + out.mv_dy) / ny as f32;
             let a = uv_to_world(u, v, aspect);
-            geometry.segments.push(SegmentInstance {
-                a,
-                b: [a[0] + len * aspect, a[1] + len],
-                color: colour,
-                width: THIN,
-                joined: 0,
-            });
+            geometry.push_segment(
+                SegmentInstance {
+                    a,
+                    b: [a[0] + len * aspect, a[1] + len],
+                    color: colour.rgb,
+                    width: THIN,
+                    alpha: colour.coverage,
+                    joined: 0,
+                },
+                false,
+            );
         }
     }
 }

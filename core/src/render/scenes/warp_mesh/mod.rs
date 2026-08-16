@@ -706,6 +706,9 @@ struct Resources {
     lines: lines::LineRenderer,
     /// The filled-shape pipeline and its buffers.
     shape_pipeline: wgpu::RenderPipeline,
+    /// The same pipeline compositing **over** rather than adding, for a shape
+    /// instance whose `additive` register is off — see `draw`'s module docs.
+    shape_over_pipeline: wgpu::RenderPipeline,
     shape_vertices: wgpu::Buffer,
     shape_uniform: wgpu::Buffer,
     shape_bind_group: wgpu::BindGroup,
@@ -1232,7 +1235,11 @@ impl Resources {
         );
 
         // --- the draw layer (Plan 0100 Phase 4) ---
-        let lines = lines::LineRenderer::new(device, surface_format, max_segments, "warp-mesh");
+        // `new_split`, not `new`: this is the one scene whose batch carries both
+        // blend modes (see `draw`'s module docs), and the only one that should
+        // pay for the second pipeline.
+        let lines =
+            lines::LineRenderer::new_split(device, surface_format, max_segments, "warp-mesh");
         let shape_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("warp-mesh-shape-shader"),
             source: wgpu::ShaderSource::Wgsl(SHAPE_SHADER.into()),
@@ -1276,41 +1283,51 @@ impl Resources {
                 bind_group_layouts: &[Some(&shape_layout)],
                 immediate_size: 0,
             });
-        let shape_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("warp-mesh-shape-pipeline"),
-            layout: Some(&shape_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shape_shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<draw::ShapeVertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32x3,
-                        2 => Float32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shape_shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: FIELD_FORMAT,
-                    // The shared draw seam (ADR-0056), same as the line batch
-                    // beside it.
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // Two pipelines differing in exactly one field, from one closure — the
+        // same shape the line renderer's pair takes, and for the same reason: a
+        // MilkDrop shape chooses its blend per instance (`additive`), and reading
+        // both as additive is what saturated the frame. They share this layout
+        // and this bind group, so ADR-0058 has nothing to separate.
+        let shape_pipeline_of = |blend: wgpu::BlendState, suffix: &str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(&format!("warp-mesh-shape-pipeline{suffix}")),
+                layout: Some(&shape_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shape_shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<draw::ShapeVertex>() as u64,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x2,
+                            1 => Float32x3,
+                            2 => Float32,
+                        ],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shape_shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: FIELD_FORMAT,
+                        blend: Some(blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        // The shared draw seam (ADR-0056), same as the line batch beside it.
+        let shape_pipeline = shape_pipeline_of(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE, "");
+        // ...and premultiplied OVER, for an instance whose source blend replaces.
+        let shape_over_pipeline =
+            shape_pipeline_of(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over");
         let shape_capacity = MAX_SHAPE_VERTICES;
         let shape_vertices = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("warp-mesh-shape-vertices"),
@@ -1355,6 +1372,7 @@ impl Resources {
             lut_texture_b,
             lines,
             shape_pipeline,
+            shape_over_pipeline,
             shape_vertices,
             shape_uniform,
             shape_bind_group,
@@ -1838,17 +1856,29 @@ impl Scene for WarpMeshScene {
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
-                pass.set_pipeline(&res.shape_pipeline);
+                // Two draws over one buffer, split at the partition the draw
+                // layer built: additive instances first, then the over-blended
+                // ones on top of them. See `draw`'s module docs for why both
+                // exist.
+                let split = self.geometry.triangles_additive.min(count) as u32;
                 pass.set_bind_group(0, &res.shape_bind_group, &[]);
                 pass.set_vertex_buffer(0, res.shape_vertices.slice(..));
-                pass.draw(0..count as u32, 0..1);
+                if split > 0 {
+                    pass.set_pipeline(&res.shape_pipeline);
+                    pass.draw(0..split, 0..1);
+                }
+                if count as u32 > split {
+                    pass.set_pipeline(&res.shape_over_pipeline);
+                    pass.draw(split..count as u32, 0..1);
+                }
             }
         }
         if !self.geometry.segments.is_empty() {
             // One batch for the whole layer — the waveform, every custom wave,
             // every shape outline, both borders and the motion grid — because
-            // colour and width are per segment and only `glow` is per draw.
-            res.lines.draw(
+            // colour and width are per segment and only `glow` is per draw. The
+            // split is the same partition the shapes above use.
+            res.lines.draw_split(
                 queue,
                 encoder,
                 res.field.write_view(),
@@ -1856,6 +1886,7 @@ impl Scene for WarpMeshScene {
                 1.0,
                 lines::ViewTransform::default(),
                 &self.geometry.segments,
+                self.geometry.segments_additive,
             );
         }
 

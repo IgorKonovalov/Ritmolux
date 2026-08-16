@@ -116,6 +116,7 @@ fn seg(a: [f32; 2], b: [f32; 2], joined: u32) -> SegmentInstance {
         b,
         color: [1.0, 1.0, 1.0],
         width: 0.01,
+        alpha: 1.0,
         joined,
     }
 }

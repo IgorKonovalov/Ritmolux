@@ -153,9 +153,11 @@ outputs! {
     wave_usedots: "wave_usedots" = 0.0, Plain;
     /// Past `0.5`, the trace is drawn thick.
     wave_thick: "wave_thick" = 0.0, Plain;
-    /// Past `0.5`, the trace adds rather than blends. Always true here — the
-    /// draw seam is additive by construction (ADR-0056) — and read only so the
-    /// converter does not have to warn about it.
+    /// Past `0.5`, the trace **adds** rather than blends, and this engine honours
+    /// the difference. The seam itself is additive by construction (ADR-0056), so
+    /// the alpha-blended case is matched at its steady state instead — see
+    /// [`warp_mesh::draw::Exposure`](crate::render::scenes::warp_mesh::draw::Exposure),
+    /// which is where reading both cases as additive saturated the frame.
     wave_additive: "wave_additive" = 0.0, Plain;
     /// Past `0.5`, the trace's colour is normalized to its brightest channel.
     wave_brighten: "wave_brighten" = 1.0, Plain;
@@ -259,6 +261,10 @@ outputs! {
     thick_outline: "thickoutline" = 0.0, Plain;
     /// How many sides this instance has, overriding the structural count.
     sides: "sides" = 4.0, Plain;
+    /// Past `0.5`, this instance **adds** rather than blends. Per instance rather
+    /// than per element, because a shape's per-frame program may write it — see
+    /// [`warp_mesh::draw::Exposure`](crate::render::scenes::warp_mesh::draw::Exposure).
+    additive: "additive" = 0.0, Plain;
 }
 
 /// One raw output as this engine's vocabulary.

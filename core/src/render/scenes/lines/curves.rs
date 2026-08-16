@@ -108,6 +108,7 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
             b: cur,
             color: p.color,
             width: p.width,
+            alpha: 1.0,
             joined,
         });
         prev = cur;

@@ -643,7 +643,48 @@ fn emit(
         }
         let _ = writeln!(out, "{section} = \"\"\"\n{}\"\"\"\n", program.to_assembly());
     }
+    emit_elements(&mut out, "waves", &bundle.waves);
+    emit_elements(&mut out, "shapes", &bundle.shapes);
     out
+}
+
+/// The `[[milk.waves]]` / `[[milk.shapes]]` array-of-tables a bundle's custom
+/// elements load back from.
+///
+/// **Emitted after the three `[milk]` keys and never before them**: TOML array-of
+/// tables close the table they are nested in, so a `per_frame` written after the
+/// first `[[milk.waves]]` would parse as a key of *that* wave.
+fn emit_elements(out: &mut String, which: &str, elements: &[MilkElement]) {
+    for element in elements {
+        let _ = writeln!(out, "[[milk.{which}]]");
+        let _ = writeln!(out, "count = {}", element.count);
+        if element.instances != 1 {
+            let _ = writeln!(out, "instances = {}", element.instances);
+        }
+        if element.use_dots {
+            let _ = writeln!(out, "use_dots = true");
+        }
+        if element.thick {
+            let _ = writeln!(out, "thick = true");
+        }
+        if element.additive {
+            let _ = writeln!(out, "additive = true");
+        }
+        for (key, program) in [
+            ("init", &element.init),
+            ("per_frame", &element.per_frame),
+            ("per_point", &element.per_point),
+        ] {
+            // An element with no per-point code — every shape — writes no key
+            // rather than an empty string, which is what the loader's `Option`
+            // already means.
+            if program.register_count() == 0 && program.to_assembly().trim().is_empty() {
+                continue;
+            }
+            let _ = writeln!(out, "{key} = \"\"\"\n{}\"\"\"", program.to_assembly());
+        }
+        let _ = writeln!(out);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -720,6 +761,7 @@ fn build_elements(
             1,
             file.number(&format!("wavecode_{n}_busedots"), 0.0) >= 0.5,
             file.number(&format!("wavecode_{n}_bdrawthick"), 0.0) >= 0.5,
+            file.number(&format!("wavecode_{n}_badditive"), 0.0) >= 0.5,
         )?;
         if file.number(&format!("wavecode_{n}_bspectrum"), 0.0) >= 0.5 {
             warnings.push(Warning {
@@ -749,6 +791,10 @@ fn build_elements(
             file.number(&format!("shapecode_{n}_num_inst"), 1.0) as u32,
             false,
             file.number(&format!("shapecode_{n}_thickoutline"), 0.0) >= 0.5,
+            // A shape's own `additive` is seeded into its register file by
+            // `SHAPE_KEYS` and may be rewritten per instance, so the element-level
+            // flag is unused for shapes — see `ElementSpec::additive`.
+            false,
         )?;
         if file.number(&format!("shapecode_{n}_textured"), 0.0) >= 0.5 {
             warnings.push(Warning {
@@ -795,6 +841,7 @@ fn compile_element(
     instances: u32,
     use_dots: bool,
     thick: bool,
+    additive: bool,
 ) -> Result<MilkElement, ConvertError> {
     let per_frame = format!("{prologue}\n{};", file.block(&format!("{block}_per_frame")));
     let per_point = file.block(&format!("{block}_per_point")).to_string();
@@ -808,6 +855,7 @@ fn compile_element(
         kind,
         use_dots,
         thick,
+        additive,
     })
 }
 

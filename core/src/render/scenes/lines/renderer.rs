@@ -42,6 +42,21 @@ pub struct SegmentInstance {
     pub color: [f32; 3],
     /// Half-width in NDC-y units.
     pub width: f32,
+    /// **How much of its own footprint this stroke occupies**, on top of the
+    /// across-the-stroke falloff — the fragment's alpha is `falloff * alpha`.
+    ///
+    /// `1.0` for every producer that draws through the additive seam, and that is
+    /// the value to pass unless you know otherwise: ADR-0056's rule is that a
+    /// dimmed stroke still covers its own footprint, so brightness belongs in
+    /// [`color`](Self::color) and never here. Every line scene in this crate
+    /// passes `1.0`, which makes the fragment exactly what it was before this
+    /// field existed.
+    ///
+    /// What it is for is [`LineRenderer::draw_split`]'s second range, where the
+    /// stroke is composited **over** rather than added and the blend needs the
+    /// producer's real coverage: a MilkDrop waveform at `wave_a = 0.1` must
+    /// replace a tenth of what is under it, not all of it (Plan 0100 Phase 4).
+    pub alpha: f32,
     /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
     ///
     /// Connectivity is the **producer's** to declare: only it knows whether an
@@ -79,6 +94,7 @@ struct VsOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) side: f32,
     @location(1) color: vec3<f32>,
+    @location(2) alpha: f32,
 }
 
 @vertex
@@ -88,6 +104,7 @@ fn vs_main(
     @location(1) b: vec2<f32>,
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
+    @location(5) alpha: f32,
     @location(4) joined: u32,
 ) -> VsOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
@@ -138,6 +155,7 @@ fn vs_main(
     out.pos = vec4<f32>(pos, 0.0, 1.0);
     out.side = c.y;
     out.color = color;
+    out.alpha = alpha;
     return out;
 }
 
@@ -147,12 +165,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let d = abs(in.side);
     let falloff = max(0.0, 1.0 - d);
     let g = falloff * falloff;
-    // Premultiplied: colour AND alpha carry the same coverage `g`, so the two
-    // long edges of the quad - where the across-the-stroke falloff reaches zero
-    // - write nothing at all rather than opaque black (ADR-0056). Note the glow
-    // multiplier scales the LIGHT, not the coverage: a dimmed stroke still
-    // covers its own footprint. See `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.
-    return vec4<f32>(in.color * g * u.v.y, g);
+    // Premultiplied: colour AND alpha carry the same coverage `g * alpha`, so
+    // the two long edges of the quad - where the across-the-stroke falloff
+    // reaches zero - write nothing at all rather than opaque black (ADR-0056).
+    // Note the glow multiplier scales the LIGHT, not the coverage: a dimmed
+    // stroke still covers its own footprint. See
+    // `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.
+    //
+    // `alpha` is 1.0 for every additive producer, so this is byte-identical to
+    // the pre-Plan-0100 fragment for all of them; it is the OVER pipeline's
+    // second range that passes anything else. The colour is NOT divided by it -
+    // an over-blended producer arrives premultiplied already.
+    return vec4<f32>(in.color * g * u.v.y, g * in.alpha);
 }
 "#;
 
@@ -348,6 +372,20 @@ fn measure_extent(
 /// fixed-capacity instance buffer, and the aspect/glow uniform.
 pub struct LineRenderer {
     pipeline: wgpu::RenderPipeline,
+    /// The same pipeline with the light composited **over** rather than added —
+    /// see [`LineRenderer::draw_split`]. It shares the shader, the layout and the
+    /// bind group with [`pipeline`](Self::pipeline), so ADR-0058 has nothing to
+    /// separate: there is one layout, not two that happen to match.
+    ///
+    /// **`None` unless the scene asked for it** ([`LineRenderer::new_split`]),
+    /// and that is not a micro-optimization. Building a pipeline the scene never
+    /// binds still allocates on the device, and on the WARP software adapter a
+    /// changed allocation order changes what a later pass resolves to — the
+    /// hazard `core/tests/composite.rs`'s header records and the golden suite
+    /// captures on. Building this for the nine line scenes that do not use it
+    /// moved five composite baselines while changing nothing a driver would
+    /// render differently.
+    over_pipeline: Option<wgpu::RenderPipeline>,
     instances: wgpu::Buffer,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
@@ -366,6 +404,30 @@ impl LineRenderer {
         surface_format: wgpu::TextureFormat,
         capacity: usize,
         label: &str,
+    ) -> Self {
+        Self::build(device, surface_format, capacity, label, false)
+    }
+
+    /// [`new`](Self::new), plus the second pipeline
+    /// [`draw_split`](Self::draw_split) needs. Only a scene that actually splits
+    /// its batch by blend mode should call this — see
+    /// [`over_pipeline`](Self::over_pipeline) for why building it unconditionally
+    /// is not free.
+    pub fn new_split(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        label: &str,
+    ) -> Self {
+        Self::build(device, surface_format, capacity, label, true)
+    }
+
+    fn build(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        label: &str,
+        split: bool,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(&format!("{label}-shader")),
@@ -409,47 +471,61 @@ impl LineRenderer {
             bind_group_layouts: &[Some(&bind_layout)],
             immediate_size: 0,
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(&format!("{label}-pipeline")),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<SegmentInstance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32x2,
-                        2 => Float32x3,
-                        3 => Float32,
-                        4 => Uint32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // Additive light, saturating coverage (ADR-0056) — the same
-                    // constant the swarm's sprite pipeline takes, so the two
-                    // draw seams cannot drift apart.
-                    blend: Some(crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // The two pipelines differ in exactly one field — the blend state — so
+        // they are built from one closure. Anything else that diverges between
+        // them would be a bug that renders as a difference between two ranges of
+        // the same batch, which is close to unreadable in a capture.
+        let make = |blend: wgpu::BlendState, suffix: &str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(&format!("{label}-pipeline{suffix}")),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<SegmentInstance>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x2,
+                            1 => Float32x2,
+                            2 => Float32x3,
+                            3 => Float32,
+                            4 => Uint32,
+                            5 => Float32,
+                        ],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: Some(blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        // Additive light, saturating coverage (ADR-0056) — the same constant the
+        // swarm's sprite pipeline takes, so the two draw seams cannot drift
+        // apart. This is what every line scene draws through.
+        let pipeline = make(crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE, "");
+        // Premultiplied OVER, for a producer whose source blend *replaces* rather
+        // than accumulates — see `draw_split`. The fragment is premultiplied
+        // either way, which is why one shader serves both.
+        let over_pipeline =
+            split.then(|| make(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over"));
 
         Self {
             pipeline,
+            over_pipeline,
             instances,
             uniforms,
             bind_group,
@@ -483,6 +559,49 @@ impl LineRenderer {
         glow: f32,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
+    ) {
+        self.draw_split(
+            queue,
+            encoder,
+            view,
+            aspect,
+            glow,
+            xform,
+            segments,
+            segments.len(),
+        );
+    }
+
+    /// [`draw`](Self::draw), with the batch split by blend mode: the first
+    /// `n_additive` segments are added (ADR-0056's seam, what every line scene
+    /// uses), and the rest are composited **over** using each segment's own
+    /// [`alpha`](SegmentInstance::alpha).
+    ///
+    /// # Why a split range rather than two calls
+    ///
+    /// One instance buffer, one upload, one render pass, two `draw` calls that
+    /// differ only in the pipeline bound. Two calls would mean two passes over
+    /// the same attachment and a second buffer, and the *order* would stop being
+    /// expressible: an over-blended stroke has to land on top of the additive
+    /// light it covers, which a single ordered batch gives for free.
+    ///
+    /// The caller partitions — it is the only thing that knows which producer
+    /// each segment came from. Passing `n_additive >= segments.len()` is exactly
+    /// [`draw`](Self::draw).
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw` — this is that signature plus the partition index"
+    )]
+    pub fn draw_split(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+        glow: f32,
+        xform: super::ViewTransform,
+        segments: &[SegmentInstance],
+        n_additive: usize,
     ) {
         let count = segments.len().min(self.capacity);
         let drawn = segments.get(..count).unwrap_or(&[]);
@@ -532,10 +651,23 @@ impl LineRenderer {
         if drawn.is_empty() {
             return; // nothing to stroke; the backdrop shows through
         }
-        pass.set_pipeline(&self.pipeline);
+        // Clamped to what actually reached the buffer: `n_additive` counts into
+        // `segments`, which may be longer than `drawn`.
+        let split = n_additive.min(drawn.len()) as u32;
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.instances.slice(..));
-        pass.draw(0..6, 0..drawn.len() as u32);
+        if split > 0 {
+            pass.set_pipeline(&self.pipeline);
+            pass.draw(0..6, 0..split);
+        }
+        if (drawn.len() as u32) > split {
+            // Falls back to the additive pipeline when the scene did not ask for
+            // the second one. That is the wrong blend rather than a panic, and it
+            // is unreachable in practice: the only caller that passes a partition
+            // is the one that built with `new_split`.
+            pass.set_pipeline(self.over_pipeline.as_ref().unwrap_or(&self.pipeline));
+            pass.draw(0..6, split..drawn.len() as u32);
+        }
     }
 }
 
