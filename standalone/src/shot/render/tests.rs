@@ -1,0 +1,304 @@
+//! Unit tests for the offline render mode's pure halves (Plan 0101).
+//!
+//! The two clocks and the wire format are exactly the parts that can be wrong in
+//! a way nobody notices: a frame-count off-by-one is a picture that ends a
+//! sixtieth of a second before its soundtrack, and a mis-declared colour range is
+//! a file that is washed out against the app for a reason that reads as an engine
+//! bug. The GPU half is asserted from outside, in `standalone/tests/`.
+
+use super::*;
+
+fn stereo(rate: u32) -> AudioFormat {
+    AudioFormat {
+        sample_rate: rate,
+        channels: 2,
+    }
+}
+
+/// Interleaved sample count for `seconds` of `format`.
+fn samples_for(seconds: f32, format: AudioFormat) -> usize {
+    (seconds * format.sample_rate as f32) as usize * format.channels as usize
+}
+
+// ---------------------------------------------------------------------------
+// --fps
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fps_parses_a_whole_rate_and_an_exact_rational() {
+    assert_eq!(parse_fps("60"), Ok(Fps { num: 60, den: 1 }));
+    assert_eq!(parse_fps("24"), Ok(Fps { num: 24, den: 1 }));
+    assert_eq!(
+        parse_fps("30000/1001"),
+        Ok(Fps {
+            num: 30_000,
+            den: 1_001
+        })
+    );
+    assert_eq!(parse_fps(" 30 / 1 "), Ok(Fps { num: 30, den: 1 }));
+
+    // A decimal is rejected rather than approximated: 29.97 is 30000/1001, and
+    // 2997/100 drifts a frame against the soundtrack every few minutes.
+    let err = parse_fps("29.97").expect_err("a decimal rate");
+    assert!(
+        err.contains("30000/1001"),
+        "the error names the form: {err}"
+    );
+    assert!(parse_fps("0").is_err(), "zero frames a second");
+    assert!(parse_fps("60/0").is_err(), "zero denominator");
+    assert!(parse_fps("-30").is_err(), "negative");
+    assert!(parse_fps("fast").is_err(), "not a number");
+}
+
+/// The step is the rate, and at 60 fps it is bit-for-bit the step every other
+/// capture path in this repo takes — which is the *only* reason a rendered frame
+/// and a `--frame-at` PNG can be compared byte for byte at all.
+#[test]
+fn the_step_at_sixty_is_the_capture_paths_own_step() {
+    assert_eq!(DEFAULT_FPS.dt(), 1.0 / 60.0);
+    assert_eq!(Fps { num: 30, den: 1 }.dt(), 1.0 / 30.0);
+    // The rational rate is not the same number as its decimal, which is the
+    // whole reason `Fps` is not an `f32`.
+    let ntsc = Fps {
+        num: 30_000,
+        den: 1_001,
+    };
+    assert!(ntsc.dt() > 1.0 / 30.0, "29.97 fps steps slightly longer");
+    assert_eq!(ntsc.as_header_field(), "30000:1001");
+}
+
+// ---------------------------------------------------------------------------
+// The two clocks
+// ---------------------------------------------------------------------------
+
+/// `ceil(clip_seconds x fps)`, which is the done-when Phase 1 is asserted on.
+#[test]
+fn the_frame_count_is_the_ceiling_of_the_clips_length() {
+    let format = stereo(48_000);
+    // Four seconds, the length `--signal` synthesizes.
+    let four = samples_for(4.0, format);
+    assert_eq!(frame_count(four, format, DEFAULT_FPS), Ok(240));
+    assert_eq!(frame_count(four, format, Fps { num: 30, den: 1 }), Ok(120));
+    assert_eq!(frame_count(four, format, Fps { num: 24, den: 1 }), Ok(96));
+
+    // A clip that does not divide evenly gets its trailing partial frame, so the
+    // picture is never shorter than the audio it is muxed against.
+    let ragged = samples_for(4.0, format) + format.channels as usize;
+    assert_eq!(
+        frame_count(ragged, format, DEFAULT_FPS),
+        Ok(241),
+        "one sample past four seconds still needs a 241st frame"
+    );
+
+    // Mono halves the interleaved samples per audio frame, so the same count is
+    // twice the clip.
+    let mono = AudioFormat {
+        sample_rate: 48_000,
+        channels: 1,
+    };
+    assert_eq!(frame_count(four, mono, DEFAULT_FPS), Ok(480));
+
+    // A four-minute track at 1080p/60 — the length Phase 4 is asserted on.
+    assert_eq!(
+        frame_count(samples_for(240.0, format), format, DEFAULT_FPS),
+        Ok(14_400)
+    );
+
+    // Nothing to render is an error, not a zero-frame stream nobody can play.
+    let err = frame_count(0, format, DEFAULT_FPS).expect_err("an empty clip");
+    assert!(err.contains("shorter than one frame"), "got {err}");
+}
+
+/// The hop clock and the frame clock are different clocks, and this is the map.
+///
+/// At 48 kHz a hop is 512 samples, so hops arrive at 93.75 Hz against a 60 Hz
+/// frame clock: most frames take one new hop and some take two. Rendering one
+/// hop per frame — the mistake this function exists to prevent — would run the
+/// picture at 64% speed against its own soundtrack.
+#[test]
+fn the_hop_clock_and_the_frame_clock_advance_independently() {
+    let format = stereo(48_000);
+
+    // 93.75 hops a second against 60 frames a second: by the end of frame 0
+    // (1/60 s) one hop has completed, and by the end of frame 59 (one second)
+    // ninety-three have.
+    assert_eq!(hops_through(0, DEFAULT_FPS, format), 1);
+    assert_eq!(hops_through(59, DEFAULT_FPS, format), 93);
+    assert_eq!(hops_through(119, DEFAULT_FPS, format), 187);
+
+    // Some frames take two hops and some take one — that unevenness *is* the
+    // two clocks, and a schedule where every gap were 1 would be the bug.
+    let steps: Vec<usize> = (1..60)
+        .map(|i| hops_through(i, DEFAULT_FPS, format) - hops_through(i - 1, DEFAULT_FPS, format))
+        .collect();
+    assert!(steps.contains(&1) && steps.contains(&2), "{steps:?}");
+    assert!(
+        steps.iter().all(|s| *s <= 2),
+        "no frame skips a hop: {steps:?}"
+    );
+
+    // A frame rate *above* the hop rate leaves frames with no new hop at all,
+    // which the loop resolves by repeating the last published frame.
+    let fast = Fps { num: 240, den: 1 };
+    let repeats = (1..12)
+        .filter(|i| hops_through(*i, fast, format) == hops_through(i - 1, fast, format))
+        .count();
+    assert!(repeats > 0, "240 fps must outrun a 93.75 Hz hop clock");
+
+    // 30,720 Hz is the one rate where the two clocks coincide — 60 hops a
+    // second — and it is what the tap-identity fixture is built at.
+    let locked = stereo(60 * HOP_SIZE as u32);
+    for frame in 0..120 {
+        assert_eq!(
+            hops_through(frame, DEFAULT_FPS, locked),
+            frame as usize + 1,
+            "at 60 x HOP_SIZE Hz each frame takes exactly one hop"
+        );
+    }
+}
+
+/// The schedule is monotone and never runs ahead of the audio — a hop cannot be
+/// consumed before the samples in it have played.
+#[test]
+fn the_hop_schedule_never_runs_ahead_of_the_clip() {
+    let format = stereo(44_100);
+    let fps = Fps { num: 25, den: 1 };
+    let mut previous = 0;
+    for frame in 0..500u32 {
+        let due = hops_through(frame, fps, format);
+        assert!(due >= previous, "the schedule went backwards at {frame}");
+        // Every hop counted has genuinely completed: its last sample plays at or
+        // before the end of this frame.
+        let hop_end_samples = due as u64 * HOP_SIZE as u64;
+        let frame_end_samples =
+            (u64::from(frame) + 1) * u64::from(fps.den) * u64::from(format.sample_rate)
+                / u64::from(fps.num);
+        assert!(
+            hop_end_samples <= frame_end_samples,
+            "frame {frame} claimed hop {due}, which has not played yet"
+        );
+        previous = due;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The wire format
+// ---------------------------------------------------------------------------
+
+/// The header carries everything a consumer needs to decode the stream without
+/// being told anything on the command line — the self-describing requirement
+/// ADR-0114 exists to state.
+#[test]
+fn the_stream_header_declares_its_own_geometry_rate_and_range() {
+    let header = y4m_header(1920, 1080, DEFAULT_FPS);
+    assert_eq!(
+        header, "YUV4MPEG2 W1920 H1080 F60:1 Ip A1:1 C444 XCOLORRANGE=FULL\n",
+        "the header is a wire format, so it is asserted verbatim"
+    );
+    // The magic and the terminator are what make it parseable at all.
+    assert!(header.starts_with("YUV4MPEG2 "));
+    assert!(header.ends_with('\n'));
+
+    // The rate is the rational, not a rounded decimal.
+    let ntsc = y4m_header(
+        1280,
+        720,
+        Fps {
+            num: 30_000,
+            den: 1_001,
+        },
+    );
+    assert!(ntsc.contains(" F30000:1001 "), "got {ntsc}");
+    assert!(!ntsc.contains("29.97"));
+
+    // Full range is the half most likely to ship wrong: without it every player
+    // expands 16-235 to 0-255 and the file is visibly darker than the app.
+    assert!(header.contains("XCOLORRANGE=FULL"));
+    // 4:4:4 — chroma is not subsampled, so the conversion loses only rounding.
+    assert!(header.contains(" C444 "));
+}
+
+/// The colour conversion is near-identity, and "near" is measured rather than
+/// asserted by hand-wave (Plan 0101 Phase 3).
+///
+/// An 8-bit RGB->YUV->RGB round trip cannot be exact — that is precisely why the
+/// tap-placement assertion is made on the RGB frame and not on the wire bytes —
+/// but it must be tight enough that no visible shift is hiding in it.
+#[test]
+fn the_colour_conversion_round_trips_to_within_a_level() {
+    /// Largest per-channel error over the swept colours. Two levels out of 256
+    /// is under 1%, and is what an exact-in-float, rounded-twice conversion
+    /// costs; anything larger would be a wrong matrix rather than rounding.
+    const TOLERANCE: i32 = 2;
+
+    let mut worst = 0i32;
+    // A coarse sweep of the whole cube plus the corners and the greys, which is
+    // where a swapped coefficient shows up first.
+    for r in (0..=255u16).step_by(17) {
+        for g in (0..=255u16).step_by(17) {
+            for b in (0..=255u16).step_by(17) {
+                let (r, g, b) = (r as u8, g as u8, b as u8);
+                let (y, u, v) = rgb_to_yuv(r, g, b);
+                let (r2, g2, b2) = yuv_to_rgb(y, u, v);
+                for (before, after) in [(r, r2), (g, g2), (b, b2)] {
+                    let error = (i32::from(before) - i32::from(after)).abs();
+                    worst = worst.max(error);
+                    assert!(
+                        error <= TOLERANCE,
+                        "({r},{g},{b}) round-tripped to ({r2},{g2},{b2}) — \
+                         channel error {error} past {TOLERANCE}"
+                    );
+                }
+            }
+        }
+    }
+    eprintln!("worst round-trip channel error: {worst}");
+
+    // Black and white are exact, and their chroma is neutral: a full-range
+    // conversion must not clip either end, which is the studio-swing bug.
+    assert_eq!(rgb_to_yuv(0, 0, 0), (0, 128, 128));
+    assert_eq!(rgb_to_yuv(255, 255, 255), (255, 128, 128));
+    // ...and grey stays grey rather than acquiring a cast.
+    assert_eq!(rgb_to_yuv(128, 128, 128), (128, 128, 128));
+    // A primary lands where BT.709 says it does — luma weights, not BT.601's.
+    let (y, _, _) = rgb_to_yuv(0, 255, 0);
+    assert_eq!(y, 182, "0.7152 x 255 = 182.4; BT.601 would read 150");
+}
+
+/// A written frame is the marker plus three full-resolution planes, in the order
+/// the header's `C444` promises — asserted on bytes, since a plane-order slip
+/// swaps the red and blue of every exported video.
+#[test]
+fn a_written_frame_is_a_marker_and_three_planes() {
+    // Two pixels: pure red then pure blue.
+    let img = CaptureImage {
+        width: 2,
+        height: 1,
+        rgba: vec![255, 0, 0, 255, 0, 0, 255, 255],
+    };
+    let mut planes = Vec::new();
+    let mut out: Vec<u8> = Vec::new();
+    write_y4m_frame(&img, &mut planes, &mut out).expect("a Vec never fails to write");
+
+    assert_eq!(&out[..6], b"FRAME\n");
+    let body = &out[6..];
+    assert_eq!(body.len(), 2 * 3, "one Y, one Cb and one Cr per pixel");
+
+    let (red, blue) = (rgb_to_yuv(255, 0, 0), rgb_to_yuv(0, 0, 255));
+    assert_eq!(&body[0..2], &[red.0, blue.0], "the luma plane comes first");
+    assert_eq!(&body[2..4], &[red.1, blue.1], "then Cb for both pixels");
+    assert_eq!(&body[4..6], &[red.2, blue.2], "then Cr");
+
+    // Planar, not interleaved: red's three samples must not be adjacent.
+    assert_ne!(&body[0..3], &[red.0, red.1, red.2], "packed, not planar");
+
+    // The scratch buffer is reused across frames without growing.
+    let before = planes.capacity();
+    write_y4m_frame(&img, &mut planes, &mut out).expect("second frame");
+    assert_eq!(planes.len(), 6);
+    assert_eq!(
+        planes.capacity(),
+        before,
+        "a long render reallocates nothing"
+    );
+}

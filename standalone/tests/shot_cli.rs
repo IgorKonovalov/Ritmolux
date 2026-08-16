@@ -953,6 +953,196 @@ fn a_horizon_rejects_a_clip_as_its_stimulus() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The offline render mode (Plan 0101 Phase 1, ADR-0114)
+// ---------------------------------------------------------------------------
+
+/// Wrap interleaved 16-bit samples in a canonical 44-byte-header WAV.
+///
+/// `--render` takes a **file**, and this repo commits no audio (see
+/// `assets/test/`), so every render fixture is written by the test that needs
+/// it. Same header layout `shot::wav`'s own tests build, for the same reason:
+/// the real parser has to accept it.
+fn wav_bytes(channels: u16, sample_rate: u32, samples: &[i16]) -> Vec<u8> {
+    let block_align = channels * 2;
+    let data_len = (samples.len() * 2) as u32;
+    let mut b = Vec::new();
+    b.extend_from_slice(b"RIFF");
+    b.extend_from_slice(&(36 + data_len).to_le_bytes());
+    b.extend_from_slice(b"WAVE");
+    b.extend_from_slice(b"fmt ");
+    b.extend_from_slice(&16u32.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes()); // uncompressed PCM
+    b.extend_from_slice(&channels.to_le_bytes());
+    b.extend_from_slice(&sample_rate.to_le_bytes());
+    b.extend_from_slice(&(sample_rate * block_align as u32).to_le_bytes());
+    b.extend_from_slice(&block_align.to_le_bytes());
+    b.extend_from_slice(&16u16.to_le_bytes());
+    b.extend_from_slice(b"data");
+    b.extend_from_slice(&data_len.to_le_bytes());
+    for s in samples {
+        b.extend_from_slice(&s.to_le_bytes());
+    }
+    b
+}
+
+/// A `secs`-long stereo clip with real dynamics, written to the scratch tree.
+///
+/// `dynamic_groove` rather than a steady tone: a render whose analysis never
+/// moves would pass a determinism check while proving nothing about the two
+/// clocks, since every frame would carry the same stimulus either way.
+fn render_clip(name: &str, sample_rate: u32, secs: f32) -> PathBuf {
+    let format = lmv_core::audio::AudioFormat {
+        sample_rate,
+        channels: 2,
+    };
+    let pcm = lmv_core::signal::dynamic_groove(110.0, secs, format);
+    let samples: Vec<i16> = pcm
+        .iter()
+        .map(|s| (s.clamp(-1.0, 1.0) * 32_767.0) as i16)
+        .collect();
+    let path = scratch("render").join(name);
+    std::fs::write(&path, wav_bytes(2, sample_rate, &samples))
+        .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    path
+}
+
+/// Frames in a Y4M stream: one `FRAME\n` marker each.
+///
+/// Counted by scanning for the marker rather than by dividing the byte length,
+/// because a truncated final plane would divide out to the right answer and is
+/// exactly the failure worth catching.
+fn y4m_frame_count(stream: &[u8]) -> usize {
+    stream.windows(6).filter(|w| *w == b"FRAME\n").count()
+}
+
+/// **Phase 1's done-when, both halves.** Two runs of the same command produce
+/// **byte-identical** streams, and the stream holds `ceil(clip_seconds x fps)`
+/// frames.
+///
+/// Determinism is the property this whole feature rests on — it is what
+/// separates an offline render from a screen capture, and the reason the feature
+/// is cheap here and impossible for every live visualizer — so it is asserted
+/// rather than inferred from the fact that `dt` is injected.
+#[test]
+fn a_render_is_byte_identical_across_runs_and_has_the_frame_count_its_length_implies() {
+    const SECS: f32 = 2.0;
+    const FPS: u32 = 30;
+    let clip = render_clip("clip.wav", 48_000, SECS);
+    let clip_arg = clip.to_string_lossy().into_owned();
+
+    let render = || {
+        run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--render",
+            &clip_arg,
+            "--fps",
+            "30",
+            "--size",
+            "32x24",
+        ])
+    };
+
+    let first = render();
+    if skipped_for_no_adapter(&first) {
+        return;
+    }
+    assert!(
+        first.status.success(),
+        "--render failed\nstderr: {}",
+        stderr(&first)
+    );
+
+    // Self-describing: the geometry, rate and colour range are on the wire, so a
+    // consumer needs nothing from the command line (ADR-0114).
+    let header = b"YUV4MPEG2 W32 H24 F30:1 Ip A1:1 C444 XCOLORRANGE=FULL\n";
+    assert!(
+        first.stdout.starts_with(header),
+        "the stream does not open with the declared header; first 64 bytes: {:?}",
+        &first.stdout[..first.stdout.len().min(64)]
+    );
+
+    // ceil(2.0 s x 30 fps) = 60.
+    let expected = (SECS * FPS as f32).ceil() as usize;
+    assert_eq!(
+        y4m_frame_count(&first.stdout),
+        expected,
+        "the stream does not hold ceil(clip_seconds x fps) frames"
+    );
+    // ...and the payload is the exact size that frame count implies at C444,
+    // so a short final plane cannot hide behind a right-looking marker count.
+    assert_eq!(
+        first.stdout.len(),
+        header.len() + expected * (b"FRAME\n".len() + 32 * 24 * 3),
+        "the stream is not header + N complete 4:4:4 frames"
+    );
+
+    // The human-readable half went to stderr, because stdout is the video.
+    assert!(
+        stderr(&first).contains("frames written"),
+        "the render printed no summary on stderr:\n{}",
+        stderr(&first)
+    );
+
+    let again = render();
+    assert!(again.status.success(), "the repeat run failed");
+    assert_eq!(
+        first.stdout.len(),
+        again.stdout.len(),
+        "two runs produced different stream lengths"
+    );
+    assert!(
+        first.stdout == again.stdout,
+        "two runs of the same render produced different bytes — the mode is not \
+         deterministic, which is the one property that distinguishes it from a \
+         screen capture"
+    );
+}
+
+/// The render mode's rejections, all GPU-free — they fail in the parser.
+#[test]
+fn a_render_rejects_a_second_clip_a_decimal_rate_and_a_pointless_out() {
+    let clip = render_clip("reject.wav", 48_000, 0.5);
+    let clip_arg = clip.to_string_lossy().into_owned();
+
+    // Two clips would mean silently ignoring one of them.
+    assert_failed_naming(
+        &run(&["--render", &clip_arg, "--signal", "dynamic:110"]),
+        "--signal",
+        "--render with a second clip",
+    );
+    assert_failed_naming(
+        &run(&["--render", &clip_arg, "--horizon", "0.05"]),
+        "--horizon",
+        "--render with a horizon",
+    );
+
+    // stdout is the frame stream, so `--out` has nothing to name.
+    assert_failed_naming(
+        &run(&["--render", &clip_arg, "--out", "unused.png"]),
+        "--out",
+        "--render with --out",
+    );
+
+    // A decimal rate is rejected rather than approximated — 29.97 is 30000/1001,
+    // and rounding it drifts the picture against its own soundtrack.
+    let out = run(&["--render", &clip_arg, "--fps", "29.97"]);
+    assert_failed_naming(&out, "--fps", "a decimal frame rate");
+    assert!(
+        stderr(&out).contains("30000/1001"),
+        "the error must name the exact form to write:\n{}",
+        stderr(&out)
+    );
+
+    // `--fps` outside the render mode would be accepted and ignored.
+    assert_failed_naming(
+        &run(&["--preset-file", SHIPPED_PRESET_FILE, "--fps", "30"]),
+        "--fps only applies",
+        "--fps without --render",
+    );
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.
