@@ -1,11 +1,12 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Two checkers in `scripts/` take an optional `root` argument so they can be run against a tree
-other than this repository. This directory is that tree. Every file under it is **deliberately
+Three checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
-rather than a property nobody has re-tested since the day it was written.
+rather than a property nobody has re-tested since the day it was written. `index-rows/` is the
+exception and inverts it — see its section below.
 
-`check-doc-links.mjs` skips this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-doc-links.mjs` and `check-index-rows.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -64,5 +65,34 @@ breaks when it moves link-dense prose between documents: the *uses* travel with 
 the *definitions* stay behind.
 
 Note the root: this checker is pointed at `scripts/fixtures`, not at `scripts/fixtures/doc-links`,
-so the run also asserts that the backlog fixture's own markdown is link-clean. Keep it that way —
-a broken link seeded outside `doc-links/` would make the count above wrong for the wrong reason.
+so the run also asserts that the backlog and index-row fixtures' own markdown is link-clean. Keep
+it that way — a broken link seeded outside `doc-links/` would make the count above wrong for the
+wrong reason. That constraint is why `index-rows/` ships five one-line stub documents: its roster
+rows carry real relative links, and a row shaped like a real row has to point somewhere real.
+
+## `index-rows/` — for `check-index-rows.mjs`
+
+```
+node scripts/check-index-rows.mjs scripts/fixtures
+```
+
+Expect **exit 0** — the one fixture here that passes rather than fails. A byte cap is trivially
+red on any tree with a fat row in it, so the interesting assertion is the reverse: that the
+checker measures the rows it should and stays silent about everything else. Green here means all
+four hold at once:
+
+| Case | Seeded as | Expected |
+|------|-----------|----------|
+| a row inside a region, at width | a 258-byte row, just under ADR-0116's 269-byte worst case | measured, not reported |
+| a second region in the same file | a bullet region below a table region | **2** of the 3 regions counted, proving the count is a count |
+| a row outside every region | a ~1,100-byte unmarked ledger row | not measured at all |
+| a fenced row inside a region | an over-cap row inside a ```` ```markdown ```` block | not measured — a document describing a roster is not one |
+
+The third case is the gate's own documented hole ([ADR-0116](../../docs/adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md),
+Negative 3): a row moved past a marker escapes silently. It is pinned here as **behavior** rather
+than left as an accident, so that a future attempt to close it fails this fixture loudly instead
+of changing what the markers mean without anyone noticing.
+
+The per-file region count the checker prints on success is the mitigation for that hole, and it
+is what the second case exercises — a deleted marker shows up as a region that vanished rather
+than as a file that quietly stopped being checked.
