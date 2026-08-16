@@ -54,7 +54,16 @@ bloom_amount = "0.30 + beat * 0.25"
 bloom_threshold = "0.55"
 bloom_radius = "1.6"
 
-spin = "0.0 + beat * 0.05"
+# SPIN IS A RATE, NOT AN ANGLE, AND THAT IS WHY THIS IS A BARE ZERO.
+# `advance_spin` integrates it (`spin_time + spin * dt`), so a beat term does not
+# nudge the figure and let it back - it ADDS rotation on every beat and keeps it.
+# This file used to read `0.0 + beat * 0.05`, which is upright at load and at an
+# arbitrary angle a few minutes into a set: the butterfly's vertical symmetry,
+# which is the whole reason it reads as a heart, quietly drained away with
+# playtime. The header above already said `spin` stays at 0 through all of it;
+# the binding disagreed with it. The beat is carried by `size` and
+# `bloom_amount` instead, which return to rest.
+spin = "0"
 perspective = "0.20 + clamp(mid * 0.12, 0, 0.10)"
 depth_fade = "0.45 + clamp(mid * 0.15, 0, 0.15)"
 

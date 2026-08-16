@@ -58,7 +58,7 @@ kaleido_angle  = "time * 0.05"
 # and a swept value is meaningless between rungs. Placed so a normal passage
 # sits at 6 and real peaks reach 12. Eased hard in [smoothing] so the change
 # reads as the motif growing petals rather than as a cut.
-kaleido_order  = "select(bass + mid + treb > 1.55, 12, 6)"
+kaleido_order  = "select(bass + mid + treb > 1.70, 9, 6)"
 # `tile` reads through MirrorRepeat, so the edge treatment has nothing left to
 # do - every destination coordinate lands inside a mirrored cell by
 # construction. Left at the default rather than bound to a value that would not
@@ -100,7 +100,16 @@ trails       = "0.12"
 # Lengthened at the live pass - a tiled layout shows a ladder step in every cell
 # simultaneously, so the change wants to arrive as a settling rather than as an
 # event.
-kaleido_order = 1.9
+#
+# LENGTHENED AGAIN, 2026-08-16, on a user look call: the fold change read as
+# JARRING at 1.9. Three things were wrong with it together and all three are
+# fixed here rather than only the constant. `kaleido_order` is quantized, so an
+# eased 6 -> 12 does not glide - it STEPS through 7, 8, 9, 10, 11, and each step
+# is a whole re-fold of every cell at once, so the old ladder was six discrete
+# events dressed as a slew. The rung is now 6 -> 9 (three steps, not six), the
+# threshold moved 1.55 -> 1.70 so it fires on real peaks rather than hovering,
+# and the constant is nearly doubled so the steps that remain arrive spread out.
+kaleido_order = 3.5
 
 # All raised about half again at the live pass. The tiling multiplies motion the
 # same way the fold multiplies luminance: whatever one cell does, four do at
