@@ -460,7 +460,7 @@ fn vertex_grid(
     tier: &TierConfig,
     capacity: usize,
 ) -> Option<((u32, u32), usize)> {
-    let scenes::GeneratorConfig::WarpMesh { mesh } = config? else {
+    let scenes::GeneratorConfig::WarpMesh { mesh, .. } = config? else {
         return None;
     };
     let mesh = scenes::warp_mesh::clamp_grid(*mesh, tier);

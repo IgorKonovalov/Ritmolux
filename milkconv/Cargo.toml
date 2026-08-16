@@ -1,0 +1,30 @@
+# The MilkDrop converter (Plan 0100 / ADR-0113). **Never ships.**
+#
+# It parses `.milk` text, compiles EEL2 to the bytecode `lmv-core` executes and
+# (from Phase 6) HLSL to WGSL, and emits an LMV bundle — all ahead of time. None
+# of that enters `lmv.exe` or `foo_lmv.dll`; what those link is the VM and the
+# bundle loader in `core/src/milk/`, which is small Rust with no parser in it.
+#
+# Deliberately OUTSIDE the workspace `default-members`, exactly as `lmv-core-cabi`
+# is (ADR-0072): a bare `cargo build` / `cargo run` / `cargo nextest run` must not
+# spend time on a developer tool that no shipped artifact depends on. `--workspace`
+# selects it — CI and the pre-push hook both pass it, so its conformance suite and
+# clippy still cover it — and `cargo build -p milkconv` builds it directly.
+[package]
+name = "milkconv"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# A developer tool, not a crates.io package.
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# The one dependency, and the point of the seam: the converter emits the exact
+# `EelProgram` the engine executes, so the two cannot drift into different
+# bytecodes. Nothing flows the other way — `core` does not know this crate
+# exists.
+lmv-core = { path = "../core" }

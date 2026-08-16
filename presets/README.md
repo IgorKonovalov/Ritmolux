@@ -1121,6 +1121,37 @@ finer on a better machine.
 > something smooth: `smoothstep` over `rad` costs nothing extra and has no
 > vertices to show.
 
+#### `[milk]` — the table you do not write
+
+A **converted** MilkDrop preset carries a fourth table, and it is the one part of
+this file's vocabulary that is not for you:
+
+```toml
+[milk]
+per_frame = """
+.regs q1 zoom bass time
+.code
+const 1.024
+...
+"""
+```
+
+That is compiled EEL2 bytecode, emitted ahead of time by `milkconv` and executed
+by a small stack VM in the engine
+([ADR-0113](../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+Two things about it are worth knowing even though you will not author one:
+
+- **A bundle is authoritative about the transform.** Its programs run *after*
+  `[params]` and `[per_vertex]`, so binding `zoom` alongside a `[milk]` table is
+  inert rather than a conflict. What a converted preset does still take from
+  `[params]` is everything the bundle has no opinion about — the deposit, the
+  palette, the compositing stages.
+- **The rates inside it are MilkDrop's, per *frame*.** The runtime converts them
+  to this engine's per-second vocabulary at a nominal 30 fps, which is what makes
+  a converted preset move at the speed its author saw on any display. So a number
+  you read in a bundle is not on the same scale as the same-named `[params]`
+  binding beside it.
+
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
 **Strokes join at their interior vertices** (Plan 0039,
