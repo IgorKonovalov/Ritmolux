@@ -16,7 +16,9 @@ This is an early build. It is not code-signed.
 
   - foobar2000 v2, 64-bit. Check Help -> About; if it does not say 64-bit,
     this component will not install. There is no 32-bit build.
-  - Windows 10 or later, and a GPU with DirectX 12 or Vulkan drivers.
+  - Windows 10 version 1903 or later.
+  - A DirectX 12 capable GPU. Integrated graphics are fine - roughly any
+    Intel or AMD chip from 2015 on.
 
 Built against the foobar2000 SDK release @SDK_VERSION@.
 
@@ -50,7 +52,8 @@ Two ways, and you can use both at once:
 Press Space with the visualizer focused to cycle scenes.
 
 Only one of them renders at a time - whichever you opened last claims the
-engine. That is deliberate: one GPU session, not one per panel.
+engine, and the other goes inert until you close it. That is deliberate: one
+GPU session, not one per panel.
 
 
 4. Where it keeps its files
