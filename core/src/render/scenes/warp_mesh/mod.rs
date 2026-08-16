@@ -664,6 +664,17 @@ struct Vertex {
     t2: [f32; 4],
 }
 
+/// [`Vertex`]'s attribute layout — one definition, because the built-in warp
+/// pipeline and a converted preset's custom one (Plan 0100 Phase 6) must read
+/// the same buffer, and two inline copies would drift exactly the way
+/// `SegmentInstance::alpha`'s hazard note warns about.
+const VERTEX_ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    0 => Float32x2,
+    1 => Float32x4,
+    2 => Float32x4,
+    3 => Float32x4,
+];
+
 /// The GPU-side state, built lazily on first render (module docs).
 struct Resources {
     field: PingPongField,
@@ -717,6 +728,13 @@ struct Resources {
     /// Whether the field still holds the undefined contents of a fresh
     /// allocation. Cleared by one pass before anything samples it.
     needs_clear: bool,
+    /// The converted-shader surface (Plan 0100 Phase 6) — noise, blur chain,
+    /// custom warp/comp pipelines. `None` for every preset without WGSL, which
+    /// is what keeps the allocation sequence — and therefore every existing
+    /// WARP golden — identical to before this existed.
+    milk_shaders: Option<shader::MilkShaderResources>,
+    /// The [`shader::ShaderSpec::key`] these resources were built for.
+    shader_key: u64,
 }
 
 /// The per-frame values the CPU assembles a vertex buffer from.
@@ -873,6 +891,10 @@ pub struct WarpMeshScene {
     /// A converted preset is authoritative about its own transform; a `[params]`
     /// binding alongside one is inert rather than fighting it.
     milk: Option<crate::milk::MilkRuntime>,
+    /// What the bundle's translated shaders ask the scene to build (Plan 0100
+    /// Phase 6). Extracted at `configure`; `render` compares its key against
+    /// the built resources and rebuilds when a preset switch changes it.
+    shader_spec: Option<shader::ShaderSpec>,
     /// The tier's line-segment cap, which the draw layer's own `LineRenderer` is
     /// sized to — the same capacity every line scene gets (ADR-0045).
     max_segments: usize,
@@ -944,6 +966,7 @@ impl WarpMeshScene {
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             milk: None,
+            shader_spec: None,
             max_segments,
             draw: None,
             geometry: draw::DrawGeometry::default(),
@@ -966,12 +989,16 @@ impl WarpMeshScene {
 const FIELD_FORMAT: wgpu::TextureFormat = PingPongField::FORMAT;
 
 impl Resources {
+    #[allow(clippy::too_many_arguments)]
     fn build(
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
         size: (u32, u32),
         mesh: (u32, u32),
         max_segments: usize,
+        shader_spec: Option<&shader::ShaderSpec>,
+        shader_key: u64,
     ) -> Self {
         let warp_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("warp-mesh-warp-shader"),
@@ -1088,12 +1115,7 @@ impl Resources {
                 buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32x4,
-                        2 => Float32x4,
-                        3 => Float32x4,
-                    ],
+                    attributes: &VERTEX_ATTRS,
                 })],
             },
             fragment: Some(wgpu::FragmentState {
@@ -1336,6 +1358,22 @@ impl Resources {
             mapped_at_creation: false,
         });
 
+        // The converted-shader surface, only when this preset carries WGSL
+        // (Plan 0100 Phase 6). Built after everything above so the allocation
+        // sequence up to here is byte-for-byte what a native preset builds.
+        let milk_shaders = shader_spec.map(|spec| {
+            shader::MilkShaderResources::build(
+                device,
+                queue,
+                spec,
+                &field,
+                size,
+                surface_format,
+                &warp_shader,
+                &warp_layout,
+            )
+        });
+
         let indices_data = build_indices(mesh);
         let indices = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("warp-mesh-indices"),
@@ -1378,6 +1416,8 @@ impl Resources {
             shape_bind_group,
             shape_capacity,
             needs_clear: true,
+            milk_shaders,
+            shader_key,
         }
     }
 
@@ -1455,6 +1495,16 @@ impl Scene for WarpMeshScene {
             self.milk = milk
                 .as_ref()
                 .map(|bundle| crate::milk::MilkRuntime::new((**bundle).clone(), *salt));
+            // The translated shaders, when the bundle carries any (Phase 6).
+            self.shader_spec = milk.as_ref().and_then(|bundle| {
+                (bundle.warp_wgsl.is_some() || bundle.comp_wgsl.is_some()).then(|| {
+                    shader::ShaderSpec {
+                        warp: bundle.warp_wgsl.clone(),
+                        comp: bundle.comp_wgsl.clone(),
+                        blur: bundle.blur_level,
+                    }
+                })
+            });
             // A preset switch must not leave the previous bundle's draw layer
             // on screen for a frame.
             self.draw = None;
@@ -1619,19 +1669,26 @@ impl Scene for WarpMeshScene {
         } else {
             self.target
         };
-        // Build or rebuild: a fresh scene, a resized target, or a preset whose
-        // grid differs from the one the buffers were built for.
+        // Build or rebuild: a fresh scene, a resized target, a preset whose
+        // grid differs from the one the buffers were built for, or one whose
+        // translated shaders differ (Plan 0100 Phase 6).
+        let shader_key = self.shader_spec.as_ref().map_or(0, shader::ShaderSpec::key);
         let stale = match self.res.as_ref() {
             None => true,
-            Some(res) => res.size != size || res.mesh != self.state.mesh,
+            Some(res) => {
+                res.size != size || res.mesh != self.state.mesh || res.shader_key != shader_key
+            }
         };
         if stale {
             self.res = Some(Resources::build(
                 &self.device,
+                queue,
                 self.surface_format,
                 size,
                 self.state.mesh,
                 self.max_segments,
+                self.shader_spec.as_ref(),
+                shader_key,
             ));
             self.palette_dirty = true;
         }
@@ -1641,6 +1698,11 @@ impl Scene for WarpMeshScene {
 
         if res.needs_clear {
             res.encode_clear(encoder);
+            // The blur chain's textures start undefined too, and a custom warp
+            // shader may sample them on the very first frame.
+            if let Some(milk_shaders) = res.milk_shaders.as_ref() {
+                milk_shaders.encode_clear(encoder);
+            }
             queue.write_buffer(
                 &res.indices,
                 0,
@@ -1754,6 +1816,29 @@ impl Scene for WarpMeshScene {
                 ],
             }),
         );
+        // The converted-shader uniform, filled from the same frame the EEL
+        // programs saw (Plan 0100 Phase 6). One buffer serves both the warp
+        // pass (pre-swap) and the comp pass (post-swap).
+        if let (Some(milk_shaders), Some(runtime)) = (res.milk_shaders.as_ref(), self.milk.as_ref())
+        {
+            // The *unclamped* per-second decay: a custom warp shader applies
+            // decay itself, and the reference's bound is its 8-bit target —
+            // which the shader epilogue's clamp reproduces.
+            queue.write_buffer(
+                &milk_shaders.uniform,
+                0,
+                bytemuck::bytes_of(&shader::fill_uniform(
+                    runtime,
+                    self.time,
+                    dt,
+                    size,
+                    aspect,
+                    self.decay,
+                    self.brightness,
+                    self.occlude,
+                )),
+            );
+        }
 
         // --- warp: the past, resampled through the mesh, into the write half ---
         let warp_bg = if res.field.reading_a() {
@@ -1782,8 +1867,30 @@ impl Scene for WarpMeshScene {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&res.warp_pipeline);
-            pass.set_bind_group(0, warp_bg, &[]);
+            // A converted warp shader replaces the built-in decay fragment; the
+            // vertex stage — the mesh transform — is shared, so `uv` reaching
+            // the custom fragment is exactly the warped source uv (Phase 6).
+            let custom_warp = res.milk_shaders.as_ref().and_then(|milk_shaders| {
+                milk_shaders.warp_pipeline.as_ref().map(|pipeline| {
+                    let bg = if res.field.reading_a() {
+                        &milk_shaders.bind_a
+                    } else {
+                        &milk_shaders.bind_b
+                    };
+                    (pipeline, bg)
+                })
+            });
+            match custom_warp {
+                Some((pipeline, milk_bg)) => {
+                    pass.set_pipeline(pipeline);
+                    pass.set_bind_group(0, warp_bg, &[]);
+                    pass.set_bind_group(1, milk_bg, &[]);
+                }
+                None => {
+                    pass.set_pipeline(&res.warp_pipeline);
+                    pass.set_bind_group(0, warp_bg, &[]);
+                }
+            }
             pass.set_vertex_buffer(0, res.vertices.slice(..));
             pass.set_index_buffer(res.indices.slice(..), wgpu::IndexFormat::Uint32);
             pass.draw_indexed(0..res.index_count, 0, 0..1);
@@ -1893,7 +2000,23 @@ impl Scene for WarpMeshScene {
         // The fresh state becomes the next frame's past.
         res.field.swap();
 
+        // --- the blur chain (Phase 6): from the frame just composed, for the
+        // comp pass now and the next frame's warp pass ---
+        if let Some(milk_shaders) = res.milk_shaders.as_ref() {
+            milk_shaders.encode_blur(encoder, res.field.reading_a());
+        }
+
         // --- present: the field, over the backdrop ---
+        let custom_comp = res.milk_shaders.as_ref().and_then(|milk_shaders| {
+            milk_shaders.comp_pipeline.as_ref().map(|pipeline| {
+                let bg = if res.field.reading_a() {
+                    &milk_shaders.bind_a
+                } else {
+                    &milk_shaders.bind_b
+                };
+                (pipeline, bg)
+            })
+        });
         let present_bg = if res.field.reading_a() {
             &res.present_bg_a
         } else {
@@ -1915,13 +2038,25 @@ impl Scene for WarpMeshScene {
             occlusion_query_set: None,
             multiview_mask: None,
         });
-        pass.set_pipeline(&res.present_pipeline);
-        pass.set_bind_group(0, present_bg, &[]);
+        // A converted comp shader replaces the built-in remap stack whole — it
+        // *is* MilkDrop's composite, gamma and echo and all, in the preset's
+        // own arithmetic.
+        match custom_comp {
+            Some((pipeline, milk_bg)) => {
+                pass.set_pipeline(pipeline);
+                pass.set_bind_group(0, milk_bg, &[]);
+            }
+            None => {
+                pass.set_pipeline(&res.present_pipeline);
+                pass.set_bind_group(0, present_bg, &[]);
+            }
+        }
         pass.draw(0..3, 0..1);
     }
 }
 
 pub mod draw;
+mod shader;
 
 #[cfg(test)]
 mod tests;

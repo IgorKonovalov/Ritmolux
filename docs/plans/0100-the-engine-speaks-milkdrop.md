@@ -374,10 +374,10 @@ is sized by is only local).
 | 3 — the converter reads a real preset | **done**, committed `ebbf395` |
 | 4 — the draw layer | **done**, committed `aec8f15` (built at `9941129`, finished at `aec8f15`) |
 | 5 — what actually converts | **done**, committed below |
-| 6 — the shaders | not started — its stop condition is the next decision |
+| 6 — the shaders | **done**, committed below (fresh session, 2026-08-16) |
 | 7, 8 — human | not started, and not `dev`'s |
 
-`cargo nextest run --workspace` is **863 passed, 3 skipped**; `cargo clippy
+`cargo nextest run --workspace` is **888 passed, 3 skipped**; `cargo clippy
 --workspace --all-targets`, `cargo fmt --all --check` and
 `scripts/check-doc-links.mjs` are clean.
 
@@ -532,6 +532,100 @@ in size to Phase 2's EEL2 machine, which was its own session.
 blocked and it is not deferred by doubt — it is deferred because a whole subsystem
 belongs in its own context, and because this one had already run Phase 4's blend
 rework and Phase 5.
+
+### Phase 6, implemented (fresh session, 2026-08-16)
+
+The stop condition did not fire, as the census above predicted, and the route it
+predicted is the one that was built: **a hand-written Rust frontend for the
+MilkDrop HLSL subset** in `milkconv/src/shader/` (a lexer with parameterless
+`#define`s and literal `#if`s, a recursive-descent parser, a typed WGSL emitter)
+plus the GPU half in `core/src/render/scenes/warp_mesh/shader.rs` (six
+procedural noise textures, the four-sampler quartet, a three-level blur chain,
+the ~40-name uniform surface, custom warp/comp pipelines). The interface
+contract between the two — binding roster, uniform WGSL, prelude helpers, the
+naga gate — lives in one shipped module, `core/src/milk/shader.rs`, so the
+converter and the engine cannot drift into incompatible halves.
+
+Three translation decisions carry most of the correctness:
+
+- **Every scalar is `f32`** — HLSL's int→float promotion becomes the ambient
+  rule again, and nothing in the corpus needs integers back (zero bitwise ops,
+  censused).
+- **Matrix constructors go through `transpose`** — HLSL fills rows, WGSL fills
+  columns, and this is what lets `mul(a, b)` translate positionally without
+  transposing every rotation in the corpus.
+- **`tex2D` becomes `textureSampleLevel(..., 0.0)`, never `textureSample`** —
+  presets sample inside conditionals, naga's uniformity analysis (correctly)
+  refuses implicit derivatives there, and no MilkDrop texture has mips.
+
+Every loop is bounded (1024 iterations, nesting ≤ 2, 16 384 static ops, all
+recorded in the bundle header per the phase's rule), and validation runs
+**twice**: in the converter the moment a shader is emitted — so an emitter bug
+is a named class in the ranking, not a load-time mystery — and again in the
+preset loader, where a failed compile **rejects that preset by name and the
+directory loader's per-file skip loads the rest**.
+
+**What the measurement loop bought.** The first full run converted 74.1 % and
+the failure ranking named exactly what fxc tolerated that the frontend did not:
+`//*` opening a phantom block comment, C brace initializers, the comma operator
+(as statement sequencing and in parens), lowercase `tex2d`, prefix-composed
+sampler names (`sampler_pw_noise_lq`), `M_PI`-family constants, mixed
+scalar/vector matrix constructors, chained assignment, `sampler_state { }`
+blocks, globals initialized from shader inputs (deferred into the `fs_main`
+prologue as `var<private>` shadows — fxc treats every input as a mutable
+global, and shipped presets assign to `rand_preset`), and zero-padded vector
+widening (`lum(float2)`). Two fix rounds later:
+
+| corpus | converts, shaders included |
+|---|---|
+| all 10 347 files | **8 289 (80.1 %)** — ~97 % of everything not disk-texture-bound |
+| the 552-file original pack | **476 (86.2 %)**, 471 non-blank under the probe |
+
+The dominant residual class is the **deliberate** disk-texture exclusion
+(1 826 files, 17.7 % — the census priced 19 %), now a *named conversion
+failure* rather than a silent render-without-it, which is what the plan's
+"What this plan does NOT do" said would happen. The `unsupported`/`parse` tail
+(under 2 %) is HLSL arrays, computed `#if`s and similar exotica — the tail the
+reject-by-name rule exists for. The `emitter-invalid` class (naga refusing our
+own emission) ended the session at **zero**.
+
+**The done-when, verified.** The end-to-end test
+(`milkconv/tests/shader.rs::a_shader_preset_renders_and_its_shaders_have_effect`)
+converts an MD2 fixture with both shaders, loads it through the real preset
+loader, renders it on the hardware adapter, and asserts the image is non-blank
+*and differs from the same preset stripped of its shaders* — the pipelines
+demonstrably ran. Evidence frames from real corpus files are in
+`docs/capturing.md`: *Geiss — Blur Mix 3* (the blur chain) and *Geiss — Myriad
+Mosaics* (3D noise volume + `rand_frame` dither), both recognizably the preset
+their name says.
+
+**The size delta, measured.** Release builds, `strip = symbols`:
+
+| binary | pre-Phase-6 (`f06f7dd`) | after Phase 6 | Phase 6 delta | current `main` (`ffe34db`) | whole-plan delta |
+|---|---|---|---|---|---|
+| `lmv.exe` | 9 474 048 B | 9 613 312 B | **+139 264 B** | 9 230 336 B | +382 976 B |
+| `lmv_core_c.dll` | 9 071 616 B | 9 211 904 B | **+140 288 B** | 8 835 584 B | +376 320 B |
+
+The cdylib is the proxy for `foo_lmv.dll` (which statically links the same
+core). Phase 6's own cost is ~140 KB — the scene-side shader runtime and the
+interface strings; naga's WGSL frontend was already in the binary, which is why
+the delta is KB and not MB. Against NFR §4's ~10 MB soft cap the cdylib sits at
+~8.8 MiB; the near-zero expectation the plan stated was optimistic by 140 KB
+and is recorded here rather than papered over.
+
+**Golden safety.** A preset without WGSL builds byte-identically the same GPU
+resources as before — the shader surface is built only when a bundle carries
+shaders — and the full suite (888 tests, every golden included) is green
+without a single bless. The two new bind-group layouts are unique shapes under
+the ADR-0058 scan (the 15-entry surface layout by length; the blur layout by
+its `[Texture, Sampler, Uniform+size]` order); the scan's `MARKERS` learned the
+`texture_3d(` helper spelling.
+
+**The caveat the last session left, resolved:** the full-corpus `--render`
+probe from the Phase 5 era landed at **10 257 of 10 325 non-blank (99.1 %)**,
+with 60 of the 68 blanks declaring MilkDrop 2 — consistent with the picture
+having been in the then-untranslated shader. Both eras' tables are preserved
+side by side in `docs/capturing.md`.
 
 ### Things a fresh session will want to know
 

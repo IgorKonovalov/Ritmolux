@@ -386,10 +386,20 @@ impl Report {
         }
 
         // --- the two predictions the census made, checked ---
+        //
+        // From Phase 6 on, a disk texture is a *conversion failure* (the shader
+        // that samples it is rejected by name), so the class lives in the
+        // failure reasons rather than the warning classes. Counted from both so
+        // the prediction row survives the phase boundary it was written across.
         let disk = self
             .rows
             .iter()
-            .filter(|r| r.classes.contains(&"disk-texture"))
+            .filter(|r| {
+                r.classes.contains(&"disk-texture")
+                    || r.reason
+                        .as_deref()
+                        .is_some_and(|reason| reason.contains("disk-texture"))
+            })
             .count();
         let shaderless = self.rows.iter().filter(|r| !r.milkdrop2).count();
         let _ = writeln!(
@@ -417,7 +427,7 @@ impl Report {
             pct(shaderless).trim()
         );
 
-        // --- and what Phase 6 is worth ---
+        // --- and what Phase 6 delivered ---
         let with_shaders = self
             .rows
             .iter()
@@ -425,18 +435,20 @@ impl Report {
             .count();
         let _ = writeln!(
             out,
-            "\nWHAT PHASE 6 IS WORTH: {with_shaders} presets ({}) convert AND declare\n\
-             MilkDrop 2, so they render today with their `warp` and `comp` HLSL missing.",
+            "\nWHAT PHASE 6 DELIVERS: {with_shaders} presets ({}) convert AND declare\n\
+             MilkDrop 2 — their `warp` and `comp` HLSL is translated to WGSL and runs.\n\
+             A MilkDrop 2 preset that no longer converts failed a shader-translation\n\
+             rule (see the ranking above); before Phase 6 it converted WITHOUT its\n\
+             shaders, which rendered something its author never drew.",
             pct(with_shaders).trim()
         );
 
         if rendered {
             let blank: Vec<&Row> = self.rows.iter().filter(|r| r.blank == Some(true)).collect();
-            // Split by whether the source carries HLSL. A preset whose whole
-            // picture lives in its `warp` shader converts perfectly and renders
-            // nothing, and that is a Phase 6 item rather than a bug — where a
-            // blank *shaderless* preset is something Phases 1-5 got wrong and is
-            // the row a work list actually wants.
+            // Split by whether the source carries HLSL. Both halves are real
+            // findings now: since Phase 6 an MD2 preset renders WITH its
+            // translated shaders, so a blank one is a translation-fidelity item
+            // rather than "the picture is in the missing shader".
             let shader_blank = blank.iter().filter(|r| r.milkdrop2).count();
             let plain_blank = blank.len() - shader_blank;
             let _ = writeln!(
@@ -451,9 +463,9 @@ impl Report {
             );
             let _ = writeln!(
                 out,
-                "  {shader_blank:>6}  declare MilkDrop 2, so the picture is plausibly IN the\n\
-                 \x20         untranslated shader - a Phase 6 item, not a defect\n\
-                 \x20{plain_blank:>5}  are shaderless and blank anyway - THIS is the work list"
+                "  {shader_blank:>6}  declare MilkDrop 2 - their shaders RAN (Phase 6), so a\n\
+                 \x20         blank one is a shader-fidelity finding\n\
+                 \x20{plain_blank:>5}  are shaderless and blank - the Phases 1-5 work list"
             );
             for row in blank.iter().filter(|r| !r.milkdrop2).take(20) {
                 let _ = writeln!(

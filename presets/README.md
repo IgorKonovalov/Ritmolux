@@ -1191,6 +1191,15 @@ Three things about it are worth knowing even though you will not author one:
 - **A bundle brings its own light, so the deposit stays off.** That is the one
   place where reading this section as "the warp mesh has nothing to draw" would
   mislead you.
+- **A MilkDrop 2 bundle may also carry `warp_shader` / `comp_shader`** — the
+  preset's own pixel shaders, translated from HLSL to WGSL ahead of time
+  (Plan 0100 Phase 6), plus a `blur_level` naming how deep a blur chain they
+  sample. The engine validates each through naga at load; **a shader that does
+  not compile rejects that one preset by name and the rest of the library
+  loads**. When a `warp_shader` is present it replaces the built-in decay
+  fragment, and a `comp_shader` replaces the built-in present remaps — the
+  bundle is then authoritative about the compositing too, not just the
+  transform.
 
 #### The draw layer a converted preset brings
 

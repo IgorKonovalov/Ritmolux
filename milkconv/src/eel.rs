@@ -960,10 +960,14 @@ pub fn compile_bundle(
         per_frame_init: build(init, "per_frame_init")?,
         per_frame: build(frame, "per_frame")?,
         per_vertex: build(vertex, "per_vertex")?,
-        // The custom waves and shapes are attached by `convert`, which is the
-        // half that knows the `.milk` file they came from.
+        // The custom waves and shapes — and, from Phase 6, the translated
+        // shaders — are attached by `convert`, which is the half that knows the
+        // `.milk` file they came from.
         waves: Vec::new(),
         shapes: Vec::new(),
+        warp_wgsl: None,
+        comp_wgsl: None,
+        blur_level: 0,
     };
     Ok((bundle, symbols))
 }

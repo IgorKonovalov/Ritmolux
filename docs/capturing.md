@@ -1064,11 +1064,12 @@ not know".
 
 | carried | not carried |
 |---|---|
-| the per-frame and per-vertex programs, whole | the `warp` and `comp` HLSL blocks (Phase 6) |
-| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
-| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | disk textures — deliberately out of scope, and priced at 19 % of the corpus |
-| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | a custom shape's `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
-| up to four custom waves and four custom shapes, each with its own programs | the second audio channel, because this engine's analysis is mono by construction |
+| the per-frame and per-vertex programs, whole | disk textures — deliberately out of scope, and priced at 19 % of the corpus. **Since Phase 6 this is a conversion *failure***: the shader that samples one is rejected by name rather than silently rendered without it |
+| **the `warp` and `comp` HLSL blocks, translated to WGSL** (Phase 6) — the ~30 intrinsics, swizzles, `if`, bounded loops, `#define`s, helper functions, the noise samplers, `GetBlur1..3`, the `q`/roam/rand/`rot_*` input surface | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
+| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | HLSL arrays, computed `#if` conditions, structs — each a named rejection, together well under 2 % of the corpus |
+| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | a custom shape's `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
+| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | the second audio channel, because this engine's analysis is mono by construction |
+| up to four custom waves and four custom shapes, each with its own programs | |
 | the inner and outer borders, and the motion-vector grid | |
 | the initial conditions, re-applied at the top of every frame | |
 | `q1`–`q32`, `t1`–`t8`, `megabuf`, `gmegabuf` | |
@@ -1129,6 +1130,19 @@ now the preset's own, and the difference is not subtle:
 | ![Escher's Tunnel, with the draw layer](images/milkconv/eschers-tunnel-drawn.png) | ![Songflower, with the draw layer](images/milkconv/songflower-drawn.png) |
 | *Aderrasi — Contortion (Escher's Tunnel Mix)*, the same preset as the last frame of the block above. The tunnel and its dark core are the mesh, as before; the magenta lattice at the edges is the preset's own custom shapes and waveform, which the stand-in ring had nothing to say about. | *Aderrasi — Songflower (Hybrid Plant)*: four custom shapes and a waveform over a field with `fDecay = 1`, so nothing ever fades. This is the case that reads as a flat white frame under a purely additive draw seam — see the blend note in [`presets/README.md`](../presets/README.md#milk--the-table-you-do-not-write). |
 
+### And with the shaders (Phase 6)
+
+MilkDrop 2's `warp` and `comp` pixel shaders are translated to WGSL at
+conversion time and run as the preset's own passes — the warp shader replaces
+the built-in decay fragment, the comp shader replaces the built-in present.
+Both frames below are corpus files converted with no hand editing, same
+settings as above:
+
+| | |
+|---|---|
+| ![Blur Mix 3, with its shaders](images/milkconv/blur-mix-3-shaded.png) | ![Myriad Mosaics, with its shaders](images/milkconv/myriad-mosaics-shaded.png) |
+| *Geiss — Blur Mix 3*: the waveform stroke sharp, its history softened through the three-level blur chain the comp shader reads with `GetBlur1..3` — the look the preset is named for. | *Geiss — Myriad Mosaics*: the mosaic grid is the warp shader's `cos` tiling, the swirl inside each tile its 3D noise-volume lookup (`sampler_noisevol_hq`), the grain its `rand_frame` dither. |
+
 ### `--report`: how much of the corpus converts, and what happens to the rest
 
 Point the converter at a directory instead of a file and it walks it, converts
@@ -1170,35 +1184,62 @@ prediction in advance.
 
 #### What it said, 2026-08-16
 
-Over all three collections at `WORK/milkdrop-corpus`, on `windows x86_64`:
+Two readings of the same corpus, one plan phase apart — together they are the
+record of what Phase 6 changed.
+
+**Before the shaders (Phases 1–5).** Over all three collections at
+`WORK/milkdrop-corpus`, on `windows x86_64`; 10 325 of 10 347 converted, but the
+82 % `unconverted-shader` row is the honest caveat — four fifths of the corpus
+rendered with its `warp`/`comp` HLSL missing. The full-corpus `--render` probe
+(same day) counted **10 257 non-blank of 10 325**, with 60 of the 68 blanks
+declaring MilkDrop 2 — the picture was in the shader nothing ran yet.
+
+```text
+  files seen                     10347  100.0 %
+  parse                          10347  100.0 %
+  compile                        10325   99.8 %
+  render non-blank               10257   99.1 %
+
+WHAT A CONVERSION COULD NOT CARRY (top rows):
+    8482   82.0 %  unconverted-shader
+    2251   21.8 %  disk-texture
+                               predicted   measured
+  reads a disk texture           19.0 %     21.8 %
+  MilkDrop 1.x, no shaders       18.0 %     17.9 %
+```
+
+**After the shaders (Phase 6).** The translator ran; `unconverted-shader` is
+gone, and the disk-texture class moved from a warning to a **named conversion
+failure** — a preset whose shader samples a texture we refuse to ship no longer
+loads without it and renders something its author never drew:
 
 ```text
   stage                          count  share
   ---------------------------- -------  -------
   files seen                     10347  100.0 %
   parse                          10347  100.0 %
-  compile                        10325   99.8 %
+  compile                         8289   80.1 %
 
 WHY A FILE DID NOT CONVERT, ranked:
+    1217   11.8 %  warp shader disk-texture
+     609    5.9 %  comp shader disk-texture
+      75    0.7 %  warp shader unsupported
+      74    0.7 %  comp shader unsupported
+      37    0.4 %  warp shader parse
+      16    0.2 %  comp shader unknown-name
       15    0.1 %  per_frame
+       6    0.1 %  warp shader unknown-name
        5    0.0 %  per_vertex
+       2    0.0 %  comp shader parse
        2    0.0 %  per_frame_init
-
-WHAT A CONVERSION COULD NOT CARRY, ranked by presets affected:
-    8482   82.0 %  unconverted-shader
-    4454   43.0 %  unconsumed-other
-    4162   40.2 %  shape-textured
-    2251   21.8 %  disk-texture
-    1353   13.1 %  wave-spectrum-source
-     432    4.2 %  vertex-input-in-frame
-     347    3.4 %  unconsumed-echo
-      23    0.2 %  weak-input
-       6    0.1 %  writes-input
-
-                               predicted   measured
-  reads a disk texture           19.0 %     21.8 %
-  MilkDrop 1.x, no shaders       18.0 %     17.9 %
 ```
+
+Read together: **8 289 presets (80.1 %) now convert whole, shaders included** —
+which is about 97 % of everything not bound to a disk texture. The `unsupported`
+and `parse` rows (under 2 % combined) are HLSL arrays, computed `#if`
+conditions and similar exotica, each rejected by name. On the 552-preset
+original pack, where disk textures are rarer, the same run reads 476 converted
+(86.2 %) and 471 render non-blank (85.3 %) under the probe.
 
 **Both predictions held**, which is the result that says the ranking is about the
 corpus. The shaderless share landed at 17.9 % against a predicted 18 % — as close
