@@ -13,6 +13,54 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md)
+  — closed 2026-08-16, all six `dev` phases (`5791d25`, `0171fdf`, `f17be77`, `665eb0e`, `34b72ea`,
+  `7903351`) in one session. Review: **no blockers, two majors, two minors, one nit.** The three
+  roster files went **477,594 -> 220,626 bytes** — `docs/adrs/README.md` alone 189,305 -> 21,085, an
+  89 % cut against the ~24 KB [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
+  predicted — and `scripts/check-index-rows.mjs` now holds every row inside a
+  `<!-- roster:begin cap=320 -->` region to 320 bytes at the pre-push hook, the CI `links` job, and
+  the architect close ceremony. **The cap did not move**: the widest row in the tree is 246 bytes.
+  **Three deviations, every one surfaced in the commit that hit it rather than tuned to.** The
+  over-cap count was **136, not 135** (26 plan bullets against the plan's 25; the ADR and backlog
+  figures matched exactly). Phase 2's `awk`-and-`grep` forward-reference invariant **moved 7 -> 3
+  rather than holding** — four of the seven matches were the regex catching ordinary words (*"an
+  owed supplement"*, *"extended to"*, *"a superseded blob"*) inside the abstracts the phase was
+  deleting, and a fifth was `awk` splitting a row whose title cell contains a pipe; the **three
+  genuine inbound edges** (0002 supplemented by 0020, 0003 extended by 0006/0008/0013, 0031
+  membership revised by 0032) are byte-unchanged, and all 24 outbound trailers were checked edge by
+  edge against the ADR bodies and found redundant. And Phase 4 came back green a phase early,
+  because the gate does not know it is not wired up yet. **The verification work is the part worth
+  keeping.** Every number and backticked identifier in every ADR index cell was matched against the
+  linked body and each survivor read by hand: 43 flagged, 39 resolved as notation, **four
+  genuinely index-only** — those became dated `Outcome` sections on ADRs 0046, 0103, 0104 and 0105
+  rather than being deleted, on the ADR-0054 / ADR-0074 precedent. The plans section turned out to
+  be worse than assumed: **24 of the 26 fat bullets had never been archived at all**, so the
+  section had been emptied once by Plan 0061 Phase 7b and then regrew entirely fresh — preservation
+  was never the problem, which is precisely ADR-0116's argument. Moving that prose stranded **9
+  reference-link uses** from their definitions, the third break class, caught by
+  `check-doc-links.mjs`. In the backlog ledger exactly **one** datum survived both the archive and
+  the pointed-at document — commit `3732fb4` in row 0056, which is in git and in no document at all
+  — and it stayed in the row. **Two majors, both outside the trim.** First, **the gate has no
+  assertion that it can convict**: its fixture is the only one in `scripts/fixtures/` that asserts
+  exit 0, and a mutation that makes the row matcher match nothing still exits 0 there and on the
+  repo, so a dead detector reads exactly like a clean tree — the same non-vacuity class Plans 0084
+  and 0094 fixed for the other two gates, filed as [backlog 0104](../design-backlog.md). Second,
+  **Phase 5 changed what a `git push` runs without sweeping the two operator docs that enumerate
+  it** — `README.md`'s "What it runs" table and `docs/nfr.md`'s CI-gate and pre-push bullets both
+  still named only `check-doc-links.mjs`, and had *already* missed `check-backlog-claims.mjs` since
+  Plan 0093, so this was the second consecutive miss on the same two lists; repaired in the close
+  commit, and `CLAUDE.md`'s `scripts/` description with them. Minors: ADR-0116's Negative bullet
+  estimating *"roughly six rows"* of forward-reference graph measured **three**, now recorded as a
+  dated `Outcome` there — which matters because that number is the whole argument against
+  regenerating the index from the bodies; and the plan's own TL;DR and Phase 1/3 done-whens still
+  read 135/25, left standing since a plan is the contract as written and the correction belongs
+  here. Nit: two missing blank lines in the architect skill's new steps, where a `2.`/`3.` list
+  marker cannot interrupt the paragraph above it and renders as run-on prose. **What outlives the
+  plan is the loop, not the trim.** The ceremony that wrote the fat rows now states the pointer
+  shape at each of the three places it refreshes a roster and re-runs the gate at step 1d, so the
+  lane that causes the defect is the lane it fires on — and this close was its first live exercise.
+
 - [0097 — The track announces itself](done/0097-the-track-announces-itself.md) — closed
   2026-08-16, all five `dev` phases (`c9f7a3e`, `3621030`, `cb41dee`, `1c96327`, `51d4489`) plus
   one **approved out-of-plan fix** (`1016777`), with the `human` Phase 6 run the same day on the

@@ -16,7 +16,6 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0105](0105-the-indexes-go-back-to-being-indexes.md) | The indexes go back to being indexes | approved | dev | **Carries [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) (accepted); docs and tooling only, no core/shell code.** The three roster files carry **135 over-cap rows** and this index is one of them — the gate is built in Phase 1 and wired in Phase 5, so Phases 2-4 push red on the hook until the trim lands. |
 | [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | draft | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | draft | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
@@ -127,24 +126,13 @@ renderer, and they sort into two groups that barely interact:
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world.
 
-- **First, and cheaply: [0105](0105-the-indexes-go-back-to-being-indexes.md)** (user call,
-  2026-08-16). It is the one plan here with **no user-visible value at all** — it improves the
-  repo's own ergonomics, not the product — and it goes first anyway, because it is *preventive* and
-  its value is proportional to how much work comes after it. Every plan on this roster writes rows
-  into the three roster files at its close; with 0105's Phase 6 landed, those closes produce thin
-  rows on their own, and without it each one adds to a work list already at **135 over-cap rows**.
-  The ADR index grew 41,705 bytes in three days with no plan closing at all. It is also cheap in the
-  ways that usually cost — no core, no shell, no GPU, no golden bless, no ABI, no version-visible
-  behaviour.
-
-  **Its one contention is with closes, not with content.** It touches nothing outside `scripts/` and
-  `docs/`, so it collides with none of the plans below — but it rewrites `docs/plans/README.md` and
-  `docs/design-backlog.md`, which is exactly what a *close ceremony* writes to. Run it concurrently
-  with another lane's close and you get conflicts in those two files, and a close landing fat rows
-  into a section it has already trimmed. Take a worktree per
-  [ADR-0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md) and merge `main` in before the close;
-  the live-entry half of `design-backlog.md` is deliberately out of its scope, so a parallel
-  session filing backlog entries does not contend with Phase 4's ledger rewrite.
+- **Taken first and now closed: [0105](done/0105-the-indexes-go-back-to-being-indexes.md)** (user
+  call, 2026-08-16; closed the same day). It went first because it was *preventive* — every plan
+  below writes rows into the three roster files at its close, and with its Phase 6 landed those
+  closes now produce thin rows on their own, checked by `scripts/check-index-rows.mjs` at the same
+  three call sites the link gate occupies. **What that changes for the plans below is one line in
+  their close:** the roster row is a pointer under 320 bytes, and the write-up goes to
+  `README-archive.md`, the ADR body's `Outcome`, or the backlog archive — never into the row.
 
 **One sequencing disagreement is left open rather than decided**, because it is a product call and
 not an architecture one: [0103] wants [0104] to have landed, and [0104] is four phases of content
@@ -627,6 +615,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md) — closed 2026-08-16. Review: **no blockers, two majors, two minors, one nit.**
 - [0097 — The track announces itself](done/0097-the-track-announces-itself.md) — closed 2026-08-16. Review: **no blockers, no majors, three minors and a nit.**
 - [0096 — The HUD gets out of the way](done/0096-the-hud-gets-out-of-the-way.md) — closed 2026-08-16. Review: **no blockers, no majors, two minors and a nit.**
 - [0091 — The figure fills the frame](done/0091-the-figure-fills-the-frame.md) — closed 2026-08-16. Review: **no blockers, no majors, three minors.**

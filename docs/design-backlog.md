@@ -1784,3 +1784,59 @@ question, since sharing `wnd_proc` between both host kinds is deliberate in this
 
 **Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
 component from my layout" is a bad first impression.
+
+## 0104 — `check-index-rows.mjs` has no assertion that it can convict, so a dead detector reads exactly like a clean tree
+
+Found at Plan 0105's close (2026-08-16), reviewing the gate that plan built.
+
+Of the three checkers in `scripts/`, this is the only one whose fixture asserts **exit 0**.
+`scripts/fixtures/README.md` argues the inversion is correct — *"a byte cap is trivially red on any
+tree with a fat row in it, so the interesting assertion is the reverse"* — and that was true of the
+tree it was written against, which still held 136 over-cap rows. **Phases 2-4 of the same plan made
+it false.** Nothing in the repo now contains a row the gate would reject, so nothing anywhere
+exercises its ability to reject one.
+
+The consequence is that the checker's row detection is unasserted. Demonstrated at the close by
+copying the script and replacing `TABLE_ROW` and `BULLET` with regexes that match nothing: the
+fixture reports `3 regions, 0 rows, 0 over cap` and **exits 0**, and so does the repo run. Every one
+of the three call sites — pre-push, the CI `links` job, the architect close ceremony — goes green.
+The per-file region and row counts the script prints are the documented mitigation, and they are
+*printed*, not asserted; nothing compares them to an expected number.
+
+This is the same non-vacuity class the other two gates were repaired for.
+[Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) found the link checker
+covering one of markdown's two link forms, and
+[Plan 0094](plans/done/0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name
+skip swallowing a real tree and a whole half of ADR-0108's rule invisible to a bullet-driven check.
+Both now ship fixtures that expect **exit 1 with an exact break count**, and
+`check-backlog-claims.mjs` additionally carries a `--self-test` whose non-vacuity assertion is
+pinned to the real repository rather than to the fixture.
+
+- **Verified 2026-08-16** — the script has no self-test:
+  `absent: self-test in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-16** — its fixture is documented as the one that passes rather than fails:
+  `present: Expect \*\*exit 0\*\* in: scripts/fixtures/README.md`
+- **Verified 2026-08-16** — the sibling gate has the mechanism this one lacks:
+  `present: --self-test in: scripts/check-backlog-claims.mjs`
+
+### What a fix would be
+
+Two shapes, and they are not exclusive. A **second fixture root** — `scripts/fixtures/index-rows-red/`
+with one over-cap row inside a marked region, run as its own root and expected to exit 1 with
+exactly one break — keeps the existing green fixture's four negative assertions intact rather than
+flipping them. Or a **`--self-test`** on the model `check-backlog-claims.mjs` already carries,
+asserting the green fixture's own counts (3 regions, 4 rows) so a detector that finds nothing fails
+loudly. The `--self-test` is the cheaper of the two and covers the demonstrated mutation; the red
+fixture additionally covers the reporting path, which nothing currently runs either.
+
+[ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) names the *marker*
+hole in its Negative section and pins it as deliberate behavior in the fixture. It does not name
+this one, and its dated `Outcome` now says so.
+
+### Priority
+
+**Medium.** Nothing is broken today — the gate was verified working by hand at Plan 0105's close,
+and the fix is small. What makes it worth an entry is the failure mode: a silent one, in a gate
+whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md))
+is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
+same rule wearing a green tick.

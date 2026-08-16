@@ -434,6 +434,7 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    `docs/adrs/README.md` had reached **16 %** of the ADR corpus it indexes. If a row will not fit,
    the answer is **new arithmetic in ADR-0116** — never a raised constant, and never a row nudged
    outside the markers.
+
 2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
    append-only *once accepted* — but if the plan's implementation falsified something the ADR
    recorded, accept it **with a dated `Outcome` section** (the ADR-0054 and ADR-0074 precedent)
@@ -452,6 +453,7 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    cell holds that lives nowhere else is the **inbound** forward-reference (`supplemented by 0020`,
    `extended by 0006, 0008, 0013`), because an accepted ADR is append-only and nobody may reach back
    into 0003's header to record that 0013 extended it. Never drop one.
+
 3. **Refresh `docs/plans/README.md`**: roster → recently-closed, execution order, next-free-number.
 
    **The recently-closed bullet is one line — link, close date, review verdict, under 320 bytes:**

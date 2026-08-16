@@ -132,6 +132,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) | MilkDrop presets are translated ahead of time onto a warp-mesh idiom | accepted 2026-08-16 (Outcome) |
 | [0114](0114-the-engine-renders-video-offline-and-delegates-encoding.md) | The engine renders video offline and delegates encoding to a pipe | accepted 2026-08-16 |
 | [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 |
-| [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 |
+| [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
 
 <!-- roster:end -->
