@@ -717,6 +717,10 @@ const MARKERS: &[(&str, Kind, Vis)] = &[
     ("gpu::texture(", Kind::Texture, Vis::Fixed("FRAGMENT")),
     ("gpu::sampler(", Kind::Sampler, Vis::Fixed("FRAGMENT")),
     ("gpu::uniform(", Kind::Uniform, Vis::Following),
+    // warp_mesh/shader.rs's local helper for the two 3D noise volumes (Plan
+    // 0100 Phase 6). The dimension is not part of the shape — like a size's
+    // *value*, recording it could only split pairs, never join them.
+    ("texture_3d(", Kind::Texture, Vis::Fixed("FRAGMENT")),
 ];
 
 /// One bind-group layout as the scan sees it.

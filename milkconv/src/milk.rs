@@ -159,9 +159,31 @@ pub fn parse(text: &str) -> Result<MilkFile, MilkError> {
     }
 
     for (prefix, lines) in indexed {
-        out.blocks.insert(prefix, join_code(lines.into_values()));
+        let joined = if matches!(prefix.as_str(), "warp" | "comp") {
+            join_shader(lines.into_values())
+        } else {
+            join_code(lines.into_values())
+        };
+        out.blocks.insert(prefix, joined);
     }
     Ok(out)
+}
+
+/// Join a **shader** block's numbered lines.
+///
+/// Shader lines are the one part of the format MilkDrop's writer does *not*
+/// chop: each stored line is one source line, written verbatim behind a leading
+/// backtick (the format's way of protecting leading whitespace from INI
+/// trimming). So the correct join is the opposite of [`join_code`]'s — strip
+/// the backtick, keep the newline, and leave `//` comments for the shader lexer,
+/// which knows where a `#define` ends only because the line does.
+fn join_shader(lines: impl Iterator<Item = String>) -> String {
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(line.strip_prefix('`').unwrap_or(&line));
+        out.push('\n');
+    }
+    out
 }
 
 /// Join a code block's numbered lines into one program.
@@ -353,6 +375,25 @@ mod tests {
             file.keys.is_empty(),
             "none of these may land in the scalar roster: {:?}",
             file.keys
+        );
+    }
+
+    /// A shader block joins by newline with its backticks stripped — the exact
+    /// opposite of the EEL join, because the writer never chops a shader line
+    /// and a `#define` ends where its line does.
+    #[test]
+    fn a_shader_block_keeps_its_lines_and_loses_its_backticks() {
+        let file = parse(
+            "warp_1=`#define PI 3.14159\n\
+             warp_2=`shader_body\n\
+             warp_3=`{\n\
+             warp_4=`    ret = tex2D(sampler_main, uv).xyz; // decay me\n\
+             warp_5=`}\n",
+        )
+        .expect("parses");
+        assert_eq!(
+            file.block("warp"),
+            "#define PI 3.14159\nshader_body\n{\n    ret = tex2D(sampler_main, uv).xyz; // decay me\n}\n"
         );
     }
 

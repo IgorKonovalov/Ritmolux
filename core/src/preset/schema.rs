@@ -1024,10 +1024,7 @@ fn build_config(
         // rebuild them mid-frame. Config is always `Some` so `configure` runs on
         // every preset switch (resizing the mesh — never stale).
         SystemKind::WarpMesh => {
-            let bundle = milk
-                .map(|raw| raw.into_bundle())
-                .transpose()
-                .map_err(|err| PresetError::Config(err.to_string()))?;
+            let bundle = milk.map(|raw| raw.into_bundle()).transpose()?;
             Ok(Some(
                 mesh.unwrap_or_default()
                     .into_config(bundle.map(Box::new), salt)?,
@@ -1501,6 +1498,18 @@ struct RawMilk {
     /// Up to four custom shapes — **63 % of the corpus enables at least one.**
     #[serde(default)]
     shapes: Vec<RawMilkElement>,
+    /// The translated `warp` shader, as a complete WGSL fragment module (Plan
+    /// 0100 Phase 6). Compiled through naga at load: **a failed compile rejects
+    /// this preset by name and the loader's per-file skip loads the rest.**
+    #[serde(default)]
+    warp_shader: Option<String>,
+    /// The translated `comp` shader — same contract as `warp_shader`.
+    #[serde(default)]
+    comp_shader: Option<String>,
+    /// The deepest blur level either shader samples, `0..=3`. Decides whether
+    /// the scene runs its blur chain at all.
+    #[serde(default)]
+    blur_level: Option<u8>,
 }
 
 /// One `[[milk.waves]]` or `[[milk.shapes]]` entry: an element's own three
@@ -1533,28 +1542,47 @@ struct RawMilkElement {
 impl RawMilk {
     /// Decode and validate every section at the load boundary — a malformed
     /// program is a surfaced load error, never a panic (ADR-0002 / NFR 10).
-    fn into_bundle(self) -> Result<crate::milk::MilkBundle, crate::milk::BundleError> {
+    /// A bundle's WGSL goes through the same naga frontend wgpu will hand it
+    /// to, here, so a bad shader is a named load error rather than a render-time
+    /// device error.
+    fn into_bundle(self) -> Result<crate::milk::MilkBundle, PresetError> {
         let mut bundle = crate::milk::MilkBundle::from_assembly(
             self.per_frame_init.as_deref(),
             self.per_frame.as_deref(),
             self.per_vertex.as_deref(),
-        )?;
+        )
+        .map_err(|err| PresetError::Config(err.to_string()))?;
+        for (which, source) in [("warp", &self.warp_shader), ("comp", &self.comp_shader)] {
+            if let Some(source) = source {
+                crate::milk::shader::validate_wgsl(source).map_err(|err| {
+                    PresetError::Config(format!(
+                        "[milk] {which}_shader rejected by naga — this preset is skipped, \
+                         the rest of the library loads: {err}"
+                    ))
+                })?;
+            }
+        }
+        bundle.warp_wgsl = self.warp_shader;
+        bundle.comp_wgsl = self.comp_shader;
+        bundle.blur_level = self.blur_level.unwrap_or(0).min(3);
         for (kind, elements) in [
             (crate::milk::ElementKind::Wave, self.waves),
             (crate::milk::ElementKind::Shape, self.shapes),
         ] {
             for element in elements {
-                bundle.push_element(
-                    kind,
-                    element.init.as_deref(),
-                    element.per_frame.as_deref(),
-                    element.per_point.as_deref(),
-                    element.count,
-                    element.instances.unwrap_or(1),
-                    element.use_dots,
-                    element.thick,
-                    element.additive,
-                )?;
+                bundle
+                    .push_element(
+                        kind,
+                        element.init.as_deref(),
+                        element.per_frame.as_deref(),
+                        element.per_point.as_deref(),
+                        element.count,
+                        element.instances.unwrap_or(1),
+                        element.use_dots,
+                        element.thick,
+                        element.additive,
+                    )
+                    .map_err(|err| PresetError::Config(err.to_string()))?;
             }
         }
         Ok(bundle)

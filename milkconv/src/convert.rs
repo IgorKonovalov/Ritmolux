@@ -189,8 +189,9 @@ const MISSING_INPUTS: &[(&str, &str)] = &[
     ("rand_preset4", SHADER_RAND),
 ];
 
-const SHADER_RAND: &str =
-    "a MilkDrop 2 shader-side random vector — Plan 0100 Phase 6's input surface";
+const SHADER_RAND: &str = "a MilkDrop 2 random seed. The shader-side pair (`rand_preset`, \
+     `rand_frame`) is supplied to translated shaders (Phase 6); this EEL-side \
+     quadruple is not, and reads 0";
 
 /// MilkDrop's own `zoomexp`, folded into the per-vertex program.
 ///
@@ -234,12 +235,43 @@ pub struct Converted {
 pub enum ConvertError {
     /// A section did not compile.
     Eel(EelError),
+    /// A MilkDrop 2 shader did not translate (Plan 0100 Phase 6). The whole
+    /// preset is rejected **by name** rather than converted without its shader:
+    /// a preset whose picture lives in its `warp` block would otherwise load
+    /// without complaint and render something its author never drew, which is
+    /// the failure class the plan's Risks call the worst for reputation.
+    Shader {
+        /// `"warp"` or `"comp"`.
+        stage: &'static str,
+        /// What did not translate — class first, so the report ranks by it.
+        err: crate::shader::ShaderError,
+    },
+    /// The translator emitted WGSL that naga then refused — a converter defect
+    /// by definition, and ranked as its own class so it can never hide inside a
+    /// preset-shaped reason.
+    EmitterInvalid {
+        /// `"warp"` or `"comp"`.
+        stage: &'static str,
+        /// naga's report.
+        err: String,
+    },
 }
 
 impl std::fmt::Display for ConvertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ConvertError::Eel(e) => write!(f, "{e}"),
+            // The first colon-free segment is the ranking key (`reason_class`),
+            // so the stage and the class both sit before the first `:`.
+            ConvertError::Shader { stage, err } => {
+                write!(f, "{stage} shader {}: {}", err.class, err.message)
+            }
+            ConvertError::EmitterInvalid { stage, err } => {
+                write!(
+                    f,
+                    "{stage} shader emitter-invalid (converter defect): {err}"
+                )
+            }
         }
     }
 }
@@ -297,6 +329,45 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
     let (waves, shapes) = build_elements(file, &mut warnings)?;
     bundle.waves = waves;
     bundle.shapes = shapes;
+
+    // --- the shaders (Plan 0100 Phase 6) ---
+    //
+    // Only a MilkDrop 2 preset runs its shader blocks; a 1.x file carrying
+    // stray `warp_N` lines (the corpus has a few, from hand editing) never
+    // executed them in the reference either.
+    let mut shader_stats = Vec::new();
+    if file.is_milkdrop2() {
+        let tex_wrap = file.number("btexwrap", 1.0) >= 0.5;
+        for (stage, block) in [
+            (crate::shader::Stage::Warp, "warp"),
+            (crate::shader::Stage::Comp, "comp"),
+        ] {
+            let source = file.block(block);
+            if source.trim().is_empty() {
+                continue;
+            }
+            let translated = crate::shader::translate(stage, source, tex_wrap).map_err(|err| {
+                ConvertError::Shader {
+                    stage: stage.name(),
+                    err,
+                }
+            })?;
+            // The same gate the loader runs, run now — an emitter bug is a
+            // converter finding, not a load-time mystery.
+            lmv_core::milk::shader::validate_wgsl(&translated.wgsl).map_err(|err| {
+                ConvertError::EmitterInvalid {
+                    stage: stage.name(),
+                    err,
+                }
+            })?;
+            shader_stats.push((stage.name(), translated.ops, translated.loops));
+            bundle.blur_level = bundle.blur_level.max(translated.blur_level);
+            match stage {
+                crate::shader::Stage::Warp => bundle.warp_wgsl = Some(translated.wgsl),
+                crate::shader::Stage::Comp => bundle.comp_wgsl = Some(translated.wgsl),
+            }
+        }
+    }
 
     // --- the roster check: nothing unrecognized goes through silently ---
     //
@@ -383,30 +454,18 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
         }
     }
 
-    // Blocks the file carries and this phase does not translate. Counted rather
-    // than parsed, so Phase 5's ranking has the numbers before Phase 4 and
-    // Phase 6 exist.
-    for (block, owed, class) in [
-        (
-            "warp",
-            "Plan 0100 Phase 6, the shaders",
-            "unconverted-shader",
-        ),
-        (
-            "comp",
-            "Plan 0100 Phase 6, the shaders",
-            "unconverted-shader",
-        ),
-    ] {
-        if !file.block(block).trim().is_empty() {
-            warnings.push(Warning {
-                section: "",
-                message: format!(
-                    "carries a `{block}` HLSL block, which is not translated — {owed}"
-                ),
-                class,
-            });
-        }
+    // A 1.x file carrying stray shader text: the reference never ran it, so the
+    // conversion does not either — but it is said, not silent.
+    if !file.is_milkdrop2()
+        && (!file.block("warp").trim().is_empty() || !file.block("comp").trim().is_empty())
+    {
+        warnings.push(Warning {
+            section: "",
+            message: "carries shader text but declares MilkDrop 1.x, which never ran it — \
+                      ignored, as the reference ignored it"
+                .into(),
+            class: "shader-on-milkdrop1",
+        });
     }
     if file.key("sampler_pc").is_some() || uses_disk_texture(file) {
         warnings.push(Warning {
@@ -425,6 +484,7 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
         &warnings,
         &per_frame_src,
         &per_vertex_src,
+        &shader_stats,
     );
     Ok(Converted {
         toml,
@@ -574,6 +634,7 @@ fn emit(
     warnings: &[Warning],
     per_frame_src: &str,
     per_vertex_src: &str,
+    shader_stats: &[(&'static str, u32, u32)],
 ) -> String {
     let mut out = String::new();
     let _ = writeln!(
@@ -642,6 +703,31 @@ fn emit(
             let _ = writeln!(out, "#   {}", line.trim_end());
         }
         let _ = writeln!(out, "{section} = \"\"\"\n{}\"\"\"\n", program.to_assembly());
+    }
+    // The translated shaders (Plan 0100 Phase 6) — before the array-of-tables,
+    // which close the `[milk]` table. TOML *literal* strings, because WGSL never
+    // contains a quote and a basic string would reinterpret its backslashes (of
+    // which WGSL has none today, and this keeps it that way).
+    for (key, wgsl) in [
+        ("warp_shader", &bundle.warp_wgsl),
+        ("comp_shader", &bundle.comp_wgsl),
+    ] {
+        if let Some(wgsl) = wgsl {
+            let stats = shader_stats
+                .iter()
+                .find(|(stage, _, _)| key.starts_with(stage));
+            if let Some((stage, ops, loops)) = stats {
+                let _ = writeln!(
+                    out,
+                    "# --- the {stage} shader, translated from HLSL: {ops} ops, \
+                     {loops} loop(s), each bounded at 1024 iterations ---"
+                );
+            }
+            let _ = writeln!(out, "{key} = '''\n{wgsl}'''\n");
+        }
+    }
+    if bundle.blur_level > 0 {
+        let _ = writeln!(out, "blur_level = {}\n", bundle.blur_level);
     }
     emit_elements(&mut out, "waves", &bundle.waves);
     emit_elements(&mut out, "shapes", &bundle.shapes);

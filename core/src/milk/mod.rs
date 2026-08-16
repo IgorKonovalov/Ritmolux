@@ -56,6 +56,7 @@
 
 pub mod bytecode;
 pub mod outputs;
+pub mod shader;
 pub mod vm;
 
 use bytecode::{EelProgram, ProgramError};
@@ -120,6 +121,17 @@ pub struct MilkBundle {
     /// Up to four custom shapes — filled polygons with their own per-instance
     /// programs. **63 % of the corpus enables at least one.**
     pub shapes: Vec<MilkElement>,
+    /// The translated MilkDrop 2 `warp` shader, as a complete WGSL fragment
+    /// module (Plan 0100 Phase 6). `None` — most of MilkDrop 1.x, and any
+    /// MilkDrop 2 preset that never wrote one — takes the engine's built-in
+    /// decay path. Validated through naga at load ([`shader::validate_wgsl`]).
+    pub warp_wgsl: Option<String>,
+    /// The translated `comp` shader — replaces the built-in present remaps when
+    /// present. See [`warp_wgsl`](Self::warp_wgsl).
+    pub comp_wgsl: Option<String>,
+    /// The deepest `GetBlur`/`sampler_blur` level either shader reaches,
+    /// `0..=3`. Zero means the blur chain never runs for this preset.
+    pub blur_level: u8,
 }
 
 /// What a custom element draws, which decides which of its programs run and how
@@ -249,6 +261,9 @@ impl MilkBundle {
             per_vertex: decode("per_vertex", per_vertex)?,
             waves: Vec::new(),
             shapes: Vec::new(),
+            warp_wgsl: None,
+            comp_wgsl: None,
+            blur_level: 0,
         };
         // The shared register file is the bridge, so the rosters have to agree.
         // An empty program declares nothing and is exempt.
@@ -428,6 +443,16 @@ pub struct MilkRuntime {
     /// injected real `dt`, so they are frame-rate independent like everything
     /// else here.
     att: [f32; 3],
+    /// The MilkDrop-scaled band levels of the last [`run_frame`](Self::run_frame),
+    /// kept so the shader uniform reads exactly what the EEL program read.
+    last_bands: [f32; 3],
+    /// The preset's salt, kept for the two `rand_*` shader vectors.
+    salt: u32,
+    /// The shader-side `rand_frame` stream's state — a counter mixed per frame,
+    /// so a capture replaying the same frames sees the same randoms (ADR-0051).
+    shader_rand_state: u32,
+    /// This frame's `rand_frame` vector, advanced by `run_frame`.
+    shader_rand_frame: [f32; 4],
 }
 
 /// The time constant of the `*_att` envelopes, in seconds.
@@ -521,6 +546,10 @@ impl MilkRuntime {
             snapshot,
             frame_index: 0,
             att: [0.0; 3],
+            last_bands: [0.0; 3],
+            salt,
+            shader_rand_state: 0,
+            shader_rand_frame: [0.0; 4],
         };
         runtime.reset();
         runtime
@@ -539,6 +568,9 @@ impl MilkRuntime {
         self.state.reset_rng();
         self.frame_index = 0;
         self.att = [0.0; 3];
+        self.last_bands = [0.0; 3];
+        self.shader_rand_state = 0;
+        self.shader_rand_frame = [0.0; 4];
         vm::run(&self.bundle.per_frame_init, &mut self.state, Budget::INIT);
         for element in self.waves.iter_mut().chain(self.shapes.iter_mut()) {
             element.reset();
@@ -587,6 +619,24 @@ impl MilkRuntime {
                 state.set(index, value);
             }
         };
+        self.last_bands = [
+            frame.bass * BAND_SCALE,
+            frame.mid * BAND_SCALE,
+            frame.treb * BAND_SCALE,
+        ];
+        // The shader-side `rand_frame`, mixed from the frame counter rather than
+        // drawn from a stream — replaying the same frame numbers replays the
+        // same randoms whatever else ran in between (NFR §6).
+        self.shader_rand_state = self.frame_index.wrapping_add(1);
+        self.shader_rand_frame = std::array::from_fn(|i| {
+            unit01(mix32(
+                self.salt.wrapping_add(
+                    self.shader_rand_state
+                        .wrapping_mul(4)
+                        .wrapping_add(i as u32),
+                ),
+            ))
+        });
         set(&mut self.state, self.inputs.bass, frame.bass * BAND_SCALE);
         set(&mut self.state, self.inputs.mid, frame.mid * BAND_SCALE);
         set(&mut self.state, self.inputs.treb, frame.treb * BAND_SCALE);
@@ -772,6 +822,71 @@ impl MilkRuntime {
         });
         convert_outputs(raw)
     }
+
+    // --- the shader input surface (Plan 0100 Phase 6) ---
+    //
+    // Read after `run_frame` by the scene's uniform fill, so a converted shader
+    // sees the same frame the EEL programs saw.
+
+    /// `q1`..`q32` as the per-frame program left them.
+    pub fn q_values(&self) -> [f32; Q_COUNT] {
+        std::array::from_fn(|i| {
+            self.q_slots
+                .get(i)
+                .and_then(|slot| *slot)
+                .map_or(0.0, |index| self.state.get(index))
+        })
+    }
+
+    /// `bass, mid, treb, vol` then their attenuated four, MilkDrop-scaled.
+    /// `vol` is the mean of the three — this engine's analysis has no separate
+    /// loudness, and the mean behaves the way presets use `vol`.
+    pub fn shader_bands(&self) -> [f32; 8] {
+        let [b, m, t] = self.last_bands;
+        let [ba, ma, ta] = self.att;
+        let vol = (b + m + t) / 3.0;
+        let vol_att = (ba + ma + ta) / 3.0;
+        [b, m, t, vol, ba, ma, ta, vol_att]
+    }
+
+    /// This frame's `rand_frame` vector — four uniform randoms, fresh per frame,
+    /// a pure function of the salt and the frame index.
+    pub fn rand_frame(&self) -> [f32; 4] {
+        self.shader_rand_frame
+    }
+
+    /// The preset-lifetime `rand_preset` vector, fixed at load from the salt.
+    pub fn rand_preset(&self) -> [f32; 4] {
+        std::array::from_fn(|i| unit01(mix32(self.salt.wrapping_mul(0x9E37_79B9) ^ (i as u32))))
+    }
+
+    /// The frame counter, for the shader's `frame`.
+    pub fn frame_index(&self) -> u32 {
+        self.frame_index
+    }
+
+    /// The preset's salt, for shader inputs derived outside the runtime (the
+    /// `rot_*` matrices).
+    pub fn salt(&self) -> u32 {
+        self.salt
+    }
+}
+
+/// One round of the lowbias32 mixer — the CPU mirror of `gpu::HASH_WGSL`, here
+/// because `milk` sits below `render` and cannot reach the crate-private one.
+fn mix32(v: u32) -> u32 {
+    let mut h = v;
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x7FEB_352D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x846C_A68B);
+    h ^= h >> 16;
+    h
+}
+
+/// The top 24 bits as a unit fraction in `[0, 1)`.
+fn unit01(h: u32) -> f32 {
+    (h >> 8) as f32 / 16_777_216.0
 }
 
 /// The structural numbers a custom element's geometry is sized from — the parts

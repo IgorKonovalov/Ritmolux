@@ -18,3 +18,4 @@ pub mod convert;
 pub mod eel;
 pub mod milk;
 pub mod report;
+pub mod shader;
