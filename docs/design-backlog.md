@@ -1312,3 +1312,154 @@ user asked for twice and it shipped; the floor was asked for once, as one elemen
 this engine is not a collage tool. It becomes worth taking when someone authors a world that wants
 a vanishing point — at which point the two routes above should be judged by rendering, not by
 argument, which is what Phase 7's own first done-when said.
+
+---
+
+## 0096 — `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies
+
+**Raised by:** `preset-author`, authoring `presets/shape_pulse.toml` against two user reference
+images at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6 (2026-08-16).
+**Owner if taken:** `architect` (it owes an ADR — see the routes below), then `dev`.
+
+- **Verified 2026-08-16** — the scene's scalar is a distance, so its level sets are offsets by
+  construction: `present: definition of an offset curve in: core/src/render/scenes/shape_field.rs`
+- **Verified 2026-08-16** — the normalization that makes it so:
+  `present: at that deepest point in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+[ADR-0105](adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) chose "a band of the
+palette coordinate is a band of constant distance, **which is the definition of an offset curve**",
+and the scene delivers exactly that. The user's reference — nested heart contours, red on black —
+is **not** an offset family. Its inner rings stay sharply heart-shaped down to a small core, which
+only **self-similar scaled copies** do.
+
+The mechanism is geometry and it is not tunable. An inward offset is an erosion, and erosion
+**rounds a reflex corner while keeping convex ones sharp**. On the heart that means the bottom
+point stays crisp and the top notch fills in — which is precisely the artifact the user asked the
+content lane to fix and it could not.
+
+**The cost is a hard coupling, not a difficulty.** The core's inner boundary sits at
+`d = ((1/palette_steps) / color_span)^(1/gamma)`, so a notch sharp enough to read needs
+`palette_steps * color_span ~ 1` — which leaves **one** band inside the figure. Measured at 9
+steps on the heart:
+
+| core sits at | notch rounding | rings inside the figure |
+|---|---|---|
+| 0.48 | 0.33 | four — what ships |
+| 0.68 | 0.20 | two |
+| 0.81 | 0.12 | one |
+| 0.91 | 0.06 | none: a black heart with a red rim |
+
+The user judged the last one in the running app and **rejected it**; `shape_pulse` keeps the
+rounded core. So "many rings inside **and** a small sharp core" is unreachable today, and it is the
+reference's whole construction.
+
+### What a fix would be
+
+A second coordinate mode on the scene: a **shape-radius** rather than a distance — for a region
+star-shaped about its centre, `r / r_boundary(theta)`, which is `0` at the centre and `1` on the
+outline like the distance is, but whose level sets are *scaled copies*. It would decouple ring
+count from notch sharpness entirely, and both would then be free parameters.
+
+**It owes an ADR when taken**, and the rejected alternatives are already visible: reusing
+`kaleido_radial` (it nests shrinking copies periodic in `log r`, but it nests the **frame** about a
+screen point rather than the figure about its own centre, so it cannot follow `pan_*` or a shape);
+and doing it in the palette (what `shape_pulse` does today — stripes packed as gradient stops,
+which fakes the ring *count* but cannot change what the level sets are shaped like).
+
+### Priority
+
+**Medium.** Nothing ships broken and the first world landed without it. It is the difference
+between "the construction resembles the reference" and "the construction *is* the reference", on
+the one family this project has now had two batches of user reference images for.
+
+---
+
+## 0097 — a curved or jittered `star` returns a NEGATIVE normalized distance at its own centre, and on `shape_field` that is a hole through the figure
+
+**Raised by:** `preset-author`, building the Phase 6 star probes for
+[Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) (2026-08-16).
+**Owner if taken:** `dev`.
+
+- **Verified 2026-08-16** — the branch that produces it:
+  `present: select\(nearest, -nearest in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+`marks.rs` documents the roster's normalization as `0` at the shape's deepest interior point,
+exactly `1` on the outline. The `star` arm honours that on its **straight-edge** branch, which
+returns `r*cos(f) + r*sin(f)*B` and is therefore `0` at `r = 0`. Its **curved/jittered** branch —
+taken whenever `star_curve` or `star_jitter` is non-zero — returns `1 + sd/inradius` with `sd` the
+true nearest distance, so at the centre it returns `1 - k/inradius`, where `k` is the valley radius.
+
+**That is always negative, and provably so rather than incidentally.** `inradius` is the
+perpendicular from the origin to the edge *line*, and a perpendicular to a chord is never longer
+than either endpoint's radius — so `inradius <= k` for every configuration, hence `d(0) <= 0`
+always. Measured across the probe set: `-0.23` (valley 0.20, 4 points), `-0.30` (0.12, 4),
+`-0.30` (0.45, 6), `-0.75` (0.45, 9), `-0.94` (0.18, 7).
+
+**On `shape_field` it is visible and ugly.** The palette repeat-addresses, so a negative coordinate
+wraps to the gradient's far end and punches a hard n-sided dark hole through the middle of the
+figure — hexagonal on a six-pointer, nine-sided on a nine-pointer.
+
+**Nothing in the suite can see it.** On the particle path a negative `d` only makes
+`max(0, 1 - d)` exceed 1 and the falloff saturates brighter, so no golden baseline moves; and no
+shipped preset drives `shape_field` with a star.
+
+### What a fix would be
+
+The disagreement is in the **reference** the two branches divide by, not in either distance. The
+straight branch's `inradius` is the edge-plane perpendicular — an approximation Plan 0091 Phase 2
+recorded and deliberately kept, because repairing it would move every shipped `shape = "3"` mark.
+The curved branch computes a true distance and then divides it by that same approximate reference.
+Either give the curved branch a reference equal to the figure's actual deepest-point distance, or
+clamp the normalized result at 0 and record that the interior is not metric there.
+
+**Whoever takes it should read Plan 0091 Phase 2 first** — the byte-identity contract on the
+particle path is the constraint that shaped the current arithmetic, and a naive repair breaks it.
+
+### Priority
+
+**Medium.** It is invisible until a preset puts a shaped star on the field scene, and the content
+lane already hit it on its first attempt — four probe presets carry a `color_center` offset whose
+only purpose is to dodge it.
+
+---
+
+## 0098 — `thickness` below 0.167 is a dead zone on every line scene: all values render identically and nothing says so
+
+**Raised by:** `preset-author`, repairing `presets/fragment_vitrail.toml` (2026-08-16).
+**Owner if taken:** `dev` for the warning, `architect` for the doc line.
+
+- **Verified 2026-08-16** — the floor that creates the dead zone:
+  `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`
+
+### The finding
+
+`thickness` maps to an NDC-y half-width as `(thickness * 0.003).max(0.0005)`. The `.max` is a floor,
+so **every `thickness` below `0.167` produces the identical half-width** — 0.0005 NDC, about 0.27 px
+at 1080p, which rasterizes as a broken dotted line rather than a stroke.
+
+`fragment_vitrail` shipped with `thickness = 0.016` — two orders below the 1.5-3.2 every other line
+preset uses — so its Maurer rose rendered as scattered dots and read as gauze over the vault for
+its whole shipped life.
+
+**The dead zone is what made it expensive to find.** The content lane re-tuned `0.016` to `0.022`
+to `0.038` and the picture did not change *at all*, because all three clamp to the same floor — so
+the thickness hypothesis was discarded as disproved, and chord count and sample count were swept
+first. The value is in range, the preset loads clean, and nothing warns.
+
+### What a fix would be
+
+A load-time warning when a line scene's `thickness` binding rests below the floor's own threshold,
+in ADR-0020's shape (the unknown-param warning already exists and is the precedent). The floor
+itself should stay — it is what stops a zero thickness degenerating the quad.
+
+The doc half is already done: `presets/README.md` now states the working range and the dead zone.
+
+### Priority
+
+**Low for the engine, and the doc half is discharged.** One preset was affected and is repaired.
+It is filed because the *failure mode* — a parameter range where changing the value does nothing,
+with no warning — is the kind that costs a session every time someone meets it.
