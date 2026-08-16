@@ -35,6 +35,33 @@
 //! handed to [`write_y4m_frame`] and never on the wire bytes: a guard written
 //! against the wire would have to be loosened to a tolerance until it passed.
 //!
+//! ## Where the tap sits
+//!
+//! Nowhere new — and that is the design, not an accident of reuse. The composite
+//! is linear-light `Rgba16Float` until the tonemap ([ADR-0046]) and the display
+//! write dithers in the **encoded** domain ([ADR-0096]), both inside the one
+//! `draw_frame` the on-surface present path and every capture path share. The
+//! frame this module hands [`write_y4m_frame`] is a readback of exactly the
+//! texture the app would have presented, so an exported file cannot be washed
+//! out relative to the app without the app being washed out too.
+//!
+//! That is a property, so it is asserted rather than asserted-by-comment:
+//! `standalone/tests/shot_cli.rs`'s
+//! `a_rendered_frame_is_byte_identical_to_the_png_the_app_writes` renders the
+//! same instant twice — once through here, once through `shot --frame-at` — and
+//! compares the bytes exactly. It is exact because a tolerance would pass with
+//! the tap one stage too early, which is the failure ADR-0114 calls the most
+//! likely to ship unnoticed. The clip's sample rate is what makes "the same
+//! instant" expressible: [`HOP_SIZE`] samples at 30,720 Hz is 60 hops a second,
+//! so at `--fps 60` frame *N* and hop *N* coincide. Nothing in this module
+//! assumes that alignment — the test arranges it.
+//!
+//! The assertion is on the RGB frame and never on the wire, for the reason the
+//! section above gives: the YUV conversion is not bijective, so a wire-level
+//! version of it could only be loosened until it passed.
+//!
+//! [ADR-0046]: ../../../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md
+//! [ADR-0096]: ../../../docs/adrs/0096-the-display-write-dithers.md
 //! [NFR §4]: ../../../docs/nfr.md#4-size-and-dependencies
 
 use std::io::Write;
