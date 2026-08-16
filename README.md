@@ -27,10 +27,11 @@ Ten built-in rendering systems, all driven by editable text presets —
 > CLI under a synthesized audio clip — not a screenshot of the application window. There is no
 > picture anywhere of the preset browser, the settings menu or the `F3` overlay.
 
-> **Status: pre-1.0, in active development.** Both frontends run: the standalone app renders
-> live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI. The
-> preset format and the C ABI may still change between releases — stability begins at 1.0.0.
-> See [`docs/plans/`](docs/plans/) for what's in flight.
+> **Status: pre-1.0, in active development.** Both frontends run **and both ship**: the standalone
+> app renders live WASAPI loopback on Windows, and the foobar2000 component links the core's C ABI
+> and is attached to every `v*` tag since `v0.70.0`. The preset format and the C ABI may still
+> change between releases — stability begins at 1.0.0. See [`docs/plans/`](docs/plans/) for what's
+> in flight.
 
 ## Architecture
 
@@ -74,8 +75,10 @@ lmv-ring/            # The lock-free SPSC ring, split out zero-dependency so Mir
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
-packaging/           # What a `v*` tag ships: macos/bundle.sh (build, lipo, sign, zip, verify) and the
-                     #   READ-ME-FIRST.md testers get in each zip. See ADR-0038.
+packaging/           # What a `v*` tag ships, one recipe per artifact, each doing its own verification
+                     #   so a local run is held to CI's bar: macos/bundle.sh (build, lipo, sign, zip,
+                     #   verify) and foobar/ (fetch the pinned SDK, build, stamp, package, verify).
+                     #   Plus the READ-ME-FIRST.md testers get in each zip. See ADR-0038, ADR-0115.
 docs/
 ├── nfr.md           # Quantified v1 non-functional requirements (the numbers behind "lightweight").
 ├── preset-guide.md  # START HERE for presets: the illustrated entrance — the systems, one
@@ -86,7 +89,8 @@ docs/
 ├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
 ├── capturing.md     # Headless capture + visual-QA harness: the shot CLI and the core/tests/ checks.
 ├── releasing.md     # The version-bump / release procedure (one bump per plan close).
-├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback.
+├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback,
+│                    #   and installing the foobar2000 component (no runner can load foobar2000).
 ├── design-backlog.md  # Captured friction not yet promoted to an ADR or a plan (…-archive.md holds retired entries).
 ├── roadmap-visual-richness.md  # The visual-capability roadmap the recent plans are sequenced against.
 ├── generative-techniques-catalogue.md  # The technique survey behind the scene families.
@@ -253,8 +257,9 @@ This is real-time audio + graphics, so a few rules are non-negotiable:
   types in `core/`; no raw Metal/DX/Vulkan outside the wgpu layer. Swappability is the point.
 - **Determinism where it's testable.** DSP math is a pure function of its input window; visual
   randomness, when wanted, is explicitly seeded.
-- **The C ABI is a versioned contract.** Minimal surface — opaque handle, push-samples,
-  render, resize, free. Changing its shape is an ADR-worthy event.
+- **The C ABI is a versioned contract**, and [`docs/specs/0001-c-abi.md`](docs/specs/0001-c-abi.md)
+  is the authority on its shape — not this list, which paraphrased five functions long enough for
+  the real surface to reach thirteen. Changing that shape is an ADR-worthy event.
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU.
 
 ## Presets
@@ -263,8 +268,9 @@ Visuals are driven by **presets** — small TOML files that bind a built-in
 rendering system's parameters to short expressions over the live audio analysis
 (no Rust, no rebuild). The whole curated set ships across every built-in system —
 fragment field, particle swarm, parametric curve, L-system, star pattern,
-reaction-diffusion, attractor, spectrum readout, ballistic emitter — seeded into a
-per-user directory that both the standalone app and the foobar plugin share.
+reaction-diffusion, attractor, spectrum readout, ballistic emitter, shape field —
+seeded into a per-user directory that both the standalone app and the foobar
+plugin share.
 
 **Start with [`docs/preset-guide.md`](docs/preset-guide.md)** — the illustrated
 entrance: a complete preset in ten lines, what each built-in system looks
