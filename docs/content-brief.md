@@ -226,6 +226,14 @@ Three riders:
 > **Still open, and both need the user rather than the lane:** whether a beat-latched
 > `palette_steps` reads as a response or a strobe — the probe set for it was built and never run —
 > and which of the three star params is mis-shaped.
+>
+> **The second one now decides a plan, so it is worth more than it looks.** If the stars were
+> rejected on **silhouette**, the answer is the star params or
+> [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)'s new coordinate
+> ([Plan 0098](plans/0098-the-figure-nests-properly.md)). If they were rejected because they read
+> **flat and unlit**, the answer is [backlog 0092](design-backlog.md) — whose own trigger says to
+> take it *"if the Phase 6 look gate says the flat sparkle is the disappointing one in the set"*,
+> and which is currently blocked on exactly this. One short look call settles which.
 
 **This is the first sitting on a system that ships with no content at all.** Plan 0091 landed the
 `shape_field` scene, the `star` arm's three shape params, and the two-tone `multiply` route, and it

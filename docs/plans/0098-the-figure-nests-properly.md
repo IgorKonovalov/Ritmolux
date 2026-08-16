@@ -1,0 +1,240 @@
+# 0098 — The figure nests properly
+
+> **Status:** draft
+> **Created:** 2026-08-16
+> **Owner skill(s):** dev, human
+> **Related ADRs:** [0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the shape field gains a scaled-copy coordinate)
+> **Closes:** design-backlog 0096, design-backlog 0097
+
+## TL;DR
+
+`shape_field` learns a second coordinate — `r / r_boundary(theta)` — whose level sets are **scaled
+copies** of the outline rather than offsets of it, which is the construction two batches of user
+reference images have now asked for and the one the distance coordinate provably cannot make. On
+the way, the `star` arm stops returning a **negative** normalized distance at its own centre, which
+today punches a hole through any curved or jittered star drawn on this scene.
+
+## Context & problem
+
+Two findings from the content pass that authored the first `shape_field` world
+([Plan 0091](done/0091-the-figure-fills-the-frame.md) Phase 6), both verified against the code
+rather than taken on report.
+
+**The nesting is the wrong kind of nesting.** ADR-0105 chose offset contours and delivers them; the
+reference wants scaled copies. An inward offset is an erosion, and erosion **rounds a reflex corner
+while keeping convex ones sharp**, so a nested heart keeps its bottom point and loses its top notch
+as the rings move inward. That is not tunable: the innermost band sits at
+`d = ((1/palette_steps)/color_span)^(1/gamma)`, so a sharp notch needs `palette_steps * color_span ~ 1`,
+which leaves **one** band inside the figure. The far end of that trade was rendered and the user
+rejected it. [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) has the
+derivation and the rejected alternatives.
+
+**The star arm's interior is not merely approximate, it is signed wrong.** The straight-edge branch
+returns `0` at the centre, honouring the contract `marks.rs` documents. The curved/jittered branch —
+taken whenever `star_curve` or `star_jitter` is non-zero — returns `1 + sd/inradius` with `sd` a true
+distance, and at the centre that is `1 - k/inradius` for valley radius `k`. **It is always negative,
+provably:** `inradius` is the perpendicular from the origin to the edge *line*, and a perpendicular
+to a chord is never longer than either endpoint's radius, so `inradius <= k` always. Measured:
+`-0.23`, `-0.30`, `-0.30`, `-0.75`, `-0.94` across five configurations. On this scene the palette
+repeat-addresses, so a negative coordinate wraps and puts a hard n-sided dark hole through the middle
+of the figure.
+
+**Nothing in the suite can see the second one**, which is why it shipped: on the particle path a
+negative `d` only makes `max(0, 1 - d)` exceed 1 and the falloff saturates brighter, so no golden
+baseline moves, and no shipped preset drives `shape_field` with a star.
+
+## Decision
+
+Build ADR-0111's coordinate mode as a numeric selector with the distance mode as its default, with
+`r_boundary` derived **per arm in closed form** rather than by marching the SDF. Fix the star's
+interior sign first, because it is on the same file and a wrong arm underneath new work is a bad
+foundation. Leave the `ring` question — where the mode is undefined, since an annulus's centre is
+in its hole — to a phase that decides it against a rendered figure.
+
+## Architecture diagram
+
+```mermaid
+flowchart TD
+  subgraph marks["marks — the shared closed roster"]
+    SD["mark_distance(p, shape, points, star)<br/>signed distance, normalized by inradius"]
+    RB["mark_boundary_radius(theta, shape, points, star)<br/>NEW: closed form per arm"]
+  end
+  SD -->|"unchanged"| SW["swarm / emitter<br/>(particle marks)"]
+  SD -->|"mode 0 — offsets"| SF
+  RB -->|"mode 1 — scaled copies<br/>s = r / r_boundary"| SF
+  SF["shape_field<br/>one scalar to the palette"] --> PAL["[palette] + palette_steps<br/>+ palette_contour"]
+  RING["ring: centre is in the hole,<br/>so the ratio is undefined"] -.->|"Phase 4 decides"| RB
+```
+
+## Implementation phases
+
+### Phase 1 — The star's interior stops lying
+
+- **Owner skill:** dev
+- **What:** Closes design-backlog 0097. It is first because it is small, independent of everything
+  below, and it is on the file the later phases extend — building a second coordinate on top of an
+  arm whose first one is signed wrong is how a defect gets inherited rather than fixed.
+- **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/render/scenes/marks/tests.rs`.
+- **Done when:**
+  - `mark_distance` returns a value **`>= 0` everywhere inside every arm**, swept across the roster
+    and across the point counts, with `star_curve` and `star_jitter` both zero and non-zero. This is
+    a property, not a threshold: the module header states `0` at the deepest interior point, and the
+    curved branch currently violates it for every star configuration.
+  - The repair is stated as a choice with its reason recorded, because there are two and they are
+    not equivalent: give the curved branch a reference equal to the figure's **actual** deepest-point
+    distance, or clamp the normalized result at `0` and document that the interior is not metric
+    there. **The first changes what the interior field looks like; the second does not.**
+  - **The particle path moves zero pixels**, proved bless-to-bless on the branch rather than by
+    `git diff` — the Plan 0091 Phase 2 precedent, and the same reason: baselines drift from their
+    committed bytes on this box under a clean bless, so a diff would charge that drift here. The
+    straight-edge branch must remain bit-for-bit the arithmetic every shipped `shape = "3"` mark
+    evaluates.
+  - A test renders a jittered star on `shape_field` and asserts the **centre is not a hole** — that
+    the innermost region takes the palette colour its coordinate should give rather than the far end
+    of the gradient. The existing probe presets reproduce it; `presets/README.md` has the numbers.
+
+### Phase 2 — The coordinate exists, and a polygon proves it is scaled copies
+
+- **Owner skill:** dev
+- **What:** The walking skeleton: the selector, the uniform, and `r_boundary` for the two arms whose
+  closed form is one line (`disc` is `1`; `polygon` is `apothem / cos(f)` on the angle the fold has
+  already computed). **The polygon is what makes this phase a proof rather than a wiring exercise** —
+  a scaled polygon keeps its corners, an eroded one rounds them, so the two coordinates are
+  visibly and measurably different figures on it. The `disc` cannot show that: its offsets and its
+  scaled copies are the same circles, which is exactly why it is the control.
+- **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/render/scenes/shape_field.rs`,
+  their tests, `presets/README.md`.
+- **Done when:**
+  - A numeric selector chooses the mode, defaulting to the distance, **clamped and rounded
+    CPU-side** — the `kaleido_edge` / `shape` treatment, for the `kaleido_edge` reason: a mode is an
+    identity, and `[smoothing]` and preset dissolves interpolate a binding continuously.
+  - **The property, stated as a ratio that is constant:** on a `polygon`, walk rays out from the
+    centre and find where a given band boundary falls; under the radius mode the ratio
+    `r_level / r_boundary(theta)` is **constant in `theta`** to the harness's own resolution, which
+    is the definition of a scaled copy.
+  - **The control that makes it non-vacuous:** the same measurement under the **distance** mode is
+    *not* constant on the same figure. Both numbers get printed. Without this the first assertion
+    would pass on a disc, on a bug, and on a coordinate that was never wired up.
+  - **The `disc` arm agrees between the two modes**, which is the harness check: for a circle the
+    two constructions coincide exactly, so a disagreement there convicts the harness rather than the
+    shape.
+  - **Every existing golden baseline is byte-identical**, proved bless-to-bless as in Phase 1. The
+    default mode is the shipped arithmetic and nothing else may move.
+
+### Phase 3 — The heart and the star take the coordinate
+
+- **Owner skill:** dev
+- **What:** The two arms the references actually need. Both admit a closed form and neither is
+  one line: `star` is a ray against the tip-valley edge the angular fold has already selected, and
+  `heart` is a ray against a lobe circle or a tangent ray, chosen by the same branch its SDF takes.
+- **Files touched:** `core/src/render/scenes/marks.rs`, its tests, `presets/README.md`.
+- **Done when:**
+  - Both arms satisfy Phase 2's constant-ratio property, swept across the point counts and across
+    the three `star_*` shape params — including the curved and jittered configurations, since those
+    change where the boundary is and are the arms Phase 1 just repaired.
+  - **`r_boundary` agrees with the outline the SDF describes**, checked against the numerically
+    sampled boundary `marks/tests.rs` already builds for Plan 0091 Phase 2 rather than against a
+    second ground truth. A ratio that is beautifully constant against the *wrong* boundary is the
+    failure this check exists to catch.
+  - **The heart's notch is measurably sharper under the new mode** — the property the whole plan is
+    for. Stated as a comparison rather than an absolute: at equal ring counts, the inner contour's
+    deviation from a scaled copy of the outline is far smaller under the radius coordinate than
+    under the distance one, and the distance one's deviation grows as the contour moves inward while
+    the radius one's does not.
+
+### Phase 4 — `ring` gets an honest answer
+
+- **Owner skill:** dev
+- **What:** ADR-0111 names this as the one behavioural choice it leaves open. An annulus's centre is
+  in its hole, a ray from there crosses the boundary twice, and `r / r_boundary` has no single
+  value. Three answers are defensible — fall back to the distance silently, refuse the combination
+  with a load warning, or define it against the outer edge and document that the hole is not
+  expressed — and the phase picks one **against a rendered figure**.
+- **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/preset/schema.rs` if the answer is
+  a warning, `presets/README.md`.
+- **Done when:**
+  - All three are rendered before one is chosen, and the phase records **why** rather than only
+    which. The silent fallback is the cheapest and the worst to debug; the warning is the
+    ADR-0020 precedent and costs a load-path branch; the outer-edge definition is the only one that
+    draws something on a ring at all.
+  - Whatever is chosen, **a preset cannot reach a state that renders as a third thing without
+    saying so** — the negative ADR-0111 records is that a legal shape plus a legal mode could
+    otherwise produce a figure nobody asked for.
+  - `presets/README.md` carries it beside the selector, not in a footnote.
+
+### Phase 5 — What it costs at the floor tier
+
+- **Owner skill:** dev
+- **What:** ADR-0111 argues the closed forms are "a handful of ALU ops, the same order as the SDF
+  they sit beside" and that this is what makes the mode cheap enough not to need a gate. That is an
+  argument, not a measurement, and this phase settles it.
+- **Files touched:** none necessarily — a measurement phase, plus `docs/nfr.md` if a budget moves.
+- **Done when:**
+  - The radius mode's per-frame cost is measured against the distance mode's on the same preset and
+    the same figure, at the **floor tier** ([`docs/nfr.md`](../nfr.md) §1 is the reference), and the
+    reading is recorded with the machine it was taken on (ADR-0071).
+  - **A negative result is a legitimate outcome and it does not sink the plan** — the mode would
+    ship documented as the expensive coordinate, or gated to the tiers that can afford it. What is
+    not acceptable is shipping it unmeasured after an ADR that asserted it was cheap.
+
+### Phase 6 — The docs learn both coordinates
+
+- **Owner skill:** dev
+- **What:** The three load-bearing authoring docs, swept in the same commit as the last code phase
+  rather than after it (the Plan 0079 minor).
+- **Files touched:** `presets/README.md`, `docs/preset-palettes.md`.
+- **Done when:**
+  - `presets/README.md` carries the selector, the per-arm availability, and — **stated, not
+    implied** — that `color_span` values do **not** transfer between the modes, because the exterior
+    is divided by the inradius under one and grows linearly in `r` under the other. This sits beside
+    the portability trap that param already has, which the same file documents.
+  - `docs/preset-palettes.md` learns that `palette_contour` behaves differently under the radius
+    coordinate: it is an `fwidth` of whatever field it is given, and the radius field's gradient
+    differs sharply from the distance's near the centre, so the hairline does not keep its weight at
+    the same value.
+  - The worked recipe for the reference construction — nested figure, ring count on
+    `palette_steps`, spacing on `gamma` — replaces the palette-packing workaround
+    `shape_pulse` uses today as the documented route.
+
+### Phase 7 — The look gate
+
+- **Owner skill:** human
+- **What:** Judge the nested figure in motion against the reference images that started this.
+- **Done when:**
+  - A verdict on whether the reference now reproduces — specifically whether the inner rings keep
+    the heart's notch where the offset coordinate rounded it off.
+  - A verdict on whether `shape_pulse` should be **re-authored onto the new coordinate** or left as
+    it is. It is a shipped, accepted world built on the palette-packing workaround; the new route is
+    better but the look was judged and approved on the old one, so this is a content call and not an
+    automatic migration.
+  - **This phase may carry forward.** If the user is not available the `dev` phases close the plan
+    and the item moves to [`docs/content-brief.md`](../content-brief.md), the rule Plan 0083, Plan
+    0088 and Plan 0091 all followed. It gates nothing below it.
+
+## Risks & open questions
+
+- **The heart's closed form is the one that could turn out fiddly.** Its SDF is piecewise with a
+  branch, and the ray intersection has to take the *same* branch or the boundary radius and the
+  distance will describe different outlines. Phase 3's check against the numerically sampled
+  boundary is aimed squarely at this.
+- **Phase 1's repair choice has a look consequence and the plan does not pre-empt it.** Giving the
+  curved branch a true reference changes what the interior field looks like on a curved or jittered
+  star; clamping at zero does not, but leaves the interior non-metric. The phase must state which it
+  took and why.
+- **`shape_pulse` is a shipped world built on the workaround this plan supersedes.** Nothing forces
+  it to move, and Phase 7 asks the question rather than assuming the answer — but if it stays, the
+  library ships an example of the route the docs will now steer people away from.
+- **A second scalar per arm is a standing tax on the roster.** ADR-0084's closed roster bounds it,
+  and this plan does not open it.
+
+## What this plan does NOT do
+
+- **It does not make the roster extensible.** Five names, closed, per ADR-0084 and restated in
+  ADR-0105 and ADR-0111. This plan adds a coordinate, not a shape.
+- **It does not touch the particle path.** `swarm` and `emitter` read `mark_distance` and only its
+  interior; the new function is a second entry point that they do not call. Phase 1's repair is the
+  one place the two paths meet, which is why it owes a zero-pixel proof.
+- **It does not build a composable field grammar.** ADR-0111 Alternative D, declined for the same
+  reason ADR-0002 has declined it for the project's life.
+- **It does not address the occlusion half of design-backlog 0069.** Nothing here decides what is in
+  front of what.

@@ -1019,6 +1019,16 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 
 ## 0092 — every figure this engine draws is unlit, and two reference images ask for a shaded one
 
+> **ITS TRIGGER FIRED, AMBIGUOUSLY — 2026-08-16.** This entry says to take it *"if the Phase 6 look
+> gate says the flat sparkle is the disappointing one in the set"*. That gate ran at
+> [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md)'s close and the user rejected the star
+> silhouettes as not good enough to curate — but **the reason was never captured**, and the plan had
+> asked specifically for a *named* miss. So the condition is met on its face and unusable in
+> substance: a rejection on **silhouette** points at the star params or at ADR-0111's coordinate,
+> and a rejection on **shading** points here. **One short look call settles it** and it is recorded
+> as the open question in [`docs/content-brief.md`](content-brief.md) item 6. Do not plan lighting
+> off this trigger until that answer exists.
+
 - **Raised:** 2026-08-13, from the second of two user reference batches, alongside
   [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md). Filed separately **at the point of raising**
   rather than absorbed into that plan, because it is a lighting decision and the plan is a silhouette
@@ -1078,6 +1088,9 @@ verdict is the trigger, and it is scheduled.
 ---
 
 ## 0093 — the headless capture path dies past a few thousand frames, so the horizon cannot reach its own headline length
+
+> **PROMOTED 2026-08-16** — [Plan 0099](plans/0099-the-horizon-reaches-its-own-length.md), whose
+> Phase 1 is exactly the `reaction_etching` run this entry names as the cheapest discriminator.
 
 **Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)'s
 close, from that plan's Phase 2 findings. **Owner if taken:** `dev` — but read the mechanism below
@@ -1317,6 +1330,11 @@ argument, which is what Phase 7's own first done-when said.
 
 ## 0096 — `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies
 
+> **PROMOTED 2026-08-16** — [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)
+> (proposed) and [Plan 0098](plans/0098-the-figure-nests-properly.md) Phases 2-4. The entry stays
+> live until that plan lands, per this file's own lifecycle: a design that has not shipped is
+> still live.
+
 **Raised by:** `preset-author`, authoring `presets/shape_pulse.toml` against two user reference
 images at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6 (2026-08-16).
 **Owner if taken:** `architect` (it owes an ADR — see the routes below), then `dev`.
@@ -1378,6 +1396,9 @@ the one family this project has now had two batches of user reference images for
 
 ## 0097 — a curved or jittered `star` returns a NEGATIVE normalized distance at its own centre, and on `shape_field` that is a hole through the figure
 
+> **PROMOTED 2026-08-16** — [Plan 0098](plans/0098-the-figure-nests-properly.md) Phase 1, placed
+> first because it is on the file the rest of that plan extends.
+
 **Raised by:** `preset-author`, building the Phase 6 star probes for
 [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) (2026-08-16).
 **Owner if taken:** `dev`.
@@ -1428,6 +1449,10 @@ only purpose is to dodge it.
 ---
 
 ## 0098 — `thickness` below 0.167 is a dead zone on every line scene: all values render identically and nothing says so
+
+> **PROMOTED 2026-08-16** — folded into [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)
+> as Phase 1b, placed before that plan's Phase 4 stop gate so it cannot be orphaned if the arc work
+> is abandoned. The doc half is already discharged.
 
 **Raised by:** `preset-author`, repairing `presets/fragment_vitrail.toml` (2026-08-16).
 **Owner if taken:** `dev` for the warning, `architect` for the doc line.
