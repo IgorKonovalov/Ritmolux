@@ -241,7 +241,7 @@ pub fn to_yuv444(img: &CaptureImage, planes: &mut Vec<u8>) {
 pub fn write_y4m_frame(
     img: &CaptureImage,
     planes: &mut Vec<u8>,
-    out: &mut impl Write,
+    out: &mut (impl Write + ?Sized),
 ) -> std::io::Result<()> {
     to_yuv444(img, planes);
     out.write_all(b"FRAME\n")?;
@@ -261,6 +261,26 @@ pub struct RenderRequest {
     pub width: u32,
     pub height: u32,
     pub tier: Tier,
+    /// `--ffmpeg`: spawn this encoder and wire the pipe, instead of writing the
+    /// stream to stdout. `None` is the raw-stream case.
+    pub encoder: Option<EncoderRequest>,
+}
+
+/// The encoder half of a render: which `ffmpeg` to run, which clip to mux, and
+/// where the file lands.
+///
+/// The binary is a **path the user supplies** and never a bundled fallback
+/// (ADR-0114). Its absence is a named error naming the flag, because "we quietly
+/// used something else" is the one outcome that would make an exported file
+/// untrustworthy.
+pub struct EncoderRequest {
+    /// The `ffmpeg` binary. A bare name resolves on `PATH`.
+    pub ffmpeg: std::path::PathBuf,
+    /// The source WAV, passed through untouched for muxing — the encoder's job,
+    /// not ours.
+    pub clip: std::path::PathBuf,
+    /// Where the encoded file lands.
+    pub out: std::path::PathBuf,
 }
 
 /// Drive `name` over `pcm` at `fps`, handing every rendered frame to `sink`.
@@ -314,7 +334,180 @@ pub fn render_frames(
     Ok(frames)
 }
 
-/// Render the clip and write the stream to stdout.
+// ---------------------------------------------------------------------------
+// The encoder
+// ---------------------------------------------------------------------------
+
+/// **The one canonical `ffmpeg` invocation** (Plan 0101 Phase 2).
+///
+/// The documented command will be wrong on somebody's build, so there is exactly
+/// one of it and `--ffmpeg` *generates* it — a wiki of incantations would mean
+/// several things to fix rather than one. It is printed on stderr at the start
+/// of every encoded run, so adapting it by hand starts from what actually ran.
+///
+/// Every argument is here for a reason:
+///
+/// - `-f yuv4mpegpipe -i pipe:0` — the frame stream, whose header carries its own
+///   geometry, so no `-s` / `-pix_fmt` is passed and none can be mistyped.
+/// - the clip as a second input, `-map`ped explicitly — muxing audio to video is
+///   the encoder's job and the WAV goes through untouched.
+/// - `-color_range pc` and the BT.709 tags — the stream is full range, and an
+///   untagged file is one a player expands from 16-235 and shows washed out.
+///   `bt709` transfer rather than `iec61966-2-1`: the tap hands over sRGB-encoded
+///   samples and the two are close, but every player assumes the former and some
+///   ignore the latter outright.
+/// - `-shortest` — the trailing partial frame makes the video a fraction longer
+///   than the audio, and they should end together.
+pub fn ffmpeg_args(clip: &std::path::Path, out: &std::path::Path) -> Vec<String> {
+    [
+        "-hide_banner",
+        "-nostats",
+        "-y",
+        "-f",
+        "yuv4mpegpipe",
+        "-i",
+        "pipe:0",
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .chain(["-i".to_string(), clip.display().to_string()])
+    .chain(
+        [
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-color_range",
+            "pc",
+            "-colorspace",
+            "bt709",
+            "-color_primaries",
+            "bt709",
+            "-color_trc",
+            "bt709",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-shortest",
+        ]
+        .iter()
+        .map(|s| (*s).to_string()),
+    )
+    .chain([out.display().to_string()])
+    .collect()
+}
+
+/// A spawned encoder, its stdin pipe, and the thread draining its stderr.
+///
+/// The stderr drain is not optional. Inheriting it would mix the encoder's
+/// output with ours and leave nothing to quote in an error; reading it inline
+/// would deadlock the moment the pipe buffer filled while we were blocked
+/// writing a frame. A thread does both jobs: it echoes each line as it arrives,
+/// so a long render shows what the encoder is doing, and keeps the tail so a
+/// failure can be reported in the encoder's own words.
+struct Encoder {
+    child: std::process::Child,
+    stdin: Option<std::process::ChildStdin>,
+    stderr: Option<std::thread::JoinHandle<Vec<String>>>,
+}
+
+/// Lines of the encoder's own output kept for the failure message. Enough for a
+/// real diagnostic, few enough that a runaway encoder cannot grow the process.
+const ENCODER_TAIL_LINES: usize = 20;
+
+impl Encoder {
+    /// Spawn `ffmpeg` with the pipe wired.
+    ///
+    /// A spawn failure names the flag, because "ffmpeg is not installed" and
+    /// "the path is wrong" are the two ways this goes wrong and both are the
+    /// user's to fix — there is deliberately no fallback to try instead.
+    fn spawn(req: &EncoderRequest) -> Result<Self, String> {
+        let args = ffmpeg_args(&req.clip, &req.out);
+        eprintln!(
+            "render: encoding with `{} {}`",
+            req.ffmpeg.display(),
+            args.join(" ")
+        );
+        let mut child = std::process::Command::new(&req.ffmpeg)
+            .args(&args)
+            .stdin(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                format!(
+                    "--ffmpeg {}: {e} (no encoder ships with this tool — install \
+                     ffmpeg or point --ffmpeg at one)",
+                    req.ffmpeg.display()
+                )
+            })?;
+        let stdin = child.stdin.take();
+        let stderr = child.stderr.take().map(|pipe| {
+            std::thread::spawn(move || {
+                use std::io::BufRead as _;
+                let mut tail: Vec<String> = Vec::new();
+                for line in std::io::BufReader::new(pipe).lines().map_while(Result::ok) {
+                    eprintln!("ffmpeg: {line}");
+                    if tail.len() == ENCODER_TAIL_LINES {
+                        tail.remove(0);
+                    }
+                    tail.push(line);
+                }
+                tail
+            })
+        });
+        Ok(Self {
+            child,
+            stdin,
+            stderr,
+        })
+    }
+
+    /// Close the pipe, wait for the encoder, and turn a non-zero exit into an
+    /// error carrying **the encoder's own last words**.
+    ///
+    /// Called on the success path *and* after a write failure. That is the whole
+    /// point: a broken pipe means the encoder died, and reporting our own
+    /// `EPIPE` instead of what it said is the mystery this path is most likely
+    /// to produce.
+    fn finish(mut self) -> Result<(), String> {
+        // Dropping stdin closes the pipe, which is how the encoder learns the
+        // stream ended. Without it `wait` blocks forever.
+        drop(self.stdin.take());
+        let status = self
+            .child
+            .wait()
+            .map_err(|e| format!("waiting for the encoder: {e}"))?;
+        let tail = self
+            .stderr
+            .take()
+            .and_then(|handle| handle.join().ok())
+            .unwrap_or_default();
+        if status.success() {
+            return Ok(());
+        }
+        let said = if tail.is_empty() {
+            "it printed nothing".to_string()
+        } else {
+            format!("it said:\n  {}", tail.join("\n  "))
+        };
+        Err(format!("the encoder exited with {status} — {said}"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The mode
+// ---------------------------------------------------------------------------
+
+/// Render the clip, writing the stream to stdout or to a spawned encoder.
 ///
 /// **Everything human-readable goes to stderr**, because stdout is the frame
 /// stream: a summary line printed the way every other mode prints one would be
@@ -343,20 +536,72 @@ pub fn run(
         req.tier.as_str()
     );
 
+    let mut encoder = req.encoder.as_ref().map(Encoder::spawn).transpose()?;
     let mut r = super::renderer(req.width, req.height, presets, req.tier)?;
+
+    // One writer either way. The encoder's stdin is a pipe, so a full one blocks
+    // this thread until the encoder drains it — that *is* the backpressure
+    // handling, and it is why nothing here buffers frames on our side of it.
     let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
+    let mut out: Box<dyn Write> = match encoder.as_mut().and_then(|e| e.stdin.take()) {
+        Some(pipe) => Box::new(std::io::BufWriter::new(pipe)),
+        None => Box::new(std::io::BufWriter::new(stdout.lock())),
+    };
+
+    let outcome = stream_into(&mut out, &mut r, &name, pcm, format, req, frames);
+    // Drop the writer before waiting: on the encoder path it owns the pipe, and
+    // the encoder cannot finish until the pipe closes.
+    drop(out);
+
+    match (outcome, encoder) {
+        // A write failure with an encoder attached is almost always the encoder
+        // having died, so ask it what happened rather than reporting our EPIPE.
+        (Err(ours), Some(encoder)) => Err(match encoder.finish() {
+            Err(theirs) => theirs,
+            Ok(()) => ours,
+        }),
+        (Err(ours), None) => Err(ours),
+        (Ok(rendered), Some(encoder)) => {
+            encoder.finish()?;
+            eprintln!("render: {rendered} frames encoded");
+            Ok(())
+        }
+        (Ok(rendered), None) => {
+            eprintln!("render: {rendered} frames written");
+            Ok(())
+        }
+    }
+}
+
+/// Write the header and every frame into `out`, reporting progress on stderr.
+fn stream_into(
+    out: &mut dyn Write,
+    r: &mut Renderer,
+    name: &str,
+    pcm: &[f32],
+    format: AudioFormat,
+    req: &RenderRequest,
+    frames: u32,
+) -> Result<u32, String> {
     out.write_all(y4m_header(req.width, req.height, req.fps).as_bytes())
         .map_err(|e| format!("write stream header: {e}"))?;
 
+    // At most twenty lines however long the render is — a four-minute track is
+    // 14,400 frames and a line each would bury the encoder's own output.
+    let every = (frames / 20).max(1);
     let mut planes: Vec<u8> = Vec::new();
-    let rendered = render_frames(&mut r, &name, pcm, format, req.fps, &mut |_index, img| {
-        write_y4m_frame(img, &mut planes, &mut out).map_err(|e| format!("write frame: {e}"))
+    let rendered = render_frames(r, name, pcm, format, req.fps, &mut |index, img| {
+        write_y4m_frame(img, &mut planes, out).map_err(|e| format!("write frame {index}: {e}"))?;
+        if index > 0 && index % every == 0 {
+            eprintln!(
+                "render: {index}/{frames} frames ({:.0}%)",
+                100.0 * index as f32 / frames as f32
+            );
+        }
+        Ok(())
     })?;
     out.flush().map_err(|e| format!("flush stream: {e}"))?;
-
-    eprintln!("render: {rendered} frames written");
-    Ok(())
+    Ok(rendered)
 }
 
 #[cfg(test)]

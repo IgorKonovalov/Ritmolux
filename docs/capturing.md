@@ -109,6 +109,7 @@ Flags:
 | `--interval <secs>` | simulated seconds between horizon rows (default 30) |
 | `--render <clip.wav>` | [offline video](#--render-a-music-video-from-a-track) — walk the clip at `--fps` and stream every frame to stdout for an encoder to read. Deterministic and decoupled from real time |
 | `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
+| `--ffmpeg <path>` | spawn this encoder and wire the pipe, so one command produces a file. Needs `--out <file>`. No encoder ships and there is no fallback |
 
 Bad arguments and unknown presets exit non-zero with a message.
 
@@ -223,10 +224,10 @@ end at a fixed frame step and writes a **video stream** to stdout, for a user's
 own `ffmpeg` to encode ([ADR-0114](adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md)).
 
 ```bash
+# One command: --ffmpeg spawns the encoder and wires the pipe.
 cargo run -p standalone --example shot -- \
-  --preset "Supernova" --render track.wav --fps 30 --size 320x240 \
-  | ffmpeg -f yuv4mpegpipe -i - -i track.wav \
-      -c:v libx264 -pix_fmt yuv420p -c:a aac out.mp4
+  --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 \
+  --ffmpeg ffmpeg --out track.mp4
 ```
 
 **No encoder ships, and that is a decision rather than an omission.** A 1080p
@@ -275,11 +276,52 @@ why the tap-placement guard is asserted on the RGB frame the writer is handed an
 never on the wire bytes; a guard written against the wire would have to be
 loosened to a tolerance until it passed, which is how a guard becomes decoration.
 
+#### The one canonical `ffmpeg` invocation
+
+`--ffmpeg <path>` spawns the encoder, wires the frame stream into its stdin, and
+passes the source WAV through as a second input for muxing. **There is exactly
+one command line and `--ffmpeg` generates it** — it is echoed on stderr at the
+start of every encoded run, so adapting it by hand starts from what actually
+ran rather than from a wiki of incantations:
+
+```
+ffmpeg -hide_banner -nostats -y -f yuv4mpegpipe -i pipe:0 -i track.wav \
+  -map 0:v:0 -map 1:a:0 \
+  -c:v libx264 -preset medium -crf 18 \
+  -pix_fmt yuv420p -color_range pc -colorspace bt709 -color_primaries bt709 \
+  -color_trc bt709 \
+  -c:a aac -b:a 192k -shortest track.mp4
+```
+
+No `-s` or input `-pix_fmt`: the geometry is on the wire, which is the point of a
+self-describing stream. The `-map` pair is explicit so a clip carrying album art
+cannot displace the rendered picture. The four colour tags are the half most
+likely to ship wrong — an untagged file is one the player expands from studio
+swing and shows washed out. `-color_trc bt709` rather than `iec61966-2-1`: the
+tap hands over sRGB-encoded samples and the two are close, but every player
+assumes the former and some ignore the latter outright.
+
+**A dead encoder reports the encoder's failure, not our broken pipe.** The child's
+stderr is drained on a thread — echoed line by line as it arrives, and kept — so
+if it exits non-zero `shot` exits non-zero quoting its last words. Writing into a
+full pipe blocks until the encoder drains it, which *is* the backpressure
+handling: nothing is buffered on this side of it. Both halves are asserted in
+`standalone/tests/shot_cli.rs`, the second against a stand-in encoder that dies
+on its first argument.
+
+**`ffmpeg` is a prerequisite, and its absence is a named error naming the flag** —
+never a fallback to something else, because a quietly-substituted encoder is what
+would make an exported file untrustworthy.
+
 Practical notes:
 
-- **stdout is the video.** Every human-readable line goes to stderr, so a summary
-  printed the way the other modes print one would be eight bytes of garbage in
-  the middle of the file. `--out` is rejected for the same reason.
+- **stdout is the video** on the raw-stream path. Every human-readable line goes
+  to stderr, so a summary printed the way the other modes print one would be
+  eight bytes of garbage in the middle of the file. `--out` is therefore rejected
+  *without* `--ffmpeg` and required *with* it.
+- Nothing validates the container. That the frames and the stream are right is
+  tested; whether `ffmpeg` made a good MP4 is outside this harness and ADR-0114
+  accepts it.
 - `--render` takes its own clip and is mutually exclusive with `--signal`,
   `--audio` and `--horizon` — any pair would mean silently ignoring one of two
   stimuli.
