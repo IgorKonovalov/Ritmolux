@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0105** (ADRs are a separate sequence — next free there is **0116**.)
+**Next free number: 0106** (ADRs are a separate sequence — next free there is **0117**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0105](0105-the-indexes-go-back-to-being-indexes.md) | The indexes go back to being indexes | draft | dev | **Carries [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) (proposed); docs and tooling only, no core/shell code.** The three roster files carry **135 over-cap rows** and this index is one of them — the gate is built in Phase 1 and wired in Phase 5, so Phases 2-4 push red on the hook until the trim lands. |
 | [0097](0097-the-track-announces-itself.md) | The track announces itself | approved | dev, human | **Carries [ADR-0110](../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md) and is split so the expensive half can be abandoned.** Phases 1-3 ship a complete standalone feature with **no ABI change and no new crate** (SMTC is a feature flag on the `windows` dep the shell already has); Phase 4 widens the C ABI to a thirteenth function, bumps `LMV_ABI_VERSION`, and **measures the plugin DLL against NFR 4's ~10 MB cap with a stop condition** — if glyphon blows it, the plan stops there and Phases 1-3 stand. Its `[hud]` question is **discharged**: [0096](done/0096-the-hud-gets-out-of-the-way.md) closed 2026-08-16 and created the section, so Phase 2 adds a second key rather than the first. |
 | [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | draft | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
