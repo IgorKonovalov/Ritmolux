@@ -1753,3 +1753,43 @@ and the fix is small. What makes it worth an entry is the failure mode: a silent
 whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md))
 is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
 same rule wearing a green tick.
+
+## 0105 — the component's READ-ME-FIRST states the SDK it was built against, and on the pre-staged route nothing checks that claim
+
+Found at [Plan 0102](plans/done/0102-the-component-ships.md)'s close (2026-08-16), reviewing the
+recipe that plan built.
+
+`packaging/foobar/build-component.ps1` substitutes `@SDK_VERSION@` into the shipped
+`READ-ME-FIRST.txt` from `packaging/foobar/sdk-pin.ps1`'s `$LmvSdkVersion` — the **pin**, which is
+what the recipe intends to have been built against. What it verifies about the SDK actually on disk
+is one existence test, `plugin-foobar/sdk/foobar2000/SDK/foobar2000.h`. The two are the same fact
+only on the fetch route, where `fetch-sdk.ps1` downloaded the pinned archive and checked its
+SHA-256.
+
+[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) makes
+the **pre-staged** route first-class — "how the SDK reaches the build host is a parameter of the
+recipe rather than a property of it" — and `plugin-foobar/README.md` documents unpacking it by hand.
+On that route a developer with an older SDK unpacked at `plugin-foobar/sdk/` produces a component
+whose reader-facing document asserts a build against 2025-03-07, with every one of the recipe's
+seven fatal checks green. Nothing downstream can tell, because the SDK version is not in the DLL.
+
+The fix is cheap and the recipe is one grep short of it: the SDK archive ships `sdk-readme.html`
+carrying `<h1>foobar2000 SDK, version 2025-03-07</h1>`, so the staged tree states its own version
+and `build-component.ps1` can fail when it disagrees with the pin instead of asserting over it. That
+also closes the smaller half — the script's own `ok: SDK <version> staged` line prints the pin, not
+what is staged.
+
+- **Verified 2026-08-16** — the recipe never reads the SDK's own version marker:
+  `absent: sdk-readme in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — but it does stamp a version claim into what ships:
+  `present: @SDK_VERSION@ in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — the only thing asserted about the staged tree is that a header exists:
+  `present: foobar2000.h in: packaging/foobar/build-component.ps1`
+
+### Priority
+
+**Low.** CI takes the fetch route, so nothing published today can carry the wrong claim, and the
+window is a developer who hand-staged a different SDK and then shipped that build. It is filed
+because the recipe's whole argument is that a local run is held to CI's bar
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
+ADR-0115) — and this is the one assertion where the local route is held to a looser one.

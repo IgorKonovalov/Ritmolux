@@ -13,6 +13,53 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0102 — The component ships](done/0102-the-component-ships.md)
+  — closed 2026-08-16, Phases 1-4 in three commits (`e5e03de`, `07f1573`, `56c3edf`), one session.
+  Review: **no blockers, three majors, four minors.** **Phase 1's `human` question — the one this
+  had been waiting on for sixty plans — took one reading:** the foobar2000 SDK licence is
+  BSD-style, permits binary redistribution, and puts a notice obligation only on redistributed
+  *source*, so Phase 3 took the CI-fetch branch and the component is a released artifact. The
+  fetched archive is **byte-identical to the copy this project has built against since Plan 0001**
+  (SHA-256 recomputed independently at the close), and foobar2000.org keeps every SDK at a stable
+  `/downloads/SDK-<date>.7z` URL back to 2011, so the pin cannot rot from under it. **The recipe was
+  verified as an artifact, not as a diff:** `target/dist` carries a deliberate `v9.9.9` run beside
+  the `v0.69.0` one, so the version-substitution path was exercised rather than assumed; the
+  produced `.fb2k-component` holds exactly `x64/foo_lmv.dll` and nothing else, which is the check
+  that matters because foobar2000 extracts a component's whole archive into the user's components
+  folder; and every reader-facing claim in `READ-ME-FIRST.md` was checked against `foo_lmv.cpp`
+  rather than believed. **`build-component.ps1` earns its 350 lines in two places a
+  `Compress-Archive` could not:** it names every zip entry by hand, because both
+  `Compress-Archive` and .NET Framework's `ZipFile` emit **backslash** separators on Windows
+  PowerShell 5.1 and forward slashes on pwsh 7 — and a check that read the archive back through the
+  same broken API would have passed either way; and it reads the PE headers directly to assert
+  machine type, the `foobar2000_get_interface` export, and the declared version, so `-SkipBuild` on
+  a box with no MSVC is still held to the full bar. **Two scope deviations, both defensible and both
+  reported by `dev`:** `docs/releasing.md` was edited though Phase 3 lists it as the *alternative*
+  branch (it claimed "two zips" in three places against a workflow that now demands three — the
+  operator-doc sweep, not scope creep), and `READ-ME-FIRST.md` landed in Phase 2 rather than Phase 4
+  because the recipe's copy step is fatal without it. Phase 2's "factor out the packaging step" had
+  no packaging step to factor; what was genuinely duplicated was the ADR-0025 version regex, now
+  dot-sourced from `packaging/foobar/lmv-version.ps1` — **two of its three copies**, the third still
+  inline in the workflow's `windows` job. **The three majors.** The shipped troubleshooting text
+  mis-diagnosed the one first-run failure already on file — [backlog 0102](../design-backlog.md)
+  says a docked panel can render without presenting and revive only at a track boundary with nothing
+  in the Console, and the text sent the reader hunting for Console lines that will not be there;
+  fixed at the close, with [backlog 0103](../design-backlog.md)'s undiscoverable layout-removal
+  workaround added beside it. Neither the plan nor ADR-0115 names those two entries as distribution
+  risks though both are `Medium` and both are what a stranger meets first — recorded in the plan's
+  close rather than back-edited into an accepted ADR. And the pre-staged SDK route, which ADR-0115
+  makes first-class, stamps `@SDK_VERSION@` into a shipped document while asserting nothing about
+  what is staged; filed as [backlog 0105](../design-backlog.md), whose fix is one grep against the
+  `sdk-readme.html` the SDK itself ships. **What outlived the plan:** the component is now on the
+  release critical path — `needs: [macos, windows, foobar]` plus an exact three-zip count means a
+  foobar-job failure produces **no release at all**, standalone zips included. That is the right
+  trade, and it is what makes `build.ps1`'s hardcoded `/p:PlatformToolset=v143` (under a comment
+  claiming the toolset is retargeted) a release-wide risk on the next runner-image bump rather than
+  a plugin-only one. **Phase 5 is unrun by design** — it tests the *released* artifact, which the
+  tag this close writes has not yet produced; it is carried to
+  [`on-device-validation.md`](../on-device-validation.md) with its expected failures named, and the
+  SDK-staleness watcher `sdk-pin.ps1`'s header admits nothing guards is a followup, not a gap.
+
 - [0099 — The horizon reaches its own length](done/0099-the-horizon-reaches-its-own-length.md)
   — closed 2026-08-16, all three `dev` phases in two commits (`b0a5ba0`, `cb8a434`), one session.
   Review: **no blockers, no majors, four minors and a nit.** **The plan's discriminator was the

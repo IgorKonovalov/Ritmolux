@@ -6,7 +6,7 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none — this is distribution work, not a design choice
 > **Soft dependency:** [0101](0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
-> **Hard dependency for Phase 4:** [0102](0102-the-component-ships.md)
+> **Hard dependency for Phase 4:** [0102](done/0102-the-component-ships.md)
 
 ## TL;DR
 
@@ -98,7 +98,7 @@ nothing here is clever and that is deliberate.
 - **Owner skill:** human
 - **What:** Submit the `.fb2k-component` to the foobar2000 component repository.
 - **Done when:** the submission is filed. **Hard-depends on
-  [0102](0102-the-component-ships.md)** — there is nothing to submit until that plan produces a
+  [0102](done/0102-the-component-ships.md)** — there is nothing to submit until that plan produces a
   released artifact, and submitting a locally built DLL with no release behind it would be worse
   than waiting.
 
