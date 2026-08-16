@@ -1666,10 +1666,54 @@ surface, attach on first non-degenerate `WM_SIZE`), or whether `needs_reattach` 
 from the same watchdog `1016777` added, which already re-derives visibility from the window every
 500 ms and is the obvious place to also notice a surface that never became real.
 
+### Reproduced independently 2026-08-16, on a second machine, with a worse symptom
+
+At [Plan 0102](plans/done/0102-the-component-ships.md)'s Phase 5 — the released component installed
+into a foobar2000 v2.25.10 profile on the dev box. **The revival mechanism this entry names was
+confirmed exactly**, and the symptom it describes was not the one observed.
+
+What was not seen: the panel was never black. It came up rendering a correct, well-formed attractor
+at full panel size, which is why nothing about it looked wrong.
+
+What was seen instead, from `plugin-diagnostics.log`: **6.5 fps, `frame_ms_avg` 135 -> 154 ms**,
+`frames_total` advancing exactly 7 per second-sample — **from the first sample of the session**, not
+degrading into it. One thread pegged `Running` at 52 of the process's 69 CPU-seconds over 66 s of
+uptime. `Responding` stayed `True`, so nothing was deadlocked; foobar2000's own status bar simply
+froze at `0:00 / 3:21` under playing audio and the playlist view showed no rows, because the host
+paints on the thread the renderer was consuming. **The user's report was "the plugin and interface
+is completely stale", and the interface half is the part this entry does not predict.**
+
+The recovery was this entry's own path, arrived at accidentally a second time: adding an album to
+the **playing** playlist put 44.1 kHz material through `ensure_handle`, and frame cost went to
+**17.6 ms at 56-58 fps** — `8.7x`, with `draw_calls` (30-31), `gpu_bytes` (2024640, byte-identical)
+and the preset all unchanged across the transition. That invariance is what rules out the obvious
+alternative: a cost that large which vanishes on an unrelated event is not the preset, the quality
+tier, or the GPU being busy.
+
+- **Verified 2026-08-16** — the field an operator would reach for cannot arbitrate this, exactly as
+  this entry already says: `gpu_bytes` was identical in the 6.5 fps and 57 fps stretches:
+  `present: gpu_bytes in: plugin-foobar/foo_lmv.cpp`
+
+**What this adds to the diagnosis.** A surface attached at a size that does not match the window
+does not only fail to present — it can present *expensively*, which looks like nothing being wrong
+at all. A fix that only restores the black case would leave this one standing, so the deferred-attach
+option in the section above is the safer of the two: re-checking `needs_reattach` from the watchdog
+repairs a surface that never became real, but this session's surface **did** become real enough to
+draw a correct picture.
+
+**What is not established.** Whether the slow present is the same degenerate attach or a second,
+adjacent defect in the same lifetime; nothing here measured the surface's actual configured size,
+because no instrument in this repo reports it. That gap is the first thing a fix should close.
+
 ### Priority
 
-**Medium.** It is the first thing a new plugin user sees, it looks exactly like a broken component,
-and the recovery is invisible and accidental.
+**Was Medium, raised to High 2026-08-16.** The original grounds were that it is the first thing a
+new plugin user sees and looks exactly like a broken component. The reproduction above is worse than
+that on two counts: the component now **ships** ([Plan 0102](plans/done/0102-the-component-ships.md),
+`v0.70.0`), so a stranger meets this rather than a developer; and the failure is not confined to our
+panel — it makes **foobar2000 itself** feel dead, with no visible cause and nothing in the console.
+Compounding it, [0103](design-backlog.md) means the user cannot remove the panel by the documented
+route to escape. Whoever picks this up should read the two together.
 
 ## 0103 — the plugin's context menu shadows foobar's, so the panel cannot be removed from a layout
 

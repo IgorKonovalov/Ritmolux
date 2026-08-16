@@ -248,6 +248,34 @@ exercises the SDK fetch, the runner's MSVC and the three-zip count. And the dev 
 `%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\` from that inner loop, so **remove it first**,
 or an older copy shadows the one under test and the version check means nothing.
 
+- [x] **RUN 2026-08-16 — `v0.70.0`, foobar2000 v2.25.10, AMD iGPU dev box. Installs and renders;
+      one new defect, worse than either expected failure.** Taken against the published release
+      zip, into a profile with the `build.ps1 -Install` copy removed first.
+      **(a) Pass** — Components list reads `Light Music Visualizer 0.70.0 / foo_lmv`. This is also
+      the first evidence that the component archive's layout is right: nothing outside a real
+      foobar2000 can confirm that an archive with an empty root and only `x64/foo_lmv.dll` installs,
+      and `build-component.ps1` asserts that layout from documentation rather than observation.
+      It loaded into a host **well past** the pinned 2025-03-07 SDK, which is one data point against
+      the staleness risk `packaging/foobar/sdk-pin.ps1` admits nothing guards.
+      **(b) Did NOT reproduce** — the docked panel was never black. It rendered a correct attractor
+      at full panel size immediately.
+      **(b') NEW, and it is the finding of this run** — the panel rendered at **6.5 fps / 154 ms per
+      frame from the session's first sample**, pegging one thread and starving foobar2000's own UI:
+      the status bar froze at `0:00` under playing audio and the playlist painted no rows, while
+      `Responding` stayed `True`. Adding an album to the playing playlist took it to **17.6 ms at
+      57 fps** — 8.7x — with preset, `draw_calls` and `gpu_bytes` byte-identical across the
+      transition. That is [backlog 0102](design-backlog.md)'s named stream-format revival path,
+      reached accidentally, with a symptom that entry does not predict. **Filed there; priority
+      raised Medium -> High.**
+      **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog.md): the panel's
+      right-click shadows foobar2000's layout-edit menu, so Remove is unreachable.
+      **(f) Pass** — `%APPDATA%\light-music-visualizer\` is present and shared; the component wrote
+      `plugin-diagnostics.log` there during the run. **Noted, not a component defect:** that
+      library held **76** presets against the **40** the repo ships, because seeding is
+      write-if-absent and never deletes. 36 retired presets from earlier cohorts are still live in
+      it, including pre-rename `rose_*` files. Anyone judging the shipped set from a long-lived
+      profile is judging the wrong set.
+
 - [ ] **Install the released component into a clean profile and play something.** Download
       `light-music-visualizer-v<version>-foobar2000-component.zip` from the Releases page, unzip,
       and install via File → Preferences → Components. Then, in this order:
