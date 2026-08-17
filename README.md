@@ -135,7 +135,9 @@ prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the r
 Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
 `foo_lmv.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
 Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
-scenes.
+scenes; **right-click** for the menu: **Preset ▸** picks one by name (the choice is remembered
+across restarts), **Reload presets** picks up a file you just dropped into the preset folder, and
+**Open presets folder** takes you there.
 
 It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no macOS component
 ([ADR-0001](docs/adrs/0001-rust-core-wgpu-cabi-foobar-shim.md); the SDK is Windows-centric). A
@@ -144,7 +146,7 @@ It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no
 Because it reads what foobar2000 is already decoding, there is no audio capture to permit and no
 output device to route — it is the path with the fewest ways to go wrong. If you run both, the
 component and the standalone app **share one preset folder**, so a preset edited in either shows
-up in both.
+up in both — the standalone hot-reloads it on save, the component on **Reload presets**.
 
 ## Running the standalone app
 

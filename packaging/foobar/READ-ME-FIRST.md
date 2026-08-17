@@ -49,7 +49,16 @@ Two ways, and you can use both at once:
     then Replace UI Element (or Split) and pick "Light Music Visualizer" under
     Playback visualisation. Turn layout editing back off when you are done.
 
-Press Space with the visualizer focused to cycle scenes.
+Press Space with the visualizer focused to cycle scenes, or right-click it for
+the menu:
+
+  - Preset lists every preset that loaded, with a mark on the one showing.
+    Pick one and it dissolves across. Your choice is remembered across
+    restarts, by name.
+  - Reload presets re-reads the folder below, so a file you just dropped in
+    shows up without restarting foobar2000.
+  - Open presets folder puts you in that folder in Explorer.
+  - Next scene is the same step Space takes.
 
 Only one of them renders at a time - whichever you opened last claims the
 engine, and the other goes inert until you close it. That is deliberate: one
@@ -61,10 +70,15 @@ GPU session, not one per panel.
 
     %APPDATA%\light-music-visualizer\
 
-Paste that into the Explorer address bar. It holds an editable copy of the
-presets and a diagnostics log. This folder is SHARED with the standalone app -
-if you have both, they read the same preset library, and a preset you edit
-shows up in both.
+Paste that into the Explorer address bar - or use Open presets folder in the
+right-click menu, which lands in the presets subfolder directly. It holds an
+editable copy of the presets and a diagnostics log. This folder is SHARED with
+the standalone app - if you have both, they read the same preset library, and a
+preset you edit shows up in both.
+
+To add a preset: drop its .toml into the presets subfolder, then right-click
+the visualizer and choose Reload presets. A file the engine cannot parse simply
+does not appear in the Preset list.
 
 Deleting the folder resets it; it is recreated on the next launch.
 
