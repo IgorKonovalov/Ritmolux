@@ -82,6 +82,23 @@
 //! asserted, because the absolute figure is a property of the box's driver stack
 //! and only the growth travels.
 //!
+//! **Measured** (2026-08-17, Windows dev box, hardware adapter, release), the
+//! full four minutes at 1080p/60 that Plan 0101 Phase 4 is asserted on —
+//! `reaction_mitosis` at `--tier rich`, i.e. the same thirteen-pass family that
+//! hit the wall in 0099:
+//!
+//! ```text
+//! render: resident set 334 MB, growth -8.1 MB across 14400 frames
+//!         after a +85.0 MB warm-up (peak 342 MB, 21 samples)
+//! render: 14400 frames written
+//! ```
+//!
+//! Flat, and slightly *below* the warm reading by the end. An external poll of
+//! the process's working set taken alongside it agrees — twenty-six readings, all
+//! in a 334-347 MB band with no trend — so the number is a property of the run
+//! and not of the instrument reading itself. Where 0099's retention would have
+//! put ~4.4 GB, the peak is 342 MB.
+//!
 //! [Plan 0099]: ../../../docs/plans/done/0099-the-horizon-reaches-its-own-length.md
 //! [NFR §12]: ../../../docs/nfr.md#12-runtime-memory
 //! [ADR-0046]: ../../../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md
