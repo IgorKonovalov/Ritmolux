@@ -446,6 +446,28 @@ fn config_element_prefix(config: Option<&scenes::GeneratorConfig>, capacity: usi
         .min(capacity)
 }
 
+/// The **clamped** warp-mesh grid `config` asks for, and how much of the
+/// per-vertex scratch that needs — or `None` for a config with no per-vertex
+/// surface (Plan 0100 Phase 1).
+///
+/// The clamp is [`warp_mesh::clamp_grid`](scenes::warp_mesh::clamp_grid), the
+/// same function the scene calls on the same request and the same tier. That
+/// shared call is the whole contract: the series this renderer sends and the
+/// vertex buffer that scene assembles are the same length because one function
+/// decides both.
+fn vertex_grid(
+    config: Option<&scenes::GeneratorConfig>,
+    tier: &TierConfig,
+    capacity: usize,
+) -> Option<((u32, u32), usize)> {
+    let scenes::GeneratorConfig::WarpMesh { mesh, .. } = config? else {
+        return None;
+    };
+    let mesh = scenes::warp_mesh::clamp_grid(*mesh, tier);
+    let count = scenes::warp_mesh::vertex_count(mesh);
+    (count <= capacity).then_some((mesh, count))
+}
+
 /// Evaluate `expr` once **per element**, binding each element's normalized
 /// `0..1` position to `index`, into `out` (Plan 0034 Phase 4).
 ///
@@ -466,6 +488,56 @@ fn evaluate_series(expr: &Expr, vars: &Variables<'_>, out: &mut [f32]) {
             i as f32 / last as f32
         };
         *slot = expr.eval(&vars.with_index(t));
+    }
+}
+
+/// The per-vertex evaluation surface one frame hands a preset (Plan 0100
+/// Phase 1): the grid to walk, the aspect to compute `rad`/`ang` in, and the
+/// renderer's scratch to write into.
+///
+/// A bundle rather than three more arguments on [`evaluate_preset`], which is
+/// already at the argument-count lint — and the three genuinely travel together:
+/// none of them means anything without the other two.
+struct VertexSurface<'a> {
+    /// The **clamped** grid, in cells. Both this and the scene's own grid come
+    /// out of [`warp_mesh::clamp_grid`](scenes::warp_mesh::clamp_grid) on the same
+    /// request and the same tier, so the series is exactly as long as the scene
+    /// expects.
+    mesh: (u32, u32),
+    /// The **render target's** aspect (ADR-0037), never the mesh grid's. The
+    /// target's aspect is the surface's whatever internal grid the chain routes
+    /// through (`PostChain::begin`), so the renderer can compute it here from the
+    /// frame's own size.
+    aspect: f32,
+    /// The renderer's scratch, sliced to `vertex_count(mesh)`. Empty for every
+    /// preset with no per-vertex surface, which is what makes their path
+    /// unchanged.
+    buf: &'a mut [f32],
+}
+
+/// Evaluate `expr` once **per mesh vertex**, binding that vertex's `x`, `y`,
+/// `rad` and `ang`, into `surface.buf` (Plan 0100 Phase 1).
+///
+/// Row-major from the top-left, which is the order
+/// [`Scene::set_per_vertex`](scenes::Scene::set_per_vertex) documents and the
+/// warp mesh assembles its vertex buffer in.
+///
+/// Pure and allocation-free — the buffer is the renderer's scratch, sized at
+/// construction. Split out for [`evaluate_series`]'s reason: the per-vertex
+/// contract is then testable without a GPU.
+fn evaluate_vertex_series(expr: &Expr, vars: &Variables<'_>, surface: &mut VertexSurface<'_>) {
+    let (mx, my) = surface.mesh;
+    let mut v = 0usize;
+    for row in 0..=my {
+        for col in 0..=mx {
+            let (x, y, rad, ang) =
+                scenes::warp_mesh::vertex_position(col, row, (mx, my), surface.aspect);
+            let Some(slot) = surface.buf.get_mut(v) else {
+                return;
+            };
+            *slot = expr.eval(&vars.with_vertex(x, y, rad, ang));
+            v += 1;
+        }
     }
 }
 
@@ -525,6 +597,7 @@ fn evaluate_preset(
     time: f32,
     dt: f32,
     series: &mut [f32],
+    vertex: Option<VertexSurface<'_>>,
 ) {
     scene.set_time(time);
     scene.advance(dt);
@@ -614,6 +687,17 @@ fn evaluate_preset(
             ParamRoute::Unclaimed => {}
         }
     }
+    // The `[per_vertex]` table (Plan 0100 Phase 1), after the scalars — so a
+    // per-vertex binding overrides the scalar of the same name for this frame
+    // rather than racing it. `None` for every preset with no per-vertex surface,
+    // and `per_vertex` is empty for every preset that declares no table, so the
+    // other ten systems take exactly the path they took before this existed.
+    if let Some(mut surface) = vertex {
+        for binding in &preset.per_vertex {
+            evaluate_vertex_series(&binding.expr, vars, &mut surface);
+            scene.set_per_vertex(&binding.name, surface.buf);
+        }
+    }
     scene.update(frame);
 }
 
@@ -646,6 +730,7 @@ fn evaluate_layer(
     time: f32,
     dt: f32,
     series: &mut [f32],
+    vertex: Option<VertexSurface<'_>>,
 ) {
     scene.set_time(time);
     scene.advance(dt);
@@ -659,6 +744,12 @@ fn evaluate_layer(
         let raw = binding.expr.eval(vars);
         let value = smoother.smooth(index, raw, binding.tau, dt);
         scene.set_param(&binding.name, value);
+    }
+    if let Some(mut surface) = vertex {
+        for binding in &layer.per_vertex {
+            evaluate_vertex_series(&binding.expr, vars, &mut surface);
+            scene.set_per_vertex(&binding.name, surface.buf);
+        }
     }
     if let Some(mix) = layer.mix.as_ref() {
         let raw = mix.expr.eval(vars);
@@ -943,6 +1034,12 @@ pub struct Renderer {
     /// the prefix its preset's `[spectrum] elements` asks for; every other system
     /// uses an empty prefix, which is what makes their path unchanged.
     series_scratch: Vec<f32>,
+    /// Scratch for per-vertex binding evaluation (Plan 0100 Phase 1). Sized
+    /// **once, here at construction**, to the largest mesh any tier may name
+    /// ([`MAX_MESH`](scenes::warp_mesh::MAX_MESH)), so the per-frame path slices
+    /// it and never allocates. Every system but the warp mesh uses an empty
+    /// prefix.
+    vertex_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
     /// The active preset's **layer** easing state (Plan 0076 Phase 1) — its own
     /// smoother because layer bindings are indexed within the layer's `params`,
@@ -1026,6 +1123,7 @@ impl Renderer {
             now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
+            vertex_scratch: vec![0.0; scenes::warp_mesh::vertex_count(scenes::warp_mesh::MAX_MESH)],
             param_smoother: ParamSmoother::default(),
             layer_smoother: ParamSmoother::default(),
             outgoing_layer_smoother: ParamSmoother::default(),
@@ -1696,6 +1794,7 @@ impl Renderer {
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
             series_scratch,
+            vertex_scratch,
             param_smoother,
             layer_smoother,
             outgoing_smoother,
@@ -1751,6 +1850,11 @@ impl Renderer {
         // order and the skip rule. The blend, the tonemap and ink are engine-wide
         // passes the renderer drives.
         let surface = (width, height);
+        // The **render target's** aspect, which `PostChain::begin` reports as the
+        // surface's whatever internal grid the chain routes through (ADR-0037).
+        // Computed once here because the per-vertex evaluation below happens
+        // before the chain opens, and `rad`/`ang` must be aspect-corrected.
+        let surface_aspect = width as f32 / height.max(1) as f32;
         let mut draw_calls = 0;
 
         // --- the outgoing side, while it is still animating (dual-live only) ---
@@ -1776,6 +1880,14 @@ impl Renderer {
                 // the capture frame and are crossfaded by the single engine-wide
                 // pass of each below.
                 let out_elements = element_prefix(outgoing, series_scratch.len());
+                let out_vertex = vertex_grid(outgoing.config.as_ref(), tier, vertex_scratch.len())
+                    .and_then(|(mesh, n)| {
+                        Some(VertexSurface {
+                            mesh,
+                            aspect: surface_aspect,
+                            buf: vertex_scratch.get_mut(..n)?,
+                        })
+                    });
                 evaluate_preset(
                     outgoing,
                     out_routes,
@@ -1788,6 +1900,7 @@ impl Renderer {
                     *time,
                     dt,
                     series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
+                    out_vertex,
                 );
                 // The outgoing preset's own layer keeps animating through a
                 // dual-live dissolve exactly as its main scene does — its scene
@@ -1796,6 +1909,14 @@ impl Renderer {
                     (outgoing.layer.as_ref(), side.layer.as_mut())
                 {
                     let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
+                    let lv = vertex_grid(layer.config.as_ref(), tier, vertex_scratch.len())
+                        .and_then(|(mesh, count)| {
+                            Some(VertexSurface {
+                                mesh,
+                                aspect: surface_aspect,
+                                buf: vertex_scratch.get_mut(..count)?,
+                            })
+                        });
                     evaluate_layer(
                         layer,
                         layer_scene,
@@ -1806,6 +1927,7 @@ impl Renderer {
                         *time,
                         dt,
                         series_scratch.get_mut(..n).unwrap_or(&mut []),
+                        lv,
                     );
                 }
                 // **The outgoing preset's OWN held stop, not the crossfaded one**
@@ -1850,6 +1972,15 @@ impl Renderer {
         tonemap.reset_params();
         ink.reset_params();
         let elements = element_prefix(preset, series_scratch.len());
+        let vertex = vertex_grid(preset.config.as_ref(), tier, vertex_scratch.len()).and_then(
+            |(mesh, n)| {
+                Some(VertexSurface {
+                    mesh,
+                    aspect: surface_aspect,
+                    buf: vertex_scratch.get_mut(..n)?,
+                })
+            },
+        );
         evaluate_preset(
             preset,
             routes,
@@ -1862,6 +1993,7 @@ impl Renderer {
             *time,
             dt,
             series_scratch.get_mut(..elements).unwrap_or(&mut []),
+            vertex,
         );
         // The `[layer]` bindings, into the layer's own scene and nowhere else
         // (ADR-0090 / Plan 0076): evaluated under the same salt, clock and
@@ -1870,6 +2002,15 @@ impl Renderer {
         if let (Some(layer), Some(layer_scene)) = (preset.layer.as_ref(), live_side.layer.as_mut())
         {
             let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
+            let lv = vertex_grid(layer.config.as_ref(), tier, vertex_scratch.len()).and_then(
+                |(mesh, count)| {
+                    Some(VertexSurface {
+                        mesh,
+                        aspect: surface_aspect,
+                        buf: vertex_scratch.get_mut(..count)?,
+                    })
+                },
+            );
             evaluate_layer(
                 layer,
                 layer_scene,
@@ -1880,6 +2021,7 @@ impl Renderer {
                 *time,
                 dt,
                 series_scratch.get_mut(..n).unwrap_or(&mut []),
+                lv,
             );
         }
 

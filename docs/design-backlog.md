@@ -1854,3 +1854,217 @@ window is a developer who hand-staged a different SDK and then shipped that buil
 because the recipe's whole argument is that a local run is held to CI's bar
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
 ADR-0115) — and this is the one assertion where the local route is held to a looser one.
+
+---
+
+## 0106 — converted MilkDrop presets wash out or invert: the float feedback field never truncates
+
+- **PROMOTED 2026-08-17 → [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) +
+  [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md) Phases 1-2.** The entry's own
+  design call — what "8-bit truncation" means in linear light — is answered with the arithmetic it
+  asked for: one 8-bit sRGB step is `3.03e-4` in linear, so the literal `1/255` floor the entry warns
+  against truncates everything below sRGB level ~13, **13x too aggressive**. The decision quantizes
+  in the encoded domain instead, per bundle and driven by a uniform. The entry stays **live** until
+  that plan lands, and its re-test trigger is that plan's Phase 2.
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `architect` (the emulation is a design call) then `dev`. **The dominant
+fidelity defect of the MilkDrop import, and the one gating the plan's central claim** — the HDR
+"better or merely different" verdict came back *merely different* and cannot be fairly re-judged
+until this is fixed.
+
+- **Verified 2026-08-16** — the warp pass scales the previous frame by a decay term and writes the
+  product back with no low-end floor: `present: decay in: core/src/render/scenes/warp_mesh/mod.rs`
+- `unprobeable:` the defect itself is a rendered divergence against an external reference
+  (`foo_vis_milk2` 0.2.0.0, DX11) and lives in no greppable line; the evidence is the seven
+  side-by-side pairs recorded in Plan 0100's Phase 7 section.
+
+### The finding
+
+MilkDrop's feedback target is 8-bit: `decay` times a dim pixel **truncates to zero**, and that
+quantization is what keeps a classic preset's background black and its trails finite. This engine's
+field is `Rgba16Float` — nothing truncates, every dim residual survives and accumulates. Judged
+over seven presets side by side (Plan 0100 Phase 7, 2026-08-16), one mechanism with four
+presentations: pastel wash (*Songflower*, *Cosmic Dust 2*), white-hot glow (*Contortion*), runaway
+to the clamp with per-channel fringing (*chasers 19 Portal*), and full tonal **inversion** — *Fog
+Tunnel*, a dark preset rendered on a white plateau. The control ran the other way: *Blur Mix 3*,
+whose blur chain actively darkens, kept its blacks and looked genuinely good — which is what
+scopes the defect to the feedback path rather than the shader translation.
+
+### What a fix would be
+
+An opt-in (per-`[milk]`-bundle, not engine-wide) floor in the warp epilogue emulating the
+reference's quantization — Butterchurn and projectM both carry an equivalent, so the shape is
+known. The design call is what "8-bit truncation" means in linear light: the reference truncates
+in its gamma-encoded target, so a literal `1/255` floor in linear is wrong at both ends. Measure
+against the same seven pairs.
+
+### Priority
+
+**High within the import lane.** Plan 0100's Phase 7 verdict is provisionally negative on the
+plan's own motivating claim; this entry is the re-test trigger.
+
+---
+
+## 0107 — the MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame
+
+> **THIS ENTRY'S OWN LEADING SUSPECT IS FALSIFIED — 2026-08-17. Do not start where item 2 says to.**
+> It says to *"check `s_fw`'s address mode against the reference's toroidal wrap first"*.
+> `core/src/render/scenes/warp_mesh/shader.rs:463` already builds `s_fw` with
+> `wgpu::AddressMode::Repeat`, and Repeat produces a **shifted** copy — not the **reflected** one the
+> entry's own fingerprint paragraph describes. The address mode cannot be the cause of a reflection.
+>
+> The replacement hypothesis, with arithmetic, is
+> [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 3: the polar pair is built
+> with a y-negation (`emit.rs:1418`, `vec2<f32>(2.0, -2.0)`), so a preset reconstructing `uv` from
+> `ang` recovers `uv_orig.y` reflected about 0.5 — a mirror about the horizontal midline with its
+> seam on the fixed line. The negation is provably correct for the EEL per-vertex program; whether
+> it is correct in the **pixel** shader is the open question, and it is answerable in one render.
+
+- **PROMOTED 2026-08-17 → [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md)
+  Phases 3-5, no ADR** — three unknown-cause hunts, one phase each, **each carrying a stop
+  condition** (a phase that cannot reproduce its defect commits the fixture, records what it ruled
+  out, and the plan continues). That shape was the user's call over committing to fix all three,
+  which this entry's falsified suspect shows would have been dishonest.
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `dev` (mechanism hunts), `architect` if a fix needs a design call.
+
+- **Verified 2026-08-16** — the wave placement code under suspicion is the warp-mesh draw layer:
+  `present: wave_mystery in: core/src/render/scenes/warp_mesh/draw.rs`
+- `unprobeable:` the three defects are rendered divergences against an external reference; the
+  evidence is the pair record in Plan 0100's Phase 7 section.
+
+### The finding
+
+Three distinct defects, each seen in at least one pair against `foo_vis_milk2`:
+
+1. **Waveform placement/orientation.** *Blur Mix 3* draws one steep diagonal stroke where the
+   reference draws horizontal full-width traces — suspect the `wave_mystery` angle mapping or the
+   mode geometry. *Cauldron painterly 5*'s centrepiece spiro scribble is entirely absent.
+   *Cosmic Dust 2*'s beaded `wave_usedots` trails never appear. (The mono engine drawing one trace
+   where stereo draws two is known and accepted — Plan 0100 Phase 4; these are beyond it.)
+2. **A horizontal reflection seam in warp sampling.** Content mirrors across a horizontal line
+   with a bright ragged boundary: *Contortion*'s split sphere, *Cauldron*'s flipped top band,
+   *Cosmic Dust 2*'s full-width false horizon. The fingerprint (reflected copy, not shifted)
+   points at the wrap path's sampler address mode or a v-axis flip — check `s_fw`'s address mode
+   against the reference's toroidal wrap first, not the `ang` discontinuity first suspected.
+3. **`chasers 19 Portal`'s mirror symmetry never takes effect** despite a clean conversion — the
+   uv-fold that makes the portal is inert. One targeted reproduction wanted.
+
+### Priority
+
+**Medium-high within the import lane.** Item 2 is likely one sampler descriptor; item 1 decides
+whether waveform-led presets (the whole *Blur Mix* / *Fog Tunnel* family) read as authored.
+
+---
+
+## 0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank
+
+**Raised by:** `dev` (Plan 0100 Phase 6 log, "followup noticed, not acted on"), filed by
+`architect` at the close (2026-08-16). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-16** — arrays are a named rejection class, not a silent drop:
+  `present: array declaration in: milkconv/src/shader/parse.rs`
+- `unprobeable:` the counts (71, 218, 80.1 %) are a measurement of one corpus run (2026-08-16,
+  dev box), reproducible with `milkconv --report`/`--render` over `WORK/milkdrop-corpus`, not a
+  property of this tree; both eras' tables are in `docs/capturing.md`.
+
+### The finding
+
+After Phase 6, the corpus converts at 80.1 % (8 289 of 10 347) and renders non-blank at 77.9 %.
+The residual worth work, in order: **218 MD2 presets convert but render blank** — with their
+shaders now running, these are fidelity findings (most plausibly warp shaders that supply no light
+of their own whose source was a refused disk texture), and backlog 0106/0107's fixes should be
+re-measured against them before any new mechanism is hunted. **~71 files use HLSL arrays**, today
+a named `unsupported` rejection; a bounded-size array lowering in the frontend would recover them.
+The `emitter-invalid` class (naga refusing our own emission) ended Phase 6 at zero and should stay
+there.
+
+### Priority
+
+**Low until 0106/0107 land** — the blank list is contaminated by both, so counting it again first
+is wasted; re-run `--render` after they land and re-rank.
+
+---
+
+## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
+
+**Raised by:** `architect`, at Plan 0108's planning sweep (2026-08-17), reading
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+Outcome and [Plan 0100](plans/done/0100-the-engine-speaks-milkdrop.md)'s followup list against
+`docs/capturing.md`'s measured corpus tables. **Owner if taken:** `architect` (it reopens a scoped
+exclusion and is ADR territory) then `dev`.
+
+- **Verified 2026-08-17** — the exclusion is a named rejection class, deliberately, and says so in
+  its own message: `present: fn disk_texture in: milkconv/src/shader/emit.rs`,
+  `present: deliberately out of scope in: milkconv/src/shader/emit.rs`
+- **Verified 2026-08-17** — the corpus tables this entry re-reads are in the operator doc, both
+  eras: `present: WHY A FILE DID NOT CONVERT, ranked in: docs/capturing.md`
+- `unprobeable:` the counts (1 217 / 609 / 2 058 / 88.7 %) are a measurement of one corpus run
+  (2026-08-16, dev box, `WORK/milkdrop-corpus`), reproducible with `milkconv --report`, not a
+  property of this tree
+
+### The finding
+
+**This entry claims nothing new about the mechanism. It claims the ranking was already decided and
+nobody carried it.** Plan 0100's followup list says *"MilkDrop's `textures/` support, if Phase 5's
+failure ranking says it is a large class."* Phase 5 ran, Phase 6 ran after it, and the ranking is
+in `docs/capturing.md`:
+
+| Rejection reason | Files | Share of corpus |
+|---|---|---|
+| warp shader `disk-texture` | 1 217 | 11.8 % |
+| comp shader `disk-texture` | 609 | 5.9 % |
+| **every other cause combined** | **232** | **2.2 %** |
+
+Total conversion failures are `10 347 - 8 289 = 2 058`. Disk textures are **1 826 of them —
+88.7 %**. Every other named cause in the whole corpus — HLSL arrays, computed conditions, parse
+failures, unknown names, the EEL program classes — sums to 232 files.
+
+So the conditional in Plan 0100's followup is **satisfied**, and by a margin that is not close.
+The 19 % figure ADR-0113's Outcome prices the exclusion at was the *census grep*; the converter
+sees a slightly wider class (it also flags `sampler_pc`) and measured **21.8 %** of the corpus
+reading a disk texture.
+
+### Why this is an entry rather than a line in Plan 0108
+
+Plan 0108 is fidelity work on presets that already convert. This is the **conversion rate**, and it
+is a different question with a different owner: shipping or sourcing texture files reopens
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+scope and collides directly with the provenance question Plan 0100 Phase 8 deferred (*decide
+later*, nothing third-party in the repository or a release). **Those two are the same decision seen
+from two sides** — a texture is third-party content exactly as a preset is — which is why this
+wants an ADR and an interview rather than a phase.
+
+It also sits *above* [0108](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
+in value by its own arithmetic: that entry's HLSL-array lowering recovers ~71 files, and this
+recovers ~1 826. Both are conversion-rate work; only one of them is 25x the other.
+
+### What a fix would be, and the shape is genuinely open
+
+At least four routes, and they differ on the question this project has already deferred once rather
+than on mechanism:
+
+1. **Ship nothing, load from the user's own `textures/` directory** — the same shape as
+   `LMV_PRESET_DIR` today. No provenance question at all, because nothing third-party enters the
+   repository; the user who has the preset pack already has its textures. Cheapest, and the most
+   consistent with Phase 8's standing answer.
+2. **Substitute procedurally.** The six built-in noise textures already exist and 51 % of the corpus
+   samples one. A missing disk texture could resolve to a procedural stand-in rather than a
+   rejection — the preset renders *something its author did not draw*, which Phase 6 explicitly
+   moved away from, so this trades fidelity for conversion rate and needs a judged look call.
+3. **Ship a small curated texture set.** Highest fidelity, and it walks straight into the licensing
+   question Phase 8 deferred.
+4. **Keep the exclusion and stop calling it a corner.** Legitimate, and it is the null option that
+   should be named: the cost is stated, the 8 289 that convert are the product, and the entry closes
+   as a decision rather than as work.
+
+### Priority
+
+**Medium, and it is the largest single lever on the import's reach.** It blocks nothing — the
+import ships and works on four fifths of the corpus. Take it when the fidelity work
+([Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md)) has settled whether converted
+presets are worth having more of, which is the honest ordering: reach is only worth buying after
+quality is judged. **Do not take it before Plan 0108's Phase 2**, whose verdict on whether these
+presets read as better or merely different is exactly the evidence for how much reach is worth.

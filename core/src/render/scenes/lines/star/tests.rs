@@ -272,6 +272,7 @@ fn a_figure_with_radial_spread_still_ramps_across_it() {
         b,
         color: [0.0; 3],
         width: 0.01,
+        alpha: 1.0,
         joined: 0,
     };
     // Three concentric chords at radii 0.2, 0.5 and 0.9.
@@ -345,6 +346,7 @@ fn an_absent_roster_builds_no_ornament_at_all() {
             b: [9.0, 9.0],
             color: [0.0; 3],
             width: 1.0,
+            alpha: 1.0,
             joined: 0,
         };
         3

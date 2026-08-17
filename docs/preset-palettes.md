@@ -131,7 +131,7 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
 | `palette_steps` | `0.0` (off) | Quantizes the gradient into that many hard bands — see [Hard bands](#hard-bands--palette_steps-and-palette_contour). |
-| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field, reaction-diffusion and shape-field only**; inert elsewhere — same section. |
+| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field, reaction-diffusion, shape-field and warp-mesh only**; inert elsewhere — same section. |
 
 `saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
 background pre-pass. You write them once and the whole frame answers — see
@@ -360,6 +360,37 @@ Two honest limits, both measured rather than estimated:
 
 ---
 
+### The warp mesh — colour by angle around the deposit
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `color_span`   | `1.0` | How much of the gradient one full turn around the deposit centre covers. `1.0` is the whole ramp once per revolution; low values give a near-single-tone ring. |
+| `color_center` | `0.0` | Where that sweep starts in the gradient. **Cyclic**, exactly as on the field scenes — `-0.1` and `0.9` are the same place. |
+
+The deposit — the scene's light source, a gaussian ring — samples the LUT **per
+pixel in its fragment stage**, so the full surface applies here: `[palette]`,
+`[palette_b]`, `palette_mix`, `saturation`, and both `palette_steps` *and*
+`palette_contour` are live (see the scoping table below). The coordinate is
+
+```
+hue + color_center + color_span * (angle / tau)
+```
+
+where `angle` is measured about the deposit centre (`deposit_x`/`deposit_y`), so
+the ring is laid down as an angular sweep through your gradient. What makes this
+scene's colour behave unlike any other: the warp then **drags that colour into
+structure**, so most of what is on screen at any moment is the palette's *history*
+— a `decay` near `1` keeps many seconds of old sweep in flight, and a moving
+`color_center` paints time as a spiral of shifting tone.
+
+**A converted MilkDrop preset is outside this surface by design.** A preset
+carrying a `[milk]` table switches the deposit off and draws its own light — the
+waveform, custom waves and shapes coloured by the `.milk` file's own authored
+`wave_r`/`_g`/`_b` values. The palette params above govern the *native*,
+hand-authored `warp_mesh` look; they do not re-tint an imported one.
+
+---
+
 ### The backdrop — `bg_hue` is a coordinate in *your* gradient
 
 The background pre-pass (`bg_hue`, `bg_bright`, `bg_vignette` — the full roster is in
@@ -550,6 +581,7 @@ Where the LUT is sampled decides whether that derivative exists at all:
 | `fragment_field` | per pixel, fragment stage | ✅ | ✅ |
 | `reaction_diffusion` | per pixel, fragment stage | ✅ | ✅ |
 | `shape_field` | per pixel, fragment stage | ✅ | ✅ |
+| `warp_mesh` (the native deposit; a `[milk]` preset draws its own colours) | per pixel, fragment stage | ✅ | ✅ |
 | `attractor` | per particle, **vertex** stage | ✅ | ❌ inert |
 | `swarm` | per particle, on the CPU | ✅ | ❌ inert |
 | `emitter` | per particle, on the CPU | ✅ | ❌ inert |

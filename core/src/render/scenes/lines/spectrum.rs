@@ -360,6 +360,7 @@ pub(crate) fn build(
                     b: turn([x, place.baseline + length]),
                     color: color_of(i),
                     width: width_of(i),
+                    alpha: 1.0,
                     // Isolated: one segment per element, both ends free. Bars
                     // must keep exactly their previous geometry, or a bar would
                     // hang below `baseline` and break the centre-mirror.
@@ -399,6 +400,7 @@ pub(crate) fn build(
                     b: next,
                     color: color_of(i),
                     width: width_of(i),
+                    alpha: 1.0,
                     joined,
                 });
                 prev = next;
@@ -419,6 +421,7 @@ pub(crate) fn build(
                     b: [c * outer, s * outer],
                     color: color_of(i),
                     width: width_of(i),
+                    alpha: 1.0,
                     // Isolated, like the bars: a spoke that extended inward
                     // would grow through `radius` and fill the inner circle.
                     joined: 0,
@@ -699,7 +702,8 @@ impl Scene for SpectrumScene {
             GeneratorConfig::Curve { .. }
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. } => {}
+            | GeneratorConfig::Particles { .. }
+            | GeneratorConfig::WarpMesh { .. } => {}
         }
         // Nothing is built here — the element count is validated at load and is
         // orders of magnitude under the segment cap — so nothing truncates.

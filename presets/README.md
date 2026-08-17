@@ -995,6 +995,241 @@ texture in a still and shimmers the moment anything moves. `d` at the corner is
 > a many-pointed star's inner rings will not sit where an offset curve should;
 > its outer ones will.
 
+### `warp_mesh` — the past, resampled through a per-vertex grid (Plan 0100)
+
+**One transform per vertex, where `trails` gives you one for the whole frame.**
+`system = "warp_mesh"` covers the frame with a grid of cells and resamples the
+*previous* frame through it, giving each grid vertex its own zoom, rotation,
+stretch and drift. The rasterizer interpolates between them, so the past can
+spiral in one corner and drift in another — which no single affine can express
+and which is why this exists beside the `fb_*` vocabulary rather than inside it
+([ADR-0113](../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
+generalizing [ADR-0048](../docs/adrs/0048-transformed-feedback.md)).
+
+It is also the **only** scene here with nothing to draw of its own *when you
+author it by hand*. Every other system paints a figure; this one paints light
+into a feedback field and then moves the field. Turn the deposit off and the
+frame goes black in about a second.
+
+A **converted** MilkDrop preset is the exception, and it is not one you can
+write: it brings its own draw layer — a waveform, custom waves and shapes,
+borders, a motion grid — and turns the deposit off. See
+[`[milk]`](#milk--the-table-you-do-not-write) below.
+
+```toml
+system = "warp_mesh"
+
+[mesh]
+x = 32                       # grid cells across; clamped to the tier (see below)
+y = 24
+
+[per_vertex]                 # evaluated ONCE PER VERTEX, with x/y/rad/ang bound
+zoom = "1.9 + rad * 0.9"     # the centre is pulled harder than the rim
+rot  = "0.35 + sin(ang) * 0.30"
+
+[params]
+decay          = "0.06"      # fraction of the past surviving per SECOND
+deposit        = "7 + clamp(mid * 4, 0, 3.5)"
+deposit_radius = "0.30"      # a ring; 0 is a blob at the centre
+deposit_width  = "0.03"
+deposit_arms   = "6"
+deposit_twist  = "2.4"
+deposit_spin   = "0.5"
+```
+
+#### The `[per_vertex]` table
+
+Its bindings are evaluated **once per mesh vertex per frame**, with four extra
+variables in scope that read `0` everywhere else:
+
+| variable | is |
+|---|---|
+| `x` / `y` | the vertex's position in `0..1`, `y = 0` at the **top** |
+| `rad` | its distance from the centre, `1.0` at the middle of the top and bottom edges on **any** display |
+| `ang` | its angle there, `0..tau`, counter-clockwise from the +x axis as you look at the screen |
+
+`rad` and `ang` are aspect-corrected against the **render target**, never against
+the mesh: `zoom = 1 + rad * 0.2` draws the same circular gradient on a 16:9
+monitor and on a 5:4 one. Only `[per_vertex]` binds them — a `[params]` binding
+naming `rad` gets a load warning and reads zero.
+
+The table accepts exactly the nine names below, and **each is also an ordinary
+scalar param**. That is the composition rule: a scalar sets the output for the
+whole mesh, and a `[per_vertex]` binding of the same name replaces it vertex by
+vertex. Bind none of them and you have ADR-0048's single shared transform; bind
+one and only that one varies.
+
+| output | does (all rates are **per second**) |
+|---|---|
+| `zoom` | scale factor. Above 1 the past expands outward — the classic tunnel. Below 1 it collapses inward. `1` is still |
+| `rot` | radians per second the past turns about `(cx, cy)` |
+| `cx` / `cy` | the fixed point everything else turns about, in uv. `0.5, 0.5` is the middle |
+| `dx` / `dy` | drift, in frame-**heights** per second, so the vocabulary is isotropic |
+| `sx` / `sy` | axis stretch factors, per second, applied before the rotation |
+| `warp` | strength of the procedural wobble — four sinusoids whose own frequencies drift, so it never settles into a visible standing pattern. Inert at `0` |
+
+Two more scalars shape that wobble and are **not** per-vertex, because they are
+properties of the pattern rather than of a vertex:
+
+| param | does |
+|---|---|
+| `warp_scale` | the wobble's spatial scale. Larger is coarser. Default `1` |
+| `warp_speed` | how fast its frequencies drift. Default `1` |
+
+**A `[smoothing]` entry naming a `[per_vertex]` binding is ignored, with a
+warning** — the same rule a per-element `index` binding takes, and for the same
+reason: a series has no single value for the smoother to hold. Ease the scalar
+instead, or ease something the expression reads.
+
+#### The field, and what feeds it
+
+| param | does |
+|---|---|
+| `decay` | fraction of the past surviving **per second**. `0.05` leaves a quarter-second tail; `0.5` leaves a second and a half; clamped just under `1`, because at exactly `1` the field is a perfect integrator and any deposit whitens the frame without bound. Default `0.72` |
+| `deposit` | light laid down per second. `0` and the frame goes black. Default `1.6` |
+| `deposit_x` / `deposit_y` | where, in uv. Default `0.5, 0.5` |
+| `deposit_radius` | the ring's radius in frame-heights. `0` degenerates to a soft blob at the centre. Default `0.45` |
+| `deposit_width` | the ring's gaussian sigma, in frame-heights. Default `0.11` |
+| `deposit_arms` | angular lobes around the ring. Below `0.5` the modulation is off entirely rather than a degenerate single lobe. Default `0` |
+| `deposit_twist` | how much the arms spiral with radius. Default `0` |
+| `deposit_spin` | how fast they turn, radians per second of scene time. Default `0` |
+
+The deposit is coloured **by angle** through the shared palette, so the shared
+colour vocabulary applies as it does everywhere else: `hue`, `color_span`,
+`color_center`, `saturation`, `palette_mix`, `palette_steps`, `palette_contour`,
+and `brightness` scaling the whole present.
+
+#### MilkDrop's composite roster
+
+Seven more, and they are here because they are what most of the MilkDrop library
+is made of rather than because the idiom needed them. Each is a flag in the source
+format and stays one here — the four remaps are one `select` apiece in the present
+shader, so a preset that binds none of them pays nothing.
+
+| param | does |
+|---|---|
+| `wrap` | past `0.5`, the past is **toroidal**: content that a zoom pulls off one edge comes back on the other. This is what most of the classic tunnels are made of. Off — the default — an off-field read contributes nothing, which is the transparent-border policy `trails` takes (ADR-0048) |
+| `gamma` | multiplies the light on the way out. Default `1` |
+| `darken_center` | darkens a soft disc at the middle, in frame-heights so it is round on any display. What stops a zooming feedback loop saturating there. A fraction gives a proportional amount, which the source format cannot express |
+| `brighten` | past `0.5`, `sqrt` of the light — lifts the shadows |
+| `darken` | past `0.5`, the light squared |
+| `solarize` | past `0.5`, `c * (1 - c) * 4` — the classic inversion around mid-grey |
+| `invert` | past `0.5`, `1 - c` |
+
+> **The four remaps operate on *linear light* here, where MilkDrop applied them to
+> 8-bit display-referred pixels.** They are the same gesture, not the same
+> arithmetic: `brighten`'s square root lifts the shadows either way, by a
+> different amount. That difference is the whole reason
+> [ADR-0046](../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
+> pipeline is interesting rather than merely compatible, and it is stated here so
+> a converted preset that looks *different* is not mistaken for one that looks
+> wrong.
+
+> **The deposit is laid down *after* the warp, deliberately.** Its light is
+> "now", so it is crisp on the frame it appears and warped from the next frame
+> onward. Deposit before warping and every stroke would be smeared on arrival.
+
+#### The `[mesh]` table, and why the grid is capped
+
+`x` and `y` are the number of **cells**, `2`..`128` and `2`..`96` — the ceiling
+is the `.milk` format's own, so a converted MilkDrop preset's grid is always
+representable. Absent keys mean `32 x 24`.
+
+The grid is a **resolution, not a shape**
+([ADR-0037](../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)):
+raising it refines how finely the per-vertex program is sampled and changes
+nothing about what the scene draws, and no coordinate anywhere in the scene takes
+its aspect from it. It is also a **tier capacity**, because every vertex costs one
+evaluation of every `[per_vertex]` binding on the render thread — `64 x 48` on the
+floor tier and `88 x 66` on rich, measured rather than chosen (the ladder and the
+numbers are on `TierConfig::mesh_grid`). A preset asking for more gets the tier's
+ceiling; it is not an error, and the request survives so the same file renders
+finer on a better machine.
+
+> **A coarse grid shows itself where the transform varies fast.** The
+> interpolation between vertices is linear, so a program with a sharp feature in
+> it — `zoom = 1 + (rad > 0.5) * 2` — renders that feature as a polygon of the
+> grid rather than as a circle. Either raise `[mesh]`, or write the feature as
+> something smooth: `smoothstep` over `rad` costs nothing extra and has no
+> vertices to show.
+
+#### `[milk]` — the table you do not write
+
+A **converted** MilkDrop preset carries a fourth table, and it is the one part of
+this file's vocabulary that is not for you:
+
+```toml
+[milk]
+per_frame = """
+.regs q1 zoom bass time
+.code
+const 1.024
+...
+"""
+
+[[milk.shapes]]              # up to four, and as many [[milk.waves]]
+count = 7                    # sides (a shape) or points (a wave)
+instances = 3
+per_frame = """..."""
+```
+
+That is compiled EEL2 bytecode, emitted ahead of time by `milkconv` and executed
+by a small stack VM in the engine
+([ADR-0113](../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+Three things about it are worth knowing even though you will not author one:
+
+- **A bundle is authoritative about the transform.** Its programs run *after*
+  `[params]` and `[per_vertex]`, so binding `zoom` alongside a `[milk]` table is
+  inert rather than a conflict. What a converted preset does still take from
+  `[params]` is everything the bundle has no opinion about — the palette and the
+  compositing stages.
+- **The rates inside it are MilkDrop's, per *frame*.** The runtime converts them
+  to this engine's per-second vocabulary at a nominal 30 fps, which is what makes
+  a converted preset move at the speed its author saw on any display. So a number
+  you read in a bundle is not on the same scale as the same-named `[params]`
+  binding beside it.
+- **A bundle brings its own light, so the deposit stays off.** That is the one
+  place where reading this section as "the warp mesh has nothing to draw" would
+  mislead you.
+- **A MilkDrop 2 bundle may also carry `warp_shader` / `comp_shader`** — the
+  preset's own pixel shaders, translated from HLSL to WGSL ahead of time
+  (Plan 0100 Phase 6), plus a `blur_level` naming how deep a blur chain they
+  sample. The engine validates each through naga at load; **a shader that does
+  not compile rejects that one preset by name and the rest of the library
+  loads**. When a `warp_shader` is present it replaces the built-in decay
+  fragment, and a `comp_shader` replaces the built-in present remaps — the
+  bundle is then authoritative about the compositing too, not just the
+  transform.
+
+#### The draw layer a converted preset brings
+
+Between the warp and the composite, a bundle draws what MilkDrop draws. None of
+it is authorable from a hand-written preset — it is listed so a converted file is
+readable, and so the vocabulary is somewhere other than the source:
+
+| what | from |
+|---|---|
+| the **waveform** | eight `wave_mode` figures over the audio trace — a circle, a pair of rings, a horizontal and a vertical scope, a Lissajous, a mirrored pair, an angled line and its double — placed by `wave_x`/`wave_y`, coloured by `wave_r`/`_g`/`_b`/`_a`, shaped by `wave_scale`, `wave_smoothing` and `wave_mystery` |
+| up to four **custom waves** | each a polyline or a scatter from its own per-point program |
+| up to four **custom shapes** | each up to 1024 filled polygons from its own per-frame program, with an optional outline |
+| the two **borders** | `ob_*` outside, `ib_*` inside |
+| the **motion grid** | `mv_*`: a lattice of short strokes |
+
+> **Two blend modes, and the difference is visible.** MilkDrop picks per element
+> between adding light and compositing it *over* what is already there
+> (`bAdditiveWaves`, and a custom element's own `additive`). This engine honours
+> both, because reading them all as additive is not a small error: an additive
+> seam **sums** where alpha-over **replaces**, so ten overlapping producers land
+> at ten rather than at one. On the 28.5 % of the MilkDrop library that sets
+> `fDecay = 1` — where the field never fades — that is the difference between a
+> preset and a white frame.
+
+The waveform's own trace is the **mono** signal this engine analyses, where
+MilkDrop had two channels. Where the reference tells two of its wave modes apart
+by drawing the left channel against the right, this draws the one trace at the
+separation the reference's own parameters name. It is the same figure with the
+channel difference removed.
+
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
 **Strokes join at their interior vertices** (Plan 0039,

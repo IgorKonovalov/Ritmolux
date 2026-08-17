@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
-> **Related plan(s):** [0100](../plans/0100-the-engine-speaks-milkdrop.md)
+> **Related plan(s):** [0100](../plans/done/0100-the-engine-speaks-milkdrop.md)
 
 ## Context
 
@@ -185,7 +185,7 @@ a stop condition, and if the translation chain proves unviable, **this is the la
 preset packs, on disk and outside this repository — put numbers on three things this ADR reasoned
 about qualitatively, and two of them cut against the optimistic reading. Recorded here rather than
 edited into the body above, per the append-only rule; the full table is in
-[Plan 0100](../plans/0100-the-engine-speaks-milkdrop.md#the-corpus-measured-2026-08-16).
+[Plan 0100](../plans/done/0100-the-engine-speaks-milkdrop.md#the-corpus-measured-2026-08-16).
 
 - **"Fidelity will be partial and we cannot say by how much" is still right, but the corners are
   not all corners.** This ADR's Negative names `sampler_noisevol_*` volumes in a list of things a
@@ -207,3 +207,17 @@ edited into the body above, per the append-only rule; the full table is in
   **8,879,104 B against the ~10 MB soft cap**, leaving ~1.07 MB. The half that *does* ship — the VM,
   the loader, the `warp_mesh` scene — spends from that, and Plan 0100's Phase 6 measurement is the
   first thing that will say by how much.
+
+## Outcome (2026-08-16, at Plan 0100's close — the Phase 7 judgment)
+
+**The decision stands; the motivating claim came back provisionally negative.** This ADR's Context
+argues "the same preset should look better here" — the linear-light HDR pipeline against the
+reference's 8-bit additive. Judged by the user over seven presets side by side against
+`foo_vis_milk2` 0.2.0.0 (Plan 0100 Phase 7), the verdict was **merely different, not better** —
+and the plan's own words apply: that finding is worth more than the feature. The qualifier the
+evidence supports: the verdict is dominated by a single defect this ADR's framing predicts —
+**the float field never truncates where the reference's 8-bit target does** (design-backlog 0106),
+which washes or inverts every feedback-heavy preset. The one pair whose tone survived (*Blur Mix
+3*) looked genuinely good, so the claim is unfalsified where the defect is absent. The HDR
+question is re-judged after 0106 lands; conversion fidelity itself was judged *mostly there, with
+defects* (0106–0108), and the provenance question (Phase 8) was deferred with nothing shipping.

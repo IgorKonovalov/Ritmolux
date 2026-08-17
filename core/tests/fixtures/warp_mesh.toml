@@ -1,0 +1,80 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `warp_mesh` scene's drift baseline (Plan 0100 Phase 1, ADR-0113): a
+# palette-coloured ring deposited every frame and dragged inward by a per-vertex
+# transform, so the field accumulates a radial pulse rather than a still ring.
+#
+# The fixture is deliberately the whole idiom rather than the scene's defaults,
+# because the defaults are the IDENTITY: with no `[per_vertex]` table and no
+# scalar overrides the mesh resamples the past exactly where it already was, and
+# the baseline would pin a static ring that no regression in the per-vertex path
+# could move. Specifically:
+#
+#  - `[per_vertex] zoom` is the plan's own done-when. It is a function of `rad`,
+#    so the transform VARIES ACROSS THE MESH - the centre is pulled in harder
+#    than the rim - which is the one thing ADR-0048's single shared affine
+#    cannot express and therefore the one thing this baseline exists to pin. A
+#    regression that fed every vertex the same `zoom` (a scalar leaking past the
+#    override, a series of the wrong length, a scratch never filled) collapses
+#    this to a uniform pull and moves the frame well past tolerance.
+#  - `[per_vertex] rot` is a function of `ang`, which pins the OTHER axis of the
+#    same property: a rotation whose rate depends on where the vertex sits. It
+#    also means `rad` and `ang` are both exercised, so a regression in either
+#    half of `vertex_position` is visible here.
+#  - `[mesh]` is named rather than defaulted, so the baseline is pinned to a
+#    known grid instead of to whatever `DEFAULT_MESH` becomes. 24x18 is inside
+#    the floor tier's ceiling, so the tier clamp is the identity here and the
+#    baseline does not move if that capacity is ever re-measured.
+#  - `deposit_arms = "6"` breaks the ring's rotational symmetry. Without it the
+#    deposit is symmetric about the centre and a rotation - per-vertex or not -
+#    would be invisible in the accumulated field.
+#  - `decay` is a factor PER SECOND and is deliberately small: 0.05 leaves a
+#    ~0.25 s tail, so the field converges well inside the 60 warm-up frames this
+#    suite renders. That is what makes the baseline a settled picture rather
+#    than a snapshot of an integrator still climbing - at a decay near 1 the
+#    accumulation saturates instead, and the frame reads as soft blobs whose
+#    brightness depends on exactly how many frames were rendered.
+#
+# The bindings are lightly audio-bound rather than constant: `core/tests/warp_mesh.rs`
+# holds this same fixture to the sanity, animation and reactivity measurements
+# (Plan 0100 Phase 1's done-when), and a fixture bound to nothing cannot pass
+# reactivity. They are shallow enough that the golden capture's frame - which
+# renders under one fixed AnalysisFrame - is unaffected by the binding's shape.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule; this scene adds
+# three bind-group layouts, so the rule is live rather than ceremonial). The
+# numbers are in `core/tests/warp_mesh.rs`'s `the_adapters_agree_on_the_warp_mesh`.
+system = "warp_mesh"
+name   = "fixture_warp_mesh"
+
+[mesh]
+x = 24
+y = 18
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#04021a" },
+  { at = 0.3,  color = "#1f3fa8" },
+  { at = 0.62, color = "#2fd2c4" },
+  { at = 1.0,  color = "#fff2c2" },
+]
+
+# The per-vertex program: the transform varies with the vertex's own position.
+[per_vertex]
+zoom = "1.9 + rad * 0.9"
+rot  = "0.35 + sin(ang) * 0.30"
+
+[params]
+decay           = "0.05 + clamp(bass * 0.05, 0, 0.04)"
+warp            = "0.25"
+warp_scale      = "1.4"
+deposit         = "7.0 + clamp(mid * 4.0, 0, 3.5)"
+deposit_radius  = "0.30"
+deposit_width   = "0.030"
+deposit_arms    = "6"
+deposit_twist   = "2.4"
+deposit_spin    = "0.5"
+color_span      = "1.0"
+color_center    = "0.15"
+saturation      = "1.0"
+brightness      = "1.0"

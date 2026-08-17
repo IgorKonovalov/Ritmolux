@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0107** (ADRs are a separate sequence — next free there is **0117**.)
+**Next free number: 0109** (ADRs are a separate sequence — next free there is **0119**.)
 
 ## Active roster
 
@@ -20,10 +20,11 @@ someone who picked it up is reading.
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | draft | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Its hard dependency is discharged — [0091](done/0091-the-figure-fills-the-frame.md) closed 2026-08-16 and `shape_field` is the scene this draws into.** Soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
-| [0100](0100-the-engine-speaks-milkdrop.md) | The engine speaks MilkDrop | approved | dev, human | **The largest plan this project has written, and the only one whose first phase is worth taking even if the rest never happens.** Carries [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md): translate `.milk` **ahead of time** in a converter outside `default-members`, run it on a new native `warp_mesh` scene plus an EEL2 bytecode VM — so no `.milk` text, no HLSL and no translator ever enters `lmv.exe` or `foo_lmv.dll`. Phase 1 alone ships a preset-authorable warp-mesh idiom (a generalization of [ADR-0048](../adrs/0048-transformed-feedback.md)); **Phase 6 carries a stop condition** — if HLSL→WGSL has no viable route, the plan lands at ADR-0113's Alternative D with Phases 1-5 standing. Wants a **worktree lane to itself**. Phase 4 draws through the shared line renderer and **contends with [0087](0087-the-line-renderer-draws-a-curve.md)**; Phase 1 contends with nothing. |
 | [0101](0101-the-engine-renders-a-music-video.md) | The engine renders a music video | approved | dev, human | **Phase 4's wall is gone: [0099](done/0099-the-horizon-reaches-its-own-length.md) closed 2026-08-16** and the capture path now renders 36,001 frames with RSS flat — but a render mode that submits passes outside `step_offscreen` inherits the defect and none of the fix. Carries [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md): render offline at fixed injected `dt`, stream over a pipe to the user's own `ffmpeg`, **ship no encoder** (a 1080p RGBA frame is 8.29 MB, so 119 GB touches disk otherwise, and any static encoder exceeds NFR 4's whole ~10 MB cap). Phase 3's done-when is **exact byte-identity** against `shot --frame-at`. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Amended 2026-08-16: a new Phase 1 fixes backlog [0102](../design-backlog.md) + [0103](../design-backlog.md) before anything advertises the component**, which Plan 0102's Phase 5 found starves foobar2000's own UI until playback starts. That phase is a surface-lifetime design pass, is ADR-worthy, and its fix only reaches users on the next tag — so the release must be green before Phase 5 submits. The rest is outreach whose done-whens are **artifacts, not outcomes**. Phase 3 soft-wants [0101](0101-the-engine-renders-a-music-video.md). |
-| [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
+| [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and its four wait on [0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
+| [0107](0107-the-foobar-menu-picks-a-preset.md) | The foobar menu picks a preset | approved | dev, human | Carries [ADR-0117](../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) (ABI v6). Contends with [0103](0103-the-project-gets-an-audience.md) Phase 1 on the menu handler - run in sequence. |
+| [0108](0108-the-milkdrop-import-gets-its-tone-back.md) | The MilkDrop import gets its tone back | approved | dev, human | Carries [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) and closes backlog 0106 + 0107. Phase 1 fixes the defect that dominated [0100](done/0100-the-engine-speaks-milkdrop.md) Phase 7; **Phase 2 re-judges that plan's central HDR claim** and can route to ADR-0118's Alternative D. Phases 3-5 are hunts, each with a stop condition. Contends with nothing. |
 | [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) | The frame stream passes through a diffusion model | draft | dev, human | **Phase 1 is a throwaway spike and Phase 2 is a stop condition** — if a diffused attractor boils, the plan ends there having cost an afternoon and nothing is built. **Phase 1 is takeable today and depends on nothing**; every later phase needs [0101](0101-the-engine-renders-a-music-video.md) Phases 1-2 (its transitive block on 0099 is discharged). **No ADR yet, deliberately** — it is written between Phases 2 and 3, against the spike's evidence rather than a guess. Ships a script, no weights and no runtime, so `lmv.exe` and the release zip do not change; `core/` is untouched. Contends with nothing (`tools/` + `docs/` only). |
 
 **Added 2026-08-16, from a backlog round after [0091](done/0091-the-figure-fills-the-frame.md)'s
@@ -112,11 +113,10 @@ and trails badly on **content volume and distribution**, neither of which any en
 addresses. So [0100]–[0104] are the first cohort here aimed at the product rather than at the
 renderer, and they sort into two groups that barely interact:
 
-- **The big one, in a lane of its own: [0100](0100-the-engine-speaks-milkdrop.md).** It is the only
-  plan on this roster that could change the project's position rather than improve it, and the only
-  one large enough to want a worktree to itself. Take it when a long session is available. **Its
-  Phase 1 is the hedge**: a native `warp_mesh` idiom that stands whether or not the import half
-  finishes, so the plan cannot fail to zero.
+- **The big one is done: [0100](done/0100-the-engine-speaks-milkdrop.md) closed 2026-08-16** — all
+  six dev phases plus the two human ones, the stop condition never fired, and the hedge was not
+  needed. What it left behind: the Phase 7 verdict (**merely different**, re-judged after backlog
+  0106) and the fidelity work list 0106–0108. Its Phase 4 contention with [0087] is discharged.
 - **The cheap ones, in parallel, in this order: [0104] → [0101] → [0103].**
   **[0102](done/0102-the-component-ships.md) is done (closed 2026-08-16), so
   [0103](0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
@@ -131,6 +131,28 @@ renderer, and they sort into two groups that barely interact:
   [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world.
+
+- **Approved 2026-08-16 from a user request, and it collides with exactly one plan:
+  [0107](0107-the-foobar-menu-picks-a-preset.md).** It rewrites the same `WM_CONTEXTMENU` handler
+  [0103](0103-the-project-gets-an-audience.md)'s amended Phase 1 does, so **the two never run in
+  parallel lanes** — either order is correct, and the plan's own Risks section states the trade.
+  The tiebreak is availability rather than architecture: 0107 is takeable today (its ABI phase
+  depends on nothing and its ADR is written), while 0103's Phase 1 is a surface-lifetime design
+  pass that is ADR-worthy and has no ADR yet. What taking 0103 first would buy is one thing worth
+  naming: 0107's new Preset submenu would inherit that phase's layout-edit deference for free
+  instead of being restructured by it.
+
+- **Added 2026-08-17 from the MilkDrop fidelity backlog:
+  [0108](0108-the-milkdrop-import-gets-its-tone-back.md).** It takes backlog 0106 + 0107 and
+  deliberately leaves 0108 (the conversion tail) filed, on that entry's own instruction that its
+  blank-render list is contaminated by both. **It contends with nothing** — `warp_mesh/`, `milkconv/`
+  and `core/src/milk/` are touched by no other live plan — so it can take any free session. Two
+  things order it against itself rather than against the roster: its Phase 2 `human` gate is what
+  makes Plan 0100's central claim re-judgeable, and it grades a tuning the three later phases are
+  judged through, so it sits at position 2 rather than at the end. The sweep that produced it also
+  falsified backlog 0107's own leading suspect before the plan started — `s_fw` is already
+  `AddressMode::Repeat`, and Repeat shifts rather than reflects — which is why Phase 3 names a
+  different hypothesis with arithmetic behind it.
 
 - **Out of sequence by design: [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md).**
   Its Phase 1 is a spike that depends on nothing and fits any gap; its Phase 2 is a stop condition
@@ -400,9 +422,10 @@ test. Bless output is deterministic run-to-run (it is bless-vs-*committed* that 
 hash sets are directly comparable and everything except the change is held fixed. All of them came
 back identical, which is how "the two WARP fixes moved zero pixels" was established rather than argued.
 
-**The suite is 28 baselines, not 20** (repaired 2026-08-12 at [0080](done/0080-the-sky-gets-a-horizon.md)'s
-close, which found the paragraph and the plan it had been copied into both saying "20" against a
-directory holding 26; 27 after [0080] and 28 after [0081]). The eight drifters are named above by label, so the numerator survives the
+**The suite is 32 baselines as of 2026-08-17** (it said 28 until then, and 20 before 2026-08-12 —
+repaired at [0080](done/0080-the-sky-gets-a-horizon.md)'s close against a directory holding 26, then
+27 after [0080] and 28 after [0081]; Plan 0100's `warp_mesh` and layer fixtures took it to 32). **The
+number has now gone stale twice, which is the paragraph's own point about itself.** The eight drifters are named above by label, so the numerator survives the
 correction; only the denominator was wrong. Re-derive the count rather than copying a number
 forward — that is what went stale here.
 
@@ -628,6 +651,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0100 — The engine speaks MilkDrop](done/0100-the-engine-speaks-milkdrop.md) — closed 2026-08-16. Review: **no blockers, one major (repaired at close), two minors.** Phase 7: **merely different**; fidelity backlog 0106–0108.
 - [0102 — The component ships](done/0102-the-component-ships.md) — closed 2026-08-16. Review: **no blockers, three majors, four minors.** Phase 5 (`human`) carried to [on-device-validation.md](../on-device-validation.md).
 - [0099 — The horizon reaches its own length](done/0099-the-horizon-reaches-its-own-length.md) — closed 2026-08-16. Review: **no blockers, no majors, four minors and a nit.**
 - [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md) — closed 2026-08-16. Review: **no blockers, two majors, two minors, one nit.**
@@ -779,7 +803,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
   `in-progress` → `done` (then `git mv` to `done/` and drop from this roster). Review
   happens at plan end, in a fresh `/architect` session — not by the session that wrote
   the code.
-[0100]: 0100-the-engine-speaks-milkdrop.md
+[0100]: done/0100-the-engine-speaks-milkdrop.md
 [0101]: 0101-the-engine-renders-a-music-video.md
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md

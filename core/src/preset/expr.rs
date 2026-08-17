@@ -17,6 +17,7 @@
 //! `max` is or, and `1 - c` is not.
 //!
 //! Variables: `bass mid treb onset beat bar time tempo novelty index`, the
+//! per-vertex position `x y rad ang`, the
 //! absolute-level escapes `bass_raw mid_raw treb_raw onset_raw`, and the musical
 //! clock `beat_index time_since_beat beat_in_bar bar_index bar_phase`. The first
 //! four are normalized against their own recent peak (ADR-0049), so a threshold
@@ -67,10 +68,13 @@ use std::fmt;
 /// musical clock, and `beat_in_bar`/`bar_index`/`bar_phase`, its Layer 2 bar
 /// position — gated on a confidence the grammar deliberately cannot see, so these
 /// three are always *something* sensible and never wrong about the music.
+/// Then `x`/`y`/`rad`/`ang`, the **vertex's own position** during a per-vertex
+/// evaluation (Plan 0100 Phase 1) — the same kind of thing as `index` one axis
+/// up, and `0` anywhere else.
 /// `index` stays **last** and is different in kind: it is not
 /// audio but the *element's own position* during a per-element evaluation
 /// (Plan 0034 Phase 4), and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 19] = [
+pub const VAR_NAMES: [&str; 23] = [
     "bass",
     "mid",
     "treb",
@@ -89,6 +93,10 @@ pub const VAR_NAMES: [&str; 19] = [
     "beat_in_bar",
     "bar_index",
     "bar_phase",
+    "x",
+    "y",
+    "rad",
+    "ang",
     "index",
 ];
 /// Number of expression variables.
@@ -122,7 +130,17 @@ const CLOCK_SLOT_BASE: usize = 13;
 /// gate to hand-tune. It rides on the analysis frame for diagnostics instead.
 const BAR_SLOT_BASE: usize = 15;
 
-// The four slot blocks must not overlap. Every bound here is a compile-time
+/// Slot of `x`, followed by `y`, `rad` and `ang` — the per-vertex position
+/// written by [`with_vertex`](Variables::with_vertex) (Plan 0100 Phase 1).
+///
+/// These are `0` in every evaluation that is not per-vertex, exactly as `index`
+/// is `0` outside a per-element one. That is the whole of "the grammar is not
+/// widened for other systems": the *names* exist crate-wide because slots are
+/// positional, and the only caller that ever binds them is the warp mesh's
+/// `[per_vertex]` table.
+const VERTEX_SLOT_BASE: usize = 18;
+
+// The five slot blocks must not overlap. Every bound here is a compile-time
 // constant, so this is checked at compile time: an overlapping base is a build
 // failure, not a test failure. `raw_slots_are_where_the_names_say` covers the
 // half a constant cannot — that the *names* at these offsets are the expected
@@ -136,8 +154,12 @@ const _: () = assert!(
     "the clock block must end before the bar block begins"
 );
 const _: () = assert!(
-    BAR_SLOT_BASE + 3 <= INDEX_SLOT,
-    "the bar block must end before `index`"
+    BAR_SLOT_BASE + 3 <= VERTEX_SLOT_BASE,
+    "the bar block must end before the vertex block begins"
+);
+const _: () = assert!(
+    VERTEX_SLOT_BASE + 4 <= INDEX_SLOT,
+    "the vertex block must end before `index`"
 );
 
 /// A bound set of variable values for one evaluation. Field order matches
@@ -287,6 +309,28 @@ impl<'a> Variables<'a> {
         let mut next = self;
         if let Some(slot) = next.values.get_mut(INDEX_SLOT) {
             *slot = t;
+        }
+        next
+    }
+
+    /// Rebind the per-vertex position `x`, `y`, `rad`, `ang`, returning a fresh
+    /// binding — the caller evaluates a `[per_vertex]` binding once per mesh
+    /// vertex against these (Plan 0100 Phase 1).
+    ///
+    /// `x`/`y` are the vertex's uv in `0..1`; `rad` is its distance from the
+    /// mesh centre and `ang` its angle there, both taken in the
+    /// **aspect-corrected** space of the render target (ADR-0037) so a
+    /// `rad`-driven figure is round on any display and does not follow the mesh
+    /// grid's own proportions. The caller does that correction — this only
+    /// carries the four values.
+    ///
+    /// By value and `Copy`, like [`with_index`](Self::with_index): a per-vertex
+    /// loop rebinds four floats without touching the borrowed spectrum or
+    /// allocating.
+    pub fn with_vertex(self, x: f32, y: f32, rad: f32, ang: f32) -> Self {
+        let mut next = self;
+        if let Some(slots) = next.values.get_mut(VERTEX_SLOT_BASE..VERTEX_SLOT_BASE + 4) {
+            slots.copy_from_slice(&[x, y, rad, ang]);
         }
         next
     }
@@ -852,6 +896,15 @@ pub struct Expr {
     /// while the preset is loaded. This is what lets the frame loop ask "is this
     /// binding per-element?" for the price of reading a `bool`.
     uses_index: bool,
+    /// Whether the expression names any of `x`, `y`, `rad`, `ang` — decided at
+    /// compile for [`uses_index`](Self::uses_index)'s reason.
+    ///
+    /// Unlike `uses_index` this does **not** select a code path: a binding is
+    /// per-vertex because it sits in a `[per_vertex]` table, not because of what
+    /// it names (Plan 0100 Phase 1). It is read by the loader, which warns when
+    /// an ordinary `[params]` binding reaches for a vertex variable that will
+    /// read a flat zero there.
+    uses_vertex: bool,
 }
 
 impl Expr {
@@ -907,6 +960,17 @@ impl Expr {
     /// (Plan 0034 Phase 4). Free to call — the answer was computed at compile.
     pub fn uses_index(&self) -> bool {
         self.uses_index
+    }
+
+    /// Whether this expression references any per-vertex position variable
+    /// (`x`, `y`, `rad`, `ang`) — Plan 0100 Phase 1. Free to call; the answer was
+    /// computed at compile.
+    ///
+    /// The loader uses it for a warning, not for routing: only a `[per_vertex]`
+    /// table's bindings are evaluated per vertex, and outside one these names
+    /// read `0`.
+    pub fn uses_vertex(&self) -> bool {
+        self.uses_vertex
     }
 }
 
@@ -1340,7 +1404,12 @@ pub fn compile(src: &str) -> Result<Expr, ExprError> {
         return Err(ExprError::TrailingTokens);
     }
     let uses_index = root.references(INDEX_SLOT);
-    Ok(Expr { root, uses_index })
+    let uses_vertex = (VERTEX_SLOT_BASE..VERTEX_SLOT_BASE + 4).any(|slot| root.references(slot));
+    Ok(Expr {
+        root,
+        uses_index,
+        uses_vertex,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1673,6 +1742,11 @@ mod tests {
                 "`{hidden}` must stay out of the grammar: authors get behavior, not homework"
             );
         }
+        assert_eq!(
+            VAR_NAMES.get(VERTEX_SLOT_BASE..VERTEX_SLOT_BASE + 4),
+            Some(["x", "y", "rad", "ang"].as_slice()),
+            "with_vertex writes four floats starting at VERTEX_SLOT_BASE"
+        );
         assert_eq!(
             VAR_NAMES.get(INDEX_SLOT),
             Some(&"index"),
