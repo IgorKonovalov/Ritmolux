@@ -205,6 +205,336 @@ fn a_custom_shape_honours_its_per_point_program() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The waveform draw layer (Plan 0108 Phase 4, design-backlog 0107)
+// ---------------------------------------------------------------------------
+
+/// A waveform with structure in it, so no mode collapses to a straight line.
+fn trace() -> [f32; WAVE_SAMPLES] {
+    std::array::from_fn(|i| {
+        (i as f32 / WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin() * 0.7
+    })
+}
+
+/// The waveform alone: every other producer silenced, so the geometry under test
+/// is the trace's and nothing else.
+fn waveform_only(mode: f32, use_dots: f32) -> FrameOutputs {
+    FrameOutputs {
+        wave_a: 1.0,
+        wave_mode: mode,
+        wave_usedots: use_dots,
+        mv_a: 0.0,
+        ob_a: 0.0,
+        ib_a: 0.0,
+        ..Default::default()
+    }
+}
+
+/// Build the waveform layer for one `(mode, use_dots)` pair.
+fn waveform_geometry(mode: f32, use_dots: f32) -> draw::DrawGeometry {
+    let mut runtime = MilkRuntime::new(
+        MilkBundle::from_assembly(None, None, None).expect("the empty bundle decodes"),
+        0,
+    );
+    let mut geometry = draw::DrawGeometry::default();
+    draw::build(
+        &mut geometry,
+        Some(&mut runtime),
+        &waveform_only(mode, use_dots),
+        &trace(),
+        0.0,
+        1.0 / 30.0,
+        16.0 / 9.0,
+    );
+    geometry
+}
+
+// ---------------------------------------------------------------------------
+// A wave's per-point state carries along the trace (Plan 0108 Phase 5)
+// ---------------------------------------------------------------------------
+
+/// The `flip` alternation, in the shape **612 corpus files** write it, on a
+/// single custom wave whose points are otherwise identical.
+///
+/// Every point runs the same three lines with the same `sample`-independent
+/// arithmetic, so the only thing that can make consecutive points differ is
+/// `flip` surviving from one to the next. `y` is `0.7` on odd points and `0.3`
+/// on even ones — an alternation with no other possible source.
+const FLIP_PRESET: &str = "\
+[preset00]
+fRating=3.000
+nMotionVectorsX=0.000
+nMotionVectorsY=0.000
+fWaveAlpha=0.000
+wavecode_0_enabled=1
+wavecode_0_samples=8
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=0
+wavecode_0_bAdditive=1
+wavecode_0_a=1.000
+wave_0_per_point1=flip = flip + 1;
+wave_0_per_point2=flip = flip * below(flip, 2);
+wave_0_per_point3=x = 0.5;
+wave_0_per_point4=y = 0.3 + flip * 0.4;
+";
+
+/// **A custom wave's per-point program carries its state from one point to the
+/// next** — Plan 0108 Phase 5, and the reason *chasers 19 Portal*'s mirror
+/// symmetry converted cleanly and rendered inert (design-backlog 0107).
+///
+/// The fold that preset is named for is not in a warp shader and not in a
+/// per-vertex program — it has neither. It is three lines of per-point code in
+/// each of three custom waves, alternating `yp` about the trace to draw a
+/// mirrored pair. `ElementRuntime::run_point` restored a register snapshot
+/// before every point, exactly as the mesh's per-vertex path does, so `flip`
+/// was handed the same value each time, the two lines computed a constant, and
+/// the pair collapsed to one trace. Nothing failed and the conversion was clean
+/// — which is what made it hard to see.
+///
+/// The claim is asserted as an alternation rather than as a pair of literals:
+/// `y` must take **two** distinct values across a run of points whose only
+/// varying input is one the program never reads.
+#[test]
+fn a_waves_per_point_state_carries_to_the_next_point() {
+    let file = milkconv::milk::parse(FLIP_PRESET).expect("the fixture parses as a .milk file");
+    let converted = milkconv::convert::convert(&file, "flip_fixture").expect("it converts");
+    let preset = Preset::from_toml_str(&converted.toml)
+        .unwrap_or_else(|e| panic!("the emitted bundle must load back: {e}"));
+    let bundle = match preset.config {
+        Some(GeneratorConfig::WarpMesh {
+            milk: Some(milk), ..
+        }) => *milk,
+        other => panic!("the converted preset must carry a bundle, got {other:?}"),
+    };
+    assert_eq!(bundle.waves.len(), 1, "the one enabled wave must survive");
+
+    let mut runtime = MilkRuntime::new(bundle, 0);
+    runtime.run_frame(
+        &lmv_core::dsp::AnalysisFrame::default(),
+        0.0,
+        1.0 / 30.0,
+        (32, 24),
+        16.0 / 9.0,
+    );
+    runtime
+        .run_wave_frame(0)
+        .expect("the wave's per-frame program runs");
+
+    let ys: Vec<f32> = (0..8)
+        .filter_map(|i| runtime.run_wave_point(0, i as f32 / 7.0, 0.0))
+        .map(|p| p.y)
+        .collect();
+    println!("[draw_layer] flip alternation down the trace: {ys:?}");
+    assert_eq!(ys.len(), 8, "every point must produce a position");
+
+    let mut distinct: Vec<f32> = ys.clone();
+    distinct.sort_by(f32::total_cmp);
+    distinct.dedup_by(|a, b| (*a - *b).abs() < 1e-5);
+    assert_eq!(
+        distinct.len(),
+        2,
+        "`flip` must alternate down the trace, giving `y` exactly two values; \
+         got {distinct:?} from {ys:?}. One value means the per-point register \
+         file is being restored between points, so a preset's alternation, \
+         accumulation or integration along the wave silently does nothing — \
+         3 368 of the corpus's 6 347 custom-wave presets depend on it"
+    );
+    // ...and it alternates rather than merely holding two values in some order,
+    // which a program that reset every other point would also satisfy.
+    assert!(
+        ys.windows(2).all(|w| (w[0] - w[1]).abs() > 1e-5),
+        "consecutive points must differ — `flip` toggles every point; got {ys:?}"
+    );
+}
+
+/// Every `wave_mode` the reference has.
+const WAVE_MODES: [f32; 8] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+
+fn segment_length(s: &lmv_core::render::scenes::lines::SegmentInstance) -> f32 {
+    (s.b[0] - s.a[0]).hypot(s.b[1] - s.a[1])
+}
+
+/// **`wave_usedots = 1` puts separated marks along the trace where `= 0` puts a
+/// continuous stroke, in every mode** — Plan 0108 Phase 4's behavioural claim
+/// for the symptom the plan names cheapest to convict, because it is binary:
+/// the beads appear or they do not.
+///
+/// The reported symptom is *Cosmic Dust 2*'s `wave_usedots` beads never
+/// appearing (design-backlog 0107). This asks the geometry stage first, which
+/// separates two very different causes — a dots path that is never reached
+/// (nothing in the buffer) from one that is reached and draws something too
+/// small to see (marks in the buffer, and the render is the thing to look at).
+///
+/// The answer was **both, in different modes.** The path is reached everywhere,
+/// but `wave_mode 5` draws in two passes and its first pass emitted a polyline
+/// unconditionally, so a preset asking for dots got a stroke above `wave_y` and
+/// beads below it. That is what the `all marks are one length` arm below pins:
+/// before the repair, mode 5's dotted geometry held a segment **13.6x longer
+/// than `DOT_LENGTH`** and every other mode's held none.
+///
+/// The `joined` arm pins the second half of the same phase's finding, and it is
+/// not cosmetic: the line renderer's falloff runs *across* the stroke only, so a
+/// mark is round because both caps are pushed out by the half-width (ADR-0041),
+/// not because the segment is short. Unflagged, it is a hard-edged sub-pixel
+/// dash — see `draw::dots` and the render test below.
+#[test]
+fn wave_usedots_puts_separated_marks_where_a_line_puts_a_stroke() {
+    use lmv_core::render::scenes::lines::{JOINED_A, JOINED_B};
+
+    for mode in WAVE_MODES {
+        let line = waveform_geometry(mode, 0.0);
+        let dotted = waveform_geometry(mode, 1.0);
+        assert!(
+            !dotted.segments.is_empty(),
+            "wave_mode {mode} emitted no dotted geometry at all"
+        );
+
+        let lengths: Vec<f32> = dotted.segments.iter().map(segment_length).collect();
+        let longest = lengths.iter().copied().fold(0.0, f32::max);
+        let shortest = lengths.iter().copied().fold(f32::INFINITY, f32::min);
+        let longest_stroke = line
+            .segments
+            .iter()
+            .map(segment_length)
+            .fold(0.0f32, f32::max);
+        println!(
+            "[draw_layer] wave_mode {mode}: line {} segs (longest {longest_stroke:.5}), \
+             dots {} segs (lengths {shortest:.5}..{longest:.5})",
+            line.segments.len(),
+            dotted.segments.len()
+        );
+
+        // Every mark is the same length, which is what "all of them are dots"
+        // means when the alternative is a mode that emits some of each.
+        assert!(
+            (longest - shortest).abs() < 1e-6,
+            "wave_mode {mode} mixes marks and strokes under `wave_usedots`: its \
+             dotted geometry runs {shortest:.5}..{longest:.5}. A pass that emits \
+             a polyline regardless of the flag is the shape of this — every \
+             emit in `waveform_figure` must go through `emit_trace`"
+        );
+        // ...and a mark is far shorter than the stroke it replaces, so the trace
+        // reads as beads rather than as a line drawn twice.
+        assert!(
+            longest * 4.0 < longest_stroke,
+            "wave_mode {mode}: a dotted mark is {longest:.5} against a stroke's \
+             {longest_stroke:.5}, which is not a bead"
+        );
+        // ...and every mark carries both caps, which is what gives it a round
+        // footprint instead of a sub-pixel dash across the trace.
+        assert!(
+            dotted
+                .segments
+                .iter()
+                .all(|s| s.joined == JOINED_A | JOINED_B),
+            "wave_mode {mode}: a dotted mark must flag BOTH ends joined so the \
+             quad extends past each cap by the half-width (ADR-0041). Without \
+             that the falloff is clipped to a dash and the beads vanish at any \
+             resolution where the mark is under a pixel long"
+        );
+    }
+}
+
+/// **The beads survive to the screen, at low resolution as well as high** — the
+/// render half of the claim above, and the arm that actually convicts
+/// design-backlog 0107's "never appear".
+///
+/// The geometry test cannot see this defect: the marks were in the buffer all
+/// along. What was wrong was their *footprint*. A mark's extent is in world
+/// units, so it shrinks with the target, and an unflagged one is only
+/// `DOT_LENGTH` long against `2 * width` across — a rectangle **3.3x wider than
+/// it is long**, whose along-axis extent is under a pixel at any size a person
+/// would run. A continuous stroke of the same width does not care: it
+/// accumulates coverage along its whole length.
+///
+/// Measured on one drawn frame, pixels above half brightness, dots against the
+/// same preset with `bWaveDots=0`:
+///
+/// | target     | before      | after        |
+/// |------------|-------------|--------------|
+/// | 320 x 180  | 2 / 137     | 46 / 137     |
+/// | 960 x 540  | 59 / 1 255  | 474 / 1 255  |
+/// | 1920 x 1080| 300 / 5 008 | 2 045 / 5 008|
+///
+/// **Two of 512 marks at 320x180** is the defect as a number. The floor below is
+/// a fifth of the stroke's footprint — comfortably under the ~0.4 the repair
+/// reaches and far above the ~0.02 it replaced — and it is checked at both ends
+/// of a 9x span in area, because resolution independence is the property that
+/// broke.
+#[test]
+fn the_dotted_trace_reaches_the_screen_at_every_resolution() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("milkconv has a workspace-root parent")
+        .join("core/tests/fixtures/scratch-0108/wave-dots.milk");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("the Phase 4 fixture must be readable at {path:?}: {e}"));
+    let frame = lmv_core::dsp::AnalysisFrame {
+        waveform: trace(),
+        ..Default::default()
+    };
+
+    for (w, h) in [(320u32, 180u32), (960u32, 540u32)] {
+        let mut renderer =
+            match lmv_core::render::Renderer::new_headless(lmv_core::render::HeadlessOptions {
+                width: w,
+                height: h,
+                prefer_software: true,
+            }) {
+                Ok(r) => r,
+                Err(lmv_core::render::RenderError::RequestAdapter(_)) => {
+                    eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                    return;
+                }
+                Err(e) => panic!("headless renderer build failed: {e}"),
+            };
+
+        // One frame, so what is measured is the light this draw layer laid down
+        // rather than several frames of it integrated by the feedback field.
+        let bright = |renderer: &mut lmv_core::render::Renderer, label: &str, src: &str| -> usize {
+            let file = milkconv::milk::parse(src).expect("the fixture parses as a .milk file");
+            let converted = milkconv::convert::convert(&file, label).expect("it converts");
+            let mut preset = Preset::from_toml_str(&converted.toml)
+                .unwrap_or_else(|e| panic!("the emitted bundle must load back: {e}"));
+            preset.name = label.to_string();
+            renderer.set_presets(vec![preset]);
+            renderer
+                .capture_preset(label, &frame, 1)
+                .expect("capture one drawn frame")
+                .rgba
+                .chunks_exact(4)
+                .filter(|px| px.iter().take(3).any(|b| *b > 96))
+                .count()
+        };
+
+        let dotted = bright(&mut renderer, "dots", &text);
+        let stroked = bright(
+            &mut renderer,
+            "line",
+            &text.replace("bWaveDots=1", "bWaveDots=0"),
+        );
+        let share = dotted as f32 / stroked.max(1) as f32;
+        println!(
+            "[draw_layer] {w}x{h}: dotted trace lights {dotted} px above half \
+             brightness against a stroke's {stroked} — {share:.3}"
+        );
+
+        assert!(
+            stroked > 50,
+            "the CONTROL drew almost nothing at {w}x{h} ({stroked} px), so the \
+             ratio below means nothing. The fixture's waveform is what lights \
+             this frame — check it is reaching the draw layer at all"
+        );
+        assert!(
+            share > 0.2,
+            "the dotted trace lights {dotted} px at {w}x{h} against a stroke's \
+             {stroked} ({share:.3}). The beads are being drawn under a pixel \
+             wide — see `draw::dots`, whose caps are what give a mark its \
+             footprint"
+        );
+    }
+}
+
 /// **`shapecode_N_additive = 0` puts the shape in the OVER half**, which is the
 /// half of Phase 4's blend work that only a converted preset exercises.
 ///

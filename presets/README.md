@@ -1200,6 +1200,25 @@ Three things about it are worth knowing even though you will not author one:
   fragment, and a `comp_shader` replaces the built-in present remaps — the
   bundle is then authoritative about the compositing too, not just the
   transform.
+- **A bundle's feedback field quantizes, and a hand-authored one's does not.**
+  MilkDrop's feedback target is 8-bit, so `decay` times a dim pixel truncates to
+  zero and a classic preset's background stays black; this engine's field is
+  `Rgba16Float`, where the same residual survives and integrates into a wash
+  ([ADR-0118](../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)).
+  So the presence of a `[milk]` table turns the emulation **on**, at 255 steps in
+  the sRGB-encoded domain, and a native `warp_mesh` preset — which has no bundle
+  — keeps the full float range it was designed for. The one key here you might
+  ever touch is the override:
+
+  ```toml
+  [milk]
+  quantize_steps = 255   # the default for a bundle. 0 turns it off entirely;
+                         # a negative value floors dim pixels to zero without
+                         # stepping the levels between (ADR-0118 Alternative D)
+  ```
+
+  It is a runtime uniform rather than something baked into the converted shader,
+  which is what makes an A/B a preset edit rather than a re-conversion.
 
 #### The draw layer a converted preset brings
 

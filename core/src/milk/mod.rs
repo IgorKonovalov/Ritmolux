@@ -132,7 +132,26 @@ pub struct MilkBundle {
     /// The deepest `GetBlur`/`sampler_blur` level either shader reaches,
     /// `0..=3`. Zero means the blur chain never runs for this preset.
     pub blur_level: u8,
+    /// How many levels this bundle's **feedback field** quantizes to at the end
+    /// of the warp pass ([ADR-0118](../../../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)),
+    /// defaulting to [`DEFAULT_QUANTIZE_STEPS`].
+    ///
+    /// **The presence of a bundle is what turns this on**, which is the whole
+    /// per-bundle shape: the reference's 8-bit target truncates a `decay`-scaled
+    /// dim pixel to zero and this engine's `Rgba16Float` field does not, so an
+    /// imported preset wants the emulation and a native `warp_mesh` world — which
+    /// carries no bundle and so never reaches this field — does not.
+    ///
+    /// `0.0` is off. Negative selects ADR-0118's Alternative D (floor to zero at
+    /// one step, no ladder between). Both are reachable from `[milk]
+    /// quantize_steps`, so the look gate's A/B is a preset edit rather than a
+    /// re-convert.
+    pub quantize_steps: f32,
 }
+
+/// The 8-bit feedback target every MilkDrop preset was authored against
+/// (ADR-0118): 256 levels, 255 steps between black and white.
+pub const DEFAULT_QUANTIZE_STEPS: f32 = 255.0;
 
 /// What a custom element draws, which decides which of its programs run and how
 /// its outputs are read.
@@ -264,6 +283,7 @@ impl MilkBundle {
             warp_wgsl: None,
             comp_wgsl: None,
             blur_level: 0,
+            quantize_steps: DEFAULT_QUANTIZE_STEPS,
         };
         // The shared register file is the bridge, so the rosters have to agree.
         // An empty program declares nothing and is exempt.
@@ -928,11 +948,17 @@ struct ElementRuntime {
     /// The registers `q1`-`q32` occupy **in this element's own file**, which the
     /// bridge copies into.
     q_slots: [Option<u16>; Q_COUNT],
-    /// The values this element's per-frame or per-point program can write, saved
-    /// before the loop and restored before each iteration — the same mechanism
-    /// and the same reason as the mesh's per-vertex snapshot.
+    /// The values a **shape's** per-frame program can write, saved before the
+    /// instance loop and restored before each instance — the same mechanism and
+    /// the same reason as the mesh's per-vertex snapshot.
+    ///
+    /// **Empty for a wave**, which is not an oversight: a wave's per-point
+    /// program walks its trace carrying state forward, and restoring between
+    /// points is what made *chasers 19 Portal*'s mirror inert. See
+    /// [`run_point`](Self::run_point).
     snapshot: Vec<f32>,
-    /// The registers that snapshot covers, taken from whichever program loops.
+    /// The registers that snapshot covers — a shape's per-frame written set, and
+    /// nothing at all for a wave.
     snapshot_of: Vec<u16>,
 }
 
@@ -983,10 +1009,16 @@ impl ElementRuntime {
         state.accommodate(&program.init);
         state.accommodate(&program.per_frame);
         state.accommodate(&program.per_point);
-        // A wave loops its per-POINT program and a shape loops its per-FRAME one,
-        // so the snapshot follows whichever one repeats.
+        // **A shape's instances are independent; a wave's points are not.**
+        //
+        // A shape loops its per-FRAME program once per instance and each copy
+        // starts from what the frame left, so its snapshot is that program's
+        // written set. A wave loops its per-POINT program along its own length
+        // and **carries state from one point to the next** — that is the
+        // reference's semantics and the corpus is built on it, so a wave takes
+        // no snapshot at all. See `run_point`.
         let snapshot_of = match program.kind {
-            ElementKind::Wave => program.per_point.written_registers().to_vec(),
+            ElementKind::Wave => Vec::new(),
             ElementKind::Shape => program.per_frame.written_registers().to_vec(),
         };
         let mut runtime = Self {
@@ -1080,8 +1112,34 @@ impl ElementRuntime {
     }
 
     /// One point of a custom wave.
+    ///
+    /// **Nothing is restored between points, and that is the semantics rather
+    /// than an omission** (Plan 0108 Phase 5). A wave's per-point program walks
+    /// the trace carrying its own working variables forward, which is what lets
+    /// a preset alternate, accumulate, or integrate along the wave. The idiom
+    /// the corpus is full of is a two-state counter:
+    ///
+    /// ```text
+    /// flip = flip + 1;
+    /// flip = flip * below(flip, 2);      // 1, 0, 1, 0, ... down the trace
+    /// yp   = (flip * 0.1 - 0.05) * sample;
+    /// ```
+    ///
+    /// Reset the registers before each point and those three lines compute a
+    /// **constant** — the mirrored pair collapses to a single trace and the
+    /// preset's symmetry silently never happens, which is design-backlog 0107's
+    /// *chasers 19 Portal* converting cleanly and rendering inert.
+    ///
+    /// Measured over the 10 347-file corpus, 2026-08-17: **6 347 files carry a
+    /// custom-wave per-point program, and 3 368 of them (53 %) read a per-point
+    /// variable before writing it with nothing in the file seeding it** — so
+    /// only carry-over can supply a value. 612 of those use `flip` by name.
+    ///
+    /// This is the opposite of [`MilkRuntime::run_vertex`], which *does* restore,
+    /// and the two are not inconsistent: the mesh's per-vertex program is a pure
+    /// function of its vertex in the reference, and a wave's per-point program
+    /// is a walk along a line.
     fn run_point(&mut self, sample: f32, value: f32) -> WavePoint {
-        self.restore_snapshot();
         if let Some(index) = self.inputs.sample {
             self.state.set(index, sample);
         }

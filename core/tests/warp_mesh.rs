@@ -652,6 +652,172 @@ fn a_lit_backdrop_survives_where_the_draw_layer_drew_nothing() {
 /// the full `bg_bright` swing.
 const LIT_TOLERANCE: i16 = 12;
 
+// ---------------------------------------------------------------------------
+// The feedback field's floor (Plan 0108 Phase 1 / ADR-0118)
+// ---------------------------------------------------------------------------
+
+/// The quantization probe — see its own header for why every binding is what it
+/// is.
+const QUANTIZE_FIXTURE: &str = include_str!("fixtures/warp_mesh_quantize.toml");
+
+/// How long the probe runs. Long enough that the quantized field has been at
+/// zero for a while; **not** a number either assertion depends on, which is the
+/// plan's own instruction — the frame count a field takes to die is a function
+/// of `decay` and of where it started, and pinning it would pin the fixture's
+/// tuning rather than the property.
+const QUANTIZE_FRAMES: u32 = 120;
+
+/// A capture with `brightness` scaled by `gain`, and quantization set to
+/// `steps` — the two levers the arms below differ in, applied to one text so
+/// nothing else can vary between them.
+fn quantize_probe(renderer: &mut Renderer, label: &str, steps: &str, gain: &str) -> CaptureImage {
+    let text = QUANTIZE_FIXTURE
+        .replace(
+            "brightness     = \"600\"",
+            &format!("brightness     = \"{gain}\""),
+        )
+        .replace("[milk]\n", &format!("[milk]\nquantize_steps = {steps}\n"));
+    let mut preset = Preset::from_toml_str(&text).expect("the quantize probe parses");
+    assert!(
+        preset.warnings.is_empty(),
+        "the quantize probe must load clean, got {:?}",
+        preset.warnings
+    );
+    preset.name = label.to_string();
+    renderer.set_presets(vec![preset]);
+    renderer
+        .capture_preset(label, &AnalysisFrame::default(), QUANTIZE_FRAMES)
+        .expect("capture the quantize probe")
+}
+
+/// The brightest byte anywhere in a capture. Zero means the frame is *exactly*
+/// black — every channel of every pixel — which is the statistic both arms turn
+/// on.
+fn peak(image: &CaptureImage) -> u8 {
+    image
+        .rgba
+        .chunks_exact(4)
+        .flat_map(|px| px.iter().take(3).copied())
+        .max()
+        .unwrap_or(0)
+}
+
+/// **The quantized feedback field reaches exact zero; the unquantized one does
+/// not** — Plan 0108 Phase 1's central done-when, and the defect ADR-0118
+/// exists for.
+///
+/// MilkDrop's feedback target is 8-bit, so `decay` times a dim pixel truncates
+/// to zero and a classic preset's background stays black. This engine's field is
+/// `Rgba16Float`: nothing truncates, every dim residual survives and integrates,
+/// and Plan 0100 Phase 7 judged the four faces of that one mechanism — pastel
+/// wash, white-hot glow, runaway with channel fringing, and full tonal
+/// inversion.
+///
+/// # Why three arms and not two
+///
+/// An 8-bit capture cannot tell an exact zero from a `1e-4` residual on its own:
+/// both read as byte 0. Two arms at one gain would therefore be satisfied by a
+/// change that merely made the field *dimmer*, which is not the claim. The third
+/// arm is what closes that: the quantized field is re-rendered at a **hundred
+/// times** the brightness and is still exactly black. Nothing multiplies to zero
+/// except zero.
+#[test]
+fn the_quantized_field_reaches_exact_zero() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    let on = quantize_probe(&mut renderer, "quantize-on", "255", "600");
+    let on_amplified = quantize_probe(&mut renderer, "quantize-on-amplified", "255", "60000");
+    let off = quantize_probe(&mut renderer, "quantize-off", "0", "600");
+    let off_amplified = quantize_probe(&mut renderer, "quantize-off-amplified", "0", "60000");
+
+    // **Measured 2026-08-17** on the development box (Windows 10, DX12 WARP),
+    // 96x96 over 120 frames: on 0 / 0, off 11 / 154. The unquantized field is
+    // still positive at a hundred times the gain that already shows it; the
+    // quantized one is black at both.
+    println!(
+        "[warp_mesh/quantize] peak after {QUANTIZE_FRAMES} frames — \
+         on {} (at 100x gain {}), off {} (at 100x gain {})",
+        peak(&on),
+        peak(&on_amplified),
+        peak(&off),
+        peak(&off_amplified)
+    );
+
+    assert!(
+        peak(&off) > 0,
+        "the CONTROL is blank: with quantization off the field must still hold \
+         light this test can see, or every arm below is black against black. The \
+         probe's `brightness` gain is what makes the residual visible — if this \
+         fires, raise the gain rather than lowering the bar"
+    );
+    assert_eq!(
+        peak(&on),
+        0,
+        "the quantized field never reached zero: its brightest channel is {} \
+         after {QUANTIZE_FRAMES} frames with the deposit off, against an \
+         unquantized control at {}. The warp epilogue's `lmv_quantize` is not \
+         flooring dim pixels",
+        peak(&on),
+        peak(&off)
+    );
+    assert_eq!(
+        peak(&on_amplified),
+        0,
+        "the quantized field is small but NOT zero — black at 600x brightness \
+         and {} at 60000x. Only zero multiplies to zero, so a residual that \
+         survives amplification is exactly the accumulation ADR-0118 exists to \
+         stop",
+        peak(&on_amplified)
+    );
+    assert!(
+        peak(&off_amplified) > peak(&off),
+        "the unquantized control does not respond to the gain ({} at 600x, {} at \
+         60000x), so the amplified arm above proves nothing about the quantized \
+         field. `brightness` is not reaching the present pass",
+        peak(&off),
+        peak(&off_amplified)
+    );
+}
+
+/// **Off is off, and on is not vacuous** — the other half of the switch.
+///
+/// The identity claim ADR-0118 makes ("with the switch off the epilogue is an
+/// exact identity") is asserted where it is checkable against pre-change bytes:
+/// `core/tests/golden/warp_mesh.png` is the native fixture's committed
+/// pre-change output and **must not move**, and `golden.rs` is what holds it to
+/// that. What no golden covers is that the switch is wired to anything at all —
+/// a `quantize_steps` that reached no shader would leave both arms above
+/// identical and this file would still be green.
+#[test]
+fn the_quantize_switch_reaches_the_shader() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let on = quantize_probe(&mut renderer, "switch-on", "255", "600");
+    let off = quantize_probe(&mut renderer, "switch-off", "0", "600");
+    let difference = frame_diff(&on, &off);
+    println!("[warp_mesh/quantize] steps 255 vs 0: frame_diff {difference:.4}");
+    assert!(
+        difference > 0.0,
+        "a bundle with `quantize_steps = 255` renders byte-identically to one \
+         with `quantize_steps = 0`. The uniform lane is not reaching either warp \
+         fragment"
+    );
+
+    // ...and `0` really is the off path rather than a step count that happens to
+    // round to the same picture: a second value below 1 must agree with it to
+    // the byte, which only the early return in `lmv_quantize` gives.
+    let half = quantize_probe(&mut renderer, "switch-half", "0.5", "600");
+    assert_eq!(
+        off.rgba, half.rgba,
+        "`quantize_steps = 0` and `= 0.5` must both take `lmv_quantize`'s early \
+         return and so render identically; they differ, so the off path is doing \
+         arithmetic"
+    );
+}
+
 /// The floor this file measures against is the one `sanity.rs` would apply, so
 /// the duplication above cannot silently drift into a weaker bar.
 ///

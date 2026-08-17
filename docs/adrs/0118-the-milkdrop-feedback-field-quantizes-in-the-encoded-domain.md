@@ -125,6 +125,31 @@ it treats a format difference as a colour-correction problem, needs a per-preset
 derive, and would have to be re-tuned against every pair rather than fixing the one mechanism the
 seven pairs share.
 
+## Outcome
+
+**2026-08-17, Plan 0108 Phase 1 — the domain was measured and sRGB stands.** The Notes below flag
+that the reference's own transfer function is a plain ~2.2 gamma rather than sRGB's piecewise curve,
+and that the two differ exactly in the near-black region this decision is about. Both were built and
+the same probe rendered through each
+(`core/tests/fixtures/warp_mesh_quantize.toml`, 96x96, WARP, deposit gated off after 0.25 s, unit
+brightness):
+
+| frame | sRGB: byte-sum / lit px / peak | 2.2 gamma: byte-sum / lit px / peak |
+|-------|-------------------------------|-------------------------------------|
+| 20    | 2 250 777 / 8 902 / 191       | 2 246 072 / 9 031 / 191             |
+| 40    | 496 718 / 7 705 / 58          | 490 471 / 8 179 / 58                |
+| 60    | 12 042 / 2 059 / 8            | 22 788 / 4 032 / 7                  |
+| field reaches exact zero | frame **68**| frame **76**             |
+
+**The two are indistinguishable wherever the picture reads** — the peak channel agrees to within one
+8-bit level at every frame and the byte-sums to 1.3 % — and they diverge only in the tail nobody can
+see. There sRGB is the **stricter** floor, and by a number that is not a coincidence: it kills a
+residual at linear `3.03e-4`, which is exactly 8-bit display level 1, so what dies is precisely what a
+viewer could not have seen. A plain 2.2 gamma floors at `(1/255)^2.2 = 5.1e-6` — **59x lower** — and
+keeps roughly six more e-foldings of invisible-but-nonzero light alive, which is the accumulation this
+ADR exists to stop. So the second transfer function would buy an eight-frame-longer invisible tail in
+exchange for a constant to justify, and it was not taken.
+
 ## Notes
 
 The reference's own transfer function is not sRGB's piecewise curve — DX9-era MilkDrop wrote to an
