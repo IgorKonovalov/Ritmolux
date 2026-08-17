@@ -41,7 +41,7 @@ The census, counted 2026-08-16 from `presets/*.toml`:
 > system in the library and it is invisible to the instrument that found the problem.
 > Phase 1 re-runs the census and owns the revision; what it should carry in is that
 > `warp_mesh +4` makes the arithmetic below **22 new presets, 39 → 61**, and that the four should
-> be authored *after* [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md), whose Phase 1
+> be authored *after* [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md), whose Phase 1
 > changes the tone of the feedback field these worlds would be tuned against.
 
 Sixty-six releases of engine work produced ten rendering systems and thirty-nine presets, and
@@ -88,7 +88,7 @@ entries are seventeen worlds or a family that converged.
   **scene registry**, not from `presets/*.toml`, or a system with zero worlds is invisible to the
   instrument looking for empty systems — which is how `warp_mesh` was missed. And the verdict states
   whether `warp_mesh`'s four land in this plan or as a follow-on cohort, given it cannot be authored
-  until [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 settles the tone.
+  until [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 settles the tone.
 
 ### Phase 2 — the singletons get a range
 
@@ -203,7 +203,7 @@ entries are seventeen worlds or a family that converged.
   worlds, so by this plan's own floor it is in scope and is the emptiest system in the library — see
   the correction box under the census. Whether the four land inside this plan or as a follow-on
   cohort is Phase 1's call; the one constraint is that they come after
-  [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1, which moves the feedback
+  [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1, which moves the feedback
   field's tone under anything authored on it.
 
 ## Followups (after this lands)

@@ -13,6 +13,42 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md)
+  — closed 2026-08-17, four dev phases in `b02cd45`, `60674da`, `6e92eb3`, `a07b0c6`, with Phases 2
+  and 6 (`human`) run as one live look-gate session at the close. Review: **no blockers, two majors
+  (both repaired at the review), three minors, one nit.**
+
+  **What shipped and works.** [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
+  feedback quantizer, in both warp epilogues out of one WGSL text, driven by a runtime uniform and
+  on by default for any `[milk]` bundle. Off is an exact identity — `warp_mesh.png` did not move, and
+  a bless-to-bless control moved exactly 1 of 32 baselines. The field reaches **exact zero** and
+  stays black at a hundred times the brightness that shows the unquantized control still positive.
+  The transfer-function domain was *rendered* rather than assumed and recorded as a dated `Outcome`.
+  Phases 4 and 5 fixed the `wave_usedots` beads (a mark carried no caps, so it was a sub-pixel dash —
+  **2 of 512 marks lit at 320x180**), `wave_mode 5` emitting a stroke where the preset asked for
+  dots, and a custom wave's per-point state being reset between points — the last reaching **3 368 of
+  the corpus's 6 347** custom-wave presets.
+
+  **What the plan got wrong, found by its own look gate.** The verdict on its central question was
+  **still merely different** — one pair better, six wrong, and *not one of the six for the reason the
+  plan was built on*. Backlog 0106 had claimed one mechanism with four presentations; on the five
+  pairs with no video echo the background sits **three orders of magnitude above the quantizer's
+  floor**, so nothing it does can reach them. Two conclusions were falsified outright: Phase 5's
+  attribution of *chasers 19 Portal*'s fold to per-point code (the real cause is
+  `per_pixel_3 = sx = -zm`, and `pow(max(v, 1e-4), dt)` clamps the sign away — **363 corpus files**),
+  and backlog 0106's "tonal inversion", which is a mid-grey non-additive waveform drawn over an
+  already-washed ground rather than any inversion at all.
+
+  **What outlived the plan.** Four engine defects it was never scoped to fix — the clamped negative
+  scale, the missing video-echo stage, `time * 0.05` in the mode 6/7 waveform angle (suspected by
+  Phase 4, convicted by the gate), and **the wash itself, still unexplained and dominant**. All four
+  carry to [Plan 0109](0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
+  Two wash hypotheses died during the gate and are recorded so nobody re-runs them: the deposit is
+  already `dt`-scaled, and `bAdditiveWaves` does not separate the washed presets from the clean one.
+  Also recorded: the review's own major — a wave's per-point carry crosses the **frame** boundary
+  too, so an odd-length trace inverts every frame at the display's refresh rate, believed faithful
+  but **unverified against the reference**.
+
 - [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md)
   — closed 2026-08-17, four dev phases in commits `39b36e6`–`0ab8400`, Phase 5 (`human`) run live at
   the close. Review: **no blockers, no majors, five minors and nits** — two of which were found by
