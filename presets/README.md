@@ -1213,9 +1213,16 @@ Three things about it are worth knowing even though you will not author one:
   ```toml
   [milk]
   quantize_steps = 255   # the default for a bundle. 0 turns it off entirely;
-                         # a negative value floors dim pixels to zero without
-                         # stepping the levels between (ADR-0118 Alternative D)
+                         # -255 floors dim pixels to zero without stepping the
+                         # levels between (ADR-0118 Alternative D)
   ```
+
+  **A negative value still takes its floor from the magnitude**, which is the one
+  trap here: the shader kills a pixel whose encoded value is below `1/|steps|`,
+  so `-255` floors at one 8-bit step — the thing Alternative D means — and `-1`
+  floors at encoded `1.0` and renders a near-black screen. The sign picks the
+  *mode*; the number still picks the *level*. Write `-255` unless you know why
+  you want another floor.
 
   It is a runtime uniform rather than something baked into the converted shader,
   which is what makes an A/B a preset edit rather than a re-conversion.
