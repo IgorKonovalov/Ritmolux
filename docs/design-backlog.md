@@ -1866,6 +1866,16 @@ ADR-0115) — and this is the one assertion where the local route is held to a l
   against truncates everything below sRGB level ~13, **13x too aggressive**. The decision quantizes
   in the encoded domain instead, per bundle and driven by a uniform. The entry stays **live** until
   that plan lands, and its re-test trigger is that plan's Phase 2.
+- **HALF DISCHARGED 2026-08-17 — the fix shipped, the verdict has not.** Plan 0108 Phase 1 landed
+  (`b02cd45`): the feedback field quantizes in the sRGB-encoded domain at 255 steps, on by default for
+  any `[milk]` bundle and an exact identity otherwise, reaching **both** warp epilogues (an MD1-era
+  bundle has no custom warp shader and washed out through the built-in one). The field now settles to
+  exact zero and stays black at a hundred times the brightness that shows the unquantized control
+  still positive, so the *mechanism* this entry names is closed. **The entry's own reason for existing
+  is not:** whether the HDR pipeline now reads *better* rather than *merely different* is Plan 0108
+  Phase 2, a `human` look-gate that has not run. It stays **live** until it does, and its answer can
+  route back into the code — ADR-0118's Alternative D is the recorded fallback if the banding reads
+  worse than the wash did.
 
 **Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
 **Owner if taken:** `architect` (the emulation is a design call) then `dev`. **The dominant
@@ -1926,6 +1936,37 @@ plan's own motivating claim; this entry is the re-test trigger.
   condition** (a phase that cannot reproduce its defect commits the fixture, records what it ruled
   out, and the plan continues). That shape was the user's call over committing to fix all three,
   which this entry's falsified suspect shows would have been dishonest.
+- **PART DISCHARGED 2026-08-17 — two of the six symptoms fixed, three reproduced-but-open, one not
+  reached.** Plan 0108 Phases 3-5 landed (`60674da`, `6e92eb3`, `a07b0c6`), and the entry stays
+  **live** on what is left. Item by item:
+  - **Item 1, `wave_usedots` beads — FIXED.** A mark carried no cap flags, so it was a hard-edged
+    `DOT_LENGTH x 2*width` rectangle, 3.3x wider than it was long, with its long axis under a pixel:
+    **2 of 512 marks lit at 320x180**. Both ends now flag joined. A second defect fell out of the
+    same measurement — `wave_mode 5` emitted a polyline unconditionally in the first of its two
+    passes, so a preset asking for dots got a stroke above `wave_y` and beads below it.
+  - **Item 1, *Blur Mix 3*'s diagonal — OPEN, suspect named.** The mode 6/7 arm computes its angle as
+    `mystery * PI + time * 0.05`, a full turn every ~126 s, so a trace authored horizontal is
+    horizontal only at instants. It is the only use of `time` in the file and contradicts the sentence
+    above it. **Not removed**, because doing so moves every mode-6 and mode-7 preset and whether the
+    reference's line drifts is a question about the reference.
+  - **Item 1, *Cauldron painterly 5*'s absent spiro — NOT REACHED.** Modes 2 and 3 are drawn here as
+    a horizontal and a vertical scope line; if the reference's mode table calls either a spiro, this
+    is a mapping question rather than a rendering one, and it needs the reference's own roster.
+  - **Item 2, the reflection seam — REPRODUCED, DELIBERATELY NOT FIXED.** `emit.rs` builds the polar
+    pair as `(uv_orig - 0.5) * (2, -2) * aspect.zw`, so a preset rebuilding `uv` from `ang` gets a
+    mirror about the horizontal midline — the reported fingerprint, on eleven lines of committed HLSL
+    (`core/tests/fixtures/scratch-0108/ang-roundtrip.milk`), 19x separation from its control. The fix
+    is withheld on purpose: that pair works out to exactly what `run_vertex` computes, and in the
+    reference `rad`/`ang` reach a pixel shader as the per-vertex program's own numbers, so flipping
+    the fragment's sign alone would put the engine in a state the reference cannot be in. **The
+    architect review endorsed withholding it.** Settling it needs `foo_vis_milk2` on screen.
+  - **Item 3, *chasers 19 Portal*'s inert mirror — FIXED, and nowhere near where this entry pointed.**
+    That preset is MD1 with no shader blocks and no per-vertex program; its fold is a `flip` counter
+    in three custom waves' per-point code, and `run_point` restored a register snapshot before every
+    point, so the counter computed a constant. **3 368 of the corpus's 6 347 custom-wave presets** read
+    a per-point variable only carry-over can supply, so this reached far past one preset. One open
+    half, from the review: the carry also crosses the **frame** boundary, which makes an odd-length
+    trace invert every frame — believed faithful, pinned by test, unverified against the reference.
 
 **Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
 **Owner if taken:** `dev` (mechanism hunts), `architect` if a fix needs a design call.
@@ -1954,8 +1995,13 @@ Three distinct defects, each seen in at least one pair against `foo_vis_milk2`:
 
 ### Priority
 
-**Medium-high within the import lane.** Item 2 is likely one sampler descriptor; item 1 decides
-whether waveform-led presets (the whole *Blur Mix* / *Fog Tunnel* family) read as authored.
+**Medium-high within the import lane.** ~~Item 2 is likely one sampler descriptor~~ — **corrected
+2026-08-17: it is not a descriptor at all.** It is a sign in the emitted warp epilogue's polar pair,
+reproduced on a committed fixture, and fixing it is a *larger* call than this entry assumed because
+the same convention is carried in three places. Item 1 decides whether waveform-led presets (the
+whole *Blur Mix* / *Fog Tunnel* family) read as authored, and half of it is now fixed. **What is left
+of this entry is mostly answerable in one sitting with `foo_vis_milk2` on screen** — Plan 0108's
+Phase 6 — rather than by more code reading.
 
 ---
 
