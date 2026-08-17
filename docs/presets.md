@@ -66,11 +66,15 @@ this document does not duplicate them.
 
 4. **Save and watch.** The standalone app polls the folder every ~150 ms and
    hot-reloads on any change (no restart). Press **Space** to cycle to your new
-   preset; the window title shows the active preset name and system. If the file
-   has a typo, the app reports it and keeps the last good set — it never crashes
-   on a bad preset.
+   preset, or **`B`** to pick it by name; the window title shows the active
+   preset name and system. If the file has a typo, the app reports it and keeps
+   the last good set — it never crashes on a bad preset.
 
-That is the whole loop: copy, edit an expression, save, cycle.
+   In the foobar2000 component the same loop is one click longer, because it has
+   no watcher: right-click → **Reload presets**, then right-click → **Preset ▸**
+   and pick yours. A file with a typo is simply absent from that list.
+
+That is the whole loop: copy, edit an expression, save, pick.
 
 ---
 
@@ -1169,10 +1173,27 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
   toggles auto-rotate on/off (auto is off out of the box; enable it per-run with
   `A` or persistently via `auto = true` under `[rotate]` in `config.toml`).
   foobar2000: **Space**, or right-click the visualization → **Next scene**.
-- **foobar loads on init.** The plugin calls the core's `lmv_load_presets` (C ABI
-  v2, [ADR-0006](adrs/0006-c-abi-v2-preset-loading.md)) against the shared
-  directory when it starts, so it seeds and renders the same library — no
-  loopback capture needed on that path.
+- **Choosing by name.** Both frontends select directly rather than cycling to it.
+  Standalone: the browse overlay (`B`). foobar2000: right-click → **Preset ▸**,
+  a flat list of everything that loaded with a mark on the one showing; the
+  choice persists across restarts **by name**, so a preset whose file you later
+  delete degrades to the roster's default rather than to a stale position
+  ([ADR-0117](adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md)).
+  The list is the **core's roster**, not a directory listing — a `.toml` the
+  engine rejected is absent from it, which is how you tell a malformed file from
+  a missed one.
+- **foobar loads on init, and re-loads on demand.** The plugin calls the core's
+  `lmv_load_presets` (C ABI v2, [ADR-0006](adrs/0006-c-abi-v2-preset-loading.md))
+  against the shared directory when it starts, so it seeds and renders the same
+  library — no loopback capture needed on that path. It has no file watcher: a
+  file dropped in afterwards appears on right-click → **Reload presets**, which
+  re-scans and keeps the preset you were watching selected. A reload re-seeds the
+  running scene's simulation state, the same way the standalone's hot-reload
+  does.
+- **Two files may declare the same `name`.** The roster tolerates it, but
+  "select by name" then means *first match wins* — for persistence, for the
+  reload's keep-selection step, and for the standalone's browse overlay alike.
+  Rename one if you want both reachable.
 
 ---
 

@@ -30,6 +30,19 @@ rather than tracked. To do it by hand instead, download from
 
 Toolchain: MSVC (VS Build Tools 2022, x64).
 
+## What the component's own UI does
+
+Everything the shim offers a user sits on one right-click menu (Plan 0107):
+**Preset ▸** (the core's roster, flat, marked on the one showing — selection
+goes over C ABI v6, [ADR-0117](../docs/adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md)),
+**Next scene**, **Reload presets** (re-calls `lmv_load_presets`, then re-selects
+the current preset *by name* — `set_presets` keeps the index, not the name),
+**Open presets folder**, and the diagnostics-overlay toggle. `Space` is the
+keyboard form of Next scene.
+
+The chosen preset is the component's only persisted setting: a `cfg_string`
+holding the **name**, restored after the window attaches and the library loads.
+
 ## Building
 
 ```powershell
