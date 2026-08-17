@@ -1,6 +1,6 @@
 # 0108 — The MilkDrop import gets its tone back
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (proposed)

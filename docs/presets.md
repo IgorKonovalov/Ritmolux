@@ -691,6 +691,15 @@ converted preset enters this repository or a release; the `milkconv` converter p
 you point `LMV_PRESET_DIR` at is the whole import path. The question is re-raised when the
 conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 
+> **If you already have a converted directory, re-run `milkconv` over it.** The feedback field now
+> emulates the reference's 8-bit floor
+> ([ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)) — without
+> it, every dim residual survives in the float field and integrates, which is what turned classic
+> presets pastel, white-hot, or tonally inverted. The switch is a runtime uniform, but a bundle
+> converted before it landed carries a warp shader whose epilogue never calls the quantizer, so the
+> fix reaches that preset only on a re-convert. Nothing breaks in the meantime; the preset renders
+> exactly as it does today.
+
 Things worth knowing before you reach for it:
 
 - **Each of the nine is also an ordinary scalar param, and the table overrides

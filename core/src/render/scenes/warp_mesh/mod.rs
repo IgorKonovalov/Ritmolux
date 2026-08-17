@@ -322,6 +322,9 @@ struct Warp {
     misc: vec4<f32>,
     // x: decay^dt, y: warp_speed, z: wrap (0/1), w: darken_center amount
     misc2: vec4<f32>,
+    // x: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D),
+    // yzw: unused
+    misc3: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> wu: Warp;
 @group(0) @binding(1) var past: texture_2d<f32>;
@@ -452,7 +455,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     centred.x = centred.x * wu.misc.x;
     let dc = 1.0 - wu.misc2.w * (1.0 - smoothstep(0.0, 0.32, length(centred)));
 
-    return past_c * (wu.misc2.x * inside * dc);
+    let faded = past_c * (wu.misc2.x * inside * dc);
+    // The 8-bit floor an MD1-era preset's feedback field had (ADR-0118). A
+    // bundle with no custom warp shader takes THIS path, so the quantizer has to
+    // reach it too or a whole era of the corpus washes out unfixed. Off — every
+    // native `warp_mesh` preset — `lmv_quantize` returns its argument, so this
+    // line is an exact identity.
+    return vec4<f32>(lmv_quantize(faded.rgb, wu.misc3.x), faded.a);
 }
 "#;
 
@@ -630,6 +639,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 struct WarpUniform {
     misc: [f32; 4],
     misc2: [f32; 4],
+    misc3: [f32; 4],
 }
 
 #[repr(C)]
@@ -895,6 +905,14 @@ pub struct WarpMeshScene {
     /// Phase 6). Extracted at `configure`; `render` compares its key against
     /// the built resources and rebuilds when a preset switch changes it.
     shader_spec: Option<shader::ShaderSpec>,
+    /// How many levels the feedback field quantizes to at the end of the warp
+    /// pass (ADR-0118), extracted from the bundle at `configure`. **`0.0` — no
+    /// bundle — is off, and off is an exact identity**, so a native `warp_mesh`
+    /// preset renders exactly what it rendered before this existed. Negative is
+    /// the ADR's Alternative D. Both warp fragments read it: the converted one
+    /// through `MilkUniform.misc.w`, the built-in one through
+    /// `WarpUniform.misc3.x`.
+    quantize_steps: f32,
     /// The tier's line-segment cap, which the draw layer's own `LineRenderer` is
     /// sized to — the same capacity every line scene gets (ADR-0045).
     max_segments: usize,
@@ -967,6 +985,7 @@ impl WarpMeshScene {
             palette_dirty: true,
             milk: None,
             shader_spec: None,
+            quantize_steps: 0.0,
             max_segments,
             draw: None,
             geometry: draw::DrawGeometry::default(),
@@ -1002,7 +1021,13 @@ impl Resources {
     ) -> Self {
         let warp_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("warp-mesh-warp-shader"),
-            source: wgpu::ShaderSource::Wgsl(WARP_SHADER.into()),
+            // The quantizer is prepended rather than written out here: a
+            // converted shader's own epilogue calls the same text out of
+            // `milk::shader::QUANTIZE_WGSL`, and a transfer function that exists
+            // in two places drifts (ADR-0118).
+            source: wgpu::ShaderSource::Wgsl(
+                format!("{}{}", crate::milk::shader::QUANTIZE_WGSL, WARP_SHADER).into(),
+            ),
         });
         let deposit_shader = gpu::fullscreen_shader(
             device,
@@ -1495,6 +1520,12 @@ impl Scene for WarpMeshScene {
             self.milk = milk
                 .as_ref()
                 .map(|bundle| crate::milk::MilkRuntime::new((**bundle).clone(), *salt));
+            // The feedback quantizer's step count (ADR-0118). **A bundle decides
+            // it; the absence of one is the decision for a native preset**, and
+            // that split is the whole per-bundle shape — `warp_mesh` is a native
+            // scene too, and a hand-authored world has no reason to want an
+            // 8-bit-era feedback field.
+            self.quantize_steps = milk.as_ref().map_or(0.0, |bundle| bundle.quantize_steps);
             // The translated shaders, when the bundle carries any (Phase 6).
             self.shader_spec = milk.as_ref().and_then(|bundle| {
                 (bundle.warp_wgsl.is_some() || bundle.comp_wgsl.is_some()).then(|| {
@@ -1771,6 +1802,7 @@ impl Scene for WarpMeshScene {
                     f32::from(self.wrap >= 0.5),
                     self.darken_center.clamp(0.0, 1.0) * DARKEN_CENTER_STRENGTH,
                 ],
+                misc3: [self.quantize_steps, 0.0, 0.0, 0.0],
             }),
         );
         queue.write_buffer(
@@ -1822,8 +1854,11 @@ impl Scene for WarpMeshScene {
         if let (Some(milk_shaders), Some(runtime)) = (res.milk_shaders.as_ref(), self.milk.as_ref())
         {
             // The *unclamped* per-second decay: a custom warp shader applies
-            // decay itself, and the reference's bound is its 8-bit target —
-            // which the shader epilogue's clamp reproduces.
+            // decay itself, and the reference's bound is its 8-bit target — both
+            // ends of which the shader epilogue now reproduces. The clamp is the
+            // ceiling; `lmv_quantize`, driven by the step count passed here, is
+            // the floor that makes a `decay`-scaled dim pixel reach zero instead
+            // of integrating forever (ADR-0118).
             queue.write_buffer(
                 &milk_shaders.uniform,
                 0,
@@ -1836,6 +1871,7 @@ impl Scene for WarpMeshScene {
                     self.decay,
                     self.brightness,
                     self.occlude,
+                    self.quantize_steps,
                 )),
             );
         }

@@ -1,0 +1,59 @@
+# **The feedback field's floor** (Plan 0108 Phase 1 / ADR-0118). Not a golden
+# fixture — nothing pins its pixels; it exists to make one property observable
+# through an 8-bit capture.
+#
+# The property is that a `decay`-scaled dim pixel reaches **exactly zero** rather
+# than integrating forever, and an ordinary capture cannot see the difference:
+# below display level 1 both a true zero and a `1e-4` residual read as byte 0.
+# So this fixture is built to amplify:
+#
+#  - `deposit` fires for a quarter of a second and then stops, so the field is
+#    purely decaying for the rest of the run — "the deposit disabled" half of the
+#    done-when, expressed as a gate rather than as a missing binding, because the
+#    field needs light in it before it can be watched leaving.
+#  - the `[milk]` bundle's `per_frame` sets `wave_a = 0`, which is NOT a
+#    formality: `wave_a` defaults to `1.0`, so a bundle that said nothing would
+#    have its waveform depositing fresh light every frame and nothing would ever
+#    decay.
+#  - `decay = 0.7943` is the reference's per-FRAME factor at its nominal 30 fps,
+#    which the runtime converts to `0.001` per second. A fast fade, so the run
+#    is short.
+#  - `brightness = 600` is the amplifier. A residual around `1e-4` lands at `0.06`
+#    linear and is plainly visible; an exact zero stays black at any multiplier,
+#    which is what the test's second arm turns into a proof rather than an
+#    inference.
+#
+# The bundle exists so quantization is ON by default (ADR-0118's per-bundle
+# rule). The test's control adds `quantize_steps = 0` to this same text.
+system = "warp_mesh"
+name   = "fixture_warp_mesh_quantize"
+
+[mesh]
+x = 24
+y = 18
+
+[palette]
+stops = [
+  { at = 0.0, color = "#301048" },
+  { at = 1.0, color = "#ffd0a0" },
+]
+
+[params]
+# Light for the first quarter second, then nothing. What is left afterwards is
+# the feedback field alone.
+deposit        = "select(time < 0.25, 9.0, 0.0)"
+deposit_radius = "0.30"
+deposit_width  = "0.10"
+deposit_arms   = "0"
+brightness     = "600"
+
+[milk]
+per_frame = """
+.regs decay wave_a
+.code
+const 0.7943
+store 0
+pop
+const 0.0
+store 1
+"""

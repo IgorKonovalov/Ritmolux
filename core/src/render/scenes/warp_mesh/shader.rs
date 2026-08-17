@@ -103,6 +103,10 @@ pub(super) struct MilkUniform {
 /// `decay` is the scene's per-second value; it is converted to *this frame's*
 /// factor here (`^dt`), so a shader's `ret *= decay` fades at the authored rate
 /// on any refresh — ADR-0019 applied to a shader input.
+///
+/// `quantize_steps` rides the free `misc.w` lane to the emitted warp epilogue's
+/// `lmv_quantize` call (ADR-0118). It is a **runtime** input rather than a baked
+/// constant precisely so a bundle can be A/B'd without a re-convert.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn fill_uniform(
     runtime: &crate::milk::MilkRuntime,
@@ -113,6 +117,7 @@ pub(super) fn fill_uniform(
     decay_per_second: f32,
     brightness: f32,
     occlude: f32,
+    quantize_steps: f32,
 ) -> MilkUniform {
     let (w, h) = (size.0.max(1) as f32, size.1.max(1) as f32);
     // The EEL convention (`MilkRuntime::run_frame`): the longer axis reads 1.
@@ -152,7 +157,7 @@ pub(super) fn fill_uniform(
             decay_per_second.max(0.0).powf(dt.max(1e-6)),
             brightness,
             occlude,
-            0.0,
+            quantize_steps,
         ],
         hue: hue_corners(time),
         q: q_packed,

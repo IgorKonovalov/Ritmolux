@@ -1510,6 +1510,13 @@ struct RawMilk {
     /// the scene runs its blur chain at all.
     #[serde(default)]
     blur_level: Option<u8>,
+    /// How many levels the feedback field quantizes to (ADR-0118). Absent takes
+    /// [`DEFAULT_QUANTIZE_STEPS`](crate::milk::DEFAULT_QUANTIZE_STEPS) — the
+    /// 8-bit target the reference wrote to — so a converted bundle gets the
+    /// emulation without the converter having to emit anything. `0` turns it
+    /// off; a negative value selects the ADR's Alternative D.
+    #[serde(default)]
+    quantize_steps: Option<f32>,
 }
 
 /// One `[[milk.waves]]` or `[[milk.shapes]]` entry: an element's own three
@@ -1565,6 +1572,16 @@ impl RawMilk {
         bundle.warp_wgsl = self.warp_shader;
         bundle.comp_wgsl = self.comp_shader;
         bundle.blur_level = self.blur_level.unwrap_or(0).min(3);
+        // Validated at the boundary like every other bundle number: a
+        // non-finite step count would reach a shader and produce a NaN field.
+        if let Some(steps) = self.quantize_steps {
+            if !steps.is_finite() {
+                return Err(PresetError::Config(
+                    "[milk] quantize_steps must be finite".into(),
+                ));
+            }
+            bundle.quantize_steps = steps.clamp(-4096.0, 4096.0);
+        }
         for (kind, elements) in [
             (crate::milk::ElementKind::Wave, self.waves),
             (crate::milk::ElementKind::Shape, self.shapes),
