@@ -1,14 +1,17 @@
 # Headless capture & visual QA
 
 The renderer can draw a scene with **no window** — a surface-less wgpu context
-draws into an offscreen texture and hands back raw RGBA pixels. Two things are
-built on that (Plan 0013):
+draws into an offscreen texture and hands back raw RGBA pixels. Three things are
+built on that:
 
 - a **`shot` CLI** (`standalone/examples/shot.rs`) that writes PNGs an agent can
-  read and a metrics report it can parse, and
+  read and a metrics report it can parse (Plan 0013),
 - a **differential visual-QA harness** in `core/tests/` that hard-tests every
   preset for reactivity, animation, shape sanity, and beat response, with an
-  advisory distinctness report and golden-image regression.
+  advisory distinctness report and golden-image regression (Plan 0013), and
+- an **offline video renderer** — [`--render`](#--render-a-music-video-from-a-track)
+  walks a WAV end to end and streams frames to your own `ffmpeg`, so a track
+  becomes a music video in one command (Plan 0101).
 
 A headless render is a **pure function** of `(preset, input, frame-count, size)` —
 scenes are reseeded per capture, every frame steps at the fixed

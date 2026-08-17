@@ -65,7 +65,7 @@ docs/
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
 ├── presets.md       # Preset authoring guide: THE expression-language reference.
 ├── preset-palettes.md  # The colour surface: palettes, custom stops, A/B crossfade.
-├── capturing.md     # Headless `shot` CLI + the core/tests/ visual-QA harness.
+├── capturing.md     # Headless `shot` CLI + the core/tests/ visual-QA harness + `--render` video.
 ├── releasing.md     # How the version moves (one bump per plan close) + the tag push that
 │                    #   builds and publishes the two release zips.
 ├── specs/           # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP).

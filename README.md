@@ -87,7 +87,7 @@ docs/
 │                    #   --report row that changed at each one.
 ├── presets.md       # Preset authoring guide: the expression language, loading, and where files live.
 ├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
-├── capturing.md     # Headless capture + visual-QA harness: the shot CLI and the core/tests/ checks.
+├── capturing.md     # Headless capture: the shot CLI, the core/tests/ checks, and --render (video).
 ├── releasing.md     # The version-bump / release procedure (one bump per plan close).
 ├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback,
 │                    #   and installing the foobar2000 component (no runner can load foobar2000).
@@ -291,10 +291,40 @@ Set **`LMV_PRESET_DIR`** to run against a custom preset folder instead of the
 per-user one — `LMV_PRESET_DIR=./presets cargo run -p standalone` points the app
 at the repo's own presets and hot-reloads an edit within ~150 ms.
 
+## Rendering a music video
+
+The engine renders a track to a video file **offline** — not by recording the
+window. From a source checkout, one command walks a WAV end to end and produces
+an MP4 with the audio muxed in:
+
+```bash
+cargo run -p standalone --example shot -- \
+  --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 \
+  --ffmpeg ffmpeg --out track.mp4
+```
+
+Because the render is offline it is **decoupled from real time**: every frame is
+drawn at an exact `1/fps` step regardless of how long it took, so the result is
+deterministic and never drops a frame the way a screen recorder does. It is also
+the mode where `--tier rich` is most worth paying for — there is no 60 Hz
+deadline for the frame-time governor to miss.
+
+**`ffmpeg` is a prerequisite and no encoder ships with this project.** A static
+`ffmpeg` is larger than the application's entire size budget
+([NFR §4](docs/nfr.md#4-size-and-dependencies)), so `shot` streams Y4M frames to whichever `ffmpeg` you
+point it at and lets it own the container
+([ADR-0114](docs/adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md)).
+Without `--ffmpeg` the raw frame stream goes to stdout for any encoder to read.
+
+See **[`docs/capturing.md`](docs/capturing.md#--render-a-music-video-from-a-track)**
+for the frame-rate rules, the exact `ffmpeg` command line it generates, and what
+it reports about a long render.
+
 ## Visual QA / headless capture
 
 Scenes can be rendered **with no window** — the core draws into an offscreen
-texture and returns raw RGBA. A `shot` CLI writes PNGs (and a text/JSON metrics
+texture and returns raw RGBA. That is the same path [the video renderer](#rendering-a-music-video)
+runs on. A `shot` CLI writes PNGs (and a text/JSON metrics
 report), and a differential harness in `core/tests/` hard-tests every preset for
 reactivity, animation, shape sanity, and beat response (with an advisory
 distinctness report and golden-image regression). It's dev/agent tooling — the
