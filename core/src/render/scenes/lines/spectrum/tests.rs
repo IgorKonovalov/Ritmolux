@@ -699,6 +699,7 @@ fn a_degenerate_element_count_is_inert() {
             b: [9.0, 9.0],
             color: [1.0, 1.0, 1.0],
             width: 1.0,
+            alpha: 1.0,
             joined: 0,
         }];
         build(layout, &none, &[], &[], Placement::default(), &mut out);

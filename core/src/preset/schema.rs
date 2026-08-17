@@ -53,6 +53,12 @@ pub enum SystemKind {
     /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
     /// The first scene whose population is not fixed.
     Emitter,
+    /// The warp mesh — a per-vertex UV grid that resamples the previous frame
+    /// ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+    /// Generalizes [ADR-0048](../../../docs/adrs/0048-transformed-feedback.md)'s
+    /// single shared feedback transform to one transform *per vertex*, driven by
+    /// a `[per_vertex]` table.
+    WarpMesh,
 }
 
 impl SystemKind {
@@ -60,7 +66,7 @@ impl SystemKind {
     /// `variant_roster_reminder` below: a new variant fails the build there until
     /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
     /// it, so bumping it without rostering the variant does not compile either.
-    pub const VARIANT_COUNT: usize = 10;
+    pub const VARIANT_COUNT: usize = 11;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the
     /// engine builds their scenes. The single place the variant list lives: the
@@ -80,6 +86,7 @@ impl SystemKind {
         SystemKind::Spectrum,
         SystemKind::Emitter,
         SystemKind::ShapeField,
+        SystemKind::WarpMesh,
     ];
 
     /// Parse a canonical system name (as written in a preset's `system = "..."`
@@ -99,6 +106,7 @@ impl SystemKind {
             "spectrum" => SystemKind::Spectrum,
             "emitter" => SystemKind::Emitter,
             "shape_field" => SystemKind::ShapeField,
+            "warp_mesh" => SystemKind::WarpMesh,
             _ => return None,
         })
     }
@@ -118,6 +126,7 @@ impl SystemKind {
             SystemKind::Spectrum => "spectrum",
             SystemKind::Emitter => "emitter",
             SystemKind::ShapeField => "shape_field",
+            SystemKind::WarpMesh => "warp_mesh",
         }
     }
 
@@ -141,6 +150,7 @@ impl SystemKind {
             SystemKind::Spectrum => scenes::lines::spectrum::PARAMS,
             SystemKind::Emitter => scenes::emitter::PARAMS,
             SystemKind::ShapeField => scenes::shape_field::PARAMS,
+            SystemKind::WarpMesh => scenes::warp_mesh::PARAMS,
         }
     }
 }
@@ -162,7 +172,8 @@ fn variant_roster_reminder(system: SystemKind) {
         | SystemKind::Attractor
         | SystemKind::Spectrum
         | SystemKind::Emitter
-        | SystemKind::ShapeField => {}
+        | SystemKind::ShapeField
+        | SystemKind::WarpMesh => {}
     }
 }
 
@@ -384,6 +395,9 @@ pub struct Layer {
     pub mix: Option<Binding>,
     /// The layer's parameter bindings, name-sorted like the preset's own.
     pub params: Vec<Binding>,
+    /// The layer's `[layer.per_vertex]` bindings — see
+    /// [`Preset::per_vertex`](Preset::per_vertex).
+    pub per_vertex: Vec<Binding>,
     /// The layer's declarative structural config (ADR-0007), from its own
     /// `[layer.curve]` / `[layer.generator]` / `[layer.particles]` /
     /// `[layer.spectrum]` tables — validated by the same per-system rules as
@@ -416,6 +430,21 @@ pub struct Preset {
     pub system: SystemKind,
     /// Parameter bindings, sorted by name for deterministic iteration.
     pub params: Vec<Binding>,
+    /// The `[per_vertex]` table's bindings (Plan 0100 Phase 1): the warp mesh's
+    /// per-vertex program, evaluated once **per mesh vertex** per frame with
+    /// `x`/`y`/`rad`/`ang` bound to that vertex's position.
+    ///
+    /// A separate table rather than a naming convention inside `[params]`,
+    /// because the cost is categorically different: one of these is `N`
+    /// evaluations where an ordinary binding is one, and an author has to be able
+    /// to see which of their bindings they are paying `N` for. Empty for every
+    /// system but the warp mesh, and for a warp-mesh preset that accepts the
+    /// identity transform.
+    ///
+    /// Never eased: like a per-element binding, a per-vertex one has no single
+    /// value for the smoother to hold. A `[smoothing]` entry naming one is a
+    /// load warning.
+    pub per_vertex: Vec<Binding>,
     /// Declarative structural config for a line scene (ADR-0007), applied once
     /// at preset load via `Scene::configure`. `None` for the fragment/swarm
     /// systems and for curve presets that accept the family default.
@@ -562,6 +591,9 @@ impl Preset {
             raw.generator,
             raw.particles,
             raw.spectrum,
+            raw.mesh,
+            raw.milk,
+            pinned_salt,
         )?;
 
         // The `[feedback]` table (ADR-0048): two closed rosters, validated here so
@@ -629,6 +661,22 @@ impl Preset {
             }
         }
 
+        // The `[per_vertex]` table (Plan 0100 Phase 1): the warp mesh's
+        // per-vertex program, compiled like any binding and never eased.
+        let per_vertex =
+            build_per_vertex(system, raw.per_vertex, &raw.smoothing, "", &mut warnings)?;
+        // A `[params]` binding reaching for a vertex variable reads a flat zero
+        // there — the names are crate-wide because expression slots are
+        // positional, and only a `[per_vertex]` table ever binds them.
+        for binding in &params {
+            if binding.expr.uses_vertex() {
+                warnings.push(format!(
+                    "parameter '{}' names a per-vertex variable (x/y/rad/ang), which                      reads 0 outside a [per_vertex] table",
+                    binding.name
+                ));
+            }
+        }
+
         // The optional second scene layer (ADR-0090 / Plan 0076), validated
         // last so a preset with several problems reports its main-surface
         // errors first — the layer is the optional extra, not the preset.
@@ -641,6 +689,7 @@ impl Preset {
             name,
             system,
             params,
+            per_vertex,
             config,
             feedback,
             palette,
@@ -652,6 +701,63 @@ impl Preset {
             warnings,
         })
     }
+}
+
+/// Compile a `[per_vertex]` table into bindings (Plan 0100 Phase 1).
+///
+/// `label` prefixes the error and warning text (`""` at the top level,
+/// `"[layer] "` inside one), and `smoothing` is that surface's own easing table
+/// — consulted only to warn, since a per-vertex binding is never eased.
+///
+/// Unknown names warn and keep the binding, exactly like `[params]` (ADR-0020):
+/// one typo must not discard an otherwise-good mesh program. A binding here for
+/// a system that has no per-vertex surface warns too — the table is inert there,
+/// and silently inert is the thing this file exists to prevent.
+fn build_per_vertex(
+    system: SystemKind,
+    raw: BTreeMap<String, String>,
+    smoothing: &BTreeMap<String, RawSmoothing>,
+    label: &str,
+    warnings: &mut Vec<String>,
+) -> Result<Vec<Binding>, PresetError> {
+    if raw.is_empty() {
+        return Ok(Vec::new());
+    }
+    if system != SystemKind::WarpMesh {
+        warnings.push(format!(
+            "{label}[per_vertex] is inert for system '{}': only `warp_mesh` evaluates a \
+             per-vertex program (bindings kept, but nothing reads them)",
+            system.as_str()
+        ));
+    }
+    let mut out = Vec::with_capacity(raw.len());
+    for (param, source) in raw {
+        let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
+            param: format!("{label}[per_vertex] {param}"),
+            err,
+        })?;
+        if !crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS.contains(&param.as_str()) {
+            warnings.push(format!(
+                "unknown {label}[per_vertex] parameter '{param}' (expected one of: {}) \
+                 (binding kept, but nothing reads it)",
+                crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS.join(", ")
+            ));
+        }
+        if smoothing.contains_key(&param) {
+            warnings.push(format!(
+                "{label}[smoothing] entry '{param}' is ignored: it names a [per_vertex] \
+                 binding, which is evaluated once per mesh vertex and has no single \
+                 value to ease"
+            ));
+        }
+        out.push(Binding {
+            name: param,
+            expr,
+            // Never eased — see `Preset::per_vertex`.
+            tau: Easing::INSTANT,
+        });
+    }
+    Ok(out)
 }
 
 /// Validate a `[layer]` table (ADR-0090 / Plan 0076). Structural keys —
@@ -784,6 +890,19 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
         })
         .transpose()?;
 
+    // `[layer.per_vertex]` — the same surface as the top level's, against the
+    // layer's own system and its own smoothing table.
+    let per_vertex =
+        build_per_vertex(system, raw.per_vertex, &raw.smoothing, "[layer] ", warnings)?;
+    for binding in &params {
+        if binding.expr.uses_vertex() {
+            warnings.push(format!(
+                "[layer] parameter '{}' names a per-vertex variable (x/y/rad/ang),                  which reads 0 outside a [layer.per_vertex] table",
+                binding.name
+            ));
+        }
+    }
+
     // The layer's structural config, by the same per-system rules as the top
     // level (ADR-0007) — a layer L-system still requires its `[layer.generator]`
     // table, a layer attractor still defaults to De Jong.
@@ -793,6 +912,13 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
         raw.generator,
         raw.particles,
         raw.spectrum,
+        raw.mesh,
+        // A `[layer]` carries no `[milk]` table: a converted preset is a whole
+        // preset, and layering one under another is a composition nothing in the
+        // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
+        // and `[layer.per_vertex]` like any hand-authored one.
+        None,
+        0,
     )?;
 
     Ok(Layer {
@@ -801,6 +927,7 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
         blend,
         mix,
         params,
+        per_vertex,
         config,
     })
 }
@@ -832,12 +959,16 @@ fn entropy_salt() -> u32 {
 
 /// Assemble the optional structural config for `system` from the raw tables,
 /// validating at this boundary (ADR-0007). Non-line systems have no config.
+#[allow(clippy::too_many_arguments)]
 fn build_config(
     system: SystemKind,
     curve: Option<RawCurve>,
     generator: Option<RawGenerator>,
     particles: Option<RawParticles>,
     spectrum: Option<RawSpectrum>,
+    mesh: Option<RawMesh>,
+    milk: Option<RawMilk>,
+    salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
     match system {
         // A curve preset without a `[curve]` table accepts the family default.
@@ -888,6 +1019,17 @@ fn build_config(
             Some(s) => s.into_config()?,
             None => RawSpectrum::default().into_config()?,
         })),
+        // The warp mesh's grid is structural for `[curve] family`'s reason: the
+        // vertex and index buffers are built from it, and an eased grid would
+        // rebuild them mid-frame. Config is always `Some` so `configure` runs on
+        // every preset switch (resizing the mesh — never stale).
+        SystemKind::WarpMesh => {
+            let bundle = milk.map(|raw| raw.into_bundle()).transpose()?;
+            Ok(Some(
+                mesh.unwrap_or_default()
+                    .into_config(bundle.map(Box::new), salt)?,
+            ))
+        }
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_field` is here for a
         // sharper reason: its structure is the `marks` roster, which is a closed
@@ -898,6 +1040,54 @@ fn build_config(
         | SystemKind::ReactionDiffusion
         | SystemKind::Emitter
         | SystemKind::ShapeField => Ok(None),
+    }
+}
+
+/// The raw `[mesh]` table (Plan 0100 Phase 1): the warp mesh's grid, in cells.
+///
+/// Both keys are optional. Absent — and an absent table — means
+/// [`DEFAULT_MESH`](crate::render::scenes::warp_mesh::DEFAULT_MESH), which is a
+/// grid every tier can carry.
+#[derive(Debug, Default, Deserialize)]
+struct RawMesh {
+    #[serde(default)]
+    x: Option<u32>,
+    #[serde(default)]
+    y: Option<u32>,
+}
+
+impl RawMesh {
+    /// Validate into the structural config, clamping to the `.milk` format's own
+    /// maximum (`meshx <= 128`, `meshy <= 96`) and refusing a degenerate grid.
+    ///
+    /// The **tier** clamp is deliberately not applied here: the loader does not
+    /// know which tier will render the preset, and a preset authored at the rich
+    /// grid must still load on the floor. `warp_mesh::clamp_grid` applies it at
+    /// both consumers — the scene and the renderer's per-vertex scratch — from
+    /// the one tier they share.
+    fn into_config(
+        self,
+        milk: Option<Box<crate::milk::MilkBundle>>,
+        salt: u32,
+    ) -> Result<GeneratorConfig, PresetError> {
+        use crate::render::scenes::warp_mesh::{DEFAULT_MESH, MAX_MESH, MIN_MESH};
+        let axis = |name: &str, value: Option<u32>, default: u32, max: u32| {
+            let v = value.unwrap_or(default);
+            if !(MIN_MESH..=max).contains(&v) {
+                return Err(PresetError::Config(format!(
+                    "[mesh] {name} must be in {MIN_MESH}..={max} cells, got {v}"
+                )));
+            }
+            Ok(v)
+        };
+        Ok(GeneratorConfig::WarpMesh {
+            mesh: (
+                axis("x", self.x, DEFAULT_MESH.0, MAX_MESH.0)?,
+                axis("y", self.y, DEFAULT_MESH.1, MAX_MESH.1)?,
+            ),
+            milk,
+            salt,
+        })
     }
 }
 
@@ -925,6 +1115,18 @@ struct RawPreset {
     /// count, layout and per-element easing of the spectrum readout.
     #[serde(default)]
     spectrum: Option<RawSpectrum>,
+    /// The optional `[mesh]` structural-config table (Plan 0100): the warp
+    /// mesh's grid, in cells.
+    #[serde(default)]
+    mesh: Option<RawMesh>,
+    /// The optional `[per_vertex]` table (Plan 0100): bindings evaluated once
+    /// per mesh vertex, with `x`/`y`/`rad`/`ang` in scope.
+    #[serde(default)]
+    per_vertex: BTreeMap<String, String>,
+    /// The optional `[milk]` table (Plan 0100 Phase 2): a converted MilkDrop
+    /// preset's three compiled EEL2 programs, as assembly text.
+    #[serde(default)]
+    milk: Option<RawMilk>,
     /// The optional `[feedback]` structural-config table (ADR-0048): the warp
     /// kind and deposit blend both accumulation buffers read their past through.
     #[serde(default)]
@@ -990,6 +1192,12 @@ struct RawLayer {
     particles: Option<RawParticles>,
     #[serde(default)]
     spectrum: Option<RawSpectrum>,
+    #[serde(default)]
+    mesh: Option<RawMesh>,
+    /// `[layer.per_vertex]` — the same per-vertex surface as the top level, for
+    /// a layer whose system is the warp mesh (Plan 0100 Phase 1).
+    #[serde(default)]
+    per_vertex: BTreeMap<String, String>,
 }
 
 /// The `[feedback]` table, before validation (ADR-0048).
@@ -1268,6 +1476,117 @@ fn validate_stops(stops: Vec<RawStop>) -> Result<Vec<(f32, [f32; 3])>, PresetErr
         out.push((stop.at, stop.color.into_rgb()?));
     }
     Ok(out)
+}
+
+/// The raw `[milk]` table (Plan 0100 Phase 2): a converted MilkDrop preset's
+/// three EEL2 programs, as the assembly text `milkconv` emits — plus, from Phase
+/// 4, its custom waves and shapes as `[[milk.waves]]` / `[[milk.shapes]]`.
+///
+/// Every section is optional. An absent one is the empty program, which is what
+/// a `.milk` file with no `per_frame_init` block converts to.
+#[derive(Debug, Default, Deserialize)]
+struct RawMilk {
+    #[serde(default)]
+    per_frame_init: Option<String>,
+    #[serde(default)]
+    per_frame: Option<String>,
+    #[serde(default)]
+    per_vertex: Option<String>,
+    /// Up to four custom waves — **47 % of the corpus enables at least one.**
+    #[serde(default)]
+    waves: Vec<RawMilkElement>,
+    /// Up to four custom shapes — **63 % of the corpus enables at least one.**
+    #[serde(default)]
+    shapes: Vec<RawMilkElement>,
+    /// The translated `warp` shader, as a complete WGSL fragment module (Plan
+    /// 0100 Phase 6). Compiled through naga at load: **a failed compile rejects
+    /// this preset by name and the loader's per-file skip loads the rest.**
+    #[serde(default)]
+    warp_shader: Option<String>,
+    /// The translated `comp` shader — same contract as `warp_shader`.
+    #[serde(default)]
+    comp_shader: Option<String>,
+    /// The deepest blur level either shader samples, `0..=3`. Decides whether
+    /// the scene runs its blur chain at all.
+    #[serde(default)]
+    blur_level: Option<u8>,
+}
+
+/// One `[[milk.waves]]` or `[[milk.shapes]]` entry: an element's own three
+/// programs and the structural numbers its geometry is sized from.
+///
+/// A shape's `additive` is absent here on purpose — it is a register its own
+/// per-frame program may write, so it varies per instance. See
+/// [`ElementSpec::additive`](crate::milk::ElementSpec::additive).
+#[derive(Debug, Default, Deserialize)]
+struct RawMilkElement {
+    #[serde(default)]
+    init: Option<String>,
+    #[serde(default)]
+    per_frame: Option<String>,
+    #[serde(default)]
+    per_point: Option<String>,
+    /// Points, for a wave; sides, for a shape.
+    count: u32,
+    /// How many copies a shape draws. Ignored for a wave, which draws one.
+    #[serde(default)]
+    instances: Option<u32>,
+    #[serde(default)]
+    use_dots: bool,
+    #[serde(default)]
+    thick: bool,
+    #[serde(default)]
+    additive: bool,
+}
+
+impl RawMilk {
+    /// Decode and validate every section at the load boundary — a malformed
+    /// program is a surfaced load error, never a panic (ADR-0002 / NFR 10).
+    /// A bundle's WGSL goes through the same naga frontend wgpu will hand it
+    /// to, here, so a bad shader is a named load error rather than a render-time
+    /// device error.
+    fn into_bundle(self) -> Result<crate::milk::MilkBundle, PresetError> {
+        let mut bundle = crate::milk::MilkBundle::from_assembly(
+            self.per_frame_init.as_deref(),
+            self.per_frame.as_deref(),
+            self.per_vertex.as_deref(),
+        )
+        .map_err(|err| PresetError::Config(err.to_string()))?;
+        for (which, source) in [("warp", &self.warp_shader), ("comp", &self.comp_shader)] {
+            if let Some(source) = source {
+                crate::milk::shader::validate_wgsl(source).map_err(|err| {
+                    PresetError::Config(format!(
+                        "[milk] {which}_shader rejected by naga — this preset is skipped, \
+                         the rest of the library loads: {err}"
+                    ))
+                })?;
+            }
+        }
+        bundle.warp_wgsl = self.warp_shader;
+        bundle.comp_wgsl = self.comp_shader;
+        bundle.blur_level = self.blur_level.unwrap_or(0).min(3);
+        for (kind, elements) in [
+            (crate::milk::ElementKind::Wave, self.waves),
+            (crate::milk::ElementKind::Shape, self.shapes),
+        ] {
+            for element in elements {
+                bundle
+                    .push_element(
+                        kind,
+                        element.init.as_deref(),
+                        element.per_frame.as_deref(),
+                        element.per_point.as_deref(),
+                        element.count,
+                        element.instances.unwrap_or(1),
+                        element.use_dots,
+                        element.thick,
+                        element.additive,
+                    )
+                    .map_err(|err| PresetError::Config(err.to_string()))?;
+            }
+        }
+        Ok(bundle)
+    }
 }
 
 /// The raw `[particles]` table: which strange-attractor family the

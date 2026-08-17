@@ -1,0 +1,50 @@
+# GOLDEN-ADJACENT FIXTURE - the lit-backdrop guard for the warp mesh's draw seams
+# (Plan 0100 Phase 4, ADR-0056). Not a drift baseline; `warp_mesh.rs`'s
+# `a_lit_backdrop_survives_where_the_draw_layer_drew_nothing` is its only reader,
+# and that test asserts the fixture's own non-vacuity before it captures.
+#
+# WHAT IT IS FOR
+#
+# `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE` records the rule that **a new draw
+# seam owes a lit-backdrop capture test**: a fragment that writes no light must
+# write no coverage, or the frame discards the backdrop across the whole
+# footprint it touched. Both existing call sites shipped that defect and both
+# were invisible at `bg_bright = 0`, which is the setting every golden baseline
+# runs. Phase 4 added TWO seams into the warp field - the shape triangle
+# pipeline and its premultiplied-OVER twin - so this is the third and fourth.
+#
+# WHY EACH BINDING IS WHAT IT IS
+#
+#  - `bg_bright` is high, and on black this whole comparison is black against
+#    black. The test asserts it is non-zero before capturing.
+#  - The `[milk]` table is EMPTY, and deliberately: an empty bundle still puts
+#    the scene in converted-preset mode, so the draw layer runs and every
+#    FrameOutputs default applies - `wave_a = 1`, `wave_mode = 0`, a centred
+#    circle of radius 0.2. That is a figure with a large untouched region around
+#    it, which is exactly what the guard needs and what a full-frame deposit
+#    would not give.
+#  - The scene's own deposit stays unbound, so the only light in the field is the
+#    draw layer's. Anything else would fill the corners this test reads.
+#  - `occlude` is left at its default: the present stage resolves the field OVER
+#    the backdrop by the field's own alpha, and that resolve is the thing under
+#    test.
+system = "warp_mesh"
+name   = "fixture_warp_mesh_lit_backdrop"
+
+[mesh]
+x = 16
+y = 12
+
+[palette]
+stops = [
+  { at = 0.0, color = "#000000" },
+  { at = 1.0, color = "#ffffff" },
+]
+
+[params]
+bg_bright  = "0.45"
+bg_hue     = "0.55"
+bg_vignette = "0.0"
+brightness = "1.0"
+
+[milk]

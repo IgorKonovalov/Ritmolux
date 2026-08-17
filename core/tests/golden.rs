@@ -63,6 +63,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
         SystemKind::Spectrum => ("spectrum", include_str!("fixtures/spectrum.toml")),
         SystemKind::Emitter => ("emitter", include_str!("fixtures/emitter.toml")),
         SystemKind::ShapeField => ("shape_field", include_str!("fixtures/shape_field.toml")),
+        SystemKind::WarpMesh => ("warp_mesh", include_str!("fixtures/warp_mesh.toml")),
     }
 }
 
@@ -112,12 +113,21 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// crate's baselines that reads the **along-band** axis at all; with the default
 /// there the shader never touches `t`.
 ///
+/// `warp_mesh_milk` is the sixth (Plan 0100 Phase 2, ADR-0113), and its
+/// impossibility is structural in the strongest sense the list has: the rostered
+/// `warp_mesh.toml` carries **no `[milk]` table at all**, so no bundle is
+/// constructed, no `MilkRuntime` exists, and not one instruction of the EEL2 VM
+/// executes under it. The two presets drive the same nine outputs of the same
+/// scene through two entirely separate paths — one through `[per_vertex]`
+/// expression bindings evaluated by the renderer, the other through bytecode
+/// executed by the VM — and only this fixture pins the second one to pixels.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 5] = [
+const EXTRA_FIXTURES: [(&str, &str); 6] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -126,6 +136,10 @@ const EXTRA_FIXTURES: [(&str, &str); 5] = [
     ("swarm_shaped", include_str!("fixtures/swarm_shaped.toml")),
     ("backdrop_ramp", include_str!("fixtures/backdrop_ramp.toml")),
     ("backdrop_band", include_str!("fixtures/backdrop_band.toml")),
+    (
+        "warp_mesh_milk",
+        include_str!("fixtures/warp_mesh_milk.toml"),
+    ),
 ];
 
 fn golden_dir() -> PathBuf {

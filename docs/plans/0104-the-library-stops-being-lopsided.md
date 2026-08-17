@@ -8,12 +8,13 @@
 
 ## TL;DR
 
-The shipped library is **39 presets across 10 systems, and it is wildly uneven**: `attractor` has
-17 worlds while `lsystem`, `shape_field`, `spectrum` and `star_pattern` have **exactly one each**.
-A visitor who tries this app judges the content, not the composite, and four of ten systems
-currently present themselves with a single example. This plan brings every system to **at least
-four distinct worlds** — 18 new presets, taking the library to 57 — and starts by asking whether
-the 17-strong family is seventeen worlds or seventeen variations.
+The shipped library is **39 presets across 11 systems, and it is wildly uneven**: `attractor` has
+17 worlds while `lsystem`, `shape_field`, `spectrum` and `star_pattern` have **exactly one each**
+and `warp_mesh` has **none**. A visitor who tries this app judges the content, not the composite,
+and five of eleven systems currently present themselves with one example or zero. This plan brings
+every system to **at least four distinct worlds** — 18 new presets to 57 as written, 22 to 61 once
+`warp_mesh` is counted — and starts by asking whether the 17-strong family is seventeen worlds or
+seventeen variations.
 
 ## Context & problem
 
@@ -32,6 +33,16 @@ The census, counted 2026-08-16 from `presets/*.toml`:
 | `spectrum` | **1** |
 | `star_pattern` | **1** |
 | **total** | **39** |
+
+> **Corrected 2026-08-17 — there are eleven systems, not ten.**
+> [Plan 0100](done/0100-the-engine-speaks-milkdrop.md) closed 2026-08-16, the same day this census
+> was counted, and shipped **`warp_mesh`** — which the table above cannot show, because it is
+> counted from `presets/*.toml` and `warp_mesh` has **zero** shipped worlds. That is the emptiest
+> system in the library and it is invisible to the instrument that found the problem.
+> Phase 1 re-runs the census and owns the revision; what it should carry in is that
+> `warp_mesh +4` makes the arithmetic below **22 new presets, 39 → 61**, and that the four should
+> be authored *after* [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md), whose Phase 1
+> changes the tone of the feedback field these worlds would be tuned against.
 
 Sixty-six releases of engine work produced ten rendering systems and thirty-nine presets, and
 nearly half of those presets are one family. This is not a volume problem dressed up as a
@@ -73,6 +84,11 @@ entries are seventeen worlds or a family that converged.
   the `attractor` family has an explicit verdict: how many of its 17 are distinct worlds. If a
   meaningful number converged, **the target arithmetic above is revised in this plan before Phase 2
   starts**, because retiring three duplicates is worth more than authoring three new ones.
+  **Two things the census must not miss** (both added 2026-08-17): the system roster comes from the
+  **scene registry**, not from `presets/*.toml`, or a system with zero worlds is invisible to the
+  instrument looking for empty systems — which is how `warp_mesh` was missed. And the verdict states
+  whether `warp_mesh`'s four land in this plan or as a follow-on cohort, given it cannot be authored
+  until [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 settles the tone.
 
 ### Phase 2 — the singletons get a range
 
@@ -181,12 +197,20 @@ entries are seventeen worlds or a family that converged.
   produces the list.
 - **It does not target 100 presets.** The floor is four per system, arrived at by counting rather
   than by ambition.
-- **It does not cover `warp_mesh`** ([Plan 0100](0100-the-engine-speaks-milkdrop.md)), which does
-  not exist yet. When it does, the per-system floor applies to it too.
+- ~~**It does not cover `warp_mesh`** ([Plan 0100](done/0100-the-engine-speaks-milkdrop.md)), which does
+  not exist yet. When it does, the per-system floor applies to it too.~~
+  **Stale as of 2026-08-17: it exists.** Plan 0100 closed 2026-08-16 and `warp_mesh` ships with zero
+  worlds, so by this plan's own floor it is in scope and is the emptiest system in the library — see
+  the correction box under the census. Whether the four land inside this plan or as a follow-on
+  cohort is Phase 1's call; the one constraint is that they come after
+  [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1, which moves the feedback
+  field's tone under anything authored on it.
 
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
-- A `warp_mesh` cohort once [0100](0100-the-engine-speaks-milkdrop.md) Phase 1 lands.
+- ~~A `warp_mesh` cohort once [0100](done/0100-the-engine-speaks-milkdrop.md) Phase 1 lands.~~
+  **Its condition is met** — 0100 closed 2026-08-16 — so this is no longer a followup but a scope
+  question this plan's Phase 1 answers; see the census correction box.
 - Re-run `node scripts/docs-shots.mjs` if any gallery preset is retired — the committed images name
   presets by hand.

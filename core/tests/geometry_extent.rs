@@ -201,7 +201,11 @@ fn draws_segments(system: SystemKind) -> bool {
         // `shape_field` draws a figure and still belongs on this side: it is a
         // per-pixel distance with no CPU segment list at all, which is precisely
         // the property ADR-0105 chose it for.
-        | SystemKind::ShapeField => false,
+        | SystemKind::ShapeField
+        // The warp mesh draws a grid of triangles through its own pipeline, not
+        // a CPU segment list through `LineRenderer`, so this instrument does not
+        // reach it either.
+        | SystemKind::WarpMesh => false,
     }
 }
 

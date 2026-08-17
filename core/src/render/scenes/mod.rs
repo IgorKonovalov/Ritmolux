@@ -25,6 +25,7 @@ pub mod particles;
 pub mod reaction_diffusion;
 pub mod shape_field;
 pub mod swarm;
+pub mod warp_mesh;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -141,6 +142,38 @@ pub enum GeneratorConfig {
         /// (ADR-0035).
         easing: crate::preset::Easing,
     },
+    /// The warp mesh's `[mesh]` table (Plan 0100 / ADR-0113): the grid, in
+    /// cells, that the per-vertex program is evaluated over.
+    ///
+    /// Structural for `[curve] family`'s reason — the vertex and index buffers
+    /// are built from it, so an eased grid would rebuild them mid-frame — and
+    /// **clamped to the tier at both consumers** rather than at load, since the
+    /// loader does not know which tier will render the preset
+    /// ([`warp_mesh::clamp_grid`]).
+    WarpMesh {
+        /// Requested cells, `(x, y)`, validated at load into
+        /// [`MIN_MESH`](warp_mesh::MIN_MESH)`..=`[`MAX_MESH`](warp_mesh::MAX_MESH).
+        mesh: (u32, u32),
+        /// The compiled EEL2 programs a **converted** preset carries, from a
+        /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a
+        /// hand-authored `warp_mesh` preset — drives the mesh from the ordinary
+        /// `[params]` and `[per_vertex]` bindings instead, and executes no VM at
+        /// all.
+        ///
+        /// Boxed because it is much the largest thing this enum carries and every
+        /// other variant would pay for it by value.
+        milk: Option<Box<crate::milk::MilkBundle>>,
+        /// The salt the bundle's `rand()` draws under (ADR-0051).
+        ///
+        /// **The preset's `pinned_salt`, always** — its declared numeric seed, or
+        /// `0` where it declared `seed = "random"`. So a bundle is a pure
+        /// function of its inputs in the live app as well as in the harness,
+        /// which is stronger than ADR-0051 requires and costs nothing: per-run
+        /// variety is opt-in through `seed = "random"`, and no *converted* preset
+        /// declares one. A hand-written bundle that does gets the pinned
+        /// behaviour, and that is stated rather than discovered.
+        salt: u32,
+    },
 }
 
 impl GeneratorConfig {
@@ -157,7 +190,8 @@ impl GeneratorConfig {
             GeneratorConfig::Curve { .. }
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. } => 0,
+            | GeneratorConfig::Particles { .. }
+            | GeneratorConfig::WarpMesh { .. } => 0,
         }
     }
 }
@@ -322,6 +356,26 @@ pub(crate) trait Scene {
             self.set_param(name, first);
         }
     }
+
+    /// Apply one named parameter as a **per-vertex series** (Plan 0100 Phase 1,
+    /// ADR-0113): `values` holds one evaluation of the binding per mesh vertex,
+    /// in row-major order from the top-left, `(meshx + 1) * (meshy + 1) ` long.
+    ///
+    /// The per-element channel one axis up, and deliberately just as narrow: it
+    /// carries `(name, &[f32])` in one direction and returns nothing. Reached
+    /// only for a binding in a `[per_vertex]` table, so a scene that never opts
+    /// in is never called.
+    ///
+    /// Unlike [`set_param_series`](Self::set_param_series) the default does
+    /// **nothing** rather than degrading to the first value. A per-vertex series
+    /// varies over space and its first element is the top-left corner, which is
+    /// not a sensible whole-scene reading of anything; the loader already warns
+    /// that a `[per_vertex]` table on another system is inert.
+    ///
+    /// The slice borrows the renderer's scratch, sized at preset load from the
+    /// same [`clamp_grid`](warp_mesh::clamp_grid) the scene uses, so nothing here
+    /// allocates.
+    fn set_per_vertex(&mut self, _name: &str, _values: &[f32]) {}
 
     /// Consume a preset's declarative structural config (ADR-0007). Invoked
     /// **once at preset load, off the hot path** — a generator builds and caches
@@ -506,7 +560,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::ReactionDiffusion
         | SystemKind::Attractor
         | SystemKind::Emitter
-        | SystemKind::ShapeField => false,
+        | SystemKind::ShapeField
+        | SystemKind::WarpMesh => false,
     }
 }
 
@@ -570,6 +625,12 @@ fn create(
         SystemKind::ShapeField => {
             Box::new(shape_field::ShapeFieldScene::new(device, surface_format))
         }
+        SystemKind::WarpMesh => Box::new(warp_mesh::WarpMeshScene::new(
+            device,
+            surface_format,
+            tier.mesh_grid,
+            tier.max_segments,
+        )),
     }
 }
 
@@ -627,6 +688,7 @@ mod tests {
             SystemKind::Attractor => "attractor",
             SystemKind::Spectrum => "spectrum",
             SystemKind::Emitter => "emitter",
+            SystemKind::WarpMesh => "warp mesh",
         }
     }
 
@@ -718,6 +780,7 @@ mod tests {
             SystemKind::Attractor,
             SystemKind::Emitter,
             SystemKind::ShapeField,
+            SystemKind::WarpMesh,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

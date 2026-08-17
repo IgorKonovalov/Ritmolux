@@ -120,6 +120,13 @@ fn hot_path_modules_carry_the_panic_pragma() {
         // The SPSC ring's `unsafe` now lives in the sibling lmv-ring crate
         // (Plan 0005); its whole `src/` is hot-path code.
         workspace_root().join("lmv-ring").join("src"),
+        // The EEL2 machine (Plan 0100 Phase 2, ADR-0113). Its whole directory,
+        // not just `vm.rs`: this is the only code in the engine that executes
+        // **untrusted program text** — a converted MilkDrop preset's — and it does
+        // so once per mesh vertex per frame. The bytecode module beside the VM is
+        // load-time, and is scanned anyway because the split between "decodes" and
+        // "executes" is not one a future edit should have to remember.
+        src.join("milk"),
     ];
 
     let mut files = Vec::new();

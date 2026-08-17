@@ -1017,6 +1017,7 @@ pub(crate) fn build_rings(
                     b: place(b),
                     color: [1.0, 1.0, 1.0],
                     width: 0.01,
+                    alpha: 1.0,
                     joined,
                 });
             }
@@ -1157,7 +1158,8 @@ impl Scene for StarPatternScene {
             GeneratorConfig::Curve { .. }
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::Spectrum { .. } => {}
+            | GeneratorConfig::Spectrum { .. }
+            | GeneratorConfig::WarpMesh { .. } => {}
         }
         // A rosette is `2 * n` segments for the small regular tilings v1 allows
         // (n <= 12), far under the cap — no truncation to surface.

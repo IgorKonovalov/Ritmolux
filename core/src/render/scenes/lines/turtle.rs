@@ -94,6 +94,7 @@ pub fn walk_with_depths(
                         b: [nx, ny],
                         color: [1.0, 1.0, 1.0],
                         width: 0.01,
+                        alpha: 1.0,
                         joined,
                     });
                 } else {

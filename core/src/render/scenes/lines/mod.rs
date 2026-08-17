@@ -205,6 +205,7 @@ pub(crate) fn transform_cached(
             b: rot(seg.b),
             color,
             width,
+            alpha: 1.0,
             // Connectivity is a property of the cached structure, not of this
             // frame's rotation/scale/colour, so it passes straight through.
             joined: seg.joined,
@@ -294,6 +295,7 @@ pub(crate) fn replicate_mirror(
                     b: map(seg.b),
                     color: seg.color,
                     width: seg.width,
+                    alpha: seg.alpha,
                     // A reflected or rotated copy has the same connectivity as
                     // its source: the geometry moves, the topology does not.
                     joined: seg.joined,

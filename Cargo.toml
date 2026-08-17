@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["core", "core-cabi", "lmv-ring", "standalone"]
+members = ["core", "core-cabi", "lmv-ring", "milkconv", "standalone"]
 # ADR-0072's whole point: `core-cabi` is the only crate emitting a cdylib and a
 # staticlib, and nothing in this workspace links either - the one consumer is
 # the foobar C++ shim, built on demand through plugin-foobar/build.ps1. Leaving
@@ -9,13 +9,18 @@ members = ["core", "core-cabi", "lmv-ring", "standalone"]
 # edit. It is still a full member: `--workspace` selects it (CI and the pre-push
 # hook both pass it, so the ABI conformance suite and clippy still cover it),
 # and `cargo build -p lmv-core-cabi` builds it directly.
+#
+# `milkconv` is out for the same reason and a different cost (Plan 0100 / ADR-0113):
+# it is the MilkDrop converter, it NEVER ships, and no shipped artifact depends on
+# it — so the everyday loop should not compile it. Same three ways in: `--workspace`,
+# `-p milkconv`, or its own tests.
 default-members = ["core", "lmv-ring", "standalone"]
 
 [workspace.package]
 # Single source of truth for the application version (ADR-0005). Member crates
 # inherit it via `version.workspace = true`; cargo-release bumps this one line
 # once per plan at the architect close. Separate axis from LMV_ABI_VERSION.
-version = "0.70.0"
+version = "0.71.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/eastsphere/light-music-visualizer"
