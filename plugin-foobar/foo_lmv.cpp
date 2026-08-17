@@ -62,6 +62,16 @@ constexpr GUID kGuidLmvMenu = {
     0x8f7c2a1e, 0x94d3, 0x4b6a, {0x9c, 0x1f, 0x27, 0x5e, 0x88, 0x3a, 0xd4, 0x61}};
 constexpr GUID kGuidLmvElement = {
     0x2d9b4f7c, 0x6e21, 0x4a83, {0xb5, 0x0c, 0x1a, 0x77, 0x3e, 0x08, 0xc2, 0x54}};
+constexpr GUID kGuidCfgPreset = {
+    0x5b3ad1c7, 0x0f4e, 0x4d92, {0xa6, 0x18, 0x3c, 0x71, 0x9e, 0x2d, 0x84, 0x0b}};
+
+// The component's only persisted setting: the preset the user last chose, BY
+// NAME. A name and not an index, because the roster is a directory listing -
+// dropping a file in reorders it, and an index would then restore a different
+// look than the one that was showing. An empty value, or a name whose file is
+// gone, means "whatever the roster opens on"; nothing is surfaced to the user,
+// since a preset they deleted is not an error.
+cfg_string g_cfg_preset(kGuidCfgPreset, "");
 
 constexpr UINT_PTR kRenderTimer = 1;
 // ~66 fps pump; actual pacing is vsync inside the core's present.
@@ -300,6 +310,29 @@ bool select_preset_named(LmvHandle *h, const std::string &name) {
     return false; // a name that is gone leaves the roster where it is
 }
 
+// Store what is showing now, so the next foobar start comes up on it. Reads the
+// name back from the core rather than trusting the caller's index: the snapshot
+// reports the dissolve's target, which is the preset the user just asked for.
+void remember_current_preset(LmvHandle *h) {
+    PresetSnapshot snap;
+    if (!read_preset_snapshot(h, snap)) return;
+    if (snap.current < 0 ||
+        static_cast<size_t>(snap.current) >= snap.names.size()) {
+        return;
+    }
+    g_cfg_preset.set(snap.names[static_cast<size_t>(snap.current)].c_str());
+}
+
+// Restore the remembered preset onto a freshly loaded roster. Called after the
+// window is attached and the library is loaded - the roster does not exist
+// before either. A name that no longer resolves leaves the roster's own default
+// showing, which is the documented degrade.
+void restore_remembered_preset(LmvHandle *h) {
+    const pfc::string8 name = g_cfg_preset.get();
+    if (name.is_empty()) return;
+    select_preset_named(h, std::string(name.get_ptr(), name.get_length()));
+}
+
 // Re-scan the shared folder so a file dropped into it appears, without
 // restarting foobar - the explicit alternative to a file watcher (Plan 0107's
 // interview decision).
@@ -319,6 +352,9 @@ void reload_presets_keeping_selection(LmvHandle *h) {
     }
     load_presets_into(h);
     select_preset_named(h, keep);
+    // Whatever the reload landed on is now what a restart should come up on -
+    // including the case where `keep`'s file was the one deleted.
+    remember_current_preset(h);
 }
 
 // Show the shared preset folder in Explorer - the only thing that makes the
@@ -383,6 +419,11 @@ void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
     // Next-scene cycles it. Called here (not only on claim) so a mid-playback
     // format change, which recreates the handle, does not drop the presets.
     load_presets_into(h);
+    // ...and comes up on the preset the user last chose. After the attach above
+    // on purpose: the roster installs there, so the snapshot this reads against
+    // does not exist any earlier. A format change mid-playback therefore keeps
+    // the look on screen instead of snapping back to the roster's first entry.
+    restore_remembered_preset(h);
     // Re-apply the current debug flags so a menu-toggled overlay survives a
     // handle re-creation (mid-playback format change); the core otherwise
     // re-seeds from the env at create.
@@ -765,6 +806,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == VK_SPACE && g_session.owner == wnd &&
                 g_session.handle != nullptr) {
                 lmv_cycle_scene(g_session.handle);
+                remember_current_preset(g_session.handle);
                 return 0;
             }
             break;
@@ -839,6 +881,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             const UINT ucmd = static_cast<UINT>(cmd);
             if (cmd == kMenuNextScene) {
                 lmv_cycle_scene(g_session.handle);
+                remember_current_preset(g_session.handle);
             } else if (cmd == kMenuToggleOverlay && g_abi_ok) {
                 // Flip the overlay bit and push it live over the ABI.
                 g_debug_flags ^= LMV_DEBUG_OVERLAY;
@@ -849,8 +892,11 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                 open_preset_folder();
             } else if (listed != 0 && ucmd >= kMenuPresetBase &&
                        ucmd < kMenuPresetBase + listed) {
-                lmv_select_preset(g_session.handle,
-                                  static_cast<int32_t>(ucmd - kMenuPresetBase));
+                if (lmv_select_preset(
+                        g_session.handle,
+                        static_cast<int32_t>(ucmd - kMenuPresetBase)) == LMV_OK) {
+                    remember_current_preset(g_session.handle);
+                }
             }
             return 0;
         }
