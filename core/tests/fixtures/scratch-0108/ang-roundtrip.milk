@@ -1,0 +1,36 @@
+[preset00]
+MILKDROP_PRESET_VERSION=201
+PSVERSION=2
+fRating=3.000
+fDecay=1.000
+bTexWrap=0
+nMotionVectorsX=0.000
+nMotionVectorsY=0.000
+fWaveAlpha=0.000
+ob_a=0.000
+ib_a=0.000
+shapecode_0_enabled=1
+shapecode_0_sides=16
+shapecode_0_num_inst=1
+shapecode_0_additive=1
+shapecode_0_x=0.5
+shapecode_0_y=0.82
+shapecode_0_rad=0.14
+shapecode_0_a=1.0
+shape_0_per_frame1=x = 0.5;
+shape_0_per_frame2=y = 0.82;
+shape_0_per_frame3=rad = 0.14;
+shape_0_per_frame4=r = 1; g = 0.85; b = 0.5; a = 1;
+shape_0_per_frame5=r2 = 1; g2 = 0.85; b2 = 0.5; a2 = 1;
+shape_0_per_frame6=border_a = 0;
+warp_1=`shader_body
+warp_2=`{
+warp_3=`    // THE IDIOM UNDER TEST (Plan 0108 Phase 3): rebuild uv from the
+warp_4=`    // polar pair the stage was handed. Most tunnel presets are made of
+warp_5=`    // this shape. If `ang` is measured in the opposite y direction from
+warp_6=`    // `uv`, the reconstruction is not the identity - it is a reflection
+warp_7=`    // about the horizontal midline, with its seam on the fixed line.
+warp_8=`    float2 d = float2(cos(ang), sin(ang)) * rad;
+warp_9=`    float2 uv2 = 0.5 + 0.5*d;
+warp_10=`    ret = tex2D(sampler_main, uv2).xyz * 0.90;
+warp_11=`}
