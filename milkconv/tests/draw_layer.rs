@@ -249,6 +249,104 @@ fn waveform_geometry(mode: f32, use_dots: f32) -> draw::DrawGeometry {
     geometry
 }
 
+// ---------------------------------------------------------------------------
+// A wave's per-point state carries along the trace (Plan 0108 Phase 5)
+// ---------------------------------------------------------------------------
+
+/// The `flip` alternation, in the shape **612 corpus files** write it, on a
+/// single custom wave whose points are otherwise identical.
+///
+/// Every point runs the same three lines with the same `sample`-independent
+/// arithmetic, so the only thing that can make consecutive points differ is
+/// `flip` surviving from one to the next. `y` is `0.7` on odd points and `0.3`
+/// on even ones — an alternation with no other possible source.
+const FLIP_PRESET: &str = "\
+[preset00]
+fRating=3.000
+nMotionVectorsX=0.000
+nMotionVectorsY=0.000
+fWaveAlpha=0.000
+wavecode_0_enabled=1
+wavecode_0_samples=8
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=0
+wavecode_0_bAdditive=1
+wavecode_0_a=1.000
+wave_0_per_point1=flip = flip + 1;
+wave_0_per_point2=flip = flip * below(flip, 2);
+wave_0_per_point3=x = 0.5;
+wave_0_per_point4=y = 0.3 + flip * 0.4;
+";
+
+/// **A custom wave's per-point program carries its state from one point to the
+/// next** — Plan 0108 Phase 5, and the reason *chasers 19 Portal*'s mirror
+/// symmetry converted cleanly and rendered inert (design-backlog 0107).
+///
+/// The fold that preset is named for is not in a warp shader and not in a
+/// per-vertex program — it has neither. It is three lines of per-point code in
+/// each of three custom waves, alternating `yp` about the trace to draw a
+/// mirrored pair. `ElementRuntime::run_point` restored a register snapshot
+/// before every point, exactly as the mesh's per-vertex path does, so `flip`
+/// was handed the same value each time, the two lines computed a constant, and
+/// the pair collapsed to one trace. Nothing failed and the conversion was clean
+/// — which is what made it hard to see.
+///
+/// The claim is asserted as an alternation rather than as a pair of literals:
+/// `y` must take **two** distinct values across a run of points whose only
+/// varying input is one the program never reads.
+#[test]
+fn a_waves_per_point_state_carries_to_the_next_point() {
+    let file = milkconv::milk::parse(FLIP_PRESET).expect("the fixture parses as a .milk file");
+    let converted = milkconv::convert::convert(&file, "flip_fixture").expect("it converts");
+    let preset = Preset::from_toml_str(&converted.toml)
+        .unwrap_or_else(|e| panic!("the emitted bundle must load back: {e}"));
+    let bundle = match preset.config {
+        Some(GeneratorConfig::WarpMesh {
+            milk: Some(milk), ..
+        }) => *milk,
+        other => panic!("the converted preset must carry a bundle, got {other:?}"),
+    };
+    assert_eq!(bundle.waves.len(), 1, "the one enabled wave must survive");
+
+    let mut runtime = MilkRuntime::new(bundle, 0);
+    runtime.run_frame(
+        &lmv_core::dsp::AnalysisFrame::default(),
+        0.0,
+        1.0 / 30.0,
+        (32, 24),
+        16.0 / 9.0,
+    );
+    runtime
+        .run_wave_frame(0)
+        .expect("the wave's per-frame program runs");
+
+    let ys: Vec<f32> = (0..8)
+        .filter_map(|i| runtime.run_wave_point(0, i as f32 / 7.0, 0.0))
+        .map(|p| p.y)
+        .collect();
+    println!("[draw_layer] flip alternation down the trace: {ys:?}");
+    assert_eq!(ys.len(), 8, "every point must produce a position");
+
+    let mut distinct: Vec<f32> = ys.clone();
+    distinct.sort_by(f32::total_cmp);
+    distinct.dedup_by(|a, b| (*a - *b).abs() < 1e-5);
+    assert_eq!(
+        distinct.len(),
+        2,
+        "`flip` must alternate down the trace, giving `y` exactly two values; \
+         got {distinct:?} from {ys:?}. One value means the per-point register \
+         file is being restored between points, so a preset's alternation, \
+         accumulation or integration along the wave silently does nothing — \
+         3 368 of the corpus's 6 347 custom-wave presets depend on it"
+    );
+    // ...and it alternates rather than merely holding two values in some order,
+    // which a program that reset every other point would also satisfy.
+    assert!(
+        ys.windows(2).all(|w| (w[0] - w[1]).abs() > 1e-5),
+        "consecutive points must differ — `flip` toggles every point; got {ys:?}"
+    );
+}
+
 /// Every `wave_mode` the reference has.
 const WAVE_MODES: [f32; 8] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 
