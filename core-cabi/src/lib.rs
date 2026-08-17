@@ -4,7 +4,7 @@
 //! `core-cabi/include/lmv_core.h` separately from this crate, so any change to
 //! the shape of these functions is an ADR-worthy event, not a casual edit. Keep
 //! it minimal: create/free, push samples, attach window, render, resize,
-//! cycle scene, load presets, version query.
+//! cycle scene, load presets, read the roster, select a preset, version query.
 //!
 //! **This crate exists so the rest of the workspace stops paying for it**
 //! (ADR-0072). It is the only crate declaring `cdylib`/`staticlib`, and its
@@ -49,8 +49,9 @@ use lmv_core::render::Renderer;
 /// Bump on any ABI shape change (with the accompanying ADR). v2 added
 /// `lmv_load_presets` (ADR-0006); v3 added `lmv_set_debug` + `lmv_get_metrics`
 /// and the `LmvMetrics` struct (ADR-0008); v4 added `lmv_render_dt` (ADR-0013);
-/// v5 added `lmv_set_now_playing` (ADR-0110).
-pub const LMV_ABI_VERSION: u32 = 5;
+/// v5 added `lmv_set_now_playing` (ADR-0110); v6 added `lmv_get_presets` +
+/// `lmv_select_preset` (ADR-0117).
+pub const LMV_ABI_VERSION: u32 = 6;
 
 /// Call succeeded.
 pub const LMV_OK: i32 = 0;
@@ -418,6 +419,116 @@ pub unsafe extern "C" fn lmv_load_presets(
             None => state.pending_presets = report.presets,
         }
         count
+    }))
+    .unwrap_or(LMV_ERR_PANIC)
+}
+
+/// Snapshot the installed preset roster: every name, in roster order, written
+/// into the caller's buffer as UTF-8 with a single `0x00` after each. Returns
+/// the total byte count the full list needs (`>= 0`), or a negative `LMV_ERR_*`.
+///
+/// **Call twice to size it**: pass `buf_len = 0` (or a null `buf`) to learn the
+/// count, allocate, then call again. If `buf_len` is smaller than the needed
+/// count **nothing is written** — the buffer is left exactly as the caller left
+/// it, so a short buffer is never a partial list a host could mistake for a
+/// whole one. No allocation crosses the boundary (ADR-0008's rule).
+///
+/// `out_current_index` is nullable (skipped when null) and receives the index
+/// the show is **going** to — the dissolve's target while a transition is in
+/// flight, matching `lmv_cycle_scene`'s convention — or `-1` on an empty roster.
+/// It is filled on every successful call, sizing calls included.
+///
+/// Returns `LMV_ERR_NO_WINDOW` before `lmv_attach_window`: the roster installs
+/// at attach (ADR-0006's pending-set rule), so there is nothing honest to report
+/// until then. Indices are **snapshot-scoped** — meaningful only against this
+/// same handle's roster with no `lmv_load_presets` in between. Added in ABI v6
+/// (ADR-0117).
+///
+/// # Safety
+/// `handle` valid per `lmv_create`; `buf` either null or writable for `buf_len`
+/// bytes; `out_current_index` either null or a writable `int32_t`. Render-thread
+/// role only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lmv_get_presets(
+    handle: *mut LmvHandle,
+    buf: *mut u8,
+    buf_len: usize,
+    out_current_index: *mut i32,
+) -> i32 {
+    if handle.is_null() {
+        return LMV_ERR_INVALID_ARG;
+    }
+    let handle = unsafe { &*handle };
+    catch_unwind(AssertUnwindSafe(|| {
+        let state = unsafe { &mut *handle.render.get() };
+        let Some(renderer) = state.renderer.as_ref() else {
+            return LMV_ERR_NO_WINDOW;
+        };
+
+        let needed: usize = renderer.preset_names().map(|n| n.len() + 1).sum();
+        // Guard the cast rather than truncate it. Unreachable in practice (it
+        // would take 2 GB of preset names), but the return type is the contract.
+        let Ok(needed_i32) = i32::try_from(needed) else {
+            return LMV_ERR_INVALID_ARG;
+        };
+
+        if !out_current_index.is_null() {
+            let current = if renderer.preset_names().next().is_none() {
+                -1
+            } else {
+                i32::try_from(renderer.target_preset_index()).unwrap_or(-1)
+            };
+            unsafe { *out_current_index = current };
+        }
+
+        if !buf.is_null() && buf_len >= needed {
+            let mut off = 0usize;
+            for name in renderer.preset_names() {
+                let bytes = name.as_bytes();
+                unsafe {
+                    std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf.add(off), bytes.len());
+                    // The separator: one NUL per name, terminator included, so
+                    // the host walks the block without a count.
+                    *buf.add(off + bytes.len()) = 0;
+                }
+                off += bytes.len() + 1;
+            }
+        }
+        needed_i32
+    }))
+    .unwrap_or(LMV_ERR_PANIC)
+}
+
+/// Switch to the preset at `index` — an absolute position in the list this same
+/// handle's [`lmv_get_presets`] reported — **dissolving** rather than cutting,
+/// exactly as [`lmv_cycle_scene`] does.
+///
+/// Returns `LMV_OK`; `LMV_ERR_INVALID_ARG` for a null handle or an index that is
+/// negative or past the end of the roster (a stale index is a host bug worth
+/// signalling, not worth a wrap or a panic — nothing changes); and
+/// `LMV_ERR_NO_WINDOW` before `lmv_attach_window`. Added in ABI v6 (ADR-0117).
+///
+/// # Safety
+/// `handle` valid per `lmv_create`; render-thread role only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lmv_select_preset(handle: *mut LmvHandle, index: i32) -> i32 {
+    if handle.is_null() {
+        return LMV_ERR_INVALID_ARG;
+    }
+    let handle = unsafe { &*handle };
+    catch_unwind(AssertUnwindSafe(|| {
+        let state = unsafe { &mut *handle.render.get() };
+        let Some(renderer) = state.renderer.as_mut() else {
+            return LMV_ERR_NO_WINDOW;
+        };
+        let Ok(index) = usize::try_from(index) else {
+            return LMV_ERR_INVALID_ARG;
+        };
+        if index >= renderer.preset_names().count() {
+            return LMV_ERR_INVALID_ARG;
+        }
+        renderer.select_preset(index);
+        LMV_OK
     }))
     .unwrap_or(LMV_ERR_PANIC)
 }

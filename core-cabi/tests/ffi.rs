@@ -1,17 +1,22 @@
 //! First automated coverage of the C ABI (the long-standing zero-CI-coverage
 //! gap noted in the Plan 0001/0002 reviews). Drives lmv_create ->
 //! lmv_load_presets -> lmv_free across the FFI boundary against a temp dir,
-//! confirms the v2 version handshake, and exercises the null-path error path
-//! (no UB, documented negative code). No window is attached, so this runs
-//! headless: lmv_load_presets stashes the loaded set as pending until a
-//! renderer exists, and still reports the loaded count.
+//! confirms the version handshake, and exercises the null-path error path
+//! (no UB, documented negative code). Most of it runs headless, where
+//! lmv_load_presets stashes the loaded set as pending until a renderer exists
+//! and still reports the loaded count.
+//!
+//! One test is the exception and says so in its own doc: v6's roster surface
+//! (ADR-0117) only exists after lmv_attach_window, so it opens a hidden Win32
+//! window and drives the real attach path — the first coverage that entry has
+//! had.
 
 use std::path::Path;
 
 use lmv_core_c::{
     LMV_ABI_VERSION, LMV_DEBUG_OVERLAY, LMV_ERR_INVALID_ARG, LMV_ERR_NO_WINDOW, LMV_OK, LmvMetrics,
-    lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_load_presets, lmv_render,
-    lmv_render_dt, lmv_set_debug, lmv_set_now_playing,
+    lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_get_presets, lmv_load_presets,
+    lmv_render, lmv_render_dt, lmv_select_preset, lmv_set_debug, lmv_set_now_playing,
 };
 
 /// Count the `.toml` files in `dir` (0 if it can't be read).
@@ -73,9 +78,9 @@ fn lmv_metrics_is_56_bytes() {
 }
 
 #[test]
-fn abi_version_is_five() {
-    assert_eq!(lmv_abi_version(), 5, "runtime ABI version is v5");
-    assert_eq!(LMV_ABI_VERSION, 5, "compile-time ABI version is v5");
+fn abi_version_is_six() {
+    assert_eq!(lmv_abi_version(), 6, "runtime ABI version is v6");
+    assert_eq!(LMV_ABI_VERSION, 6, "compile-time ABI version is v6");
 }
 
 /// v4 render entry (ADR-0013): `lmv_render_dt` takes a real `dt` and behaves
@@ -135,7 +140,7 @@ fn set_debug_and_get_metrics_over_the_abi() {
     out.struct_size = std::mem::size_of::<LmvMetrics>() as u32;
     let rc = unsafe { lmv_get_metrics(handle, &mut out) };
     assert_eq!(rc, LMV_OK, "lmv_get_metrics -> OK");
-    assert_eq!(out.abi_version, 5, "core stamps the current abi_version");
+    assert_eq!(out.abi_version, 6, "core stamps the current abi_version");
     assert_eq!(
         out.struct_size,
         std::mem::size_of::<LmvMetrics>() as u32,
@@ -228,6 +233,239 @@ fn set_now_playing_validates_at_the_boundary() {
     );
 
     unsafe { lmv_free(handle) };
+}
+
+/// v6's roster surface (ADR-0117) on the path every host hits first: the roster
+/// installs at `lmv_attach_window`, so before that both new entries report
+/// `LMV_ERR_NO_WINDOW` rather than an empty list — which a menu would render as
+/// "this build ships no presets", the one lie the ADR rejected Alternative B to
+/// avoid.
+#[test]
+fn get_presets_and_select_report_no_window_before_attach() {
+    let handle = lmv_create(48_000, 2);
+    assert!(!handle.is_null(), "lmv_create returns a handle");
+
+    // A sentinel the core must not touch on a failed call.
+    let mut current: i32 = i32::MIN;
+    assert_eq!(
+        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) },
+        LMV_ERR_NO_WINDOW,
+        "pre-attach lmv_get_presets -> no window"
+    );
+    assert_eq!(
+        current,
+        i32::MIN,
+        "a failed call leaves out_current_index untouched"
+    );
+
+    assert_eq!(
+        unsafe { lmv_select_preset(handle, 0) },
+        LMV_ERR_NO_WINDOW,
+        "pre-attach lmv_select_preset -> no window"
+    );
+
+    // Null handles are rejected at the boundary, before anything is read.
+    assert_eq!(
+        unsafe {
+            lmv_get_presets(
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+            )
+        },
+        LMV_ERR_INVALID_ARG,
+        "null handle -> invalid arg"
+    );
+    assert_eq!(
+        unsafe { lmv_select_preset(std::ptr::null_mut(), 0) },
+        LMV_ERR_INVALID_ARG,
+        "null handle -> invalid arg"
+    );
+
+    unsafe { lmv_free(handle) };
+}
+
+/// The windowed half of v6's coverage (Plan 0107 Phase 1), and the first test in
+/// this repo to drive `lmv_attach_window` at all.
+///
+/// Everything the roster surface promises is only observable **after** attach —
+/// the pending set installs there — so the claims below (call-twice sizing, the
+/// short-buffer rule, roster order, the dissolve-target index) need a real
+/// `HWND`. It is a hidden `STATIC` window: a system class, so no window class to
+/// register and no window procedure to write, and never shown.
+///
+/// **Skips rather than fails when no adapter can present to that window** (the
+/// software-rasterizer-only case): the assertions below are about the ABI, not
+/// about the GPU, and a machine that cannot open a surface has nothing to say
+/// about them.
+#[cfg(windows)]
+#[test]
+fn roster_snapshot_and_select_over_the_abi() {
+    use std::ffi::c_void;
+
+    use lmv_core_c::lmv_attach_window;
+
+    // Declared here rather than pulled in as a dependency: three symbols from a
+    // library every Windows process already links (ADR-0001's "every new crate
+    // is a cost" applies to test code too).
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        #[allow(non_snake_case)]
+        fn CreateWindowExW(
+            ex_style: u32,
+            class_name: *const u16,
+            window_name: *const u16,
+            style: u32,
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            parent: *mut c_void,
+            menu: *mut c_void,
+            instance: *mut c_void,
+            param: *mut c_void,
+        ) -> *mut c_void;
+        #[allow(non_snake_case)]
+        fn DestroyWindow(hwnd: *mut c_void) -> i32;
+    }
+    const WS_POPUP: u32 = 0x8000_0000;
+    const W: u32 = 320;
+    const H: u32 = 240;
+
+    let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+    let title: Vec<u16> = "lmv ffi roster\0".encode_utf16().collect();
+    let hwnd = unsafe {
+        CreateWindowExW(
+            0,
+            class.as_ptr(),
+            title.as_ptr(),
+            WS_POPUP, // deliberately not WS_VISIBLE: nothing flashes on screen
+            0,
+            0,
+            W as i32,
+            H as i32,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    assert!(!hwnd.is_null(), "CreateWindowExW(STATIC) returns a window");
+
+    let handle = lmv_create(48_000, 2);
+    assert!(!handle.is_null(), "lmv_create returns a handle");
+
+    let rc = unsafe { lmv_attach_window(handle, hwnd, W, H) };
+    if rc != LMV_OK {
+        eprintln!("skipping: lmv_attach_window -> {rc} (no adapter can present here)");
+        unsafe { lmv_free(handle) };
+        unsafe { DestroyWindow(hwnd) };
+        return;
+    }
+
+    let dir = std::env::temp_dir().join("lmv_ffi_roster_test");
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.to_str().expect("temp path is valid UTF-8");
+    let installed = unsafe { lmv_load_presets(handle, path.as_bytes().as_ptr(), path.len()) };
+    assert!(
+        installed > 3,
+        "the seeded library installs more than the index selected below"
+    );
+
+    // The order the ABI must report, read from the same loader the boundary
+    // calls — so this asserts *roster order*, not merely "some names".
+    let expected: Vec<String> = lmv_core::preset::load_dir(&dir)
+        .presets
+        .iter()
+        .map(|p| p.name.clone())
+        .collect();
+    assert_eq!(expected.len(), installed as usize);
+
+    // 1. The sizing call: exact byte count, and it writes nothing.
+    let mut current: i32 = i32::MIN;
+    let needed = unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) };
+    let expected_bytes: usize = expected.iter().map(|n| n.len() + 1).sum();
+    assert_eq!(
+        needed as usize, expected_bytes,
+        "the sizing call returns exactly what a fill needs (name + one NUL each)"
+    );
+    assert_eq!(
+        current, 0,
+        "a freshly installed roster sits on its first preset"
+    );
+
+    // 2. One byte short is still nothing written — never a partial list.
+    let mut buf = vec![0xAA_u8; needed as usize];
+    let short = unsafe {
+        lmv_get_presets(
+            handle,
+            buf.as_mut_ptr(),
+            buf.len() - 1,
+            std::ptr::null_mut(),
+        )
+    };
+    assert_eq!(short, needed, "a short call still reports the needed size");
+    assert!(
+        buf.iter().all(|&b| b == 0xAA),
+        "a buffer too small is left byte-for-byte untouched"
+    );
+
+    // 3. The fill: every installed name, NUL-terminated, in roster order.
+    let filled =
+        unsafe { lmv_get_presets(handle, buf.as_mut_ptr(), buf.len(), std::ptr::null_mut()) };
+    assert_eq!(filled, needed);
+    assert_eq!(buf.last(), Some(&0), "the last name is NUL-terminated too");
+    let names: Vec<&str> = buf
+        .split(|&b| b == 0)
+        .filter(|chunk| !chunk.is_empty())
+        .map(|chunk| std::str::from_utf8(chunk).expect("names cross the ABI as UTF-8"))
+        .collect();
+    assert_eq!(
+        names.len(),
+        installed as usize,
+        "as many names as lmv_load_presets reported installed"
+    );
+    assert_eq!(
+        names,
+        expected.iter().map(String::as_str).collect::<Vec<_>>(),
+        "names arrive in roster order"
+    );
+
+    // 4. Select: the reported index is the dissolve's target, immediately —
+    //    which is what lets a host menu tick the user's choice, not the frame
+    //    the dissolve happens to be on.
+    assert_eq!(unsafe { lmv_select_preset(handle, 3) }, LMV_OK);
+    let mut after: i32 = i32::MIN;
+    assert_eq!(
+        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut after) },
+        needed
+    );
+    assert_eq!(after, 3, "out_current_index reads back the selected index");
+
+    // 5. A negative and a past-the-end index are both rejected, and neither
+    //    moves the show.
+    for bad in [-1, installed] {
+        assert_eq!(
+            unsafe { lmv_select_preset(handle, bad) },
+            LMV_ERR_INVALID_ARG,
+            "index {bad} is out of range -> invalid arg"
+        );
+    }
+    let mut unchanged: i32 = i32::MIN;
+    assert_eq!(
+        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut unchanged) },
+        needed
+    );
+    assert_eq!(
+        unchanged, 3,
+        "a rejected index leaves the current one alone"
+    );
+
+    // The window must outlive the renderer that holds a surface on it.
+    unsafe { lmv_free(handle) };
+    unsafe { DestroyWindow(hwnd) };
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The copy-on-receipt rule the spec states and the C++ side must be able to

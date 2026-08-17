@@ -1,6 +1,6 @@
 # 0107 — The foobar menu picks a preset
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16
 > **Owner skill(s):** dev, human

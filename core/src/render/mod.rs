@@ -1263,6 +1263,21 @@ impl Renderer {
         self.roster.active
     }
 
+    /// The index the show is **going** to: the dissolve's target while a
+    /// transition is in flight, and [`active_index`](Self::active_index)
+    /// otherwise. This is the "where the show is going, not where it has been"
+    /// convention [`cycle_preset`](Self::cycle_preset) already returns a name by,
+    /// expressed as an index — a host checkmarking a menu wants the user's most
+    /// recent choice to be ticked immediately, not a quarter-second later.
+    ///
+    /// Meaningless on an empty roster (`0`, like `active_index`); a caller that
+    /// distinguishes that case reads [`preset_names`](Self::preset_names) first.
+    pub fn target_preset_index(&self) -> usize {
+        self.transition
+            .as_ref()
+            .map_or(self.roster.active, Transition::incoming_index)
+    }
+
     /// Whether the frame-time governor demoted this session's tier.
     ///
     /// The frontend reports the **transition**, so a demotion is announced once

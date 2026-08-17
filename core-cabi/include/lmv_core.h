@@ -1,6 +1,6 @@
 /*
  * lmv_core.h — C ABI of the light-music-visualizer core (hand-written,
- * kept in lockstep with core/src/ffi.rs).
+ * kept in lockstep with core-cabi/src/lib.rs).
  *
  * THIS IS A CONTRACT. The C++ host compiles against this header separately
  * from the Rust crate; changing the shape of this surface is an ADR-worthy
@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define LMV_ABI_VERSION 5u
+#define LMV_ABI_VERSION 6u
 
 /* Result codes (0 success, negative failure). */
 #define LMV_OK 0
@@ -53,7 +53,7 @@ typedef struct LmvHandle LmvHandle;
  * struct_size = sizeof(LmvMetrics), the core writes at most that many bytes and
  * stamps what it wrote. Process RSS is deliberately NOT here (host-process
  * owned; each shell reads its own). Layout mirrors the Rust #[repr(C)] struct in
- * core/src/ffi.rs - keep the two in lockstep. Added in ABI v3.
+ * core-cabi/src/lib.rs - keep the two in lockstep. Added in ABI v3.
  */
 typedef struct LmvMetrics {
     uint32_t struct_size;   /* caller sets sizeof; core stamps what it wrote */
@@ -71,7 +71,7 @@ typedef struct LmvMetrics {
 #ifdef __cplusplus
 /* A layout mismatch with the Rust struct is a silent memory bug, not a compile
  * error (no cbindgen, per ADR-0003); guard it where the C++ shim compiles. */
-static_assert(sizeof(LmvMetrics) == 56, "LmvMetrics layout must match core/src/ffi.rs");
+static_assert(sizeof(LmvMetrics) == 56, "LmvMetrics layout must match core-cabi/src/lib.rs");
 #endif
 
 /* Runtime ABI version of the linked core; compare with LMV_ABI_VERSION. */
@@ -133,6 +133,39 @@ int32_t lmv_cycle_scene(LmvHandle *handle);
  */
 int32_t lmv_load_presets(LmvHandle *handle, const uint8_t *path_utf8,
                          size_t path_len);
+
+/*
+ * Snapshot the installed preset roster: every name, in roster order, written
+ * into `buf` as UTF-8 with a single 0x00 after each. Returns the total byte
+ * count the full list needs (>= 0), or a negative LMV_ERR_*.
+ *
+ * CALL TWICE TO SIZE IT: pass buf_len = 0 (or buf = NULL) to learn the count,
+ * allocate, call again. If buf_len is smaller than the needed count NOTHING is
+ * written - a short buffer never yields a partial list. No allocation crosses
+ * the ABI.
+ *
+ * out_current_index may be NULL (then skipped); otherwise it receives the index
+ * the show is GOING to - the dissolve's target while a transition is in flight,
+ * matching lmv_cycle_scene's convention - or -1 on an empty roster. It is filled
+ * on every successful call, sizing calls included.
+ *
+ * Returns LMV_ERR_NO_WINDOW before lmv_attach_window: the roster installs at
+ * attach. Indices are SNAPSHOT-SCOPED - meaningful only against this same
+ * handle's roster with no lmv_load_presets in between. Added in ABI v6.
+ */
+int32_t lmv_get_presets(LmvHandle *handle, uint8_t *buf, size_t buf_len,
+                        int32_t *out_current_index);
+
+/*
+ * Switch to the preset at `index` - an absolute position in the list this same
+ * handle's lmv_get_presets reported - dissolving rather than cutting, exactly as
+ * lmv_cycle_scene does.
+ *
+ * Returns LMV_OK; LMV_ERR_INVALID_ARG on a null handle or an index that is
+ * negative or past the end of the roster (nothing changes); LMV_ERR_NO_WINDOW
+ * before lmv_attach_window. Added in ABI v6.
+ */
+int32_t lmv_select_preset(LmvHandle *handle, int32_t index);
 
 /*
  * Announce the currently playing track: the core fades a banner in over the
