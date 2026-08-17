@@ -22,9 +22,11 @@
 
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include <windows.h>
 #include <windowsx.h> // GET_X_LPARAM / GET_Y_LPARAM
+#include <shellapi.h> // ShellExecuteW (Open presets folder)
 
 #include "lmv_core.h"
 
@@ -49,7 +51,8 @@ DECLARE_COMPONENT_VERSION(
     "(curves / L-systems / star patterns), reaction-diffusion and attractor "
     "flows - rendered by the shared lmv-core Rust engine (wgpu).\n"
     "Dockable as a Default UI panel or opened from the View menu. "
-    "Space cycles scenes.");
+    "Space cycles scenes; right-click to pick one by name, reload the preset "
+    "folder, or open it.");
 VALIDATE_COMPONENT_FILENAME("foo_lmv.dll");
 
 namespace {
@@ -82,6 +85,14 @@ constexpr UINT kWatchdogMs = 500;
 // Context-menu command ids (window-local; not foobar menu GUIDs).
 constexpr UINT kMenuNextScene = 1001;
 constexpr UINT kMenuToggleOverlay = 1002;
+constexpr UINT kMenuReloadPresets = 1003;
+constexpr UINT kMenuOpenPresetDir = 1004;
+// The Preset submenu's ids: base + roster index. A reserved RANGE rather than a
+// handful of constants, so the ids stay disjoint from the fixed items above
+// however far the library grows. The cap bounds the range (and a menu nobody
+// could use); the roster is ~40 presets today.
+constexpr UINT kMenuPresetBase = 2000;
+constexpr size_t kMenuPresetMax = 900;
 // Read this far behind "now": visualisation data close to the playback head
 // may not be decoded yet.
 constexpr double kReadBehindSec = 0.05;
@@ -156,25 +167,38 @@ bool g_abi_ok = false;
 // authority once running.
 uint32_t g_debug_flags = LMV_DEBUG_OFF;
 
-// Resolve the shared per-user preset directory as UTF-8 bytes for the ABI:
-// %APPDATA%\light-music-visualizer\presets - the exact path the standalone
-// seeds and watches, so both frontends share one library. Empty on failure
-// (the core then keeps its embedded defaults).
-//
-// This is the last independent copy of that path. The two Rust frontends (the
-// app and the shot CLI) now share one resolver in standalone/src/lib.rs, which
-// also honors the LMV_PRESET_DIR override (ADR-0014); this shim deliberately
-// does not - it resolves the same %APPDATA% directory on its own, and honoring
-// the override here is a documented followup. Keep the literals below in step
-// with APP_DIR_NAME in that module.
-std::string resolve_preset_dir_utf8() {
+// %APPDATA%\light-music-visualizer - the app dir the standalone shares. Empty on
+// failure. The diagnostics log lives here, next to the shared presets dir.
+std::wstring plugin_app_dir_w() {
     const DWORD need = GetEnvironmentVariableW(L"APPDATA", nullptr, 0);
     if (need == 0) return {};
     std::wstring wide(need, L'\0');
     const DWORD got = GetEnvironmentVariableW(L"APPDATA", wide.data(), need);
     if (got == 0 || got >= need) return {};
     wide.resize(got);
-    wide += L"\\light-music-visualizer\\presets";
+    wide += L"\\light-music-visualizer";
+    return wide;
+}
+
+// The shared per-user preset directory: %APPDATA%\light-music-visualizer\presets
+// - the exact path the standalone seeds and watches, so both frontends share one
+// library. Empty on failure (the core then keeps its embedded defaults).
+//
+// This is the last independent copy of that path. The two Rust frontends (the
+// app and the shot CLI) now share one resolver in standalone/src/lib.rs, which
+// also honors the LMV_PRESET_DIR override (ADR-0014); this shim deliberately
+// does not - it resolves the same %APPDATA% directory on its own, and honoring
+// the override here is a documented followup. Keep the literals above in step
+// with APP_DIR_NAME in that module.
+std::wstring preset_dir_w() {
+    const std::wstring app = plugin_app_dir_w();
+    if (app.empty()) return {};
+    return app + L"\\presets";
+}
+
+// UTF-16 -> UTF-8, for the path the ABI takes as bytes.
+std::string narrow(const std::wstring &wide) {
+    if (wide.empty()) return {};
     const int len =
         WideCharToMultiByte(CP_UTF8, 0, wide.c_str(),
                             static_cast<int>(wide.size()), nullptr, 0, nullptr,
@@ -185,6 +209,33 @@ std::string resolve_preset_dir_utf8() {
                         out.data(), len, nullptr, nullptr);
     return out;
 }
+
+// UTF-8 -> UTF-16, for the roster names the menu draws. Preset names are
+// author-supplied text and need not be ASCII, so this is not decoration.
+std::wstring widen(const std::string &utf8) {
+    if (utf8.empty()) return {};
+    const int len = MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                                        static_cast<int>(utf8.size()), nullptr, 0);
+    if (len <= 0) return {};
+    std::wstring out(static_cast<size_t>(len), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
+                        out.data(), len);
+    return out;
+}
+
+// A menu label from a preset name. The only transformation is doubling '&',
+// which AppendMenuW would otherwise eat as an accelerator prefix - a preset
+// called "black & white" must not display as "black  white" with a underlined W.
+std::wstring menu_label(const std::string &name) {
+    std::wstring out;
+    for (const wchar_t c : widen(name)) {
+        out.push_back(c);
+        if (c == L'&') out.push_back(c);
+    }
+    return out;
+}
+
+std::string resolve_preset_dir_utf8() { return narrow(preset_dir_w()); }
 
 // Seed + load the shared preset library into `h` over the C ABI. No-op if the
 // ABI handshake failed or the directory can't be resolved. Runs on the main
@@ -197,6 +248,92 @@ void load_presets_into(LmvHandle *h) {
                      dir.size());
 }
 
+// One reading of the core's installed roster (C ABI v6, ADR-0117).
+//
+// The names are the CORE's, not the folder's, and that is the whole point: a
+// malformed .toml a user dropped in the directory is absent here, so the menu
+// cannot offer a preset that would not load. `current` is the index the show is
+// going to - the dissolve's target - so a checkmark follows the click rather
+// than the fade.
+struct PresetSnapshot {
+    std::vector<std::string> names; // UTF-8, roster order
+    int32_t current = -1;           // -1 = empty roster / not read
+};
+
+// Fill `out` from `h`. False (and an empty snapshot) when the ABI is too old,
+// no window is attached yet, or the roster is empty - all cases where the menu
+// simply omits the Preset submenu rather than showing an empty one.
+bool read_preset_snapshot(LmvHandle *h, PresetSnapshot &out) {
+    out.names.clear();
+    out.current = -1;
+    if (!g_abi_ok || h == nullptr) return false;
+    // Call twice: size, then fill. Nothing is written when the buffer is short,
+    // so a roster that grew between the two calls yields no names rather than a
+    // truncated list - and it cannot, since both run on this thread.
+    const int32_t needed = lmv_get_presets(h, nullptr, 0, &out.current);
+    if (needed <= 0) return false;
+    std::vector<uint8_t> buf(static_cast<size_t>(needed));
+    if (lmv_get_presets(h, buf.data(), buf.size(), &out.current) != needed) {
+        return false;
+    }
+    size_t start = 0;
+    for (size_t i = 0; i < buf.size(); ++i) {
+        if (buf[i] != 0) continue;
+        out.names.emplace_back(reinterpret_cast<const char *>(buf.data()) + start,
+                               i - start);
+        start = i + 1;
+    }
+    return !out.names.empty();
+}
+
+// Select the preset called `name` against a FRESH snapshot; returns whether it
+// was found. Indices are snapshot-scoped (ADR-0117), so the lookup and the
+// select must have nothing between them - which is exactly why this reads the
+// roster itself instead of taking an index from a caller who read it earlier.
+bool select_preset_named(LmvHandle *h, const std::string &name) {
+    PresetSnapshot snap;
+    if (name.empty() || !read_preset_snapshot(h, snap)) return false;
+    for (size_t i = 0; i < snap.names.size(); ++i) {
+        if (snap.names[i] != name) continue;
+        return lmv_select_preset(h, static_cast<int32_t>(i)) == LMV_OK;
+    }
+    return false; // a name that is gone leaves the roster where it is
+}
+
+// Re-scan the shared folder so a file dropped into it appears, without
+// restarting foobar - the explicit alternative to a file watcher (Plan 0107's
+// interview decision).
+//
+// The re-selection is not a nicety: the core's set_presets keeps the roster
+// INDEX, not the name, so a new file sorting before the current one would
+// silently move the show to a different look. Reloading also re-seeds the
+// running scene's simulation state (set_presets reconfigures the active scene),
+// which is accepted here because reload is something the user asked for.
+void reload_presets_keeping_selection(LmvHandle *h) {
+    if (!g_abi_ok || h == nullptr) return;
+    PresetSnapshot before;
+    std::string keep;
+    if (read_preset_snapshot(h, before) && before.current >= 0 &&
+        static_cast<size_t>(before.current) < before.names.size()) {
+        keep = before.names[static_cast<size_t>(before.current)];
+    }
+    load_presets_into(h);
+    select_preset_named(h, keep);
+}
+
+// Show the shared preset folder in Explorer - the only thing that makes the
+// drop-a-file loop discoverable, since the seeding is silent.
+void open_preset_folder() {
+    const std::wstring dir = preset_dir_w();
+    if (dir.empty()) return;
+    // Seeding creates it, but a session that never got that far should still
+    // land in a real folder rather than an error box. Both levels, because
+    // CreateDirectoryW does not create parents.
+    CreateDirectoryW(plugin_app_dir_w().c_str(), nullptr);
+    CreateDirectoryW(dir.c_str(), nullptr);
+    ShellExecuteW(nullptr, L"open", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
 // True when LMV_DEBUG_OVERLAY is set to a truthy value (1/true/on/yes). Seeds
 // the overlay default; the core reads the same var at lmv_create, but the plugin
 // tracks it too so the menu toggle and handle re-creation stay consistent.
@@ -206,20 +343,6 @@ bool env_overlay_on() {
     if (got == 0 || got >= 16) return false;
     return _wcsicmp(buf, L"1") == 0 || _wcsicmp(buf, L"true") == 0 ||
            _wcsicmp(buf, L"on") == 0 || _wcsicmp(buf, L"yes") == 0;
-}
-
-// %APPDATA%\light-music-visualizer - the app dir the standalone shares. Empty on
-// failure (the plugin log is then skipped). The diagnostics log lives here, next
-// to the shared presets dir.
-std::wstring plugin_app_dir_w() {
-    const DWORD need = GetEnvironmentVariableW(L"APPDATA", nullptr, 0);
-    if (need == 0) return {};
-    std::wstring wide(need, L'\0');
-    const DWORD got = GetEnvironmentVariableW(L"APPDATA", wide.data(), need);
-    if (got == 0 || got >= need) return {};
-    wide.resize(got);
-    wide += L"\\light-music-visualizer";
-    return wide;
 }
 
 void VizSession::destroy_handle() {
@@ -661,8 +784,47 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             HMENU menu = CreatePopupMenu();
             if (menu == nullptr) return 0;
+
+            // The roster is read ONCE, here, and the ids the items carry are
+            // positions in this snapshot. That is safe because the menu is
+            // modal: nothing on this thread can reload presets between the
+            // build and the click, and no other thread may touch the handle.
+            PresetSnapshot snap;
+            size_t listed = 0;
+            if (read_preset_snapshot(g_session.handle, snap)) {
+                HMENU presets = CreatePopupMenu();
+                if (presets != nullptr) {
+                    listed = snap.names.size() < kMenuPresetMax ? snap.names.size()
+                                                               : kMenuPresetMax;
+                    for (size_t i = 0; i < listed; ++i) {
+                        AppendMenuW(presets, MF_STRING,
+                                    kMenuPresetBase + static_cast<UINT>(i),
+                                    menu_label(snap.names[i]).c_str());
+                    }
+                    if (snap.current >= 0 &&
+                        static_cast<size_t>(snap.current) < listed) {
+                        // A radio bullet rather than a tick: exactly one preset
+                        // is showing, and this also clears the previous mark.
+                        CheckMenuRadioItem(
+                            presets, kMenuPresetBase,
+                            kMenuPresetBase + static_cast<UINT>(listed) - 1,
+                            kMenuPresetBase + static_cast<UINT>(snap.current),
+                            MF_BYCOMMAND);
+                    }
+                    // DestroyMenu(menu) below tears the submenu down with it.
+                    AppendMenuW(menu, MF_POPUP,
+                                reinterpret_cast<UINT_PTR>(presets), L"Preset");
+                }
+            }
+
             AppendMenuW(menu, MF_STRING, kMenuNextScene, L"Next scene");
             if (g_abi_ok) {
+                AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+                AppendMenuW(menu, MF_STRING, kMenuReloadPresets,
+                            L"Reload presets");
+                AppendMenuW(menu, MF_STRING, kMenuOpenPresetDir,
+                            L"Open presets folder");
+                AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
                 const UINT check =
                     (g_debug_flags & LMV_DEBUG_OVERLAY) ? MF_CHECKED : MF_UNCHECKED;
                 AppendMenuW(menu, MF_STRING | check, kMenuToggleOverlay,
@@ -672,13 +834,23 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                 TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y,
                                0, wnd, nullptr);
             DestroyMenu(menu);
+            // The menu is modal, so ownership can have changed while it was up.
             if (g_session.owner != wnd || g_session.handle == nullptr) return 0;
+            const UINT ucmd = static_cast<UINT>(cmd);
             if (cmd == kMenuNextScene) {
                 lmv_cycle_scene(g_session.handle);
             } else if (cmd == kMenuToggleOverlay && g_abi_ok) {
                 // Flip the overlay bit and push it live over the ABI.
                 g_debug_flags ^= LMV_DEBUG_OVERLAY;
                 lmv_set_debug(g_session.handle, g_debug_flags);
+            } else if (cmd == kMenuReloadPresets && g_abi_ok) {
+                reload_presets_keeping_selection(g_session.handle);
+            } else if (cmd == kMenuOpenPresetDir) {
+                open_preset_folder();
+            } else if (listed != 0 && ucmd >= kMenuPresetBase &&
+                       ucmd < kMenuPresetBase + listed) {
+                lmv_select_preset(g_session.handle,
+                                  static_cast<int32_t>(ucmd - kMenuPresetBase));
             }
             return 0;
         }
