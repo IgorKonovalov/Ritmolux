@@ -1985,3 +1985,86 @@ there.
 
 **Low until 0106/0107 land** — the blank list is contaminated by both, so counting it again first
 is wasted; re-run `--render` after they land and re-rank.
+
+---
+
+## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
+
+**Raised by:** `architect`, at Plan 0108's planning sweep (2026-08-17), reading
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+Outcome and [Plan 0100](plans/done/0100-the-engine-speaks-milkdrop.md)'s followup list against
+`docs/capturing.md`'s measured corpus tables. **Owner if taken:** `architect` (it reopens a scoped
+exclusion and is ADR territory) then `dev`.
+
+- **Verified 2026-08-17** — the exclusion is a named rejection class, deliberately, and says so in
+  its own message: `present: fn disk_texture in: milkconv/src/shader/emit.rs`,
+  `present: deliberately out of scope in: milkconv/src/shader/emit.rs`
+- **Verified 2026-08-17** — the corpus tables this entry re-reads are in the operator doc, both
+  eras: `present: WHY A FILE DID NOT CONVERT, ranked in: docs/capturing.md`
+- `unprobeable:` the counts (1 217 / 609 / 2 058 / 88.7 %) are a measurement of one corpus run
+  (2026-08-16, dev box, `WORK/milkdrop-corpus`), reproducible with `milkconv --report`, not a
+  property of this tree
+
+### The finding
+
+**This entry claims nothing new about the mechanism. It claims the ranking was already decided and
+nobody carried it.** Plan 0100's followup list says *"MilkDrop's `textures/` support, if Phase 5's
+failure ranking says it is a large class."* Phase 5 ran, Phase 6 ran after it, and the ranking is
+in `docs/capturing.md`:
+
+| Rejection reason | Files | Share of corpus |
+|---|---|---|
+| warp shader `disk-texture` | 1 217 | 11.8 % |
+| comp shader `disk-texture` | 609 | 5.9 % |
+| **every other cause combined** | **232** | **2.2 %** |
+
+Total conversion failures are `10 347 - 8 289 = 2 058`. Disk textures are **1 826 of them —
+88.7 %**. Every other named cause in the whole corpus — HLSL arrays, computed conditions, parse
+failures, unknown names, the EEL program classes — sums to 232 files.
+
+So the conditional in Plan 0100's followup is **satisfied**, and by a margin that is not close.
+The 19 % figure ADR-0113's Outcome prices the exclusion at was the *census grep*; the converter
+sees a slightly wider class (it also flags `sampler_pc`) and measured **21.8 %** of the corpus
+reading a disk texture.
+
+### Why this is an entry rather than a line in Plan 0108
+
+Plan 0108 is fidelity work on presets that already convert. This is the **conversion rate**, and it
+is a different question with a different owner: shipping or sourcing texture files reopens
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+scope and collides directly with the provenance question Plan 0100 Phase 8 deferred (*decide
+later*, nothing third-party in the repository or a release). **Those two are the same decision seen
+from two sides** — a texture is third-party content exactly as a preset is — which is why this
+wants an ADR and an interview rather than a phase.
+
+It also sits *above* [0108](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
+in value by its own arithmetic: that entry's HLSL-array lowering recovers ~71 files, and this
+recovers ~1 826. Both are conversion-rate work; only one of them is 25x the other.
+
+### What a fix would be, and the shape is genuinely open
+
+At least four routes, and they differ on the question this project has already deferred once rather
+than on mechanism:
+
+1. **Ship nothing, load from the user's own `textures/` directory** — the same shape as
+   `LMV_PRESET_DIR` today. No provenance question at all, because nothing third-party enters the
+   repository; the user who has the preset pack already has its textures. Cheapest, and the most
+   consistent with Phase 8's standing answer.
+2. **Substitute procedurally.** The six built-in noise textures already exist and 51 % of the corpus
+   samples one. A missing disk texture could resolve to a procedural stand-in rather than a
+   rejection — the preset renders *something its author did not draw*, which Phase 6 explicitly
+   moved away from, so this trades fidelity for conversion rate and needs a judged look call.
+3. **Ship a small curated texture set.** Highest fidelity, and it walks straight into the licensing
+   question Phase 8 deferred.
+4. **Keep the exclusion and stop calling it a corner.** Legitimate, and it is the null option that
+   should be named: the cost is stated, the 8 289 that convert are the product, and the entry closes
+   as a decision rather than as work.
+
+### Priority
+
+**Medium, and it is the largest single lever on the import's reach.** It blocks nothing — the
+import ships and works on four fifths of the corpus. Take it when the fidelity work
+([Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md)) has settled whether converted
+presets are worth having more of, which is the honest ordering: reach is only worth buying after
+quality is judged. **Do not take it before Plan 0108's Phase 2**, whose verdict on whether these
+presets read as better or merely different is exactly the evidence for how much reach is worth.
