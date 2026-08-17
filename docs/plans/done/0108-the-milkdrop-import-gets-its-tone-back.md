@@ -1,18 +1,19 @@
 # 0108 — The MilkDrop import gets its tone back
 
-> **Status:** in-progress — **every `dev` phase has landed and been reviewed (2026-08-17); the two
-> `human` look-gates are what remain.** See the implementation log at the foot of this file. The plan
-> stays live rather than closing because Phase 2 is a routing cut point that can send Phase 1 back to
-> [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
-> Alternative D, and Phase 6 is what decides Phase 3's sign and Phase 4's `time * 0.05`.
+> **Status:** done — **closed 2026-08-17, all six phases run.** Phases 1/3/4/5 landed as code
+> (`b02cd45`, `60674da`, `6e92eb3`, `a07b0c6`) and were reviewed the same day; Phases 2 and 6 ran as
+> one live look-gate session against `foo_vis_milk2` and are recorded below. The verdict on this
+> plan's own central question is **still merely different** — and the gate found four engine defects
+> this plan was never scoped to fix, which is worth more than the answer it went looking for. They
+> carry to [Plan 0109](../0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (proposed)
+> **Related ADRs:** [0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (proposed)
 > **Closes:** design-backlog 0106, design-backlog 0107
 
 ## TL;DR
 
-[Plan 0100](done/0100-the-engine-speaks-milkdrop.md) shipped the MilkDrop import and its Phase 7
+[Plan 0100](0100-the-engine-speaks-milkdrop.md) shipped the MilkDrop import and its Phase 7
 judged it *mostly there, with defects* — and returned **merely different**, not better, on the
 plan's own motivating claim about the HDR pipeline. Four defects explain the gap. This plan fixes
 the one that dominates (the float feedback field never truncates, so every dim residual
@@ -26,7 +27,7 @@ The rig and the evidence are Plan 0100's Phase 7 (2026-08-16): real MilkDrop 2 v
 0.2.0.0 (DX11) in foobar2000 v2 against this engine's release `lmv.exe`, one track feeding both,
 seven presets judged side by side. Structure, motion and reactivity survived conversion in **every**
 pair — the bones are right. Four defects did not, filed as
-[design-backlog 0106](../design-backlog.md) and [0107](../design-backlog.md):
+[design-backlog 0106](../../design-backlog.md) and [0107](../../design-backlog.md):
 
 1. **The float field never truncates.** MilkDrop's 8-bit feedback target floors `decay`-scaled dim
    pixels to zero; `Rgba16Float` keeps them and they integrate. One mechanism, four presentations:
@@ -58,7 +59,7 @@ different one, below, with the arithmetic behind it.
 We take **backlog 0106 and 0107 together and leave 0108 (the conversion tail) filed**, because that
 entry's own instruction is that its blank-render list is contaminated by both and re-counting it
 first is wasted work. The truncation fix is
-[ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md): quantize in
+[ADR-0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md): quantize in
 the **gamma-encoded** domain (a literal linear `1/255` floor is 13x too aggressive — the arithmetic
 is in the ADR), driven by a runtime uniform, **on by default for `[milk]` bundles** and off for
 native `warp_mesh` presets so nothing authored moves.
@@ -118,7 +119,7 @@ flowchart TB
 - **Done when:**
   - **Off is an exact identity.** A native `warp_mesh` preset renders **byte-identical** to its
     pre-change output. Assert it against a live control rather than by argument — the
-    [Plan 0075](done/0075-the-content-renaissance.md) Phase 2 form — so it cannot pass vacuously.
+    [Plan 0075](0075-the-content-renaissance.md) Phase 2 form — so it cannot pass vacuously.
     `core/tests/golden/warp_mesh.png` must not move.
   - **On, the field reaches exact zero.** A converted feedback fixture with the deposit disabled
     settles to **exactly `0.0`** in its background in a finite number of frames, where the same
@@ -148,7 +149,7 @@ flowchart TB
   *Songflower (Moss Posy)*, *chasers 19 Portal*, *Blur Mix 3*, *Cauldron painterly 5*, *Cosmic Dust
   2*, *Fog Tunnel* — plus an answer to the two questions the tuning turns on:
   1. **Does the banding read?** ADR-0118's stated price is that quantizing inside the feedback loop
-     re-introduces exactly what [ADR-0096](../adrs/0096-the-display-write-dithers.md) dithers away at
+     re-introduces exactly what [ADR-0096](../../adrs/0096-the-display-write-dithers.md) dithers away at
      the display write, upstream of where that dither can reach. If it reads worse than the wash
      did, the recorded fallback is ADR-0118's **Alternative D** — floor to zero without quantizing
      the levels between — and that is a return to Phase 1, not a defect to file.
@@ -259,7 +260,7 @@ fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
   `LMV_BLESS` on this box. Bless twice **on the same branch**, differing only by reverting the change
   under test, and compare bless-to-bless. The suite is **32 baselines** as of 2026-08-17 — re-derive
   the count rather than copying this one forward, which is what went stale in the plans README at 28.
-- **[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) applies and this family is
+- **[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) applies and this family is
   a repeat offender.** Phases 1 and 3 both touch code near `U.aspect`. Any aspect used for
   screen-destined geometry comes from the **render target**, never from a grid or mesh size, and the
   development display cannot tell the two apart — test at a size where they disagree.
@@ -281,7 +282,7 @@ fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
   the repository or a release, and the import path stays the converter plus a user-supplied
   `LMV_PRESET_DIR`.
 - **MilkDrop `textures/` support**, per-vertex evaluation on a compute shader, and a `warp_mesh`
-  content cohort ([Plan 0104](0104-the-library-stops-being-lopsided.md) owns the last).
+  content cohort ([Plan 0104](../0104-the-library-stops-being-lopsided.md) owns the last).
 - **Any move on the engine-wide HDR chain.** ADR-0046's linear-light ordering and ADR-0096's display
   dither are inputs here, not subjects.
 
@@ -368,8 +369,82 @@ handed forward, each of which needs the reference on screen and can be answered 
    open half. Reproduce with any preset whose custom wave has an odd sample count and a `flip`
    counter.
 
-Also discharged by Phase 1 landing: [Plan 0104](0104-the-library-stops-being-lopsided.md)'s four
+Also discharged by Phase 1 landing: [Plan 0104](../0104-the-library-stops-being-lopsided.md)'s four
 `warp_mesh` worlds were waiting on it.
+
+## The look gate — Phases 2 and 6, run 2026-08-17
+
+One session, both `human` phases together, `foo_vis_milk2` 0.2.0.0 beside release `lmv.exe`, one
+track feeding both, the same seven pairs as [Plan 0100](0100-the-engine-speaks-milkdrop.md)
+Phase 7. The engine side ran a purpose-built set: the seven presets re-converted by the current
+`milkconv`, each at three quantizer settings (**A** = 255 default, **B** = `quantize_steps = 0`, the
+pre-Phase-1 picture, **C** = `-255`, Alternative D), so the A/B/C question was a browser keypress
+rather than a restart.
+
+### Phase 2's central question: still merely different
+
+| Preset | closest variant | verdict | what actually dominates the pair |
+|--------|-----------------|---------|----------------------------------|
+| *Contortion (Escher's Tunnel Mix)* | C | wrong | the wash, cause open — plus a black ray artifact on all four frame edges |
+| *Songflower (Moss Posy)* | C | wrong | **no video-echo stage** (`fVideoEchoAlpha = 1.000`) |
+| *chasers 19 Portal* | B | wrong | **a negative `sx` is clamped away** |
+| *Blur Mix 3* | C | wrong | **`time * 0.05`** in the mode 6/7 angle |
+| *Cauldron painterly 5* | C | **better** | — (the spiro is still a mode-mapping gap) |
+| *Cosmic Dust 2* | C | wrong | the wash; hue magenta where the reference is green |
+| *Fog Tunnel* | A | wrong | the wash, presenting as tonal inversion |
+
+**One better, six wrong, and not one of the six for the reason this plan was built on.** That closes
+Plan 0100's motivating HDR claim **negatively on fair evidence**, which is the outcome Phase 2
+explicitly named as legitimate and worth more than the feature.
+
+### The two questions the tuning turned on — both clean
+
+1. **Does the banding read? No.** No pair showed it. A, B and C differ far less than the defects
+   around them, and where C was picked as closest it was by a hair and never *because* of banding.
+   **ADR-0118 stands as written; Alternative D is not needed** and Phase 1 does not reopen.
+2. **Did *Blur Mix 3* survive? Yes.** The quantizer did it no harm — the control holds. Its
+   divergence is the waveform angle and is unrelated to the switch.
+
+### What Phase 1 actually bought, stated honestly
+
+The quantizer works and is measurable: `the_quantized_field_reaches_exact_zero` passes, and under a
+dynamic-groove signal *Fog Tunnel* at **A** keeps its shading legible across eight hops where **B**
+dissolves to flat white by the fourth. **But on the five pairs with no video echo the background sits
+three orders of magnitude above the quantizer's floor**, so nothing it does can reach them.
+**Backlog 0106's diagnosis was real but not dominant** — it claimed one mechanism with four
+presentations, and the look gate found that at most one of the four (the dim-residual accumulation)
+is truncation. The wash is something else and is still unexplained.
+
+### Two of this plan's own conclusions are falsified
+
+- **Phase 5's Portal diagnosis is wrong.** Its commit says *chasers 19 Portal*'s fold "is three lines
+  of per-point code in each of three custom waves". The preset's mirror is `per_pixel_3=sx=-zm`, a
+  negative x-scale — and `warp_mesh/mod.rs`'s `let sx = pow(max(in.t1.z, 1e-4), dt)` clamps the sign
+  away, so the fold is not *inert*, it is replaced by a near-zero positive scale. The per-point carry
+  fix Phase 5 landed is real, correct and reaches 3 368 corpus files; it simply is not this preset's
+  fold. **Corpus reach of the real cause: 363 of 10 347 files (3.5 %)** assign a negative to
+  `sx` / `sy` / `zoom` in per-pixel code — 229, 172 and 155 respectively.
+- **Backlog 0106's "tonal inversion" is not a mechanism.** *Fog Tunnel* sets `bInvert = 0` and
+  `bSolarize = 0`; it draws its waveform **over**, not additive (`bAdditiveWaves = 0`), at
+  `wave_r/g/b = 0.65`. A mid-grey line over the reference's dark ground reads bright; over our washed
+  near-white ground the same line reads dark. Nothing inverts — the ground overtakes the ink. The
+  reference's tunnel is a skeleton of discrete rings and ours is a solid tube, which is the clearest
+  single picture of the wash in the set.
+
+### What the gate confirmed working
+
+- **Phase 4's dot repair, on real content.** *Cosmic Dust 2*'s reference draws its trails as dotted
+  beads, and ours now does too — the first confirmation of that fix outside its own test.
+- **Phase 4's `time * 0.05` suspect, convicted.** The reference's *Blur Mix 3* traces stay horizontal;
+  ours rotates. The phase deliberately left the term in pending exactly this observation, and its
+  stop condition is now discharged: the term is wrong and comes out in Plan 0109.
+- **Phase 1's quantizer**, per the dynamic-groove evidence above.
+
+### What the gate could not settle
+
+**Phase 3's seam.** *Cauldron*'s reference at the framing captured has no mirror to compare against,
+and the pairs are unsynchronised, so the sign question stands exactly where Phase 3 left it. It
+carries to Plan 0109 with the reproduction fixture already committed.
 
 ## Followups (after this lands)
 

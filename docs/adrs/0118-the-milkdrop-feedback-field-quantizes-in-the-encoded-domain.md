@@ -1,8 +1,8 @@
 # ADR-0118 — The MilkDrop feedback field quantizes in the encoded domain, per bundle
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-17 (Plan 0108) — carries two `Outcome` entries
 > **Date:** 2026-08-17
-> **Related plan(s):** [0108](../plans/0108-the-milkdrop-import-gets-its-tone-back.md)
+> **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)
 
 ## Context
 
@@ -149,6 +149,36 @@ viewer could not have seen. A plain 2.2 gamma floors at `(1/255)^2.2 = 5.1e-6` �
 keeps roughly six more e-foldings of invisible-but-nonzero light alive, which is the accumulation this
 ADR exists to stop. So the second transfer function would buy an eight-frame-longer invisible tail in
 exchange for a constant to justify, and it was not taken.
+
+## Outcome — the look gate, and what this decision did not buy
+
+**2026-08-17, Plan 0108 Phase 2/6 — the decision stands unchanged, and its premise was too broad.**
+Seven pairs judged live against `foo_vis_milk2`, each at three settings of this ADR's own lane
+(255 / off / Alternative D).
+
+**The two questions this ADR put to the look gate both answer in its favour:**
+
+- **The banding does not read.** Consequences names it as the designed price — quantizing inside the
+  feedback loop re-introduces upstream of where [ADR-0096](0096-the-display-write-dithers.md)'s
+  dither can reach. No pair showed it. Where Alternative D was picked as the closest of the three it
+  was by a hair and never *because* of banding, so **Alternative D is not taken** and stays what it
+  was: a recorded fallback nobody needed.
+- **The control survived.** *Blur Mix 3*, the one preset that already looked right, is unharmed.
+
+**What is falsified is not this decision but the size of the problem it was sold against.**
+[Backlog 0106](../design-backlog.md) claimed one mechanism with four presentations — pastel wash,
+white-hot glow, runaway with fringing, tonal inversion — and this ADR's Context repeats that claim.
+The gate found otherwise. On the five pairs with no video echo the background sits **three orders of
+magnitude above this quantizer's floor** (linear `3.03e-4`), so no setting of `quantize_steps` can
+reach it, and A/B/C are nearly indistinguishable there. *Fog Tunnel*'s "inversion" turned out to be a
+mid-grey non-additive waveform drawn over an already-washed ground, not an inversion at all.
+
+So the mechanism recorded here is **real, measurable and worth keeping** — the field reaches exact
+zero, and under a dynamic signal a preset that dissolved to flat white now holds its shading — but it
+is **not** the dominant fidelity defect of the MilkDrop import. Plan 0100's HDR claim closes
+**negatively**: still merely different. The dominant defect is the wash itself, cause unknown, and it
+carries to [Plan 0109](../plans/0109-the-milkdrop-import-gets-its-geometry-back.md) with
+[backlog 0113](../design-backlog.md).
 
 ## Notes
 

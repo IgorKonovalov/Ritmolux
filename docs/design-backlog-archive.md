@@ -5444,3 +5444,183 @@ header verdict comparable across worlds.
 every frame through its own present. But it silently truncates the only instrument this project has
 for show-length behaviour, on the family that most needs it, and the truncation reads as a *result*
 (`monotone 1.00`) rather than as an error unless someone reads the run's stderr.
+
+---
+
+## 0106 — converted MilkDrop presets wash out or invert: the float feedback field never truncates
+
+> **CLOSED 2026-08-17** — [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)
+> + [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md). The fix shipped and it
+> works: the field reaches exact zero, and under a dynamic signal a preset that dissolved to flat
+> white now holds its shading. The re-judge ran and came back **still merely different**.
+> **This entry's central claim is falsified in closing.** It said one mechanism with four
+> presentations — pastel wash, white-hot glow, runaway with fringing, tonal inversion. On the five
+> pairs with no video echo the background sits three orders of magnitude above the quantizer's floor
+> (linear `3.03e-4`), so at most one of the four is truncation; the "inversion" is a mid-grey
+> non-additive waveform drawn over an already-washed ground. **The residual wash is a new entry,
+> 0113 — not this one reopened.**
+
+> **CLOSED 2026-08-17** — [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)
+> + [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md). The fix shipped and works;
+> the re-judge ran and came back **still merely different**. **This entry's central claim is
+> falsified in closing:** it said one mechanism with four presentations, and the look gate found the
+> wash sits three orders of magnitude above the quantizer's floor on five of seven pairs, so at most
+> one of the four is truncation. The residual wash is a **new** entry, 0113 — not this one reopened.
+
+- **PROMOTED 2026-08-17 → [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) +
+  [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md) Phases 1-2.** The entry's own
+  design call — what "8-bit truncation" means in linear light — is answered with the arithmetic it
+  asked for: one 8-bit sRGB step is `3.03e-4` in linear, so the literal `1/255` floor the entry warns
+  against truncates everything below sRGB level ~13, **13x too aggressive**. The decision quantizes
+  in the encoded domain instead, per bundle and driven by a uniform. The entry stays **live** until
+  that plan lands, and its re-test trigger is that plan's Phase 2.
+- **HALF DISCHARGED 2026-08-17 — the fix shipped, the verdict has not.** Plan 0108 Phase 1 landed
+  (`b02cd45`): the feedback field quantizes in the sRGB-encoded domain at 255 steps, on by default for
+  any `[milk]` bundle and an exact identity otherwise, reaching **both** warp epilogues (an MD1-era
+  bundle has no custom warp shader and washed out through the built-in one). The field now settles to
+  exact zero and stays black at a hundred times the brightness that shows the unquantized control
+  still positive, so the *mechanism* this entry names is closed. **The entry's own reason for existing
+  is not:** whether the HDR pipeline now reads *better* rather than *merely different* is Plan 0108
+  Phase 2, a `human` look-gate that has not run. It stays **live** until it does, and its answer can
+  route back into the code — ADR-0118's Alternative D is the recorded fallback if the banding reads
+  worse than the wash did.
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `architect` (the emulation is a design call) then `dev`. **The dominant
+fidelity defect of the MilkDrop import, and the one gating the plan's central claim** — the HDR
+"better or merely different" verdict came back *merely different* and cannot be fairly re-judged
+until this is fixed.
+
+- **Verified 2026-08-16** — the warp pass scales the previous frame by a decay term and writes the
+  product back with no low-end floor: `present: decay in: core/src/render/scenes/warp_mesh/mod.rs`
+- `unprobeable:` the defect itself is a rendered divergence against an external reference
+  (`foo_vis_milk2` 0.2.0.0, DX11) and lives in no greppable line; the evidence is the seven
+  side-by-side pairs recorded in Plan 0100's Phase 7 section.
+
+### The finding
+
+MilkDrop's feedback target is 8-bit: `decay` times a dim pixel **truncates to zero**, and that
+quantization is what keeps a classic preset's background black and its trails finite. This engine's
+field is `Rgba16Float` — nothing truncates, every dim residual survives and accumulates. Judged
+over seven presets side by side (Plan 0100 Phase 7, 2026-08-16), one mechanism with four
+presentations: pastel wash (*Songflower*, *Cosmic Dust 2*), white-hot glow (*Contortion*), runaway
+to the clamp with per-channel fringing (*chasers 19 Portal*), and full tonal **inversion** — *Fog
+Tunnel*, a dark preset rendered on a white plateau. The control ran the other way: *Blur Mix 3*,
+whose blur chain actively darkens, kept its blacks and looked genuinely good — which is what
+scopes the defect to the feedback path rather than the shader translation.
+
+### What a fix would be
+
+An opt-in (per-`[milk]`-bundle, not engine-wide) floor in the warp epilogue emulating the
+reference's quantization — Butterchurn and projectM both carry an equivalent, so the shape is
+known. The design call is what "8-bit truncation" means in linear light: the reference truncates
+in its gamma-encoded target, so a literal `1/255` floor in linear is wrong at both ends. Measure
+against the same seven pairs.
+
+### Priority
+
+**High within the import lane.** Plan 0100's Phase 7 verdict is provisionally negative on the
+plan's own motivating claim; this entry is the re-test trigger.
+
+---
+
+## 0107 — the MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame
+
+> **CLOSED 2026-08-17** — [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)
+> Phases 3-5. Two symptoms fixed: the `wave_usedots` beads (a mark carried no caps, so it was a
+> sub-pixel dash) and `wave_mode 5` emitting a continuous stroke where the preset asked for dots.
+> **Two were re-attributed by the look gate, and both of this entry's attributions were wrong.**
+> Item 3's inert mirror is `per_pixel_3 = sx = -zm` clamped away by the rate conversion's
+> `pow(max(v, 1e-4), dt)`, **not** the per-point carry Phase 5 fixed — that fix is real and reaches
+> 3 368 corpus files, it is simply a different defect. Item 1's diagonal is `time * 0.05` in the
+> mode 6/7 angle, suspected by Phase 4 and convicted by the gate. Item 2's seam is **still open**,
+> with its reproduction fixture committed. Item 1's absent spiro was never reached. Successors:
+> 0114, 0115, 0116.
+
+> **THIS ENTRY'S OWN LEADING SUSPECT IS FALSIFIED — 2026-08-17. Do not start where item 2 says to.**
+> It says to *"check `s_fw`'s address mode against the reference's toroidal wrap first"*.
+> `core/src/render/scenes/warp_mesh/shader.rs:463` already builds `s_fw` with
+> `wgpu::AddressMode::Repeat`, and Repeat produces a **shifted** copy — not the **reflected** one the
+> entry's own fingerprint paragraph describes. The address mode cannot be the cause of a reflection.
+>
+> The replacement hypothesis, with arithmetic, is
+> [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 3: the polar pair is built
+> with a y-negation (`emit.rs:1418`, `vec2<f32>(2.0, -2.0)`), so a preset reconstructing `uv` from
+> `ang` recovers `uv_orig.y` reflected about 0.5 — a mirror about the horizontal midline with its
+> seam on the fixed line. The negation is provably correct for the EEL per-vertex program; whether
+> it is correct in the **pixel** shader is the open question, and it is answerable in one render.
+
+- **PROMOTED 2026-08-17 → [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)
+  Phases 3-5, no ADR** — three unknown-cause hunts, one phase each, **each carrying a stop
+  condition** (a phase that cannot reproduce its defect commits the fixture, records what it ruled
+  out, and the plan continues). That shape was the user's call over committing to fix all three,
+  which this entry's falsified suspect shows would have been dishonest.
+- **PART DISCHARGED 2026-08-17 — two of the six symptoms fixed, three reproduced-but-open, one not
+  reached.** Plan 0108 Phases 3-5 landed (`60674da`, `6e92eb3`, `a07b0c6`), and the entry stays
+  **live** on what is left. Item by item:
+  - **Item 1, `wave_usedots` beads — FIXED.** A mark carried no cap flags, so it was a hard-edged
+    `DOT_LENGTH x 2*width` rectangle, 3.3x wider than it was long, with its long axis under a pixel:
+    **2 of 512 marks lit at 320x180**. Both ends now flag joined. A second defect fell out of the
+    same measurement — `wave_mode 5` emitted a polyline unconditionally in the first of its two
+    passes, so a preset asking for dots got a stroke above `wave_y` and beads below it.
+  - **Item 1, *Blur Mix 3*'s diagonal — OPEN, suspect named.** The mode 6/7 arm computes its angle as
+    `mystery * PI + time * 0.05`, a full turn every ~126 s, so a trace authored horizontal is
+    horizontal only at instants. It is the only use of `time` in the file and contradicts the sentence
+    above it. **Not removed**, because doing so moves every mode-6 and mode-7 preset and whether the
+    reference's line drifts is a question about the reference.
+  - **Item 1, *Cauldron painterly 5*'s absent spiro — NOT REACHED.** Modes 2 and 3 are drawn here as
+    a horizontal and a vertical scope line; if the reference's mode table calls either a spiro, this
+    is a mapping question rather than a rendering one, and it needs the reference's own roster.
+  - **Item 2, the reflection seam — REPRODUCED, DELIBERATELY NOT FIXED.** `emit.rs` builds the polar
+    pair as `(uv_orig - 0.5) * (2, -2) * aspect.zw`, so a preset rebuilding `uv` from `ang` gets a
+    mirror about the horizontal midline — the reported fingerprint, on eleven lines of committed HLSL
+    (`core/tests/fixtures/scratch-0108/ang-roundtrip.milk`), 19x separation from its control. The fix
+    is withheld on purpose: that pair works out to exactly what `run_vertex` computes, and in the
+    reference `rad`/`ang` reach a pixel shader as the per-vertex program's own numbers, so flipping
+    the fragment's sign alone would put the engine in a state the reference cannot be in. **The
+    architect review endorsed withholding it.** Settling it needs `foo_vis_milk2` on screen.
+  - **Item 3, *chasers 19 Portal*'s inert mirror — FIXED, and nowhere near where this entry pointed.**
+    That preset is MD1 with no shader blocks and no per-vertex program; its fold is a `flip` counter
+    in three custom waves' per-point code, and `run_point` restored a register snapshot before every
+    point, so the counter computed a constant. **3 368 of the corpus's 6 347 custom-wave presets** read
+    a per-point variable only carry-over can supply, so this reached far past one preset. One open
+    half, from the review: the carry also crosses the **frame** boundary, which makes an odd-length
+    trace invert every frame — believed faithful, pinned by test, unverified against the reference.
+
+**Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
+**Owner if taken:** `dev` (mechanism hunts), `architect` if a fix needs a design call.
+
+- **Verified 2026-08-16** — the wave placement code under suspicion is the warp-mesh draw layer:
+  `present: wave_mystery in: core/src/render/scenes/warp_mesh/draw.rs`
+- `unprobeable:` the three defects are rendered divergences against an external reference; the
+  evidence is the pair record in Plan 0100's Phase 7 section.
+
+### The finding
+
+Three distinct defects, each seen in at least one pair against `foo_vis_milk2`:
+
+1. **Waveform placement/orientation.** *Blur Mix 3* draws one steep diagonal stroke where the
+   reference draws horizontal full-width traces — suspect the `wave_mystery` angle mapping or the
+   mode geometry. *Cauldron painterly 5*'s centrepiece spiro scribble is entirely absent.
+   *Cosmic Dust 2*'s beaded `wave_usedots` trails never appear. (The mono engine drawing one trace
+   where stereo draws two is known and accepted — Plan 0100 Phase 4; these are beyond it.)
+2. **A horizontal reflection seam in warp sampling.** Content mirrors across a horizontal line
+   with a bright ragged boundary: *Contortion*'s split sphere, *Cauldron*'s flipped top band,
+   *Cosmic Dust 2*'s full-width false horizon. The fingerprint (reflected copy, not shifted)
+   points at the wrap path's sampler address mode or a v-axis flip — check `s_fw`'s address mode
+   against the reference's toroidal wrap first, not the `ang` discontinuity first suspected.
+3. **`chasers 19 Portal`'s mirror symmetry never takes effect** despite a clean conversion — the
+   uv-fold that makes the portal is inert. One targeted reproduction wanted.
+
+### Priority
+
+**Medium-high within the import lane.** ~~Item 2 is likely one sampler descriptor~~ — **corrected
+2026-08-17: it is not a descriptor at all.** It is a sign in the emitted warp epilogue's polar pair,
+reproduced on a committed fixture, and fixing it is a *larger* call than this entry assumed because
+the same convention is carried in three places. Item 1 decides whether waveform-led presets (the
+whole *Blur Mix* / *Fog Tunnel* family) read as authored, and half of it is now fixed. **What is left
+of this entry is mostly answerable in one sitting with `foo_vis_milk2` on screen** — Plan 0108's
+Phase 6 — rather than by more code reading.
+
+---
+
