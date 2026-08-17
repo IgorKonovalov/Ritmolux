@@ -350,6 +350,11 @@ Practical notes:
   like. The peak keeps both honest: a run that grew and was reclaimed reads flat
   end to end, and only an intermediate sample tells it apart.
 
+  The full four minutes at 1080p/60 — 14,400 frames of `reaction_mitosis` at
+  `--tier rich`, the thirteen-pass family that hit 0099's wall — measured
+  **334 MB, growth -8.1 MB, peak 342 MB** on the Windows dev box (2026-08-17,
+  hardware adapter, release). Where the old retention would have reached ~4.4 GB.
+
 ### The three calibration traps
 
 `--set` is a **held** stimulus: it writes the analysis frame directly and that
