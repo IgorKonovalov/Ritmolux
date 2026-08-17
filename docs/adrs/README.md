@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0118**
+**Next free number: 0119**
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -134,5 +134,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 (Plan 0102; Outcome) |
 | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
 | [0117](0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) | C ABI v6: the host reads the roster and selects a preset | proposed |
+| [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | proposed |
 
 <!-- roster:end -->
