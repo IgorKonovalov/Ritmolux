@@ -347,6 +347,107 @@ fn a_waves_per_point_state_carries_to_the_next_point() {
     );
 }
 
+/// Load [`FLIP_PRESET`] (or a variant of it) and run its per-frame program once,
+/// leaving the runtime positioned at the first point of a frame.
+fn flip_runtime(text: &str) -> MilkRuntime {
+    let file = milkconv::milk::parse(text).expect("the fixture parses as a .milk file");
+    let converted = milkconv::convert::convert(&file, "flip_fixture").expect("it converts");
+    let preset = Preset::from_toml_str(&converted.toml)
+        .unwrap_or_else(|e| panic!("the emitted bundle must load back: {e}"));
+    let bundle = match preset.config {
+        Some(GeneratorConfig::WarpMesh {
+            milk: Some(milk), ..
+        }) => *milk,
+        other => panic!("the converted preset must carry a bundle, got {other:?}"),
+    };
+    MilkRuntime::new(bundle, 0)
+}
+
+/// One frame of `count` points: the per-frame program, then the walk.
+fn flip_frame(runtime: &mut MilkRuntime, count: usize) -> Vec<f32> {
+    runtime.run_frame(
+        &lmv_core::dsp::AnalysisFrame::default(),
+        0.0,
+        1.0 / 30.0,
+        (32, 24),
+        16.0 / 9.0,
+    );
+    runtime
+        .run_wave_frame(0)
+        .expect("the wave's per-frame program runs");
+    (0..count)
+        .filter_map(|i| runtime.run_wave_point(0, i as f32 / count.max(2) as f32, 0.0))
+        .map(|p| p.y)
+        .collect()
+}
+
+/// **The carry also crosses the frame boundary, and on an odd-length trace that
+/// inverts the whole figure every frame** — Plan 0108's Mode 4 review,
+/// 2026-08-17.
+///
+/// Phase 5 removed the per-point snapshot restore. What it did not state is that
+/// nothing else reseeds a working register either: `ElementRuntime::run_frame`
+/// seeds only the named wave-point **outputs** (`milk::outputs`'s
+/// `WavePointSlots` — `x`, `y`, `r`, `g`, `b`, `a`), and a wave's `snapshot_of`
+/// is now empty, so `flip` survives from the last point of one frame into the
+/// first point of the next.
+///
+/// With an **even** sample count the two-state counter returns to where it
+/// started and the frame boundary is invisible — which is exactly what the
+/// eight-point fixture above cannot see, and why this arm exists. With an odd
+/// one the trace comes out inverted on every other frame, so a mirrored pair
+/// alternates at the **display's** refresh rate: twice as fast on a 120 Hz panel
+/// as on a 60 Hz one.
+///
+/// **This pins the behaviour rather than blessing it.** It is most likely
+/// faithful — MilkDrop allocates a custom element's variable space once and only
+/// its `init` code reseeds it — but that is a claim about the reference, and
+/// Plan 0108's Phase 6 is where it is answered with `foo_vis_milk2` on screen.
+/// What must not happen is the behaviour moving silently while `run_point`'s doc
+/// comment still describes the carry as reaching only "the next point".
+#[test]
+fn a_waves_per_point_state_also_carries_across_the_frame_boundary() {
+    // The same three lines on a seven-point trace: an odd count, so `flip` does
+    // NOT come back to its starting value at the end of a frame.
+    let odd = FLIP_PRESET.replace("wavecode_0_samples=8", "wavecode_0_samples=7");
+    assert_ne!(
+        odd, FLIP_PRESET,
+        "the sample-count substitution found nothing"
+    );
+
+    let mut runtime = flip_runtime(&odd);
+    let first = flip_frame(&mut runtime, 7);
+    let second = flip_frame(&mut runtime, 7);
+    let third = flip_frame(&mut runtime, 7);
+    println!("[draw_layer] flip across frames, 7 points — 1: {first:?} 2: {second:?} 3: {third:?}");
+
+    assert!(
+        first.iter().zip(&second).all(|(a, b)| (a - b).abs() > 1e-5),
+        "frame 2 repeats frame 1 ({first:?} then {second:?}), so something \
+         reseeds `flip` at the frame boundary. That is a defensible behaviour — \
+         but it is the OPPOSITE of what ships today, and `run_point`'s doc \
+         comment has to move with it"
+    );
+    assert!(
+        first.iter().zip(&third).all(|(a, b)| (a - b).abs() < 1e-5),
+        "frame 3 does not return to frame 1 ({first:?} then {third:?}). The \
+         two-state counter has a period of two frames on an odd-length trace; \
+         anything else means the carry is not a clean walk"
+    );
+
+    // ...and the even-length case is genuinely the blind spot this arm covers:
+    // there the frame boundary changes nothing at all.
+    let mut even = flip_runtime(FLIP_PRESET);
+    let a = flip_frame(&mut even, 8);
+    let b = flip_frame(&mut even, 8);
+    assert!(
+        a.iter().zip(&b).all(|(x, y)| (x - y).abs() < 1e-5),
+        "an eight-point trace must be frame-invariant ({a:?} then {b:?}) — if it \
+         is not, the even case is no longer the quiet one and the arm above is \
+         measuring something other than the counter's parity"
+    );
+}
+
 /// Every `wave_mode` the reference has.
 const WAVE_MODES: [f32; 8] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 

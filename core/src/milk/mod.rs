@@ -1139,6 +1139,26 @@ impl ElementRuntime {
     /// and the two are not inconsistent: the mesh's per-vertex program is a pure
     /// function of its vertex in the reference, and a wave's per-point program
     /// is a walk along a line.
+    ///
+    /// # The carry reaches past the end of the trace, too
+    ///
+    /// Nothing reseeds a working register at the **frame** boundary either
+    /// (Plan 0108 Mode 4 review, 2026-08-17). [`run_frame`](Self::run_frame)
+    /// seeds only the named wave-point *outputs* — `WavePointSlots`'s `x`, `y`,
+    /// `r`, `g`, `b`, `a` — and a wave's `snapshot_of` is empty, so `flip`
+    /// survives from the last point of one frame into the first point of the
+    /// next. On an **even**-length trace the two-state counter returns to where
+    /// it started and this is invisible; on an odd one the figure comes out
+    /// inverted every other frame, which reads as an alternation at the
+    /// **display's** refresh rate rather than at any authored one.
+    ///
+    /// That is believed faithful — the reference allocates a custom element's
+    /// variable space once and only its `init` code reseeds it — but it is a
+    /// claim about the reference and is **not verified against it**; Plan 0108's
+    /// Phase 6 is where `foo_vis_milk2` answers it. It is pinned meanwhile by
+    /// `milkconv/tests/draw_layer.rs`'s
+    /// `a_waves_per_point_state_also_carries_across_the_frame_boundary`, so the
+    /// behaviour cannot move without this comment moving with it.
     fn run_point(&mut self, sample: f32, value: f32) -> WavePoint {
         if let Some(index) = self.inputs.sample {
             self.state.set(index, sample);
