@@ -132,7 +132,26 @@ pub struct MilkBundle {
     /// The deepest `GetBlur`/`sampler_blur` level either shader reaches,
     /// `0..=3`. Zero means the blur chain never runs for this preset.
     pub blur_level: u8,
+    /// How many levels this bundle's **feedback field** quantizes to at the end
+    /// of the warp pass ([ADR-0118](../../../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)),
+    /// defaulting to [`DEFAULT_QUANTIZE_STEPS`].
+    ///
+    /// **The presence of a bundle is what turns this on**, which is the whole
+    /// per-bundle shape: the reference's 8-bit target truncates a `decay`-scaled
+    /// dim pixel to zero and this engine's `Rgba16Float` field does not, so an
+    /// imported preset wants the emulation and a native `warp_mesh` world — which
+    /// carries no bundle and so never reaches this field — does not.
+    ///
+    /// `0.0` is off. Negative selects ADR-0118's Alternative D (floor to zero at
+    /// one step, no ladder between). Both are reachable from `[milk]
+    /// quantize_steps`, so the look gate's A/B is a preset edit rather than a
+    /// re-convert.
+    pub quantize_steps: f32,
 }
+
+/// The 8-bit feedback target every MilkDrop preset was authored against
+/// (ADR-0118): 256 levels, 255 steps between black and white.
+pub const DEFAULT_QUANTIZE_STEPS: f32 = 255.0;
 
 /// What a custom element draws, which decides which of its programs run and how
 /// its outputs are read.
@@ -264,6 +283,7 @@ impl MilkBundle {
             warp_wgsl: None,
             comp_wgsl: None,
             blur_level: 0,
+            quantize_steps: DEFAULT_QUANTIZE_STEPS,
         };
         // The shared register file is the bridge, so the rosters have to agree.
         // An empty program declares nothing and is exempt.

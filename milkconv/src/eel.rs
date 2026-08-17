@@ -968,6 +968,11 @@ pub fn compile_bundle(
         warp_wgsl: None,
         comp_wgsl: None,
         blur_level: 0,
+        // The 8-bit feedback target the source preset was authored against
+        // (ADR-0118). Emitted as the default rather than as a key, so a
+        // converted bundle carries no `quantize_steps` line at all and the
+        // engine's own default is the single place the number lives.
+        quantize_steps: lmv_core::milk::DEFAULT_QUANTIZE_STEPS,
     };
     Ok((bundle, symbols))
 }
