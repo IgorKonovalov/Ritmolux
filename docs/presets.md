@@ -695,10 +695,11 @@ conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 > emulates the reference's 8-bit floor
 > ([ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)) — without
 > it, every dim residual survives in the float field and integrates, which is what turned classic
-> presets pastel, white-hot, or tonally inverted. The switch is a runtime uniform, but a bundle
-> converted before it landed carries a warp shader whose epilogue never calls the quantizer, so the
-> fix reaches that preset only on a re-convert. Nothing breaks in the meantime; the preset renders
-> exactly as it does today.
+> presets pastel, white-hot, or tonally inverted. The switch is a runtime uniform, so **an MD1-era
+> preset — one with no `warp_shader` of its own — picks the fix up with no re-convert at all.** What
+> needs re-running is a bundle that *does* carry a converted warp shader: its epilogue was emitted
+> before the quantizer existed and never calls it, so the uniform reaches nothing. Nothing breaks in
+> the meantime; that preset renders exactly as it does today.
 
 Things worth knowing before you reach for it:
 

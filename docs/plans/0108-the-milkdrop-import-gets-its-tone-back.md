@@ -1,6 +1,10 @@
 # 0108 — The MilkDrop import gets its tone back
 
-> **Status:** in-progress
+> **Status:** in-progress — **every `dev` phase has landed and been reviewed (2026-08-17); the two
+> `human` look-gates are what remain.** See the implementation log at the foot of this file. The plan
+> stays live rather than closing because Phase 2 is a routing cut point that can send Phase 1 back to
+> [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
+> Alternative D, and Phase 6 is what decides Phase 3's sign and Phase 4's `time * 0.05`.
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (proposed)
@@ -280,6 +284,92 @@ fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
   content cohort ([Plan 0104](0104-the-library-stops-being-lopsided.md) owns the last).
 - **Any move on the engine-wide HDR chain.** ADR-0046's linear-light ordering and ADR-0096's display
   dither are inputs here, not subjects.
+
+## Implementation log
+
+**2026-08-17 — Phases 1, 3, 4 and 5 landed; Mode 4 review run the same day.** Commits `b02cd45`
+(Phase 1), `60674da` (Phase 3), `6e92eb3` (Phase 4), `a07b0c6` (Phase 5). Review verdict: **no
+blockers, two majors (both repaired at the review), three minors, one nit.** `fmt`, `clippy
+--workspace --all-targets -D warnings`, the three doc gates and the plan's own tests all green,
+including the full 32-baseline golden suite.
+
+What each phase actually delivered, where it differs from what this plan asked for:
+
+- **Phase 1 — delivered as specified.** The quantizer reaches both epilogues out of one text
+  (`milk::shader::QUANTIZE_WGSL`), on `MilkUniform.misc.w` for a converted shader and a new
+  `WarpUniform.misc3.x` for the built-in decay fragment — **which this plan did not anticipate**: an
+  MD1-era bundle carries no custom warp shader, takes the built-in path, and washed out identically.
+  All four done-whens were met by measurement: `warp_mesh.png` mean `0.0000` against its committed
+  pre-change bytes, a bless-to-bless control moving exactly 1 of 32 baselines, the field reaching
+  exact zero at a hundred times the brightness that shows the unquantized control, and the transfer
+  function *rendered* rather than assumed. That last one is a dated `Outcome` on ADR-0118 — written
+  by `dev` with the architect's authorisation, and correctly formed: appended below Alternatives,
+  body untouched, dated.
+- **Phase 3 — landed on a branch this plan's done-when does not offer.** The plan gives two (fixed
+  and re-blessed, or *did not reproduce*). What happened is a third: **the fixture reproduces the
+  seam exactly, the cause is named, and the fix is deliberately withheld.** `emit.rs` builds the
+  polar pair as `(uv_orig - 0.5) * (2, -2) * aspect.zw`, which works out to `(nx, ny/aspect)` —
+  *exactly* what `MilkRuntime::run_vertex` computes — and in the reference `rad`/`ang` reach a pixel
+  shader as interpolated per-vertex attributes, the same numbers. So flipping the fragment's sign
+  alone would put the engine in a state the reference cannot be in, and flipping both moves every
+  converted preset's geometry. **The review endorses withholding it** and would have rejected the
+  fix had it been applied. The cost is that design-backlog 0107 item 2 is *not* discharged and the
+  seam is still on screen; Phase 6 is where the sign is settled.
+- **Phase 4 — two of three symptoms fixed, exactly the partial result this plan says is a success.**
+  `wave_usedots` beads (a mark had no caps, so it was a sub-pixel dash — 2 of 512 marks visible at
+  320x180) and `wave_mode 5` mixing a stroke with beads (one of four emit sites did not read the
+  flag). The third, *Blur Mix 3*'s diagonal, has a named suspect with arithmetic — `time * 0.05` in
+  the mode 6/7 arm, the only use of `time` in the file — recorded as a comment at the line rather
+  than removed, because removing it moves every mode-6 and mode-7 preset. *Cauldron painterly 5*'s
+  absent spiro was **not reached**; the commit records where the next session should start.
+- **Phase 5 — the fold was nowhere this plan said to look.** *chasers 19 Portal* is an MD1 file with
+  no shader blocks and no per-vertex program at all; its mirror is a `flip` counter in three custom
+  waves' per-point code, and `ElementRuntime::run_point` was restoring a register snapshot before
+  every point, so the counter computed a constant. Scoped to a **wave** — a shape's instances stay
+  independent. 3 368 of the corpus's 6 347 custom-wave presets read a per-point variable only
+  carry-over can supply.
+
+Two majors, both repaired in the review session:
+
+1. **The Phase 5 carry also crosses the frame boundary, and nothing said so.** Nothing reseeds a
+   working register between frames either, so on an **odd**-length trace the whole figure inverts
+   every frame — an alternation at the *display's* refresh rate. The Phase 5 fixture is eight points,
+   even, so it could not see it. Repaired with a doc section on `run_point` (naming it believed
+   faithful but **unverified against the reference**, for Phase 6) and a second test,
+   `a_waves_per_point_state_also_carries_across_the_frame_boundary`, that pins both parities.
+2. **Phase 3's third branch**, recorded here.
+
+Three minors and a nit, **left open for the next `dev` touch on this file** (none blocks the look
+gates):
+
+- `lmv_quantize`'s Alternative D branch returns its argument unclamped where the positive branch
+  clamps to `[0,1]` first. On the built-in path the argument is not pre-clamped, so selecting
+  Alternative D — which is exactly what Phase 2 may route to — silently also drops the 8-bit
+  *ceiling* for MD1-era bundles. Not a regression, but an asymmetry nobody reasoned about.
+- `draw.rs`'s module header and `dots` now say the caps make a mark *round*. The extension is purely
+  geometric and the falloff runs across the stroke only, so the mark is a squared-off lozenge. It
+  went from a 3.3:1 sub-pixel dash to roughly square, which is the complete and sufficient reason
+  the beads read — "round" replaces one wrong mechanism with another.
+- Phase 3's argument rests on "in MilkDrop `rad`/`ang` reach a pixel shader as interpolated
+  per-vertex attributes", asserted from knowledge with no citation, in the one place the withheld
+  fix turns.
+- (repaired) `docs/presets.md` said every existing converted directory needs a re-convert; an MD1-era
+  bundle with no `warp_shader` picks the fix up for free.
+
+**What the two human gates still owe.** Phase 2: a verdict on all seven pairs plus the two questions
+the tuning turns on (does the banding read? did *Blur Mix 3* survive?). Phase 6: the seven pairs
+again, the *chasers 19 Portal* fold, and — added by this review — three questions the dev phases
+handed forward, each of which needs the reference on screen and can be answered in the same sitting:
+
+1. **Does the reference's warp `ang` measure y the same way its `uv` does?** Settles Phase 3's sign
+   and design-backlog 0107 item 2.
+2. **Does a mode-6 waveform drift in the reference?** Settles Phase 4's `time * 0.05`.
+3. **Does a custom wave's per-point state survive the frame in the reference?** Settles major 1's
+   open half. Reproduce with any preset whose custom wave has an odd sample count and a `flip`
+   counter.
+
+Also discharged by Phase 1 landing: [Plan 0104](0104-the-library-stops-being-lopsided.md)'s four
+`warp_mesh` worlds were waiting on it.
 
 ## Followups (after this lands)
 
