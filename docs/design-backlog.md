@@ -1859,6 +1859,14 @@ ADR-0115) — and this is the one assertion where the local route is held to a l
 
 ## 0106 — converted MilkDrop presets wash out or invert: the float feedback field never truncates
 
+- **PROMOTED 2026-08-17 → [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) +
+  [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md) Phases 1-2.** The entry's own
+  design call — what "8-bit truncation" means in linear light — is answered with the arithmetic it
+  asked for: one 8-bit sRGB step is `3.03e-4` in linear, so the literal `1/255` floor the entry warns
+  against truncates everything below sRGB level ~13, **13x too aggressive**. The decision quantizes
+  in the encoded domain instead, per bundle and driven by a uniform. The entry stays **live** until
+  that plan lands, and its re-test trigger is that plan's Phase 2.
+
 **Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
 **Owner if taken:** `architect` (the emulation is a design call) then `dev`. **The dominant
 fidelity defect of the MilkDrop import, and the one gating the plan's central claim** — the HDR
@@ -1899,6 +1907,25 @@ plan's own motivating claim; this entry is the re-test trigger.
 ---
 
 ## 0107 — the MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame
+
+> **THIS ENTRY'S OWN LEADING SUSPECT IS FALSIFIED — 2026-08-17. Do not start where item 2 says to.**
+> It says to *"check `s_fw`'s address mode against the reference's toroidal wrap first"*.
+> `core/src/render/scenes/warp_mesh/shader.rs:463` already builds `s_fw` with
+> `wgpu::AddressMode::Repeat`, and Repeat produces a **shifted** copy — not the **reflected** one the
+> entry's own fingerprint paragraph describes. The address mode cannot be the cause of a reflection.
+>
+> The replacement hypothesis, with arithmetic, is
+> [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 3: the polar pair is built
+> with a y-negation (`emit.rs:1418`, `vec2<f32>(2.0, -2.0)`), so a preset reconstructing `uv` from
+> `ang` recovers `uv_orig.y` reflected about 0.5 — a mirror about the horizontal midline with its
+> seam on the fixed line. The negation is provably correct for the EEL per-vertex program; whether
+> it is correct in the **pixel** shader is the open question, and it is answerable in one render.
+
+- **PROMOTED 2026-08-17 → [Plan 0108](plans/0108-the-milkdrop-import-gets-its-tone-back.md)
+  Phases 3-5, no ADR** — three unknown-cause hunts, one phase each, **each carrying a stop
+  condition** (a phase that cannot reproduce its defect commits the fixture, records what it ruled
+  out, and the plan continues). That shape was the user's call over committing to fix all three,
+  which this entry's falsified suspect shows would have been dishonest.
 
 **Raised by:** `architect`, from Plan 0100 Phase 7's side-by-side judgment (2026-08-16).
 **Owner if taken:** `dev` (mechanism hunts), `architect` if a fix needs a design call.
