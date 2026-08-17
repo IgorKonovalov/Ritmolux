@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-16, user approval)
 > **Date:** 2026-08-16
-> **Related plan(s):** [0101](../plans/0101-the-engine-renders-a-music-video.md)
+> **Related plan(s):** [0101](../plans/done/0101-the-engine-renders-a-music-video.md)
 
 ## Context
 

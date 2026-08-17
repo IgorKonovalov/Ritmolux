@@ -4,7 +4,7 @@
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — **one is owed and deliberately deferred**, see Phase 2
-> **Hard dependency:** [0101](0101-the-engine-renders-a-music-video.md) Phases 1–2, for every
+> **Hard dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) Phases 1–2, for every
 > phase except the spike. *(The transitive dependency on
 > [0099](done/0099-the-horizon-reaches-its-own-length.md) for renders past ~2 minutes is
 > **discharged** — it closed 2026-08-16 and the long-run path now completes.)*
@@ -23,7 +23,7 @@ the plan ends there having cost an afternoon.
 
 The user asked for TouchDesigner-plus-TouchDiffusion: take this engine's abstract output and let a
 diffusion model reimagine it. The architecture turned out to be nearly free, because
-[Plan 0101](0101-the-engine-renders-a-music-video.md) /
+[Plan 0101](done/0101-the-engine-renders-a-music-video.md) /
 [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) already build
 the pipe it needs: `shot --render clip.wav` walks a WAV at fixed injected `dt` and streams
 self-describing frames to stdout for the user's own `ffmpeg`. **A diffusion stage is a filter
@@ -277,7 +277,7 @@ desynchronizes the audio mux downstream, and that failure is silent in the file.
   run.
 - **An ADR is owed and does not exist.** Deferred deliberately to after Phase 2 (see that phase).
   If Phases 3+ begin without it, that is a Mode 4 blocker.
-- **Blocked on [0101](0101-the-engine-renders-a-music-video.md) Phases 1–2** for everything except
+- **Blocked on [0101](done/0101-the-engine-renders-a-music-video.md) Phases 1–2** for everything except
   the spike. The transitive block on [0099](done/0099-the-horizon-reaches-its-own-length.md) past
   ~2 minutes is **discharged** (closed 2026-08-16). Phase 1 is takeable **today** and depends on
   neither.

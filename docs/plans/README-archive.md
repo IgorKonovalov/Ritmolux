@@ -13,6 +13,47 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md)
+  — closed 2026-08-17, four dev phases in commits `39b36e6`–`0ab8400`, Phase 5 (`human`) run live at
+  the close. Review: **no blockers, no majors, five minors and nits** — two of which were found by
+  *running* the feature rather than reading it. **`shot --render` walks a WAV at a fixed injected
+  `dt` and streams Y4M to a user-supplied `ffmpeg`; no encoder ships and `lmv.exe` did not change
+  size.** Phase 1 chose Y4M over NUT on the plan's own tie-break (a plain-text header, one
+  non-`ffmpeg` consumer already foreseen in Plan 0106), paying an RGB→YUV conversion for it. That
+  choice reached Phase 3 exactly as the plan predicted, and the plan's escape clause was used as
+  written: byte-identity is asserted on the **RGB frame** handed to the writer, never on the wire,
+  with the 8-bit conversion swept as its own round-trip property — a wire-level version could only
+  have been loosened to a tolerance until it passed. **Phase 3 needed no `core/src/render/` change
+  at all**, which the plan had budgeted for: `capture_stream` goes through the one `draw_frame` the
+  on-surface present path and every capture path share, so the tap sits after the tonemap
+  (ADR-0046) and after the encoded-domain dither (ADR-0096) *structurally* rather than by
+  placement. The review walked both clocks and confirmed the identity is real — at 30,720 Hz a hop
+  is 1/60 s, so frame *N* and hop *N* coincide, and at index 45 both paths have pushed 46 hops and
+  advanced the clock 46 × `FALLBACK_DT`. **Phase 4's argument is structural and was verified as
+  such**: the mode encodes no passes of its own, so it inherits `capture::read_back`'s poll — the
+  same retirement Plan 0099 had to give `step_offscreen` — and the resident set is *reported, never
+  asserted* (ADR-0071), with warm-up split from growth because the measured 357→434→434 series
+  would otherwise have printed "+76 MB" and read exactly like 0099's leak. Determinism was checked
+  at the root: no wall-clock read exists anywhere in `core/src/render/`, and the frame-time governor
+  lives in the surface present path where no capture reaches it, so `--tier rich` renders at full
+  cost. The C ABI did not move. **Phase 5, run live on Floating Points' *LesAlpx* (4:41,
+  `attractor_leviathan`, 1920x1080/60 `--tier rich`): 16,869 frames in 37m20s, a playable MP4 with
+  audio, container tagged `color_range=pc`/`bt709`/`60/1`, duration 281.140998 s against the
+  source's 281.141565 s — `-shortest` trimming the trailing partial frame exactly as designed — and
+  resident growth of **-7.9 MB across the whole track**, i.e. Phase 4's property holding outside the
+  harness at full size and 17 % past the done-when's length. **The verdict was yes, and its first
+  question answered no:** an offline `Rich` render does *not* look better than the live app, it
+  looks like the same image larger ("it just looks like Leviathan upscaled"). That impression was
+  run down rather than filed as taste — `TierConfig::attractor_particles` is a fixed 50,000/150,000
+  with no render-target term while the trail grid *is* surface-sized, so 1080p multiplies pixels 4x
+  while `Rich` multiplies particles 3x and **density falls as resolution rises**. Filed as
+  [backlog 0110](../design-backlog.md), which now gates whether a rendered file is publishable and
+  which Plan 0103's demo material depends on. Two more findings came from the same session and were
+  filed rather than fixed: the encoder is spawned *and* a GPU device built before `--preset` is
+  validated, so a typo'd name leaves a 262-byte audio-only MP4 at `--out`
+  ([0111](../design-backlog.md)); and the one canonical `ffmpeg` invocation is archival-grade with
+  no size lever — 3.73 GB and 106 Mbit/s for 4:41, about 9x a typical 1080p60 upload rate
+  ([0112](../design-backlog.md)). Version: **0.71.0 → 0.72.0**.
 - [0100 — The engine speaks MilkDrop](done/0100-the-engine-speaks-milkdrop.md)
   — closed 2026-08-16, six dev phases in commits `2603309`–`0948cf2` across two sessions (one `wip:`
   checkpoint kept unsquashed by the no-rewrite rule), Phases 7 and 8 (`human`) run live at the close.
