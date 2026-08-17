@@ -9,7 +9,7 @@
 > **Amended:** 2026-08-16 — Phase 1 added after [Plan 0102](done/0102-the-component-ships.md)'s
 > Phase 5 found the shipped component starves its host; former Phases 1-5 renumbered 2-6
 > **Closes:** design-backlog 0102, design-backlog 0103
-> **Soft dependency:** [0101](0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
+> **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
 > **Hard dependency for Phase 5:** [0102](done/0102-the-component-ships.md)
 
 ## TL;DR
@@ -121,7 +121,7 @@ first because every later phase increases the number of people who meet the defe
   ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)).
 - **Files touched:** `scripts/docs-shots.mjs` (or a sibling), `docs/images/`.
 - **Notes for the implementer:** **this is the phase that wants
-  [0101](0101-the-engine-renders-a-music-video.md)** — `shot --render` is the only way this repo
+  [0101](done/0101-the-engine-renders-a-music-video.md)** — `shot --render` is the only way this repo
   can record motion, and screen-capturing the window would be the one image here that is not a
   reproducible render. If 0101 has not landed, ship the still and say in the commit that the clip
   is owed; do not introduce a hand-captured video.

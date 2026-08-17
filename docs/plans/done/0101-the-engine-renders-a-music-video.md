@@ -1,11 +1,11 @@
 # 0101 — The engine renders a music video
 
-> **Status:** in-progress
+> **Status:** done (2026-08-17)
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) (the engine renders video offline and delegates encoding)
-> **Hard dependency:** [0099](done/0099-the-horizon-reaches-its-own-length.md) — **DISCHARGED 2026-08-16.** The capture path now polls per frame and 36,001 renders complete with the resident set flat, so the ~3,601-frame wall Phase 4 was blocked on is gone.
+> **Related ADRs:** [0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) (the engine renders video offline and delegates encoding)
+> **Hard dependency:** [0099](0099-the-horizon-reaches-its-own-length.md) — **DISCHARGED 2026-08-16.** The capture path now polls per frame and 36,001 renders complete with the resident set flat, so the ~3,601-frame wall Phase 4 was blocked on is gone.
 
 ## TL;DR
 
@@ -24,10 +24,10 @@ its render loop is welded to a real-time audio device, so "export" means screen-
 window and keeping whatever the machine managed.
 
 **This engine is already decoupled**, and three shipped decisions are why: `dt` is injected by the
-caller ([ADR-0013](../adrs/0013-c-abi-v4-render-dt.md)); DSP is a pure function of its input window
-with no clock read ([NFR §6](../nfr.md#6-determinism)); visual randomness is explicitly seeded and
+caller ([ADR-0013](../../adrs/0013-c-abi-v4-render-dt.md)); DSP is a pure function of its input window
+with no clock read ([NFR §6](../../nfr.md#6-determinism)); visual randomness is explicitly seeded and
 every capture path forces the declared number
-([ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)). `shot` already drives
+([ADR-0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)). `shot` already drives
 a headless renderer over a WAV clip on every push. The only missing piece is turning a frame
 sequence into a file — and the arithmetic says that piece must be a pipe: a 1080p RGBA frame is
 **8.29 MB**, sixty a second is **498 MB/s**, and four minutes is **119 GB** if the frames touch
@@ -35,11 +35,11 @@ disk before the encoder.
 
 The repository also has a smaller, embarrassing version of the same gap. Every picture in it is a
 **still**, because there has never been a way to record a moving one — which is exactly what
-[Plan 0103](0103-the-project-gets-an-audience.md) needs and cannot make.
+[Plan 0103](../0103-the-project-gets-an-audience.md) needs and cannot make.
 
 ## Decision
 
-Per [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md): render
+Per [ADR-0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md): render
 offline, stream over a pipe, ship no encoder. A self-describing stream format carries its own
 dimensions, rate and colour range so a mistyped geometry cannot silently produce garbage; a
 convenience flag spawns a user-supplied `ffmpeg` and wires the pipe. We rejected **bundling a
@@ -82,7 +82,7 @@ flowchart LR
   file's own header warns about.
 
   **The stream format is chosen in this phase, and the choice reaches Phase 3.**
-  [ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) leaves it at
+  [ADR-0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md) leaves it at
   "self-describing, `ffmpeg` reads it natively", which admits two candidates that differ in a way
   the ADR did not price. Measured against the installed `ffmpeg` 8.1 (2026-08-16, dev box):
 
@@ -124,8 +124,8 @@ flowchart LR
 - **What:** Put the export tap in the right place and declare colour correctly.
 - **Files touched:** `standalone/src/shot/render.rs`, `core/src/render/` (tap point only).
 - **Notes for the implementer:** the composite is linear-light `Rgba16Float` until the tonemap
-  ([ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)) and the display write
-  dithers in the **encoded** domain ([ADR-0096](../adrs/0096-the-display-write-dithers.md)). The tap
+  ([ADR-0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)) and the display write
+  dithers in the **encoded** domain ([ADR-0096](../../adrs/0096-the-display-write-dithers.md)). The tap
   sits after **both**, or the file is washed out relative to the app in a way that reads as an
   engine bug.
 - **Done when:** for the same preset, clip and frame index, a frame pulled from `--render` is
@@ -146,7 +146,7 @@ flowchart LR
 - **Owner skill:** dev
 - **What:** Make a 14,400-frame render complete.
 - **Files touched:** `standalone/src/shot/render.rs`, and whatever
-  [Plan 0099](done/0099-the-horizon-reaches-its-own-length.md) found.
+  [Plan 0099](0099-the-horizon-reaches-its-own-length.md) found.
 - **Notes for the implementer:** **this phase is why 0099 was a hard dependency, and 0099 has
   landed** (2026-08-16). What it found is the thing to reuse rather than rediscover: the wall was
   not a frame count but memory pressure, from a capture path that submitted without ever polling —
@@ -155,7 +155,7 @@ flowchart LR
   wall clock. If this render mode encodes its own passes and submits them anywhere other than
   through `step_offscreen`, it inherits the same defect and none of the fix.
 - **Done when:** a four-minute clip renders to completion at 1080p/60 with resident memory **flat
-  across the run** — the same no-session-growth requirement [NFR §12](../nfr.md#12-runtime-memory)
+  across the run** — the same no-session-growth requirement [NFR §12](../../nfr.md#12-runtime-memory)
   makes of a live session, measured the same way, because a render that leaks is the identical
   defect with a different symptom.
 
@@ -166,10 +166,25 @@ flowchart LR
 - **Done when:** the user says whether the output is something they would publish. Two specific
   questions ride it: does an offline `Rich`-tier render at full cost look **better** than the live
   app on the same machine, and does the visual land on the beat when nothing is racing a display.
+- **Executed 2026-08-17.** Floating Points, *LesAlpx* (Crush, 2019), 4:41, `attractor_leviathan`
+  at 1920x1080/60 `--tier rich`: **16,869 frames, 37m20s, exit 0**, playable MP4 with audio,
+  container tagged `color_range=pc` / `bt709` / `60/1`, duration 281.140998 s against the source's
+  281.141565 s — `-shortest` trimming the trailing partial frame exactly as designed. Throughput
+  7.5 fps, 0.125x real time.
+- **Verdict: yes, with one named defect.** The picture holds structure and evolves across the
+  whole track. **The first question is answered "no", and that is the finding:** an offline `Rich`
+  render does *not* look better than the live app — it looks like the same image at a larger size
+  ("it just looks like Leviathan upscaled"). The cause was run down rather than left as an
+  impression, and it is not in this plan's work: `TierConfig::attractor_particles` is a fixed
+  50,000 / 150,000 with no render-target term, while the trail grid *is* surface-sized, so 1080p
+  multiplies pixels 4x while `Rich` multiplies particles 3x and **density falls as resolution
+  rises**. Filed as [design-backlog 0110](../../design-backlog.md), which now gates whether a
+  rendered file is publishable and which [Plan 0103](../0103-the-project-gets-an-audience.md) depends
+  on.
 
 ## Risks & open questions
 
-- ~~**Blocked by [0099](done/0099-the-horizon-reaches-its-own-length.md).**~~ **Discharged
+- ~~**Blocked by [0099](0099-the-horizon-reaches-its-own-length.md).**~~ **Discharged
   2026-08-16** — the repair landed and 36,001 renders complete with the resident set flat, so
   Phase 4 is takeable with the rest.
 - **Colour is the most likely silent failure.** A file that is subtly darker than the app passes
@@ -198,4 +213,31 @@ flowchart LR
 - A preset **arc** across a render — the engine has a `director` module and a novelty signal, and
   an authored per-track sequence is the natural next thing to want once one video exists.
 - Use this to produce the repository's demo material for
-  [Plan 0103](0103-the-project-gets-an-audience.md), which currently has no way to record motion.
+  [Plan 0103](../0103-the-project-gets-an-audience.md), which currently has no way to record motion.
+- **Raise the attractor's sample density before that material is made** —
+  [design-backlog 0110](../../design-backlog.md), found by Phase 5 and the one thing standing between
+  a rendered file and a publishable one.
+
+## Close (2026-08-17)
+
+Phases 1-4 landed in `39b36e6..0ab8400`; Phase 5 executed 2026-08-17 (see its own entry above).
+Mode 4 review: **no blockers, no majors**, five minor/nit findings, two of them found by running
+the feature rather than by reading it.
+
+**Verified, not taken on trust.** Phase 3's byte-identity holds exactly, on the RGB frame and not
+the wire, with the escape clause used as written; the tap needed **no** `core/src/render/` change
+because `capture_stream` goes through the one `draw_frame` the surface path shares, so the
+placement is structural rather than positional. Phase 1's determinism and `ceil(clip_seconds x
+fps)` are both asserted. Phase 4's property held outside the harness at full size: **growth -7.9
+MB across 16,869 frames** at 1080p/60 `rich`, 17 % past the done-when's length. No wall-clock read
+exists in `core/src/render/`, and the frame-time governor is unreachable from a capture, so
+`--tier rich` renders at full cost. The C ABI did not move.
+
+**Findings left open**, all filed rather than fixed here: [design-backlog
+0110](../../design-backlog.md) (the attractor's sample budget ignores the render target — the Phase 5
+verdict's substance), [0111](../../design-backlog.md) (the encoder is spawned and a GPU device built
+before `--preset` is validated, leaving a stub MP4 at `--out`), and
+[0112](../../design-backlog.md) (the canonical `ffmpeg` invocation is archival-grade with no size
+lever: 3.73 GB for 4:41). Three review nits stay in the review record: `--fps` outside `--render`
+is only rejected when it differs from the default; the long-render probe panics where the repo's
+convention is to skip; `ffmpeg_args` converts paths through `Path::display()`.

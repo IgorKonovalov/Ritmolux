@@ -2068,3 +2068,107 @@ import ships and works on four fifths of the corpus. Take it when the fidelity w
 presets are worth having more of, which is the honest ordering: reach is only worth buying after
 quality is judged. **Do not take it before Plan 0108's Phase 2**, whose verdict on whether these
 presets read as better or merely different is exactly the evidence for how much reach is worth.
+
+---
+
+## 0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale
+
+- **Raised:** 2026-08-17, from [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase 5.
+  The first real music video this engine produced — `attractor_leviathan` over a 4:41 track at
+  1920x1080/60, `--tier rich` — came back with the verdict *"it just looks like Leviathan
+  upscaled"*, and that is exactly what it is.
+- **Verified 2026-08-17** — the count is a plain tier constant with no render-target term:
+  `present: attractor_particles: 150_000 in: core/src/render/tier.rs`,
+  `present: attractor_particles: 50_000 in: core/src/render/tier.rs`. Whether the result *looks*
+  upscaled is a judgement about pixels: `unprobeable: the grain is judged by eye; only the
+  constants and the grid's surface sizing are claims about the repo`.
+
+**The arithmetic.** `TierConfig::attractor_particles` is 50,000 at `Floor` and 150,000 at `Rich`,
+fixed. The trail grid *is* surface-sized (Plan 0027), so the deposit spreads over whatever the
+target holds: at 1920x1080 that is 150,000 particles into 2.07 M texels, ~0.07 per pixel per
+frame; in a 640x360-class window it is ~0.65, nine times denser. Going to 1080p multiplies pixels
+4x while `Rich` multiplies particles 3x, so **density falls as resolution rises** and the figure
+gets grainier rather than finer.
+
+**The engine already says this in the type's own docs** and stops one step short of the
+consequence: `attractor_particles` is *"a sample count and not a brightness"* whose deposit is
+divided by the count (ADR-0065), so *"raising it buys a smoother figure rather than a brighter
+one"*. Correct — and the count never learned that the number of pixels it is smoothing over is
+not fixed.
+
+**Why it surfaces now.** Every capture path in this repo renders small, and the live app runs at a
+window size where the density is fine. Plan 0101 is the first path that renders at 1080p and asks
+the result to stand on its own as a *file*, where the whole point is that it is not bounded by a
+display. Offline is also where the fix is affordable — there is no 60 Hz deadline, so the sample
+budget can be raised with no governor to answer to.
+
+**Shapes, none decided.** (a) Scale the count with the target's pixel count against a reference
+resolution, capped — the smallest change, and it makes `Rich` mean the same *density* everywhere
+rather than the same *number*. (b) A preset-authorable density param, which puts the look in the
+content lane where the rest of the attractor's look already lives. (c) Accumulate more than one
+integration step per frame offline, trading render wall-clock for grain — available only to
+`shot --render`, and the one that costs no live budget at all. (a) and (c) compose.
+
+**ADR-worthy** if taken: it changes what a tier *means* (a count becomes a density), which is
+exactly the class [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) and the
+`tier.rs` module header already argue about. **Priority: high for the video path, low for the
+app** — nothing shipped is broken and the live tiers are validated where they are. It gates
+whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
+[Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
+
+---
+
+## 0111 — `shot --render` spawns the encoder and builds a GPU device before it validates `--preset`
+
+- **Raised:** 2026-08-17, hit twice while running
+  [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase 5.
+- **Verified 2026-08-17** — `run()` never scans the roster for membership; its only roster read is
+  the one-entry `[only]` arm: `absent: presets\.iter in: standalone/src/shot/render.rs`.
+
+**Reproduced.** `--preset attractor_leviathan` — the *filename*, where the roster key is the
+preset's `name` field, `"Leviathan"` — exits 1 with `no preset named 'attractor_leviathan' in the
+roster` and leaves a **262-byte MP4 at `--out`**, because `ffmpeg` had already been spawned,
+consumed the muxed WAV, written a valid audio-only container and exited 0. At the 20 s trial size
+the leftover was 26 KB. The name is only checked deep inside `Renderer::capture_stream`'s
+`reset_for_capture`, after `Encoder::spawn` *and* after a GPU device is built.
+
+**Why it matters beyond tidiness.** ADR-0114's rule for this path is that a missing encoder is a
+named error and *never* a silent fallback, because a quietly-substituted encoder makes an exported
+file untrustworthy. This is that hazard one step over: nothing was substituted, but the artifact
+left at the destination is a real, playable MP4 that a glance cannot tell from a short render. Two
+wasted costs ride along — a child process and a GPU device — on an error knowable from the
+arguments alone.
+
+**The fix is small**: check `name` against `presets` in `render::run()` before `Encoder::spawn`.
+The roster is already in hand there — the `(None, [only])` arm reads it two lines up — and the
+error can name the roster's keys, which would also have caught the filename-vs-`name` confusion
+that produced this. **No ADR needed. Priority: low-medium**, a good first-phase item on any
+follow-up that touches `--render`.
+
+---
+
+## 0112 — the one canonical `ffmpeg` invocation is archival-grade and has no size lever
+
+- **Raised:** 2026-08-17, from [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase
+  5's real render.
+- **Verified 2026-08-17** — the quality setting is a literal in the generated command and no flag
+  reaches it: `present: -crf in: standalone/src/shot/render.rs`,
+  `absent: --crf in: standalone/examples/shot.rs`.
+
+**Measured.** `attractor_leviathan` at 1920x1080/60, `--tier rich`, a 4:41 track: **3.73 GB,
+106 Mbit/s**. On a 30 s slice, the shipped `-crf 18` is 119 Mbit/s, `-crf 23` is 60, `-crf 28` is
+27. The engine's grainiest families are pathological for x264 — an attractor is a per-pixel
+stochastic spray, so every frame is full-frame noise that changes completely — and entry 0110 is
+why that grain is there at 1080p at all. For scale, ~12 Mbit/s is a typical 1080p60 upload
+recommendation, so the shipped default is about **9x** it.
+
+**Nothing is missing from the capability** — omit `--ffmpeg`, redirect stdout and run your own
+encoder, which `capturing.md` documents. What is missing is a lever on the *convenience* path,
+whose whole stated justification is that there is exactly one command line to fix rather than a
+wiki of incantations; today adjusting it means editing `ffmpeg_args`.
+
+**Shapes:** a `--crf <n>` passthrough (smallest, and the tests already pin the load-bearing
+arguments so the colour tags cannot be lost); or one line in `docs/capturing.md` naming the
+raw-stream path as the size-control route, which costs nothing and may be the whole answer.
+**No ADR needed. Priority: low** — and it may be **discharged by 0110** rather than on its own,
+since most of those bits are encoding shot noise that should not have been in the picture.
