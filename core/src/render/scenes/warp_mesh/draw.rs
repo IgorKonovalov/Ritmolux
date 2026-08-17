@@ -41,9 +41,12 @@
 //!
 //! # What is approximated, stated
 //!
-//! - **A dot is a very short segment.** `wave_usedots` draws points; the line
-//!   renderer draws quads between endpoints, and its across-the-stroke falloff
-//!   makes a near-zero-length one a round dot.
+//! - **A dot is a very short segment with both caps extended.** `wave_usedots`
+//!   draws points; the line renderer draws quads between endpoints, and its
+//!   falloff runs across the stroke only — so a short segment is round *because*
+//!   [`JOINED_A`]`|`[`JOINED_B`] push the quad past both ends by the half-width
+//!   (ADR-0041), not because it is short. Without the flags it is a sub-pixel
+//!   dash; see [`dots`].
 //! - **`wave_mystery` means something different in every mode**, which is the
 //!   reference's own design rather than a simplification here.
 
@@ -359,17 +362,64 @@ fn polyline(
     }
 }
 
+/// Emit one built trace the way the mode asked for it: separated marks when
+/// `wave_usedots` is set, a continuous stroke otherwise.
+///
+/// **This exists because there were four call sites and one of them forgot**
+/// (Plan 0108 Phase 4). `wave_mode 5` draws its figure in two passes and its
+/// first pass called [`polyline`] unconditionally, so a preset asking for dots
+/// got a continuous stroke above `wave_y` and beads below it. Nothing failed and
+/// nothing warned; the trace was simply half wrong. The defect was found by
+/// measurement — mode 5's dotted geometry held segments **13.6x longer than
+/// [`DOT_LENGTH`]** where every other mode's held none — and the repair is to
+/// leave one place where the choice is made.
+fn emit_trace(
+    geometry: &mut DrawGeometry,
+    points: &[Point],
+    width: f32,
+    closed: bool,
+    additive: bool,
+    use_dots: bool,
+) {
+    if use_dots {
+        dots(geometry, points, width, additive);
+    } else {
+        polyline(geometry, points, width, closed, additive);
+    }
+}
+
 /// Push each point as its own dot.
+///
+/// **Both ends are flagged joined, and that is what makes a dot a dot** (Plan
+/// 0108 Phase 4). The line renderer's falloff runs *across* the stroke only; the
+/// quad simply ends at each endpoint unless [`JOINED_A`]/[`JOINED_B`] push it
+/// past by the half-width (ADR-0041). Without those flags a mark is a hard-edged
+/// [`DOT_LENGTH`] x `2 * width` rectangle — **3.3x wider than it is long**, a
+/// sub-pixel dash lying across the trace rather than the round dot this module's
+/// header describes. Measured at 1080p on one drawn frame, that cost 300 pixels
+/// above half brightness against a continuous stroke's 5 008, and at 320x180 it
+/// left **2**, which is design-backlog 0107's "the `wave_usedots` beads never
+/// appear".
+///
+/// With both ends flagged the quad extends by the half-width at each cap, so the
+/// mark is `DOT_LENGTH + 2 * width` long against `2 * width` across — round
+/// enough that the falloff reads as a bead at any resolution, through the
+/// mechanism that already exists rather than a new constant.
+///
+/// The mark is also **centred** on its point rather than growing forward from
+/// it. Half of [`DOT_LENGTH`] is well under a pixel, so this moves nothing
+/// visible; it is here because a dot that is offset from the sample it stands
+/// for is wrong in a way nobody would ever see and everybody would inherit.
 fn dots(geometry: &mut DrawGeometry, points: &[Point], width: f32, additive: bool) {
     for (p, light) in points {
         geometry.push_segment(
             SegmentInstance {
-                a: *p,
-                b: [p[0] + DOT_LENGTH, p[1]],
+                a: [p[0] - DOT_LENGTH * 0.5, p[1]],
+                b: [p[0] + DOT_LENGTH * 0.5, p[1]],
                 color: light.rgb,
                 width,
                 alpha: light.coverage,
-                joined: 0,
+                joined: JOINED_A | JOINED_B,
             },
             additive,
         );
@@ -416,6 +466,10 @@ fn waveform_figure(
         return;
     }
     let width = if out.wave_thick >= 0.5 { THICK } else { THIN };
+    // Read once and passed to every [`emit_trace`] below: the modes that draw in
+    // two passes have to make the same choice in both, and reading the flag at
+    // each site is how one of them came to be a stroke where the other was beads.
+    let use_dots = out.wave_usedots >= 0.5;
     let scale = out.wave_scale;
     let mystery = out.wave_mystery;
     let (cx, cy) = (out.wave_x, out.wave_y);
@@ -496,11 +550,7 @@ fn waveform_figure(
                 // shared emit below, so both are stroked exactly once.
                 if ring > 0.0 {
                     let built = points.get(..used).unwrap_or(&[]);
-                    if out.wave_usedots >= 0.5 {
-                        dots(geometry, built, width, additive);
-                    } else {
-                        polyline(geometry, built, width, true, additive);
-                    }
+                    emit_trace(geometry, built, width, true, additive, use_dots);
                 }
             }
         }
@@ -543,12 +593,13 @@ fn waveform_figure(
                 let s = sample(i).abs() * 0.15;
                 push((u, cy + s), &mut points, &mut used);
             }
-            polyline(
+            emit_trace(
                 geometry,
                 points.get(..used).unwrap_or(&[]),
                 width,
                 false,
                 additive,
+                use_dots,
             );
             used = 0;
             for i in 0..count {
@@ -563,6 +614,30 @@ fn waveform_figure(
         // the relationship mode 5 has to mode 2, so the pair is consistent with
         // the pair above it rather than being two names for one figure.
         6 | 7 => {
+            // **`time * 0.05` is the leading suspect for design-backlog 0107's
+            // diagonal stroke, and it is recorded rather than removed** (Plan
+            // 0108 Phase 4). *Blur Mix 3* draws one steep diagonal where the
+            // reference draws horizontal full-width traces, and this term is the
+            // only way a mode-6 line can be at an angle its preset never asked
+            // for: it rotates the figure a full turn every ~126 s, so a trace
+            // authored horizontal is horizontal only at the instants
+            // `mystery * PI + time * 0.05` happens to be a multiple of `pi`.
+            //
+            // Three things make it a suspect rather than a finding. It is the
+            // **only** use of `time` in this whole file — every other mode is a
+            // pure function of the trace and the outputs, which is why
+            // `waveform_figure` takes the parameter at all. It contradicts the
+            // sentence directly above it, which says the angle is set by
+            // `wave_mystery`. And it is absent from the module header's "What is
+            // approximated, stated" list, where every other liberty this file
+            // takes is written down.
+            //
+            // What it is not is *settled*: removing it changes every mode-6 and
+            // mode-7 preset, and whether the reference's line drifts is a
+            // question about the reference. Plan 0108's Phase 6 puts the seven
+            // pairs back beside `foo_vis_milk2`, which is where one look answers
+            // it. Until then the term stays and this comment carries the
+            // arithmetic.
             let angle = mystery * std::f32::consts::PI + time * 0.05;
             let (s, c) = angle.sin_cos();
             let offsets: &[f32] = if mode == 7 { &[0.03, -0.03] } else { &[0.0] };
@@ -581,11 +656,7 @@ fn waveform_figure(
                 // shared emit below.
                 if index + 1 < offsets.len() {
                     let built = points.get(..used).unwrap_or(&[]);
-                    if out.wave_usedots >= 0.5 {
-                        dots(geometry, built, width, additive);
-                    } else {
-                        polyline(geometry, built, width, false, additive);
-                    }
+                    emit_trace(geometry, built, width, false, additive, use_dots);
                 }
             }
         }
@@ -593,11 +664,7 @@ fn waveform_figure(
     }
 
     let built = points.get(..used).unwrap_or(&[]);
-    if out.wave_usedots >= 0.5 {
-        dots(geometry, built, width, additive);
-    } else {
-        polyline(geometry, built, width, closed, additive);
-    }
+    emit_trace(geometry, built, width, closed, additive, use_dots);
 }
 
 /// The preset's custom waves, each a polyline or a scatter from its own

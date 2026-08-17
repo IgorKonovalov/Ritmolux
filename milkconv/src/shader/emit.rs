@@ -1432,13 +1432,24 @@ impl Emitter {
         self.stmts(body, &mut out, 1)?;
         self.scopes.pop();
         match self.stage {
-            // The reference's target was 8-bit: feedback saturates at 1.0, which
-            // is what keeps a `decay >= 1` preset bounded here too. The select
-            // scrubs a NaN out of the feedback loop — comparisons with NaN are
-            // false, so a poisoned lane resets to 0 instead of spreading.
+            // **The reference's target was 8-bit, and this reproduces both ends
+            // of that bound.** The clamp is the ceiling — what keeps a
+            // `decay >= 1` preset bounded here too. `lmv_quantize` is the floor
+            // and the ladder between (ADR-0118): the reference's `decay` times a
+            // dim pixel truncates to zero in its 8-bit target, and without that
+            // every dim residual survives in `Rgba16Float` and integrates. The
+            // step count arrives at runtime in `U.misc.w`, so a bundle converted
+            // by this emitter can be A/B'd — or switched off — without a
+            // re-convert.
+            //
+            // The select scrubs a NaN out of the feedback loop — comparisons
+            // with NaN are false, so a poisoned lane resets to 0 instead of
+            // spreading. It runs BEFORE the quantizer, which would otherwise
+            // propagate the NaN through its own arithmetic.
             Stage::Warp => out.push_str(
                 "    var _lmv_o = clamp(_lmv_ret, vec3<f32>(0.0), vec3<f32>(1.0));\n\
                  \x20   _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);\n\
+                 \x20   _lmv_o = lmv_quantize(_lmv_o, U.misc.w);\n\
                  \x20   return vec4<f32>(_lmv_o, 1.0);\n}\n",
             ),
             // The composite goes to the screen: brightness scales the light,

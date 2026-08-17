@@ -74,6 +74,79 @@ pub const BINDINGS: &[&str] = &[
 /// `vec4` rows per matrix — the shape `float4x3` indexes as.
 pub const ROT_MATRICES: usize = 24;
 
+/// **The feedback-field quantizer** ([ADR-0118](../../../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)),
+/// as WGSL — the *one* text, emitted into every converted module by
+/// [`fragment_prelude`] and concatenated onto the engine's own built-in warp
+/// fragment by `render/scenes/warp_mesh`. A transfer function written out twice
+/// is a transfer function that drifts.
+///
+/// # Why the round trip
+///
+/// The reference's feedback target is 8-bit, so `decay` times a dim pixel
+/// **truncates to zero** and a classic preset's background stays black. This
+/// engine's field is `Rgba16Float`, nothing truncates, and every dim residual
+/// integrates — the wash, glow, runaway and inversion Plan 0100 Phase 7 judged.
+///
+/// The field is **linear light** (ADR-0046) and the reference quantizes in its
+/// **gamma-encoded** target, so the step has to be taken in the encoded domain.
+/// One number carries the whole decision: one 8-bit sRGB step is `1/255 =
+/// 0.00392` encoded, which is `3.03e-4` in linear light. A literal `1/255` floor
+/// applied *in linear* would truncate everything below encoded `0.0498` — sRGB
+/// level ~13, **thirteen times too aggressive** — and would crush the dim trails
+/// the reference keeps rather than the dimmer ones it discards.
+///
+/// # Why sRGB and not the reference's own ~2.2 gamma
+///
+/// DX9-era MilkDrop wrote to an 8-bit target with no explicit encoding, which in
+/// practice is a plain 2.2 power curve — and it differs from sRGB's piecewise
+/// one *only* in the near-black region this whole decision is about, so the
+/// choice was rendered rather than assumed (ADR-0118's `Outcome`, 2026-08-17).
+/// The two agree to within one 8-bit level at every frame where the picture
+/// reads. They part in the tail, and there sRGB's floor lands on linear
+/// `3.03e-4` — **exactly 8-bit display level 1**, so what it discards is
+/// precisely what a viewer could not have seen. The 2.2 curve floors at
+/// `(1/255)^2.2 = 5.1e-6`, 59x lower, keeping six more e-foldings of invisible
+/// light alive to accumulate. sRGB is also already here (ADR-0046).
+///
+/// # The lane
+///
+/// `steps` is a **count**, not a flag, so the look gate can A/B a tuning without
+/// a rebuild:
+///
+/// - `|steps| < 1` — off, and off is an **exact identity**: the early return
+///   hands back the argument, so a native `warp_mesh` preset renders the bytes it
+///   rendered before this existed.
+/// - `steps > 0` — the decision: encode, floor to `steps` levels, decode.
+/// - `steps < 0` — ADR-0118's **Alternative D**, the named fallback: floor to
+///   zero at one encoded step and leave the levels between alone. It is the half
+///   of the mechanism that does the visible work (dim residuals die instead of
+///   accumulating) without re-introducing the banding ADR-0096 dithers away.
+///   Reachable from the same lane on purpose — the fallback is a parameter
+///   change, not a rebuild.
+pub const QUANTIZE_WGSL: &str = "\
+fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x * 12.92;
+    let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, x <= vec3<f32>(0.0031308));
+}
+fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x / 12.92;
+    let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, x <= vec3<f32>(0.04045));
+}
+fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+    let n = abs(steps);
+    if (n < 1.0) { return c; }
+    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    if (steps < 0.0) {
+        return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
+    }
+    return lmv_srgb_decode(floor(e * n) / n);
+}
+";
+
 /// The uniform block, as WGSL. **Field-for-field with `MilkUniform` in
 /// `render/scenes/warp_mesh/shader.rs`** — every member is 16-byte data, so the
 /// Rust `#[repr(C)]` layout and the WGSL std140-ish layout agree by
@@ -95,7 +168,8 @@ struct MilkU {
     rand_frame: vec4<f32>,
     // four uniform randoms, fixed for the preset's life
     rand_preset: vec4<f32>,
-    // x: decay for this frame (already rate-converted), y: brightness, z: occlude, w: unused
+    // x: decay for this frame (already rate-converted), y: brightness, z: occlude,
+    // w: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D)
     misc: vec4<f32>,
     // the four corner colours hue_shader interpolates between
     hue: array<vec4<f32>, 4>,
@@ -155,6 +229,12 @@ pub fn fragment_prelude(group: u32) -> String {
          \x20   return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;\n\
          }\n\n",
     );
+    // The feedback quantizer, declared for both stages though only the warp
+    // epilogue calls it — the same "helpers are declared whether or not the
+    // preset calls them" rule as above, and it keeps the two stages' preludes
+    // one text.
+    out.push_str(QUANTIZE_WGSL);
+    out.push('\n');
     out
 }
 
