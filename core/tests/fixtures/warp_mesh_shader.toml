@@ -1,0 +1,394 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# **The only preset anywhere in the crate that carries WGSL** (Plan 0110 Phase 2).
+# `core/src/render/scenes/warp_mesh/shader.rs` is built only for a bundle whose
+# `[milk]` table names a shader, and until this file existed no fixture did - so
+# `MilkShaderResources::build`, the six procedural noise textures, the
+# three-level blur chain and the fifteen-entry bind group had never run under any
+# test on any adapter, at 0.00 % line coverage.
+#
+# THE SHADERS ARE GENERATED, NOT TRANSCRIBED. Each begins with exactly
+# `milk::shader::fragment_prelude(g)` at its own group - `WARP_GROUP` for the
+# warp module, `COMP_GROUP` for the comp one - and `core/tests/warp_mesh.rs`'s
+# `the_fixture_shaders_begin_with_the_prelude` asserts that byte for byte. That
+# is `milkconv/tests/fixture.rs`'s discipline applied to WGSL: the prelude is
+# ~2 KB of generated text that ADR-0118 changed this month, so a verbatim copy
+# would drift into a comment that used to be true, and the guard is what turns
+# that drift into a named failure instead.
+#
+# What the two bodies reach, and why a shorter shader would pin less:
+#
+#  - `lmv_GetPixel` (binding 1) in BOTH stages, so the `bind_a`/`bind_b` pair -
+#    the two bind groups that differ only in which half of the ping-pong field
+#    is `t_main` - are each exercised on the frame they read.
+#  - A 2D noise sampler in each stage, and the two arms of the generator are
+#    split across them: the comp reads `t_noise_lq` (zoom 1, per-texel randoms)
+#    through the POINT sampler, the warp reads `t_noise_mq` (zoom 4, the
+#    interpolated lattice) through the FILTERING one. Two of the reference's
+#    sampler quartet, two of the noise set's two shapes.
+#  - A 3D volume in each stage - `t_noisevol_lq` and `t_noisevol_hq` - which is
+#    the only thing in the suite that asks an adapter for `texture_3d` at all.
+#  - `lmv_GetBlur1`, `lmv_GetBlur2` AND `lmv_GetBlur3`, which is what forces
+#    `blur_level = 3` to build the whole chain rather than a prefix of it. Read
+#    only `GetBlur1` and levels 2 and 3 would be 1x1 stand-ins and the six
+#    encoded blur passes would be two.
+#  - Six distinct uniform lanes - `U.clock`, `U.bands`/`U.bands_att`, `U.q`,
+#    `U.roam`, `U.rot`, `U.hue`, plus `U.aspect` and all three of `U.misc`'s
+#    live lanes - so `fill_uniform`'s output is load-bearing ON THE PICTURE
+#    rather than merely written to a buffer nothing samples.
+#  - The warp epilogue's `lmv_quantize(o, U.misc.w)` and the comp's
+#    `U.misc.y`/`U.misc.z`, exactly as `milkconv`'s emitter writes them, so the
+#    two stages' output conventions are the shipped ones.
+#
+# The `[milk]` EEL2 programs, the `[mesh]`, `[palette]` and `[params]` tables are
+# `warp_mesh_milk.toml`'s, deliberately: the two fixtures then differ in exactly
+# one thing - whether the bundle carries WGSL - which is what makes
+# `the_shaders_and_not_the_defaults_drive_the_picture` a clean comparison.
+#
+# THIS FIXTURE IS NOT A CLAIM ABOUT FIDELITY. It pins that the surface WORKS -
+# that the pipelines build, the bindings resolve, the chain runs and the uniform
+# arrives. Whether a real converted preset renders correctly is Plan 0109's.
+system = "warp_mesh"
+name   = "fixture_warp_mesh_shader"
+
+[mesh]
+x = 24
+y = 18
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#180016" },
+  { at = 0.34, color = "#7a1d68" },
+  { at = 0.68, color = "#ff7a3d" },
+  { at = 1.0,  color = "#fff6d0" },
+]
+
+[params]
+# The bundle drives the transform; the preset supplies the light it drags.
+deposit        = "6.5"
+deposit_radius = "0.34"
+deposit_width  = "0.045"
+deposit_arms   = "4"
+deposit_twist  = "1.6"
+deposit_spin   = "0.4"
+color_span     = "1.0"
+brightness     = "1.0"
+
+[milk]
+# Three levels, because both bodies below read `lmv_GetBlur3`.
+blur_level = 3
+
+per_frame_init = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+const 0.35
+store 0
+pop
+const 0.0
+store 1
+"""
+
+per_frame = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+load 1
+const 0.013
+add
+store 1
+pop
+const 1.024
+load 3
+const 0.004
+mul
+add
+store 2
+pop
+const 0.011
+store 4
+pop
+const 0.9
+store 5
+pop
+const 0.5
+const 0.05
+load 7
+const 0.7
+mul
+fn1 sin
+mul
+add
+store 6
+pop
+const 0.5
+const 0.05
+load 7
+const 0.53
+mul
+fn1 cos
+mul
+add
+store 8
+"""
+
+per_vertex = """
+.regs q1 q2 zoom bass rot decay cx time cy rad x dx ang
+.code
+load 2
+load 9
+const 0.018
+mul
+add
+store 2
+pop
+load 4
+load 0
+load 10
+const 0.5
+sub
+mul
+add
+store 4
+pop
+const 0.002
+load 1
+load 12
+add
+fn1 sin
+mul
+store 11
+"""
+
+warp_shader = """
+struct MilkU {
+    // x: time (s), y: fps (the nominal 30, as the EEL side reports), z: frame, w: progress
+    clock: vec4<f32>,
+    // bass, mid, treb, vol — MilkDrop-scaled, exactly what the EEL programs read
+    bands: vec4<f32>,
+    // the attenuated versions of the same four
+    bands_att: vec4<f32>,
+    // w, h, 1/w, 1/h of the field
+    texsize: vec4<f32>,
+    // aspectx, aspecty, 1/aspectx, 1/aspecty — the EEL convention (longer axis reads 1)
+    aspect: vec4<f32>,
+    // four uniform randoms, fresh each frame, deterministic from the preset salt
+    rand_frame: vec4<f32>,
+    // four uniform randoms, fixed for the preset's life
+    rand_preset: vec4<f32>,
+    // x: decay for this frame (already rate-converted), y: brightness, z: occlude,
+    // w: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D)
+    misc: vec4<f32>,
+    // the four corner colours hue_shader interpolates between
+    hue: array<vec4<f32>, 4>,
+    // q1..q32 as _qa.._qh
+    q: array<vec4<f32>, 8>,
+    // slow_roam_cos, roam_cos, slow_roam_sin, roam_sin
+    roam: array<vec4<f32>, 4>,
+    // the 24 rot_* matrices, 4 rows each; .xyz of a row is what float4x3 indexing reads
+    rot: array<vec4<f32>, 96>,
+}
+@group(1) @binding(0) var<uniform> U: MilkU;
+@group(1) @binding(1) var t_main: texture_2d<f32>;
+@group(1) @binding(2) var s_fw: sampler;
+@group(1) @binding(3) var s_fc: sampler;
+@group(1) @binding(4) var s_pw: sampler;
+@group(1) @binding(5) var s_pc: sampler;
+@group(1) @binding(6) var t_noise_lq: texture_2d<f32>;
+@group(1) @binding(7) var t_noise_lq_lite: texture_2d<f32>;
+@group(1) @binding(8) var t_noise_mq: texture_2d<f32>;
+@group(1) @binding(9) var t_noise_hq: texture_2d<f32>;
+@group(1) @binding(10) var t_noisevol_lq: texture_3d<f32>;
+@group(1) @binding(11) var t_noisevol_hq: texture_3d<f32>;
+@group(1) @binding(12) var t_blur1: texture_2d<f32>;
+@group(1) @binding(13) var t_blur2: texture_2d<f32>;
+@group(1) @binding(14) var t_blur3: texture_2d<f32>;
+
+fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
+}
+
+fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x * 12.92;
+    let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, x <= vec3<f32>(0.0031308));
+}
+fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x / 12.92;
+    let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, x <= vec3<f32>(0.04045));
+}
+fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+    let n = abs(steps);
+    if (n < 1.0) { return c; }
+    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    if (steps < 0.0) {
+        return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
+    }
+    return lmv_srgb_decode(floor(e * n) / n);
+}
+
+@fragment
+fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) -> @location(0) vec4<f32> {
+    // MilkDrop's rad/ang normalization, the way milkconv's emitter writes it:
+    // the longer axis reads 1, so the reciprocal aspect lanes are load-bearing.
+    let p = (_in_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    let rad = length(p);
+    let ang = atan2(p.y, p.x);
+
+    // Binding 1, through the prelude's own helper. `_in_uv` here is the WARPED
+    // source uv the shared vertex stage computed, so this is the feedback read.
+    let past = lmv_GetPixel(_in_uv);
+
+    // The interpolated noise arm through the filtering+wrapping sampler, and a
+    // 3D volume walked along z by the clock.
+    let n2 = textureSampleLevel(t_noise_mq, s_fw, _in_uv * 3.0 + U.roam[0].xy, 0.0).xyz;
+    let n3 = textureSampleLevel(t_noisevol_lq, s_fw, vec3<f32>(_in_uv * 2.0, U.clock.x * 0.07), 0.0).xyz;
+
+    // All three levels: this is what forces the whole chain to be built.
+    let glow = lmv_GetBlur1(_in_uv) * 0.5 + lmv_GetBlur2(_in_uv) * 0.3 + lmv_GetBlur3(_in_uv) * 0.2;
+
+    // The q bridge, two rot rows and a hue corner.
+    let q = U.q[0].x + U.q[0].y;
+    let spin = U.rot[0].x + U.rot[20].y;
+    let tint = mix(U.hue[0].xyz, U.hue[3].xyz, clamp(rad, 0.0, 1.0));
+
+    var ret = past * U.misc.x;
+    ret = ret + glow * (0.06 + 0.22 * U.bands.x);
+    ret = ret + tint * (n2.x * 0.05 * (0.5 + 0.5 * sin(ang * 3.0 + q + spin)));
+    ret = ret + tint.zyx * (n3.y * 0.04 * lmv_lum(past));
+
+    // The emitter's own warp epilogue, verbatim in shape: clamp, scrub a NaN out
+    // of the feedback loop, then the ADR-0118 quantizer off `U.misc.w`.
+    var o = clamp(ret, vec3<f32>(0.0), vec3<f32>(1.0));
+    o = select(vec3<f32>(0.0), o, o == o);
+    o = lmv_quantize(o, U.misc.w);
+    return vec4<f32>(o, 1.0);
+}
+"""
+
+comp_shader = """
+struct MilkU {
+    // x: time (s), y: fps (the nominal 30, as the EEL side reports), z: frame, w: progress
+    clock: vec4<f32>,
+    // bass, mid, treb, vol — MilkDrop-scaled, exactly what the EEL programs read
+    bands: vec4<f32>,
+    // the attenuated versions of the same four
+    bands_att: vec4<f32>,
+    // w, h, 1/w, 1/h of the field
+    texsize: vec4<f32>,
+    // aspectx, aspecty, 1/aspectx, 1/aspecty — the EEL convention (longer axis reads 1)
+    aspect: vec4<f32>,
+    // four uniform randoms, fresh each frame, deterministic from the preset salt
+    rand_frame: vec4<f32>,
+    // four uniform randoms, fixed for the preset's life
+    rand_preset: vec4<f32>,
+    // x: decay for this frame (already rate-converted), y: brightness, z: occlude,
+    // w: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D)
+    misc: vec4<f32>,
+    // the four corner colours hue_shader interpolates between
+    hue: array<vec4<f32>, 4>,
+    // q1..q32 as _qa.._qh
+    q: array<vec4<f32>, 8>,
+    // slow_roam_cos, roam_cos, slow_roam_sin, roam_sin
+    roam: array<vec4<f32>, 4>,
+    // the 24 rot_* matrices, 4 rows each; .xyz of a row is what float4x3 indexing reads
+    rot: array<vec4<f32>, 96>,
+}
+@group(0) @binding(0) var<uniform> U: MilkU;
+@group(0) @binding(1) var t_main: texture_2d<f32>;
+@group(0) @binding(2) var s_fw: sampler;
+@group(0) @binding(3) var s_fc: sampler;
+@group(0) @binding(4) var s_pw: sampler;
+@group(0) @binding(5) var s_pc: sampler;
+@group(0) @binding(6) var t_noise_lq: texture_2d<f32>;
+@group(0) @binding(7) var t_noise_lq_lite: texture_2d<f32>;
+@group(0) @binding(8) var t_noise_mq: texture_2d<f32>;
+@group(0) @binding(9) var t_noise_hq: texture_2d<f32>;
+@group(0) @binding(10) var t_noisevol_lq: texture_3d<f32>;
+@group(0) @binding(11) var t_noisevol_hq: texture_3d<f32>;
+@group(0) @binding(12) var t_blur1: texture_2d<f32>;
+@group(0) @binding(13) var t_blur2: texture_2d<f32>;
+@group(0) @binding(14) var t_blur3: texture_2d<f32>;
+
+fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
+}
+
+fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x * 12.92;
+    let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, x <= vec3<f32>(0.0031308));
+}
+fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x / 12.92;
+    let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, x <= vec3<f32>(0.04045));
+}
+fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+    let n = abs(steps);
+    if (n < 1.0) { return c; }
+    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    if (steps < 0.0) {
+        return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
+    }
+    return lmv_srgb_decode(floor(e * n) / n);
+}
+
+@fragment
+fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {
+    let p = (_in_uv - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    let rad = length(p);
+
+    let field = lmv_GetPixel(_in_uv);
+    let glow = lmv_GetBlur1(_in_uv) * 0.6 + lmv_GetBlur2(_in_uv) * 0.3 + lmv_GetBlur3(_in_uv) * 0.1;
+
+    // The per-texel noise arm through the POINT+wrapping sampler, and the high
+    // quality volume through the filtering one.
+    let grain = textureSampleLevel(t_noise_lq, s_pw, _in_uv * 8.0 + U.roam[3].zw, 0.0).x;
+    let vol = textureSampleLevel(t_noisevol_hq, s_fw, vec3<f32>(_in_uv, U.clock.x * 0.03), 0.0).z;
+
+    // The four hue corners, bilinear across the frame — the reference's own
+    // `hue_shader`, which is what `hue_corners` exists to feed.
+    let hue = mix(
+        mix(U.hue[0].xyz, U.hue[1].xyz, _in_uv.x),
+        mix(U.hue[2].xyz, U.hue[3].xyz, _in_uv.x),
+        _in_uv.y);
+
+    let qmix = 0.5 + 0.5 * sin(U.q[0].y * 3.0 + U.q[0].x);
+
+    var ret = field * (0.85 + 0.5 * U.bands_att.w);
+    ret = ret + glow * (0.25 + 0.30 * qmix);
+    ret = ret * mix(vec3<f32>(1.0), hue, 0.45 + 0.45 * U.rot[40].z);
+    ret = ret * (1.0 - 0.30 * rad);
+    ret = ret * (0.88 + 0.24 * grain) * (0.92 + 0.16 * vol);
+
+    // The emitter's own comp epilogue: brightness scales the light, occlude is
+    // the coverage the backdrop blend reads (ADR-0085).
+    var o = max(ret, vec3<f32>(0.0));
+    o = select(vec3<f32>(0.0), o, o == o);
+    return vec4<f32>(o * U.misc.y, U.misc.z);
+}
+"""

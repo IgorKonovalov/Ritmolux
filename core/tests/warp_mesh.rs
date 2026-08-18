@@ -505,6 +505,213 @@ fn the_bundle_and_not_the_defaults_drives_the_transform() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The converted-shader surface (Plan 0110 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// The shader-carrying fixture — the only preset anywhere in the crate whose
+/// `[milk]` table names a `warp_shader` or a `comp_shader`, and so the only one
+/// that builds `warp_mesh/shader.rs` at all.
+const SHADER_FIXTURE: &str = include_str!("fixtures/warp_mesh_shader.toml");
+
+fn shader_fixture() -> Preset {
+    let preset = Preset::from_toml_str(SHADER_FIXTURE).expect("the shader fixture parses");
+    assert_eq!(preset.system, SystemKind::WarpMesh);
+    assert!(
+        preset.warnings.is_empty(),
+        "the shader fixture must load clean, got {:?}",
+        preset.warnings
+    );
+    // Both modules and the full chain reached the bundle — `validate_wgsl` ran
+    // over each at load, so a broken module is a named load error above rather
+    // than a pipeline failure at first render.
+    let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+        milk: Some(bundle), ..
+    }) = preset.config.as_ref()
+    else {
+        panic!("the shader fixture must carry a [milk] table");
+    };
+    assert!(bundle.warp_wgsl.is_some(), "and a warp module");
+    assert!(bundle.comp_wgsl.is_some(), "and a comp module");
+    assert_eq!(bundle.blur_level, 3, "and all three blur levels");
+    preset
+}
+
+/// **The fixture's shaders begin with exactly the prelude the engine generates**
+/// — `milkconv/tests/fixture.rs`'s discipline applied to WGSL.
+///
+/// A hand-written fixture has to inline the *complete* module, because
+/// `preset/schema.rs` runs `validate_wgsl` over the whole string at load and
+/// `milkconv`'s emitter builds every converted shader as `fragment_prelude(g)`
+/// followed by translated code. The prelude is ~2 KB of generated text and
+/// ADR-0118 changed it this month, so a verbatim copy in a `.toml` **will**
+/// drift. When it does, this fails and names the repair — rather than the
+/// fixture silently pinning a surface the engine no longer emits.
+#[test]
+fn the_fixture_shaders_begin_with_the_prelude() {
+    use lmv_core::milk::shader::{COMP_GROUP, WARP_GROUP, fragment_prelude};
+
+    let preset = shader_fixture();
+    let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+        milk: Some(bundle), ..
+    }) = preset.config.as_ref()
+    else {
+        panic!("the shader fixture must carry a [milk] table");
+    };
+
+    for (which, source, group) in [
+        ("warp", bundle.warp_wgsl.as_deref(), WARP_GROUP),
+        ("comp", bundle.comp_wgsl.as_deref(), COMP_GROUP),
+    ] {
+        let source = source.unwrap_or_default();
+        let prelude = fragment_prelude(group);
+        assert!(
+            source.starts_with(&prelude),
+            "the fixture's `{which}_shader` no longer begins with \
+             `milk::shader::fragment_prelude({group})`. Regenerate the fixture's \
+             two modules by PRINTING the prelude rather than editing them by \
+             hand — the first {} bytes of each string are generated text, not \
+             authored text",
+            prelude.len()
+        );
+        // ...and there is a body after it, or the guard above is satisfied by a
+        // fixture that carries the prelude and nothing else.
+        assert!(
+            source.len() > prelude.len() + 200,
+            "`{which}_shader` is the prelude and almost nothing else"
+        );
+    }
+}
+
+/// **The shader surface builds and renders a real, moving picture** — the same
+/// two statistics `sanity.rs` and `animation.rs` apply, against the same floors,
+/// so this entry is comparable to the fixtures beside it rather than measured
+/// differently.
+///
+/// This is the first time in the crate's history that
+/// `MilkShaderResources::build` runs: the six noise textures are generated and
+/// uploaded, the three-level blur chain is allocated and encoded, and the
+/// fifteen-entry bind group resolves. A failure here is far more likely to be
+/// "the pipeline did not build" than "the picture is dim".
+#[test]
+fn the_shader_fixture_draws_a_real_shape_and_animates() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let preset = without_backdrop(shader_fixture());
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let img = renderer
+        .capture_preset(&name, &loud(), SANITY_FRAMES)
+        .expect("capture the shader fixture");
+    let cov = coverage(&img, BLACK, EPS);
+    let spread = quadrant_spread(&img, BLACK, EPS);
+    let flat = tonal_flatness(&img, BLACK, EPS);
+    println!(
+        "[warp_mesh/shader] coverage={cov:.4} (floor {COVERAGE_FLOOR:.2}) \
+         quadrants={spread} flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2})"
+    );
+    assert!(
+        cov >= COVERAGE_FLOOR,
+        "the shader fixture is blank: coverage {cov:.4} < {COVERAGE_FLOOR:.2}"
+    );
+    assert!(
+        spread >= MIN_QUADRANTS,
+        "the shader fixture is a dot: {spread} quadrant(s) < {MIN_QUADRANTS}"
+    );
+    assert!(
+        flat <= MAX_TONAL_FLATNESS,
+        "the shader fixture is flat: {:.1}% of its lit pixels sit in one \
+         luminance band (max {:.0}%)",
+        flat * 100.0,
+        MAX_TONAL_FLATNESS * 100.0
+    );
+
+    // ...and it moves, under silence, on the scene's own clock — which is what
+    // makes the animated uniform lanes (`U.clock`, `U.roam`, `U.rot`, `U.q`)
+    // load-bearing rather than merely written.
+    let quiet = AnalysisFrame::default();
+    let a = renderer
+        .capture_preset(&name, &quiet, FRAME_A)
+        .expect("capture frame A");
+    let b = renderer
+        .capture_preset(&name, &quiet, FRAME_B)
+        .expect("capture frame B");
+    let motion = footprint_diff(&a, &b, BLACK, EPS, MIN_FOOTPRINT_FRAC);
+    println!(
+        "[warp_mesh/shader] motion (footprint) frames {FRAME_A}->{FRAME_B} = \
+         {motion:.4} (floor {MOTION_FLOOR:.2})"
+    );
+    assert!(
+        motion >= MOTION_FLOOR,
+        "the shader fixture is frozen: {motion:.4} < {MOTION_FLOOR:.2}"
+    );
+}
+
+/// **The shaders, and not the engine's defaults, drive the picture** — the
+/// `[milk]`-vs-control argument `the_bundle_and_not_the_defaults_drives_the_transform`
+/// makes one layer down, applied one layer up.
+///
+/// The control is the *same* preset with only its two shader keys removed: the
+/// same bundle, the same EEL programs, the same mesh, palette and deposit. So
+/// the two frames differ in exactly one thing — whether the custom warp and comp
+/// fragments replaced the built-in decay and present ones. A regression that
+/// built `MilkShaderResources` and then never bound it would render the control
+/// and this would go quiet.
+#[test]
+fn the_shaders_and_not_the_defaults_drive_the_picture() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let mut driven = shader_fixture();
+    let mut control = Preset::from_toml_str(&without_shaders(SHADER_FIXTURE))
+        .expect("the no-shader control parses");
+    assert!(
+        matches!(
+            control.config.as_ref(),
+            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+                milk: Some(bundle), ..
+            }) if bundle.warp_wgsl.is_none() && bundle.comp_wgsl.is_none()
+        ),
+        "the control must keep its bundle and lose only its shaders, or it \
+         proves nothing"
+    );
+
+    driven.name = "shader-driven".into();
+    control.name = "shader-control".into();
+    renderer.set_presets(vec![driven, control]);
+
+    let frame = loud();
+    let a = renderer
+        .capture_preset("shader-driven", &frame, SANITY_FRAMES)
+        .expect("capture the shader-driven fixture");
+    let b = renderer
+        .capture_preset("shader-control", &frame, SANITY_FRAMES)
+        .expect("capture the control");
+    let difference = frame_diff(&a, &b);
+    println!("[warp_mesh/shader] shaders vs no shaders: frame_diff {difference:.4}");
+    assert!(
+        difference > 0.01,
+        "a bundle carrying WGSL must render differently from the same bundle \
+         without it; got {difference:.4}. The custom pipelines are built but not \
+         bound"
+    );
+}
+
+/// The fixture's text with the two shader keys cut out, keeping everything else
+/// — including the `[milk]` table itself — exactly as it was.
+///
+/// Cut by position rather than by `replace`, because the header discusses
+/// `warp_shader` and `comp_shader` in prose and a textual substitution would
+/// rewrite the comment too.
+fn without_shaders(text: &str) -> String {
+    let Some(cut) = text.find("warp_shader = \"\"\"") else {
+        panic!("the fixture no longer declares `warp_shader`");
+    };
+    text[..cut].to_string()
+}
+
 /// The lit-backdrop fixture — see its own header for why every binding is what
 /// it is.
 const LIT_FIXTURE: &str = include_str!("fixtures/warp_mesh_lit_backdrop.toml");
