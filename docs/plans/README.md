@@ -105,13 +105,73 @@ waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
 
-**First, ahead of everything below: [0110](0110-the-shader-surface-stops-being-invisible.md).**
-CI's `coverage` gate has been red since 2026-08-16 and is the only red job, so every plan under it
-lands on a tree whose signal is already failing — and a second regression would hide inside the
-first. It adds tests rather than behavior, but Phase 1 declares a module in
-`warp_mesh/shader.rs` and Phase 4 edits `core/src/milk/tests.rs`, both of which
-[0109](0109-the-milkdrop-import-gets-its-geometry-back.md) also works in: **run the two in
-sequence, not in parallel lanes.**
+**Rewritten 2026-08-18, and this is the live sequence — everything from "Prior sequence notes"
+down is history.** Four calls set it: the next stretch is **engine and visual richness**, work runs
+in **two lanes**, [0103] waits for [0104], and [0087] goes **early to de-risk** rather than late
+because it is large.
+
+### The two lanes, now
+
+- **Lane A — [0110](0110-the-shader-surface-stops-being-invisible.md), in progress.** CI's
+  `coverage` gate is red and this is the only plan that fixes it. Nothing else should reach the
+  golden corpus until its one new baseline has landed.
+- **Lane B — [0087], startable now.** It touches `core/src/render/scenes/lines/` and one warning
+  in `core/src/preset/schema.rs`; Lane A touches neither. **It goes early on purpose:** its Phase 3
+  cost measurement and Phase 4 look gate can send it to
+  [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)'s
+  Alternative C, and two other plans carry phases scoped as if it lands
+  ([0092](0092-the-engine-draws-an-authored-path.md) Phase 4, [0104] Phase 4). Learning that late
+  wastes work written around it.
+
+**The one rule these two lanes need, and it is not obvious.** Both end at the golden corpus — Lane A
+adds a baseline, Lane B re-blesses 28 — and `LMV_BLESS` rewrites every baseline the run renders, not
+only the intended ones. Worktrees keep that isolated while the lanes are live, so the collision is at
+**merge**, not at bless: **[0087] merges `main` and re-blesses only after [0110]'s baseline is on
+`main`**, then checks its diff carries only its own 28. Taken in the other order, a bless silently
+reverts the new fixture and nothing fails.
+
+### Then, in this order
+
+1. **[0109](0109-the-milkdrop-import-gets-its-geometry-back.md)** — the moment 0110 lands. It is
+   the *only* plan that hard-contends with it (`warp_mesh/shader.rs`, `core/src/milk/`), so it
+   cannot run in parallel; taking it straight after also means the same subsystem twice while the
+   context is warm.
+2. **[0098](0098-the-figure-nests-properly.md)** — after [0087]. Both edit
+   `core/src/preset/schema.rs`, but each in one small localized spot, so that is a merge nuisance
+   rather than a serialization constraint; the real reason it follows is that lane capacity is two.
+3. **[0092](0092-the-engine-draws-an-authored-path.md)** — after 0098 and **not beside it**: both
+   rewrite `core/src/render/scenes/shape_field.rs`, which is a genuine conflict. Its Phase 4 reads
+   [0087]'s outcome, which by here exists.
+4. **[0104]** — once [0087] and 0098 have resolved, since its Phase 2 is partly blocked on 0098 and
+   its Phase 4 wholly on [0087]. Every phase is a `preset-author` session in `presets/`.
+5. **[0103]** — last. **Decided 2026-08-18: it waits for [0104]**, which closes the disagreement
+   this section carried open since 2026-08-16. The cost being avoided is announcing into a library
+   where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
+   demo material, a 1080p render still reading as an upscale
+   ([backlog 0110](../design-backlog.md)).
+
+### Gap fillers — either lane, any time
+
+- **[0095]** — `core/src/dsp/` only, contends with nothing, and by its own Phase 3 assertion
+  `beat`/`beat_index` stay bit-identical, so **it moves no golden baseline**. That is what makes it
+  the one plan safe to run beside a lane that is blessing. **Read
+  [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) first** — `beat_index` counts
+  onsets, not beats, and two authoring docs still say otherwise.
+- **[0106](0106-the-frame-stream-passes-through-a-diffusion-model.md)** — `tools/` and `docs/` only,
+  contends with nothing. Phase 1 is a throwaway spike and Phase 2 a stop condition, so it either
+  dies for the cost of an afternoon or runs straight through.
+
+### What this sequence assumes
+
+- **[0087] failing at its stop condition is the live risk, and it is priced rather than hedged.** If
+  it ends at ADR-0098's Alternative C, [0092]'s Phase 4 may legitimately be empty and [0104]'s
+  Phase 4 needs rescoping *before* it is authored — which is precisely the information early
+  placement buys.
+- **Two lanes is the ceiling here, not a target.** Only three groups are genuinely disjoint
+  (`lines/`, `shape_field.rs`, and `dsp/` + `tools/`); a third lane starts forcing plans that share
+  files into one window.
+
+**Superseded 2026-08-18, kept as the record.** The 2026-08-16 sequence follows.
 
 **Rewritten 2026-08-16, when five plans arrived from a competitive review rather than from the
 backlog — and that origin is the thing to know about them.** The user asked how this project
@@ -176,11 +236,12 @@ renderer, and they sort into two groups that barely interact:
   their close:** the roster row is a pointer under 320 bytes, and the write-up goes to
   `README-archive.md`, the ADR body's `Outcome`, or the backlog archive — never into the row.
 
-**One sequencing disagreement is left open rather than decided**, because it is a product call and
+~~**One sequencing disagreement is left open rather than decided**~~ — **answered 2026-08-18: [0103]
+waits for [0104]**, see the live sequence above. It was left open because it is a product call and
 not an architecture one: [0103] wants [0104] to have landed, and [0104] is four phases of content
-work with two of them blocked on live engine plans. Shipping the announcement against today's 39
-presets is a defensible choice — the app is honestly labelled pre-1.0 — and it is the user's to
-make.
+work with two of them blocked on live engine plans. Shipping the announcement against today's
+presets was the defensible other choice — the app is honestly labelled pre-1.0 — and the user made
+it the other way.
 
 **Prior sequence notes follow, and they are the record of how the previous roster ordered itself.**
 
