@@ -712,6 +712,184 @@ fn without_shaders(text: &str) -> String {
     text[..cut].to_string()
 }
 
+// ---------------------------------------------------------------------------
+// The branches where the surface is partly absent (Plan 0110 Phase 3)
+// ---------------------------------------------------------------------------
+
+/// The fixture's text with only `comp_shader` cut out, leaving `warp_shader` and
+/// the rest of the `[milk]` table as they were.
+///
+/// Cut by position for [`without_shaders`]'s reason: the header discusses both
+/// keys in prose, and a textual substitution would rewrite the comment too.
+fn warp_only(text: &str) -> String {
+    let Some(cut) = text.find("comp_shader = \"\"\"") else {
+        panic!("the fixture no longer declares `comp_shader`");
+    };
+    text[..cut].to_string()
+}
+
+/// The fixture's text with only `warp_shader` cut out — the key, its module and
+/// the blank line that follows — leaving `comp_shader` in place.
+fn comp_only(text: &str) -> String {
+    let Some(start) = text.find("warp_shader = \"\"\"") else {
+        panic!("the fixture no longer declares `warp_shader`");
+    };
+    let Some(end) = text.find("comp_shader = \"\"\"") else {
+        panic!("the fixture no longer declares `comp_shader`");
+    };
+    assert!(
+        start < end,
+        "`warp_shader` must precede `comp_shader` for this cut to excise one key"
+    );
+    let mut out = String::with_capacity(text.len());
+    out.push_str(&text[..start]);
+    out.push_str(&text[end..]);
+    out
+}
+
+/// The fixture's text with the blur chain asked for at `level`.
+///
+/// Anchored to the declaration at the start of its own line, **not** `replace`d.
+/// The header spells `blur_level = 3` in prose to say why the fixture wants the
+/// whole chain rather than a prefix of it, so the string occurs twice in the
+/// file and a substitution would rewrite that sentence into one contradicting
+/// the table below it.
+fn with_blur_level(text: &str, level: u8) -> String {
+    const DECL: &str = "\nblur_level = 3\n";
+    let Some(at) = text.find(DECL) else {
+        panic!("the fixture no longer declares `blur_level = 3` on its own line");
+    };
+    let rest = &text[at + DECL.len()..];
+    assert!(
+        !rest.contains(DECL),
+        "`blur_level` is declared twice; this cut would rewrite only the first"
+    );
+    format!("{}\nblur_level = {level}\n{rest}", &text[..at])
+}
+
+/// **Each partly-absent surface still builds and renders.**
+///
+/// `MilkShaderResources::build` takes each module as an `Option` and the blur
+/// chain as a count, so three of its arms never execute under the full fixture:
+/// a bundle with no comp module, one with no warp module, and one with no chain
+/// at all. None of those is a hypothetical shape — a converted preset carries
+/// whichever blocks its `.milk` had, and carrying one shader and not the other
+/// is ordinary.
+///
+/// The bar is the plan's — each variant builds and renders a full-size frame
+/// without panicking — and deliberately not `sanity.rs`'s floors. A surface with
+/// half its shaders replaced by the built-in defaults renders a legitimately
+/// different picture, and holding it to the whole fixture's numbers would pin
+/// something this phase does not claim.
+#[test]
+fn each_partly_absent_shader_surface_builds_and_renders() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    let variants = [
+        ("warp-only", warp_only(SHADER_FIXTURE), true, false, 3u8),
+        ("comp-only", comp_only(SHADER_FIXTURE), false, true, 3u8),
+        (
+            "no-blur",
+            with_blur_level(SHADER_FIXTURE, 0),
+            true,
+            true,
+            0u8,
+        ),
+    ];
+
+    let mut presets = Vec::new();
+    for (name, text, warp, comp, blur) in &variants {
+        let mut preset = Preset::from_toml_str(text)
+            .unwrap_or_else(|e| panic!("the `{name}` variant parses: {e:?}"));
+        assert!(
+            preset.warnings.is_empty(),
+            "the `{name}` variant must load clean, got {:?}",
+            preset.warnings
+        );
+        let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+            milk: Some(bundle), ..
+        }) = preset.config.as_ref()
+        else {
+            panic!("the `{name}` variant must keep its [milk] table");
+        };
+        assert_eq!(
+            bundle.warp_wgsl.is_some(),
+            *warp,
+            "`{name}`: whether a warp module survived the cut"
+        );
+        assert_eq!(
+            bundle.comp_wgsl.is_some(),
+            *comp,
+            "`{name}`: whether a comp module survived the cut"
+        );
+        assert_eq!(bundle.blur_level, *blur, "`{name}`: blur level");
+
+        preset.name = format!("partial-{name}");
+        presets.push(without_backdrop(preset));
+    }
+    renderer.set_presets(presets);
+
+    let frame = loud();
+    for (name, ..) in &variants {
+        let image = renderer
+            .capture_preset(&format!("partial-{name}"), &frame, SANITY_FRAMES)
+            .unwrap_or_else(|e| panic!("the `{name}` variant renders: {e:?}"));
+        assert_eq!(
+            image.rgba.len(),
+            (SIZE * SIZE * 4) as usize,
+            "`{name}`: a full-size frame"
+        );
+        let lit = coverage(&image, BLACK, EPS);
+        println!("[warp_mesh/shader] {name}: coverage {lit:.4}");
+        assert!(
+            lit > 0.0,
+            "the `{name}` variant built its pipelines and then drew nothing"
+        );
+    }
+}
+
+/// **The blur chain is load-bearing on the picture.**
+///
+/// Both fixture bodies read `lmv_GetBlur1`, `lmv_GetBlur2` and `lmv_GetBlur3` by
+/// construction, so a surface built with no chain must resolve those three
+/// bindings to *something*, and what that something is decides whether the two
+/// arms can differ at all.
+///
+/// If this ever comes back equal, that is a finding about what bindings 12..14
+/// resolve to when no chain is built — it belongs in the plan's followups, and
+/// it is **not** a cue to tune the fixture until it goes away.
+#[test]
+fn the_blur_chain_changes_the_picture() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let mut full = shader_fixture();
+    let mut none = Preset::from_toml_str(&with_blur_level(SHADER_FIXTURE, 0))
+        .expect("the no-blur variant parses");
+    full.name = "blur-three".into();
+    none.name = "blur-zero".into();
+    renderer.set_presets(vec![without_backdrop(full), without_backdrop(none)]);
+
+    let frame = loud();
+    let a = renderer
+        .capture_preset("blur-three", &frame, SANITY_FRAMES)
+        .expect("capture the three-level chain");
+    let b = renderer
+        .capture_preset("blur-zero", &frame, SANITY_FRAMES)
+        .expect("capture the chainless variant");
+    let difference = frame_diff(&a, &b);
+    println!("[warp_mesh/shader] blur 3 vs blur 0: frame_diff {difference:.4}");
+    assert!(
+        difference > 0.01,
+        "`blur_level = 0` renders identically to `blur_level = 3` (frame_diff \
+         {difference:.4}), yet both fixture bodies read `lmv_GetBlur3`. Record \
+         what bindings 12..14 resolve to with no chain built - do not tune the \
+         fixture to make this pass"
+    );
+}
+
 /// The lit-backdrop fixture — see its own header for why every binding is what
 /// it is.
 const LIT_FIXTURE: &str = include_str!("fixtures/warp_mesh_lit_backdrop.toml");
