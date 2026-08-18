@@ -297,6 +297,31 @@ or an older copy shadows the one under test and the version check means nothing.
       confirms two filed defects rather than finding new ones; anything else is new.
       _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
 
+- [ ] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
+      can reach lives on one menu since [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md),
+      and CI builds no C++, so this is the only place any of it is exercised. Mid-playback, in this
+      order:
+      **(a)** right-click → **Preset ▸** lists the presets and marks the one showing; pick a
+      different one and it **dissolves** across and the mark follows;
+      **(b)** drop a fresh `.toml` into the presets folder (author one, or copy-rename an existing
+      file with an edited `name`), then right-click → **Reload presets** — it appears in the list
+      without restarting foobar2000, and the preset you were watching is still the one showing.
+      Drop a deliberately malformed `.toml` too: it must be **absent** from the list, since the
+      list is the core's roster and not a directory listing;
+      **(c)** right-click → **Open presets folder** lands in `…\light-music-visualizer\presets`
+      itself, not its parent;
+      **(d)** exit foobar2000 **fully** and relaunch — the preset from (a) is rendering and carries
+      the mark. Then delete that preset's file and relaunch again — the component comes up on the
+      roster's default with nothing surfaced to the user, which is the documented degrade of
+      persist-by-name.
+      **Two things to note rather than fix.** The restore is a *dissolve*, not a cut, so a fresh
+      handle starts on the roster's first entry and crossfades to the remembered one over ~1 s —
+      at every start, and at every mid-playback format change. And the menu still shadows
+      foobar2000's own in layout-editing mode ([backlog 0103](design-backlog.md)), which this plan
+      made larger rather than fixing; Plan 0103 Phase 1 owns it.
+      **Escalation:** same rule as above — a failure is a backlog entry or a followup plan.
+      _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18.)_
+
 ## How to run
 
 From the repo root on the target box:
