@@ -122,12 +122,23 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// expression bindings evaluated by the renderer, the other through bytecode
 /// executed by the VM — and only this fixture pins the second one to pixels.
 ///
+/// `warp_mesh_shader` is the seventh (Plan 0110), and what puts it out of reach
+/// of the other six is a **file**, not a param: every fixture in the crate drives
+/// the warp mesh from EEL2 bytecode, and not one of them carries WGSL.
+/// `warp_mesh_milk` gets closest and still stops short — its `[milk]` table
+/// declares no `warp_shader`, no `comp_shader` and no `blur_level`, and
+/// `warp_mesh/shader.rs` is built *only* for a bundle that declares them. So this
+/// is the one baseline anywhere in the crate that executes a translated shader
+/// module, a procedural noise texture, or a single level of the blur chain — 719
+/// lines that no other entry here can reach, and which this suite pinned to
+/// nothing at all until it existed.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 6] = [
+const EXTRA_FIXTURES: [(&str, &str); 7] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -139,6 +150,10 @@ const EXTRA_FIXTURES: [(&str, &str); 6] = [
     (
         "warp_mesh_milk",
         include_str!("fixtures/warp_mesh_milk.toml"),
+    ),
+    (
+        "warp_mesh_shader",
+        include_str!("fixtures/warp_mesh_shader.toml"),
     ),
 ];
 
