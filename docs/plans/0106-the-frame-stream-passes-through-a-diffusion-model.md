@@ -1,6 +1,6 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — **one is owed and deliberately deferred**, see Phase 2

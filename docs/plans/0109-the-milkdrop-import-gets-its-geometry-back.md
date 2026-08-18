@@ -1,6 +1,6 @@
 # 0109 — The MilkDrop import gets its geometry back
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — Phase 1 writes one if the wash needs a design call
