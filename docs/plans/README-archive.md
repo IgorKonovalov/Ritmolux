@@ -13,6 +13,68 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md)
+  — closed 2026-08-18, four `dev` phases in `1ea486b`, `bdadf47`, `2919b7b`, `4d1f450`. Review:
+  **no blockers, two majors (both repaired at the close in `cc1b7ef`), four minors, two nits.**
+
+  **What shipped.** [ADR-0117](../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md)'s
+  two functions and nothing else — `lmv_get_presets` (caller-buffer roster snapshot, call-twice
+  sizing, NUL-separated UTF-8, plus the current index) and `lmv_select_preset`, with
+  `LMV_ABI_VERSION` 5 → 6. **Fifteen exports in `core-cabi/src/lib.rs`, fifteen in the header,
+  signatures identical** — checked at the review rather than assumed, because nothing mechanically
+  compares them (no cbindgen, per ADR-0003). One core addition, `Renderer::target_preset_index`, a
+  thin read of the dissolve's target so a host checkmark follows the click and not the fade. Shim
+  side: a flat **Preset** submenu with a radio mark, **Reload presets**, **Open presets folder**, and
+  the component's first `cfg_var` persisting the choice **by name**.
+
+  **The done-when that could not be satisfied as written, and what replaced it.** Phase 1 asked the
+  FFI test to defend the roster claims, but the roster only exists after `lmv_attach_window` — so
+  there was nothing to assert against headless. The user chose the fix before the "go": the test
+  opens a hidden `STATIC` window through two raw `extern "system"` user32 declarations (no new
+  dependency, per ADR-0001's every-crate-is-a-cost rule) and drives the **real attach path — its
+  first coverage ever**. It **skips green** when no adapter can present, so a CI pass is not evidence
+  for any of it; the review confirmed it genuinely attaches here by re-running under
+  `--success-output final` and seeing no skip notice. Recorded as a known gap in
+  [`docs/specs/0001-c-abi.md`](../specs/0001-c-abi.md), which is the honest place for it.
+
+  **Path drift, found and repaired mid-plan.** The plan and the spec both said `core/tests/ffi.rs`;
+  ADR-0072 had moved it to `core-cabi/tests/ffi.rs` at Plan 0061's close. Three further stale
+  `core/src/ffi.rs` references were sitting in the header's own comments, including the
+  `static_assert` message that exists to catch a layout mismatch — a guard pointing at a file that
+  had not held the struct for fifteen plans.
+
+  **Three judgment calls the plan did not make.** `Space` also writes the persisted name (the plan
+  said "menu pick or Next scene"; `Space` *is* Next scene). Reload re-stores the name afterwards, so
+  a deleted file cannot leave a stale value behind. And the restore runs on the mid-playback
+  format-change handle re-creation too, which previously snapped the show back to the roster's first
+  entry — the review's one caveat on that being that it restores with a **dissolve**, since the ABI
+  has no cut form, so a fresh handle crossfades from the roster's first entry over ~1 s.
+
+  **What the review repaired.** The Phase 4 doc sweep had written **`B`** for the standalone's browse
+  overlay in two places in `docs/presets.md`; the binding is **`Tab`** (`standalone/src/main.rs` maps
+  `KeyCode::Tab`, and there is no `KeyB` arm anywhere). That is the doc the `preset-author` lane reads
+  as truth, which is what made it a major rather than a typo. Separately,
+  `docs/on-device-validation.md` was absent from the plan's Phase 4 holder list and still described
+  the component as `Space`-only.
+
+  **Phase 5 (`human`) did not run, and the close does not claim it did.** It became a standing
+  checklist item in `on-device-validation.md`, the way Plan 0102's Phase 5 was carried forward —
+  that file's own escalation rule is that on-device checks do not gate closes here.
+
+  **What outlived the plan.** Three filed rather than fixed. **Backlog 0117**: the menu dispatches a
+  snapshot index across a modal wait on the argument that *"nothing on this thread can reload presets
+  between the build and the click"* — but `TrackPopupMenu`'s modal loop dispatches `WM_TIMER`, whose
+  handler reaches `ensure_handle` and can replace the handle outright, which the post-dismiss
+  null-check does not notice. Bounded in practice, and the fix is to dispatch by name the way every
+  other selection path in the file already does. **Backlog 0118**: `foo_lmv.dll` measured
+  **9,279,488 B** against the spec's recorded 8,879,104 B, so NFR §4 headroom is **~0.72 MB**, not
+  the "~1.07 MB" the spec and this plan's own ADR both advertise. The plan links nothing new and is
+  not the cause; the ~400 KB arrived unattributed between Plans 0097 and 0107, and the spec's stated
+  re-measure trigger ("when a dependency is added") would never have fired on it. Recorded as a dated
+  `Outcome` on ADR-0117 rather than edited into its body. **Backlog 0103** was updated in place: it
+  convicts a menu of two items that is now five items and a submenu, so the entry is stronger and
+  stays live.
+
 - [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md)
   — closed 2026-08-17, four dev phases in `b02cd45`, `60674da`, `6e92eb3`, `a07b0c6`, with Phases 2
   and 6 (`human`) run as one live look-gate session at the close. Review: **no blockers, two majors

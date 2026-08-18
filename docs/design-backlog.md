@@ -1757,6 +1757,16 @@ tree, which is not discoverable from the panel.
 - **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
   `absent: is_edit_mode_enabled in: plugin-foobar/foo_lmv.cpp`
 
+### Updated 2026-08-18 — the shadowing menu is now four items and a submenu
+
+[Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md) rebuilt this same handler without
+touching the edit-mode question, so the description above is stale on one detail: the menu is no
+longer `Next scene` / `Diagnostics overlay` but a **Preset** submenu listing the whole roster, plus
+Next scene, Reload presets, Open presets folder and the overlay toggle. The claim is unchanged and
+the probe still holds — the entry is if anything **stronger**, since more of the panel's right-click
+is now unreachable in layout-edit mode, and the two plans were deliberately run in sequence on the
+understanding that whichever landed second would restructure the other's menu.
+
 ### What a fix would have to decide
 
 `ui_element_instance_callback` exposes the edit-mode query; the panel path can consult it and fall
@@ -2242,5 +2252,104 @@ two well-separated `time` values. Needs a golden re-bless — it is *intended* t
 ### Priority
 
 **High, and cheap.** [Plan 0109](plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2.
+
+---
+
+## 0117 — the plugin's preset menu dispatches a snapshot index across a modal wait, and the "nothing can reload" argument is not sound
+
+**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
+close review (2026-08-18). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-18** — the render timer's handler is still the path that can re-create the
+  handle, and it is dispatched by the modal menu loop:
+  `present: ensure_handle\(static_cast<uint32_t>\(chunk_rate\) in: plugin-foobar/foo_lmv.cpp`
+
+### The finding
+
+`wnd_proc`'s `WM_CONTEXTMENU` case reads the roster once, builds the Preset submenu with
+`kMenuPresetBase + index` command ids, and after `TrackPopupMenu` returns dispatches the click by
+that **raw index**. The comment above it justifies this:
+
+> *"That is safe because the menu is modal: nothing on this thread can reload presets between the
+> build and the click."*
+
+That is not true. `TrackPopupMenu` runs its own message loop and dispatches `WM_TIMER` to the owner
+window, so `kRenderTimer` keeps firing while the menu is up — which is what keeps the visualizer
+animating behind an open menu, and is presumably wanted. That handler calls `VizSession::pump()`,
+which calls `ensure_handle()`, which on a mid-playback stream-format change **destroys the handle,
+creates a new one, re-runs `load_presets_into` and `restore_remembered_preset`**. The roster can
+therefore be reloaded, and the handle replaced, between the build and the click.
+
+The post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A handle that
+was *replaced* rather than dropped passes it.
+
+**Impact is small, which is why this is filed rather than fixed.** The reload reads the same
+directory, so the order is almost always identical and the index still resolves to the preset the
+user clicked. It goes wrong only if a file appeared or vanished inside the modal window.
+
+### What a fix would be
+
+Dispatch by name instead of index — the shim already has the helper, and every *other* selection
+path in the file uses it precisely because indices are snapshot-scoped (ADR-0117):
+
+```cpp
+} else if (listed != 0 && ucmd >= kMenuPresetBase && ucmd < kMenuPresetBase + listed) {
+    if (select_preset_named(g_session.handle, snap.names[ucmd - kMenuPresetBase]))
+        remember_current_preset(g_session.handle);
+}
+```
+
+Then correct the comment: the safety comes from re-resolving, not from modality.
+
+### Priority
+
+**Low.** A few lines, no design question, and it removes a false claim from a file whose comments
+are load-bearing. Natural pickup for whoever takes
+[Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
+
+---
+
+## 0118 — `foo_lmv.dll` has grown ~400 KB since the C ABI spec measured it, and the spec still advertises the old headroom
+
+**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
+close review (2026-08-18). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-18** — the spec still records the Plan 0097 measurement and the headroom it
+  implied: `present: 8,879,104 B in: docs/specs/0001-c-abi.md`
+
+### The finding
+
+`docs/specs/0001-c-abi.md`'s size table is from Plan 0097, when the `text` feature landed, and it
+concludes *"the headroom is now ~1.07 MB and is the tightest this component has had, so the next
+dependency added to this crate should re-measure rather than assume."* Measured on the dev box at
+Plan 0107's close, release x64:
+
+| Artifact | Spec records (Plan 0097) | Measured 2026-08-18 | Delta |
+|---|---|---|---|
+| `foo_lmv.dll` — the shipped component | 8,879,104 B | 9,279,488 B | +400,384 B |
+| `lmv_core_c.dll` — built, not shipped | 8,824,320 B | 9,218,048 B | +393,728 B |
+
+Against NFR §4's ~10 MB soft cap the real headroom is **~0.72 MB**, not ~1.07 MB.
+
+**Plan 0107 is not the cause and the review confirmed that**: it links nothing new — two small Rust
+functions and ~200 lines of C++. Plan 0100's MilkDrop conversion work landed between the two
+measurements and is the obvious suspect, but nothing has attributed the growth, which is the point
+of filing it.
+
+### What a fix would be
+
+Two separable halves. **Correct the spec** — the table becomes a dated series rather than a
+before/after pair, so the next reader sees a trend instead of a frozen pair, and the "~1.07 MB"
+sentence goes. **Attribute the delta** — bisect the component size across Plans 0100-0106, since a
+soft cap nobody can attribute movement in is a cap that gets discovered breached.
+
+Worth noting what makes this self-correcting badly: the spec instructs a re-measure *"when a
+dependency is added to this crate"*, and this growth arrived without one.
+
+### Priority
+
+**Medium-low.** Nothing is over cap and nothing is broken. But 0.72 MB is the tightest this
+component has been, the doc that would warn you is wrong by a third of the remaining room, and the
+trigger it names would not have fired.
 
 ---
