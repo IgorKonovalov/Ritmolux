@@ -66,7 +66,7 @@ this document does not duplicate them.
 
 4. **Save and watch.** The standalone app polls the folder every ~150 ms and
    hot-reloads on any change (no restart). Press **Space** to cycle to your new
-   preset, or **`B`** to pick it by name; the window title shows the active
+   preset, or **`Tab`** to pick it by name; the window title shows the active
    preset name and system. If the file has a typo, the app reports it and keeps
    the last good set — it never crashes on a bad preset.
 
@@ -1174,7 +1174,7 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
   `A` or persistently via `auto = true` under `[rotate]` in `config.toml`).
   foobar2000: **Space**, or right-click the visualization → **Next scene**.
 - **Choosing by name.** Both frontends select directly rather than cycling to it.
-  Standalone: the browse overlay (`B`). foobar2000: right-click → **Preset ▸**,
+  Standalone: the browse overlay (`Tab`). foobar2000: right-click → **Preset ▸**,
   a flat list of everything that loaded with a mark on the one showing; the
   choice persists across restarts **by name**, so a preset whose file you later
   delete degrades to the roster's default rather than to a stale position
