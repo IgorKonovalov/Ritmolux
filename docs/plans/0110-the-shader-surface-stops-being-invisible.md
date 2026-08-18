@@ -331,6 +331,124 @@ cannot drift.
   to a followup — a coverage plan that also changes what the code does cannot tell you which of
   the two moved the baseline.
 
+## Implementation log (dev, 2026-08-18)
+
+**Bookkeeping, not design.** Written by `dev` at the end of the dev phases so the
+close ceremony and Phase 6 do not have to re-derive any of it. Everything below
+is *what happened*; the phases above are still the contract.
+
+**Lane:** `main` directly, no worktree. The session that began this plan was
+killed mid-flight by a filesystem failure — `.git/refs/heads/main` came back as
+41 NUL bytes, which reads as "your current branch appears to be broken" and shows
+every tracked file as newly added. It was recovered from the reflog before Phase
+3 started. `git fsck --full --strict` is clean, no work was lost, and Phases 1
+and 2 were already committed when it happened.
+
+### Where it stands
+
+| phase | state |
+|---|---|
+| 1 — the pure half gets unit tests | **done**, committed `4595e14` |
+| 2 — a shader-carrying fixture, and the guard | **done**, committed `c2b36cc` |
+| 3 — the branches where the surface is partly absent | **done**, committed `916df90` |
+| 4 — the element half of the runtime | **done**, committed `e46232f` |
+| 5 — compare adapters, bless once, measure | **done**, committed with this log |
+| 6 — the CI reading | **human**, not started |
+
+### Phase 3 found nothing to record
+
+The phase asked for a finding if `blur_level = 0` and `= 3` rendered identically,
+since both fixture bodies read `lmv_GetBlur3` by construction. They do not:
+`frame_diff 0.2998`. The chain is load-bearing on the picture, bindings 12..14
+resolve to something distinguishable when no chain is built, and the followup
+this plan reserved for that question is not needed.
+
+Measured on WARP at 96x96 — warp-only coverage `1.0000`, comp-only `1.0000`,
+no-blur `0.9998`.
+
+### The ADR-0058 adapter comparison, before the bless
+
+Run on the development box (Windows 10, DX12) under `golden.rs`'s own capture
+conditions — 128x128 over 60 frames, the same `fixed_frame` — so the number
+describes the baseline actually being blessed rather than a differently-measured
+render:
+
+| adapter | mean rgb |
+|---|---|
+| hardware | `235.4217  230.1932  235.1522` |
+| WARP | `235.4122  230.1790  235.1396` |
+
+`frame_diff 0.000267`, `max_channel_outlier 1`.
+
+Agreement to a single 8-bit level. **The fifteen-binding layout with two 3D
+textures does not alias on WARP**, which is the specific hazard this phase owed a
+measurement for: a new pass whose bind-group layout matches a live pipeline's has
+been observed taking that pass's uniform on WARP while hardware stayed correct,
+and the golden suite would then bless the garbage. It did not happen here.
+
+The probe was a throwaway test file, run once and deleted. Phase 5's file list is
+`golden.rs` plus the baseline, and a permanent sibling to
+`the_adapters_agree_on_the_warp_mesh` was not in its scope — but it is worth
+having, and it is a followup below.
+
+### The bless
+
+`LMV_BLESS=1` rewrote five baselines. `git status` then showed **exactly one**
+new file, `core/tests/golden/warp_mesh_shader.png`, and no modification to any
+existing baseline — the other four came back byte-identical. Confirmed by the
+diff rather than by intent, as the phase asks. A re-run without `LMV_BLESS` puts
+every entry including the new one at `mean 0.0000  max_outlier 0`.
+
+### The coverage reading, and why its total is not CI's
+
+`cargo llvm-cov nextest -p lmv-core --summary-only`, 705 tests, on this box:
+
+| | lines | missed | cover |
+|---|---|---|---|
+| local, 2026-08-18 | 29,232 | 10,827 | 62.96 % |
+
+**That total does not reconcile with the 19,935 this plan is sized against, and
+the gap is not something this plan did.** `core/src` has gained 765 lines since
+CI's 2026-08-17 run, 382 of them test code — nowhere near the 9,297 the two
+totals differ by. The two denominators are measuring different scopes, so **the
+local percentage is not comparable to CI's in either direction** and no margin
+should be read off it.
+
+**The per-file rows are comparable, and they are exact.** Every file total in the
+local report matches the plan's CI table to the line — `shader.rs` 719,
+`milk/mod.rs` 572, `draw.rs` 466, `warp_mesh/mod.rs` 1,035, `vm.rs` 309 — and the
+two files this plan does not touch still carry CI's exact missed counts
+(`draw.rs` 128, `vm.rs` 87). Same files, same execution outcomes, same units.
+
+So the arithmetic the Decision set up is answered per file:
+
+| file | missed at CI (2026-08-17) | missed now | eliminated |
+|---|---|---|---|
+| `warp_mesh/shader.rs` | 719 (0.00 %) | 3 (99.58 %) | **716** |
+| `milk/mod.rs` | 271 (52.62 %) | 55 (90.38 %) | **216** |
+| | | | **932** |
+
+**932 eliminated against the 746 the Decision requires — a margin of 186**, out
+of the 990 the two files offered. `warp_mesh/mod.rs` also improved without being
+in scope, 116 missed to 47, because the fixture drives it.
+
+**The hardware/WARP asymmetry applies and points the usual way.** This box has a
+hardware GPU and CI has only WARP, so hardware-gated tests execute here and skip
+there — the gate is `device_type == Cpu`, not "discrete". The local reading is
+therefore an over-estimate of CI's, the same asymmetry `ci.yml:29-33` records
+about the floor itself. **Phase 6 is the only authority on whether the floor is
+met**, and that was true before this discrepancy and is more true because of it.
+
+### Followups this phase found
+
+- **A permanent adapter check for the shader surface.** `the_adapters_agree_on_the_warp_mesh`
+  is an `#[ignore]`d sibling guarding the native fixture; the shader surface now
+  owns a baseline of its own and has no such guard. Same file, same shape.
+- **The local/CI denominator gap is unexplained**, and should be explained before
+  anyone sizes another coverage plan off a CI table. 19,935 against 29,232 is not
+  a rounding difference, and the per-file agreement makes it stranger rather than
+  less strange.
+
 ## Followups (after this lands)
 
 - Re-derive the 91 floor from a real cache-warm CI reading, as `ci.yml:33` has asked since Plan
