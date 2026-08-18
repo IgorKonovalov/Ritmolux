@@ -1,6 +1,6 @@
 # 0095 — the downbeat fold gets a musical beat
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-15
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md),

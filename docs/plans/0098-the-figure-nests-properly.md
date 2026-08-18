@@ -1,6 +1,6 @@
 # 0098 — The figure nests properly
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the shape field gains a scaled-copy coordinate)

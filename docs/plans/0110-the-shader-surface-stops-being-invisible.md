@@ -1,8 +1,7 @@
 # 0110 — The shader surface stops being invisible
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-18
-> **Approved:** 2026-08-18
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the ratchet this restores), [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the fixture discipline), [0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (the adapter comparison Phase 5 owes), [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (what the surface is for)
 
