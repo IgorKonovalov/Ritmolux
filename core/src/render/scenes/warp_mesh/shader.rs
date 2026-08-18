@@ -1010,3 +1010,12 @@ impl MilkShaderResources {
 fn clone_view(view: &wgpu::TextureView) -> wgpu::TextureView {
     view.clone()
 }
+
+// The pure half's tests (Plan 0110 Phase 1). A **separate file** rather than an
+// inline module, and declared *here* rather than beside the scene's own
+// `tests.rs`, because everything it asserts on — `hue_corners`, `roam_vectors`,
+// `rot_rows`, the noise generators — is private to this module and so is
+// unreachable from a sibling.
+#[cfg(test)]
+#[path = "shader_tests.rs"]
+mod tests;
