@@ -1,8 +1,8 @@
 # ADR-0117 — C ABI v6: the host reads the roster and selects a preset
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-16
-> **Related plan(s):** [0107](../plans/0107-the-foobar-menu-picks-a-preset.md)
+> **Related plan(s):** [0107](../plans/done/0107-the-foobar-menu-picks-a-preset.md)
 
 ## Context
 
@@ -94,6 +94,28 @@ only honest list source.
 Keep v5 and let users cycle to the preset they want. Rejected: with the library heading from 39
 toward ~57 presets (Plan 0104), cycling is up to N-1 dissolves to reach a chosen look, and the
 user has asked for direct choice by name. This is precisely the event ADR-0006 deferred and named.
+
+## Outcome (2026-08-18, at Plan 0107's close)
+
+**The decision landed unchanged** — two functions, `LMV_ABI_VERSION` 5 → 6, fifteen exports in
+`core-cabi/src/lib.rs` matching fifteen in the header with identical signatures, and the plugin's
+persist-by-name built entirely host-side as the Positive section predicted.
+
+**One number in the Positive section was already stale when it was written.** It says the two
+functions cost "no material binary growth against NFR §4's ~1.07 MB remaining headroom", quoting
+`docs/specs/0001-c-abi.md`'s Plan 0097 measurement. The no-growth half is right — the review
+confirmed this plan links nothing new. The headroom half is not: `foo_lmv.dll` measured
+**9,279,488 B** at this close against the spec's recorded 8,879,104 B, so the real headroom is
+**~0.72 MB**. The ~400 KB predates this ADR and is unattributed; it is filed as design-backlog 0118
+along with the correction the spec's table needs. Recorded here rather than edited into the body,
+because an accepted ADR is append-only.
+
+**One consequence the ADR did not consider, found in the shim.** `lmv_select_preset` is the
+*dissolving* form only — the core's instant-cut `Renderer::select_preset_now` has no ABI mirror. The
+plugin restores its persisted preset immediately after `lmv_attach_window`, so every fresh handle
+starts on the roster's first entry and crossfades to the remembered one over ~1 s, including at
+every mid-playback stream-format change. Not worth a v7 on its own; noted so the next host-side
+"restore a known state" need does not rediscover it.
 
 ## Notes
 

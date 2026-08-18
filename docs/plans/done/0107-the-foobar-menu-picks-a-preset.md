@@ -1,10 +1,35 @@
 # 0107 — The foobar menu picks a preset
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16
+> **Closed:** 2026-08-18
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0117](../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) (C ABI v6), [0006](../adrs/0006-c-abi-v2-preset-loading.md) (the folder + seed-then-load this builds on)
+> **Related ADRs:** [0117](../../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) (C ABI v6), [0006](../../adrs/0006-c-abi-v2-preset-loading.md) (the folder + seed-then-load this builds on)
+
+**Closed 2026-08-18.** Phases 1-4 landed as `1ea486b` (ABI v6), `bdadf47` (the menu),
+`2919b7b` (persistence), `4d1f450` (the doc sweep). Mode 4 review: **no blockers, two majors**,
+both doc-side and both repaired at the close in `cc1b7ef` — the Phase 4 sweep had written `B` for
+the standalone's browse overlay in `docs/presets.md` (the binding is `Tab`), and
+`docs/on-device-validation.md` was absent from Phase 4's holder list and kept describing the
+component as Space-only.
+
+Verified at the review rather than taken on trust: fifteen exports in `core-cabi/src/lib.rs` and
+fifteen in the header with identical signatures; `fmt` clean, `clippy -p lmv-core-cabi
+--all-targets` clean, 9/9 cabi tests; and the new `#[cfg(windows)]` roster test **really attaches**
+on the dev box — re-run under `--success-output final` it prints no skip notice, so its assertions
+ran. That is the one thing a CI pass cannot tell you here, which is why the spec now records the
+silent-skip as a known gap.
+
+**Phase 5 (human, on-device) did not run before the close and is not claimed to have.** It is
+carried forward as a standing item in
+[`docs/on-device-validation.md`](../../on-device-validation.md), the way Plan 0102's Phase 5 was —
+that file's own escalation rule is that on-device checks do not gate closes here.
+
+Three minors were filed rather than fixed: the modal-menu staleness argument in
+`plugin-foobar/foo_lmv.cpp` (backlog 0117), the component's DLL growth past the size the C ABI
+spec records (backlog 0118), and backlog 0103's now-stale description of the menu it convicts
+(updated in place, entry stays live — Plan 0103 Phase 1 owns the fix).
 
 ## TL;DR
 
