@@ -813,3 +813,377 @@ fn per_frame_init_runs_once_at_load() {
         "and did not run again — `per_frame` alone advanced q1"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The element half of the runtime (Plan 0110 Phase 4)
+// ---------------------------------------------------------------------------
+
+/// A bundle whose three frame programs are all empty — the shape an element test
+/// wants, because then the only thing moving is the element under test.
+fn element_bundle() -> MilkBundle {
+    MilkBundle::from_assembly(None, None, None).expect("an empty bundle decodes")
+}
+
+/// `acc = acc + 1; x = acc` over `.regs acc x` — an accumulator whose output is
+/// visible as a wave point's `x`, so what carries and what does not is readable
+/// off the returned position.
+const ACCUMULATE: &str =
+    ".regs acc x\n.code\nload 0\nconst 1\nadd\nstore 0\npop\nload 0\nstore 1\npop\n";
+
+fn push_wave(bundle: &mut MilkBundle, per_point: Option<&str>) {
+    bundle
+        .push_element(
+            ElementKind::Wave,
+            None,
+            None,
+            per_point,
+            8,
+            1,
+            false,
+            false,
+            false,
+        )
+        .expect("the wave pushes");
+}
+
+/// **A wave's per-point state carries to the next point, and does not leak into
+/// the next wave.**
+///
+/// The carry is the semantics rather than an omission, and `run_point`'s header
+/// records the corpus reading behind it: of the 6 347 files carrying a
+/// custom-wave per-point program, 3 368 read a per-point variable before writing
+/// it, so only carry-over can supply a value. It is also the exact defect commit
+/// `a07b0c6` fixed — reset the registers between points and the two-state
+/// counter idiom computes a constant, which is *chasers 19 Portal* converting
+/// cleanly and rendering inert — and nothing inside `core` pinned it until now.
+///
+/// The isolation half fails differently and matters just as much: each element
+/// gets its own register file, so a second wave running the same program starts
+/// from its own zero rather than from wherever the first one stopped.
+#[test]
+fn a_waves_per_point_state_carries_forward_but_not_across_waves() {
+    let mut bundle = element_bundle();
+    push_wave(&mut bundle, Some(ACCUMULATE));
+    push_wave(&mut bundle, Some(ACCUMULATE));
+    let mut runtime = MilkRuntime::new(bundle, 0);
+
+    let walk = |runtime: &mut MilkRuntime, wave: usize, n: usize| -> Vec<f32> {
+        (0..n)
+            .map(|i| {
+                runtime
+                    .run_wave_point(wave, i as f32 / n as f32, 0.0)
+                    .expect("the wave exists")
+                    .x
+            })
+            .collect()
+    };
+
+    assert_eq!(
+        walk(&mut runtime, 0, 4),
+        vec![1.0, 2.0, 3.0, 4.0],
+        "the accumulator must carry from one point to the next"
+    );
+    assert_eq!(
+        walk(&mut runtime, 1, 4),
+        vec![1.0, 2.0, 3.0, 4.0],
+        "and the second wave must start from its own zero rather than from \
+         where the first one stopped"
+    );
+    assert_eq!(
+        walk(&mut runtime, 0, 2),
+        vec![5.0, 6.0],
+        "meanwhile the first wave kept going — running another wave in between \
+         did not touch its register file"
+    );
+}
+
+/// **A shape instance's index reaches its program**, which is the whole reason a
+/// shape runs its per-frame program once per copy rather than once per frame: a
+/// preset places its instances by reading `instance` and computing from it.
+///
+/// Two instances of one shape must therefore disagree, and disagree by exactly
+/// what was asked for.
+#[test]
+fn a_shape_instances_index_reaches_its_program() {
+    // x = instance
+    const PLACE_BY_INSTANCE: &str = ".regs instance x\n.code\nload 0\nstore 1\npop\n";
+    let mut bundle = element_bundle();
+    bundle
+        .push_element(
+            ElementKind::Shape,
+            None,
+            Some(PLACE_BY_INSTANCE),
+            None,
+            8,
+            16,
+            false,
+            false,
+            false,
+        )
+        .expect("the shape pushes");
+    let mut runtime = MilkRuntime::new(bundle, 0);
+
+    let at = |runtime: &mut MilkRuntime, instance: u32| -> f32 {
+        runtime
+            .run_shape_instance(0, instance)
+            .expect("the shape exists")
+            .x
+    };
+    let (third, seventh) = (at(&mut runtime, 3), at(&mut runtime, 7));
+    assert_eq!(third, 3.0, "instance 3 must see its own index");
+    assert_eq!(seventh, 7.0, "and instance 7 must see a different one");
+    assert_ne!(
+        third, seventh,
+        "a shape whose instances all land in one place is a shape whose \
+         `instance` never reached the program"
+    );
+}
+
+/// **An element whose register roster disagrees with its own per-frame
+/// program's is a load error**, for the reason
+/// `a_bundle_with_mismatched_rosters_is_rejected` gives one layer up: the shared
+/// register file *is* the bridge, so a `q1` written by one program has to be the
+/// `q1` the next one reads.
+///
+/// And **every `BundleError` renders text**. The `Display` arms are the only
+/// thing a user ever sees of a rejected bundle, so an empty one turns a named
+/// diagnosis into silence.
+#[test]
+fn a_mismatched_element_roster_is_rejected_and_every_bundle_error_speaks() {
+    let mut bundle = element_bundle();
+    let err = bundle
+        .push_element(
+            ElementKind::Wave,
+            None,
+            Some(".regs a b\n.code\nconst 1\nstore 0\npop\n"),
+            Some(".regs b a\n.code\nconst 1\nstore 0\npop\n"),
+            8,
+            1,
+            false,
+            false,
+            false,
+        )
+        .expect_err("the same two names in a different order is a different file");
+    assert_eq!(
+        err,
+        BundleError::RosterMismatch {
+            section: "element per_point"
+        }
+    );
+    assert!(
+        bundle.waves.is_empty(),
+        "a rejected element must not be half-pushed"
+    );
+
+    // The format's ceiling of four each: the fifth is refused by name.
+    let mut full = element_bundle();
+    for _ in 0..MAX_ELEMENTS {
+        push_wave(&mut full, None);
+    }
+    let err = full
+        .push_element(
+            ElementKind::Wave,
+            None,
+            None,
+            None,
+            8,
+            1,
+            false,
+            false,
+            false,
+        )
+        .expect_err("a fifth wave is more than the .milk format declares");
+    assert_eq!(err, BundleError::TooManyElements { which: "wave" });
+
+    let decode =
+        EelProgram::new(vec![Op::Add], vec![]).expect_err("an underflow is a decode error");
+    for err in [
+        BundleError::Program {
+            section: "element init",
+            err: decode,
+        },
+        BundleError::RosterMismatch {
+            section: "element per_point",
+        },
+        BundleError::TooManyElements { which: "shape" },
+    ] {
+        let text = err.to_string();
+        assert!(!text.trim().is_empty(), "{err:?} renders no text at all");
+        assert!(
+            text.starts_with("[milk]"),
+            "{err:?} renders `{text}`, which does not say where it came from"
+        );
+    }
+}
+
+/// **The specs agree with what was pushed, are clamped to the format's own
+/// limits, and run out where the roster does.**
+///
+/// The draw layer sizes its buffers from these numbers, so a spec reporting more
+/// geometry than the format allows would be an overrun rather than a wrong
+/// picture — and `None` past the end is what lets a caller loop without knowing
+/// the count first.
+#[test]
+fn element_specs_are_clamped_and_run_out_where_the_roster_does() {
+    let mut bundle = element_bundle();
+    // Over the ceiling, under the floor, and a shape asking for far too many
+    // copies — one of each direction the clamp has to hold.
+    bundle
+        .push_element(
+            ElementKind::Wave,
+            None,
+            None,
+            None,
+            MAX_WAVE_POINTS + 128,
+            1,
+            true,
+            false,
+            true,
+        )
+        .expect("the wide wave pushes");
+    bundle
+        .push_element(
+            ElementKind::Wave,
+            None,
+            None,
+            None,
+            1,
+            1,
+            false,
+            true,
+            false,
+        )
+        .expect("the degenerate wave pushes");
+    bundle
+        .push_element(
+            ElementKind::Shape,
+            None,
+            None,
+            None,
+            7,
+            MAX_SHAPE_INSTANCES * 4,
+            false,
+            false,
+            false,
+        )
+        .expect("the crowded shape pushes");
+    let runtime = MilkRuntime::new(bundle, 0);
+
+    assert_eq!(runtime.wave_count(), 2, "two waves went in");
+    assert_eq!(runtime.shape_count(), 1, "and one shape");
+
+    assert_eq!(
+        runtime.wave_spec(0),
+        Some(ElementSpec {
+            count: MAX_WAVE_POINTS,
+            instances: 1,
+            use_dots: true,
+            thick: false,
+            additive: true,
+        }),
+        "clamped down to the format's ceiling, with every flag carried through"
+    );
+    assert_eq!(
+        runtime.wave_spec(1).map(|s| s.count),
+        Some(2),
+        "and up to the floor of two — one point is not a line"
+    );
+    assert_eq!(
+        runtime.shape_spec(0).map(|s| s.instances),
+        Some(MAX_SHAPE_INSTANCES),
+        "a shape's instance count is clamped to what the buffers were sized for"
+    );
+
+    assert_eq!(runtime.wave_spec(2), None, "past the last wave");
+    assert_eq!(runtime.shape_spec(1), None, "past the last shape");
+}
+
+/// **A shape instance is reproducible whatever ran between** — the round trip
+/// `take_snapshot` / `restore_snapshot` exists for.
+///
+/// A shape loops its per-*frame* program once per copy, and each copy has to
+/// start from what the frame left rather than from what the previous copy did.
+/// The snapshot covers exactly that program's written set, so an accumulator
+/// inside it is rewound before every instance: run one, run a divergent one, run
+/// the first again, and the output must be identical to the first run.
+///
+/// This is the opposite of the wave above, and the two are not inconsistent — a
+/// shape's instances are independent copies, a wave's points are a walk.
+#[test]
+fn a_shape_instance_is_reproducible_whatever_ran_between() {
+    // acc = acc + 1;  x = instance;  y = acc
+    const ACCUMULATING_SHAPE: &str = ".regs instance acc x y\n.code\nload 1\nconst 1\nadd\nstore 1\npop\nload 0\nstore 2\npop\nload 1\nstore 3\npop\n";
+    let mut bundle = element_bundle();
+    bundle
+        .push_element(
+            ElementKind::Shape,
+            None,
+            Some(ACCUMULATING_SHAPE),
+            None,
+            8,
+            16,
+            false,
+            false,
+            false,
+        )
+        .expect("the shape pushes");
+    let mut runtime = MilkRuntime::new(bundle, 0);
+
+    let first = runtime.run_shape_instance(0, 0).expect("the shape exists");
+    let divergent = runtime.run_shape_instance(0, 7).expect("the shape exists");
+    let again = runtime.run_shape_instance(0, 0).expect("the shape exists");
+
+    assert_eq!(
+        first, again,
+        "instance 0 must render the same both times; a per-frame accumulator \
+         that survived the restore would have carried into it"
+    );
+    assert_ne!(
+        first.x, divergent.x,
+        "the divergent run has to actually diverge, or this proves nothing"
+    );
+    assert_eq!(
+        first.y, 1.0,
+        "the accumulator is rewound before every instance, so it always reads one"
+    );
+    assert_eq!(divergent.y, 1.0, "including the divergent one");
+}
+
+/// **`uses_random` is true exactly when some pushed program draws.**
+///
+/// It is what decides whether a capture is reproducible (ADR-0051): a bundle
+/// that draws gets its RNG reset before a re-run, and one that does not is
+/// spared the work. Reporting `false` for a drawing element would make a golden
+/// baseline flicker; reporting `true` for a still one costs a reset nobody
+/// needed. Every section of both kinds is checked, because the walk has one arm
+/// per slot and a missed arm is invisible from any single one.
+#[test]
+fn uses_random_is_true_exactly_when_a_pushed_program_draws() {
+    const STILL: &str = ".regs a\n.code\nconst 1\nstore 0\npop\n";
+    const DRAWING: &str = ".regs a\n.code\nconst 1\nfn1 rand\nstore 0\npop\n";
+
+    let mut quiet = element_bundle();
+    push_wave(&mut quiet, Some(STILL));
+    assert!(
+        !quiet.uses_random(),
+        "a bundle whose every program is still does not draw"
+    );
+
+    for kind in [ElementKind::Wave, ElementKind::Shape] {
+        for slot in 0..3 {
+            let (init, per_frame, per_point) = match slot {
+                0 => (Some(DRAWING), None, None),
+                1 => (None, Some(DRAWING), None),
+                _ => (None, None, Some(DRAWING)),
+            };
+            let mut bundle = element_bundle();
+            bundle
+                .push_element(kind, init, per_frame, per_point, 8, 1, false, false, false)
+                .expect("the element pushes");
+            assert!(
+                bundle.uses_random(),
+                "{kind:?} drawing from slot {slot} must report randomness"
+            );
+        }
+    }
+}
