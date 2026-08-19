@@ -467,6 +467,61 @@ harness before concluding the experiment was wrong.
 **Phase 1 lands as one commit** — `core/src/milk/outputs.rs`, `core/src/milk/tests.rs`,
 `core/src/render/scenes/warp_mesh/tests.rs`. Phases 2 through 5 are untouched and unstarted.
 
+### Phase 2 — the bisect ran, and it **stopped**: the wash is not downstream
+
+**The five seams are three, measured.** Every post stage reports `active` only above zero and neither
+converted subject binds `bloom`, `trails` or any kaleidoscope param; with no stage active
+`PostChain::begin` hands the scene the tonemap's own input, so seams B, C and D are **one texture**.
+`bg_bright` defaults to `0` and neither binds it, so the backdrop contributes nothing. The chain is
+`field -> present pass -> tonemap -> display`: two stages.
+
+```text
+  seam        fog tunnel    blur mix 3    ratio     (hardware, 3 runs, bit-identical)
+  A field     0.29798886    0.01990991    14.967
+  B present   0.52298039    0.08744538     5.981
+  E display   0.74454564    0.25118530     2.964
+
+  seam        fog tunnel    blur mix 3    ratio     (DX12 WARP)
+  A field     0.29793853    0.01192657    24.981
+  B present   0.52290142    0.05914328     8.841
+  E display   0.74456638    0.24515122     3.037
+```
+
+**No seam departs upward.** The ratio is maximal at the field and falls monotonically on both
+adapters. The present pass and the tonemap **compress** the separation rather than creating it, so
+**Phase 3 does not run** and Phases 4, 5 and 6 do — the stop condition, taken as written.
+
+**The stop is not the one the plan drafted, and the difference matters.** The plan's branch was "no
+seam separates them". These two separate by `15x` — at **seam A**, the seam this plan treats as ruled
+clean. Plan 0109 Phase 4's probe drives `MilkBundle::from_assembly(None, None, None)`, an **empty**
+bundle with synthetic params, so its `1e-6` background describes a stand-in and not any preset. On
+*Fog Tunnel*'s own bundle the field background reads `0.298` — and backlog 0113 predicted exactly
+that magnitude from the look gate ("three orders of magnitude above" the `3.03e-4` floor) before
+anyone could measure it. **The built-in warp path is back in scope**, which is a redirection this
+plan has no phase for; it is recorded on 0113 as a dated update and is the successor's question.
+
+**The seam-B lead is dead as a wash mechanism.** `gamma` is a `1.9x` linear multiply and *Fog Tunnel*
+carries `1.8`, so seam B was the plan's named suspect. The ratio *falls* across it. Gamma may still be
+wrong on its own terms — that is Phase 3's ADR question and Phase 3 did not run — but it does not make
+the washed subject diverge from the control.
+
+**Instrument.** `core/src/render/milk_wash.rs`, `#[cfg(test)]`, plus two committed fixtures converted
+from the pinned corpus paths. Seams B and E needed no plumbing: `Tonemap::src_texture()` already
+existed and the display comes from `capture_preset`. Seam A needed one `#[cfg(test)]` method on the
+`Scene` trait — gated so the shipped extension seam (ADR-0002) is unchanged, and taken instead of a
+`dyn Any` downcast because the plan requires all seams from **one run**. No probe adds a render
+target, which is what keeps this clear of the adapter hazard the plan's Risks name.
+
+**Asserts no threshold** (ADR-0071), for two measured reasons: the hardware readings are
+bit-identical across three runs, so there is no spread to derive a tolerance from; and *Blur Mix 3*
+alone diverges `1.67x` between adapters at the field, so any ratio threshold would be
+adapter-dependent.
+
+**One gate is red and `dev` left it alone.** `check-backlog-claims.mjs` reports entry **0121**'s probe
+broken at `docs/design-backlog.md:2446` — it asserts `present: None => d\.\$field`, the defect Phase 1
+removed, so it fired **on delivery** rather than on decay. 0121 is a `**Closes:**` entry and archiving
+it is the close ceremony's step 3c, which is `architect`'s call.
+
 ## Followups (after this lands)
 
 - Whatever Phase 5's x-extent question files, if it turns out to be a second defect.
