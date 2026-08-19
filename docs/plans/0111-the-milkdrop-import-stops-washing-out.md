@@ -1,6 +1,6 @@
 # 0111 — The MilkDrop import stops washing out
 
-> **Status:** draft
+> **Status:** approved — 2026-08-19
 > **Created:** 2026-08-19
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet, deliberately — Phase 3 writes one (**ADR-0120**) if and only if the
