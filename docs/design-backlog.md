@@ -2207,6 +2207,52 @@ convicted at Plan 0109's:
   stroke on stroke. Black-on-black is invisible; black-on-yellow-green is glaring. Unverified against
   the reference, hence "probably".
 
+### Update 2026-08-19 — [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 2 bisected the chain and the wash is **not downstream**. The field was never measured on a real bundle.
+
+**The entry stays live, and its direction reverses.** The update above concluded *"the remaining
+direction is downstream of the field"*. Phase 2 measured that chain and it is not there.
+
+One statistic (`edge`, the mean over the outermost ring) at every seam, both subjects, one run,
+128x128, 300 frames, quantizer at its default 255:
+
+```text
+  seam        fog tunnel    blur mix 3    ratio     (hardware)
+  A field     0.29798886    0.01990991    14.967
+  B present   0.52298039    0.08744538     5.981
+  E display   0.74454564    0.25118530     2.964
+
+  seam        fog tunnel    blur mix 3    ratio     (DX12 WARP)
+  A field     0.29793853    0.01192657    24.981
+  B present   0.52290142    0.05914328     8.841
+  E display   0.74456638    0.24515122     3.037
+```
+
+**The plan's five seams are three**, measured rather than assumed: every post stage reports `active`
+only above zero and neither converted preset binds `bloom`, `trails` or any kaleidoscope param, so
+`PostChain::begin` hands the scene the tonemap's own input texture; and `bg_bright` defaults to `0`
+and neither binds it, so the backdrop contributes nothing. Seams B, C and D are one texture.
+
+**No seam departs upward. The ratio is maximal at the field and falls monotonically** — `15 -> 6 -> 3`
+on hardware, `25 -> 9 -> 3` on WARP. The present pass and the tonemap **compress** the separation
+rather than creating it, so Plan 0111 Phase 3 did not run.
+
+**Why the field looked clean and is not.** Plan 0109 Phase 4's probe drives
+`MilkBundle::from_assembly(None, None, None)` — an **empty** bundle with synthetic params — so its
+`1e-6` background is a statement about a stand-in, not about any preset. Driven with *Fog Tunnel*'s own
+bundle the field background reads `0.298`: five orders of magnitude higher, and almost exactly the
+*"three orders of magnitude above the quantizer's `3.03e-4` floor"* this entry predicted from the look
+gate before anyone could measure it. **The field is where the separation already exists**, and the
+built-in warp path is back in scope.
+
+**Two caveats, neither of which moves the conclusion.** `edge` reads background only for a figure that
+does not fill the frame, and our *Fog Tunnel* draws the solid tube that is the defect — so the absolute
+`14.967` is soft while the monotonic trend, being one statistic at every seam, is not. And *Blur Mix 3*
+alone diverges `1.67x` between adapters at the field (it is the one subject with a blur chain), so any
+threshold here would be adapter-dependent; the probe asserts none.
+
+- **Verified 2026-08-19** — the field is still read back by the probe this update is built on:
+  `present: fn feedback_field in: core/src/render/scenes/warp_mesh/mod.rs`
+
 ---
 
 ## 0117 — the plugin's preset menu dispatches a snapshot index across a modal wait, and the "nothing can reload" argument is not sound
