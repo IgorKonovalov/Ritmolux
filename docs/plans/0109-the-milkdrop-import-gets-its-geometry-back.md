@@ -1,6 +1,8 @@
 # 0109 — The MilkDrop import gets its geometry back
 
-> **Status:** approved
+> **Status:** in-progress — **amended 2026-08-19: a Phase 6 was added after this plan started**,
+> carrying Plan 0110's close-review major. It is **order-independent** and touches no file any
+> phase below touches, so it does not disturb work in flight; take it whenever convenient.
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — Phase 1 writes one if the wash needs a design call
@@ -168,6 +170,56 @@ flowchart TB
 - **Pin the reference by full filename.** Plan 0108's gate lost one pair to `Geiss - Cosmic Dust 2 -
   Trails 5b` being judged against the plain `Geiss - Cosmic Dust 2`; the seven exact filenames are in
   that plan's close notes.
+
+### Phase 6 — the pragma guard learns to see a `#[path]` module
+
+- **Owner skill:** dev
+- **Added 2026-08-19**, from [Plan 0110](done/0110-the-shader-surface-stops-being-invisible.md)'s
+  close review. It lands here because the file it concerns is this plan's own subsystem
+  (`core/src/render/scenes/warp_mesh/`) and the fix is about ten lines — not because it has anything
+  to do with MilkDrop geometry. **Order-independent:** it shares no file with Phases 1-5 and may be
+  taken first, last, or between any two of them.
+- **What:** `core/tests/hygiene.rs`'s `is_cfg_test_module` decides which files are *test* modules —
+  and so exempt from the hot-path panic-denial pragma — by matching a line `#[cfg(test)]`
+  **immediately followed by** `mod <file stem>;`. Plan 0110 Phase 1 wrote:
+
+  ```rust
+  #[cfg(test)]
+  #[path = "shader_tests.rs"]   // an attribute in between
+  mod tests;                     // and the module is named `tests`, not `shader_tests`
+  ```
+
+  which matches on neither count. So `shader_tests.rs` is collected as **hot-path source** and
+  passes the guard **only because its `#![allow(...)]` block contains the literal
+  `clippy::indexing_slicing`** — the string the guard greps for as its sentinel. That is exactly the
+  failure `is_cfg_test_module`'s own doc comment names: *"satisfy the check with an allow exactly
+  where the guard means to demand a deny — passing vacuously, and turning a real gate into a
+  spelling coincidence."* Nothing is unsafe today; the file really is test-only. What is broken is
+  the guard, and this is the tree's first `#[path]`-declared module, so the pattern is now available
+  to the next one.
+- **Files touched:** `core/tests/hygiene.rs`, and possibly the declaration at the foot of
+  `core/src/render/scenes/warp_mesh/shader.rs`.
+- **Two routes, and the choice is yours.** Either teach `is_cfg_test_module` to step over an
+  attribute run between `#[cfg(test)]` and the `mod` line and to resolve `#[path = "<file>"]` to its
+  target; **or** move the file to `core/src/render/scenes/warp_mesh/shader/shader_tests.rs` and
+  declare it `#[cfg(test)] mod shader_tests;`, which the existing matcher already recognises (its
+  parent search tries `dir.with_extension("rs")`, and `warp_mesh/shader.rs` is exactly that). The
+  first is more robust and the second is smaller. **Prefer the first** — the defect is that the
+  guard is blind, and the second only removes today's instance of it.
+- **Done when:**
+  - `shader_tests.rs` is skipped because the guard **resolved its declaration**, not because of what
+    its allow-block spells.
+  - **The guard is proven non-vacuous on that file, by inversion.** Today, deleting
+    `clippy::indexing_slicing` from `shader_tests.rs`'s `#![allow(...)]` block makes
+    `hot_path_modules_carry_the_panic_pragma` **fail**, naming the file — that is how this defect was
+    found. After the fix it must **pass**. Run that scratch edit, observe the flip, revert it. This
+    is the one check the fix cannot satisfy by accident, and no permanent assertion replaces it.
+  - **The skip rule did not widen into real code.** The same scratch probe on a genuine hot-path
+    file — remove the pragma block from `warp_mesh/draw.rs` — still **fails**. Revert.
+  - The scanned file set is otherwise unchanged: same files as today, minus `shader_tests.rs`.
+- **Not in scope:** auditing the rest of the tree for the same shape. There is exactly one
+  `#[path]`-declared module in `core/src` as of 2026-08-19 (`grep -rn "#\[path" core/src`), and it
+  is this one.
 
 ## Risks & open questions
 
