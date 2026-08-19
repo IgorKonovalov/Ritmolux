@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0111** (ADRs are a separate sequence — next free there is **0119**.)
+**Next free number: 0112** (ADRs are a separate sequence — next free there is **0120**.)
 
 ## Active roster
 
@@ -23,6 +23,29 @@ someone who picked it up is reading.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Amended 2026-08-16: a new Phase 1 fixes backlog [0102](../design-backlog.md) + [0103](../design-backlog.md) before anything advertises the component**, which Plan 0102's Phase 5 found starves foobar2000's own UI until playback starts. That phase is a surface-lifetime design pass, is ADR-worthy, and its fix only reaches users on the next tag — so the release must be green before Phase 5 submits. The rest is outreach whose done-whens are **artifacts, not outcomes**. Phase 3's soft want [0101](done/0101-the-engine-renders-a-music-video.md) **closed 2026-08-17 — motion can be recorded now, but its Phase 5 found a 1080p render reads as an upscale ([backlog 0110](../design-backlog.md)), so demo material made before that lands shows the engine at its grainiest.** |
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and ~~its four wait on [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1~~ — **that wait is discharged: 0108 Phase 1 landed 2026-08-17, so the four `warp_mesh` worlds are authorable now.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
 | [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) | The frame stream passes through a diffusion model | approved | dev, human | **Phase 1 is a throwaway spike and Phase 2 is a stop condition** — if a diffused attractor boils, the plan ends there having cost an afternoon and nothing is built. **Fully unblocked: [0101](done/0101-the-engine-renders-a-music-video.md) closed 2026-08-17**, so the Y4M stream every later phase needs exists on stdout today and the `shot/` lane is free. **No ADR yet, deliberately** — it is written between Phases 2 and 3, against the spike's evidence rather than a guess. Ships a script, no weights and no runtime, so `lmv.exe` and the release zip do not change; `core/` is untouched. Contends with nothing (`tools/` + `docs/` only). |
+| [0111](0111-the-milkdrop-import-stops-washing-out.md) | The MilkDrop import stops washing out | draft | dev, human | **Takes the whole live MilkDrop fidelity cluster — backlog 0113 (the wash), 0119, 0120, 0121 — and deliberately leaves reach (0109 disk textures, 0108 tail) filed.** Phase 2 is a **bisect with a stop condition**: one statistic (`FieldTrace::edge`) at five seams from the field to the swapchain, naming the first seam that separates a washed conversion from the clean control. [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4 ruled the field itself clean, so the suspect is the present pass, the blend, bloom or the tonemap. **Four hypotheses on this defect are already dead**, which is why no fix is promised: Phase 3 runs only if Phase 2 names a seam, and stops again if no mechanism survives being written as arithmetic. Phases 1/4/5 are the three smaller defects and land regardless. Phase 6 is a fourth `human` look gate on the seven pairs, now pinned by full path. Contends with nothing. |
+
+**Added 2026-08-19, from a MilkDrop backlog round after
+[0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
+[0111](0111-the-milkdrop-import-stops-washing-out.md).** Six live entries came out of the import;
+the round split them on one line and took one side:
+
+- **The four fidelity entries went into one plan** — 0113 (the wash), 0119 (the `ang` seam), 0120
+  (the waveform scale) and 0121 (the `decay` fallback's units). They share four files, so three
+  separate plans would have contended; and 0121 goes **first** inside the plan rather than last,
+  because it is what silently corrupted Plan 0109 Phase 4's own instrument and every measurement
+  after it is worth less until it lands.
+- **The two reach entries stayed filed, by their own argument.** Backlog 0109 (disk textures — 1 826
+  files, 88.7 % of every conversion failure) says to take it only once the fidelity work has settled
+  whether converted presets are worth having more of. Two look gates have now answered that with
+  *"still merely different"* (Plan 0100 Phase 7, Plan 0108 Phase 2), so the answer is not yet yes.
+  0111's Phase 6 asks it a third time, and that verdict is the trigger for planning reach. Backlog
+  0108 (the conversion tail) is 25x smaller than 0109 by its own arithmetic and waits behind it.
+- **One thing the authoring turned up and the plan carries:** `gamma` is applied as a **linear
+  multiply** in the present shader while being named for MilkDrop's `fGammaAdj`, so a preset at
+  `fGammaAdj = 1.9` takes an unclamped 1.9x linear gain into the tonemap. It is a **lead and not a
+  diagnosis** — the highest-gamma preset in the judged set reads fine and one that washes sits at
+  unity — which is exactly why Phase 2 measures the seam rather than starting from it.
 
 **Added 2026-08-16, from a backlog round after [0091](done/0091-the-figure-fills-the-frame.md)'s
 close: [0098](0098-the-figure-nests-properly.md) and [0099](done/0099-the-horizon-reaches-its-own-length.md)
