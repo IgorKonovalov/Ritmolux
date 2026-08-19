@@ -2436,6 +2436,75 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
+### Update 2026-08-19 — [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+
+**The amplitude half stopped, on the branch the phase was given for it.** The reference's
+normalization is not derivable from any source available in this environment: there is no MilkDrop
+source and no authoring documentation beside the corpus, and a `.milk` preset does not record the
+convention it was authored against. Nothing was changed, and matching a picture was refused — it
+would produce a number right for one preset at one wave mode and wrong for the corpus.
+
+**What the corpus does settle, and it narrows the question usefully.** Across the 552 presets in
+`milkdrop-original` that set `fWaveScale`:
+
+```text
+  n=552  min=0.0000  p10=0.0100  p25=0.2920  median=0.9724  p75=1.5540  p90=3.2350  max=100.0000
+```
+
+**The median is 0.9724 — unity.** So `fWaveScale` is authored as a multiplier *about 1*, and what is
+missing is a single **base amplitude** (what a unit-scale wave should occupy), not a per-preset or
+mode-dependent correction. That also weakens this entry's own "factor of 279 across the seven pinned
+presets, so it cannot be a bare multiplier" argument: `p10 = 0.01` means a tenth of the corpus
+authors near-zero scales deliberately, and a near-flat trace is a *visible flat line* rather than an
+invisible one, so the spread is consistent with a bare multiplier over a correct base.
+
+Any candidate constant must keep both ends of that distribution usable. Whoever takes this needs one
+of: MilkDrop 2's waveform draw, its authoring documentation, or a reference capture of a preset built
+to be amplitude-revealing.
+
+- **Verified 2026-08-19** — the scale is still a bare multiply with no normalization constant:
+  `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
+---
+
+## 0122 — a mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width
+
+**Raised by:** `dev`, from [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
+(2026-08-19), splitting the x-extent half out of [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
+**Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the cancelling pair is still both halves, one at the point and one on
+  the way out: `present: fn uv_to_world in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### The finding
+
+`draw.rs`'s mode 6/7 arm places points at `t = i/(count-1) - 0.5` and divides the x component by
+`aspect`; `uv_to_world` then multiplies x **by** `aspect`. The two cancel exactly, so the trace's
+world-space length is `2t = 2.0` **whatever the target's shape**, while the frame is `2 * aspect`
+wide in those units. The trace therefore covers `1/aspect` of the width — `0.5625` at 16:9, which is
+the "roughly the middle 57 %" Plan 0109's Phase 5 gate reported for *Blur Mix 3*. The reference draws
+these full-width.
+
+Said plainly: **the trace is normalized to the frame's height rather than its width.** At aspect 1 it
+is full-width, which is why nothing caught it — the same coincidence
+[ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) exists for, one level down.
+
+**It is independent of `wave_scale`,** which scales only the amplitude term, so 0120's constant
+cannot fix this and this cannot fix 0120. That independence is why the two were split.
+`a_straight_wave_trace_spans_one_over_aspect_of_the_width` pins it as a property over three aspects.
+
+### What a fix would be
+
+Almost certainly dropping the `/aspect` at the point, so the length is width-normalized and the
+`uv_to_world` multiply is the only aspect term. **Unverified against the reference** — whether
+MilkDrop's mode 6 spans the full width at every aspect or is itself height-normalized is the same
+class of question as 0120's constant and 0119's handedness, and it wants the same source.
+
+### Priority
+
+**Medium.** Visible on every mode-6/7 preset on any non-square display, which is every display; but
+like 0120 it makes a preset look mis-tuned rather than unrecognisable.
+
 ---
 
 ## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
