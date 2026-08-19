@@ -126,6 +126,16 @@ outputs! {
     /// Past `0.5`, `1 - c`.
     invert: "invert" = 0.0, Plain;
 
+    // --- the video echo (Plan 0109 Phase 3) ---
+    /// How much of a second sampled copy of the finished frame the composite
+    /// blends over the first. `0` is no echo at all, and is the identity.
+    echo_alpha: "echo_alpha" = 0.0, Plain;
+    /// How far that copy is zoomed, about the frame centre.
+    echo_zoom: "echo_zoom" = 1.0, Plain;
+    /// How it is flipped: `0` none, `1` x, `2` y, `3` both. Quantized where it
+    /// is read, not here — see `warp_mesh::echo_orientation`.
+    echo_orient: "echo_orient" = 0.0, Plain;
+
     // --- the waveform ---
     /// Which of the eight `wave_mode` figures the waveform draws.
     wave_mode: "wave_mode" = 0.0, Plain;

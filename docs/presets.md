@@ -704,6 +704,14 @@ conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 > needs re-running is a bundle that *does* carry a converted warp shader: its epilogue was emitted
 > before the quantizer existed and never calls it, so the uniform reaches nothing. Nothing breaks in
 > the meantime; that preset renders exactly as it does today.
+>
+> **A second reason to re-run, as of Plan 0109: the video echo now exists.** `fVideoEchoAlpha`,
+> `fVideoEchoZoom` and `nVideoEchoOrientation` were warned about as unconsumed and are now read by
+> the present pass — a second sampled copy of the frame, zoomed and flipped, summed over the first.
+> This one *always* needs the re-convert, at every era: the three values are seeded into the bundle
+> at conversion time, so a bundle emitted before this has no register for the scene to read. Only
+> 2.4 % of the corpus sets a non-zero echo alpha, and where it does the preset is usually
+> unrecognisable without it.
 
 Things worth knowing before you reach for it:
 

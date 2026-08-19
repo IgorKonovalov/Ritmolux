@@ -81,10 +81,10 @@ const OUTPUTS: &[Output] = &[
     o("bdarken", "darken", 0.0, true, ""),
     o("bsolarize", "solarize", 0.0, true, ""),
     o("binvert", "invert", 0.0, true, ""),
-    // --- the video echo, the one composite member with no home here ---
-    o("fvideoechozoom", "echo_zoom", 1.0, false, ECHO),
-    o("fvideoechoalpha", "echo_alpha", 0.0, false, ECHO),
-    o("nvideoechoorientation", "echo_orient", 0.0, false, ECHO),
+    // --- the video echo, built by Plan 0109 Phase 3 ---
+    o("fvideoechozoom", "echo_zoom", 1.0, true, ""),
+    o("fvideoechoalpha", "echo_alpha", 0.0, true, ""),
+    o("nvideoechoorientation", "echo_orient", 0.0, true, ""),
     // --- the draw layer (Plan 0100 Phase 4) ---
     o("nwavemode", "wave_mode", 0.0, true, ""),
     o("fwavescale", "wave_scale", 1.0, true, ""),
@@ -127,9 +127,6 @@ const OUTPUTS: &[Output] = &[
     o("", "monitor", 0.0, false, MONITOR),
 ];
 
-const ECHO: &str = "the video echo — a second sampled copy of the frame, which this engine has no \
-     stage for. Only 2.4 % of the corpus sets a non-zero echo alpha, which is why \
-     it is named here rather than built";
 /// Kept for the roster's shape even though nothing carries it today — the draw
 /// layer landed in Phase 4 and its entries are consumed. A future unconsumed
 /// output names its own phase here.
@@ -396,8 +393,6 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
             ),
             class: if out.owed == DRAW {
                 "unconsumed-draw"
-            } else if out.owed == ECHO {
-                "unconsumed-echo"
             } else {
                 "unconsumed-other"
             },

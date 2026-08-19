@@ -223,10 +223,14 @@ const DEFAULT_DEPOSIT_SPIN: f32 = 0.0;
 /// ```
 ///
 /// Each is one `select` in a shader, and between them they reach most of the
-/// library. `fVideoEchoZoom`/`_Alpha`/`_Orientation` — the one member of the
-/// same family that is *not* here — is a second sampled copy rather than a
-/// remap, and only 252 files (2.4 %) set a non-zero echo alpha, so the converter
-/// names it as unsupported instead.
+/// library.
+///
+/// **The video echo joined them in Plan 0109 Phase 3**, and it is the one member
+/// that is not a remap: `echo_alpha`/`echo_zoom`/`echo_orient` blend a second
+/// sampled copy of the finished field over the first. Only 252 files (2.4 %) set
+/// a non-zero echo alpha, which is why it waited — but where it appears it is
+/// load-bearing rather than decorative, and *Songflower (Moss Posy)*'s woven
+/// lattice is only one family of bars without it.
 pub const COMPOSITE_PARAMS: &[&str] = &[
     "gamma",
     "wrap",
@@ -235,12 +239,44 @@ pub const COMPOSITE_PARAMS: &[&str] = &[
     "darken",
     "solarize",
     "invert",
+    "echo_alpha",
+    "echo_zoom",
+    "echo_orient",
 ];
 
 /// `gamma` default — MilkDrop's `fGammaAdj` at unity.
 const DEFAULT_GAMMA: f32 = 1.0;
 /// The other six default off, which is the identity for each.
 const DEFAULT_COMPOSITE_FLAG: f32 = 0.0;
+/// The echo's own defaults — no second copy, at unit zoom and unflipped, which
+/// is the identity and is MilkDrop's own resting value for each.
+const DEFAULT_ECHO_ALPHA: f32 = 0.0;
+const DEFAULT_ECHO_ZOOM: f32 = 1.0;
+const DEFAULT_ECHO_ORIENT: f32 = 0.0;
+
+/// MilkDrop's `nVideoEchoOrientation` as its two flip bits — `1` flips x, `2`
+/// flips y, `3` both.
+///
+/// **This is where a continuous value becomes one of four states.** The source
+/// format stores an integer, but it reaches here as an `f32` that a per-frame
+/// program can compute and that a preset's own smoothing can sweep *between*
+/// states; deciding what `1.5` means in the shader would mean deciding it four
+/// times. Out of range **wraps** rather than clamping, so a preset animating the
+/// orientation by counting gets a cycle rather than a value stuck at `3`. Total
+/// on every input, `NaN` included, because a non-finite orientation is not a
+/// reason to lose the echo.
+fn echo_orientation(v: f32) -> u8 {
+    if !v.is_finite() {
+        return 0;
+    }
+    match v.round().rem_euclid(4.0) as i32 {
+        1 => 1,
+        2 => 2,
+        3 => 3,
+        _ => 0,
+    }
+}
+
 /// How much `darken_center` takes out of the middle at full strength.
 ///
 /// MilkDrop draws a fixed alpha there rather than exposing an amount; this is
@@ -293,6 +329,9 @@ pub const PARAMS: &[&str] = &[
     "darken",
     "solarize",
     "invert",
+    "echo_alpha",
+    "echo_zoom",
+    "echo_orient",
     // Colour.
     "hue",
     "color_span",
@@ -622,6 +661,9 @@ struct Present {
     // The four MilkDrop composite remaps, each 0 or 1:
     // x: brighten, y: darken, z: solarize, w: invert
     b: vec4<f32>,
+    // The video echo: x: alpha, y: zoom, z: flip x (0/1), w: flip y (0/1).
+    // The orientation arrives already decoded into two flags — see `render`.
+    c: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> pp: Present;
 @group(0) @binding(1) var field: texture_2d<f32>;
@@ -629,7 +671,44 @@ struct Present {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let c = textureSampleLevel(field, field_samp, in.uv, 0.0);
+    var c = textureSampleLevel(field, field_samp, in.uv, 0.0);
+
+    // **The video echo**: MilkDrop's composite draws the finished frame twice,
+    // the second copy zoomed about the centre and flipped, at `fVideoEchoAlpha`.
+    // It samples the SAME texture this pass is already reading — the frame as it
+    // stands after the warp, the deposit and the draw layer — so the echo is a
+    // display-time composite and **does not accumulate**: the field the next
+    // frame warps is untouched by it. That is the plan's open question, and it
+    // is what makes the stage cheap: one extra sample, no second target.
+    //
+    // **The second copy ADDS rather than replacing**, which is the one part of
+    // this that could not be read off the reference from here and is stated
+    // rather than discovered. Three things point the same way. The plan's
+    // acceptance property — flip x at `alpha = 1` renders left-right symmetric —
+    // is only true of a sum; a lerp at 1 shows the flipped copy *alone*, which
+    // is a mirrored picture, no more symmetric than the one it came from. Plan
+    // 0108's look gate describes the reference at `alpha = 1.000` as showing two
+    // families of bars where this engine showed one, and two families is both
+    // copies. And this field is premultiplied linear light whose whole seam is
+    // additive (ADR-0056), so a sum is the composite this engine already speaks.
+    // If the Phase 5 gate reads the echo as too bright, `alpha`'s meaning is the
+    // knob and this comment is where to start.
+    //
+    // The zoom and the flip are both about the frame centre, so they commute and
+    // the order below is free. No aspect enters (ADR-0037): a uniform scale in
+    // uv is a uniform scale of the picture whatever shape the target is, which
+    // is exactly what MilkDrop's scaled quad does.
+    if (pp.c.x > 0.0) {
+        var euv = (in.uv - vec2<f32>(0.5)) / max(pp.c.y, 1e-3) + vec2<f32>(0.5);
+        euv.x = select(euv.x, 1.0 - euv.x, pp.c.z > 0.5);
+        euv.y = select(euv.y, 1.0 - euv.y, pp.c.w > 0.5);
+        c = c + textureSampleLevel(field, field_samp, euv, 0.0) * pp.c.x;
+    }
+    // The branch is on a uniform and it is there for exactness rather than for
+    // speed: adding `echo * 0` is the identity in arithmetic but not for a
+    // non-finite `echo`, and an echo-less preset must render the bytes it
+    // rendered before this stage existed.
+
     // The field already holds premultiplied colour and coverage (the deposit
     // writes them that way and the warp scales both together), so `brightness`
     // and `gamma` scale the light and `occlude` scales only how much backdrop is
@@ -682,6 +761,7 @@ struct ShapeUniform {
 struct PresentUniform {
     a: [f32; 4],
     b: [f32; 4],
+    c: [f32; 4],
 }
 
 /// One mesh vertex, as the warp pipeline reads it.
@@ -898,6 +978,9 @@ pub struct WarpMeshScene {
     darken: f32,
     solarize: f32,
     invert: f32,
+    echo_alpha: f32,
+    echo_zoom: f32,
+    echo_orient: f32,
     hue: f32,
     color_span: f32,
     color_center: f32,
@@ -992,6 +1075,9 @@ impl WarpMeshScene {
             darken: DEFAULT_COMPOSITE_FLAG,
             solarize: DEFAULT_COMPOSITE_FLAG,
             invert: DEFAULT_COMPOSITE_FLAG,
+            echo_alpha: DEFAULT_ECHO_ALPHA,
+            echo_zoom: DEFAULT_ECHO_ZOOM,
+            echo_orient: DEFAULT_ECHO_ORIENT,
             hue: DEFAULT_HUE,
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
@@ -1587,6 +1673,9 @@ impl Scene for WarpMeshScene {
         self.darken = DEFAULT_COMPOSITE_FLAG;
         self.solarize = DEFAULT_COMPOSITE_FLAG;
         self.invert = DEFAULT_COMPOSITE_FLAG;
+        self.echo_alpha = DEFAULT_ECHO_ALPHA;
+        self.echo_zoom = DEFAULT_ECHO_ZOOM;
+        self.echo_orient = DEFAULT_ECHO_ORIENT;
         self.hue = DEFAULT_HUE;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
@@ -1625,6 +1714,9 @@ impl Scene for WarpMeshScene {
             "darken" => self.darken = value,
             "solarize" => self.solarize = value,
             "invert" => self.invert = value,
+            "echo_alpha" => self.echo_alpha = value,
+            "echo_zoom" => self.echo_zoom = value,
+            "echo_orient" => self.echo_orient = value,
             "hue" => self.hue = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
@@ -1689,6 +1781,9 @@ impl Scene for WarpMeshScene {
             self.darken = out.darken;
             self.solarize = out.solarize;
             self.invert = out.invert;
+            self.echo_alpha = out.echo_alpha;
+            self.echo_zoom = out.echo_zoom;
+            self.echo_orient = out.echo_orient;
             // **The deposit is NOT forced off here**, and that was a bug for one
             // commit. A converted preset draws its own light — the waveform, its
             // custom elements, its borders — and the converter emits no deposit
@@ -1866,6 +1961,21 @@ impl Scene for WarpMeshScene {
                     f32::from(self.solarize >= 0.5),
                     f32::from(self.invert >= 0.5),
                 ],
+                // **The orientation is quantized here, on the CPU.** It is one of
+                // four states in the source format, but it arrives as an `f32`
+                // that a per-frame program — or a preset's own smoothing — can
+                // sweep continuously through the values between them. Rounding
+                // to the nearest state on this side keeps the shader from having
+                // to decide what 1.5 means.
+                c: {
+                    let orient = echo_orientation(self.echo_orient);
+                    [
+                        self.echo_alpha.clamp(0.0, 1.0),
+                        self.echo_zoom,
+                        f32::from(orient & 1 != 0),
+                        f32::from(orient & 2 != 0),
+                    ]
+                },
             }),
         );
         // The converted-shader uniform, filled from the same frame the EEL

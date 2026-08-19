@@ -660,3 +660,39 @@ fn mesh_cost_by_grid() {
         TierConfig::RICH.mesh_grid
     );
 }
+
+/// **The echo orientation is four states, and a continuous value picks one** —
+/// Plan 0109 Phase 3.
+///
+/// The source format stores an integer, but the value reaches the scene as an
+/// `f32` that a per-frame program computes and that a preset's own `[smoothing]`
+/// can sweep through the gaps between states. Quantizing here rather than in the
+/// shader means one decision instead of one per flip, and it is the same rule
+/// the kaleidoscope's seam took: an eased param is continuous even when its
+/// meaning is not.
+#[test]
+fn the_echo_orientation_quantizes_to_four_states() {
+    // The four states, and the halves that round into them.
+    for (input, want) in [
+        (0.0, 0),
+        (0.4, 0),
+        (1.0, 1),
+        (0.6, 1),
+        (1.49, 1),
+        (2.0, 2),
+        (3.0, 3),
+    ] {
+        assert_eq!(
+            echo_orientation(input),
+            want,
+            "{input} must read as orientation {want}"
+        );
+    }
+    // Out of range wraps, so counting animates rather than sticking.
+    assert_eq!(echo_orientation(4.0), 0, "4 is 0 again");
+    assert_eq!(echo_orientation(5.0), 1);
+    assert_eq!(echo_orientation(-1.0), 3, "counting down wraps too");
+    // Total: a non-finite orientation loses the flip, never the echo.
+    assert_eq!(echo_orientation(f32::NAN), 0);
+    assert_eq!(echo_orientation(f32::INFINITY), 0);
+}
