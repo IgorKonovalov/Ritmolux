@@ -16,7 +16,6 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0110](0110-the-shader-surface-stops-being-invisible.md) | The shader surface stops being invisible | in-progress | dev, human | **CI's `coverage` job has been red since 2026-08-16 and is the only red one** — `warp_mesh/shader.rs` is 719 lines at 0.00 %, unreached because every fixture drives the mesh from EEL2 bytecode and none carries WGSL. The arithmetic sets the scope: **746 missed lines must go and the two files in scope hold 990**, so the margin is thin and the floor stays at 91 by decision rather than by drift. |
 | [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | approved | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | approved | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
@@ -112,9 +111,12 @@ because it is large.
 
 ### The two lanes, now
 
-- **Lane A — [0110](0110-the-shader-surface-stops-being-invisible.md), in progress.** CI's
-  `coverage` gate is red and this is the only plan that fixes it. Nothing else should reach the
-  golden corpus until its one new baseline has landed.
+- **Lane A — [0110](done/0110-the-shader-surface-stops-being-invisible.md) is closed
+  (2026-08-19), and its baseline is on `main` but not yet pushed.** Its Phase 6 — the CI reading
+  that is the whole point — runs on the user's next push; the close projected **~92.3 %** against
+  the floor of 91 from CI's own per-file table, so the `coverage` gate is expected to go green
+  without further work. **Lane A's successor is
+  [0109](0109-the-milkdrop-import-gets-its-geometry-back.md) below, which starts now.**
 - **Lane B — [0087], startable now.** It touches `core/src/render/scenes/lines/` and one warning
   in `core/src/preset/schema.rs`; Lane A touches neither. **It goes early on purpose:** its Phase 3
   cost measurement and Phase 4 look gate can send it to
@@ -127,15 +129,19 @@ because it is large.
 adds a baseline, Lane B re-blesses 28 — and `LMV_BLESS` rewrites every baseline the run renders, not
 only the intended ones. Worktrees keep that isolated while the lanes are live, so the collision is at
 **merge**, not at bless: **[0087] merges `main` and re-blesses only after [0110]'s baseline is on
-`main`**, then checks its diff carries only its own 28. Taken in the other order, a bless silently
-reverts the new fixture and nothing fails.
+`main`** — which it now is, as of 2026-08-19 — then checks its diff carries only its own 28. Taken
+in the other order, a bless silently reverts the new fixture and nothing fails. **The baseline to
+watch is `core/tests/golden/warp_mesh_shader.png`** — the newest entry, and the one a re-bless
+would revert most quietly.
 
 ### Then, in this order
 
-1. **[0109](0109-the-milkdrop-import-gets-its-geometry-back.md)** — the moment 0110 lands. It is
-   the *only* plan that hard-contends with it (`warp_mesh/shader.rs`, `core/src/milk/`), so it
-   cannot run in parallel; taking it straight after also means the same subsystem twice while the
-   context is warm.
+1. **[0109](0109-the-milkdrop-import-gets-its-geometry-back.md)** — startable now; 0110 closed
+   2026-08-19. It is the *only* plan that hard-contended with it (`warp_mesh/shader.rs`,
+   `core/src/milk/`), so it could not run in parallel; taking it straight after also means the same
+   subsystem twice while the context is warm. **It inherits 0110's one major** — `hygiene.rs`
+   cannot see a `#[path]`-declared test module, so `shader_tests.rs` satisfies the hot-path pragma
+   guard vacuously — as a cheap fix in the same files.
 2. **[0098](0098-the-figure-nests-properly.md)** — after [0087]. Both edit
    `core/src/preset/schema.rs`, but each in one small localized spot, so that is a merge nuisance
    rather than a serialization constraint; the real reason it follows is that lane capacity is two.
@@ -720,6 +726,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 open: unpushed, CI reading projected **~92.3 %** vs floor 91.
 - [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md) — closed 2026-08-18. Review: **no blockers, two majors (repaired at close), four minors.** Phase 5 not run; carried to the on-device checklist. Backlog 0117 + 0118.
 - [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md) — closed 2026-08-17. Review: **no blockers, two majors, three minors.** Phase 2: **still merely different**; four new defects → [0109](0109-the-milkdrop-import-gets-its-geometry-back.md).
 - [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md) — closed 2026-08-17. Review: **no blockers, no majors, five minors/nits.** Phase 5: **yes, with backlog 0110** — a 1080p render reads as an upscale.

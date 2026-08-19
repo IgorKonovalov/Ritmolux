@@ -13,6 +13,59 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md)
+  — closed 2026-08-19, five `dev` phases in `4595e14`, `c2b36cc`, `916df90`, `e46232f`, `2b639fe`.
+  Review: **no blockers, one major, three minors.** **Phase 6 (`human`) is deliberately still
+  open** — nothing is pushed, so the CI reading this plan exists to turn green has not happened.
+
+  **What shipped.** The fixture the engine never had: `core/tests/fixtures/warp_mesh_shader.toml`,
+  the only preset anywhere in the crate carrying WGSL, whose `[mesh]`, `[palette]` and `[params]`
+  tables are **byte-identical** to `warp_mesh_milk.toml` and whose `[milk]` programs differ only by
+  `blur_level = 3` — which is what makes the shaders-vs-defaults comparison a clean single variable.
+  Around it: 7 unit tests over `shader.rs`'s pure half (no GPU), 4 GPU tests over the build, the
+  partly-absent `Option` arms and the blur chain, 6 tests over the wave/shape element half of
+  `milk/mod.rs`, a golden baseline appended **last** to `EXTRA_FIXTURES`, and the prelude drift
+  guard — `milkconv/tests/fixture.rs`'s discipline applied to WGSL, asserting the fixture's two
+  modules still begin with exactly `fragment_prelude(g)` so a hand-inlined ~2 KB of generated text
+  cannot rot into a comment that used to be true.
+
+  **The coverage arithmetic, and the log's one superseded claim.** `dev` recorded the local total
+  (29,232 lines / 10,827 missed) as irreconcilable with CI's 19,935 / 2,540 and left it as an open
+  question. The review resolved it: the local total reproduces exactly, and diffing it against CI's
+  own per-file table from run `32008593831` sorts every diverging file into **`delta lines == delta
+  missed`** (never-executed duplicate mappings merged out of `target/llvm-cov-target` — `bloom.rs`
+  +507/+507, `particles/mod.rs` +1130/+1130, `expr.rs` +679/+679) or **`delta lines == 0` with
+  misses down** (the real work: `shader.rs` -716, `milk/mod.rs` -216, `warp_mesh/mod.rs` -69). Same
+  tree, stale artifacts; `cargo llvm-cov clean --workspace` first is what a future coverage plan
+  should be told. And because `headless()` is software-preferred, **every GPU test here ran on WARP,
+  the adapter CI uses** — so the per-file eliminations transfer, and the projection is **~1,530
+  missed over ~19,943 lines, ~92.3 %**: 1,010 eliminated against the 746 required, ~265 lines of
+  headroom over the floor, with `vm.rs` and `draw.rs` untouched as the plan wanted.
+
+  **The major, and it is about the guard rather than the code.** Phase 1 declared its tests as
+  `#[cfg(test)] / #[path = "shader_tests.rs"] / mod tests;`. `hygiene.rs`'s `is_cfg_test_module`
+  skips out-of-line test modules by matching `#[cfg(test)]` **immediately followed by** `mod <file
+  stem>;` — and this is neither adjacent nor stem-named. So `shader_tests.rs` is scanned as
+  hot-path source and passes **only** because its `#![allow(...)]` block contains the literal
+  `clippy::indexing_slicing` the guard greps for: the "spelling coincidence" that function's own
+  header warns about, now live. Proven by probe rather than inferred — rename that one lint and
+  `hot_path_modules_carry_the_panic_pragma` fails naming the file. Nothing is unsafe (the file is
+  test-only); what is damaged is the guard, for a class of file this plan introduced. Carried as a
+  followup.
+
+  **What the phases found, and did not.** Phase 3 asked for a finding if `blur_level = 0` and `= 3`
+  rendered identically — they do not (`frame_diff 0.2998`), so the followup that reserved that
+  question is discharged rather than owed. Phase 5's ADR-0058 comparison, run before the bless at
+  `golden.rs`'s own capture conditions, put hardware and WARP at `frame_diff 0.000267` with a
+  max-channel outlier of 1: **the fifteen-binding layout with two 3D textures does not alias**,
+  which is the specific hazard a new layout of that size owes a measurement for. The bless produced
+  exactly one new file, confirmed by diff. The probe itself was a throwaway, so that evidence now
+  lives only here — a permanent `#[ignore]`d sibling is the second followup.
+
+  **Version: no bump, deliberately.** Tests, a fixture and a baseline; the built binary is
+  byte-identical to `v0.74.0` and a tag push publishes release zips. `docs/releasing.md` blesses
+  "no bump" for a chore-only plan as a choice, and this was made as one rather than missed.
+
 - [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md)
   — closed 2026-08-18, four `dev` phases in `1ea486b`, `bdadf47`, `2919b7b`, `4d1f450`. Review:
   **no blockers, two majors (both repaired at the close in `cc1b7ef`), four minors, two nits.**
