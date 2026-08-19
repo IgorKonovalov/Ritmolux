@@ -56,6 +56,10 @@ macro_rules! outputs {
         /// [`Default`] is MilkDrop's own default for each, which is what the host
         /// seeds before running a program — so an output the preset never writes
         /// comes back as the reference's resting value rather than as zero.
+        ///
+        /// It is therefore **unconverted**, in the reference's vocabulary, and is
+        /// not interchangeable with a value `read` returns. Anything comparing
+        /// the two must convert first.
         #[derive(Debug, Clone, Copy, PartialEq)]
         pub struct $struct_name {
             $($(#[$meta])* pub $field: f32,)*
@@ -92,12 +96,20 @@ macro_rules! outputs {
             }
 
             /// Read every field back, converting the rates.
+            ///
+            /// **Both arms convert.** A default is stated in the reference's
+            /// vocabulary exactly as a program's own value is — [`Default`] is
+            /// MilkDrop's per-frame number, not this engine's per-second one — so
+            /// an unnamed output that skipped `convert` would leave a per-frame
+            /// factor in a field whose doc says "per second". That was
+            /// design-backlog 0121, and it silently ran an entire Plan 0109
+            /// experiment at `0.98`/s instead of `0.5455`/s.
             pub fn read(&self, state: &VmState) -> $struct_name {
                 let d = $struct_name::default();
                 $struct_name {
                     $($field: match self.$field {
                         Some(i) => convert(state.get(i), Rate::$rate, d.$field),
-                        None => d.$field,
+                        None => convert(d.$field, Rate::$rate, d.$field),
                     },)*
                 }
             }
@@ -284,7 +296,7 @@ outputs! {
 /// [`per_second_factor`](super::per_second_factor). Everything else passes
 /// through, with a non-finite value falling back to the reference's default so a
 /// single `NaN` cannot blank a frame.
-fn convert(value: f32, rate: Rate, default: f32) -> f32 {
+pub(super) fn convert(value: f32, rate: Rate, default: f32) -> f32 {
     match rate {
         Rate::Factor => super::per_second_factor(value),
         Rate::Plain => {
