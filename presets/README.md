@@ -1115,7 +1115,7 @@ shader, so a preset that binds none of them pays nothing.
 | `darken` | past `0.5`, the light squared |
 | `solarize` | past `0.5`, `c * (1 - c) * 4` — the classic inversion around mid-grey |
 | `invert` | past `0.5`, `1 - c` |
-| `echo_alpha` | how much of a **second sampled copy** of the finished frame the present adds over the first. `0` — the default — is the exact identity and costs one uniform branch |
+| `echo_alpha` | how far the present blends toward a **second sampled copy** of the finished frame. `0` — the default — is the exact identity and costs one uniform branch; `1` is the copy *alone*, with the base frame gone |
 | `echo_zoom` | how far that copy is zoomed, about the frame centre. `1` is the same size. Default `1` |
 | `echo_orient` | how it is flipped: `0` none, `1` left-right, `2` top-bottom, `3` both. Rounded to the nearest of the four, so a smoothed or computed value never lands between them. Out of range wraps, so a preset that animates the orientation by counting gets a cycle. Default `0` |
 
@@ -1129,12 +1129,20 @@ shader, so a preset that binds none of them pays nothing.
 > wrong.
 
 > **The echo is the one member of that roster that is not a remap**, and it is
-> the one that adds light rather than reshaping it: the second copy is *summed*
-> over the first, so `echo_alpha = 1` with `echo_orient = 1` renders a frame that
-> is its own left-right mirror rather than a mirrored frame. It reads the field
-> as the present pass finds it — after the warp, the deposit and the draw layer —
-> and writes nothing back, so **it does not accumulate**: what the next frame
-> warps is untouched by it.
+> the one that reaches for a *second sample* rather than reshaping the first. It
+> **blends toward** that copy rather than adding it
+> ([ADR-0119](../docs/adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)),
+> so it can never brighten the frame past what the frame already holds: at
+> `echo_alpha = 1`, `echo_orient = 1`, `echo_zoom = 1` you get the picture
+> mirrored left-right, not the picture plus its mirror. Summing was tried first
+> and washed *Songflower* out — a big soft magnified duplicate laid over a crisp
+> lattice is a contrast destroyer.
+>
+> It reads the field as the present pass finds it — after the warp, the deposit
+> and the draw layer — and writes nothing back, so **it does not accumulate**:
+> what the next frame warps is untouched by it. That is also what makes the
+> mirror above exact rather than approximate, since both arms evolve the same
+> field.
 
 > **The deposit is laid down *after* the warp, deliberately.** Its light is
 > "now", so it is crisp on the frame it appears and warped from the next frame

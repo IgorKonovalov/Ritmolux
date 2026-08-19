@@ -97,44 +97,50 @@ fn headless() -> Option<Renderer> {
     }
 }
 
-/// Which line a frame is asked to be symmetric about.
+/// Which line the second frame is flipped about before the two are compared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Axis {
     /// Flip top for bottom — the `ang` round trip's own fingerprint.
     Horizontal,
-    /// Flip left for right — what a negative `sx` produces (Plan 0109 Phase 1).
+    /// Flip left for right — what a negative `sx` produces (Plan 0109 Phase 1),
+    /// and what `echo_orient = 1` produces (Phase 7).
     Vertical,
+    /// No flip at all. Only useful with [`mirrored_distance`]'s two-image form,
+    /// where it is the **non-vacuity arm**: "the echoed frame matches the
+    /// mirrored control" says nothing unless the echoed frame also *fails* to
+    /// match the unmirrored one.
+    None,
 }
 
-/// **How far the frame is from being its own mirror** about `axis`: the mean
-/// absolute per-channel difference between the image and itself flipped, on the
-/// stored-byte 0..1 scale `frame_diff` uses.
+/// **Mean absolute per-channel difference between `a` and `b` flipped about
+/// `axis`**, on the stored-byte 0..1 scale `frame_diff` uses.
 ///
-/// Zero means the picture is exactly symmetric across that line. The statistic
-/// is the defect's own fingerprint rather than a proxy for it — a share-of-light
-/// measure was tried first and could not separate the two arms, because the
-/// composite carries a soft glow that fills both halves whatever the geometry
-/// does.
+/// One statistic, three defects, because two copies of a statistic drift. Both
+/// mirror hunts in this file pass the same image twice (see
+/// [`mirror_asymmetry`]); Phase 7's echo test passes two different captures,
+/// because the property there is not "this picture is symmetric" but "this
+/// picture *is* that one, mirrored".
 ///
-/// The axis is a parameter rather than a second function because both defects
-/// this file hunts are the same measurement about a different line, and two
-/// copies of a statistic drift.
-fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
-    let (w, h) = (image.width.max(1), image.height.max(1));
+/// The images must be the same size; a mismatched pair reads out of `b` at `a`'s
+/// coordinates and the missing bytes come back as zero, which shows up as a
+/// large distance rather than as a silent pass.
+fn mirrored_distance(a: &CaptureImage, b: &CaptureImage, axis: Axis) -> f32 {
+    let (w, h) = (a.width.max(1), a.height.max(1));
     let mut sum = 0f64;
     let mut n = 0u64;
-    let at = |x: u32, y: u32, c: u32| -> f64 {
-        let i = ((y * w + x) * 4 + c) as usize;
-        f64::from(image.rgba.get(i).copied().unwrap_or(0))
+    let at = |img: &CaptureImage, x: u32, y: u32, c: u32| -> f64 {
+        let i = ((y * img.width.max(1) + x) * 4 + c) as usize;
+        f64::from(img.rgba.get(i).copied().unwrap_or(0))
     };
     for y in 0..h {
         for x in 0..w {
             let (mx, my) = match axis {
                 Axis::Horizontal => (x, h - 1 - y),
                 Axis::Vertical => (w - 1 - x, y),
+                Axis::None => (x, y),
             };
             for c in 0..3 {
-                sum += (at(x, y, c) - at(mx, my, c)).abs();
+                sum += (at(a, x, y, c) - at(b, mx, my, c)).abs();
                 n += 1;
             }
         }
@@ -144,6 +150,18 @@ fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
     } else {
         (sum / n as f64 / 255.0) as f32
     }
+}
+
+/// **How far the frame is from being its own mirror** about `axis` — the
+/// one-image case of [`mirrored_distance`].
+///
+/// Zero means the picture is exactly symmetric across that line. The statistic
+/// is the defect's own fingerprint rather than a proxy for it — a share-of-light
+/// measure was tried first and could not separate the two arms, because the
+/// composite carries a soft glow that fills both halves whatever the geometry
+/// does.
+fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
+    mirrored_distance(image, image, axis)
 }
 
 /// **The `ang` round trip reflects content about the horizontal midline** — the
@@ -330,32 +348,43 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
     );
 }
 
-/// **The video echo puts a second, flipped copy of the frame on screen** —
-/// Plan 0109 Phase 3, design-backlog 0115.
+/// **At full alpha the frame IS its own transformed copy** — Plan 0109 Phase 7,
+/// [ADR-0119], superseding the property Phase 3 shipped.
 ///
-/// # What was missing
+/// # What the stage is
 ///
 /// MilkDrop's composite draws the finished frame twice: once straight, once
 /// zoomed about the centre and flipped per `nVideoEchoOrientation`, at
-/// `fVideoEchoAlpha`. This engine had no stage for it and the converter said so
-/// by name — 2.4 % of the corpus sets a non-zero echo alpha, and where it is set
-/// it is load-bearing. *Songflower (Moss Posy)* asks for `1.000` with an animated
-/// orientation, and its woven lattice **is** the echo: one family of bars
-/// survived without it.
+/// `fVideoEchoAlpha`. 2.4 % of the corpus sets a non-zero alpha and where it is
+/// set it is load-bearing. This engine had no such stage until Phase 3, and the
+/// converter used to name the three values as unconsumed.
 ///
-/// # The property
+/// # Why the property changed
 ///
-/// A frame plus its own left-right flip is left-right symmetric, whatever the
-/// frame was. So the fixture — one shape at `x = 0.22`, `echo_orient = 1`,
-/// `echo_zoom = 1`, `echo_alpha = 1` — must render symmetric about the vertical
-/// axis, and the same file at `echo_alpha = 0` must not. The control is one
-/// token: the initial condition the converter now seeds.
+/// Phase 3 asserted that a flip-x at `alpha = 1` renders **left-right
+/// symmetric**. That is a consequence of a *sum*, and it is weak — a uniform
+/// grey frame satisfies it too. The Phase 5 look gate then convicted the sum
+/// itself: at the authored `alpha = 1.000` it turned *Songflower*'s crisp
+/// lattice pale, and the observation Phase 3 had reasoned from (that only one
+/// family of bars survives without the echo) did not reproduce. ADR-0119 makes
+/// the blend a `mix`.
 ///
-/// This walks the converter, so it also pins the half that is not the shader:
-/// three outputs that were warned about as unconsumed are now seeded into the
+/// Under a `mix` the stage can be pinned **exactly** rather than by a symptom.
+/// The echo samples the same field this pass is already reading and writes
+/// nothing back, so the field evolves identically in both arms; at `alpha = 1`,
+/// `echo_zoom = 1`, `echo_orient = 1` the echoed frame therefore *is* the
+/// horizontal mirror of the `alpha = 0` control, frame for frame. Nothing but
+/// the intended transform satisfies that — which is the whole gain over the
+/// symmetry statistic, and is why this test asserts a distance between two
+/// captures rather than a property of one.
+///
+/// This also still walks the converter, so it pins the half that is not the
+/// shader: three outputs once warned about as unconsumed are seeded into the
 /// bundle and read by the scene.
+///
+/// [ADR-0119]: ../../docs/adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md
 #[test]
-fn the_video_echo_draws_a_flipped_second_copy() {
+fn at_full_alpha_the_echo_is_the_mirror_of_the_control() {
     let Some(mut renderer) = headless() else {
         return;
     };
@@ -379,25 +408,29 @@ fn the_video_echo_draws_a_flipped_second_copy() {
         .capture_preset("no-echo", &frame, FRAMES)
         .expect("capture the control");
 
-    let (echo, none) = (
-        mirror_asymmetry(&a, Axis::Vertical),
-        mirror_asymmetry(&b, Axis::Vertical),
-    );
+    // The claim, and its own non-vacuity arm: `a` must match `b` MIRRORED, and
+    // must NOT match `b` as it stands. Without the second, a stage that ignored
+    // `echo_orient` entirely — or ignored the echo entirely — would pass.
+    let mirrored = mirrored_distance(&a, &b, Axis::Vertical);
+    let direct = mirrored_distance(&a, &b, Axis::None);
     println!(
-        "[warp_geometry] distance from being its own left-right mirror — \
-         `echo_alpha = 1`: {echo:.4}, `echo_alpha = 0`: {none:.4}"
+        "[warp_geometry] `echo_alpha = 1` against the control — mirrored: \
+         {mirrored:.4}, unmirrored: {direct:.4}"
     );
 
     assert!(
-        none > 0.05,
-        "the CONTROL is already close to symmetric ({none:.4}), so a symmetric \
-         echo proves nothing. The fixture's one shape sits at x = 0.22"
+        direct > 0.05,
+        "the echoed frame already matches the UNMIRRORED control ({direct:.4}), \
+         so the echo is not reaching the screen at all and the mirrored \
+         comparison below would pass on a stage that does nothing. The \
+         fixture's one shape sits at x = 0.22, off centre on purpose"
     );
     assert!(
-        echo < none * 0.25,
-        "`echo_alpha = 1` with `echo_orient = 1` is {echo:.4} from its own \
-         left-right mirror against the control's {none:.4}, so the flipped \
-         second copy is not reaching the screen — check that the converter \
-         seeds the three echo outputs and that the present pass reads them"
+        mirrored < direct * 0.25,
+        "at `echo_alpha = 1`, `echo_orient = 1`, `echo_zoom = 1` the frame must \
+         BE the control mirrored left-right — it is {mirrored:.4} from it, \
+         against {direct:.4} from the unmirrored control. Either the blend is \
+         not a `mix` (ADR-0119), or the flip/zoom is not the identity transform \
+         the fixture asks for"
     );
 }
