@@ -330,6 +330,26 @@ struct Warp {
 @group(0) @binding(1) var past: texture_2d<f32>;
 @group(0) @binding(2) var past_samp: sampler;
 
+// A per-frame scale raised to `dt`, with its SIGN carried around the outside.
+//
+// A scale is a rate, so it is raised to `dt` (ADR-0019) - but `pow()` of a
+// negative base is undefined, and a negative scale is MilkDrop's standard mirror
+// idiom (3.5 % of the corpus writes one). Flooring the value itself, as this
+// stage did before, replaced every mirror with a near-zero positive scale;
+// flooring the MAGNITUDE keeps the guard `pow` needs and lets the flip through.
+// A zero stays on the positive arm, so the expression is bit-identical to the
+// old one for every `v >= 0` - nothing shipping a positive scale moves.
+//
+// Applying the flip on every frame is safe under any frame rate, which is the
+// non-obvious half: a mirror composed with itself is the identity, so the
+// symmetric fixed point a preset converges to is the same at 30 Hz as at 144 Hz,
+// even though the intermediate frames differ. A signed rate does not interpolate
+// the way a positive one does, and it does not have to.
+fn signed_rate(v: f32, dt: f32) -> f32 {
+    let m = pow(max(abs(v), 1e-4), dt);
+    return select(m, -m, v < 0.0);
+}
+
 struct VsIn {
     @location(0) clip: vec2<f32>,
     // zoom, rot, cx, cy
@@ -360,12 +380,12 @@ fn vs_main(in: VsIn) -> VsOut {
 
     // Rates are per second (ADR-0019): a factor is raised to dt, an amount is
     // multiplied by it, so two half-length frames compose to one full-length one.
-    let zoom = pow(max(in.t0.x, 1e-4), dt);
+    let zoom = signed_rate(in.t0.x, dt);
     let rot  = in.t0.y * dt;
     let ctr  = in.t0.zw;
     let d    = in.t1.xy * dt;
-    let sx   = pow(max(in.t1.z, 1e-4), dt);
-    let sy   = pow(max(in.t1.w, 1e-4), dt);
+    let sx   = signed_rate(in.t1.z, dt);
+    let sy   = signed_rate(in.t1.w, dt);
     let warp = in.t2.x * dt;
 
     // **The stage order is MilkDrop's**, and it matters: `zoom` is about the

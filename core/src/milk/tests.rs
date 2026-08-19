@@ -737,10 +737,14 @@ fn an_overflowing_factor_saturates_in_the_direction_it_asked_for() {
         with_zoom("0.01") < 1.0e-20,
         "and a collapsing one stays collapsing"
     );
-    // A non-positive factor is not a factor: it reads as the identity rather
-    // than as a mirror or a hole.
+    // Zero is not a factor: it reads as the identity rather than as a hole.
     assert_eq!(with_zoom("0"), 1.0);
-    assert_eq!(with_zoom("-2"), 1.0);
+    // A NEGATIVE one is, and it is MilkDrop's mirror idiom (Plan 0109 Phase 1).
+    // This line read `1.0` until then, which is what deleted the mirror before
+    // the mesh vertex stage could apply it — the magnitude converts as its
+    // positive twin does and the sign rides through.
+    assert_eq!(with_zoom("-2"), -with_zoom("2"));
+    assert!(with_zoom("-2") < 0.0, "a mirror stays a mirror");
 }
 
 /// A bundle is **reset with the preset**: a second run from a fresh runtime gives
@@ -1185,5 +1189,61 @@ fn uses_random_is_true_exactly_when_a_pushed_program_draws() {
                 "{kind:?} drawing from slot {slot} must report randomness"
             );
         }
+    }
+}
+
+/// **A positive scale converts exactly as it always did, and a negative one
+/// mirrors** — Plan 0109 Phase 1, the CPU half of design-backlog 0113.
+///
+/// The claim under test is *byte-identity for a positive input*, asserted
+/// against the live unsigned converter rather than argued from the source: the
+/// two functions are different code, and a scale that moved here would move
+/// every converted preset that ships. `0.0` is on the positive arm on purpose —
+/// zero is not a mirror, and the old reading of it (the identity) is the one to
+/// keep.
+///
+/// The negative arm is the defect: `per_second_factor` answers `1.0` for
+/// anything at or below zero, which is right for `decay` and wrong for a scale,
+/// because it deletes MilkDrop's mirror idiom before the mesh vertex stage can
+/// apply it.
+#[test]
+fn a_signed_factor_keeps_the_positive_arm_and_mirrors_the_negative_one() {
+    let positives = [
+        0.0f32,
+        f32::MIN_POSITIVE,
+        1e-6,
+        0.5,
+        0.96,
+        1.0,
+        1.05,
+        13.0,
+        1e6,
+        f32::INFINITY,
+    ];
+    for v in positives {
+        assert_eq!(
+            per_second_signed_factor(v).to_bits(),
+            per_second_factor(v).to_bits(),
+            "a positive scale must convert bit-identically to before, and {v} did not"
+        );
+    }
+    assert_eq!(
+        per_second_signed_factor(f32::NAN).to_bits(),
+        per_second_factor(f32::NAN).to_bits(),
+        "a non-finite scale must fall back exactly as it did before"
+    );
+
+    for v in [-0.5f32, -0.96, -1.0, -1.05, -13.0] {
+        let signed = per_second_signed_factor(v);
+        assert!(
+            signed < 0.0,
+            "a negative scale must stay negative through the conversion — {v} \
+             came back as {signed}, which is a collapse rather than a mirror"
+        );
+        assert_eq!(
+            signed.to_bits(),
+            (-per_second_factor(-v)).to_bits(),
+            "the magnitude must convert exactly as its positive twin does"
+        );
     }
 }
