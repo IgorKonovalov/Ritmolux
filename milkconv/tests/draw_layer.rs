@@ -676,3 +676,116 @@ fn a_non_additive_shape_lands_in_the_over_half() {
         );
     }
 }
+
+/// A trace with structure in it, so "the same geometry" below is a claim about
+/// something rather than about a flat line. Asymmetric on purpose: a symmetric
+/// trace would survive a half-turn rotation and could not tell one apart from
+/// the identity.
+fn ramp_waveform() -> [f32; WAVE_SAMPLES] {
+    std::array::from_fn(|i| {
+        let t = i as f32 / (WAVE_SAMPLES - 1) as f32;
+        t * t - 0.2
+    })
+}
+
+/// The frame outputs for a mode-6 line, with everything but the waveform
+/// silenced so every segment built belongs to it.
+fn wave_outputs(mystery: f32) -> FrameOutputs {
+    FrameOutputs {
+        wave_mode: 6.0,
+        wave_mystery: mystery,
+        wave_a: 1.0,
+        mv_a: 0.0,
+        ob_a: 0.0,
+        ib_a: 0.0,
+        ..Default::default()
+    }
+}
+
+/// Build the draw layer at `time` and hand back the segments it emitted.
+fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[f32; 4]> {
+    let mut runtime = MilkRuntime::new(bundle(), 0);
+    let mut geometry = draw::DrawGeometry::default();
+    draw::build(
+        &mut geometry,
+        Some(&mut runtime),
+        &wave_outputs(mystery),
+        waveform,
+        time,
+        1.0 / 30.0,
+        16.0 / 9.0,
+    );
+    geometry
+        .segments
+        .iter()
+        .map(|s| [s.a[0], s.a[1], s.b[0], s.b[1]])
+        .collect()
+}
+
+/// **A mode-6 figure's orientation is a pure function of `wave_mystery`** —
+/// Plan 0109 Phase 2, design-backlog 0115.
+///
+/// # The defect
+///
+/// The arm computed its angle as `mystery * PI + time * 0.05`, a full turn every
+/// ~126 s. `time` was the only reading of the clock in the whole draw layer, it
+/// contradicted the arm's own comment, and it meant *a trace authored horizontal
+/// was horizontal only at instants*. Plan 0108 Phase 4 named it and left it in
+/// because the question — does the reference's line drift? — is about the
+/// reference; Phase 6 of that plan put the two side by side and answered no.
+///
+/// # The three claims
+///
+/// **Pure**, so the same trace builds the same geometry at two well-separated
+/// times: 61 s was half a turn under the old term, the furthest apart two frames
+/// could be. **Horizontal**, stated as the plan states it — a trace authored
+/// horizontal (`wave_mystery = 0`, a flat trace) has every endpoint at one
+/// height. And **still steered by `wave_mystery`**, which is the non-vacuity: a
+/// figure that ignored its angle entirely would pass the first two.
+#[test]
+fn a_mode_six_figure_is_oriented_by_mystery_alone() {
+    let waveform = ramp_waveform();
+    let early = segments_at(0.0, 0.0, &waveform);
+    let late = segments_at(61.0, 0.0, &waveform);
+    assert!(
+        !early.is_empty(),
+        "the fixture drew no waveform segments, so nothing below is a test of one"
+    );
+    assert_eq!(
+        early, late,
+        "the mode-6 figure moved between t = 0 and t = 61 s. Its angle is \
+         `wave_mystery` alone — if the clock is being read again, a trace \
+         authored horizontal is horizontal only at instants"
+    );
+
+    // Horizontal means horizontal: a flat trace at `mystery = 0` lies on one
+    // line. The endpoints carry the waveform's own excursion, so the trace is
+    // flattened for this arm rather than the tolerance being widened.
+    let flat = segments_at(0.0, 0.0, &[0.0f32; WAVE_SAMPLES]);
+    let height = flat.first().map_or(0.0, |s| s[1]);
+    for (i, s) in flat.iter().enumerate() {
+        assert!(
+            (s[1] - height).abs() < 1e-6 && (s[3] - height).abs() < 1e-6,
+            "segment {i} of a flat `mystery = 0` trace runs from y {} to y {}, \
+             off the trace's own height {height} — the figure is at an angle its \
+             preset never asked for",
+            s[1],
+            s[3]
+        );
+    }
+    let span = flat.iter().fold(f32::MIN, |m, s| m.max(s[2].abs()));
+    assert!(
+        span > 0.5,
+        "the flat trace spans only {span} in x, so its horizontality is the \
+         horizontality of a dot"
+    );
+
+    // Non-vacuity: the angle still responds to the parameter that owns it.
+    let turned = segments_at(0.0, 0.5, &waveform);
+    assert_ne!(
+        early, turned,
+        "`wave_mystery = 0.5` built the same geometry as `0`, so the figure is \
+         not oriented by mystery either — the term was not removed, the whole \
+         angle was"
+    );
+}
