@@ -1,9 +1,17 @@
 # 0110 — The shader surface stops being invisible
 
-> **Status:** in-progress
+> **Status:** done — **closed 2026-08-19, the five `dev` phases run** (`4595e14`, `c2b36cc`,
+> `916df90`, `e46232f`, `2b639fe`). Review: **no blockers, one major, three minors.** The major is
+> that Phase 1's `#[path]`-declared test module is invisible to `hygiene.rs`'s skip rule, so it is
+> scanned as hot-path code and passes only because its `#![allow(...)]` block spells the sentinel
+> the guard greps for — the exact vacuous pass that guard's own header warns about, proven by probe
+> and carried to the followups below. **Phase 6 (`human`) is deliberately still open**: nothing is
+> pushed, so the CI reading that is this plan's stated success criterion has not happened. The
+> review projected it instead, from CI's own per-file table against a local run — see "The coverage
+> reading" below, corrected.
 > **Created:** 2026-08-18
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the ratchet this restores), [0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the fixture discipline), [0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (the adapter comparison Phase 5 owes), [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (what the surface is for)
+> **Related ADRs:** [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the ratchet this restores), [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the fixture discipline), [0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (the adapter comparison Phase 5 owes), [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (what the surface is for)
 
 ## TL;DR
 
@@ -52,8 +60,8 @@ because of what it says about itself in its own header:
 `warp_shader`, `comp_shader` or `blur_level` keys. So `MilkShaderResources::build`, the six
 procedural noise textures, the three-level blur chain, `fill_uniform`, `encode_clear` and
 `encode_blur` have never run under any test, on any adapter. That is a test gap Plan
-[0100](done/0100-the-engine-speaks-milkdrop.md) Phase 6 left behind and Plan
-[0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) widened.
+[0100](0100-the-engine-speaks-milkdrop.md) Phase 6 left behind and Plan
+[0108](0108-the-milkdrop-import-gets-its-tone-back.md) widened.
 
 **The arithmetic, because it decides the scope.** At the current denominator, a 91 % floor
 allows `0.09 x 19,935 = 1,794` missed lines. There are 2,540. **This plan must eliminate at
@@ -313,7 +321,7 @@ cannot drift.
   is a narrower capture size for this fixture, not a dropped assertion.
 - **The fixture is hand-written, so it is only as representative as its author.** It pins that
   the surface *works*, not that any real preset renders correctly — Plan
-  [0109](0109-the-milkdrop-import-gets-its-geometry-back.md) owns the latter.
+  [0109](../0109-the-milkdrop-import-gets-its-geometry-back.md) owns the latter.
 
 ## What this plan does NOT do
 
@@ -326,7 +334,7 @@ cannot drift.
 - **Does not cover `milk/vm.rs` or `warp_mesh/draw.rs`** unless Phase 6's reading forces it.
 - **Does not convert a corpus preset, wire `milkconv` into `core`'s tests, or ship a
   shader-carrying preset to `presets/`.** Shipping `warp_mesh` worlds belongs to Plan
-  [0104](0104-the-library-stops-being-lopsided.md) and the `preset-author` lane.
+  [0104](../0104-the-library-stops-being-lopsided.md) and the `preset-author` lane.
 - **Does not change engine behavior.** If a phase finds a defect, it records it and the fix goes
   to a followup — a coverage plan that also changes what the code does cannot tell you which of
   the two moved the baseline.
@@ -449,11 +457,62 @@ met**, and that was true before this discrepancy and is more true because of it.
   a rounding difference, and the per-file agreement makes it stranger rather than
   less strange.
 
+## Close review (architect, 2026-08-19)
+
+**The denominator gap is not unexplained, and the log above is superseded on that one point.**
+The local total reproduces exactly (29,232 lines / 10,827 missed / 62.96 %), and CI's full
+per-file table pulled from run `32008593831` diffs against it into exactly two buckets:
+
+- **`delta lines == delta missed`**, file after file — `bloom.rs` +507/+507, `particles/mod.rs`
+  +1130/+1130, `expr.rs` +679/+679, and twenty-odd more. Extra mappings that never execute:
+  pure inflation of both numerator and denominator, contributing nothing else.
+- **`delta lines == 0`, misses down** — the real work. `warp_mesh/shader.rs` **-716**,
+  `milk/mod.rs` **-216**, `warp_mesh/mod.rs` -69, `milk/bytecode.rs` -5, plus 1 in `schema.rs`
+  and 3 in `render/mod.rs`.
+
+So the two runs measure the same tree; the local one merges never-executed duplicate coverage
+mappings out of `target/llvm-cov-target`. **`cargo llvm-cov clean --workspace` before measuring
+is the first thing to try**, and that — not "the totals are incomparable" — is what a future
+coverage plan should be told.
+
+**Which makes the arithmetic a projection rather than a hope.** `headless()` is
+`headless_on(true)`, software-preferred, so every GPU test here ran on WARP — the same adapter
+CI uses. The hardware/WARP asymmetry the log invokes applies to the suite at large, not to the
+files in scope, and the per-file eliminations transfer directly:
+
+| | missed | lines | cover |
+|---|---|---|---|
+| CI, 2026-08-17 (run `32008593831`) | 2,540 | 19,935 | 87.26 % |
+| projected next push | ~1,530 | ~19,943 | **~92.3 %** |
+
+**1,010 missed lines eliminated against the 746 the Decision required**, and floor 91 allows
+1,795 — roughly 265 lines of headroom. `vm.rs` and `draw.rs` stay untouched, as the plan wanted.
+Phase 6 remains the authority; this is what it is expected to confirm.
+
+**Version: no bump, deliberately.** The plan ships tests, a fixture and a baseline; the built
+binary is byte-identical to `v0.74.0` and a tag push publishes release zips. `docs/releasing.md`
+blesses "no bump" for a chore-only plan as a choice, and this is one.
+
 ## Followups (after this lands)
 
+- **`hygiene.rs` cannot see a `#[path]`-declared test module** (the review's one major).
+  `is_cfg_test_module` matches `#[cfg(test)]` immediately followed by `mod <file stem>;`, and
+  Phase 1 wrote `#[cfg(test)] / #[path = "shader_tests.rs"] / mod tests;` — neither adjacent nor
+  stem-named. So `shader_tests.rs` is scanned as hot-path source and passes **only** because its
+  `#![allow(...)]` block contains the literal `clippy::indexing_slicing` the guard greps for.
+  Verified by probe: rename that lint and `hot_path_modules_carry_the_panic_pragma` fails naming
+  the file. Nothing is unsafe — the file is test-only — but the guard is vacuous for a whole
+  class now, and this is the tree's first such module. Teach the skip rule to step over an
+  attribute run and to resolve `#[path]`.
+- **A permanent adapter check for the shader surface**, as the log's own followup says. The
+  measurement Phase 5 owed is recorded here, and here is where it stops: the native fixture's
+  equivalent lives beside the test as `the_adapters_agree_on_the_warp_mesh`, an `#[ignore]`d
+  sibling carrying its numbers in the doc comment. Same file, same shape.
 - Re-derive the 91 floor from a real cache-warm CI reading, as `ci.yml:33` has asked since Plan
   0061 Phase 9 — as its own decision, on a green tree.
 - `render/text.rs` at 0.00 % and `render/overlay.rs` at 44.49 %: decide whether they are
   untested or structurally unreachable, and say so in one place.
-- If Phase 3 finds that `blur_level = 0` and `= 3` render identically, that is a real question
-  about the placeholder binding, not a test-authoring detail.
+- ~~If Phase 3 finds that `blur_level = 0` and `= 3` render identically, that is a real question
+  about the placeholder binding, not a test-authoring detail.~~ **Answered by Phase 3, not owed:**
+  they differ at `frame_diff 0.2998`, so bindings 12..14 resolve to something distinguishable
+  with no chain built.

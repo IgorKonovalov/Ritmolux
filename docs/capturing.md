@@ -1510,11 +1510,16 @@ tune them freely without re-blessing pixels. A new `SystemKind` variant fails
 
 **One narrow exception: `EXTRA_FIXTURES`** (Plan 0063). A *second* fixture for a system
 already in the roster, for when the rostered one structurally cannot reach the code under
-test. `attractor_depth.toml` opened it and is so far the only entry: the rostered
+test. `attractor_depth.toml` opened it, and the list has grown since: the rostered
 `attractor.toml` is **De Jong**, and [ADR-0076](adrs/0076-the-attractor-keeps-the-depth-it-already-computes.md)
 gives every 2-D family an inverse depth extent of exactly `0.0` — which is precisely what
 makes the perspective divide, the distance haze and the depth tint the identity there, so
-no edit to that fixture could execute a line of them. The list is **captured after the
+no edit to that fixture could execute a line of them. The newest, `warp_mesh_shader.toml`
+(Plan 0110), earns its place the same way one level up: it is the only fixture anywhere in
+the crate that carries WGSL, and `render/scenes/warp_mesh/shader.rs` is built **only** for a
+bundle that declares a shader — so no edit to the rostered `warp_mesh.toml`, or to the
+bytecode-driven `warp_mesh_milk.toml` beside it, could execute a line of that file either.
+The list is **captured after the
 roster loop, never interleaved with it**, so every pre-existing baseline renders from the
 device state it always did (which matters on WARP, where building GPU resources mid-run
 changes what a later capture resolves to). `systems_rosters_every_variant` holds it to the
