@@ -1,6 +1,6 @@
 # 0111 — The MilkDrop import stops washing out
 
-> **Status:** approved — 2026-08-19
+> **Status:** in-progress — 2026-08-19
 > **Created:** 2026-08-19
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet, deliberately — Phase 3 writes one (**ADR-0120**) if and only if the
@@ -152,6 +152,40 @@ flowchart LR
   cannot silently read its neighbour); and the commit message **names every fixture whose golden
   moved** and why that fixture's bundle omits `decay`. If no golden moves, say so — that is a claim
   about the fixture set, and it is checkable.
+
+- **Amended 2026-08-19 by `architect`, mid-phase, on `dev`'s escalation — Phase 1 also restates two
+  probes, and lands as one commit.** The fix falsifies two Plan 0109 Phase 4 field probes in
+  `core/src/render/scenes/warp_mesh/tests.rs`. That is not collateral to route around: the probes
+  measured a field whose `decay` was this very defect, so they are the first thing the fix corrects
+  and they cannot land separately without leaving the suite red. The finding and its numbers are
+  recorded as [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
+  **third `Outcome`**; that entry is the authority on the corrected claim, and this is the build
+  instruction for it. **The ADR's Decision is unchanged** — the quantizer keeps its floor, and it is
+  still the only thing that provides one.
+  - **Add `core/src/milk/outputs.rs`'s two siblings to Files touched:**
+    `core/src/render/scenes/warp_mesh/tests.rs`, and `core/src/milk/tests.rs` for the new test.
+  - **`the_field_equilibrates_only_when_the_quantizer_runs` is false as named and gets renamed.**
+    The field equilibrates on both arms; `decay` bounds it. What the quantizer changes is **where it
+    settles**. The restated claim: both arms converge, and the quantized arm converges *far lower*.
+    The existing "converged by frame 120" assertion on the ON arm already states half of it and
+    stays; the OFF-arm guard becomes the same convergence test rather than a climb test, plus the
+    settled ratio. The name follows the claim — something in the shape of
+    `the_quantizer_settles_the_field_far_below_where_decay_alone_does`.
+  - **`the_quantized_background_stays_black` keeps its name and its claim.** Only its control-arm
+    guard moves, from a climb rate to the **separation**: the unquantized background settles about
+    two orders of magnitude above the quantized one. That is what the guard was always proxying for
+    — it exists so "stays black" cannot pass by both arms being black.
+  - **Both replacements must be ratios between the two arms of one run** (ADR-0071 / ADR-0074):
+    same statistic, same units, same adapter, dimensionless. **Do not** freeze `0.2963` or `1.1e-4`
+    into an assertion — they are this box's numbers, and the ADR entry is where they are recorded as
+    such. Derive each tolerance from the observed run-to-run spread, as Phase 2 is already required
+    to do for its own instrument.
+  - **Update both probes' doc-comment tables.** Each carries a "Measured 2026-08-19 on the
+    development box" block whose numbers came from the corrupted field. Re-measure and re-record, or
+    the next reader calibrates against the defect a third time.
+  - **Done when**, in addition to Phase 1's own list: both probes pass on their restated claims, the
+    full workspace suite is green, and the commit message names ADR-0118's third `Outcome` as the
+    authority for the restatement.
 
 ### Phase 2 — the wash bisect: one statistic at five seams
 
@@ -367,6 +401,75 @@ struct SeamTrace {
 `warp_mesh` worlds, which read the params this plan may re-mean: if Phase 3 changes what `gamma`
 does, tell that lane), and [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) is
 `tools/` + `docs/` only. Safe to run in a worktree lane alongside either.
+
+## Implementation log
+
+### Phase 1 — done in the working tree, **not committed**, and it is blocked on an ADR question
+
+Written 2026-08-19 by `dev`, in the lane `WORK/lmv-plan-0111` on branch
+`plan-0111-milkdrop-wash`, branched from `5cf592d` at v0.75.0.
+
+**The change.** `FrameSlots::read`'s `None` arm now returns
+`convert(d.$field, Rate::$rate, d.$field)` rather than `d.$field`. `convert` widened to
+`pub(super)` so the test can assert against the same function both arms use. Two doc comments
+record the why. Verified both ways: with the fix an unnamed `decay` reads `0.54548466`; with the
+arm reverted it reads `0.98`. The new test is
+`milk::tests::an_unnamed_rate_converts_like_a_written_one`.
+
+**No golden moved, and that is a claim about the fixture set rather than missing coverage.** The
+golden set carries exactly two `[milk]` fixtures — `warp_mesh_milk` and `warp_mesh_shader` — and
+**both declare `decay` in their `.regs` roster**, so both slots resolve to `Some` and both already
+took the converting arm. The only fixture whose bundle omits `decay` is
+`warp_mesh_lit_backdrop.toml`, whose `[milk]` table is empty by design, and it has no golden. No
+preset in `presets/*.toml` carries a `[milk]` block at all.
+
+**What it broke: 2 of 945 tests**, both Plan 0109 Phase 4 field probes, both in
+`warp_mesh/tests.rs`. Full `--no-fail-fast` workspace sweep otherwise green, goldens and all four
+preset gates included.
+
+- `the_field_equilibrates_only_when_the_quantizer_runs` — the OFF-arm guard
+  `off.f300.mean > off.f120.mean * 1.5` reads `0.2929` against a required `0.3351`.
+- `the_quantized_background_stays_black` — the OFF-arm guard
+  `off.f300.edge > off.f30.edge * 4.0` reads `0.000110` against a required `0.000128`.
+
+In both cases the test's **primary** assertion still passes. What fails is the control-arm guard
+that exists to prove the instrument still has dynamic range.
+
+**Why, measured rather than argued.** The control trace extended from 300 to 900 frames:
+
+```text
+  off  f150 0.2461   f300 0.2929   f450 0.2963   f600 0.2963   f899 0.2963
+```
+
+**With a correct `decay` the unquantized field converges** — flat to four decimals from frame 450.
+Under the bug the per-frame retention was `0.98^(1/60) = 0.99966`, a time constant near 2 900
+frames, so at frame 300 the field was about a tenth of the way to its equilibrium and read as an
+unbounded integrator. Corrected, retention is `0.5455^(1/60) = 0.98995`, a time constant near 100
+frames. The probes were calibrated against the bug.
+
+**What this does and does not put in question.** ADR-0118's decision stands and the quantizer still
+does demonstrable work — the field settles 2.3x lower with it (`0.1298` against `0.2963`) and the
+background pins 110x lower, at exact black (`1e-6` against `1.1e-4`). The **floor**, truncation to
+zero, is real and only the quantizer provides it. What is now overstated is the ADR's mechanism
+sentence, *"nothing truncates, every dim residual survives and accumulates"*: a residual survives
+far longer than the reference's, but it does fade and the field does settle. And one test's name —
+`the_field_equilibrates_only_when_the_quantizer_runs` — is **false as stated**, because the field
+equilibrates either way.
+
+**Why `dev` stopped here.** Restating those two guards means restating what bounds the field, which
+is an architectural claim and not a threshold. Re-tuning two constants until green is
+indistinguishable from tuning to a picture — the failure mode this plan's Phase 3 hard guard exists
+to prevent, applied one level down. Routed to `architect` on the user's call, consistent with the
+same session's routing of Phase 3's ADR-0120 trigger.
+
+**What `architect` owes before this lane resumes:** an amendment to ADR-0118's mechanism paragraph,
+and a restatement of both probe tests — the claim and, for the first, its name. The discriminations
+themselves survive intact and are the natural replacements: settled level 2.3x, background 110x and
+at exact zero.
+
+**To resume:** the change is uncommitted in the lane's working tree
+(`core/src/milk/outputs.rs`, `core/src/milk/tests.rs`, plus this log and the `Status` line). Phase 1
+commits once the two probes are restated; Phases 2 through 5 are untouched and unstarted.
 
 ## Followups (after this lands)
 

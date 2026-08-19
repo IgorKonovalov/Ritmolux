@@ -1,8 +1,9 @@
 # ADR-0118 — The MilkDrop feedback field quantizes in the encoded domain, per bundle
 
-> **Status:** accepted 2026-08-17 (Plan 0108) — carries two `Outcome` entries
+> **Status:** accepted 2026-08-17 (Plan 0108) — carries three `Outcome` entries
 > **Date:** 2026-08-17
-> **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)
+> **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md),
+> [0111](../plans/0111-the-milkdrop-import-stops-washing-out.md) (third `Outcome`)
 
 ## Context
 
@@ -179,6 +180,61 @@ is **not** the dominant fidelity defect of the MilkDrop import. Plan 0100's HDR 
 **negatively**: still merely different. The dominant defect is the wash itself, cause unknown, and it
 carries to [Plan 0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) with
 [backlog 0113](../design-backlog.md).
+
+## Outcome — what bounds the field, measured against a `decay` that was wrong
+
+**2026-08-19, Plan 0111 Phase 1 — the decision stands; the Context's mechanism sentence is
+overstated, and Plan 0109 Phase 4's probes were calibrated against a defect.**
+
+Design-backlog 0121: `FrameSlots::read`'s `None` arm returned the seeded default **unconverted**, so
+a bundle naming no `decay` ran at MilkDrop's per-frame `0.98` in a field documented as per-second.
+`still_field_params()` names no `decay`, so **every** measurement in this ADR's own field probes ran
+that way. At 60 Hz the retention actually rendered was `0.98^(1/60) = 0.99966` a frame — a time
+constant near **2 900 frames** — against the `0.5455^(1/60) = 0.98995` the conversion gives, whose
+time constant is near **100 frames**. At the probes' 300-frame horizon the first is about a tenth of
+the way to its equilibrium, which is indistinguishable from not having one.
+
+With `decay` converted, the unquantized field **converges**:
+
+```text
+  quantizer off   f150 0.2461   f300 0.2929   f450 0.2963   f600 0.2963   f899 0.2963
+```
+
+Flat to four decimals from frame 450. So the Context's *"nothing truncates, every dim residual
+survives and accumulates"* is **overstated as a description of the field's bound**: `decay` bounds it
+on its own, and always did. A residual here survives far longer than the reference's — that much is
+true and is the whole reason this ADR exists — but it does fade, and the field does settle.
+
+**What the quantizer provides is the floor, and that is unchanged and still only available here:**
+
+| | quantizer off | quantizer on |
+|---|---|---|
+| settled field mean | 0.2963 | 0.1298 — **2.3x lower** |
+| background `edge` | 1.1e-4 | 1e-6 — **110x lower, exact zero** |
+
+The Decision, the rejected alternatives and the second Outcome's look-gate verdict are all
+untouched: the mechanism is real, it reaches exact zero, and it is not the import's dominant defect.
+What changes is the *reason* given for it. The honest statement is that this engine's field decays
+toward a **nonzero** equilibrium where the reference's decays to **black**, and closing that gap is
+the floor's job — not that the field is an unbounded integrator, which it is not.
+
+**Two probes in `core/src/render/scenes/warp_mesh/tests.rs` assert the overstated version and now
+fail.** In both the primary assertion still passes; what fails is the control-arm guard that exists
+to prove the instrument still has dynamic range.
+
+- `the_field_equilibrates_only_when_the_quantizer_runs` is **false as named** — the field
+  equilibrates either way. Its guard `off.f300.mean > off.f120.mean * 1.5` reads `0.2929` against a
+  required `0.3351`. The discrimination it should carry is the **settled ratio**: converged by the
+  same frame on both arms, and the quantized arm settles far below.
+- `the_quantized_background_stays_black` keeps its name and its claim — the ON arm still reads
+  `1e-6`. Its guard `off.f300.edge > off.f30.edge * 4.0` reads `0.000110` against a required
+  `0.000128`, and should become the **separation** it was always proxying for: the unquantized
+  background settles two orders of magnitude above the quantized one, which is what makes "stays
+  black" a measurement rather than a tautology.
+
+Neither replacement is a frozen number asserted universally (ADR-0071): both are ratios between two
+arms of **one run on one adapter**, measuring the same statistic in the same units — same-kind by
+ADR-0074, and dimensionless.
 
 ## Notes
 
