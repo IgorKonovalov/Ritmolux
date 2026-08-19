@@ -368,7 +368,9 @@ fn lmv_inside(uv: vec2<f32>) -> f32 {
 /// fields (not a `[_; 2]`) so read/write selection needs no array indexing on
 /// the hot path.
 pub(crate) struct PingPongField {
-    // Kept alive so the views stay valid; not read after construction.
+    // Kept alive so the views stay valid. Read only by `read_texture`, which is
+    // test-only — hence the underscores, which are what keep a shipped build
+    // from calling these fields dead.
     _tex_a: wgpu::Texture,
     _tex_b: wgpu::Texture,
     view_a: wgpu::TextureView,
@@ -401,8 +403,14 @@ impl PingPongField {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: Self::FORMAT,
+                // `COPY_SRC` is here for **observability** and costs nothing on
+                // the backends we ship: it is what lets a probe read the field's
+                // own levels back rather than inferring them from the composite,
+                // which is where two plans' worth of tone defects hid (Plan 0109
+                // Phase 4). No shipped path copies from these textures.
                 usage: wgpu::TextureUsages::TEXTURE_BINDING
-                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::COPY_SRC,
                 view_formats: &[],
             })
         };
@@ -450,6 +458,20 @@ impl PingPongField {
             &self.view_b
         } else {
             &self.view_a
+        }
+    }
+
+    /// The texture behind [`read_view`](Self::read_view) — what the next pass
+    /// samples, and so what the last one wrote. For measurement: a probe copies
+    /// it to a readback buffer and reads the field's own levels in the field's
+    /// own units, instead of reading the composite and arguing backwards through
+    /// `gamma`, `brightness` and the present remaps.
+    #[cfg(test)]
+    pub(crate) fn read_texture(&self) -> &wgpu::Texture {
+        if self.reading_a {
+            &self._tex_a
+        } else {
+            &self._tex_b
         }
     }
 

@@ -696,3 +696,366 @@ fn the_echo_orientation_quantizes_to_four_states() {
     assert_eq!(echo_orientation(f32::NAN), 0);
     assert_eq!(echo_orientation(f32::INFINITY), 0);
 }
+
+// ---------------------------------------------------------------------------
+// The field instrument (Plan 0109 Phase 4)
+// ---------------------------------------------------------------------------
+//
+// **Every observation of the wash before this was of the final picture**, where
+// `gamma`, `brightness`, the four remaps, the post chain and the tonemap all sit
+// downstream of the feedback field and any of them could be the whole story.
+// Two plans failed to find the cause with that instrument. What follows reads
+// the `Rgba16Float` field itself, frame by frame, in its own linear units:
+// `PingPongField::read_texture` is copied to a readback buffer after each frame
+// and decoded with `capture::read_back_linear`, which does not clamp at 1.
+//
+// It is a GPU test, so it skips where there is no adapter (ADR-0016).
+//
+// # What it found, including what it ruled out
+//
+// **The built-in warp path is clean.** With the quantizer on the field converges
+// and its background sits at black; with it off the field integrates without
+// bound. Both are asserted below. ADR-0118's mechanism is therefore confirmed at
+// the field rather than inferred from a picture, which is what it was.
+//
+// **Dead hypothesis: the decay multiply's domain.** This engine multiplies the
+// field by `decay` in LINEAR light; the reference multiplies its 8-bit target in
+// the GAMMA-ENCODED domain, and a factor `a` encoded is `a^2.2` linear, so the
+// arithmetic predicts our trails outliving the reference's by roughly that much.
+// Measured, they do not: with the quantizer on, an undeposited field fading from
+// frame 40 to frame 200 reads an encoded-domain ratio of **0.2303** against the
+// reference's arithmetic **0.1986** — 16 % slower, not the 2.4x the domain
+// difference alone predicts (0.4797). **The truncation absorbs most of the
+// domain error**, and this is not the wash. That is the third hypothesis this
+// defect has killed, after frame-rate accumulation and `bAdditiveWaves`.
+//
+// **The live hypothesis, and it is not in this path.** A converted warp shader
+// applies `decay` only if the preset's own HLSL names it: `emit.rs` exposes
+// `decay` as a readable `U.misc.x` and nothing multiplies by it, so a preset
+// whose shader merely samples never fades at all — its field is bounded by the
+// epilogue's clamp and the quantizer's floor, which is a saturated plateau
+// rather than a fade. **Of the corpus's 8 162 files carrying a warp shader,
+// only 1 253 name `decay` in it** — so 6 909 presets, two thirds of the whole
+// corpus, land on that path. It predicts the look gate's own pattern: the five
+// washed presets are shader presets, and the one clean control, *Blur Mix 3*, is
+// the one whose blur chain darkens by a second mechanism.
+//
+// Whether the engine should apply `decay` there — and what to do about the 15 %
+// that would then apply it twice — is a design call about matching the
+// reference, not an implementation detail. It needs the reference on screen,
+// which is Phase 5, and an ADR. Phase 4 stops here, which is the branch the plan
+// wrote for it.
+
+/// Field-probe capture size. Small: the recursion under test is per-texel, so
+/// resolution buys nothing but readback time.
+const FIELD_SIZE: u32 = 64;
+
+/// One frame's reading of the field.
+#[derive(Debug, Clone, Copy, Default)]
+struct FieldLevel {
+    /// Mean of the three colour channels over every texel.
+    mean: f32,
+    /// The brightest single channel anywhere in the field.
+    peak: f32,
+    /// Mean over the outermost ring of texels — the **background**, where a
+    /// centred deposit puts nothing and only the warp's resampling reaches.
+    edge: f32,
+}
+
+/// Drive a `warp_mesh` scene for `frames` frames and read the field back after
+/// each one.
+///
+/// The scene is driven directly rather than through `Renderer`, which is what
+/// makes the field reachable at all — and it keeps the probe honest in a second
+/// way: no preset loader, no post chain, no backdrop. What the numbers describe
+/// is the warp pass, the deposit pass and the draw layer, and nothing else.
+fn field_trace(
+    quantize_steps: f32,
+    params: &[(&str, f32)],
+    frames: usize,
+    deposit_off_at: usize,
+) -> Option<Vec<FieldLevel>> {
+    use crate::render::capture;
+    use crate::render::context::{RenderContext, RenderError};
+
+    let ctx = match RenderContext::new_headless(FIELD_SIZE, FIELD_SIZE, true) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+
+    // A bundle carries the quantizer's step count, so an empty one is how the
+    // probe reaches ADR-0118's switch from a test. Its programs are empty: the
+    // field is driven by the scene's own params below, which is what makes the
+    // recursion a scalar with an arithmetic answer to compare against.
+    let mut bundle = crate::milk::MilkBundle::from_assembly(None, None, None)
+        .expect("an empty bundle assembles");
+    bundle.quantize_steps = quantize_steps;
+
+    // **`COMPOSITE_FORMAT`, not the surface format** — that is what the renderer
+    // hands every scene (`scenes::create_all`), because a scene draws into the
+    // composite chain's linear target rather than onto the swapchain.
+    let mut scene = WarpMeshScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        TierConfig::FLOOR.mesh_grid,
+        TierConfig::FLOOR.max_segments,
+    );
+    scene.configure(&super::super::GeneratorConfig::WarpMesh {
+        mesh: (32, 24),
+        milk: Some(Box::new(bundle)),
+        salt: 0,
+    });
+    for (name, value) in params {
+        assert!(
+            PARAMS.contains(name),
+            "the probe set an unknown param `{name}`"
+        );
+        scene.set_param(name, *value);
+    }
+
+    let (target, view) = capture::create_target(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        FIELD_SIZE,
+        FIELD_SIZE,
+    );
+    let _ = &target;
+    let (readback, padded_bpr) =
+        capture::create_linear_readback(&ctx.device, FIELD_SIZE, FIELD_SIZE);
+
+    let frame = AnalysisFrame::default();
+    let dt = 1.0 / 60.0;
+    let mut out = Vec::with_capacity(frames);
+    for i in 0..frames {
+        if i == deposit_off_at {
+            // The decay half of the experiment: stop feeding the field and watch
+            // what it does with what it has. A bundle's per-frame outputs
+            // overwrite the composite roster every frame but not `deposit`,
+            // which is a native param, so this sticks.
+            scene.set_param("deposit", 0.0);
+        }
+        scene.set_target_size(FIELD_SIZE, FIELD_SIZE);
+        scene.set_time(i as f32 * dt);
+        scene.advance(dt);
+        scene.update(&frame);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("field-probe"),
+            });
+        capture::record_clear(&mut encoder, &view);
+        scene.render(&ctx.queue, &mut encoder, &view, 1.0);
+        let field = scene
+            .res
+            .as_ref()
+            .expect("the first render builds the resources")
+            .field
+            .read_texture()
+            .clone();
+        // `record_copy` is format-agnostic — it honours whatever stride it is
+        // handed, and `create_linear_readback` sized this one for four halves.
+        capture::record_copy(
+            &mut encoder,
+            &field,
+            &readback,
+            padded_bpr,
+            FIELD_SIZE,
+            FIELD_SIZE,
+        );
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        let texels =
+            capture::read_back_linear(&ctx.device, &readback, FIELD_SIZE, FIELD_SIZE, padded_bpr)
+                .expect("the field reads back");
+        let mut sum = 0f64;
+        let mut n = 0u64;
+        let mut peak = 0f32;
+        let mut edge_sum = 0f64;
+        let mut edge_n = 0u64;
+        for (i, rgba) in texels.chunks_exact(4).enumerate() {
+            let (x, y) = (i as u32 % FIELD_SIZE, i as u32 / FIELD_SIZE);
+            let border = x < 2 || y < 2 || x >= FIELD_SIZE - 2 || y >= FIELD_SIZE - 2;
+            for c in rgba.iter().take(3) {
+                sum += f64::from(*c);
+                n += 1;
+                peak = peak.max(*c);
+                if border {
+                    edge_sum += f64::from(*c);
+                    edge_n += 1;
+                }
+            }
+        }
+        out.push(FieldLevel {
+            mean: if n == 0 { 0.0 } else { (sum / n as f64) as f32 },
+            peak,
+            edge: if edge_n == 0 {
+                0.0
+            } else {
+                (edge_sum / edge_n as f64) as f32
+            },
+        });
+    }
+    Some(out)
+}
+
+/// A still field with a centred deposit: the recursion is per-texel, so what it
+/// does has an arithmetic answer to compare against.
+fn still_field_params() -> Vec<(&'static str, f32)> {
+    vec![
+        ("zoom", 1.0),
+        ("sx", 1.0),
+        ("sy", 1.0),
+        ("rot", 0.0),
+        ("dx", 0.0),
+        ("dy", 0.0),
+        ("warp", 0.0),
+        ("deposit", 1.6),
+        ("deposit_radius", 0.0),
+        ("deposit_width", 0.2),
+    ]
+}
+
+/// **The field is bounded by the quantizer and by nothing else** — ADR-0118's
+/// mechanism, measured in the field rather than inferred from a picture.
+///
+/// Plan 0108 diagnosed the wash from seven side-by-side captures: an
+/// `Rgba16Float` field keeps every dim residual, so it integrates where the
+/// reference's 8-bit target truncates. That reasoning was right and it was never
+/// *observed* — the evidence was always the final picture, where `gamma`,
+/// `brightness`, the four remaps and the whole post chain sit downstream. This
+/// reads the field itself.
+///
+/// Measured 2026-08-19 on WARP at 64x64, 300 frames, deposit at the centre, no
+/// warp motion:
+///
+/// ```text
+///   steps    frame  mean      peak
+///   0 (off)     30  0.1011
+///   0 (off)    120  0.3690
+///   0 (off)    300  0.8331    6.680   <- still climbing, no equilibrium
+///   255 (on)    30  0.0851
+///   255 (on)   120  0.2039
+///   255 (on)   300  0.2081    1.017   <- converged by ~120
+/// ```
+#[test]
+fn the_field_equilibrates_only_when_the_quantizer_runs() {
+    let params = still_field_params();
+    let Some(off) = field_trace(0.0, &params, 300, usize::MAX) else {
+        return;
+    };
+    let on = field_trace(255.0, &params, 300, usize::MAX).expect("the second trace runs too");
+    let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
+    println!(
+        "[field] quantizer OFF  f30 {:.4} f120 {:.4} f300 {:.4} (peak {:.3})",
+        read(&off, 29).mean,
+        read(&off, 119).mean,
+        read(&off, 299).mean,
+        read(&off, 299).peak
+    );
+    println!(
+        "[field] quantizer ON   f30 {:.4} f120 {:.4} f300 {:.4} (peak {:.3})",
+        read(&on, 29).mean,
+        read(&on, 119).mean,
+        read(&on, 299).mean,
+        read(&on, 299).peak
+    );
+
+    // Off: no equilibrium. The last stretch still climbs measurably, which is
+    // the integrator ADR-0118 named.
+    assert!(
+        read(&off, 299).mean > read(&off, 119).mean * 1.5,
+        "with the quantizer off the field must still be climbing at frame 300 — \
+         it read {:.4} against frame 120's {:.4}",
+        read(&off, 299).mean,
+        read(&off, 119).mean
+    );
+    // On: converged. The last 180 frames move it by under a percent.
+    let (mid, end) = (read(&on, 119).mean, read(&on, 299).mean);
+    assert!(
+        (end - mid).abs() < mid * 0.05,
+        "with the quantizer on the field must have converged by frame 120 — it \
+         read {mid:.4} there and {end:.4} at frame 300"
+    );
+    assert!(
+        end < read(&off, 299).mean * 0.5,
+        "the quantized field must settle far below the unquantized one"
+    );
+}
+
+/// **The background goes black, and stays black, once the quantizer runs** —
+/// Plan 0109 Phase 4's redirection.
+///
+/// The phase was written to find why "the background equilibrates far brighter
+/// than the reference's" and told to look in the field rather than in the
+/// composite. It looked. **With the quantizer on, this field's background is
+/// not bright: it sits at `1e-6` linear and does not move**, while the same
+/// fixture with the quantizer off climbs monotonically. So for the built-in warp
+/// path the field is not where the wash lives, and the next hunt belongs
+/// downstream — or, far more likely, in the *other* warp path. See the module
+/// note below.
+///
+/// Measured on WARP at 64x64 with a zooming warp dragging a centred deposit
+/// outward, which is how a MilkDrop tunnel fills its background — edge is the
+/// mean over the outer two-texel ring:
+///
+/// ```text
+///   steps    frame  mean      edge
+///   0 (off)     30  0.0409    0.000037
+///   0 (off)    120  0.1396    0.000140
+///   0 (off)    300  0.3104    0.000319   <- climbing
+///   255 (on)    30  0.0345    0.000001
+///   255 (on)   120  0.0772    0.000001
+///   255 (on)   300  0.0787    0.000001   <- pinned at black
+/// ```
+///
+/// (Measured 2026-08-19 on the development box.)
+#[test]
+fn the_quantized_background_stays_black() {
+    let mut params = still_field_params();
+    // A zoom drags the deposit outward; `wrap` off so the edge is fed only by
+    // what the warp actually carries there.
+    for (name, value) in &mut params {
+        if *name == "zoom" {
+            *value = 1.6;
+        }
+        if *name == "deposit_width" {
+            *value = 0.12;
+        }
+    }
+    let Some(on) = field_trace(255.0, &params, 300, usize::MAX) else {
+        return;
+    };
+    let off = field_trace(0.0, &params, 300, usize::MAX).expect("the second trace runs too");
+    let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
+    println!(
+        "[field] edge ON  f30 {:.6} f120 {:.6} f300 {:.6}",
+        read(&on, 29).edge,
+        read(&on, 119).edge,
+        read(&on, 299).edge
+    );
+    println!(
+        "[field] edge OFF f30 {:.6} f120 {:.6} f300 {:.6}",
+        read(&off, 29).edge,
+        read(&off, 119).edge,
+        read(&off, 299).edge
+    );
+
+    assert!(
+        read(&on, 299).edge < 1e-4,
+        "the quantized field's background must stay black; it read {:.6}",
+        read(&on, 299).edge
+    );
+    assert!(
+        read(&off, 299).edge > read(&off, 29).edge * 4.0,
+        "the unquantized control must show the background filling — it read \
+         {:.6} at frame 300 against {:.6} at frame 30, and if it does not, this \
+         fixture no longer drags light outward and the assertion above is \
+         measuring nothing",
+        read(&off, 299).edge,
+        read(&off, 29).edge
+    );
+}
