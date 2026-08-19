@@ -5624,3 +5624,112 @@ Phase 6 — rather than by more code reading.
 
 ---
 
+## 0114 — a negative scale is clamped away, so MilkDrop's standard mirror idiom collapses instead of mirroring
+
+**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
+look gate (2026-08-17). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-17** — the rate conversion clamps the sign off before the power:
+  `present: max\(in\.t1\.z, 1e-4\) in: core/src/render/scenes/warp_mesh/mod.rs`
+
+### The finding
+
+The mesh vertex stage converts MilkDrop's per-frame rates to per-second with
+`pow(max(v, 1e-4), dt)` for `zoom`, `sx` and `sy`. The `max` is there because `pow()` of a negative
+base is undefined — but **a negative scale is MilkDrop's standard mirror idiom**, so the guard does
+not protect the mirror, it deletes it and substitutes a near-zero positive scale. The fold is not
+*inert*; it is replaced by a collapse.
+
+*chasers 19 Portal* is exactly this: `per_pixel_3 = sx = -zm`, and the reference renders a perfectly
+bilaterally symmetric portal where this engine renders an asymmetric smear. **Archived 0107 item 3
+attributed that preset's missing mirror to per-point code, and Plan 0108 Phase 5 fixed a real defect
+there — the per-point carry, reaching 3 368 corpus files — which simply is not this preset's fold.**
+
+**Corpus reach, 2026-08-17:** 363 of 10 347 files (3.5 %) assign a negative to `sx`, `sy` or `zoom`
+in per-pixel/per-vertex code — 229, 172 and 155 respectively.
+
+### What a fix would be
+
+`sign(s) * pow(abs(s), dt)`. It is safe under rate conversion: a mirror composed with itself is the
+identity, so the symmetric fixed point converges the same at 30 Hz and at 144 Hz even though the
+intermediate frames differ. Needs a golden re-bless and a fixture pinning bilateral symmetry.
+
+### Priority
+
+**High, and cheap.** Roughly four lines with a test.
+[Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1.
+
+---
+
+## 0115 — there is no video-echo stage, and one preset in seven is unrecognisable without it
+
+**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
+look gate (2026-08-17). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-17** — the converter names the feature as unconsumed rather than dropping it
+  silently, which is where the gap is recorded today:
+  `present: echo_zoom in: milkconv/src`
+
+### The finding
+
+MilkDrop composites a **second sampled copy of the previous frame** — zoomed by `fVideoEchoZoom`,
+flipped per `nVideoEchoOrientation` (0 none, 1 flip x, 2 flip y, 3 both), blended at
+`fVideoEchoAlpha`. This engine has no such stage. All three values are already per-frame outputs the
+runtime computes and then drops on the floor, and `milkconv` warns about them at conversion time.
+
+*Songflower (Moss Posy)* sets `fVideoEchoAlpha = 1.000` with `nVideoEchoOrientation = 1` and animates
+both per frame. **Its woven lattice IS the echo**: the reference draws a bold two-axis basket weave,
+and without the echo only one family of bars survives — this engine renders pale horizontal ripples
+that read as a different preset entirely. *Fog Tunnel* carries echo at `0.400`.
+
+The converter's own census puts non-zero echo alpha at **2.4 %** of the corpus. Narrow, and
+load-bearing where it appears.
+
+### What a fix would be
+
+A composite-stage pass sampling the previous frame with a flip and a zoom, blended at alpha. The one
+open design question is whether the echo samples before or after the warp — MilkDrop composites from
+the previous frame's final target, which decides whether the echo accumulates; confirm against the
+reference rather than assume.
+
+### Priority
+
+**Medium-high.** Real new work, but bounded, and it is the difference between one of the seven
+judged pairs being recognisable or not.
+[Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 3.
+
+---
+
+## 0116 — the mode 6/7 waveform rotates a full turn every two minutes, and the reference's does not
+
+**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
+look gate (2026-08-17). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-17** — the term is still in the mode 6/7 arm, with Plan 0108 Phase 4's
+  arithmetic recorded beside it:
+  `present: time \* 0\.05 in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### The finding
+
+`draw.rs`'s mode 6/7 arm computes its angle as `mystery * PI + time * 0.05` — a full turn every
+~126 s, so a trace authored horizontal is horizontal only at instants. Three things made it a
+suspect when Plan 0108 Phase 4 found it: it is the **only** use of `time` in the whole file, it
+contradicts the sentence directly above it (which says the angle is set by `wave_mystery`), and it is
+absent from the module header's list of stated approximations.
+
+Phase 4 deliberately left it in, because removing it changes every mode-6 and mode-7 preset and
+whether the reference's line drifts is a question about the reference. **The look gate answered it:
+the reference's *Blur Mix 3* draws horizontal full-width traces and does not drift; this engine draws
+one steep diagonal.** The term is convicted.
+
+### What a fix would be
+
+Remove the term; add its removal to the module header's stated-approximations list; pin that a
+mode-6 figure's orientation is a pure function of `wave_mystery` by rendering the same geometry at
+two well-separated `time` values. Needs a golden re-bless — it is *intended* to change what ships.
+
+### Priority
+
+**High, and cheap.** [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2.
+
+---

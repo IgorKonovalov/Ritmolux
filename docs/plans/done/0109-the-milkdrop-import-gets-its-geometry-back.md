@@ -1,16 +1,84 @@
 # 0109 — The MilkDrop import gets its geometry back
 
-> **Status:** in-progress — **amended 2026-08-19: a Phase 6 was added after this plan started**,
-> carrying Plan 0110's close-review major. It is **order-independent** and touches no file any
-> phase below touches, so it does not disturb work in flight; take it whenever convenient.
+> **Status:** done — closed 2026-08-19. Seven phases, six of them code: `b0f1223` (signed scale),
+> `0c87e36` (mode 6/7 angle), `c983002` (video echo), `e7dc9c5` (the field instrument, on its stop
+> branch), `b8108d1` (the pragma guard), `cfe15be` (close-review repairs), `39a8eb4` (the echo blend).
+> Phase 5's look gate ran on 2026-08-19 against `foo_vis_milk2` 0.2.0.0; its verdicts are below.
+> **Review: no blockers, two majors, three minors** — both majors repaired before the close, and the
+> gate produced [ADR-0119](../../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)
+> plus a Phase 7 that was not in the original plan.
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
-> **Related ADRs:** none yet — Phase 1 writes one if the wash needs a design call
-> **Closes:** design-backlog 0113, 0114, 0115, 0116
+> **Related ADRs:** [0119](../../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)
+> **Closes:** design-backlog 0114, 0115, 0116. **0113 is carried, not closed** — Phase 4 stopped as
+> designed, and its entry now holds a dated half-discharge update.
+
+## Phase 5 — the look gate, as run (2026-08-19)
+
+| pair | verdict | what dominates |
+|---|---|---|
+| *chasers 19 Portal* | **fixed** — bilaterally symmetric, and the portal reads like the reference | the wash; the `ang` seam |
+| *Blur Mix 3* | **fixed** — horizontal traces, ground black | waveform figure oversized; crisp trace short in x |
+| *Songflower (Moss Posy)* | **weave restored**; way too bright *against the additive build* | the echo blend — since fixed, see below |
+| *Cauldron painterly 5* | **better, holds** | waveform figure oversized |
+| *Contortion (Escher's Tunnel Mix)* | better, still too bright | the wash |
+| *Cosmic Dust 2* | still washed | the wash |
+| *Fog Tunnel* | still washed | the wash |
+
+**Phases 1, 2 and 3 all land on real content**, which is three of the four defects Plan 0108 found.
+The wash is untouched, as designed.
+
+**The Songflower verdict was taken against the additive blend and is stale by construction** —
+ADR-0119's own Negative section says so. Re-judged after Phase 7 at the same hop of the same signal,
+the lattice is crisp and high-contrast, which is Plan 0108's description of the reference ("a bold
+two-axis basket weave") reached for the first time.
+
+### What the gate changed beyond the verdicts
+
+Four things, and they are why the sitting was worth running rather than skipping to the close:
+
+1. **The echo's additive blend was convicted**, on a controlled offline A/B (two conversions of
+   *Songflower* differing only in `fVideoEchoAlpha`, same hop, same signal, same size). Phase 7 and
+   ADR-0119 followed.
+2. **The premise that justified `add` over `lerp` is falsified.** Plan 0108's "without the echo only
+   one family of bars survives" does not reproduce: echo-off shows both families crisply, and
+   *Songflower* sets `sx = sy = zoom = 1`, so Phase 1 did not restore the second family either.
+3. **The seam is not `emit.rs`.** It shows on *Songflower* and *chasers 19 Portal*, both MilkDrop 1.x
+   presets carrying no shader block at all, running centre-to-right-edge — the `ang` branch cut at
+   `warp_mesh/mod.rs:151`. This plan's own Phase 5 question 4 was framed backwards; the finding is
+   now design-backlog 0119.
+4. **Phase 4's live hypothesis does not explain this wash.** The five washed presets carry no warp
+   shader; the only two that do are the clean control and the "better". Recorded on backlog 0113,
+   whose remaining direction is downstream of the field.
+
+Two Plan 0108 observations were retracted outright: *Cosmic Dust 2*'s "hue magenta where the
+reference is green" (three independent per-channel LFOs on `time` — the two renderers are simply out
+of phase) and, provisionally, *Contortion*'s "black ray artifact" (black borders warped into a ground
+that should be black). Both are on backlog 0113.
+
+## What the close review found
+
+**Two majors, both repaired in `cfe15be` before the close.** Six backlog citations written into the
+source by Phases 1-3 were each off by one and two of them transposed, so a reader following the
+pointer landed on a real but wrong entry — and the close was about to freeze that by archiving those
+entries. And Phase 4's third dead hypothesis was not reproducible: `field_trace`'s `deposit_off_at`
+was passed `usize::MAX` at every call site, so the branch that produced the phase's decay-domain
+measurement was dead code. It now runs, as a property rather than a frozen number.
+
+Repairing it surfaced design-backlog 0121: the probe had silently run its whole experiment at
+`decay = 0.98`/s, because `FrameOutputs`' unresolved-slot arm hands back MilkDrop's *per-frame*
+default into a field documented as *per-second*.
+
+**Three minors**, all filed rather than fixed here: `COPY_SRC` ships on every feedback field for a
+`#[cfg(test)]` consumer on an unmeasured "costs nothing" claim; `docs/capturing.md` still described
+the echo as unbuilt (swept at the close); and Phase 3's blend decision lived only in a shader comment
+(now ADR-0119).
+
+---
 
 ## TL;DR
 
-[Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md)'s look gate answered its own
+[Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md)'s look gate answered its own
 question negatively — **still merely different** — and found four defects it was never scoped to
 fix, three of them mechanical and one unknown. This plan takes all four. Two are small and certain
 (a clamped sign, a rogue `time` term), one is a missing engine stage, and one is a hunt with a stop
@@ -18,7 +86,7 @@ condition. The certain ones go first, because they are what make the next look g
 
 ## Context & problem
 
-Plan 0108 shipped [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
+Plan 0108 shipped [ADR-0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
 feedback quantizer and three of four defect hunts, then put seven converted presets beside
 `foo_vis_milk2` 0.2.0.0. **One pair read better; six read wrong; none of the six for the reason that
 plan was built on.** The full verdict table is in that plan's own look-gate section. What it produced
@@ -174,7 +242,7 @@ flowchart TB
 ### Phase 6 — the pragma guard learns to see a `#[path]` module
 
 - **Owner skill:** dev
-- **Added 2026-08-19**, from [Plan 0110](done/0110-the-shader-surface-stops-being-invisible.md)'s
+- **Added 2026-08-19**, from [Plan 0110](0110-the-shader-surface-stops-being-invisible.md)'s
   close review. It lands here because the file it concerns is this plan's own subsystem
   (`core/src/render/scenes/warp_mesh/`) and the fix is about ten lines — not because it has anything
   to do with MilkDrop geometry. **Order-independent:** it shares no file with Phases 1-5 and may be
@@ -226,7 +294,7 @@ flowchart TB
 - **Owner skill:** dev
 - **Added 2026-08-19**, from Phase 5's look gate, which convicted Phase 3's blend and falsified the
   observation that justified it. The decision and its rejected alternatives are
-  [ADR-0119](../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md); read it
+  [ADR-0119](../../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md); read it
   first, because this phase is that ADR and nothing else.
 - **What:** the present pass composites the echo as `mix(base, echo, alpha)` rather than
   `base + echo * alpha`. One expression. Nothing else Phase 3 built moves — not the converter roster,
@@ -261,7 +329,7 @@ flowchart TB
 - **Do not `git diff` the committed baselines.** Bless twice on the same branch, differing only by
   reverting the change under test, and compare bless-to-bless. Re-derive the baseline count rather
   than copying one forward.
-- **[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) applies.** Phases 1 and 3
+- **[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) applies.** Phases 1 and 3
   both touch screen-destined geometry near `U.aspect`. Any aspect comes from the **render target**,
   never a grid or mesh size, and the development display cannot tell the two apart.
 - **Open: does the echo sample before or after the warp?** MilkDrop composites it from the previous
@@ -273,9 +341,9 @@ flowchart TB
 - **Re-open ADR-0118.** The quantizer stands; the look gate confirmed the banding does not read and
   Alternative D is not needed.
 - **Backlog 0108's conversion tail** (~71 HLSL-array files, 218 MD2 presets rendering blank) or
-  [backlog 0109](../design-backlog.md)'s disk textures. Re-run `milkconv --render` after this closes
+  [backlog 0109](../../design-backlog.md)'s disk textures. Re-run `milkconv --render` after this closes
   and re-rank both — with the wash and the mirror fixed, that list changes.
 - **`textures/` support, per-vertex evaluation on a compute shader**, or a `warp_mesh` content
-  cohort ([Plan 0104](0104-the-library-stops-being-lopsided.md) owns the last, and its wait on Plan
+  cohort ([Plan 0104](../0104-the-library-stops-being-lopsided.md) owns the last, and its wait on Plan
   0108 Phase 1 is discharged).
 - **Any move on the engine-wide HDR chain.** ADR-0046 and ADR-0096 are inputs, not subjects.

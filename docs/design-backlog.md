@@ -281,6 +281,10 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0106 | Converted MilkDrop presets wash out or invert: the float feedback field never truncates | [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) + [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md). **Closed 2026-08-17** |
 | 0107 | The MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame | [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md) Phases 3-5. Two fixed, two re-attributed (both attributions here were wrong), one seam still open. **Closed 2026-08-17** |
 
+| 0114 | A negative scale is clamped away, so MilkDrop’s standard mirror idiom collapses | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1. Both halves were engine-side. **Closed 2026-08-19** |
+| 0115 | There is no video-echo stage, and one preset in seven is unrecognisable without it | [ADR-0119](adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) + [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7. **Closed 2026-08-19** |
+| 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
+
 <!-- roster:end -->
 
 ## Open entries
@@ -2140,118 +2144,68 @@ given the same `decay` and deposit.
 ### Priority
 
 **High.** It is the dominant defect of the import and it survived two plans because nobody could see
-it. [Plan 0109](plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4 takes it, with a
+it. [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4 takes it, with a
 stop condition.
 
----
+### Update 2026-08-19 — half discharged by [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4, and its leading hypothesis corrected
 
-## 0114 — a negative scale is clamped away, so MilkDrop's standard mirror idiom collapses instead of mirroring
+**The entry stays live. What Phase 4 delivered is the instrument, not the fix** — which is the branch
+that plan wrote for it. The field is now readable: `PingPongField` carries `COPY_SRC` and a test-only
+`read_texture`, and `warp_mesh/tests.rs` drives the scene directly, copies the field after every frame
+and decodes it with `read_back_linear`, which does not clamp at 1.
 
-**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
-look gate (2026-08-17). **Owner if taken:** `dev`.
+**What was ruled out, by measurement rather than by argument.**
 
-- **Verified 2026-08-17** — the rate conversion clamps the sign off before the power:
-  `present: max\(in\.t1\.z, 1e-4\) in: core/src/render/scenes/warp_mesh/mod.rs`
+- **The field is not where the wash lives on the built-in warp path.** With the quantizer on, the field
+  converges by frame 120 and stays there, and the background of a zooming tunnel sits at `1e-6` linear
+  and does not move over 300 frames. With it off, both integrate without bound. ADR-0118's mechanism is
+  now *observed* rather than inferred from seven captures.
+- **The decay multiply's domain is not it** — the third hypothesis, after frame-rate accumulation and
+  `bAdditiveWaves`. This engine multiplies in linear light where the reference multiplies its 8-bit
+  target in the encoded domain, which predicts our trails outliving the reference's by about `2.4x`.
+  Measured, they do not: the quantizer's truncation absorbs most of the domain error. Reproducible —
+  `the_decay_domain_is_not_the_wash` derives both predictions from the decay the frames actually ran
+  with and asserts the measured fade is nearer the reference's arithmetic than the pure-linear one.
 
-### The finding
+**The hypothesis Phase 4 named as live is wrong about this evidence, and that is the important half of
+this update.** Phase 4 proposed that a converted warp shader applies `decay` only when the preset's own
+HLSL names it — 6 909 of 8 162 corpus files with a warp shader do not — and that this "predicts the look
+gate's own pattern, including why *Blur Mix 3* was the clean control." **The census says the inverse.**
+Of Plan 0108's seven pairs:
 
-The mesh vertex stage converts MilkDrop's per-frame rates to per-second with
-`pow(max(v, 1e-4), dt)` for `zoom`, `sx` and `sy`. The `max` is there because `pow()` of a negative
-base is undefined — but **a negative scale is MilkDrop's standard mirror idiom**, so the guard does
-not protect the mirror, it deletes it and substitutes a near-zero positive scale. The fold is not
-*inert*; it is replaced by a collapse.
+| preset | warp shader | 0108 verdict |
+|---|---|---|
+| Contortion, Songflower, chasers 19 Portal, Cosmic Dust 2, Fog Tunnel | **none** (MilkDrop 1.x) | **all five washed** |
+| Blur Mix 3 | yes | clean control |
+| Cauldron painterly 5 | yes | better |
 
-*chasers 19 Portal* is exactly this: `per_pixel_3 = sx = -zm`, and the reference renders a perfectly
-bilaterally symmetric portal where this engine renders an asymmetric smear. **Archived 0107 item 3
-attributed that preset's missing mirror to per-point code, and Plan 0108 Phase 5 fixed a real defect
-there — the per-point carry, reaching 3 368 corpus files — which simply is not this preset's fold.**
+The five that wash carry no `warp_` or `comp_` block at all; the only two that do are the control and
+the one good verdict. The shader-`decay` gap may still be a real corpus-wide defect worth its own
+entry, but **it cannot be this wash.** The washed five run the built-in path, which Phase 4 measured as
+clean at the field.
 
-**Corpus reach, 2026-08-17:** 363 of 10 347 files (3.5 %) assign a negative to `sx`, `sy` or `zoom`
-in per-pixel/per-vertex code — 229, 172 and 155 respectively.
+**So the remaining direction is downstream of the field** — `gamma`, `brightness`, the four composite
+remaps, the post chain and the tonemap — which is the half Phase 4 was told to rule out and instead
+only ruled the *field* in as clean. One value worth a look on the way in: *Cosmic Dust 2* sets
+`fGammaAdj = 1.9`, the highest of the seven, and this engine applies gamma to linear light where
+MilkDrop applied it to 8-bit display-referred pixels. Worked through by hand that points *darker*
+rather than brighter, and *Contortion* washes at `fGammaAdj = 1.0`, so it is a question rather than a
+lead.
 
-### What a fix would be
+**Two symptoms this entry inherited are retracted.** Both came from Plan 0108's gate and both were
+convicted at Plan 0109's:
 
-`sign(s) * pow(abs(s), dt)`. It is safe under rate conversion: a mirror composed with itself is the
-identity, so the symmetric fixed point converges the same at 30 Hz and at 144 Hz even though the
-intermediate frames differ. Needs a golden re-bless and a fixture pinning bilateral symmetry.
-
-### Priority
-
-**High, and cheap.** Roughly four lines with a test.
-[Plan 0109](plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1.
-
----
-
-## 0115 — there is no video-echo stage, and one preset in seven is unrecognisable without it
-
-**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
-look gate (2026-08-17). **Owner if taken:** `dev`.
-
-- **Verified 2026-08-17** — the converter names the feature as unconsumed rather than dropping it
-  silently, which is where the gap is recorded today:
-  `present: echo_zoom in: milkconv/src`
-
-### The finding
-
-MilkDrop composites a **second sampled copy of the previous frame** — zoomed by `fVideoEchoZoom`,
-flipped per `nVideoEchoOrientation` (0 none, 1 flip x, 2 flip y, 3 both), blended at
-`fVideoEchoAlpha`. This engine has no such stage. All three values are already per-frame outputs the
-runtime computes and then drops on the floor, and `milkconv` warns about them at conversion time.
-
-*Songflower (Moss Posy)* sets `fVideoEchoAlpha = 1.000` with `nVideoEchoOrientation = 1` and animates
-both per frame. **Its woven lattice IS the echo**: the reference draws a bold two-axis basket weave,
-and without the echo only one family of bars survives — this engine renders pale horizontal ripples
-that read as a different preset entirely. *Fog Tunnel* carries echo at `0.400`.
-
-The converter's own census puts non-zero echo alpha at **2.4 %** of the corpus. Narrow, and
-load-bearing where it appears.
-
-### What a fix would be
-
-A composite-stage pass sampling the previous frame with a flip and a zoom, blended at alpha. The one
-open design question is whether the echo samples before or after the warp — MilkDrop composites from
-the previous frame's final target, which decides whether the echo accumulates; confirm against the
-reference rather than assume.
-
-### Priority
-
-**Medium-high.** Real new work, but bounded, and it is the difference between one of the seven
-judged pairs being recognisable or not.
-[Plan 0109](plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 3.
-
----
-
-## 0116 — the mode 6/7 waveform rotates a full turn every two minutes, and the reference's does not
-
-**Raised by:** `architect`, from [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)'s
-look gate (2026-08-17). **Owner if taken:** `dev`.
-
-- **Verified 2026-08-17** — the term is still in the mode 6/7 arm, with Plan 0108 Phase 4's
-  arithmetic recorded beside it:
-  `present: time \* 0\.05 in: core/src/render/scenes/warp_mesh/draw.rs`
-
-### The finding
-
-`draw.rs`'s mode 6/7 arm computes its angle as `mystery * PI + time * 0.05` — a full turn every
-~126 s, so a trace authored horizontal is horizontal only at instants. Three things made it a
-suspect when Plan 0108 Phase 4 found it: it is the **only** use of `time` in the whole file, it
-contradicts the sentence directly above it (which says the angle is set by `wave_mystery`), and it is
-absent from the module header's list of stated approximations.
-
-Phase 4 deliberately left it in, because removing it changes every mode-6 and mode-7 preset and
-whether the reference's line drifts is a question about the reference. **The look gate answered it:
-the reference's *Blur Mix 3* draws horizontal full-width traces and does not drift; this engine draws
-one steep diagonal.** The term is convicted.
-
-### What a fix would be
-
-Remove the term; add its removal to the module header's stated-approximations list; pin that a
-mode-6 figure's orientation is a pure function of `wave_mystery` by rendering the same geometry at
-two well-separated `time` values. Needs a golden re-bless — it is *intended* to change what ships.
-
-### Priority
-
-**High, and cheap.** [Plan 0109](plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2.
+- **"hue magenta where the reference is green" (*Cosmic Dust 2*) was never evidence.** The preset drives
+  `wave_r`/`wave_g`/`wave_b` from three independent LFOs on `time` at incommensurate frequencies with
+  ~4-7 s periods, so the hue cycles the whole circle continuously. Green and magenta are the same preset
+  a few seconds apart, and two renderers started at different moments are simply out of phase. A hue
+  comparison at one instant measures nothing.
+- **"a black ray artifact on all four frame edges" (*Contortion*) is probably a presentation of the
+  wash, not a second defect.** Motion vectors are off in that preset (`nMotionVectorsX/Y = 0`,
+  `mv_a = 0`), so the hatching is not the grid. What it does set is `ob_size = ib_size = 0.01` at full
+  alpha in **pure black** — a thin opaque black border drawn every frame and dragged inward by the warp,
+  stroke on stroke. Black-on-black is invisible; black-on-yellow-green is glaring. Unverified against
+  the reference, hence "probably".
 
 ---
 
@@ -2351,5 +2305,135 @@ dependency is added to this crate"*, and this growth arrived without one.
 **Medium-low.** Nothing is over cap and nothing is broken. But 0.72 MB is the tightest this
 component has been, the doc that would warn you is wrong by a third of the remaining room, and the
 trigger it names would not have fired.
+
+---
+
+## 0119 — `ang`'s branch cut on the +x axis seams every per-vertex program that is continuous in it
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+Phase 5 look gate (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the wrap is unconditional and has no continuity treatment:
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mod.rs`
+
+### The finding
+
+`vertex_position` computes `ang = atan2(py, px)` and lifts the negative half by `TAU`, so `ang` is
+`0..tau` **with a discontinuity along the +x axis**. Any per-vertex program whose output varies
+continuously with `ang` therefore jumps across that ray, and the jump is a visible seam running from
+the frame centre to the right edge.
+
+**This supersedes Plan 0108's reading of the same symptom.** That plan attributed the seam to a sign
+in the emitted warp epilogue's polar pair (`milkconv/src/shader/emit.rs`) and built a reproduction
+fixture for it, and [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)
+Phase 5 asked whether the seam survived the mirror fixes. It did — **on *Songflower (Moss Posy)* and
+*chasers 19 Portal*, both MilkDrop 1.x presets carrying no `warp_` or `comp_` block at all.** `emit.rs`
+never runs on them. Whatever is true of the emitted epilogue, it is not what produces this seam.
+
+The two look different only because of what surrounds them: on *Songflower* the cut runs centre to
+right edge, which is the branch cut plainly; on *chasers 19 Portal* it reads full-width because that
+preset's own fold mirrors it.
+
+### What a fix would be
+
+Unknown, and it is a design call rather than a patch — which is why this is an entry. The reference
+has the same branch cut in `atan2`, so MilkDrop presets are *authored* against a discontinuity at +x
+and simply avoid it or hide it; the question is whether this engine's `ang` lands the cut in the same
+place and with the same handedness as the reference's, and it is measurable against a converted
+fixture rather than arguable. Do not "fix" it by smoothing the wrap — that would break every preset
+that uses the cut deliberately.
+
+### Priority
+
+**Medium.** It is one of the two remaining named geometry defects of the import (the other being
+[0113](#0113--the-converted-feedback-field-equilibrates-far-brighter-than-the-references-and-nothing-knows-why)'s
+wash), it shows on real content rather than only on a fixture, and the diagnosis is now specific
+enough to act on.
+
+---
+
+## 0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+Phase 5 look gate (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the authored scale is a bare multiply on the trace samples, with no
+  normalization constant and no comment on units:
+  `present: held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### The finding
+
+Two of the seven judged pairs reported an oversized waveform figure, independently and unprompted:
+*Blur Mix 3* ("a bit upscaled", `nWaveMode = 6`, `fWaveScale = 3.266`) and *Cauldron painterly 5*
+("wave became very large", `nWaveMode = 5`, `fWaveScale = 1.139`). `draw.rs` applies the value as
+`*slot = held * scale`, straight from `fWaveScale`, on a trace already normalized to `-1..1`.
+MilkDrop's `fWaveScale` is not a bare multiplier on such a trace — the reference normalizes by the
+sample range — so a missing constant is a plausible single home.
+
+**It is a candidate and not a diagnosis, deliberately.** The complaint does not scale with the
+authored value: the preset with the *larger* `fWaveScale` read as *less* wrong, at a different
+`nWaveMode`. So there may be two defects here rather than one, and a third observation is recorded
+without a mechanism at all: *Blur Mix 3*'s **crisp trace spans roughly the middle 57 % of the frame**
+while its blurred halo reaches the edges, where Plan 0108 described the reference as drawing
+"horizontal full-width traces". Amplitude and extent are different quantities and may have different
+causes.
+
+### What a fix would be
+
+Derive the reference's constant from MilkDrop's own waveform construction rather than by matching a
+picture, then decide whether the x-extent is the same defect or a second one. Both are checkable
+against `milkconv/tests/draw_layer.rs`, which already builds the figure as geometry and can assert a
+span without a capture.
+
+### Priority
+
+**Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
+presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
+
+---
+
+## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+close review (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the unresolved-slot arm returns the seeded default without converting it:
+  `present: None => d\.\$field in: core/src/milk/outputs.rs`
+
+### The finding
+
+`FrameOutputs`' table declares `decay: "decay" = 0.98, Factor`, and that one constant is used for two
+different things. `seed` writes it into the register **before** the program runs, where `0.98` is
+correctly MilkDrop's *per-frame* value. `read` returns it unchanged when the program never mentions
+`decay` — but that arm feeds a field whose own doc says "**per second** here", and the converted
+value is `per_second_factor(0.98) = 0.5455`. A bundle that never names `decay` therefore fades at
+`0.98`/s (about `0.9997` per frame) instead of `0.5455`/s: effectively not at all.
+
+`decay` is the only `Factor`-rate output, so nothing else is affected.
+
+**Not currently reachable from a converted preset**, which is why this is an entry rather than a bug
+report. `milkconv`'s prologue emits an assignment for **every** roster output carrying an
+initial-condition key, unconditionally, at the top of every frame — so the slot always resolves and
+the conversion always runs. The one shipped hand-written bundle
+(`core/tests/fixtures/warp_mesh_milk.toml`) names `decay` too.
+
+**It has already cost real time once**, which is the argument for fixing it rather than documenting
+it: Plan 0109 Phase 4's field probe drives an empty bundle, silently ran its whole experiment at
+`0.98`/s, and the phase's reported fade numbers could not be reproduced from the committed code until
+the close review found this. A latent unit error that only bites instruments is exactly the kind that
+bites the next instrument too.
+
+### What a fix would be
+
+Convert on the `None` arm as well, so the fallback is in the same vocabulary as the resolved value —
+roughly `convert(d.$field, Rate::$rate, d.$field)`. **It moves goldens** for any fixture whose bundle
+omits `decay`, so it wants a bless and a check of which fixtures those are, and it should not be
+slipped into an unrelated plan.
+
+### Priority
+
+**Low-medium.** Latent for shipped content, but it is a units error sitting in the one table that
+exists to stop units errors, and its own module header says four parallel lists were replaced by that
+table precisely so a value could not silently read its neighbour.
 
 ---

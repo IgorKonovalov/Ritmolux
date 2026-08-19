@@ -1229,7 +1229,7 @@ not, says so — in the shape ADR-0020's typo warning already takes.
 
 ```text
 milkconv: Songflower: custom shape 1 is textured with the previous frame, which this engine has no stage for; it is drawn as a flat gradient fill
-milkconv: Songflower: sets `echo_zoom`, which this engine does not consume — the video echo ...
+milkconv: Cauldron - painterly 5: reads `ang` in per-frame code, where it is a per-VERTEX variable ...
 ```
 
 What is **not** warned about is a bare name the preset uses as its own
@@ -1243,10 +1243,10 @@ not know".
 | carried | not carried |
 |---|---|
 | the per-frame and per-vertex programs, whole | disk textures — deliberately out of scope, and priced at 19 % of the corpus. **Since Phase 6 this is a conversion *failure***: the shader that samples one is rejected by name rather than silently rendered without it |
-| **the `warp` and `comp` HLSL blocks, translated to WGSL** (Phase 6) — the ~30 intrinsics, swizzles, `if`, bounded loops, `#define`s, helper functions, the noise samplers, `GetBlur1..3`, the `q`/roam/rand/`rot_*` input surface | `echo_zoom` / `echo_alpha` / `echo_orient` — a second sampled copy, which this engine has no stage for |
-| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | HLSL arrays, computed `#if` conditions, structs — each a named rejection, together well under 2 % of the corpus |
-| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert` | a custom shape's `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
-| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | the second audio channel, because this engine's analysis is mono by construction |
+| **the `warp` and `comp` HLSL blocks, translated to WGSL** (Phase 6) — the ~30 intrinsics, swizzles, `if`, bounded loops, `#define`s, helper functions, the noise samplers, `GetBlur1..3`, the `q`/roam/rand/`rot_*` input surface | HLSL arrays, computed `#if` conditions, structs — each a named rejection, together well under 2 % of the corpus |
+| `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | a custom shape’s `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
+| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert`, and **the video echo** `echo_zoom` / `echo_alpha` / `echo_orient` (Plan 0109) — a bundle emitted before that plan carries no register for them and must be re-converted | the second audio channel, because this engine’s analysis is mono by construction |
+| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | |
 | up to four custom waves and four custom shapes, each with its own programs | |
 | the inner and outer borders, and the motion-vector grid | |
 | the initial conditions, re-applied at the top of every frame | |

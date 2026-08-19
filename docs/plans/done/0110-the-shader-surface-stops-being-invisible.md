@@ -321,7 +321,7 @@ cannot drift.
   is a narrower capture size for this fixture, not a dropped assertion.
 - **The fixture is hand-written, so it is only as representative as its author.** It pins that
   the surface *works*, not that any real preset renders correctly — Plan
-  [0109](../0109-the-milkdrop-import-gets-its-geometry-back.md) owns the latter.
+  [0109](0109-the-milkdrop-import-gets-its-geometry-back.md) owns the latter.
 
 ## What this plan does NOT do
 

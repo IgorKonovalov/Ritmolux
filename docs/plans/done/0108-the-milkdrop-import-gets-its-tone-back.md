@@ -5,7 +5,7 @@
 > one live look-gate session against `foo_vis_milk2` and are recorded below. The verdict on this
 > plan's own central question is **still merely different** — and the gate found four engine defects
 > this plan was never scoped to fix, which is worth more than the answer it went looking for. They
-> carry to [Plan 0109](../0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
+> carry to [Plan 0109](0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
 > **Created:** 2026-08-17
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (proposed)
