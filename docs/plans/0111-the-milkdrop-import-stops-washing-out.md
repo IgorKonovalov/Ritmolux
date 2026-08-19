@@ -522,6 +522,56 @@ broken at `docs/design-backlog.md:2446` — it asserts `present: None => d\.\$fi
 removed, so it fired **on delivery** rather than on decay. 0121 is a `**Closes:**` entry and archiving
 it is the close ceremony's step 3c, which is `architect`'s call.
 
+### Phase 4 — `ang` is pinned, and the reference comparison is **not decidable here**
+
+**Half the done-when is delivered, half is not, and the split is clean.**
+`ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` pins this engine's construction from
+`vertex_position`'s arithmetic: the cut is on **+x** and is a real discontinuity of nearly a full
+turn (asserted against its two neighbouring vertices), `ang` is continuous everywhere else on the
+ring, and it increases **counter-clockwise as seen on screen** because y is flipped before the
+`atan2`. Neither can now move silently, and `milkconv/tests/warp_geometry.rs` already holds the
+emitted WGSL epilogue and the draw layer to the same y-down/y-up asymmetry.
+
+**The comparison against the reference could not be made.** The phase required it be derived from the
+source format's convention or the reference implementation, with the source named, and never from a
+picture. Neither exists in this environment: the corpus is `.milk` files with no MilkDrop source and
+no authoring documentation, and a corpus-wide search for a preset stating a rotation direction
+returns two files, both building their own Kardan rotation from `q` variables rather than reading the
+per-vertex `ang`. A `.milk` preset does not record the convention it was authored against.
+
+So **neither** of the phase's two branches was taken. The seam is not corrected, and it is also not
+recorded as authored-against — that second claim needs the half that is missing, and asserting it
+would be exactly the prose error ADR-0071's rule catches. Backlog 0119 stays live. What would settle
+it, most direct first: MilkDrop 2's `milkdropfs.cpp` mesh setup, where the sign of the `y` handed to
+`atan2f` is one line; the authoring documentation; or one reference capture of a deliberately
+handedness-revealing preset, which is a look-gate artifact and not a test.
+
+### Phase 5 — the entry splits: the x-extent is a second defect, the constant is not derivable
+
+**The x-extent is a second defect and it is now backlog 0122**, shown by arithmetic rather than by a
+picture. Modes 6/7 place points at `t = i/(count-1) - 0.5` and divide x by `aspect`; `uv_to_world`
+multiplies x **by** `aspect`; the two cancel, so the trace's world length is `2.0` at every aspect
+while the frame is `2 * aspect` wide. The trace covers `1/aspect` of the width — `0.5625` at 16:9,
+which is the "middle 57 %" Plan 0109's gate reported. **The trace is normalized to the frame's height
+rather than its width**, and at aspect 1 that is full width, which is why nothing caught it — the
+ADR-0037 coincidence one level down. Pinned by
+`a_straight_wave_trace_spans_one_over_aspect_of_the_width` as a property over three aspects. It is
+independent of `wave_scale`, which is what makes it a separate entry.
+
+**The amplitude constant stopped**, on the branch the phase provides for it. No MilkDrop source and
+no authoring documentation are available, and matching a picture was refused. But the corpus is an
+available source and it narrows the question: across the **552** presets in `milkdrop-original` that
+set `fWaveScale` the median is **0.9724** — unity — with `p10 = 0.01` and `p90 = 3.235`. So
+`fWaveScale` is authored as a multiplier *about 1*, and what is missing is a single **base
+amplitude**, not a per-preset or mode-dependent correction. That also weakens the entry's own "factor
+of 279, so it cannot be a bare multiplier" argument: a tenth of the corpus authors near-zero scales
+deliberately, and a near-flat trace is a visible flat line rather than an invisible one. Recorded on
+0120; nothing changed.
+
+**Two corrections made while writing the Phase 5 test**, both mine and neither in the engine: the
+draw geometry is world space rather than uv, and taking only each segment's start point drops the
+trace's final vertex. The first is what made the `/aspect` look uncancelled on a first reading.
+
 ## Followups (after this lands)
 
 - Whatever Phase 5's x-extent question files, if it turns out to be a second defect.
