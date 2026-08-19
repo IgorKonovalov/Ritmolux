@@ -49,6 +49,12 @@
 //!   dash; see [`dots`].
 //! - **`wave_mystery` means something different in every mode**, which is the
 //!   reference's own design rather than a simplification here.
+//! - **Mode 6 and 7's line does not drift.** Its angle is `wave_mystery` alone.
+//!   A `time * 0.05` term rotated it a full turn every ~126 s until Plan 0109
+//!   Phase 2 removed it, on a look gate that put *Blur Mix 3*'s horizontal
+//!   reference traces beside this engine's one steep diagonal. Listed here
+//!   because the reference's own mode 6 is documented only as "a line", and
+//!   "which line" is a reading of it — see the arm's comment.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). This builds geometry every displayed frame.
@@ -174,12 +180,19 @@ const DOT_LENGTH: f32 = 0.0015;
 ///
 /// `runtime` is `None` for a hand-authored `warp_mesh` preset, which draws no
 /// MilkDrop layer at all — so this whole file costs a native preset one branch.
+/// **`_time` is read by nothing here, and that is the contract** (Plan 0109
+/// Phase 2): every figure this layer builds is a pure function of the trace and
+/// the frame outputs. The parameter stays in the signature because the scene has
+/// the value and because time-independence is a claim worth being able to *test*
+/// — `draw_layer.rs` calls this twice at well-separated times and compares the
+/// geometry. A future mode that legitimately animates would rename it back, and
+/// would owe that test a reason.
 pub fn build(
     geometry: &mut DrawGeometry,
     runtime: Option<&mut MilkRuntime>,
     out: &FrameOutputs,
     waveform: &[f32; WAVE_SAMPLES],
-    time: f32,
+    _time: f32,
     dt: f32,
     aspect: f32,
 ) {
@@ -188,7 +201,7 @@ pub fn build(
         return;
     };
     let exposure = Exposure::new(dt);
-    waveform_figure(geometry, out, waveform, time, exposure, aspect);
+    waveform_figure(geometry, out, waveform, exposure, aspect);
     custom_waves(geometry, runtime, waveform, exposure, aspect);
     custom_shapes(geometry, runtime, exposure, aspect);
     // The two borders and the motion-vector grid are **always** alpha-blended in
@@ -448,7 +461,6 @@ fn waveform_figure(
     geometry: &mut DrawGeometry,
     out: &FrameOutputs,
     waveform: &[f32; WAVE_SAMPLES],
-    time: f32,
     exposure: Exposure,
     aspect: f32,
 ) {
@@ -614,31 +626,19 @@ fn waveform_figure(
         // the relationship mode 5 has to mode 2, so the pair is consistent with
         // the pair above it rather than being two names for one figure.
         6 | 7 => {
-            // **`time * 0.05` is the leading suspect for design-backlog 0107's
-            // diagonal stroke, and it is recorded rather than removed** (Plan
-            // 0108 Phase 4). *Blur Mix 3* draws one steep diagonal where the
-            // reference draws horizontal full-width traces, and this term is the
-            // only way a mode-6 line can be at an angle its preset never asked
-            // for: it rotates the figure a full turn every ~126 s, so a trace
-            // authored horizontal is horizontal only at the instants
-            // `mystery * PI + time * 0.05` happens to be a multiple of `pi`.
-            //
-            // Three things make it a suspect rather than a finding. It is the
-            // **only** use of `time` in this whole file — every other mode is a
-            // pure function of the trace and the outputs, which is why
-            // `waveform_figure` takes the parameter at all. It contradicts the
-            // sentence directly above it, which says the angle is set by
-            // `wave_mystery`. And it is absent from the module header's "What is
-            // approximated, stated" list, where every other liberty this file
-            // takes is written down.
-            //
-            // What it is not is *settled*: removing it changes every mode-6 and
-            // mode-7 preset, and whether the reference's line drifts is a
-            // question about the reference. Plan 0108's Phase 6 puts the seven
-            // pairs back beside `foo_vis_milk2`, which is where one look answers
-            // it. Until then the term stays and this comment carries the
-            // arithmetic.
-            let angle = mystery * std::f32::consts::PI + time * 0.05;
+            // **`time * 0.05` was here until Plan 0109 Phase 2** (design-backlog
+            // 0115). It rotated the figure a full turn every ~126 s, so a trace
+            // authored horizontal was horizontal only at the instants
+            // `mystery * PI + time * 0.05` happened to be a multiple of `pi`.
+            // Plan 0108 Phase 4 named it a suspect and deliberately left it in,
+            // because removing it moves every mode-6 and mode-7 preset and
+            // because whether the reference's line drifts is a question about
+            // the reference. Plan 0108 Phase 6 asked it: *Blur Mix 3*'s traces
+            // stay horizontal in `foo_vis_milk2` and drew one steep diagonal
+            // here. So the angle is what the sentence above always said it was —
+            // `wave_mystery` alone — and this file is now a pure function of the
+            // trace and the outputs, with no use of `time` anywhere in it.
+            let angle = mystery * std::f32::consts::PI;
             let (s, c) = angle.sin_cos();
             let offsets: &[f32] = if mode == 7 { &[0.03, -0.03] } else { &[0.0] };
             for (index, offset) in offsets.iter().enumerate() {
