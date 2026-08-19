@@ -157,7 +157,7 @@ were superseded orderings of the active roster.
   **What outlived the plan.** Four engine defects it was never scoped to fix — the clamped negative
   scale, the missing video-echo stage, `time * 0.05` in the mode 6/7 waveform angle (suspected by
   Phase 4, convicted by the gate), and **the wash itself, still unexplained and dominant**. All four
-  carry to [Plan 0109](0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
+  carry to [Plan 0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md) and backlog 0113-0116.
   Two wash hypotheses died during the gate and are recorded so nobody re-runs them: the deposit is
   already `dt`-scaled, and `bAdditiveWaves` does not separate the washed presets from the clean one.
   Also recorded: the review's own major — a wave's per-point carry crosses the **frame** boundary
@@ -4262,3 +4262,54 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0082]: done/0082-the-gradient-stops-banding.md
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
 [0087]: 0087-the-line-renderer-draws-a-curve.md
+
+## 0109 — The MilkDrop import gets its geometry back
+
+Closed 2026-08-19. **Seven phases, six of them code**; Phase 5 was the `human` look gate and it
+earned its place — it changed the plan rather than merely grading it.
+
+**What landed.** A negative scale mirrors instead of collapsing (Phase 1), which turned out to have
+*two* destroyers rather than the one the plan named: the shader's `pow(max(v, 1e-4), dt)` was the
+second, and `per_second_factor` returning `1.0` for any `v <= 0` was the first, so a negative `sx`
+reached the shader as exactly `1.0` and there was never a sign there to clamp. The mode 6/7 waveform
+stopped rotating (Phase 2). The video echo exists (Phase 3), and after the gate it **blends toward**
+its copy rather than adding it ([ADR-0119](../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md),
+Phase 7). The feedback field became observable (Phase 4, on its stop branch). The pragma guard learned
+to resolve a `#[path]`-declared module (Phase 6, carried from Plan 0110's review).
+
+**What the gate falsified, which is the part worth keeping.** Three claims this project believed going
+in did not survive it:
+
+- **Plan 0108's "without the echo only one family of bars survives"** — the premise the additive blend
+  was reasoned from. Both families are present with the echo off, and *Songflower* sets
+  `sx = sy = zoom = 1`, so Phase 1 had not restored them either. The lattice was always the preset's
+  own warp.
+- **"A surviving seam is the `emit.rs` sign"** — this plan's own Phase 5 question 4. The seam shows on
+  two MilkDrop 1.x presets carrying no shader block at all, so `emit.rs` never runs on them. It is the
+  `ang` branch cut on the +x axis (backlog 0119).
+- **Phase 4's live hypothesis about the wash** — that converted warp shaders never fade, and that this
+  "predicts the gate's own pattern." The census says the inverse: the five washed presets have no warp
+  shader; the only two that do are the clean control and the one "better".
+
+Plus two Plan 0108 *symptoms* retracted: *Cosmic Dust 2*'s magenta-vs-green hue (three per-channel
+LFOs on `time` — the renderers are out of phase, and the comparison measured nothing) and,
+provisionally, *Contortion*'s "black ray artifact" (black borders warped into a ground that should be
+black).
+
+**The pattern across all five.** Every one is a *symptom* that was filed with a mechanism attached,
+where the symptom was real and the mechanism was invented to fit it. That is the same lesson the
+design-backlog archive already carries from five inverted entries, arriving again from a different
+direction: **file the symptom; the mechanism needs its own evidence.**
+
+**The close review's two majors were both about evidence, not code.** Six backlog citations in the
+source were off by one with two transposed, about to be frozen by the archive step. And Phase 4's
+decay-domain measurement — the finding that will carry into the wash's eventual ADR — could not be
+re-run, because the parameter it needed was dead at every call site. Repairing that turned up
+backlog 0121: the probe had silently been running at `decay = 0.98`/s, MilkDrop's per-frame default
+read as per-second.
+
+**What outlived the plan.** Backlog 0113 (the wash) is carried, not closed, with the field now
+observable, three hypotheses dead by measurement and the fourth corrected — the remaining direction
+is downstream of the field. Backlog 0119 (the `ang` seam), 0120 (the oversized waveform figure) and
+0121 (the `decay` fallback) are new. The `preset-author` lane is unaffected: no shipped `.toml`
+references any defect this plan fixed.

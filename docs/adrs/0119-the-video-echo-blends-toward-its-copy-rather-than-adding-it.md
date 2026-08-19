@@ -1,12 +1,12 @@
 # ADR-0119 — The video echo blends toward its copy rather than adding it
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-19 (Plan 0109)
 > **Date:** 2026-08-19
-> **Related plan(s):** [0109](../plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7
+> **Related plan(s):** [0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7
 
 ## Context
 
-[Plan 0109](../plans/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 3 built the video-echo
+[Plan 0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 3 built the video-echo
 stage the engine had never had: a second sampled copy of the finished frame, zoomed about the centre
 and flipped per `echo_orient`, composited at `echo_alpha`. MilkDrop's own format stores those three
 values and 2.4 % of the corpus sets a non-zero alpha, but **how** the second copy meets the first is

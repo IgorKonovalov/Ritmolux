@@ -177,7 +177,7 @@ So the mechanism recorded here is **real, measurable and worth keeping** — the
 zero, and under a dynamic signal a preset that dissolved to flat white now holds its shading — but it
 is **not** the dominant fidelity defect of the MilkDrop import. Plan 0100's HDR claim closes
 **negatively**: still merely different. The dominant defect is the wash itself, cause unknown, and it
-carries to [Plan 0109](../plans/0109-the-milkdrop-import-gets-its-geometry-back.md) with
+carries to [Plan 0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) with
 [backlog 0113](../design-backlog.md).
 
 ## Notes
