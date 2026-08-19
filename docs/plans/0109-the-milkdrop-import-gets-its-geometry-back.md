@@ -221,6 +221,36 @@ flowchart TB
   `#[path]`-declared module in `core/src` as of 2026-08-19 (`grep -rn "#\[path" core/src`), and it
   is this one.
 
+### Phase 7 — the echo blends toward its copy
+
+- **Owner skill:** dev
+- **Added 2026-08-19**, from Phase 5's look gate, which convicted Phase 3's blend and falsified the
+  observation that justified it. The decision and its rejected alternatives are
+  [ADR-0119](../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md); read it
+  first, because this phase is that ADR and nothing else.
+- **What:** the present pass composites the echo as `mix(base, echo, alpha)` rather than
+  `base + echo * alpha`. One expression. Nothing else Phase 3 built moves — not the converter roster,
+  not `FrameOutputs`, not `COMPOSITE_PARAMS`, not the orientation quantizer.
+- **Files touched:** `core/src/render/scenes/warp_mesh/mod.rs` (the present shader and its comment),
+  `milkconv/tests/warp_geometry.rs` (the acceptance test), `presets/README.md`.
+- **The acceptance property is replaced, and gets stronger.** Phase 3 asserted that flip-x at
+  `alpha = 1` renders left-right symmetric — a consequence a uniform grey frame also satisfies, and
+  one that is *false* under a lerp. Assert the transform itself instead: because the echo samples the
+  same field the pass is already reading and writes nothing back, the field evolves identically in
+  both arms, so at `alpha = 1`, `echo_zoom = 1`, `echo_orient = 1` the rendered frame **is** the
+  horizontal mirror of the same preset at `alpha = 0`. Compare the echoed frame against the mirrored
+  control, and against the unmirrored control as the non-vacuity arm.
+- **Done when:**
+  - The echoed frame at `alpha = 1`, `orient = 1`, `zoom = 1` is far closer to the **mirror** of the
+    `alpha = 0` control than to the control itself, on a statistic this file already computes.
+  - `alpha = 0` is still an **exact identity** — `core/tests/golden/warp_mesh_milk.png` and every
+    other baseline unmoved.
+  - `presets/README.md`'s note that the echo "adds light rather than reshaping it" is rewritten, and
+    the roster row for `echo_alpha` says what `1` now means.
+  - The shader comment stops arguing for the sum and points at ADR-0119.
+- **Not in scope:** the wash, the `ang` seam, the waveform scale. All three are Phase 5 findings with
+  their own backlog entries; none of them is this phase.
+
 ## Risks & open questions
 
 - **Phase 4 may stop.** It is the dominant defect and the least certain, which is the whole reason it
