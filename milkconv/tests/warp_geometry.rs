@@ -1,9 +1,10 @@
-//! **Where a converted preset's geometry goes wrong** — two hunts that share a
+//! **Where a converted preset's geometry goes wrong** — three hunts that share a
 //! statistic: the horizontal reflection seam (Plan 0108 Phase 3,
-//! design-backlog 0107), and the destroyed mirror of a negative scale
-//! (Plan 0109 Phase 1, design-backlog 0113). Both ask whether a picture is its
-//! own mirror about one axis, so both read `mirror_asymmetry`; the header below
-//! is the first hunt's, and the second's is on its own test.
+//! design-backlog 0107), the destroyed mirror of a negative scale (Plan 0109
+//! Phase 1, design-backlog 0114), and the missing video echo (Plan 0109
+//! Phase 3, design-backlog 0115). Each asks whether a picture is its own mirror
+//! about one axis, so all three read `mirror_asymmetry`; the header below is the
+//! first hunt's, and the other two are on their own tests.
 //!
 //! # The defect this is hunting
 //!
@@ -247,7 +248,7 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
 }
 
 /// **A negative `sx` mirrors the past instead of collapsing it** — Plan 0109
-/// Phase 1, design-backlog 0113.
+/// Phase 1, design-backlog 0114.
 ///
 /// # The defect
 ///
@@ -330,7 +331,7 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 }
 
 /// **The video echo puts a second, flipped copy of the frame on screen** —
-/// Plan 0109 Phase 3, design-backlog 0116.
+/// Plan 0109 Phase 3, design-backlog 0115.
 ///
 /// # What was missing
 ///

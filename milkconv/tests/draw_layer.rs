@@ -723,7 +723,7 @@ fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[
 }
 
 /// **A mode-6 figure's orientation is a pure function of `wave_mystery`** —
-/// Plan 0109 Phase 2, design-backlog 0115.
+/// Plan 0109 Phase 2, design-backlog 0116.
 ///
 /// # The defect
 ///

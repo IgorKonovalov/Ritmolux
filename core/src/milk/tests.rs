@@ -1193,7 +1193,7 @@ fn uses_random_is_true_exactly_when_a_pushed_program_draws() {
 }
 
 /// **A positive scale converts exactly as it always did, and a negative one
-/// mirrors** — Plan 0109 Phase 1, the CPU half of design-backlog 0113.
+/// mirrors** — Plan 0109 Phase 1, the CPU half of design-backlog 0114.
 ///
 /// The claim under test is *byte-identity for a positive input*, asserted
 /// against the live unsigned converter rather than argued from the source: the
