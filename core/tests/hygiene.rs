@@ -57,27 +57,105 @@ fn workspace_root() -> PathBuf {
 /// This asks the parent rather than matching on the file name, because the moved
 /// modules are not all called `tests`: `particles/projection_mirror.rs` is one
 /// too, and a name-based rule would silently let it back in.
+///
+/// # It reads the declaration, not two adjacent lines
+///
+/// The first version of this matched `#[cfg(test)]` **immediately followed by**
+/// `mod <stem>;`, and Plan 0110 Phase 1 wrote a declaration that satisfies
+/// neither half:
+///
+/// ```ignore
+/// #[cfg(test)]
+/// #[path = "shader_tests.rs"]   // an attribute in between
+/// mod tests;                     // and the module is named `tests`
+/// ```
+///
+/// `shader_tests.rs` was therefore collected as hot-path source and passed only
+/// because its `#![allow(...)]` block happens to contain the literal
+/// [`PRAGMA_SENTINEL`] — the vacuous pass this function's own header warns
+/// about, arriving by the exact route it warns about. So the matcher now steps
+/// over the attribute run and resolves a `#[path]` to the file it names. That is
+/// the general fix rather than the local one: moving the file to a name the old
+/// matcher liked would have removed today's instance and left the blindness.
 fn is_cfg_test_module(path: &Path) -> bool {
-    let (Some(stem), Some(dir)) = (path.file_stem(), path.parent()) else {
+    let Some(dir) = path.parent() else {
         return false;
     };
     // `dir/name.rs` is a child of `dir/mod.rs` when that exists, otherwise of
-    // the `dir.rs` sitting beside `dir` (the Rust 2018 layout).
-    let parent_src = [
-        dir.join("mod.rs"),
-        dir.join("lib.rs"),
-        dir.with_extension("rs"),
-    ]
-    .into_iter()
-    .find(|p| p.is_file() && p != path);
+    // the `dir.rs` sitting beside `dir` (the Rust 2018 layout) — **but a
+    // `#[path]` declaration can come from any file in the module tree**, and the
+    // one that motivated this came from `warp_mesh/shader.rs` while `mod.rs` sat
+    // right there and was the only file being read. So every sibling is asked.
+    // The directory is small and this is a test.
+    let mut candidates = vec![dir.with_extension("rs")];
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        let mut siblings: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|ext| ext == "rs") && p != path)
+            .collect();
+        siblings.sort();
+        candidates.extend(siblings);
+    }
+    candidates
+        .into_iter()
+        .any(|parent| declares_cfg_test_module(&parent, path))
+}
 
-    let Some(text) = parent_src.and_then(|p| std::fs::read_to_string(p).ok()) else {
+/// Does `parent` declare `path` as a `#[cfg(test)]` module?
+///
+/// Reads the declaration rather than two adjacent lines: it steps over the
+/// attribute run between the gate and the `mod` line, and resolves a
+/// `#[path = "…"]` to the file it names.
+fn declares_cfg_test_module(parent: &Path, path: &Path) -> bool {
+    let (Some(stem), Some(parent_dir)) = (path.file_stem(), parent.parent()) else {
         return false;
     };
-    let decl = format!("mod {};", stem.to_string_lossy());
-    text.lines()
-        .zip(text.lines().skip(1))
-        .any(|(a, b)| a.trim() == "#[cfg(test)]" && b.trim() == decl)
+    if !parent.is_file() {
+        return false;
+    }
+    let Ok(text) = std::fs::read_to_string(parent) else {
+        return false;
+    };
+
+    let mut lines = text.lines().map(str::trim).peekable();
+    while let Some(line) = lines.next() {
+        if line != "#[cfg(test)]" {
+            continue;
+        }
+        // Everything between the gate and the declaration is attributes; one of
+        // them may say which file the module actually lives in.
+        let mut declared_path: Option<String> = None;
+        while let Some(next) = lines.peek() {
+            if !next.starts_with("#[") {
+                break;
+            }
+            if let Some(value) = next
+                .strip_prefix("#[path")
+                .and_then(|rest| rest.split('"').nth(1))
+            {
+                declared_path = Some(value.to_string());
+            }
+            lines.next();
+        }
+        let Some(name) = lines
+            .peek()
+            .and_then(|l| l.strip_prefix("mod "))
+            .and_then(|l| l.strip_suffix(';'))
+        else {
+            continue;
+        };
+        // A `#[path]` on a file-module declaration resolves against the
+        // directory of the file that declares it, so `shader.rs` naming
+        // `shader_tests.rs` means its own sibling.
+        let matches = match &declared_path {
+            Some(value) => parent_dir.join(value) == path,
+            None => name.trim() == stem.to_string_lossy(),
+        };
+        if matches {
+            return true;
+        }
+    }
+    false
 }
 
 fn collect_rs_files(path: &Path, out: &mut Vec<PathBuf>) {
@@ -95,6 +173,32 @@ fn collect_rs_files(path: &Path, out: &mut Vec<PathBuf>) {
     for entry in &entries {
         collect_rs_files(entry, out);
     }
+}
+
+/// **The guard sees a `#[path]`-declared test module** — Plan 0109 Phase 6.
+///
+/// A positive and a negative in the same file, because the failure this fixes
+/// was one-sided: the matcher answered `false` for a test module and the file
+/// was then scanned as hot-path source, where it passed on a spelling
+/// coincidence. This does not replace the inversion probe the phase ran (delete
+/// the sentinel, watch the guard flip) — nothing permanent can, since a guard
+/// that has stopped guarding still passes. It pins the resolution.
+#[test]
+fn the_guard_resolves_a_path_declared_test_module() {
+    let warp_mesh = core_src().join("render").join("scenes").join("warp_mesh");
+    let declared = warp_mesh.join("shader_tests.rs");
+    assert!(
+        declared.is_file(),
+        "the fixture for this test is a real file in the tree; if it moved,          point this at whatever `#[path]`-declared module replaced it"
+    );
+    assert!(
+        is_cfg_test_module(&declared),
+        "`shader_tests.rs` is declared `#[cfg(test)] #[path = \"shader_tests.rs\"]          mod tests;` in `shader.rs` — a test module by declaration, whatever it          is called and whichever file declares it"
+    );
+    assert!(
+        !is_cfg_test_module(&warp_mesh.join("draw.rs")),
+        "`draw.rs` builds geometry every displayed frame and is not a test          module; if the skip rule now covers it, the rule has widened"
+    );
 }
 
 /// The hot-path set the pragma guards. Directories are scanned recursively;
