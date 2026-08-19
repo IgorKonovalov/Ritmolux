@@ -750,6 +750,36 @@ fn the_echo_orientation_quantizes_to_four_states() {
 /// resolution buys nothing but readback time.
 const FIELD_SIZE: u32 = 64;
 
+/// The exponent between this engine's linear field and the reference's
+/// gamma-encoded 8-bit one. sRGB's transfer function is a piecewise curve, but
+/// the domain question below is about a *ratio over a decade*, where the
+/// straight `2.2` power it approximates is what the arithmetic is worth stating
+/// to. Naming it as a constant keeps the two predictions in
+/// [`the_decay_domain_is_not_the_wash`] derived from one number rather than two
+/// literals that could drift apart.
+const ENCODE_GAMMA: f64 = 2.2;
+
+/// The frame step every probe below runs at. A constant rather than a literal
+/// because [`the_decay_domain_is_not_the_wash`]'s arithmetic is in *seconds*,
+/// and a step that drifted from the one the frames were rendered with would
+/// falsify the comparison silently.
+const FIELD_DT: f32 = 1.0 / 60.0;
+
+/// One run of [`field_trace`]: what the field did, and the decay it did it with.
+///
+/// The decay is carried out rather than assumed because **the scene does not
+/// keep the one a caller sets**: a bundle's per-frame outputs overwrite the
+/// whole composite roster on every `update`, and `decay` is a roster member (the
+/// deposit is not, which is why *that* one sticks). Any arithmetic about the
+/// fade has to be built on the value the frames were actually rendered with, so
+/// the probe reads it back off the scene instead of restating it.
+struct FieldTrace {
+    /// One entry per frame, in order.
+    levels: Vec<FieldLevel>,
+    /// The per-second `decay` in force on the last frame rendered.
+    decay: f32,
+}
+
 /// One frame's reading of the field.
 #[derive(Debug, Clone, Copy, Default)]
 struct FieldLevel {
@@ -774,7 +804,8 @@ fn field_trace(
     params: &[(&str, f32)],
     frames: usize,
     deposit_off_at: usize,
-) -> Option<Vec<FieldLevel>> {
+    decay_per_second: Option<f32>,
+) -> Option<FieldTrace> {
     use crate::render::capture;
     use crate::render::context::{RenderContext, RenderError};
 
@@ -828,7 +859,7 @@ fn field_trace(
         capture::create_linear_readback(&ctx.device, FIELD_SIZE, FIELD_SIZE);
 
     let frame = AnalysisFrame::default();
-    let dt = 1.0 / 60.0;
+    let dt = FIELD_DT;
     let mut out = Vec::with_capacity(frames);
     for i in 0..frames {
         if i == deposit_off_at {
@@ -842,6 +873,18 @@ fn field_trace(
         scene.set_time(i as f32 * dt);
         scene.advance(dt);
         scene.update(&frame);
+        // **After `update`, not with the other params.** `update` has just
+        // overwritten the entire composite roster from the bundle's per-frame
+        // outputs, and `decay` is a roster member — a value set before the loop
+        // would be gone by the first frame. (`deposit` is a native param, not a
+        // roster member, which is why stopping it above sticks.)
+        //
+        // An empty bundle leaves `decay` at `FrameOutputs`' fallback, which is
+        // MilkDrop's `0.98` read as **per second** rather than per frame — a
+        // near-unity factor, and not a fade any experiment about a fade can use.
+        if let Some(d) = decay_per_second {
+            scene.set_param("decay", d);
+        }
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -899,7 +942,10 @@ fn field_trace(
             },
         });
     }
-    Some(out)
+    Some(FieldTrace {
+        levels: out,
+        decay: scene.decay,
+    })
 }
 
 /// A still field with a centred deposit: the recursion is per-texel, so what it
@@ -944,10 +990,11 @@ fn still_field_params() -> Vec<(&'static str, f32)> {
 #[test]
 fn the_field_equilibrates_only_when_the_quantizer_runs() {
     let params = still_field_params();
-    let Some(off) = field_trace(0.0, &params, 300, usize::MAX) else {
+    let Some(off) = field_trace(0.0, &params, 300, usize::MAX, None) else {
         return;
     };
-    let on = field_trace(255.0, &params, 300, usize::MAX).expect("the second trace runs too");
+    let on = field_trace(255.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let (off, on) = (off.levels, on.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(
         "[field] quantizer OFF  f30 {:.4} f120 {:.4} f300 {:.4} (peak {:.3})",
@@ -1026,10 +1073,11 @@ fn the_quantized_background_stays_black() {
             *value = 0.12;
         }
     }
-    let Some(on) = field_trace(255.0, &params, 300, usize::MAX) else {
+    let Some(on) = field_trace(255.0, &params, 300, usize::MAX, None) else {
         return;
     };
-    let off = field_trace(0.0, &params, 300, usize::MAX).expect("the second trace runs too");
+    let off = field_trace(0.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let (on, off) = (on.levels, off.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(
         "[field] edge ON  f30 {:.6} f120 {:.6} f300 {:.6}",
@@ -1057,5 +1105,128 @@ fn the_quantized_background_stays_black() {
          measuring nothing",
         read(&off, 299).edge,
         read(&off, 29).edge
+    );
+}
+
+/// **The decay multiply's domain is not the wash** — Plan 0109 Phase 4's third
+/// dead hypothesis, measured rather than argued.
+///
+/// # The hypothesis
+///
+/// This engine multiplies the field by `decay` in **linear** light; the
+/// reference multiplies its 8-bit target in the **gamma-encoded** domain, and a
+/// factor `a` encoded is `a^2.2` linear. The same nominal decay should therefore
+/// leave our trails visibly outliving the reference's, and a trail that outlives
+/// the reference's is what a wash looks like.
+///
+/// # Why this is a property rather than a frozen number
+///
+/// Both predictions are derived from the decay the frames were **actually**
+/// rendered with — read back off the scene by [`FieldTrace`], not assumed — so
+/// the claim holds at any decay, any frame step and any adapter:
+///
+/// - the **reference's** fade, stated in the reference's own encoded domain:
+///   `d^T`
+/// - the **pure-linear** prediction, which is our multiply expressed in that
+///   same domain so the two are comparable: `d^(T/2.2)`
+///
+/// The measured fade lands far closer to the first than to the second. The
+/// quantizer's truncation absorbs most of the domain error, so the domain
+/// difference is real arithmetic that does **not** reach the picture — and it is
+/// not what makes converted presets wash out. That is the third hypothesis this
+/// defect has killed, after frame-rate accumulation and `bAdditiveWaves`.
+///
+/// **What it does not touch** is the live hypothesis, which is in the other warp
+/// path entirely — see the module note above.
+///
+/// # What it read
+///
+/// Measured 2026-08-19 on the development box (Windows 10, DX12), 64x64, decay
+/// `0.5455`/s over 2.650 s of undeposited field:
+///
+/// ```text
+///   measured                 0.3034
+///   reference arithmetic     0.2007   <- 0.103 away
+///   pure-linear prediction   0.4819   <- 0.179 away
+/// ```
+///
+/// Those are an observation and not the assertion — nothing above is asserted
+/// against them. Plan 0109 Phase 4 read `0.2303` for the same quantity on a
+/// window it did not commit, which is nearer the reference still; both readings
+/// say the same thing about the hypothesis and neither is load-bearing.
+#[test]
+fn the_decay_domain_is_not_the_wash() {
+    /// The frame the deposit stops on, so everything after it is the field
+    /// living on what it already has.
+    const DEPOSIT_OFF_AT: usize = 40;
+    const FRAMES: usize = 200;
+
+    // MilkDrop's own default `fDecay`, converted the way the converter converts
+    // it — `0.98` per frame at the nominal rate. Written as the conversion
+    // rather than as `0.5455` so it cannot drift from `NOMINAL_FPS`, and held
+    // for every frame because an empty bundle's fallback is a near-unity factor
+    // that would leave nothing to measure.
+    let decay = 0.98f32.powf(crate::milk::NOMINAL_FPS);
+    let Some(trace) = field_trace(
+        255.0,
+        &still_field_params(),
+        FRAMES,
+        DEPOSIT_OFF_AT,
+        Some(decay),
+    ) else {
+        return;
+    };
+    let read = |n: usize| trace.levels.get(n).copied().unwrap_or_default();
+    let (first, last) = (read(DEPOSIT_OFF_AT).mean, read(FRAMES - 1).mean);
+
+    // `render` clamps before it converts, so this is the factor the frames were
+    // rendered with rather than the one the scene was handed.
+    let d = f64::from(trace.decay.clamp(0.0, MAX_DECAY));
+    let elapsed = f64::from((FRAMES - 1 - DEPOSIT_OFF_AT) as f32 * FIELD_DT);
+
+    // The fade this engine produced, moved into the reference's domain so the
+    // three numbers below are all the same kind of quantity.
+    let measured = (f64::from(last) / f64::from(first)).powf(1.0 / ENCODE_GAMMA);
+    let reference = d.powf(elapsed);
+    let linear_domain = d.powf(elapsed / ENCODE_GAMMA);
+
+    println!(
+        "[field] decay {d:.4}/s over {elapsed:.3} s — measured {measured:.4}, \
+         reference arithmetic {reference:.4}, pure-linear prediction \
+         {linear_domain:.4} (nearer the reference by {:.1}x)",
+        (measured - linear_domain).abs() / (measured - reference).abs().max(f64::EPSILON)
+    );
+
+    // Non-vacuity, in three parts. The field must have faded at all, or the
+    // ratio is a reading of a constant.
+    assert!(
+        first > 0.0 && last < first * 0.9,
+        "the field did not fade between frames {DEPOSIT_OFF_AT} and {FRAMES} \
+         ({first:.4} -> {last:.4}), so nothing below measures a decay. Check \
+         that the deposit actually stopped"
+    );
+    // And the two predictions must be far enough apart to tell apart, which is
+    // the whole hypothesis: if the domain difference did not predict a large
+    // divergence, there would be nothing to rule out.
+    assert!(
+        linear_domain > reference * 1.5,
+        "the domain hypothesis predicts a LARGE divergence and here it predicts \
+         almost none ({linear_domain:.4} against {reference:.4}), so this test \
+         rules nothing out. The decay in force was {d:.4}/s over {elapsed:.3} s \
+         — too little fade in the window to separate the two predictions"
+    );
+
+    // The finding. Stated as a comparison of two distances rather than as a
+    // threshold: the measured fade is nearer the reference's arithmetic than
+    // the pure-linear prediction, which is what "the truncation absorbs the
+    // domain error" means.
+    let to_reference = (measured - reference).abs();
+    let to_linear = (measured - linear_domain).abs();
+    assert!(
+        to_reference < to_linear,
+        "the measured fade {measured:.4} is nearer the PURE-LINEAR prediction \
+         {linear_domain:.4} than the reference's {reference:.4}, so the decay \
+         multiply's domain IS reaching the picture after all and this \
+         hypothesis is alive again — Plan 0109 Phase 4 recorded it as dead"
     );
 }

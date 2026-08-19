@@ -1249,7 +1249,7 @@ fn per_second_factor(v: f32) -> f32 {
 /// idiom (363 corpus files, 3.5 %). Reading one as the identity deleted the
 /// mirror here, before the mesh vertex stage ever saw the value. That stage's
 /// own `max()` guard deleted it a second time; both halves are
-/// design-backlog 0113, and the other half is `warp_mesh`'s `signed_rate`.
+/// design-backlog 0114, and the other half is `warp_mesh`'s `signed_rate`.
 ///
 /// The magnitude converts exactly as an unsigned factor does, so a positive
 /// input is bit-identical to [`per_second_factor`] and nothing shipping a
