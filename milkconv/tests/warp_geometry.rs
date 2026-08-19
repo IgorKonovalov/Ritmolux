@@ -328,3 +328,75 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
          see `signed_rate` in `warp_mesh/mod.rs`"
     );
 }
+
+/// **The video echo puts a second, flipped copy of the frame on screen** —
+/// Plan 0109 Phase 3, design-backlog 0116.
+///
+/// # What was missing
+///
+/// MilkDrop's composite draws the finished frame twice: once straight, once
+/// zoomed about the centre and flipped per `nVideoEchoOrientation`, at
+/// `fVideoEchoAlpha`. This engine had no stage for it and the converter said so
+/// by name — 2.4 % of the corpus sets a non-zero echo alpha, and where it is set
+/// it is load-bearing. *Songflower (Moss Posy)* asks for `1.000` with an animated
+/// orientation, and its woven lattice **is** the echo: one family of bars
+/// survived without it.
+///
+/// # The property
+///
+/// A frame plus its own left-right flip is left-right symmetric, whatever the
+/// frame was. So the fixture — one shape at `x = 0.22`, `echo_orient = 1`,
+/// `echo_zoom = 1`, `echo_alpha = 1` — must render symmetric about the vertical
+/// axis, and the same file at `echo_alpha = 0` must not. The control is one
+/// token: the initial condition the converter now seeds.
+///
+/// This walks the converter, so it also pins the half that is not the shader:
+/// three outputs that were warned about as unconsumed are now seeded into the
+/// bundle and read by the scene.
+#[test]
+fn the_video_echo_draws_a_flipped_second_copy() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let text = fixture_text("core/tests/fixtures/scratch-0109/video-echo.milk");
+    let control_text = text.replace("fVideoEchoAlpha=1.000", "fVideoEchoAlpha=0.000");
+    assert_ne!(
+        control_text, text,
+        "the control substitution found nothing to replace — the fixture's echo \
+         alpha was edited without updating this test"
+    );
+
+    let echoed = preset(&text, "video-echo");
+    let control = preset(&control_text, "no-echo");
+    renderer.set_presets(vec![echoed, control]);
+
+    let frame = AnalysisFrame::default();
+    let a = renderer
+        .capture_preset("video-echo", &frame, FRAMES)
+        .expect("capture the echo");
+    let b = renderer
+        .capture_preset("no-echo", &frame, FRAMES)
+        .expect("capture the control");
+
+    let (echo, none) = (
+        mirror_asymmetry(&a, Axis::Vertical),
+        mirror_asymmetry(&b, Axis::Vertical),
+    );
+    println!(
+        "[warp_geometry] distance from being its own left-right mirror — \
+         `echo_alpha = 1`: {echo:.4}, `echo_alpha = 0`: {none:.4}"
+    );
+
+    assert!(
+        none > 0.05,
+        "the CONTROL is already close to symmetric ({none:.4}), so a symmetric \
+         echo proves nothing. The fixture's one shape sits at x = 0.22"
+    );
+    assert!(
+        echo < none * 0.25,
+        "`echo_alpha = 1` with `echo_orient = 1` is {echo:.4} from its own \
+         left-right mirror against the control's {none:.4}, so the flipped \
+         second copy is not reaching the screen — check that the converter \
+         seeds the three echo outputs and that the present pass reads them"
+    );
+}
