@@ -1,4 +1,9 @@
-//! **The horizontal reflection seam** (Plan 0108 Phase 3, design-backlog 0107).
+//! **Where a converted preset's geometry goes wrong** — two hunts that share a
+//! statistic: the horizontal reflection seam (Plan 0108 Phase 3,
+//! design-backlog 0107), and the destroyed mirror of a negative scale
+//! (Plan 0109 Phase 1, design-backlog 0113). Both ask whether a picture is its
+//! own mirror about one axis, so both read `mirror_asymmetry`; the header below
+//! is the first hunt's, and the second's is on its own test.
 //!
 //! # The defect this is hunting
 //!
@@ -52,13 +57,13 @@ const SIZE: u32 = 96;
 /// it several times. The mirror, if there is one, appears on the second frame.
 const FRAMES: u32 = 12;
 
-fn fixture_text() -> String {
+fn fixture_text(relative: &str) -> String {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("milkconv has a workspace-root parent")
-        .join("core/tests/fixtures/scratch-0108/ang-roundtrip.milk");
+        .join(relative);
     std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("the Phase 3 fixture must be readable at {path:?}: {e}"))
+        .unwrap_or_else(|e| panic!("the fixture must be readable at {path:?}: {e}"))
 }
 
 /// Convert the fixture and load the emitted bundle back, exactly as `shot`
@@ -91,16 +96,29 @@ fn headless() -> Option<Renderer> {
     }
 }
 
-/// **How far the frame is from being its own vertical mirror**: the mean
-/// absolute per-channel difference between the image and itself flipped about
-/// the horizontal midline, on the stored-byte 0..1 scale `frame_diff` uses.
+/// Which line a frame is asked to be symmetric about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Axis {
+    /// Flip top for bottom — the `ang` round trip's own fingerprint.
+    Horizontal,
+    /// Flip left for right — what a negative `sx` produces (Plan 0109 Phase 1).
+    Vertical,
+}
+
+/// **How far the frame is from being its own mirror** about `axis`: the mean
+/// absolute per-channel difference between the image and itself flipped, on the
+/// stored-byte 0..1 scale `frame_diff` uses.
 ///
 /// Zero means the picture is exactly symmetric across that line. The statistic
 /// is the defect's own fingerprint rather than a proxy for it — a share-of-light
 /// measure was tried first and could not separate the two arms, because the
 /// composite carries a soft glow that fills both halves whatever the geometry
 /// does.
-fn mirror_asymmetry(image: &CaptureImage) -> f32 {
+///
+/// The axis is a parameter rather than a second function because both defects
+/// this file hunts are the same measurement about a different line, and two
+/// copies of a statistic drift.
+fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
     let (w, h) = (image.width.max(1), image.height.max(1));
     let mut sum = 0f64;
     let mut n = 0u64;
@@ -110,8 +128,12 @@ fn mirror_asymmetry(image: &CaptureImage) -> f32 {
     };
     for y in 0..h {
         for x in 0..w {
+            let (mx, my) = match axis {
+                Axis::Horizontal => (x, h - 1 - y),
+                Axis::Vertical => (w - 1 - x, y),
+            };
             for c in 0..3 {
-                sum += (at(x, y, c) - at(x, h - 1 - y, c)).abs();
+                sum += (at(x, y, c) - at(mx, my, c)).abs();
                 n += 1;
             }
         }
@@ -168,7 +190,7 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
     let Some(mut renderer) = headless() else {
         return;
     };
-    let text = fixture_text();
+    let text = fixture_text("core/tests/fixtures/scratch-0108/ang-roundtrip.milk");
     let control_text = text.replace("float2 uv2 = 0.5 + 0.5*d;", "float2 uv2 = uv;");
     assert_ne!(
         control_text, text,
@@ -188,7 +210,10 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
         .capture_preset("uv-direct", &frame, FRAMES)
         .expect("capture the control");
 
-    let (mirrored, direct) = (mirror_asymmetry(&a), mirror_asymmetry(&b));
+    let (mirrored, direct) = (
+        mirror_asymmetry(&a, Axis::Horizontal),
+        mirror_asymmetry(&b, Axis::Horizontal),
+    );
     // **Measured 2026-08-17** on the development box (Windows 10, DX12 WARP),
     // 96x96 over 12 frames: round trip 0.0086, control 0.1605 — a factor of 19.
     // The vertical light profile behind those numbers, in eighths from the top:
@@ -218,5 +243,88 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
          alongside the already-falsified `s_fw` address mode — record it, and \
          read `emit.rs`'s `_lmv_p` against the reference's own varyings before \
          changing anything"
+    );
+}
+
+/// **A negative `sx` mirrors the past instead of collapsing it** — Plan 0109
+/// Phase 1, design-backlog 0113.
+///
+/// # The defect
+///
+/// A MilkDrop scale is a per-frame factor, so the mesh vertex stage raises it to
+/// `dt`. `pow()` of a negative base is undefined, and the stage guarded that with
+/// `pow(max(v, 1e-4), dt)` — which does not fail, it *silently substitutes*. A
+/// negative scale is MilkDrop's standard mirror idiom (363 corpus files, 3.5 %),
+/// and every one of them was getting a near-zero positive scale instead: not a
+/// flip but a collapse, the past resampled from a vanishing window.
+/// *chasers 19 Portal*'s `per_pixel_3 = sx = -zm` is exactly this, and Plan 0108
+/// Phase 5 attributed its missing fold to something else entirely.
+///
+/// # What the two arms are
+///
+/// One fixture, one token apart. Both deposit the same off-centre shape at
+/// `x = 0.22` and hold the past with the same decay; they differ only in the
+/// sign of `sx`. With the sign carried through, the flip is applied on every
+/// frame, so the deposit's mirror at `x = 0.78` accumulates beside it and the
+/// picture becomes its own left-right mirror. With the sign destroyed — the old
+/// behaviour, and the control's behaviour — the light stays on the side it was
+/// deposited.
+///
+/// The measurement is `mirror_asymmetry` about the **vertical** axis, the same
+/// statistic the seam test uses about the horizontal one.
+#[test]
+fn a_negative_scale_mirrors_rather_than_collapsing() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let text = fixture_text("core/tests/fixtures/scratch-0109/negative-scale.milk");
+    let control_text = text.replace("per_pixel_2=sx = -zoom;", "per_pixel_2=sx = zoom;");
+    assert_ne!(
+        control_text, text,
+        "the control substitution found nothing to replace — the fixture's `sx` \
+         line was edited without updating this test"
+    );
+
+    let mirrored_preset = preset(&text, "negative-scale");
+    let control = preset(&control_text, "positive-scale");
+    renderer.set_presets(vec![mirrored_preset, control]);
+
+    let frame = AnalysisFrame::default();
+    let a = renderer
+        .capture_preset("negative-scale", &frame, FRAMES)
+        .expect("capture the negative scale");
+    let b = renderer
+        .capture_preset("positive-scale", &frame, FRAMES)
+        .expect("capture the control");
+
+    let (flipped, held) = (
+        mirror_asymmetry(&a, Axis::Vertical),
+        mirror_asymmetry(&b, Axis::Vertical),
+    );
+    // **Measured 2026-08-19** on the development box (Windows 10, DX12 WARP),
+    // 96x96 over 12 frames: `sx = -zoom` 0.0047, `sx = zoom` 0.1055 - a factor
+    // of 22. Before the fix the two arms read 0.1055 and 0.1055, identical to
+    // four places, which is the signature of a sign that never arrived rather
+    // than one that arrived and was clamped.
+    println!(
+        "[warp_geometry] distance from being its own left-right mirror — \
+         `sx = -zoom`: {flipped:.4}, `sx = zoom`: {held:.4}"
+    );
+
+    // Non-vacuity first: the control must be visibly one-sided, or "the negative
+    // arm is more symmetric than the control" compares two piles of noise.
+    assert!(
+        held > 0.05,
+        "the CONTROL is already close to symmetric ({held:.4}), so it cannot \
+         show a mirror by contrast. The fixture's one shape sits at x = 0.22 — \
+         if a positive `sx` renders symmetrically, the shape is not being drawn \
+         where the fixture says"
+    );
+    assert!(
+        flipped < held * 0.25,
+        "`sx = -zoom` did NOT mirror: it is {flipped:.4} from its own left-right \
+         mirror against the control's {held:.4}. The sign is being destroyed \
+         somewhere between the per-vertex program and the mesh vertex stage — \
+         see `signed_rate` in `warp_mesh/mod.rs`"
     );
 }

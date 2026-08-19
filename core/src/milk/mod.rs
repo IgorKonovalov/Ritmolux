@@ -1241,12 +1241,34 @@ fn per_second_factor(v: f32) -> f32 {
     }
 }
 
+/// A per-frame **scale** as a per-second one, with its sign carried through.
+///
+/// [`per_second_factor`]'s "at or below zero is not a factor" is right for
+/// `decay`, which is a survival fraction — but three of the nine per-vertex
+/// outputs are *scales*, and a NEGATIVE scale is MilkDrop's standard mirror
+/// idiom (363 corpus files, 3.5 %). Reading one as the identity deleted the
+/// mirror here, before the mesh vertex stage ever saw the value. That stage's
+/// own `max()` guard deleted it a second time; both halves are
+/// design-backlog 0113, and the other half is `warp_mesh`'s `signed_rate`.
+///
+/// The magnitude converts exactly as an unsigned factor does, so a positive
+/// input is bit-identical to [`per_second_factor`] and nothing shipping a
+/// positive scale moves. Zero stays on the positive arm for the same reason it
+/// does in the shader: it is not a mirror, and must not become one.
+fn per_second_signed_factor(v: f32) -> f32 {
+    if v.is_finite() && v < 0.0 {
+        -per_second_factor(-v)
+    } else {
+        per_second_factor(v)
+    }
+}
+
 /// The nine raw MilkDrop outputs as this engine's per-second vocabulary.
 fn convert_outputs(raw: [f32; 9]) -> [f32; 9] {
     std::array::from_fn(|i| {
         let v = raw.get(i).copied().unwrap_or(0.0);
         if OUTPUT_FACTOR.get(i).copied().unwrap_or(false) {
-            per_second_factor(v)
+            per_second_signed_factor(v)
         } else if OUTPUT_RATE.get(i).copied().unwrap_or(false) {
             let out = v * NOMINAL_FPS;
             if out.is_finite() { out } else { 0.0 }

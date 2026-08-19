@@ -1,0 +1,27 @@
+[preset00]
+MILKDROP_PRESET_VERSION=201
+PSVERSION=2
+fRating=3.000
+fDecay=1.000
+bTexWrap=0
+nMotionVectorsX=0.000
+nMotionVectorsY=0.000
+fWaveAlpha=0.000
+ob_a=0.000
+ib_a=0.000
+shapecode_0_enabled=1
+shapecode_0_sides=16
+shapecode_0_num_inst=1
+shapecode_0_additive=1
+shapecode_0_x=0.22
+shapecode_0_y=0.5
+shapecode_0_rad=0.12
+shapecode_0_a=1.0
+shape_0_per_frame1=x = 0.22;
+shape_0_per_frame2=y = 0.5;
+shape_0_per_frame3=rad = 0.12;
+shape_0_per_frame4=r = 1; g = 0.85; b = 0.5; a = 1;
+shape_0_per_frame5=r2 = 1; g2 = 0.85; b2 = 0.5; a2 = 1;
+shape_0_per_frame6=border_a = 0;
+per_pixel_1=zoom = 1;
+per_pixel_2=sx = -zoom;
