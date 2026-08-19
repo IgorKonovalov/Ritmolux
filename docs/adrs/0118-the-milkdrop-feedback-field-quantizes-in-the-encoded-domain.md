@@ -181,60 +181,47 @@ is **not** the dominant fidelity defect of the MilkDrop import. Plan 0100's HDR 
 carries to [Plan 0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) with
 [backlog 0113](../design-backlog.md).
 
-## Outcome — what bounds the field, measured against a `decay` that was wrong
+## Outcome — the same field under a realistic `decay`
 
-**2026-08-19, Plan 0111 Phase 1 — the decision stands; the Context's mechanism sentence is
-overstated, and Plan 0109 Phase 4's probes were calibrated against a defect.**
+**2026-08-19, Plan 0111 Phase 1 — nothing here is falsified; a second configuration is added, and
+the probes now state the one they run in.**
 
-Design-backlog 0121: `FrameSlots::read`'s `None` arm returned the seeded default **unconverted**, so
-a bundle naming no `decay` ran at MilkDrop's per-frame `0.98` in a field documented as per-second.
-`still_field_params()` names no `decay`, so **every** measurement in this ADR's own field probes ran
-that way. At 60 Hz the retention actually rendered was `0.98^(1/60) = 0.99966` a frame — a time
-constant near **2 900 frames** — against the `0.5455^(1/60) = 0.98995` the conversion gives, whose
-time constant is near **100 frames**. At the probes' 300-frame horizon the first is about a tenth of
-the way to its equilibrium, which is indistinguishable from not having one.
+This entry replaces a first draft written the same day that claimed the Context sentence was
+overstated and that Plan 0109 Phase 4's probes had been *miscalibrated*. **Both claims were wrong**,
+and the correction is worth recording because the mistake is an easy one to repeat.
 
-With `decay` converted, the unquantized field **converges**:
+Plan 0111 Phase 1 fixed design-backlog 0121: `FrameSlots::read` returned the `decay` **default**
+unconverted, so a bundle naming no `decay` ran at MilkDrop's per-frame `0.98` in a field that means
+per-second. The two probes below passed `None` and therefore ran at that near-unity factor — and
+that was **deliberate**, through an escape hatch `field_trace` documents in the comment right above
+the call. Neutralizing `decay` is what makes these probes isolate the quantizer. What the fix changed
+was not their calibration but the meaning of the value they got for free. They now pass an explicit
+`NEUTRALIZED_DECAY = Some(0.98)`, which reproduces every recorded digit of the tables in their doc
+comments — verified against the committed numbers, on hardware, where they had been recorded on WARP.
 
-```text
-  quantizer off   f150 0.2461   f300 0.2929   f450 0.2963   f600 0.2963   f899 0.2963
-```
+**So the Context stands as written.** With `decay` neutralized the unquantized field climbs to a mean
+of `0.8331` with a peak of `6.68` at frame 300 and shows no equilibrium, which is exactly *"nothing
+truncates, every dim residual survives and accumulates"*.
 
-Flat to four decimals from frame 450. So the Context's *"nothing truncates, every dim residual
-survives and accumulates"* is **overstated as a description of the field's bound**: `decay` bounds it
-on its own, and always did. A residual here survives far longer than the reference's — that much is
-true and is the whole reason this ADR exists — but it does fade, and the field does settle.
+**What is genuinely new is the second configuration** — the converted `decay` a real bundle actually
+runs at, `per_second_factor(0.98) = 0.5455`/s. There the field **does** settle, on both arms, and the
+quantizer's contribution is a lower settling point and an exactly-black background rather than the
+presence or absence of a bound:
 
-**What the quantizer provides is the floor, and that is unchanged and still only available here:**
+| statistic (still params, converged) | quantizer off | quantizer on | |
+|---|---|---|---|
+| field mean | 0.2963 by f450 | 0.1298 by f120 | **2.28x lower** |
+| background `edge` (zoom params) | 1.115e-4 by f450 | 1.237e-6 from f30 | **90x lower, at the floor** |
 
-| | quantizer off | quantizer on |
-|---|---|---|
-| settled field mean | 0.2963 | 0.1298 — **2.3x lower** |
-| background `edge` | 1.1e-4 | 1e-6 — **110x lower, exact zero** |
+Both are dev-box hardware readings, deterministic to nine decimals across three repeats — so there is
+no run-to-run spread here to derive a tolerance from, and any assertion on these must take its
+tolerance from the mechanism rather than from noise (ADR-0071).
 
-The Decision, the rejected alternatives and the second Outcome's look-gate verdict are all
-untouched: the mechanism is real, it reaches exact zero, and it is not the import's dominant defect.
-What changes is the *reason* given for it. The honest statement is that this engine's field decays
-toward a **nonzero** equilibrium where the reference's decays to **black**, and closing that gap is
-the floor's job — not that the field is an unbounded integrator, which it is not.
-
-**Two probes in `core/src/render/scenes/warp_mesh/tests.rs` assert the overstated version and now
-fail.** In both the primary assertion still passes; what fails is the control-arm guard that exists
-to prove the instrument still has dynamic range.
-
-- `the_field_equilibrates_only_when_the_quantizer_runs` is **false as named** — the field
-  equilibrates either way. Its guard `off.f300.mean > off.f120.mean * 1.5` reads `0.2929` against a
-  required `0.3351`. The discrimination it should carry is the **settled ratio**: converged by the
-  same frame on both arms, and the quantized arm settles far below.
-- `the_quantized_background_stays_black` keeps its name and its claim — the ON arm still reads
-  `1e-6`. Its guard `off.f300.edge > off.f30.edge * 4.0` reads `0.000110` against a required
-  `0.000128`, and should become the **separation** it was always proxying for: the unquantized
-  background settles two orders of magnitude above the quantized one, which is what makes "stays
-  black" a measurement rather than a tautology.
-
-Neither replacement is a frozen number asserted universally (ADR-0071): both are ratios between two
-arms of **one run on one adapter**, measuring the same statistic in the same units — same-kind by
-ADR-0074, and dimensionless.
+The useful way to say what this ADR buys, once `decay` is real: **this engine's field decays toward a
+nonzero equilibrium where the reference's decays to black, and the floor is what closes that gap.**
+That is a sharper statement than "the field is an unbounded integrator", which is true only with
+`decay` neutralized — the configuration the probes choose in order to see the mechanism at all, and
+not the one a converted preset runs in.
 
 ## Notes
 

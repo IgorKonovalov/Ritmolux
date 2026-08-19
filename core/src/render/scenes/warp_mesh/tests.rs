@@ -950,6 +950,21 @@ fn field_trace(
 
 /// A still field with a centred deposit: the recursion is per-texel, so what it
 /// does has an arithmetic answer to compare against.
+/// The decay the two quantizer probes below run at: near-unity, so **the
+/// quantizer is the only thing bounding the field** and the experiment isolates
+/// it. Over their 300 frames (5 s at the probe's `dt`) this fades to `0.98^5 =
+/// 0.904` — present, and negligible against what the deposit adds.
+///
+/// **It is stated here rather than defaulted.** These probes used to pass `None`
+/// and get a near-unity factor for free, because `FrameSlots::read` returned the
+/// `decay` default *unconverted* — MilkDrop's per-frame `0.98` landing in a field
+/// that means per-second. Plan 0111 Phase 1 fixed that (design-backlog 0121), so
+/// `None` now yields the converted `0.5455`/s, which is a real fade and a
+/// different experiment: under it the unquantized field settles by frame 450
+/// rather than climbing. `0.98` reproduces what these two always measured, and
+/// naming it means the next fix to the fallback cannot silently re-aim them.
+const NEUTRALIZED_DECAY: Option<f32> = Some(0.98);
+
 fn still_field_params() -> Vec<(&'static str, f32)> {
     vec![
         ("zoom", 1.0),
@@ -990,10 +1005,11 @@ fn still_field_params() -> Vec<(&'static str, f32)> {
 #[test]
 fn the_field_equilibrates_only_when_the_quantizer_runs() {
     let params = still_field_params();
-    let Some(off) = field_trace(0.0, &params, 300, usize::MAX, None) else {
+    let Some(off) = field_trace(0.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY) else {
         return;
     };
-    let on = field_trace(255.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let on =
+        field_trace(255.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY).expect("the second runs");
     let (off, on) = (off.levels, on.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(
@@ -1073,10 +1089,11 @@ fn the_quantized_background_stays_black() {
             *value = 0.12;
         }
     }
-    let Some(on) = field_trace(255.0, &params, 300, usize::MAX, None) else {
+    let Some(on) = field_trace(255.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY) else {
         return;
     };
-    let off = field_trace(0.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let off =
+        field_trace(0.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY).expect("the second runs");
     let (on, off) = (on.levels, off.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(

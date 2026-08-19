@@ -152,40 +152,25 @@ flowchart LR
   cannot silently read its neighbour); and the commit message **names every fixture whose golden
   moved** and why that fixture's bundle omits `decay`. If no golden moves, say so — that is a claim
   about the fixture set, and it is checkable.
-
-- **Amended 2026-08-19 by `architect`, mid-phase, on `dev`'s escalation — Phase 1 also restates two
-  probes, and lands as one commit.** The fix falsifies two Plan 0109 Phase 4 field probes in
-  `core/src/render/scenes/warp_mesh/tests.rs`. That is not collateral to route around: the probes
-  measured a field whose `decay` was this very defect, so they are the first thing the fix corrects
-  and they cannot land separately without leaving the suite red. The finding and its numbers are
-  recorded as [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s
-  **third `Outcome`**; that entry is the authority on the corrected claim, and this is the build
-  instruction for it. **The ADR's Decision is unchanged** — the quantizer keeps its floor, and it is
-  still the only thing that provides one.
-  - **Add `core/src/milk/outputs.rs`'s two siblings to Files touched:**
-    `core/src/render/scenes/warp_mesh/tests.rs`, and `core/src/milk/tests.rs` for the new test.
-  - **`the_field_equilibrates_only_when_the_quantizer_runs` is false as named and gets renamed.**
-    The field equilibrates on both arms; `decay` bounds it. What the quantizer changes is **where it
-    settles**. The restated claim: both arms converge, and the quantized arm converges *far lower*.
-    The existing "converged by frame 120" assertion on the ON arm already states half of it and
-    stays; the OFF-arm guard becomes the same convergence test rather than a climb test, plus the
-    settled ratio. The name follows the claim — something in the shape of
-    `the_quantizer_settles_the_field_far_below_where_decay_alone_does`.
-  - **`the_quantized_background_stays_black` keeps its name and its claim.** Only its control-arm
-    guard moves, from a climb rate to the **separation**: the unquantized background settles about
-    two orders of magnitude above the quantized one. That is what the guard was always proxying for
-    — it exists so "stays black" cannot pass by both arms being black.
-  - **Both replacements must be ratios between the two arms of one run** (ADR-0071 / ADR-0074):
-    same statistic, same units, same adapter, dimensionless. **Do not** freeze `0.2963` or `1.1e-4`
-    into an assertion — they are this box's numbers, and the ADR entry is where they are recorded as
-    such. Derive each tolerance from the observed run-to-run spread, as Phase 2 is already required
-    to do for its own instrument.
-  - **Update both probes' doc-comment tables.** Each carries a "Measured 2026-08-19 on the
-    development box" block whose numbers came from the corrupted field. Re-measure and re-record, or
-    the next reader calibrates against the defect a third time.
-  - **Done when**, in addition to Phase 1's own list: both probes pass on their restated claims, the
-    full workspace suite is green, and the commit message names ADR-0118's third `Outcome` as the
-    authority for the restatement.
+- **Amended 2026-08-19, twice, and the second amendment replaces the first.** The fix changes what
+  `field_trace`'s un-overridden `decay` means, so Plan 0109 Phase 4's two quantizer probes go red.
+  The first amendment read that as the probes having been *miscalibrated* and ordered them restated;
+  **that was wrong.** `field_trace` takes a `decay_per_second` override and documents, in the comment
+  above the call site, that the `None` fallback is near-unity and unusable for a fade experiment —
+  so the probes were neutralizing `decay` **deliberately**, to isolate the quantizer. The repair is
+  therefore to make that configuration explicit, not to restate anything:
+  - **Also touched:** `core/src/render/scenes/warp_mesh/tests.rs`, plus `core/src/milk/tests.rs`
+    for Phase 1's own test.
+  - Both probes pass a named `NEUTRALIZED_DECAY = Some(0.98)` whose doc comment says why it is
+    stated rather than defaulted. **Their names, claims, thresholds and recorded tables are
+    unchanged** — the explicit value reproduces every committed digit, verified.
+  - **Done when**, additionally: both probes pass unmodified apart from that argument, and the full
+    workspace suite is green. Phase 1 lands as one commit, since the fix and the probes it re-aims
+    cannot separate without leaving the suite red.
+  - The measurement that *did* come out of this — the same field under a realistic converted
+    `decay` — is recorded as
+    [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s third
+    `Outcome`, which also records the retracted first reading. Nothing in that ADR's Decision moves.
 
 ### Phase 2 — the wash bisect: one statistic at five seams
 
@@ -435,7 +420,20 @@ preset gates included.
 In both cases the test's **primary** assertion still passes. What fails is the control-arm guard
 that exists to prove the instrument still has dynamic range.
 
-**Why, measured rather than argued.** The control trace extended from 300 to 900 frames:
+**Corrected before the commit landed.** The three paragraphs below read the two red probes as having
+been calibrated against the defect, and concluded that ADR-0118's mechanism sentence was overstated.
+**Both readings were wrong**, and the thing that settles it is four lines above the probes' own call
+site: `field_trace` takes a `decay_per_second` override precisely because the `None` fallback is
+near-unity, and says so. The probes were neutralizing `decay` **on purpose**. What the fix changed is
+the meaning of the value they took for free — so the repair is one named argument, and their claims,
+names, thresholds and tables all stand. `NEUTRALIZED_DECAY = Some(0.98)` reproduces every committed
+digit. The measurement below is still correct and still worth having; it just describes a **second**
+configuration rather than correcting the first, and it is recorded that way in ADR-0118's third
+`Outcome`. Kept here rather than deleted, because the mis-reading is the instructive part: a probe
+that looks miscalibrated may be deliberately configured, and the call site is where to check.
+
+**The second configuration, measured rather than argued.** The control trace extended from 300 to
+900 frames, at the converted `decay` a real bundle runs at:
 
 ```text
   off  f150 0.2461   f300 0.2929   f450 0.2963   f600 0.2963   f899 0.2963
@@ -445,31 +443,29 @@ that exists to prove the instrument still has dynamic range.
 Under the bug the per-frame retention was `0.98^(1/60) = 0.99966`, a time constant near 2 900
 frames, so at frame 300 the field was about a tenth of the way to its equilibrium and read as an
 unbounded integrator. Corrected, retention is `0.5455^(1/60) = 0.98995`, a time constant near 100
-frames. The probes were calibrated against the bug.
+frames. **This is a second configuration, not a correction of the probes'** — see the retraction
+above.
 
-**What this does and does not put in question.** ADR-0118's decision stands and the quantizer still
-does demonstrable work — the field settles 2.3x lower with it (`0.1298` against `0.2963`) and the
-background pins 110x lower, at exact black (`1e-6` against `1.1e-4`). The **floor**, truncation to
-zero, is real and only the quantizer provides it. What is now overstated is the ADR's mechanism
-sentence, *"nothing truncates, every dim residual survives and accumulates"*: a residual survives
-far longer than the reference's, but it does fade and the field does settle. And one test's name —
-`the_field_equilibrates_only_when_the_quantizer_runs` — is **false as stated**, because the field
-equilibrates either way.
+**What it does and does not put in question.** ADR-0118's decision stands, its Context stands, and
+the quantizer does demonstrable work in **both** configurations. With `decay` neutralized it is the
+only bound at all. With `decay` converted the field settles either way, and the quantizer's
+contribution is a settling point `2.28x` lower (`0.1298` against `0.2963`) and a background `90x`
+lower, at exact black (`1.237e-6` against `1.115e-4`). The earlier draft of this log said `110x`; it
+was read off rounded output, and the measured figure is `90x`.
 
-**Why `dev` stopped here.** Restating those two guards means restating what bounds the field, which
-is an architectural claim and not a threshold. Re-tuning two constants until green is
-indistinguishable from tuning to a picture — the failure mode this plan's Phase 3 hard guard exists
-to prevent, applied one level down. Routed to `architect` on the user's call, consistent with the
-same session's routing of Phase 3's ADR-0120 trigger.
+**The repair, and why it is one argument rather than a restatement.** Both probes now pass a named
+`NEUTRALIZED_DECAY = Some(0.98)` instead of `None`. Names, claims, thresholds and recorded tables are
+all unchanged, and the explicit value reproduces every committed digit of both doc-comment tables —
+checked against the committed numbers, on hardware, where they had been recorded on WARP. The
+constant carries a doc comment explaining why it is stated rather than defaulted, so the next change
+to the fallback cannot silently re-aim these two.
 
-**What `architect` owes before this lane resumes:** an amendment to ADR-0118's mechanism paragraph,
-and a restatement of both probe tests — the claim and, for the first, its name. The discriminations
-themselves survive intact and are the natural replacements: settled level 2.3x, background 110x and
-at exact zero.
+**The general lesson, which is the part worth keeping:** a probe that looks miscalibrated may be
+deliberately configured, and `field_trace`'s call site said so in a comment four lines up. Read the
+harness before concluding the experiment was wrong.
 
-**To resume:** the change is uncommitted in the lane's working tree
-(`core/src/milk/outputs.rs`, `core/src/milk/tests.rs`, plus this log and the `Status` line). Phase 1
-commits once the two probes are restated; Phases 2 through 5 are untouched and unstarted.
+**Phase 1 lands as one commit** — `core/src/milk/outputs.rs`, `core/src/milk/tests.rs`,
+`core/src/render/scenes/warp_mesh/tests.rs`. Phases 2 through 5 are untouched and unstarted.
 
 ## Followups (after this lands)
 
