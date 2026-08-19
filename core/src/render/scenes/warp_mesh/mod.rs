@@ -681,18 +681,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // frame warps is untouched by it. That is the plan's open question, and it
     // is what makes the stage cheap: one extra sample, no second target.
     //
-    // **The second copy ADDS rather than replacing**, which is the one part of
-    // this that could not be read off the reference from here and is stated
-    // rather than discovered. Three things point the same way. The plan's
-    // acceptance property — flip x at `alpha = 1` renders left-right symmetric —
-    // is only true of a sum; a lerp at 1 shows the flipped copy *alone*, which
-    // is a mirrored picture, no more symmetric than the one it came from. Plan
-    // 0108's look gate describes the reference at `alpha = 1.000` as showing two
-    // families of bars where this engine showed one, and two families is both
-    // copies. And this field is premultiplied linear light whose whole seam is
-    // additive (ADR-0056), so a sum is the composite this engine already speaks.
-    // If the Phase 5 gate reads the echo as too bright, `alpha`'s meaning is the
-    // knob and this comment is where to start.
+    // **The second copy is BLENDED TOWARD, not added** — ADR-0119. Plan 0109
+    // Phase 3 summed it, on three supports, and the Phase 5 look gate took two
+    // of them away. It read *Songflower (Moss Posy)* at the authored
+    // `alpha = 1.000` against the same conversion at `0.000` and found the sum
+    // turning a crisp two-axis lattice into a pale one: the preset drives
+    // `echo_zoom` to ~1.75-2.0, so what was being added is a large soft
+    // magnified duplicate. And both families of bars turned out to be present
+    // with the echo OFF, which is the observation Plan 0108 said needed the
+    // echo to explain. The third support, ADR-0056, is about the seam between
+    // two *producers*; an echo is not a second producer, it is the same light
+    // sampled twice.
+    //
+    // A `mix` cannot wash the picture out at any alpha, because a convex
+    // combination is bounded by its inputs — which is the property a composite
+    // of a frame with a copy of itself has to have. At `alpha = 1` the frame
+    // becomes the transformed copy alone, and that is what makes this testable
+    // exactly rather than by symmetry: the echo writes nothing back, so the
+    // field evolves identically either way, and the echoed frame IS the mirror
+    // of the un-echoed one frame for frame.
     //
     // The zoom and the flip are both about the frame centre, so they commute and
     // the order below is free. No aspect enters (ADR-0037): a uniform scale in
@@ -702,12 +709,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         var euv = (in.uv - vec2<f32>(0.5)) / max(pp.c.y, 1e-3) + vec2<f32>(0.5);
         euv.x = select(euv.x, 1.0 - euv.x, pp.c.z > 0.5);
         euv.y = select(euv.y, 1.0 - euv.y, pp.c.w > 0.5);
-        c = c + textureSampleLevel(field, field_samp, euv, 0.0) * pp.c.x;
+        c = mix(c, textureSampleLevel(field, field_samp, euv, 0.0), pp.c.x);
     }
     // The branch is on a uniform and it is there for exactness rather than for
-    // speed: adding `echo * 0` is the identity in arithmetic but not for a
-    // non-finite `echo`, and an echo-less preset must render the bytes it
-    // rendered before this stage existed.
+    // speed: `mix(c, echo, 0)` is `c` in arithmetic but not for a non-finite
+    // `echo`, and an echo-less preset must render the bytes it rendered before
+    // this stage existed.
 
     // The field already holds premultiplied colour and coverage (the deposit
     // writes them that way and the warp scales both together), so `brightness`
