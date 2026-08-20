@@ -5,10 +5,12 @@
 > that Phase 1's `#[path]`-declared test module is invisible to `hygiene.rs`'s skip rule, so it is
 > scanned as hot-path code and passes only because its `#![allow(...)]` block spells the sentinel
 > the guard greps for — the exact vacuous pass that guard's own header warns about, proven by probe
-> and carried to the followups below. **Phase 6 (`human`) is deliberately still open**: nothing is
-> pushed, so the CI reading that is this plan's stated success criterion has not happened. The
-> review projected it instead, from CI's own per-file table against a local run — see "The coverage
-> reading" below, corrected.
+> and carried to the followups below. **Phase 6 (`human`) ran 2026-08-20, and the plan is
+> complete.** The push landed as `v0.75.0`; CI run
+> [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929)
+> on `main` (`7b9781d`) is green on all six jobs and puts `lmv-core` at **92.31 % lines** against
+> floor **91** — the review's `~92.3 %` projection, confirmed to two decimals. See
+> "Phase 6 — the CI reading" below.
 > **Created:** 2026-08-18
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the ratchet this restores), [0023](../../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (the fixture discipline), [0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (the adapter comparison Phase 5 owes), [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (what the surface is for)
@@ -493,6 +495,94 @@ Phase 6 remains the authority; this is what it is expected to confirm.
 binary is byte-identical to `v0.74.0` and a tag push publishes release zips. `docs/releasing.md`
 blesses "no bump" for a chore-only plan as a choice, and this is one.
 
+## Phase 6 — the CI reading (2026-08-20)
+
+**Done. The `coverage` job passes at floor 91 on `main`, so the plan's stated success criterion is
+met and the shortfall branch of the done-when never fires.**
+
+Run [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929),
+`main` at `7b9781d` (`v0.75.0`, pushed 2026-08-19 15:55Z). All six jobs green — `coverage`,
+`check` on both platforms, `deny`, `links`, `miri`. `rust-cache` reported a restore-key hit
+(`v0-rust-coverage-Windows_NT-x64-09dca0e9-810cc9d2`, full match false), so this is the cache-warm
+reading `ci.yml:33` has been waiting for since Plan
+[0061](0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 9.
+
+| | missed | lines | cover |
+|---|---|---|---|
+| CI, 2026-08-17 (run `32008593831`) | 2,540 | 19,935 | 87.26 % |
+| the close review's projection | ~1,530 | ~19,943 | ~92.3 % |
+| **CI, 2026-08-19 (run `32272926929`)** | **1,538** | **19,992** | **92.31 %** |
+
+Eight lines off on the missed count and forty-nine on the denominator. **The projection was sound,
+and so was the method behind it** — `cargo llvm-cov clean --workspace`, then read per file rather
+than off the total — which is what the next coverage plan should be told to do. Regions come in at
+91.04 %; the gate is `--fail-under-lines`, so lines are the number that matters. The margin over
+the floor is **1.31 points — 261 lines** of headroom before `coverage` goes red again.
+
+Per file, against what the Decision required:
+
+| file | missed 2026-08-17 | missed 2026-08-19 | lines | cover |
+|---|---|---|---|---|
+| `warp_mesh/shader.rs` | 719 (0.00 %) | **3** | 719 | **99.58 %** |
+| `milk/mod.rs` | 271 (52.62 %) | 55 | 577 | 90.47 % |
+| `warp_mesh/mod.rs` (not in scope, improved anyway) | 116 | 47 | 1,072 | 95.62 % |
+| `warp_mesh/draw.rs` (untouched, as planned) | 128 | 128 | 465 | 72.47 % |
+| `milk/vm.rs` (untouched, as planned) | 87 | 87 | 309 | 71.84 % |
+
+`vm.rs` and `draw.rs` are untouched **to the line**, which is the cleanest reading available that
+the floor was cleared by the two files in scope and nothing else: **the extension the done-when
+named as the shortfall remedy is not owed.** `render/text.rs` is still 0.00 % (128 missed) and
+`render/overlay.rs` 51.20 % lines / 44.49 % regions — both declared out of scope by this plan and
+both still a standing gap.
+
+**The fixture cost what the risk section budgeted.** `coverage` ran **24m05s** against the 22m43s
+the plan recorded before it — **+1m22s, +6 %** — with 711 tests run, 711 passed (13 slow), 3
+skipped, and no sign of the runner limit. The new tests are visible in the log by name
+(`the_shader_fixture_draws_a_real_shape_and_animates`,
+`each_partly_absent_shader_surface_builds_and_renders`, `the_fixture_reacts_to_audio` and eight
+siblings), so **the fixture executes on WARP in CI and did not silently skip** — the one failure
+mode a green job alone could not rule out.
+
+**The 3D-texture risk did not materialize.** The fixture's `texture_3d` reads through
+`t_noisevol_lq` / `_hq` are the first in this suite to ask a software adapter for one; every
+`lmv-core::warp_mesh` test passed, so the fallback the risk section reserved — drop the 3D reads
+and record it as an adapter finding — is not needed.
+
+### What this run also discharges: Plan 0061 Phase 9
+
+Phase 9 asked one CI run two questions. This run answers both.
+
+**`coverage` is the longest job, so [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md)'s
+Alternative A stays rejected.**
+
+| job | wall clock |
+|---|---|
+| `coverage` | **24m05s** |
+| `check (windows-latest)` | 11m33s |
+| `check (macos-latest)` | 2m29s |
+| `miri` | 2m22s |
+| `deny` | 20s |
+| `links` | 10s |
+
+`coverage` leads by **2.1x**. `check (windows-latest)` is therefore not build-dominated, and
+merging the two Windows jobs is not the win ADR-0073 said it would have to be to become worth
+taking. Nothing routes back to `architect` as a supplement.
+
+**The floor re-derives to the number it already carries, and its provenance is what changes.**
+`ci.yml:25-34` records 91 as "measured once, on the wrong machine, and is owed a second look" —
+94.85 % lines locally, with a ~3-point margin allowed because this box has a hardware GPU and CI
+has WARP. CI's own reading is **92.31 %**, so that asymmetry was real and cost **2.54 points**,
+inside the margin that was reserved for it. Two conclusions, and only the first is acted on here:
+
+- **91 is now a CI-measured floor rather than an inherited guess.** The re-derivation is done; the
+  constant does not move. The one edit owed is to `ci.yml`'s comment, which still tells a reader
+  the number is unverified — a `dev` change, filed in the followups below.
+- **Raising it is not taken.** A floor at 92 would leave 0.31 points — about 62 lines — and the
+  denominator moves with any non-test code that lands. That is a ratchet decision under
+  [ADR-0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md), and taking it
+  inside the plan whose own margin created the headroom is exactly the laundering this plan's
+  "What this plan does NOT do" section refused.
+
 ## Followups (after this lands)
 
 - **`hygiene.rs` cannot see a `#[path]`-declared test module** (the review's one major).
@@ -508,8 +598,12 @@ blesses "no bump" for a chore-only plan as a choice, and this is one.
   measurement Phase 5 owed is recorded here, and here is where it stops: the native fixture's
   equivalent lives beside the test as `the_adapters_agree_on_the_warp_mesh`, an `#[ignore]`d
   sibling carrying its numbers in the doc comment. Same file, same shape.
-- Re-derive the 91 floor from a real cache-warm CI reading, as `ci.yml:33` has asked since Plan
-  0061 Phase 9 — as its own decision, on a green tree.
+- ~~Re-derive the 91 floor from a real cache-warm CI reading, as `ci.yml:33` has asked since Plan
+  0061 Phase 9 — as its own decision, on a green tree.~~ **Done by Phase 6:** run `32272926929`
+  reads **92.31 %**, the constant does not move, and raising it is refused with reasons above.
+  What is still owed is one `dev` edit — **`ci.yml:25-34`'s comment still says the floor is
+  "measured once, on the wrong machine, and is owed a second look"**, which is no longer true.
+  Replace that sentence with the CI reading and the run id.
 - `render/text.rs` at 0.00 % and `render/overlay.rs` at 44.49 %: decide whether they are
   untested or structurally unreachable, and say so in one place.
 - ~~If Phase 3 finds that `blur_level = 0` and `= 3` render identically, that is a real question
