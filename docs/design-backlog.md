@@ -2507,6 +2507,81 @@ like 0120 it makes a preset look mis-tuned rather than unrecognisable.
 
 ---
 
+## 0123 — the waveform is the one un-normalized analysis output, so the OS volume slider changes the picture — and the two frontends disagree
+
+**Raised by:** `dev`, from a live-app check during [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md)
+(2026-08-19). **Owner if taken:** `architect` — this is a boundary-contract question, not a defect
+with an obvious fix. **Out of that plan's scope; nothing in it was changed for this.**
+
+- **Verified 2026-08-19** — the waveform is still documented and shipped un-normalized, alone among
+  the analysis outputs: `present: Raw amplitude in roughly in: core/src/dsp/mod.rs`
+
+### The finding, measured
+
+One `lmv.exe` instance, one preset (*Geiss - Blur Mix 3*, `nWaveMode = 6`, `fWaveScale = 3.266`), one
+clip looping, two captures ten seconds apart. **The only variable changed was the Windows master
+volume slider:**
+
+| master volume | the trace |
+|---|---|
+| 18 % | a thin near-flat ribbon with small ripple |
+| 60 % | violently active, roughly `±40 %` of frame height, halo filling the frame |
+
+Measured on the development box (Windows 10, WASAPI loopback, DX12). **That the endpoint volume is
+applied before the loopback tap is a fact about this machine's audio stack**, not a claim about
+Windows in general — ADR-0071's prose rule, and the reason it is stated this way.
+
+The same preset through `shot --audio` on a file — which reads samples at full digital scale, no
+endpoint volume anywhere — saturates the frame. So the engine's response is not weak at any point;
+only the absolute level arriving from loopback is.
+
+### Why it is a contract question rather than a bug
+
+[`core/src/dsp/mod.rs`](../core/src/dsp/mod.rs)'s `waveform` is deliberately un-normalized, and says
+so: *"normalizing it would make a quiet passage draw the same trace as a loud one — which is the
+opposite of what a scope is for."* Every other analysis output is peak-normalized under
+[ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md).
+
+**That reason conflates two different things.** A volume *knob* is not musical dynamics. A slow
+normalization against a recent peak — what ADR-0049 already does for the four bands — cancels the
+knob while leaving a quiet passage genuinely quieter than a loud one. The stated objection argues
+against *instantaneous* normalization, and nobody is proposing that.
+
+**And the two frontends disagree, which is the part that raises the stakes.** The foobar plugin pulls
+from `visualisation_stream` (`plugin-foobar/foo_lmv.cpp:3`) — the **decoded stream, before the output
+volume**. The standalone pulls **post-volume** loopback. So one core, one preset and one track give
+two different pictures depending on which frontend is running, and nothing levels them. The core is
+source-agnostic as [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) requires; what leaks is
+the *level*, and `CLAUDE.md`'s "validate at the boundary" list — sample rate, channel count, buffer
+size — does not include amplitude.
+
+### Why it surfaced now, and what it reconciles
+
+It explains a standing contradiction. [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
+reports the waveform figure rendering **larger** than the reference's; the live app at 18 % shows it
+nearly flat. Both are true. An un-normalized trace times an un-normalized `wave_scale` is
+**hypersensitive** — blown out at full scale, dead at listening volume. So 0120's missing base
+amplitude constant **cannot be the whole fix**: lowering the gain moves the entire curve down and
+makes the quiet case worse. The question is dynamic range, and 0120 should be read with this entry
+beside it.
+
+### What a fix would be
+
+Unknown, and there are at least three shapes, which is why this wants an interview rather than a
+phase. Normalize the waveform against a recent peak at the analyzer, as ADR-0049 does for the bands;
+or level at the **boundary** where audio enters the core, so both frontends deliver the same
+vocabulary and the standalone's loopback stops being the odd one out; or leave the analyzer alone and
+give the converted-preset path its own conditioning, on the argument that a native scene may
+legitimately want a true scope. The middle option is the one that matches the existing boundary rule.
+
+### Priority
+
+**Medium-high.** It makes every waveform-led converted preset look broken at ordinary listening
+volume, which is most of the MilkDrop corpus's light source, and it silently invalidates any look
+gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
+
+---
+
 ## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
 
 **Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
