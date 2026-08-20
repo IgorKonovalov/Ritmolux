@@ -13,6 +13,103 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md)
+  — closed 2026-08-20, four `dev` phases across seven commits `b8c8524`..`afc65d6`. Review: **no
+  blockers, one major, two minors.** Phase 3 did not run, on Phase 2's stop condition; **Phase 6
+  (`human`) is void rather than open** — see below.
+
+  **The plan's premise did not survive it, and that is the plan's value.** It was built on
+  [Plan 0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4 having ruled the
+  feedback field clean, which left the whole downstream chain as one undifferentiated suspect. Phase
+  2's bisect — one statistic (`FieldTrace::edge`) at every seam, two subjects, one run, both adapters
+  — found the five seams are really **three** (no post stage is active on either converted fixture,
+  so `PostChain::begin` hands the scene the tonemap's own input, and `bg_bright` is unbound), and
+  then found the washed/control ratio is **maximal at the field** (`14.967`) and lower at every seam
+  after it. Nothing downstream creates the wash. Plan 0109's `1e-6` clean reading came from
+  `MilkBundle::from_assembly(None, None, None)` — an **empty** bundle with synthetic params — so it
+  described a stand-in, not any preset; on *Fog Tunnel*'s own bundle the field background reads
+  `0.298`, almost exactly the magnitude backlog 0113 predicted from the look gate before anyone could
+  measure it. **The built-in warp path is back in scope**, recorded as a dated reversal on 0113, and
+  it is the successor's question. The seam-B `gamma` lead — a `1.9x` linear multiply named for
+  `fGammaAdj` — is dead *as a wash mechanism*: the ratio falls across it. Four hypotheses on this
+  defect were already dead entering the plan; this makes five, and it is the first one killed by
+  measurement at every stage rather than by census.
+
+  **The major, and it is the E column.** The log, the probe's doc comment and 0113's update all read
+  `15 -> 6 -> 3` as one monotone sequence and credited the tonemap with the second fall. Seams A and B
+  are linear-light means; **seam E is a mean of sRGB-encoded code values** (`HEADLESS_FORMAT =
+  Rgba8UnormSrgb`, bytes over 255, under a local binding named `linear`), so the two ratios are not
+  the same kind of quantity ([ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)).
+  Encoding seam B's own means gives `0.750` and `0.327` — ratio `2.294`, *below* the observed `2.964`
+  — so the transfer function alone over-explains the entire B-to-E fall with no stage involved. And
+  the tonemap is **exactly the identity below `KNEE = 0.6`**, which both backgrounds sit under;
+  empirically it and Jensen together account for under 1 % of *Fog Tunnel*'s reading. The conclusion
+  survives untouched — it rests on the A-to-B comparison and on the absolute magnitude at A — but the
+  tonemap is a no-op here, ruled out by the knee rather than by the bisect. Corrected in place on
+  0113 and in the plan's log; the two code comments are named in Followups.
+
+  **The two minors.** `still_field_params`' doc comment was orphaned onto the new
+  `NEUTRALIZED_DECAY` constant inserted above it, so a paragraph about a centred deposit now
+  documents a decay factor. And `ang_cuts_on_plus_x_...`'s prose claims a program continuous in `ang`
+  "meets exactly one seam rather than several" while the assertion permits any number of wraps, and
+  sweeps one column under the name `ring`.
+
+  **Three phases that correctly changed nothing, which is the harder half of this plan's design.**
+  Phase 4 pinned *this engine's* `ang` — cut on +x, discontinuity of nearly a full turn,
+  counter-clockwise on screen because y is flipped before the `atan2` — and then **stopped**, because
+  the reference comparison the phase required (derived from the format's convention or the reference
+  implementation, never from a picture) is not derivable here: there is no MilkDrop source, no
+  authoring documentation, and a `.milk` file does not record the convention it was authored against.
+  Neither of the phase's two branches was taken; backlog 0119 stays live, half discharged, with its
+  own "measurable against a converted fixture" claim corrected. Phase 5 **split** backlog 0120: the
+  x-extent is a separate defect, shown by arithmetic — modes 6/7 divide x by `aspect` and
+  `uv_to_world` multiplies it back, so the trace's world length is `2.0` at every aspect and it covers
+  `1/aspect` of the width, the "middle 57 %" the last gate reported. That is
+  [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s coincidence one level down:
+  at aspect 1 it is full width, so nothing caught it. Filed as backlog 0122 and pinned as a property
+  over three aspects. The **amplitude** constant stopped on the same procurement wall as 0119, but the
+  corpus narrowed it usefully — across 552 presets setting `fWaveScale` the median is `0.9724`, so
+  what is missing is a single **base amplitude**, not a mode-dependent correction, which also weakens
+  the entry's own "factor of 279" argument.
+
+  **Phase 1 is the only behavioural change, and it is unreachable from content.** `FrameSlots::read`'s
+  `None` arm returned MilkDrop's per-frame default into a field documented as per-second, so an
+  unnamed `decay` faded at `0.98`/s instead of `per_second_factor(0.98) = 0.5455`. Both arms now
+  convert, and the test asserts against the table rather than a literal. **No golden moved, and that
+  is a checkable claim about the fixture set** — both `[milk]` goldens declare `decay`. It never
+  reached a converted preset either: `convert.rs`'s prologue emits an assignment for every output
+  with a non-empty initial-condition key, and `fdecay` has one. What it *had* corrupted was an
+  instrument — Plan 0109 Phase 4 ran a whole experiment through it.
+
+  **The retraction inside Phase 1 is worth keeping.** A first reading concluded the two Plan 0109
+  quantizer probes had been *miscalibrated* and that ADR-0118's mechanism sentence was overstated.
+  Both were wrong: `field_trace` takes a `decay_per_second` override and says four lines above the
+  call site that the `None` fallback is unusable for a fade experiment, so the probes were
+  neutralizing `decay` **deliberately**. The repair was one named argument
+  (`NEUTRALIZED_DECAY = Some(0.98)`, reproducing every committed digit), not a restatement, and the
+  measurement that came out of it is ADR-0118's **third** `Outcome` describing a *second*
+  configuration. The lesson generalizes: a probe that looks miscalibrated may be deliberately
+  configured, and the call site is where to check.
+
+  **Why Phase 6 is void rather than deferred.** It is a seven-pair comparative look gate, and after
+  this plan **not one of those presets renders a pixel differently than before it** — Phase 3 did not
+  run, Phases 4 and 5 shipped tests, and Phase 1 is unreachable from a converted preset. Four of its
+  five questions ask whether a fix worked; the fifth asks *better or merely different* about a picture
+  that did not move. Only question 2's black-ray sub-question is fix-independent, and it stays on
+  0113. The gate itself is re-filed onto the successor plan, which will land something worth judging.
+  What the phase *did* buy is its own amendment: **pin the playback volume**, from a live-app check
+  finding the waveform is the one un-normalized analysis output, so the OS master slider changes the
+  picture (18 % a near-flat ribbon, 60 % roughly 40 % of frame height either way) — and the two
+  frontends disagree, foobar tapping `visualisation_stream` pre-volume against the standalone's
+  post-volume loopback. That is backlog 0123, `architect`-owned, and it retroactively puts every prior
+  look gate's volume in question.
+
+  **Bookkeeping.** Backlog 0121 archived; 0113, 0119 and 0120 stay live with dated updates (0113
+  reversed, 0119 and 0120 half discharged); 0122 and 0123 newly filed. ADR-0118 took a third
+  `Outcome`; **ADR-0120 was never written** — Phase 3's trigger did not fire, so 0120 is still the
+  next free ADR number. `presets/` untouched, so no curation sweep was owed. Version `0.75.0` to
+  `0.75.1`: one fix, everything else tests and docs.
+
 - [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md)
   — closed 2026-08-19, five `dev` phases in `4595e14`, `c2b36cc`, `916df90`, `e46232f`, `2b639fe`.
   Review: **no blockers, one major, three minors.** **Phase 6 (`human`) is deliberately still

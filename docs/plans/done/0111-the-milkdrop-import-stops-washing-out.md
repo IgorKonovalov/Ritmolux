@@ -1,14 +1,17 @@
 # 0111 — The MilkDrop import stops washing out
 
-> **Status:** in-progress — 2026-08-19
+> **Status:** done — 2026-08-20. Phases 1, 2, 4 and 5 landed across seven commits
+> (`b8c8524`..`afc65d6`); Phase 3 did not run, on Phase 2's stop condition; **Phase 6 is void
+> rather than un-run** — see its section. Mode 4 review: **no blockers, one major, two minors.**
+> The plan's premise did not survive it: the wash is at the **field**, not downstream.
 > **Created:** 2026-08-19
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet, deliberately — Phase 3 writes one (**ADR-0120**) if and only if the
 > Phase 2 bisect names a stage whose semantics are a decision rather than a defect. Reads against
-> [0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (the
-> quantizer), [0119](../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)
-> (the echo blend), [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the tonemap) and
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) / [0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)
+> [0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) (the
+> quantizer), [0119](../../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)
+> (the echo blend), [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the tonemap) and
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) / [0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)
 > (what a numeric assertion in here is allowed to claim).
 > **Closes:** design-backlog 0121, 0119, 0120. **0113 is carried, not closed** — it closes only if
 > Phase 3 runs *and* lands a mechanism; on the Phase 2 stop branch it takes a second dated update.
@@ -17,7 +20,7 @@
 
 The MilkDrop import's dominant remaining defect is the wash: five of Plan 0108's seven judged pairs
 came back with a background that equilibrates far brighter than the reference's, and after two plans
-nobody can say which stage does it. [Plan 0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)
+nobody can say which stage does it. [Plan 0109](0109-the-milkdrop-import-gets-its-geometry-back.md)
 Phase 4 built the instrument and **ruled the field itself clean**, which leaves the whole downstream
 chain — present, blend, bloom, tonemap — as one undifferentiated suspect. This plan bisects that
 chain with one statistic measured at five seams, stops the moment a seam separates a washed
@@ -32,10 +35,10 @@ Four MilkDrop entries are live on the backlog and all four are fidelity, not rea
 
 | Entry | Claim | State entering this plan |
 |---|---|---|
-| [0113](../design-backlog.md) | the converted feedback field equilibrates far brighter than the reference's | **High.** Instrument built; field ruled clean; three hypotheses dead |
-| [0119](../design-backlog.md) | `ang`'s branch cut on +x seams every per-vertex program continuous in it | Medium; shows on two MD1 presets carrying no shader block |
-| [0120](../design-backlog.md) | the converted waveform figure renders larger than the reference's | Medium; `fWaveScale` applied as a bare multiply |
-| [0121](../design-backlog.md) | a bundle that never names `decay` reads a per-frame default as a per-second one | Low-medium; latent for content, **has already corrupted one instrument** |
+| [0113](../../design-backlog.md) | the converted feedback field equilibrates far brighter than the reference's | **High.** Instrument built; field ruled clean; three hypotheses dead |
+| [0119](../../design-backlog.md) | `ang`'s branch cut on +x seams every per-vertex program continuous in it | Medium; shows on two MD1 presets carrying no shader block |
+| [0120](../../design-backlog.md) | the converted waveform figure renders larger than the reference's | Medium; `fWaveScale` applied as a bare multiply |
+| [0121](../../design-backlog.md) | a bundle that never names `decay` reads a per-frame default as a per-second one | Low-medium; latent for content, **has already corrupted one instrument** |
 
 **What Plan 0109 Phase 4 actually bought.** `PingPongField` carries `COPY_SRC` and a test-only
 `read_texture`; `warp_mesh/tests.rs` drives the scene directly, copies the field after every frame
@@ -109,7 +112,7 @@ forbidding a fix that the evidence hands us would cost a whole extra plan cycle 
 
 The three smaller defects run as their own phases in the same plan rather than as three plans,
 because they touch the same four files and would otherwise contend. **Reach is out of scope** —
-backlog [0109](../design-backlog.md) (disk textures, 1 826 files) and [0108](../design-backlog.md)
+backlog [0109](../../design-backlog.md) (disk textures, 1 826 files) and [0108](../../design-backlog.md)
 (the conversion tail) stay filed, on the ordering those entries themselves argue for: two look gates
 have now returned *"still merely different"*, and reach is only worth buying once quality is judged
 better.
@@ -169,7 +172,7 @@ flowchart LR
     cannot separate without leaving the suite red.
   - The measurement that *did* come out of this — the same field under a realistic converted
     `decay` — is recorded as
-    [ADR-0118](../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s third
+    [ADR-0118](../../adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s third
     `Outcome`, which also records the retracted first reading. Nothing in that ADR's Decision moves.
 
 ### Phase 2 — the wash bisect: one statistic at five seams
@@ -290,7 +293,7 @@ flowchart LR
   `lmv.exe`), the same three-variant judging set as Plan 0108 and Plan 0109 Phase 5.
 - **Pin the playback volume, and record it with the verdicts — added 2026-08-19 by `dev`, from a
   live-app check, and it is not optional.** The waveform is the one un-normalized analysis output
-  (design-backlog [0123](../design-backlog.md)), so on the standalone's loopback path **the OS master
+  (design-backlog [0123](../../design-backlog.md)), so on the standalone's loopback path **the OS master
   volume slider changes the picture**. Measured on the development box: one instance, one preset, one
   clip, ten seconds apart, volume the only variable — at 18 % *Blur Mix 3*'s trace is a near-flat
   ribbon and at 60 % it swings roughly `±40 %` of frame height. Three of the seven pairs are
@@ -335,6 +338,30 @@ flowchart LR
   from three independent LFOs on `time` at incommensurate ~4-7 s periods, so two renderers started at
   different moments are simply out of phase. Judge its **background level**, not its colour.
 
+- **Not run, and VOID rather than deferred — recorded at the close, 2026-08-20 by `architect`.**
+  This gate compares seven converted presets against the reference. **After this plan, not one of
+  them renders a single pixel differently than it did before it**, so there is nothing for the gate
+  to judge and running it would reproduce [Plan 0109](0109-the-milkdrop-import-gets-its-geometry-back.md)
+  Phase 5's verdicts at a newly-pinned volume.
+
+  That is arithmetic, not an estimate. The plan landed exactly one behavioural change — Phase 1's
+  `decay` fallback — and it is **unreachable from a converted preset**: `convert.rs`'s prologue
+  emits an assignment for every output carrying a non-empty initial-condition key, `fdecay` is
+  `o("fdecay", "decay", 0.98, true, "")` with the key populated, so the slot always resolves `Some`
+  and always took the converting arm. Phases 2, 4 and 5 shipped tests and one `#[cfg(test)]`
+  accessor. Phase 3 did not run.
+
+  Question by question: 1, 3 and 4 ask whether a fix worked, and no fix landed. 5 asks *better or
+  merely different*, and nothing moved since the answer was last taken. Only question 2's **black-ray
+  artifact** sub-question is independent of a fix — and it is one sub-question, not a seven-pair
+  gate.
+
+  **What is re-filed, and where.** The gate itself belongs to the successor that takes backlog 0113's
+  reversed direction (the field), because that plan will land a change worth judging; it is named in
+  Followups below and on 0113's Phase 2 update. The volume pinning above is not lost with it — it is
+  [backlog 0123](../../design-backlog.md), an `architect`-owned entry with its own priority. The
+  black-ray sub-question stays on 0113, where Plan 0109 filed it.
+
 ## Data shapes
 
 ```rust
@@ -376,9 +403,9 @@ struct SeamTrace {
 
 ## What this plan does NOT do
 
-- **Conversion reach.** Backlog [0109](../design-backlog.md) (disk textures — 1 826 files, 88.7 % of
+- **Conversion reach.** Backlog [0109](../../design-backlog.md) (disk textures — 1 826 files, 88.7 % of
   every conversion failure, and ADR territory because it reopens Plan 0100 Phase 8's deferred
-  provenance question) and [0108](../design-backlog.md) (HLSL arrays, ~71 files, plus 218 MD2 presets
+  provenance question) and [0108](../../design-backlog.md) (HLSL arrays, ~71 files, plus 218 MD2 presets
   that convert but render blank) both stay filed. The ordering is the entries' own: reach is worth
   buying after quality is judged better, and Phase 6 question 5 is that judgement.
 - **It does not reopen** ADR-0118's quantizer or ADR-0119's echo blend. Both were measured, and both
@@ -392,9 +419,9 @@ struct SeamTrace {
 
 `core/src/render/scenes/warp_mesh/**`, `core/src/milk/outputs.rs`, `milkconv/src/convert.rs`,
 `milkconv/tests/draw_layer.rs`. **No active plan touches these** —
-[0104](0104-the-library-stops-being-lopsided.md) authors `presets/*.toml` (including the four
+[0104](../0104-the-library-stops-being-lopsided.md) authors `presets/*.toml` (including the four
 `warp_mesh` worlds, which read the params this plan may re-mean: if Phase 3 changes what `gamma`
-does, tell that lane), and [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) is
+does, tell that lane), and [0106](../0106-the-frame-stream-passes-through-a-diffusion-model.md) is
 `tools/` + `docs/` only. Safe to run in a worktree lane alongside either.
 
 ## Implementation log
@@ -582,9 +609,60 @@ deliberately, and a near-flat trace is a visible flat line rather than an invisi
 draw geometry is world space rather than uv, and taking only each segment's start point drops the
 trace's final vertex. The first is what made the `/aspect` look uncancelled on a first reading.
 
+### Close review, 2026-08-20 — seam E is in a different domain, so the "falls monotonically" reading is half a claim
+
+**Phase 2's conclusion stands. One sentence supporting it does not, and it is recorded in three
+places the successor will read.**
+
+Seams A and B are linear-light means read back from `COMPOSITE_FORMAT` textures. Seam E is a mean of
+**sRGB-encoded** 8-bit code values: `HEADLESS_FORMAT = Rgba8UnormSrgb`, and the probe forms it as
+`f32::from(byte) / 255.0` under a local binding named `linear`, which it is not. A ratio of encoded
+values and a ratio of linear values are **not the same kind of quantity** (ADR-0074), so `5.981` and
+`2.964` cannot be placed on one monotone sequence.
+
+The drop across that column is the transfer function by itself. Encoding seam B's two means gives
+`E(0.523) = 0.750` and `E(0.0874) = 0.327` — ratio `2.294`, **below** the observed `2.964`. So the
+encoding alone over-explains the entire fall from B to E; no stage is needed to account for any of
+it, and the residual runs the other way (Jensen, on a concave map over a ring with spread).
+
+**And the tonemap cannot have compressed anything here.** `KNEE = 0.6`, below which
+`tonemap::map` is *exactly* the identity, and both subjects' backgrounds sit under it. The bound is
+also empirical: *Fog Tunnel*'s `0.74454564` against a pure-encode prediction of `0.7504` leaves under
+1 % for the tonemap and Jensen combined. So the log's *"the present pass and the tonemap **compress**
+the separation"* is right about the present pass — `14.967 -> 5.981` is like-for-like and real — and
+**unsupported about the tonemap**, which for these two subjects is a no-op.
+
+**What survives, in full.** The stop condition fired correctly: no seam departs upward, the
+separation is already `15x` at the field, and the redirection to the built-in warp path is the
+plan's finding. That rests on the A→B comparison and on the absolute magnitude at A, neither of
+which touches seam E. What the E column does *not* do is rule the tonemap in or out for a subject
+whose background exceeds the knee — for these two it is ruled out by the knee, not by the bisect.
+
+**Corrected on backlog 0113 in place.** Two artifacts still carry the overstatement and are one
+comment each, left for whoever next opens them rather than patched from this lane: the doc comment
+on `the_wash_bisect_reports_every_seam` in `core/src/render/milk_wash.rs`, and the `linear` binding
+name in `seam_trace`. Both are named in Followups.
+
 ## Followups (after this lands)
 
-- Whatever Phase 5's x-extent question files, if it turns out to be a second defect.
-- Whatever Phase 2's stop branch records, if it stops.
-- The reach question, once Phase 6 question 5 has an answer: backlog 0109 wants an ADR and an
-  interview, not a phase.
+Written at the close, 2026-08-20, replacing the three conditionals this section carried while the
+plan was in flight — all three resolved.
+
+- **The successor, and it is the real one: the wash is at the field.** Backlog
+  [0113](../../design-backlog.md) reversed direction under Phase 2 and has no plan. It inherits Phase
+  6's look gate, because it is the next work that will change what a converted preset renders.
+  `architect` owns the interview.
+- **Backlog [0119](../../design-backlog.md)** (`ang`'s handedness) and **[0120](../../design-backlog.md)**
+  (the waveform's base amplitude) both stopped on the same wall — no MilkDrop source, no authoring
+  documentation, and a `.milk` file does not record the convention it was authored against. **They
+  are one procurement question, not two engineering ones**: `milkdropfs.cpp` settles both.
+- **Backlog [0122](../../design-backlog.md)** — the mode-6/7 trace normalized to height, filed by Phase
+  5, pinned by test, unfixed. It has a stated fix and needs the same reference to confirm it.
+- **Backlog [0123](../../design-backlog.md)** — the un-normalized waveform and the two frontends'
+  disagreement. `architect`-owned, wants an interview. It gates the *validity* of any future look
+  gate, so it is worth taking before the successor's.
+- **Two comments carrying the close review's corrected claim**, one line each, for whoever next
+  opens the file: the `linear` binding in `seam_trace` holds sRGB code values, and the doc comment
+  on `the_wash_bisect_reports_every_seam` says the tonemap compresses the separation when for these
+  two subjects it is the identity. Not worth a session of their own; worth doing when the successor
+  reopens `milk_wash.rs`, which it will.
