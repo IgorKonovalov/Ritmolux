@@ -448,6 +448,74 @@ realtime architecture is built on that answer and an ADR written before it would
 guess. That spike continues below under Phase 1's umbrella: same throwaway `spike/`, no repository
 file, no commitment.
 
+### Phase 2 followup spike — the speed ladder, and where it stops, 2026-08-20
+
+Run under Phase 1's umbrella at the user's request, after the gate asked for realtime and higher
+resolution. Same throwaway `spike/`, no repository file. Its product is four findings the ADR needs,
+and it did **not** reach realtime.
+
+**Finding 1 — the look rides on guidance, not on step count, and that is the wall.** LCM-LoRA
+(`latent-consistency/lcm-lora-sdv1-5`) at the schedule it is sold on — 4 steps, `cfg 1.0` — returns
+a smoothed, desaturated render with no material at all. 6 steps at `cfg 1.5` recovers monochrome
+rock and nothing else. **8 steps at `cfg 1.0` is still flat at every strength tried (0.75, 0.90,
+1.00); the same 8 steps at `cfg 2.0` is the canyon.** So the variable that carries the material is
+classifier-free guidance, which costs a second UNet evaluation per step. The distilled schedule
+gives back 15 effective steps -> 6; guidance takes back the 2x it was supposed to save.
+
+**Finding 2 — the banked speedup is 3.1x, measured over 120 frames, with the look intact.**
+
+| cell | s/frame | boil | look |
+|---|---|---|---|
+| 20 steps UniPC `cfg 7.0` (the gate's cell) | 3.60 | 1.03 | rich strata, lava veins |
+| **LCM 8 steps `cfg 2.0`** | **1.164** | **1.09** | **holds** |
+| LCM 4 steps `cfg 1.0` | ~0.50 | not run | lost |
+| LCM 8 steps `cfg 1.0` | ~0.90 | not run | lost |
+
+Locked 30 fps at 512x512 needs 0.033 s/frame. From 1.164 that is **another ~35x**, and the
+remaining named levers are bounded: TensorRT ~2x, a T2I-Adapter in place of ControlNet ~1.3x. The
+gap closes only if guidance stops costing 2x — a model distilled to run at `cfg 1` (that test was
+still downloading when this was written) or StreamDiffusion's residual CFG, which is engineering
+rather than a setting.
+
+**Finding 3 — "it changes too fast" is a separate axis from boiling, and feedback is its brake.**
+The gate's follow-up complaint was rate, not incoherence. Measured on the LCM cell, 120 frames each:
+
+| feedback | out MAD | boil | s/frame |
+|---|---|---|---|
+| 0.40 | 16.49 | 1.09 | 1.164 |
+| 0.60 | 13.95 | **0.93** | 1.349 |
+| 0.75 | 12.13 | **0.81** | 1.611 |
+
+Below 1.0 the output moves *less* than the render driving it: it persists rather than chases. Note
+the cost direction — **feedback makes each frame more expensive, not less**, so it is a quality
+lever and never a realtime one.
+
+**Finding 4 — temporal stride is the only rate lever that is also a speed lever, and the user
+accepted its look.** Diffusing every Nth source frame and interpolating back to 30 fps was judged
+*"actually fine"* at N=3 (`lcm_stride3_interp.mp4`). The saving is exact arithmetic rather than a
+measurement — per-diffused-frame cost is unchanged, so stride N is N x fewer frames. N=5 and N=8
+were rendered as clips; **their per-frame timings are void**, having been measured against a
+concurrent GPU job, and the honest bound on N is musical rather than computational: at ~118 bpm a
+beat is ~15 frames, so N=8 leaves under two diffused frames per beat and the geometry stops
+tracking the music before the picture stops looking smooth.
+
+**What the gate asked for, and the one contract it collides with.** The ask is three modes — a
+quality render (feedback high, steps high, 768), and a realtime path (stride plus interpolation).
+**Stride contradicts this plan's Data shapes**, which state that frame count in equals frame count
+out *always*, because a filter that drops frames desynchronizes the audio mux silently. Two shapes
+resolve it, and choosing is ADR work: **interpolate inside the filter** (one frame out per frame
+in, contract intact, `ffmpeg` unchanged, filter owns an interpolator) or **emit at 30/N fps** (a
+simpler filter, but the invariant goes and the canonical `ffmpeg` command grows a rate). The first
+is recommended. Note also that the interpolation in the judged clip was `ffmpeg`'s `minterpolate`,
+which is CPU-bound and **not realtime** — a live path needs GPU interpolation (RIFE class), which
+is a new dependency and not a phase's decision.
+
+**The two modes are two architectures, not two flags.** The offline one is Phases 3-5 as written,
+plus a stride/interpolation surface and one amendment to the frame-count contract. The realtime one
+cannot sit downstream of `shot --render`, which walks a WAV offline — it needs the live loop, and
+that reopens the Decision's rejected *in-process inference* and *publish to another process*
+alternatives. It should be its own plan, and this plan should not grow it.
+
 ## Followups (after this lands)
 
 - **The diffused frame re-enters the renderer** as a texture the scene samples — the attractor
