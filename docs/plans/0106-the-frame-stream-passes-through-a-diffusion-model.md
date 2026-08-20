@@ -1,6 +1,6 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** approved
+> **Status:** in-progress — Phase 1 ran 2026-08-20; **Phase 2, the stop condition, is open**
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — **one is owed and deliberately deferred**, see Phase 2
@@ -306,6 +306,112 @@ desynchronizes the audio mux downstream, and that failure is silent in the file.
   a `--diffuse` flag is a followup and is one flag plus a spawn, not a rewrite.
 - **No timeline, cuts, or prompt automation across a track.** One prompt per render, matching
   0101's one preset per render.
+
+## Implementation log
+
+### Phase 1 — the spike ran, 2026-08-20
+
+By `dev`, in the lane `WORK/lmv-plan-0106` on branch `plan-0106-diffusion-filter`, branched from
+`5cf592d` at v0.75.0. **No repository file changed** except this log and the `Status` line, as the
+phase specifies; every artifact lives under an untracked `spike/`.
+
+**The subject material.** Caribou — *Odessa* (Swim, 2010), 4 s from 0:45, 48 kHz 16-bit PCM. Three
+subjects at 768x768, `--tier rich`, 120 frames each: `attractor_leviathan`, `star_rosewindow`,
+`attractor_ink`.
+
+**The phase's frame-generation recipe is superseded, and the saving is the whole point of 0101.**
+The plan budgeted 10–15 minutes for sixty `shot --frame-at` processes and named that cost "an
+artifact of 0101 not existing yet". 0101 closed 2026-08-17, so this ran through `shot --render`
+piped to `ffmpeg`: **all three subjects, 360 frames, in under 30 seconds**, one process each.
+`--fps` also takes an exact rational, so the 31.25 fps hop-quantization workaround is gone —
+frames were generated at a flat 30. The cost of `--render` was **not** felt in this phase at all;
+it is now three orders of magnitude below the diffusion pass beside it.
+
+**The cell that survived pass 1** — 24 cells (strength x cn_scale x control x size) on
+`attractor_leviathan`, contact sheet at `spike/out/sheet_leviathan.png`, plus the same sweep on the
+other two subjects:
+
+| | |
+|---|---|
+| base model | `Lykon/dreamshaper-8` (**no fp16 variant published** — full weights) |
+| ControlNet | `lllyasviel/control_v11p_sd15_softedge` (canny for the ink control) |
+| strength | **0.75** |
+| `controlnet_conditioning_scale` | **0.6** |
+| feedback | **0.4** |
+| steps / guidance / scheduler | 20 / 7.0 / UniPC |
+| seed | 1234, fixed for the whole render |
+
+`cn_scale = 1.0` is dead across every strength: it pins so hard to the render that the output is
+the tinted attractor back. Reimagining lives at `cn 0.6`, and only `strength 0.75` produces
+material rather than tint.
+
+**The four numbers the phase owes.**
+
+| | 512x512 | 768x768 |
+|---|---|---|
+| seconds per frame | **3.49–3.75** | **9.43** |
+| peak VRAM reserved | **3.87 GiB** | **5.04 GiB** |
+
+Both are on the dev box (RTX 3080 Laptop 8 GB, driver 581.42, torch 2.6.0+cu124, Python 3.12) and
+are **measurements naming their configuration**, not properties (ADR-0071). The interview's
+estimates — ~0.1 s/frame SD-Turbo at 512, ~0.3 s/frame SD1.5+LCM at 768 — are **out by 12x to 30x**
+against this cell, which runs 20 UniPC steps with neither Turbo nor LCM. The sweep peaked at
+**5.68 GiB** because it holds two ControlNets; a single-net render is the 3.87/5.04 above. A
+four-minute track at 30 fps is 7 200 frames, so this cell is **7.0 hours at 512** and **18.9 hours
+at 768** — that arithmetic is what Phase 2 is deciding about, and it is the strongest argument for
+the LCM/Turbo followup.
+
+**Does it boil — measured, not argued.** `spike/boil.py` computes
+`mean|out[i]-out[i-1]| / mean|src[i]-src[i-1]|`, mean absolute per-pixel difference in 8-bit sRGB
+over the same frame pairs with the source resized to the output's size: same statistic, same units,
+one run, dimensionless (ADR-0074). Ratio ~1 means the filter moves no faster than the render it was
+handed; >>1 means per-frame reinterpretation on top of it.
+
+| run | src MAD | out MAD | boil | p90 |
+|---|---|---|---|---|
+| `lev512_fb0` (feedback **0.0**) | 15.06 | 21.31 | **1.41** | 1.73 |
+| `lev512_fb4` (feedback **0.4**) | 15.06 | 15.54 | **1.03** | 1.25 |
+| `lev768_fb4` (feedback 0.4) | 15.82 | 16.21 | **1.03** | 1.24 |
+| `rose512_fb4` (feedback 0.4) | 2.32 | 12.19 | 5.26 | 10.74 |
+| `ink512_fb0` (feedback 0.0) | 2.61 | 6.85 | 2.63 | 3.06 |
+
+**Feedback is the whole coherence lever, and it is worth 1.41 -> 1.03 on one arm-to-arm comparison**
+— same seed, same cell, the blend the only difference. Frames 60/61 of the 0.0 arm re-roll the
+material completely (teal rock strata become yellow lightning veins); the same pair of the 0.4 arm
+share their lava veins and cyan streak while the geometry moves. **Resolution buys detail, not
+stability**: 768 measures the same 1.03.
+
+**The instrument's caveat, and it must travel with the number.** `boil` is only interpretable when
+the source is moving. `star_rosewindow` reads 5.26 while looking calm, because its own motion
+(`src_mad` 2.32) is a sixth of the attractor's — in *absolute* terms that clip moves less per frame
+(12.19) than the accepted leviathan one (15.54). A near-static preset inflates the ratio without
+the picture seething. Read `out_mad` alongside it, or the number will condemn the wrong content.
+
+**Radial symmetry survives**, which was the plan's named unknown for `star_rosewindow`. Every one of
+the 24 cells keeps the 12-point star intact, and at `strength 0.75` real stained glass fills the
+gaps between the points. The ink control behaved as predicted — minimal reinterpretation, paper
+grain and brush character, and at 512/0.75 the model signs it with a red seal.
+
+**Artifacts** (untracked, in the lane): `spike/out/sheet_{leviathan,rosewindow,ink}.png`, five clips
+`spike/out/{lev512_fb0,lev512_fb4,lev768_fb4,rose512_fb4,ink512_fb0}.mp4` at 30 fps with the audio
+muxed, one `cell.json` per run recording its full configuration, and the logs beside them.
+
+**Two environment traps, both of which belong in Phase 5's setup documentation because they produce
+a plausible-looking environment that fails at the first frame:**
+
+- `pip install diffusers transformers accelerate controlnet_aux` **replaced `torch 2.6.0+cu124`
+  with `2.13.0+cpu` from PyPI** — `controlnet_aux` declares a bare `torch` — and the run then died
+  at `pipe.to("cuda")` with *"Torch not compiled with CUDA enabled"* after a 13-minute weight
+  download. The `requirements.txt` this plan ships must pin torch **with its `+cuXXX` local version
+  and its index URL**, installed in a step of its own, or `pip install -r` silently produces a
+  CPU-only environment.
+- Reinstalling torch alone then broke `torchvision` (`operator torchvision::nms does not exist`) —
+  the two are version-locked, so `torchvision 0.21.0+cu124` had to be pinned to match. Pin the pair.
+
+**What Phase 1 did NOT establish.** Whether the music still reads through the filter — that is
+Phase 2's second question and it needs a human watching the clips with the audio, which is
+precisely why it is a `human` phase. Nothing here touches `core/`, `tools/`, `standalone/` or the
+release artifact.
 
 ## Followups (after this lands)
 
