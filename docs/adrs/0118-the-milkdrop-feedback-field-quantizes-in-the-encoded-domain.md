@@ -3,7 +3,7 @@
 > **Status:** accepted 2026-08-17 (Plan 0108) — carries three `Outcome` entries
 > **Date:** 2026-08-17
 > **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md),
-> [0111](../plans/0111-the-milkdrop-import-stops-washing-out.md) (third `Outcome`)
+> [0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) (third `Outcome`)
 
 ## Context
 

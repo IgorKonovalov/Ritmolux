@@ -284,7 +284,7 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0114 | A negative scale is clamped away, so MilkDrop’s standard mirror idiom collapses | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1. Both halves were engine-side. **Closed 2026-08-19** |
 | 0115 | There is no video-echo stage, and one preset in seven is unrecognisable without it | [ADR-0119](adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) + [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7. **Closed 2026-08-19** |
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
-| 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
+| 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
 
 <!-- roster:end -->
 
@@ -2208,7 +2208,7 @@ convicted at Plan 0109's:
   stroke on stroke. Black-on-black is invisible; black-on-yellow-green is glaring. Unverified against
   the reference, hence "probably".
 
-### Update 2026-08-19 — [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 2 bisected the chain and the wash is **not downstream**. The field was never measured on a real bundle.
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 2 bisected the chain and the wash is **not downstream**. The field was never measured on a real bundle.
 
 **The entry stays live, and its direction reverses.** The update above concluded *"the remaining
 direction is downstream of the field"*. Phase 2 measured that chain and it is not there.
@@ -2233,9 +2233,24 @@ only above zero and neither converted preset binds `bloom`, `trails` or any kale
 `PostChain::begin` hands the scene the tonemap's own input texture; and `bg_bright` defaults to `0`
 and neither binds it, so the backdrop contributes nothing. Seams B, C and D are one texture.
 
-**No seam departs upward. The ratio is maximal at the field and falls monotonically** — `15 -> 6 -> 3`
-on hardware, `25 -> 9 -> 3` on WARP. The present pass and the tonemap **compress** the separation
-rather than creating it, so Plan 0111 Phase 3 did not run.
+**No seam departs upward, and the separation is already maximal at the field** — the ratio is
+`14.967` at A and lower at every seam after it, on both adapters. The **present pass** demonstrably
+compresses it (`14.967 -> 5.981`, linear against linear). So no downstream stage creates the wash,
+and Plan 0111 Phase 3 did not run.
+
+**Corrected at Plan 0111's close, 2026-08-20, and the correction matters to whoever reads the E
+column.** The first draft of this update read `15 -> 6 -> 3` as one monotone sequence and credited
+the tonemap with the second fall. **Seam E is not in the same domain as A and B.** A and B are
+linear-light means; E is a mean of sRGB-encoded code values (`HEADLESS_FORMAT = Rgba8UnormSrgb`,
+bytes over 255), and a ratio of encoded values is not the same kind of quantity as a ratio of linear
+ones ([ADR-0074](adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)).
+Encoding seam B's own two means gives `0.750` and `0.327` — ratio `2.294`, **below** the observed
+`2.964` — so the transfer function alone over-explains the whole B-to-E fall with no stage involved.
+And the tonemap is *exactly* the identity below `KNEE = 0.6`, which both backgrounds sit under; the
+empirical bound agrees, leaving under 1 % of *Fog Tunnel*'s reading for tonemap and Jensen together.
+**The tonemap is a no-op for these two subjects.** It is therefore neither ruled in nor ruled out by
+this bisect for a subject whose background clears the knee — for these two, the knee rules it out,
+not the measurement.
 
 **Why the field looked clean and is not.** Plan 0109 Phase 4's probe drives
 `MilkBundle::from_assembly(None, None, None)` — an **empty** bundle with synthetic params — so its
@@ -2397,6 +2412,39 @@ that uses the cut deliberately.
 wash), it shows on real content rather than only on a fixture, and the diagnosis is now specific
 enough to act on.
 
+### Update 2026-08-20 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 4 pinned **our** half and could not reach the reference's. The entry stays live, **half discharged**.
+
+**What landed.** `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` pins this engine's
+construction from `vertex_position`'s arithmetic rather than from a picture: the cut is on **+x** and
+is a genuine discontinuity of nearly a full turn (asserted against the two neighbouring vertices),
+`ang` is continuous elsewhere along the swept column, and it increases **counter-clockwise as seen on
+screen** because y is flipped before the `atan2`. `milkconv/tests/warp_geometry.rs` already holds the
+emitted WGSL epilogue and the draw layer to the same y-down/y-up asymmetry, so the three agree by
+test. Neither fact can now move silently.
+
+**What did not, and this entry's own "What a fix would be" was wrong about it.** That section says
+the question "is measurable against a converted fixture rather than arguable". **It is not.** A
+converted fixture measures *this engine*, which is the half already pinned; the missing half is the
+reference's handedness, and no `.milk` file records the convention it was authored against. The phase
+required the comparison be derived from the source format's convention or the reference
+implementation with the source named, and never from a picture — none of those exist in this
+environment. A corpus-wide search for a preset stating a rotation direction returns two files, both
+building their own Kardan rotation from `q` variables rather than reading the per-vertex `ang`.
+
+So the seam is **not** corrected and is **not** recorded as authored-against either; that second
+claim needs the missing half and asserting it would be exactly the prose error
+[ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) catches.
+
+**What would settle it, most direct first:** MilkDrop 2's `milkdropfs.cpp` mesh setup, where the sign
+of the `y` handed to `atan2f` is one line; the authoring documentation that shipped with MilkDrop; or
+one reference capture of a deliberately handedness-revealing preset, which is a look-gate artifact
+and not a test. **This is the same procurement wall 0120 and 0122
+stopped on**, and one source clears all three — which is the argument for treating it as one
+procurement question rather than three engineering ones.
+
+- **Verified 2026-08-20** — the wrap is still unconditional and still has no continuity treatment:
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mod.rs`
+
 ---
 
 ## 0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw
@@ -2437,7 +2485,7 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
-### Update 2026-08-19 — [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
 
 **The amplitude half stopped, on the branch the phase was given for it.** The reference's
 normalization is not derivable from any source available in this environment: there is no MilkDrop
@@ -2470,7 +2518,7 @@ to be amplitude-revealing.
 
 ## 0122 — a mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width
 
-**Raised by:** `dev`, from [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
+**Raised by:** `dev`, from [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
 (2026-08-19), splitting the x-extent half out of [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
 **Owner if taken:** `dev`.
 
@@ -2510,7 +2558,7 @@ like 0120 it makes a preset look mis-tuned rather than unrecognisable.
 
 ## 0123 — the waveform is the one un-normalized analysis output, so the OS volume slider changes the picture — and the two frontends disagree
 
-**Raised by:** `dev`, from a live-app check during [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md)
+**Raised by:** `dev`, from a live-app check during [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md)
 (2026-08-19). **Owner if taken:** `architect` — this is a boundary-contract question, not a defect
 with an obvious fix. **Out of that plan's scope; nothing in it was changed for this.**
 

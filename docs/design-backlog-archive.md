@@ -5778,7 +5778,7 @@ slipped into an unrelated plan.
 exists to stop units errors, and its own module header says four parallel lists were replaced by that
 table precisely so a value could not silently read its neighbour.
 
-### Closed 2026-08-19 by [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 1 — the fix is as specified, and **one prediction above was wrong**
+### Closed 2026-08-19 by [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 1 — the fix is as specified, and **one prediction above was wrong**
 
 The `None` arm now calls the same `convert` the `Some` arm does, verified both ways: with the fix an
 unnamed `decay` reads `0.54548466`, with the arm reverted it reads `0.98`.
