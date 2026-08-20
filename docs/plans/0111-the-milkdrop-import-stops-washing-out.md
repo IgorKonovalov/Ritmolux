@@ -288,6 +288,16 @@ flowchart LR
 - **Owner skill:** human
 - **What:** The same seven pairs, the same rig (`foo_vis_milk2` 0.2.0.0, DX11, beside release
   `lmv.exe`), the same three-variant judging set as Plan 0108 and Plan 0109 Phase 5.
+- **Pin the playback volume, and record it with the verdicts — added 2026-08-19 by `dev`, from a
+  live-app check, and it is not optional.** The waveform is the one un-normalized analysis output
+  (design-backlog [0123](../design-backlog.md)), so on the standalone's loopback path **the OS master
+  volume slider changes the picture**. Measured on the development box: one instance, one preset, one
+  clip, ten seconds apart, volume the only variable — at 18 % *Blur Mix 3*'s trace is a near-flat
+  ribbon and at 60 % it swings roughly `±40 %` of frame height. Three of the seven pairs are
+  waveform-led, so a gate run at an unpinned volume judges the volume as much as the conversion, and
+  its verdicts are not comparable with Plan 0108's or Plan 0109's — **which were themselves run at
+  volumes nobody recorded.** Set one level, write it down beside the verdicts, and do not touch it
+  between pairs or between variants. The reference side needs the same treatment for the same reason.
 - **Pin the reference by full path.** Plan 0108's gate lost a pair to *Geiss - Cosmic Dust 2 - Trails
   5b* being judged against the plain preset, and authoring this plan **very nearly repeated it** — a
   loose search matched *beta106i - Contortion (Wind Up)* and reported a `fGammaAdj` that would have
