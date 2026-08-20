@@ -473,9 +473,20 @@ gives back 15 effective steps -> 6; guidance takes back the 2x it was supposed t
 
 Locked 30 fps at 512x512 needs 0.033 s/frame. From 1.164 that is **another ~35x**, and the
 remaining named levers are bounded: TensorRT ~2x, a T2I-Adapter in place of ControlNet ~1.3x. The
-gap closes only if guidance stops costing 2x — a model distilled to run at `cfg 1` (that test was
-still downloading when this was written) or StreamDiffusion's residual CFG, which is engineering
-rather than a setting.
+gap closes only if guidance stops costing 2x — a model distilled to run at `cfg 1`, or
+StreamDiffusion's residual CFG, which is engineering rather than a setting.
+
+**Finding 1b — buying a guidance-free model does not recover the look, and that is the negative
+result the realtime question turns on.** `Lykon/dreamshaper-8-lcm`, a dedicated LCM finetune loaded
+with the LCM schedule and no LoRA, at 8 steps and `cfg 1.0`, produces the **same flat, materialless
+picture** as the LoRA did at `cfg 1.0` — at strength 0.75, 0.90 and 1.00 alike. Two independent
+`cfg 1` configurations now agree. So the 2x is not an artifact of bolting distillation onto a base
+model; **the material this content needs comes from guidance itself**, and the ways out are residual
+CFG (approximates guidance at ~1.1x rather than 2x), an untested turbo-class model, or accepting a
+flatter look in the realtime mode than in the render mode. That last option is cheap and should not
+be dismissed: the realtime path is a preview, and a preview that reads differently from the final
+render is a normal thing for a creator tool, provided the difference is stated rather than
+discovered.
 
 **Finding 3 — "it changes too fast" is a separate axis from boiling, and feedback is its brake.**
 The gate's follow-up complaint was rate, not incoherence. Measured on the LCM cell, 120 frames each:
