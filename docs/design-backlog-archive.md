@@ -5733,3 +5733,72 @@ two well-separated `time` values. Needs a golden re-bless — it is *intended* t
 **High, and cheap.** [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2.
 
 ---
+
+## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+close review (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the unresolved-slot arm returns the seeded default without converting it:
+  `present: None => d\.\$field in: core/src/milk/outputs.rs`
+
+### The finding
+
+`FrameOutputs`' table declares `decay: "decay" = 0.98, Factor`, and that one constant is used for two
+different things. `seed` writes it into the register **before** the program runs, where `0.98` is
+correctly MilkDrop's *per-frame* value. `read` returns it unchanged when the program never mentions
+`decay` — but that arm feeds a field whose own doc says "**per second** here", and the converted
+value is `per_second_factor(0.98) = 0.5455`. A bundle that never names `decay` therefore fades at
+`0.98`/s (about `0.9997` per frame) instead of `0.5455`/s: effectively not at all.
+
+`decay` is the only `Factor`-rate output, so nothing else is affected.
+
+**Not currently reachable from a converted preset**, which is why this is an entry rather than a bug
+report. `milkconv`'s prologue emits an assignment for **every** roster output carrying an
+initial-condition key, unconditionally, at the top of every frame — so the slot always resolves and
+the conversion always runs. The one shipped hand-written bundle
+(`core/tests/fixtures/warp_mesh_milk.toml`) names `decay` too.
+
+**It has already cost real time once**, which is the argument for fixing it rather than documenting
+it: Plan 0109 Phase 4's field probe drives an empty bundle, silently ran its whole experiment at
+`0.98`/s, and the phase's reported fade numbers could not be reproduced from the committed code until
+the close review found this. A latent unit error that only bites instruments is exactly the kind that
+bites the next instrument too.
+
+### What a fix would be
+
+Convert on the `None` arm as well, so the fallback is in the same vocabulary as the resolved value —
+roughly `convert(d.$field, Rate::$rate, d.$field)`. **It moves goldens** for any fixture whose bundle
+omits `decay`, so it wants a bless and a check of which fixtures those are, and it should not be
+slipped into an unrelated plan.
+
+### Priority
+
+**Low-medium.** Latent for shipped content, but it is a units error sitting in the one table that
+exists to stop units errors, and its own module header says four parallel lists were replaced by that
+table precisely so a value could not silently read its neighbour.
+
+### Closed 2026-08-19 by [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 1 — the fix is as specified, and **one prediction above was wrong**
+
+The `None` arm now calls the same `convert` the `Some` arm does, verified both ways: with the fix an
+unnamed `decay` reads `0.54548466`, with the arm reverted it reads `0.98`.
+
+**"It moves goldens" did not happen, and the reason is worth keeping.** The golden set carries exactly
+two `[milk]` fixtures — `warp_mesh_milk` and `warp_mesh_shader` — and **both declare `decay` in their
+`.regs` roster**, so both slots resolved to `Some` and both already took the converting arm. The only
+fixture whose bundle omits `decay` is `warp_mesh_lit_backdrop.toml`, whose `[milk]` table is empty by
+design, and it has no golden. No preset in `presets/` carries a `[milk]` block at all. So the entry's
+own escalation — that this wants a bless and should not be slipped into an unrelated plan — was
+sound reasoning from a premise that the fixture set did not support.
+
+**What it did move was two tests, and not as collateral.** Plan 0109 Phase 4's two quantizer probes
+passed `None` to `field_trace` and relied on the fallback being near-unity — which is what neutralizes
+`decay` so the quantizer is the only bound, and is documented in the comment above their own call
+site. The fix changed the meaning of a value they took for free, not their calibration. They now pass
+an explicit `NEUTRALIZED_DECAY = Some(0.98)`, which reproduces every committed digit of both
+doc-comment tables; names, claims, thresholds and tables are unchanged. The measurement that came out
+of it — the same field under a realistic converted `decay` — is
+[ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)'s third
+`Outcome`.
+
+---
