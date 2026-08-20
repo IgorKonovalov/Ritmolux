@@ -668,22 +668,25 @@ the rows above.
   across builds, which is
   [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) territory and
   wants its own ADR. **This gates nothing** — the capability shipped without it.
-- **Plan [0061] Phase 9 — the one verification still outstanding** (2026-08-08). The plan is
-  `done` and every `dev` phase landed. **Phase 8 ran and passed the same day**: the foobar plugin
-  builds against the extracted `lmv-core-cabi` and `foo_lmv.dll` loads in foobar2000 v2 and
-  renders. That closed the one risk [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)
-  carried into C++ link time — the linked artifact renamed to `lmv_core_c.lib`, and CI has no
-  plugin job that would have caught a stale path. What remains needs a CI run rather than this
-  machine:
-  - **Phase 9 — read a cache-warm CI run** (the *second* after the push; the first is a cold
-    build, because a `[profile.dev]` edit and a new workspace member each invalidate `rust-cache`
-    wholesale). It re-derives `COVERAGE_FLOOR` — currently **91**, measured on a hardware-GPU box
-    where CI has WARP — and checks the one property
-    [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) committed to: **`coverage` is the
-    longest job**. If it is not, `check (windows-latest)` is build-dominated, and that is the
-    single measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from
-    rejected to worth taking — route it back to `architect` as a supplement rather than editing
-    the job.
+- **Plan [0061] Phase 9 — ~~the one verification still outstanding~~ discharged 2026-08-20** (filed
+  2026-08-08). The plan is `done` and every `dev` phase landed. **Phase 8 ran and passed the same
+  day**: the foobar plugin builds against the extracted `lmv-core-cabi` and `foo_lmv.dll` loads in
+  foobar2000 v2 and renders. That closed the one risk
+  [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) carried into C++ link time — the
+  linked artifact renamed to `lmv_core_c.lib`, and CI has no plugin job that would have caught a
+  stale path. **Phase 9 needed a CI run rather than this machine, and got one:** run
+  [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929)
+  (`main` at `7b9781d`, `rust-cache` restore-key hit, all six jobs green), read at Plan
+  [0110](done/0110-the-shader-surface-stops-being-invisible.md)'s Phase 6 — that plan's own success
+  criterion is the same job. Both halves answered:
+  - **`COVERAGE_FLOOR` re-derives to 91**, the number it already carries. CI reads **92.31 % lines**
+    where the floor was set off 94.85 % measured locally, so the hardware/WARP asymmetry
+    `ci.yml:25-34` reserved ~3 points for is real and cost **2.54**. Raising it to 92 is **refused**
+    — 0.31 points is ~62 lines, and the denominator moves with any non-test code that lands. The one
+    edit owed is `ci.yml`'s comment, which still tells a reader the number is unverified.
+  - **`coverage` IS the longest job** — 24m05s against `check (windows-latest)`'s 11m33s, a **2.1x**
+    lead. So [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)'s Alternative A (merge the two
+    Windows jobs) **stays rejected**, and nothing routes back to `architect` as a supplement.
 - **The content lane's five standing sittings now live in one place:
   [`docs/content-brief.md`](../content-brief.md)** (consolidated 2026-08-13). They were five
   `human` phases of five closed plans, recorded here in five separate bullets running to ~140 lines
@@ -746,7 +749,7 @@ archive first.
 
 - [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md) — closed 2026-08-20. Review: **no blockers, one major, two minors.** The bisect stopped: the wash is at the **field**. Phase 6 void.
 - [0109 — The MilkDrop import gets its geometry back](done/0109-the-milkdrop-import-gets-its-geometry-back.md) — closed 2026-08-19. Review: **no blockers, two majors (repaired at close), three minors.** The gate falsified three claims; ADR-0119 + a Phase 7 followed.
-- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 open: unpushed, CI reading projected **~92.3 %** vs floor 91.
+- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 read 2026-08-20: run `32272926929`, **92.31 %** vs floor 91.
 - [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md) — closed 2026-08-18. Review: **no blockers, two majors (repaired at close), four minors.** Phase 5 not run; carried to the on-device checklist. Backlog 0117 + 0118.
 - [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md) — closed 2026-08-17. Review: **no blockers, two majors, three minors.** Phase 2: **still merely different**; four new defects → [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md).
 - [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md) — closed 2026-08-17. Review: **no blockers, no majors, five minors/nits.** Phase 5: **yes, with backlog 0110** — a 1080p render reads as an upscale.
