@@ -413,6 +413,41 @@ Phase 2's second question and it needs a human watching the clips with the audio
 precisely why it is a `human` phase. Nothing here touches `core/`, `tools/`, `standalone/` or the
 release artifact.
 
+### Phase 2 — the look gate passed, 2026-08-20, and it did not stop the plan
+
+The user watched the five clips with audio. Recorded as given, because a gate's value is the
+verdict rather than the summary of it:
+
+> *"everything besides first one `ink512_fb0` are very good and interesting. What can we do to make
+> it happen realtime and increase resolution? music reads very well"*
+
+Against the phase's three questions:
+
+1. **Does it boil?** **Usable with feedback.** The verdict tracks the measurement exactly — the four
+   clips judged good are the four at `feedback 0.4`, and the one singled out as weak is
+   `ink512_fb0`, the `feedback 0.0` control. That agreement is worth stating: the eye and
+   `boil` picked the same arm without being shown each other.
+2. **Does the music still read?** **Yes** — *"music reads very well"*. So the no-audio-conditioning
+   decision **stands and is not reopened**: the image is still the whole signal, and the risk this
+   question existed to catch did not materialize.
+3. **Would you publish it?** **Not asked in these terms and not answered**, so it stays open. The
+   ask that came back instead — realtime, higher resolution — is a stronger signal than a yes, but
+   it is not the same answer and is not recorded as one.
+
+**What the verdict costs in scope, and it is not small.** Both requests are things this plan
+explicitly excludes: *"No real-time or live path"* and *"Near-real-time preview ... is a followup,
+not a scope."* Realtime in particular **reopens two of the Decision's rejected alternatives** — a
+filter that must sit in the live loop cannot be a stdio stage downstream of `shot --render`, so
+either inference moves in-process or frames are published to another process. That is the ADR's
+problem, not a phase's. The measured gap is the thing to design against: **3.6 s/frame at 512² is
+0.28 fps, and locked 30 fps is ~110x away.**
+
+**The ADR this plan owes is now owed against a wider question**, and the honest ordering is that one
+cheap measurement comes first — whether the look survives a 2-4 step schedule — because every
+realtime architecture is built on that answer and an ADR written before it would be recording a
+guess. That spike continues below under Phase 1's umbrella: same throwaway `spike/`, no repository
+file, no commitment.
+
 ## Followups (after this lands)
 
 - **The diffused frame re-enters the renderer** as a texture the scene samples — the attractor
