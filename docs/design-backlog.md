@@ -284,6 +284,7 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0114 | A negative scale is clamped away, so MilkDrop’s standard mirror idiom collapses | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1. Both halves were engine-side. **Closed 2026-08-19** |
 | 0115 | There is no video-echo stage, and one preset in seven is unrecognisable without it | [ADR-0119](adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) + [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7. **Closed 2026-08-19** |
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
+| 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
 
 <!-- roster:end -->
 
@@ -2579,51 +2580,5 @@ legitimately want a true scope. The middle option is the one that matches the ex
 **Medium-high.** It makes every waveform-led converted preset look broken at ordinary listening
 volume, which is most of the MilkDrop corpus's light source, and it silently invalidates any look
 gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
-
----
-
-## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
-
-**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
-close review (2026-08-19). **Owner if taken:** `dev`.
-
-- **Verified 2026-08-19** — the unresolved-slot arm returns the seeded default without converting it:
-  `present: None => d\.\$field in: core/src/milk/outputs.rs`
-
-### The finding
-
-`FrameOutputs`' table declares `decay: "decay" = 0.98, Factor`, and that one constant is used for two
-different things. `seed` writes it into the register **before** the program runs, where `0.98` is
-correctly MilkDrop's *per-frame* value. `read` returns it unchanged when the program never mentions
-`decay` — but that arm feeds a field whose own doc says "**per second** here", and the converted
-value is `per_second_factor(0.98) = 0.5455`. A bundle that never names `decay` therefore fades at
-`0.98`/s (about `0.9997` per frame) instead of `0.5455`/s: effectively not at all.
-
-`decay` is the only `Factor`-rate output, so nothing else is affected.
-
-**Not currently reachable from a converted preset**, which is why this is an entry rather than a bug
-report. `milkconv`'s prologue emits an assignment for **every** roster output carrying an
-initial-condition key, unconditionally, at the top of every frame — so the slot always resolves and
-the conversion always runs. The one shipped hand-written bundle
-(`core/tests/fixtures/warp_mesh_milk.toml`) names `decay` too.
-
-**It has already cost real time once**, which is the argument for fixing it rather than documenting
-it: Plan 0109 Phase 4's field probe drives an empty bundle, silently ran its whole experiment at
-`0.98`/s, and the phase's reported fade numbers could not be reproduced from the committed code until
-the close review found this. A latent unit error that only bites instruments is exactly the kind that
-bites the next instrument too.
-
-### What a fix would be
-
-Convert on the `None` arm as well, so the fallback is in the same vocabulary as the resolved value —
-roughly `convert(d.$field, Rate::$rate, d.$field)`. **It moves goldens** for any fixture whose bundle
-omits `decay`, so it wants a bless and a check of which fixtures those are, and it should not be
-slipped into an unrelated plan.
-
-### Priority
-
-**Low-medium.** Latent for shipped content, but it is a units error sitting in the one table that
-exists to stop units errors, and its own module header says four parallel lists were replaced by that
-table precisely so a value could not silently read its neighbour.
 
 ---
