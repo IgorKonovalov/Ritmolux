@@ -1,9 +1,11 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** in-progress — Phases 1, 2, 2b and 3 are done (2026-08-20). The stop condition did not
-> fire; **Phase 2b chose `native`**, so the filter diffuses at the stream's own aspect and every
-> square s/frame reading in this document is superseded. **Phases 4-6 remain**, and Phase 4 is
-> unblocked
+> **Status:** in-progress — Phases 1, 2, 2b and 3 are done (2026-08-20); **Phases 4 and 5 are done
+> (2026-08-24)**, which is every `dev` phase. The stop condition did not fire; **Phase 2b chose
+> `native`**, so the filter diffuses at the stream's own aspect and every square s/frame reading in
+> this document is superseded. **Only Phase 6 remains, and it is `human`.** Two Phase 4 findings are
+> owed to `architect` at the close: the `quality` profile does not ship the cell this plan names, and
+> the gap interpolator cost no new dependency — both amend ADR-0121
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
@@ -851,6 +853,46 @@ at the quality budget resolves to exactly **1024x576**, at the fast budget to **
 no `--prompt` and no `--passthrough` the filter exits **2 before importing torch**, so a missing
 prompt costs a second rather than a multi-gigabyte weight download. Exit 1 stays the malformed-stream
 code.
+
+
+### Phase 5 — one command, and the documentation, 2026-08-24
+
+`docs/capturing.md` carries the one canonical invocation; `tools/sd-filter/README.md` carries the
+setup, the flag reference and the sharp edges; `README.md` gains a short section under *Rendering a
+music video* saying what the stage is and that none of it ships.
+
+**The canonical command was run verbatim rather than composed on the page.** The pipe as printed —
+`cargo run … --render` into the filter into the full `ffmpeg` line from the `--ffmpeg` section,
+character for character — produced a 1920x1080 H.264 video with AAC audio muxed, 21 frames at
+2.913 s/frame (`spike/out/p5_canonical.mp4`). A command that has never been executed as written is
+the usual way this page rots.
+
+**The property the amendment asked to be written down, and it is the reason the command is short:**
+because `--stride` preserves the frame count, the encoder half carries **no rate that has to agree
+with a flag on another process**. Change the profile, the stride or the prompt and the third line of
+the pipe is unchanged. The page says that rather than reprinting variants of the command.
+
+**The plan's cost estimate is superseded by measurement, in the direction of the render being
+cheaper.** Phase 5's amendment says ~6.3 h for a 4-minute track and ~2.1 h at `--stride 3`, computed
+from a 3.1 s/frame 768 reading. What ships measures **~5.9 h** for `quality` and **~54 minutes** for
+`fast` on the dev box, because `fast` spends stride *and* a smaller budget. Both figures are printed
+with the machine attached, and every run prints its own mean when it finishes so no reader has to
+trust the table.
+
+**Every prerequisite is stated as a cost rather than a step**: a CUDA GPU, a Python environment the
+user builds, and a first-run multi-gigabyte weight download. The `requirements.txt` comments carry
+Phase 1's two environment traps in full, which is where they are useful — beside the command that
+triggers them, not in a plan nobody reads while installing.
+
+**Done-when: met.** A reader with a clean checkout has the setup (`tools/sd-filter/README.md`), one
+command (`docs/capturing.md`), and both pages state plainly that nothing here ships in the release
+zip. Every profile is named with the flags it expands to, and the expansion is echoed on stderr on
+every run.
+
+**Left for `architect` at the close, and deliberately not done here:** ADR-0121 is still `proposed`,
+and two of its clauses now disagree with what shipped — the profile bullet still describes `quality`
+as the 20-step UniPC cell, and the Negative about the interpolator being a new dependency is weaker
+than written, since the crossfade that shipped is `PIL.Image.blend`. Neither is a `dev` edit.
 
 
 ## Followups (after this lands)
