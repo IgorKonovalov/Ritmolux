@@ -358,6 +358,44 @@ Practical notes:
   **334 MB, growth -8.1 MB, peak 342 MB** on the Windows dev box (2026-08-17,
   hardware adapter, release). Where the old retention would have reached ~4.4 GB.
 
+#### A filter stage between `shot` and the encoder
+
+The frame stream is a pipe, so anything that speaks Y4M can sit in the middle of
+it. `tools/sd-filter/` is the first such stage. **Today it is a pass-through and
+nothing else** — it parses the header, walks the `FRAME` chunks and re-emits
+them unchanged, with no model, no weights and no GPU:
+
+```
+shot --preset-file <p> --render track.wav --fps 30 --size 1920x1080   | python tools/sd-filter/sd_filter.py   | ffmpeg -f yuv4mpegpipe -i pipe:0 ... track.mp4
+```
+
+Note that `--ffmpeg` is **not** used on this path: it spawns the encoder itself,
+which leaves no seam to insert a stage into. Composing the pipe by hand is the
+whole point of the raw-stream path, and the invocation above is the canonical one
+with a stage spliced in — the encoder half is unchanged, because the stage
+preserves the frame count and the geometry travels in the header.
+
+**Why a pass-through is worth having on its own.** It is the only part of this
+feature whose output is bit-exact and reproducible across machines, so it is the
+only part that can be a real gate; everything a later phase puts inside it is a
+model whose output is not. The check is that a stream through the stage is
+byte-identical to the same stream without it:
+
+```
+python tools/sd-filter/test_sd_filter.py
+```
+
+Standard library only, no GPU. It asserts the round-trip at four geometries and
+four colour spaces, that an unmodelled header or `FRAME` tag survives verbatim,
+that a malformed stream fails loudly rather than emitting garbage, and — when a
+built `shot` is present — the end-to-end property against real rendered bytes. It
+**skips** the last group with a printed notice when there is no built `shot`,
+rather than passing quietly.
+
+The geometry is read off the stream and never assumed, which is the reason the
+header is self-describing: the same stage handles 320x180 and 1920x1080 with no
+flag, and a truncated frame is an error rather than a short write.
+
 ### The three calibration traps
 
 `--set` is a **held** stimulus: it writes the analysis frame directly and that
