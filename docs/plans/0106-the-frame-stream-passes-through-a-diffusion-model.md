@@ -764,6 +764,94 @@ stream's own aspect, and Phase 4's profiles were restated in the same units:
    768 and 512, which are square. They should name a pixel budget and derive the geometry from the
    stream.
 
+### Phase 4 — the filter does the work, 2026-08-24
+
+`tools/sd-filter/sd_filter.py` grew the cell, the flag surface, profiles and stride; Phase 3's stub
+survives inside it as `--passthrough`. `requirements.txt` ships beside it, and the phase's two
+`human` questions were both put to the user with artifacts rather than described.
+
+**The done-when, item by item.** All measurements are from the dev box — RTX 3080 Laptop 8 GB,
+torch 2.6.0+cu124, Python 3.12 — and name that configuration rather than claiming to be properties
+([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
+
+| done-when | result |
+|---|---|
+| 60 frames through the real pipe reproduce the Phase 1 result at the same cell | **met** — `spike/out/p4_samecell.mp4`, 2.984 s/frame |
+| two runs, same seed and arguments, same bytes | **met** — `fd76350c…` twice over the whole stream |
+| `--stride N` emits exactly what it consumed | **met** — asserted at 5 strides x 6 lengths x both gap fillers |
+| a profile's echoed expansion round-trips to the same bytes | **met** — the echoed flags without `--profile` produce `fd76350c…` |
+| the held-versus-interpolated question has an answer from the user | **met** — recorded below |
+
+**The frame-count contract is asserted twice, in different currencies.** `run()` counts markers in
+against payloads out and raises if they disagree — unreachable by configuration, which is the point,
+because the failure it guards is silent in the file. The test then drives the real `push`/`finish`
+accounting with the model stubbed out (`CountingStage` replaces only the three leaves that need a
+GPU), across strides 1/2/3/5/8 and lengths 0/1/2/7/30/31, both gap fillers, asserting frames out and
+the count of frames actually diffused. 186 checks, standard library only, no GPU: the suite still
+runs where Phase 3's did.
+
+**Two flags the plan's illustrative list omits are load-bearing and had to exist**: `--cfg` and
+`--scheduler`. The two profiles differ in exactly those, so an echo without them would name a cell it
+could not reproduce, and the round-trip done-when would be satisfiable only by accident.
+
+**The `quality` profile does not ship the cell Phase 4 named, and this is the phase's substantive
+finding.** The amendment specifies "the 20-step UniPC cell, feedback 0.6" at 589,824 px. Rendered at
+that geometry it does not look like Phase 1's description of it: instead of strata and lava veins it
+draws **white contour line-work over the attractor**, and it does so at feedback 0.4 and 0.6 alike —
+so feedback is not the cause and the cell simply does not survive the move off 512/768 square. It
+costs **6.24 s/frame** against the LCM cfg 2.0 cell's **2.97** at the same budget. Both arms are in
+`spike/out/p4_cell_compare.png`, same frame, same geometry, same feedback. Put to the user as a
+plan-versus-reality choice, with routing back to `architect` offered as the third option:
+
+> *"Retune quality to the LCM cell"*
+
+So `quality` is now **589,824 px, LCM 8 steps, `cfg 2.0`, strength 0.75, `cn_scale` 0.6, feedback
+0.6, stride 1** — the cell Phase 2's gate approved, at the budget Phase 2b chose. The 20-step cell
+is one flag away (`--scheduler unipc --steps 20 --cfg 7.0`) and nothing about it is lost.
+**This contradicts the Phase 4 amendment and ADR-0121's profile bullet as written**, and both are
+`architect`'s to reconcile at the close — the code carries the reason in a comment beside the
+profile, not just here.
+
+**The gap question, answered.** Three arms were rendered from identical anchors and offered:
+`p4_gap_held.mp4`, `p4_gap_blend.mp4`, and `p4_gap_minterp.mp4` — the last being `ffmpeg`'s
+`minterpolate` applied *outside* the filter, the arm the Phase 2 gate had actually judged.
+
+> *"blend (in-filter crossfade)"*
+
+**`--gap blend` is the default**, and it costs **no new dependency**: the crossfade is `PIL.Image.blend`
+between the diffused frames on either side of a gap, and PIL is already required by the diffusion
+path. That materially weakens ADR-0121's stated Negative — the interpolator was expected to be a
+RIFE-class weight download — while leaving its substance intact, because a crossfade *dissolves* and
+does not follow motion. `--gap held` remains, one flag away.
+
+**The `minterpolate` arm demonstrated ADR-0121's Alternative A live, by accident.** Asked for 120
+frames it produced **115**. Nothing errored, and the shortfall is invisible in the file — which is
+precisely the failure the frame-count contract exists to make unrepresentable, observed rather than
+argued.
+
+**Measured cost of what ships**, per diffused frame at 1920x1080 in and out:
+
+| profile | diffusion geometry | s/frame | per emitted frame | peak VRAM |
+|---|---|---|---|---|
+| `quality` | 1024x576 | **2.966** | 2.966 | 4.88 GiB |
+| `fast` (stride 3) | 680x384 | **1.354** | **0.451** | 3.81 GiB |
+| *(the retired 20-step cell)* | 1024x576 | 6.240 | 6.240 | 4.77 GiB |
+
+**The same cell costs 2.984 here against Phase 2b's 2.721 — about 10 % more, and the difference is
+real work rather than noise.** The spike read PNG files; the filter pays a YUV444→RGB decode, a
+resample down from 1920x1080 and a resample plus RGB→YUV444 encode back up, per frame. That is the
+price of being a pipe stage instead of a directory of images, and it is the number the documentation
+quotes.
+
+**Geometry, confirmed against the ADR's own worked examples rather than against itself**: 1920x1080
+at the quality budget resolves to exactly **1024x576**, at the fast budget to **680x384**, and 4:3 to
+**888x664** — the ADR's figures, reproduced by the shipped rule with no per-aspect table.
+
+**A `human`-facing decision the code makes on its own, recorded because it is not in the plan**: with
+no `--prompt` and no `--passthrough` the filter exits **2 before importing torch**, so a missing
+prompt costs a second rather than a multi-gigabyte weight download. Exit 1 stays the malformed-stream
+code.
+
 
 ## Followups (after this lands)
 
