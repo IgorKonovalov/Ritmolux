@@ -285,12 +285,23 @@ the core, the C ABI, or `lmv.exe`.
   - **`--profile <name>` sets a known-good combination of the existing flags**, and any flag passed
     explicitly overrides it. The **expanded flag list is echoed on stderr** at the start of every
     run, so a render is reproducible from what ran rather than from a profile name whose meaning may
-    have moved. Two profiles are enough to start: `quality` (768, the 20-step UniPC cell, feedback
-    0.6) and `fast` (512, the LCM 8-step `cfg 2.0` cell, stride 3). **Those sizes are square and
-    provisional** — Phase 2b decides how 16:9 is handled, and its answer sets the real values.
-  - **The quality profile diffuses natively at 768 or above.** No upscaler dependency is taken; the
-    2.7x per-frame cost is the accepted price, and ADR-0121's Alternative C records the cheaper
-    route with its measurement intact in case render cost later becomes binding.
+    have moved. Two profiles are enough to start: `quality` (**589,824 px**, the 20-step UniPC cell,
+    feedback 0.6) and `fast` (**262,144 px**, the LCM 8-step `cfg 2.0` cell, stride 3).
+  - **A profile names a pixel budget, not a side length — settled by Phase 2b, 2026-08-20.** The
+    filter derives the diffusion geometry from the budget and the **incoming header**, rounding each
+    axis to a multiple of 8, and never squashes or letterboxes. At 16:9 the quality budget is exactly
+    **1024x576** and the fast budget is **680x384** (99.6 % of budget); the rule lands within 0.5 %
+    at every aspect tried, so it needs no per-aspect table. **The fast budget is 262,144 px because
+    that is the pixel count of the 512x512 cell the LCM ladder was measured at** — preserving the
+    count preserves the measured cost, which a rounder-looking 512x288 would not. **`--size` therefore takes a pixel budget
+    or a `WxH`**, and a `WxH` that disagrees with the stream's aspect is an error rather than a
+    silent squash — the whole finding of Phase 2b is that squashing costs both look and throughput.
+  - **Resolution is bought natively, not by upscaling**, and Phase 2b measured the price of the
+    alternatives at an identical pixel count: native **2.721** s/frame delivering 100 % of its
+    pixels, squashed-then-stretched 2.871 delivering 75 %, letterboxed 2.913 delivering 56 %. Native
+    is both the cheapest and the most detailed, so no upscaler dependency is taken and none is
+    tempting. ADR-0121's Alternative C still records the smaller-budget-plus-upscale route with its
+    measurement intact, in case render cost later becomes binding.
   - **Done when**, in addition: `--stride N` is asserted to emit exactly as many frames as it
     consumed (an exact property, no tolerance, and it extends Phase 3's byte-count gate rather than
     replacing it); a profile's echoed expansion round-trips — passing the echoed flags without
@@ -739,7 +750,9 @@ the banked number, for 2.25x the pixels. **Nothing about the realtime conclusion
 was already unbridgeable by the named levers, and it widens rather than narrows. What must not
 happen is a later phase quoting 1.164 as though it described a shipping render.
 
-**Two consequences for documents this phase does not own**, both routed to `architect`:
+**Two consequences for documents this phase does not own**, both routed to `architect` and **both
+discharged the same day** — ADR-0121's resolution clause now names a pixel budget spent at the
+stream's own aspect, and Phase 4's profiles were restated in the same units:
 
 1. **[ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
    is still `proposed`, and its resolution clause reads "768x768 or above"** — square, which this
