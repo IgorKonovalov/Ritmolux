@@ -360,7 +360,7 @@ the core, the C ABI, or `lmv.exe`.
   between a cost table that describes a render and one that describes a subroutine.
 - **Files touched:** `tools/sd-filter/test_sd_filter.py`, `tools/sd-filter/sd_filter.py`,
   `standalone/src/shot/render.rs` (one test), `.github/workflows/ci.yml`, `.githooks/pre-push`,
-  `docs/capturing.md`, `README.md`.
+  `docs/capturing.md`, `README.md`, `tools/sd-filter/README.md`.
 - **Why this is a phase and not a followup:** Phase 3 called the pass-through *"the one part of
   this feature that can be a real CI gate"* and `docs/capturing.md` repeats it as shipped fact.
   Neither is true today — nothing runs the suite, and on any checkout but this one it would go
@@ -422,9 +422,11 @@ measures.
     frames. **No threshold is stated here on purpose**: the factor is whatever the instrument and
     the clock agree on, and a number written into this plan before either ran would be the same
     error one level up.
-  - `docs/capturing.md`'s cost table and its two derived track-length figures, and `README.md`'s
-    "roughly an hour at the `fast` profile", are corrected from the fixed instrument and still name
-    their configuration ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  - **All three copies** of the cost table are corrected from the fixed instrument and still name
+    their configuration: `docs/capturing.md` and `tools/sd-filter/README.md` each carry the full
+    table plus its two derived track-length figures, and `README.md` carries the prose form
+    ("roughly an hour at the `fast` profile"). Grep the figures rather than trusting a list — the
+    third copy was missed on a first pass over exactly this question ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
   - Each corrected figure says **which cost it is**. The old numbers were not wrong about the
     machine; they were wrong about the scope, and a reader could not tell because nothing disagreed
     with anything.
