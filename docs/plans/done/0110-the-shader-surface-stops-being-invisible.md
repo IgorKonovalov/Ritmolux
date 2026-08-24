@@ -601,9 +601,10 @@ inside the margin that was reserved for it. Two conclusions, and only the first 
 - ~~Re-derive the 91 floor from a real cache-warm CI reading, as `ci.yml:33` has asked since Plan
   0061 Phase 9 — as its own decision, on a green tree.~~ **Done by Phase 6:** run `32272926929`
   reads **92.31 %**, the constant does not move, and raising it is refused with reasons above.
-  What is still owed is one `dev` edit — **`ci.yml:25-34`'s comment still says the floor is
+  ~~What is still owed is one `dev` edit — **`ci.yml:25-34`'s comment still says the floor is
   "measured once, on the wrong machine, and is owed a second look"**, which is no longer true.
-  Replace that sentence with the CI reading and the run id.
+  Replace that sentence with the CI reading and the run id.~~ **Done 2026-08-24:** the comment
+  now carries the 92.31 % reading, run `32272926929`, and the refusal to raise to 92.
 - `render/text.rs` at 0.00 % and `render/overlay.rs` at 44.49 %: decide whether they are
   untested or structurally unreachable, and say so in one place.
 - ~~If Phase 3 finds that `blur_level = 0` and `= 3` render identically, that is a real question
