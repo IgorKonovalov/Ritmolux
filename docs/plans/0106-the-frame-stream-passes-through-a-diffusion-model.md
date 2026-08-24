@@ -639,6 +639,89 @@ cannot sit downstream of `shot --render`, which walks a WAV offline — it needs
 that reopens the Decision's rejected *in-process inference* and *publish to another process*
 alternatives. It should be its own plan, and this plan should not grow it.
 
+### Phase 3 — the pass-through stub, 2026-08-20
+
+`tools/sd-filter/sd_filter.py` reads the Y4M stream on stdin and writes it unchanged to stdout.
+
+**It parses rather than copies, deliberately.** `shutil.copyfileobj` satisfies the done-when
+byte-for-byte while proving nothing, and Phase 4 replaces the middle of this loop with a diffusion
+call — so the frame boundaries are real here or they are unwritten work wearing a passing test. The
+header and each `FRAME` line are re-emitted as **the exact bytes they arrived as** rather than
+reserialized from parsed fields, so a stream carrying a tag this parser does not model still
+round-trips exactly.
+
+**Geometry is read off the stream and never assumed** — one stage handles 320x180 and 1920x1080
+with no flag, which is what the self-describing header is for. A truncated frame, an unknown colour
+tag, or garbage where `FRAME` belongs is a named error rather than a short write.
+
+**One Windows-specific hazard is closed in code.** A stdio handle inherited in text mode turns every
+`0x0A` in a frame payload into `0x0D 0x0A`, which corrupts the picture and passes silently; both
+handles are pinned to binary mode, and the test payloads are seeded with `0x0A` and `0x0D` on
+purpose so that failure cannot hide behind a buffer of zeroes.
+
+**Done-when: met.** `tools/sd-filter/test_sd_filter.py` runs on the standard library with no GPU —
+28 checks, all green: the round-trip at four geometries and four colour spaces, an unmodelled
+header/`FRAME` tag surviving verbatim, five malformed streams failing loudly, and the end-to-end
+property against real `shot --render` bytes. It **skips** the end-to-end group with a printed notice
+when no built `shot` is present rather than passing quietly (ADR-0016's shape). Also smoked as the
+three-stage pipe a user actually types — `shot | sd_filter | ffmpeg` — 600 frames at 320x180 to MP4.
+
+**CI wiring was deliberately not done**: `.github/` is not in this phase's file list. The stage is
+gateable, which was the phase's point; wiring the gate is architect's call.
+
+### Phase 2b — the aspect measurement, 2026-08-20
+
+**The plan's cost estimate for the re-render was superseded before it was written.** Phase 2b's
+notes say to re-render with the `shot --frame-at` loop; Phase 1's own log had already retired that
+for `shot --render`. 120 frames of `attractor_leviathan` at **1920x1080** took **16 seconds**, not
+the 25–35 minutes a `--frame-at` loop would have cost.
+
+**The three arms are pixel-count matched by construction**, which was not planned and is worth
+keeping: `1024x576` and `768x768` are both **589,824** pixels. Cost differences between arms are
+therefore geometry, not resolution — a same-kind comparison in
+[ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)'s sense.
+All three arms are judged at 1024x576.
+
+**The cell is Phase 2's banked one, unchanged**: `Lykon/dreamshaper-8` + LCM-LoRA, softedge
+ControlNet, strength 0.75, `cn_scale` 0.6, 8 steps, `cfg 2.0`, feedback 0.4, seed 1234, the canyon
+prompt. `spike/aspect.py` execs `sd.py`'s definitions rather than copying them, so "the same cell"
+means the same code.
+
+**Measured on the dev box** — RTX 3080 Laptop 8 GB, torch 2.6.0+cu124, Python 3.12, 120 frames per
+arm. These are measurements naming their configuration, not properties
+([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
+
+| arm | diffused at | s/frame | peak VRAM | non-upscaled pixels delivered |
+|---|---|---|---|---|
+| **native** | 1024x576 | **2.721** | 5.49 GiB | 589,824 (**100 %**) |
+| **stretch** | 768x768 | **2.871** | 5.49 GiB | 442,368 (75 %) |
+| **pad** | 768x432 band in 768x768 | **2.913** | 5.49 GiB | 331,776 (**56 %**) |
+
+**Native is the cheapest arm and also the only one that delivers every pixel it paid for.** That was
+not the expected result — the square arms were the ones the measurements existed for — and it
+inverts the intuition that SD1.5 wants a square. The two square arms are *slower* despite an
+identical pixel count, and both spend part of their output on an upscale: `stretch` stretches 768
+columns to 1024, `pad` upscales both axes from a 768x432 band.
+
+**The pad arm's bars stay black.** Measured on the raw 768x768 output before the crop: bar mean
+**8.3 / 10.5 / 7.8** against a picture mean of 47.3 / 44.7 / 50.5, with isolated bar pixels reaching
+120–140. The model does not paint material into the letterbox and nothing bleeds across the seam —
+so pad's cost is the wasted 44 %, not a corrupted edge.
+
+**A directional statistic, reported with its confound rather than as a finding.** Mean `|d/dy|` over
+mean `|d/dx|`, against the source resampled to the same 1024x576: source **0.994** (isotropic),
+`pad` 1.103 (+11 %), `native` 1.580 (+59 %), `stretch` 1.749 (+76 %). The ordering matches the eye —
+`stretch` shows pronounced horizontal banding, `pad` the least — **but the prompt asks for "rock
+strata", which are horizontal**, so this number cannot separate material the model was asked to draw
+from smear the geometry introduced. It is recorded as suggestive and is not the basis of the choice.
+`boil` is 1.061 / 1.020 / 1.023 (native / stretch / pad) and separates nothing.
+
+**Artifacts:** `spike/out/aspect_{native,stretch,pad}.mp4`, a stacked `aspect_compare.mp4`, contact
+sheets `aspect_sheet.png` and `aspect_f100.png`, and the raw pre-crop squares under
+`spike/out/aspect_raw/`. All untracked, as Phase 1's artifacts are.
+
+**Verdict: pending.** The phase closes when the user names the arm that ships.
+
 ## Followups (after this lands)
 
 - **The diffused frame re-enters the renderer** as a texture the scene samples — the attractor
