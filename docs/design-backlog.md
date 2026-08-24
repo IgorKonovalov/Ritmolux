@@ -1761,6 +1761,10 @@ tree, which is not discoverable from the panel.
 
 - **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
   `absent: is_edit_mode_enabled in: plugin-foobar/foo_lmv.cpp`
+- **Seen on-device 2026-08-24**, post-0107, at [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)
+  Phase 5: layout-edit right-click still surfaces the component's menu — now Preset ▸ and four
+  items — wholly in place of Cut / Copy / Replace / Remove. The entry's evidence was a code probe
+  plus one reporter's account; this adds a second machine and the current menu.
 
 ### Updated 2026-08-18 — the shadowing menu is now four items and a submenu
 
