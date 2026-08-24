@@ -73,13 +73,23 @@ out.** Concretely, and each clause is load-bearing:
   filter consumes N frames, diffuses one, and **emits N frames**, interpolating between successive
   diffused outputs. The canonical `ffmpeg` invocation in `docs/capturing.md` does not change, and
   no A/V desynchronization is representable. The interpolator is the filter's dependency to carry.
-- **Resolution is bought natively, not by upscaling.** The quality profile diffuses at **768x768 or
-  above**, at the measured 2.7x per-frame cost of 512, because the detail is then generated rather
-  than inferred. No upscaler dependency is taken. **What this clause does not decide is aspect**,
-  and the omission is named here rather than left for an implementer: every reading behind it is
-  square, the stream is 1920x1080, and SD1.5 degrades off-square in a way nothing here has looked
-  at. Plan 0106 **Phase 2b** measures the three handlings — native non-square, square-then-stretch,
-  pad-then-crop — and the answer amends this bullet before this ADR is accepted.
+- **Resolution is a pixel budget spent at the stream's own aspect, and it is bought natively rather
+  than by upscaling.** A profile names a **pixel count**, not a side length; the filter derives the
+  diffusion geometry from the budget and the incoming header, rounding each axis to a multiple of 8
+  and never squashing or letterboxing. The quality budget is **589,824 px**, which at 16:9 is
+  exactly **1024x576** and at 4:3 is 888x664 — within 0.2 % of budget at every aspect tried for this
+  budget, and within 0.5 % for the smaller one. Detail
+  is then generated rather than inferred, and no upscaler dependency is taken.
+
+  **This clause was originally written as "768x768 or above" and Plan 0106 Phase 2b retired it.**
+  It named the aspect question as its own open omission and said the measurement would amend it
+  before acceptance; the measurement ran, and it inverted the premise. Three arms at an identical
+  589,824 px — native 1024x576, 768x768 squashed-then-stretched, and a 768x432 band letterboxed into
+  768x768 — measured **2.721 / 2.871 / 2.913 s/frame** on the dev box. **The native arm is the
+  cheapest and the only one that delivers every pixel it paid for**; the two square arms are slower
+  at equal pixel count and each spends part of its output on an upscale (75 % and 56 % of pixels
+  delivered un-upscaled). The user judged the clips and chose native. So SD1.5 wanting a square,
+  which this bullet assumed, is not what this content and this cell actually do.
 - **Realtime is out of scope for Plan 0106 and becomes its own plan with its own ADR.** This ADR
   records the measurements that plan will start from, and records that it reopens two of Plan
   0106's rejected alternatives, but decides nothing about its architecture.
@@ -116,11 +126,14 @@ out.** Concretely, and each clause is load-bearing:
   ControlNets loaded.
 - **Profiles are a second surface that can rot.** A profile whose meaning drifts silently
   invalidates every render that named it. Mitigated by the stderr echo, not eliminated by it.
-- **The measurements this ADR rests on are square, and the pipe is not.** Every number quoted above
-  — 1.164 s/frame, the 2.7x for 768, the boil ladder — was taken at 768x768 or 512x512 against a
-  stream that is 1920x1080. None of them is known to carry, and the `quality`/`fast` profile values
-  are provisional until Plan 0106 Phase 2b returns. Recording this as a cost rather than repairing
-  it here is deliberate: the repair is a measurement, not a decision.
+- **Every s/frame number quoted above is square, and the shipping geometry is not.** This was
+  recorded as an open cost; Phase 2b closed the aspect question but **did not re-measure the
+  ladder**, so the caveat stands and is now precise. The banked **1.164 s/frame is 512x512**, the
+  **2.7x for 768** is square-to-square, and the **~35x** realtime gap is computed from the 512
+  figure. At the shipping cell the same configuration measures **2.721 s/frame** — 2.34x the banked
+  number for 2.25x the pixels. **The realtime conclusion is unaffected and in fact hardens**: the
+  gap widens rather than narrows, and it was already past what the named levers reach. What must not
+  happen is a later document quoting 1.164 as though it described a shipping render.
 - **Realtime remains unsolved and now has a named wall.** Anyone reading this should not expect the
   next increment to be small: the remaining bounded levers do not reach 35x, and the unbounded one
   (residual CFG) is engineering rather than configuration.
@@ -154,7 +167,11 @@ distinction that *is* real (offline versus live) is not a flag difference at all
 source and a different plan, which is what this ADR decides below rather than papering over with a
 second binary.
 
-### Alternative C — diffuse at 512 and upscale to 768/1080p
+### Alternative C — diffuse at a smaller budget and upscale
+
+*(Written as "diffuse at 512 and upscale to 768/1080p" before Phase 2b expressed resolution as a
+pixel budget rather than a side length. The trade is unchanged; only the units moved.)*
+
 
 Measured to be the cheaper route: 512 costs 1/2.7 of 768 per frame at identical coherence, and a
 Real-ESRGAN pass adds apparent detail for tens of milliseconds without destabilizing a frame that is
