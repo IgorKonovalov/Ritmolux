@@ -354,11 +354,13 @@ the core, the C ABI, or `lmv.exe`.
 ### Phase 7 — the gateable part actually gates, added 2026-08-24 by `architect`
 
 - **Owner skill:** dev
-- **What:** Three defects from the Mode 4 close review, all in the test and gate surface. None
-  changes what the filter draws; together they are the difference between a suite that passes
-  *here* and a suite that means something *anywhere*.
-- **Files touched:** `tools/sd-filter/test_sd_filter.py`, `standalone/src/shot/render.rs`
-  (one test), `.github/workflows/ci.yml`, `.githooks/pre-push`.
+- **What:** Four defects from the Mode 4 close review and the Phase 6 render, all in the test,
+  gate and measurement surface. None changes what the filter draws; together they are the
+  difference between a suite that passes *here* and a suite that means something *anywhere*, and
+  between a cost table that describes a render and one that describes a subroutine.
+- **Files touched:** `tools/sd-filter/test_sd_filter.py`, `tools/sd-filter/sd_filter.py`,
+  `standalone/src/shot/render.rs` (one test), `.github/workflows/ci.yml`, `.githooks/pre-push`,
+  `docs/capturing.md`, `README.md`.
 - **Why this is a phase and not a followup:** Phase 3 called the pass-through *"the one part of
   this feature that can be a real CI gate"* and `docs/capturing.md` repeats it as shipped fact.
   Neither is true today — nothing runs the suite, and on any checkout but this one it would go
@@ -400,7 +402,34 @@ guard three lines above it, with the same printed skip notice. **The `check` mat
 not the home for this**: the end-to-end group's property is the same byte identity the in-process
 group already asserts at four geometries against hostile payloads, and paying for it on three
 build matrices buys the word "real" and nothing else.
-- **Done when:**
+
+**7d — the cost every document quotes is the diffusion call, not the render.** `DiffusionStage`
+times `self.pipe(...)` alone; `_read`'s colour decode and downscale, `_emit`'s LANCZOS upscale back
+to the stream's geometry and its RGB→YUV encode, and the gap crossfades all sit outside the timer.
+`_emit` runs **per emitted frame**, so at stride 3 each anchor pays three full-resolution upscales
+and three full-frame colour encodes that nothing counts. `report()` then divides the diffusion-only
+mean by the stride and prints it as *"per emitted frame"*, which is the label the documents took.
+Measured against the wall clock on the Phase 6 render, the real figure is materially higher and the
+GPU sits near half utilization with no throttle reason active — the same fact seen from the other
+side. **Fix the instrument first, then the documents from what it reports**, in that order: a
+corrected table taken from the current instrument would be wrong again the next time anyone
+measures.
+- **Done when (7d):**
+  - `report()` prints a **wall-clock** cost per emitted frame — elapsed across the whole stream
+    divided by frames emitted — and prints the diffusion-only mean *as well*, each labelled for
+    what it measures. The two being different is the finding; collapsing them again loses it.
+  - The wall-clock figure agrees with an independent stopwatch over a run of at least a thousand
+    frames. **No threshold is stated here on purpose**: the factor is whatever the instrument and
+    the clock agree on, and a number written into this plan before either ran would be the same
+    error one level up.
+  - `docs/capturing.md`'s cost table and its two derived track-length figures, and `README.md`'s
+    "roughly an hour at the `fast` profile", are corrected from the fixed instrument and still name
+    their configuration ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  - Each corrected figure says **which cost it is**. The old numbers were not wrong about the
+    machine; they were wrong about the scope, and a reader could not tell because nothing disagreed
+    with anything.
+
+- **Done when (7a–7c):**
   - The suite passes on a checkout with **no `spike/` directory at all** and a built `shot` —
     check it by moving the lane's `spike/` aside, not by reasoning about it. The end-to-end group
     **runs** in that state rather than skipping, and still skips with its notice when no `shot`
