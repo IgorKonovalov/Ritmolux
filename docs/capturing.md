@@ -366,15 +366,73 @@ diffusion pass with ControlNet holding the render's geometry** — the attractor
 becomes canyon rock, the mandala becomes a rose window, and the shape keeps
 tracking the music because the control map is redrawn from every frame:
 
-```
-shot --preset-file <p> --render track.wav --fps 30 --size 1920x1080   | python tools/sd-filter/sd_filter.py --profile quality --prompt "a vast canyon of luminous glowing rock strata"   | ffmpeg -f yuv4mpegpipe -i pipe:0 ... track.mp4
+**One command, and there is deliberately only one.** It is the canonical
+`--ffmpeg` invocation above with a stage spliced into the middle — the encoder
+half is unchanged, character for character:
+
+```bash
+cargo run -p standalone --release --example shot -- \
+    --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 --tier rich \
+  | .venv/Scripts/python tools/sd-filter/sd_filter.py \
+      --profile quality --prompt "a vast canyon of luminous glowing rock strata" \
+  | ffmpeg -hide_banner -nostats -y -f yuv4mpegpipe -i pipe:0 -i track.wav \
+      -map 0:v:0 -map 1:a:0 \
+      -c:v libx264 -preset medium -crf 18 \
+      -pix_fmt yuv420p -color_range pc -colorspace bt709 -color_primaries bt709 \
+      -color_trc bt709 \
+      -c:a aac -b:a 192k -shortest track.mp4
 ```
 
 Note that `--ffmpeg` is **not** used on this path: it spawns the encoder itself,
 which leaves no seam to insert a stage into. Composing the pipe by hand is the
-whole point of the raw-stream path, and the invocation above is the canonical one
-with a stage spliced in — the encoder half is unchanged, because the stage
-preserves the frame count and the geometry travels in the header.
+whole point of the raw-stream path.
+
+**That command does not change when the filter's settings do**, and that is the
+property worth writing down rather than the text of the command. Because
+`--stride N` preserves the frame count, the encoder never learns a rate that has
+to agree with a flag on another process — there is no `-r` to keep in sync and no
+way to desynchronize the audio silently. Change the profile, the stride or the
+prompt and the third line of the pipe is still the third line of the pipe.
+
+**Prerequisites, stated plainly: a CUDA GPU, a Python environment you build
+yourself, and a first-run download of several gigabytes of weights from Hugging
+Face.** Setup, the flag reference and the sharp edges are in
+[`tools/sd-filter/README.md`](../tools/sd-filter/README.md).
+**Nothing on this path ships in the release zip** — no model, no weights, no
+Python runtime; `lmv.exe` and `foo_lmv.dll` do not change size, and
+[NFR §4](nfr.md#4-size-and-dependencies)'s budget is untouched. This is creator
+tooling built from a source checkout.
+
+#### The profiles are what you type
+
+A profile is a named set of flags and nothing else; any flag passed explicitly
+overrides it, and **the expansion is echoed on stderr at the start of every run**,
+so a finished file's configuration is recoverable from its own log rather than
+from a profile name whose meaning may since have moved. Pass the echoed flags
+back without `--profile` and you get the same bytes on the same machine.
+
+| profile | expands to |
+|---|---|
+| `quality` | `--model Lykon/dreamshaper-8 --controlnet lllyasviel/control_v11p_sd15_softedge --control softedge --scheduler lcm --steps 8 --cfg 2.0 --strength 0.75 --cn-scale 0.6 --feedback 0.6 --stride 1 --gap blend --size 589824 --seed 1234 --lcm-lora latent-consistency/lcm-lora-sdv1-5` |
+| `fast` | the same, with `--feedback 0.4 --stride 3 --size 262144` |
+
+`--prompt` is required and neither profile supplies one: the image is the whole
+signal, and there is no default worth having. Without one the filter exits **2
+before importing torch**, so a forgotten prompt costs a second rather than a
+multi-gigabyte download.
+
+**What a render costs**, measured on the dev box — RTX 3080 Laptop 8 GB, torch
+2.6.0+cu124, Python 3.12 — rendering `attractor_leviathan` at 1920x1080 in and
+out. A measurement naming its configuration, **not a portable figure**
+([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
+
+| profile | diffusion geometry | per diffused frame | per emitted frame | 4 minutes at 30 fps |
+|---|---|---|---|---|
+| `quality` | 1024x576 | 2.966 s | 2.966 s | **~5.9 hours** |
+| `fast` | 680x384 | 1.354 s | 0.451 s | **~54 minutes** |
+
+Each run prints its own mean when it finishes, so nobody has to trust that table
+for their own machine.
 
 **Frames in equals frames out, always** — including under `--stride N`, which
 diffuses every Nth frame and fills the gap itself rather than handing a changed
