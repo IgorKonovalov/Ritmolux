@@ -5,7 +5,7 @@
 > **Related plan(s):** [0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md)
 
 **On the number.** This is 0121 and 0120 is skipped deliberately.
-[Plan 0111](../plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names **ADR-0120** as
+[Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names **ADR-0120** as
 the ADR it writes if its bisect names a stage whose semantics are a decision, and that lane is live
 in a parallel worktree. A gap in the sequence costs nothing; two documents claiming one number costs
 a citation that silently resolves to the wrong decision. If 0111 takes its stop branch, 0120 stays

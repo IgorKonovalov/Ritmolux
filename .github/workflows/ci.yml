@@ -26,12 +26,16 @@ env:
   # 88 -> 91 at Plan 0061 Phase 2, and the reason is a moved denominator rather
   # than better tests: ADR-0072 took `ffi.rs` (493 lines, its conformance suite
   # covering ~57% of them) out of this crate, so the same code scores higher.
-  # Measured 94.85% lines LOCALLY after the move; the run that CI will produce is
-  # not this run, and is expected to read slightly LOWER because this box has a
-  # hardware GPU and CI has WARP, so hardware-gated tests execute here and skip
-  # there. Hence a ~3-point margin rather than the usual 2. Plan 0061 Phase 9
-  # re-derives this from the first cache-warm CI run - treat 91 as a floor that
-  # has been measured once, on the wrong machine, and is owed a second look.
+  # Measured 94.85% lines LOCALLY after the move, with a ~3-point margin rather
+  # than the usual 2 because this box has a hardware GPU and CI has WARP, so
+  # hardware-gated tests execute here and skip there.
+  #
+  # Re-derived from CI itself at Plan 0110 Phase 6, discharging Plan 0061 Phase
+  # 9: run 32272926929 (main at 7b9781d, cache-warm) reads 92.31% lines, so the
+  # hardware/WARP asymmetry is real and costs 2.54 points - inside the margin
+  # reserved for it. 91 therefore stands as a CI-measured floor, not an
+  # inherited guess. Raising it to 92 was refused there: 0.31 points is ~62
+  # lines, and the denominator moves with any non-test code that lands.
   COVERAGE_FLOOR: "91"
   # The C ABI's own gate (ADR-0072 Negative: without it the ABI's coverage
   # silently stops being watched the moment it leaves `lmv-core`). Measured

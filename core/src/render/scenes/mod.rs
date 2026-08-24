@@ -317,6 +317,24 @@ pub(crate) trait Scene {
     /// occlusion at that seam for this to scale. Default no-op.
     fn set_occlude(&mut self, _occlude: f32) {}
 
+    /// The scene's feedback field, for a probe that needs the value **before**
+    /// this scene's present pass. `None` for every scene without one, which is
+    /// every scene but the warp mesh.
+    ///
+    /// **`#[cfg(test)]`, and that gate is the whole justification.** ADR-0002
+    /// keeps this trait thin and a real widening of it is ADR-worthy; this method
+    /// does not exist in a shipped build, so the extension seam is unchanged. It
+    /// exists because Plan 0111 Phase 2's bisect requires its five seams to be
+    /// read from **one run** — same signal, same hop, same size, same adapter —
+    /// and a `Box<dyn Scene>` cannot otherwise be asked for the one quantity that
+    /// sits upstream of everything the plan is bisecting. Measuring seam A on a
+    /// separately-driven scene would satisfy the arithmetic and quietly break
+    /// that requirement.
+    #[cfg(test)]
+    fn feedback_field(&self) -> Option<&wgpu::Texture> {
+        None
+    }
+
     /// Advance simulation state by `dt` real seconds (Plan 0014 Phase 2). The
     /// renderer injects the elapsed time each frame; a feedback scene steps its
     /// fixed-timestep accumulator here and a CPU-integrated scene (the swarm)

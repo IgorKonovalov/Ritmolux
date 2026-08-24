@@ -21,10 +21,12 @@ on the dev box — re-run under `--success-output final` it prints no skip notic
 ran. That is the one thing a CI pass cannot tell you here, which is why the spec now records the
 silent-skip as a known gap.
 
-**Phase 5 (human, on-device) did not run before the close and is not claimed to have.** It is
+**Phase 5 (human, on-device) did not run before the close and is not claimed to have.** It was
 carried forward as a standing item in
 [`docs/on-device-validation.md`](../../on-device-validation.md), the way Plan 0102's Phase 5 was —
-that file's own escalation rule is that on-device checks do not gate closes here.
+that file's own escalation rule is that on-device checks do not gate closes here. **It ran
+2026-08-24 and all four parts pass**; the reading is [below](#phase-5--on-device-verification-2026-08-24),
+and it leaves two followups, neither of them a defect in this plan's code.
 
 Three minors were filed rather than fixed: the modal-menu staleness argument in
 `plugin-foobar/foo_lmv.cpp` (backlog 0117), the component's DLL growth past the size the C ABI
@@ -229,6 +231,67 @@ checkmark always matches the most recent user action.
 - No stable preset IDs over the ABI; indices are snapshot-scoped (ADR-0117's recorded limit).
 - No preset content: nothing in `presets/` changes.
 
+## Phase 5 — on-device verification (2026-08-24)
+
+**Done, six days after the close. All four parts pass on the real host, plus the persist-by-name
+degrade. No finding; two confirmations of already-filed defects and one wording correction owed to
+this file.**
+
+foobar2000 v2, Windows 10, the dev box. **The installed component was stale and had to be
+replaced first** — `%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\foo_lmv.dll` was dated
+2026-08-16 17:28, which predates both `bdadf47` (the menu) and `2919b7b` (persistence), landed
+2026-08-17. A run against it would have exercised a component with no Preset submenu at all and
+read as a total failure of Phases 2-3. Rebuilt from `main` at `10b0701` via `build.ps1 -Install`,
+version 0.75.1. **Anyone running a carried-forward human phase should date the installed artifact
+before trusting what they click** — the gap between a plan closing and its on-device phase running
+is exactly long enough for the profile to hold a pre-plan build.
+
+Both step-(b) fixtures were **pre-flighted through `shot --preset-file`** before being dropped, so
+a wrong result would convict the menu rather than the file: `zz_phase5_probe.toml` (a clone of
+`attractor_clifford` with `name = "ZZ Phase5 Probe"`) rendered 7201 frames clean and reported its
+new name; `zz_phase5_broken.toml` failed to parse at line 4, `unclosed table, expected ]`. Both
+were removed afterwards and the folder is back to the 76 files it held.
+
+| part | result |
+|---|---|
+| **(a)** pick from **Preset ▸** mid-playback | **Pass** — list marked on the one showing, pick dissolves across, mark follows |
+| **(b)** drop + **Reload presets** | **Pass** — `ZZ Phase5 Probe` appears with no restart; the malformed file is **absent**, so the list is the core's roster and not a directory listing; the watched preset is unchanged by the reload |
+| **(c)** **Open presets folder** | **Pass** — lands in `…\light-music-visualizer\presets` itself, not the parent |
+| **(d)** restart, then delete-and-restart | **Pass with a wrinkle, below** — the picked preset returns and carries the mark; with its file deleted the component comes up on the roster default, **nothing surfaced**, menu opens normally, no ghost entry for the deleted name |
+
+**The wrinkle in (d), and it is this file's wording that is wrong rather than the code.** On
+relaunch the panel shows the **roster default while no track is loaded**, and switches to the
+persisted preset only once playback starts. That is the documented mechanism working — the handle
+is created when the visualisation stream delivers a format, and the restore runs after
+`lmv_attach_window` — but Phase 3's done-when says "relaunch — the same preset is rendering",
+which reads as *at launch*. It is not: it is *at the first track boundary*. For a user who looks
+before pressing play, persistence looks broken. Same neighbourhood as
+[backlog 0102](../../design-backlog.md), and the correction belongs in the operator docs rather
+than in a new backlog entry, so it is filed as a followup below rather than escalated.
+
+**[Backlog 0103](../../design-backlog.md) confirmed failing on a second machine, post-0107.** In
+layout-editing mode the panel's right-click still surfaces the component's own menu — Preset,
+Next scene and the rest — wholly in place of foobar's Cut / Copy / Replace / Remove. Noted, not
+fixed; Plan 0103 Phase 1 owns it. The entry already carries the post-0107 update; today adds an
+on-device sighting to what was a code probe plus one reporter's account.
+
+**Two things this run did not settle.** The Risks section's "reload re-seeds the running scene"
+question went unremarked — the reload happened mid-playback and the watched preset survived it,
+but nobody was watching for a simulation re-seed specifically, so it is neither confirmed jarring
+nor cleared. And the preset folder again held **76** files against the 40 the repo ships, the
+stale-cohort accumulation [Plan 0102](0102-the-component-ships.md) Phase 5 already
+recorded; the submenu lists all 76, which is the first place that accumulation becomes something
+a user sees rather than a folder detail.
+
 ## Followups (after this lands)
 
-- (empty at draft)
+- **The restore lands at the first track boundary, not at launch, and no doc says so** (Phase 5).
+  Phase 3's done-when and [`docs/on-device-validation.md`](../../on-device-validation.md) both say
+  "relaunch — the same preset is rendering", which is only true once audio starts; before that the
+  panel shows the roster default and persistence looks broken to a user who checks before pressing
+  play. A `dev` doc edit: say *at the first track boundary* wherever the restart behaviour is
+  described. The code is doing what the handle lifecycle requires; nothing to fix there.
+- **Does an explicit Reload visibly re-seed the running scene?** The Risks section flagged that
+  `set_presets` calls `configure_active_scene()` even for a no-change reload, and asked Phase 5 to
+  judge whether it is jarring. Phase 5 did not look for it. Cheap to settle on the next on-device
+  pass: reload while watching a long-trail preset and see whether the accumulation restarts.

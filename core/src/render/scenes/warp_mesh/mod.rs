@@ -1038,6 +1038,21 @@ pub struct WarpMeshScene {
 }
 
 impl WarpMeshScene {
+    /// The feedback field's readable texture, or `None` before the first render
+    /// has built the GPU resources.
+    ///
+    /// **Test-only, and it is the seam-A tap** (Plan 0111 Phase 2): the field is
+    /// what the present pass reads and everything downstream is what this plan
+    /// bisects, so a probe needs the value *before* the present pass to have a
+    /// baseline at all. `PingPongField` already carries `COPY_SRC` for Plan 0109
+    /// Phase 4's probe; this only names it from outside the module, which is what
+    /// lets a `Renderer`-level probe read the same quantity the scene-level one
+    /// does rather than approximating it.
+    #[cfg(test)]
+    pub(crate) fn field_texture(&self) -> Option<&wgpu::Texture> {
+        Some(self.res.as_ref()?.field.read_texture())
+    }
+
     /// Build the CPU-side state. GPU resources are deferred to the first render
     /// (module docs). `tier_mesh` is the active tier's
     /// [`mesh_grid`](crate::render::TierConfig::mesh_grid).
@@ -1587,6 +1602,11 @@ impl Resources {
 impl Scene for WarpMeshScene {
     fn name(&self) -> &'static str {
         "warp mesh"
+    }
+
+    #[cfg(test)]
+    fn feedback_field(&self) -> Option<&wgpu::Texture> {
+        self.field_texture()
     }
 
     fn set_time(&mut self, time: f32) {

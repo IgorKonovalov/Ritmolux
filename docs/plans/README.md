@@ -23,11 +23,10 @@ someone who picked it up is reading.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Amended 2026-08-16: a new Phase 1 fixes backlog [0102](../design-backlog.md) + [0103](../design-backlog.md) before anything advertises the component**, which Plan 0102's Phase 5 found starves foobar2000's own UI until playback starts. That phase is a surface-lifetime design pass, is ADR-worthy, and its fix only reaches users on the next tag — so the release must be green before Phase 5 submits. The rest is outreach whose done-whens are **artifacts, not outcomes**. Phase 3's soft want [0101](done/0101-the-engine-renders-a-music-video.md) **closed 2026-08-17 — motion can be recorded now, but its Phase 5 found a 1080p render reads as an upscale ([backlog 0110](../design-backlog.md)), so demo material made before that lands shows the engine at its grainiest.** |
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and ~~its four wait on [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1~~ — **that wait is discharged: 0108 Phase 1 landed 2026-08-17, so the four `warp_mesh` worlds are authorable now.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
 | [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) | The frame stream passes through a diffusion model | in-progress | dev, human | **Phases 1-2 ran 2026-08-20 and the stop condition did not fire** — the gate returned *usable with feedback*, *the music reads*, and an ask for realtime + higher resolution. **The deferred ADR is written: [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (proposed)** — profiles, native 768, and `--stride N` that emits N so the frame-count contract holds; **realtime is out of scope and becomes its own plan**, measured at ~35x remaining. Phases 3-5 amended to carry it. **Phase 2b added 2026-08-20**: every spike reading is square (768x768) and the stream is 1920x1080, so the aspect handling is measured before Phase 4, which it blocks — Phase 3 is unaffected and takeable now. Phase 4 also owes the user a held-versus-interpolated call. Ships a script, no weights and no runtime; `core/` untouched. Contends with nothing (`tools/` + `docs/` only). |
-| [0111](0111-the-milkdrop-import-stops-washing-out.md) | The MilkDrop import stops washing out | approved | dev, human | **Takes the whole live MilkDrop fidelity cluster — backlog 0113 (the wash), 0119, 0120, 0121 — and deliberately leaves reach (0109 disk textures, 0108 tail) filed.** Phase 2 is a **bisect with a stop condition**: one statistic (`FieldTrace::edge`) at five seams from the field to the swapchain, naming the first seam that separates a washed conversion from the clean control. [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 4 ruled the field itself clean, so the suspect is the present pass, the blend, bloom or the tonemap. **Four hypotheses on this defect are already dead**, which is why no fix is promised: Phase 3 runs only if Phase 2 names a seam, and stops again if no mechanism survives being written as arithmetic. Phases 1/4/5 are the three smaller defects and land regardless. Phase 6 is a fourth `human` look gate on the seven pairs, now pinned by full path. Contends with nothing. |
 
 **Added 2026-08-19, from a MilkDrop backlog round after
 [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
-[0111](0111-the-milkdrop-import-stops-washing-out.md).** Six live entries came out of the import;
+[0111](done/0111-the-milkdrop-import-stops-washing-out.md) (**closed 2026-08-20**).** Six live entries came out of the import;
 the round split them on one line and took one side:
 
 - **The four fidelity entries went into one plan** — 0113 (the wash), 0119 (the `ang` seam), 0120
@@ -39,7 +38,9 @@ the round split them on one line and took one side:
   files, 88.7 % of every conversion failure) says to take it only once the fidelity work has settled
   whether converted presets are worth having more of. Two look gates have now answered that with
   *"still merely different"* (Plan 0100 Phase 7, Plan 0108 Phase 2), so the answer is not yet yes.
-  0111's Phase 6 asks it a third time, and that verdict is the trigger for planning reach. Backlog
+  0111's Phase 6 was to ask it a third time and **did not run — it was void, because that plan
+  changed nothing a converted preset renders** (see its Phase 6 section). The trigger for planning
+  reach is therefore still unbought, and it now rides on the successor to backlog 0113. Backlog
   0108 (the conversion tail) is 25x smaller than 0109 by its own arithmetic and waits behind it.
 - **One thing the authoring turned up and the plan carries:** `gamma` is applied as a **linear
   multiply** in the present shader while being named for MilkDrop's `fGammaAdj`, so a preset at
@@ -668,22 +669,25 @@ the rows above.
   across builds, which is
   [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) territory and
   wants its own ADR. **This gates nothing** — the capability shipped without it.
-- **Plan [0061] Phase 9 — the one verification still outstanding** (2026-08-08). The plan is
-  `done` and every `dev` phase landed. **Phase 8 ran and passed the same day**: the foobar plugin
-  builds against the extracted `lmv-core-cabi` and `foo_lmv.dll` loads in foobar2000 v2 and
-  renders. That closed the one risk [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md)
-  carried into C++ link time — the linked artifact renamed to `lmv_core_c.lib`, and CI has no
-  plugin job that would have caught a stale path. What remains needs a CI run rather than this
-  machine:
-  - **Phase 9 — read a cache-warm CI run** (the *second* after the push; the first is a cold
-    build, because a `[profile.dev]` edit and a new workspace member each invalidate `rust-cache`
-    wholesale). It re-derives `COVERAGE_FLOOR` — currently **91**, measured on a hardware-GPU box
-    where CI has WARP — and checks the one property
-    [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md) committed to: **`coverage` is the
-    longest job**. If it is not, `check (windows-latest)` is build-dominated, and that is the
-    single measurement that flips ADR-0073's Alternative A (merge the two Windows jobs) from
-    rejected to worth taking — route it back to `architect` as a supplement rather than editing
-    the job.
+- **Plan [0061] Phase 9 — ~~the one verification still outstanding~~ discharged 2026-08-20** (filed
+  2026-08-08). The plan is `done` and every `dev` phase landed. **Phase 8 ran and passed the same
+  day**: the foobar plugin builds against the extracted `lmv-core-cabi` and `foo_lmv.dll` loads in
+  foobar2000 v2 and renders. That closed the one risk
+  [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) carried into C++ link time — the
+  linked artifact renamed to `lmv_core_c.lib`, and CI has no plugin job that would have caught a
+  stale path. **Phase 9 needed a CI run rather than this machine, and got one:** run
+  [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929)
+  (`main` at `7b9781d`, `rust-cache` restore-key hit, all six jobs green), read at Plan
+  [0110](done/0110-the-shader-surface-stops-being-invisible.md)'s Phase 6 — that plan's own success
+  criterion is the same job. Both halves answered:
+  - **`COVERAGE_FLOOR` re-derives to 91**, the number it already carries. CI reads **92.31 % lines**
+    where the floor was set off 94.85 % measured locally, so the hardware/WARP asymmetry
+    `ci.yml:25-34` reserved ~3 points for is real and cost **2.54**. Raising it to 92 is **refused**
+    — 0.31 points is ~62 lines, and the denominator moves with any non-test code that lands. The one
+    edit owed is `ci.yml`'s comment, which still tells a reader the number is unverified.
+  - **`coverage` IS the longest job** — 24m05s against `check (windows-latest)`'s 11m33s, a **2.1x**
+    lead. So [ADR-0073](../adrs/0073-the-windows-ci-critical-path.md)'s Alternative A (merge the two
+    Windows jobs) **stays rejected**, and nothing routes back to `architect` as a supplement.
 - **The content lane's five standing sittings now live in one place:
   [`docs/content-brief.md`](../content-brief.md)** (consolidated 2026-08-13). They were five
   `human` phases of five closed plans, recorded here in five separate bullets running to ~140 lines
@@ -744,8 +748,9 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md) — closed 2026-08-20. Review: **no blockers, one major, two minors.** The bisect stopped: the wash is at the **field**. Phase 6 void.
 - [0109 — The MilkDrop import gets its geometry back](done/0109-the-milkdrop-import-gets-its-geometry-back.md) — closed 2026-08-19. Review: **no blockers, two majors (repaired at close), three minors.** The gate falsified three claims; ADR-0119 + a Phase 7 followed.
-- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 open: unpushed, CI reading projected **~92.3 %** vs floor 91.
+- [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 read 2026-08-20: run `32272926929`, **92.31 %** vs floor 91.
 - [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md) — closed 2026-08-18. Review: **no blockers, two majors (repaired at close), four minors.** Phase 5 not run; carried to the on-device checklist. Backlog 0117 + 0118.
 - [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md) — closed 2026-08-17. Review: **no blockers, two majors, three minors.** Phase 2: **still merely different**; four new defects → [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md).
 - [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md) — closed 2026-08-17. Review: **no blockers, no majors, five minors/nits.** Phase 5: **yes, with backlog 0110** — a 1080p render reads as an upscale.

@@ -8,7 +8,7 @@ Rule of thumb: if you can't name an option you're *not* taking, you don't need a
 you need a code comment.
 
 **Next free number: 0122** — **0120 is reserved, not free.**
-[Plan 0111](../plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names it as the ADR it
+[Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names it as the ADR it
 writes if its bisect names a seam, and that lane is live in a parallel worktree; 0121 was numbered
 around it. If 0111 takes its stop branch, 0120 returns to the pool.
 
@@ -137,7 +137,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 (Plan 0102; Outcome) |
 | [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
 | [0117](0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) | C ABI v6: the host reads the roster and selects a preset | accepted 2026-08-18 (Plan 0107; Outcome) |
-| [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), two Outcome |
+| [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), three Outcome |
 
 | [0119](0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) | The video echo blends toward its copy rather than adding it | accepted 2026-08-19 (Plan 0109) |
 

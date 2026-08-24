@@ -1,0 +1,608 @@
+# Converted from a MilkDrop preset by `milkconv` (Plan 0100 / ADR-0113).
+#
+# Everything below is machine-generated. The `[milk]` table is compiled
+# EEL2 bytecode, executed by the engine's stack VM; the EEL2 it came from
+# is reproduced under each section so this file can be read.
+#
+# Source format: MilkDrop 2
+# The converter had nothing to report.
+
+system = "warp_mesh"
+name   = "Geiss - Blur Mix 3"
+
+[mesh]
+x = 32
+y = 24
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#000000" },
+  { at = 0.45, color = "#8c8c8c" },
+  { at = 0.8,  color = "#fffeff" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+# A converted preset draws its own light - the waveform, its custom
+# waves and shapes, the borders - so the scene's own deposit stays off.
+brightness     = "1.0"
+warp_scale     = "1.331"
+warp_speed     = "1.0"
+
+[milk]
+# --- per_frame_init, from:
+per_frame_init = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a time frame rad
+.code
+const 0.0
+"""
+
+# --- per_frame, from:
+#   zoom = 0.99971;
+#   rot = 0.0;
+#   cx = 0.5;
+#   cy = 0.5;
+#   dx = -0.005;
+#   dy = 0.0;
+#   sx = 1.0;
+#   sy = 1.0;
+#   warp = 1e-6;
+#   zoomexp = 1.0;
+#   decay = 1.0;
+#   gamma = 1.0;
+#   wrap = 1.0;
+#   darken_center = 0.0;
+#   brighten = 0.0;
+#   darken = 0.0;
+#   solarize = 0.0;
+#   invert = 0.0;
+#   echo_zoom = 2.0;
+#   echo_alpha = 0.0;
+#   echo_orient = 0.0;
+#   wave_mode = 6.0;
+#   wave_scale = 3.266313;
+#   wave_smoothing = 0.207;
+#   wave_mystery = 0.0;
+#   wave_a = 100.0;
+#   wave_r = 1.0;
+#   wave_g = 0.999999;
+#   wave_b = 1.0;
+#   wave_x = 0.5;
+#   wave_y = 0.5;
+#   wave_usedots = 0.0;
+#   wave_thick = 0.0;
+#   wave_additive = 0.0;
+#   wave_brighten = 1.0;
+#   ob_size = 0.01;
+#   ob_r = 0.0;
+#   ob_g = 0.0;
+#   ob_b = 0.0;
+#   ob_a = 0.0;
+#   ib_size = 0.01;
+#   ib_r = 0.25;
+#   ib_g = 0.25;
+#   ib_b = 0.25;
+#   ib_a = 0.0;
+#   mv_x = 64.0;
+#   mv_y = 48.0;
+#   mv_dx = 0.0;
+#   mv_dy = 0.0;
+#   mv_l = 0.0;
+#   mv_r = 0.35;
+#   mv_g = 0.35;
+#   mv_b = 0.35;
+#   mv_a = 0.0;
+#   
+#   wave_r = wave_r + 0.350*( 0.60*sin(0.980*time) + 0.40*sin(1.047*time) );wave_g = wave_g + 0.350*( 0.60*sin(0.835*time) + 0.40*sin(1.081*time) );wave_b = wave_b + 0.350*( 0.60*sin(0.814*time) + 0.40*sin(1.011*time) );cx = cx + 0.110*( 0.60*sin(0.374*time) + 0.40*sin(0.294*time) );cy = cy + 0.110*( 0.60*sin(0.393*time) + 0.40*sin(0.223*time) );decay = decay - 0.01*equal(frame%20,0);
+per_frame = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a time frame rad
+.code
+const 0.99971
+store 0
+pop
+const 0.0
+store 1
+pop
+const 0.5
+store 2
+pop
+const 0.5
+store 3
+pop
+const 0.005
+neg
+store 4
+pop
+const 0.0
+store 5
+pop
+const 1.0
+store 6
+pop
+const 1.0
+store 7
+pop
+const 1e-6
+store 8
+pop
+const 1.0
+store 9
+pop
+const 1.0
+store 10
+pop
+const 1.0
+store 11
+pop
+const 1.0
+store 12
+pop
+const 0.0
+store 13
+pop
+const 0.0
+store 14
+pop
+const 0.0
+store 15
+pop
+const 0.0
+store 16
+pop
+const 0.0
+store 17
+pop
+const 2.0
+store 18
+pop
+const 0.0
+store 19
+pop
+const 0.0
+store 20
+pop
+const 6.0
+store 21
+pop
+const 3.266313
+store 22
+pop
+const 0.207
+store 23
+pop
+const 0.0
+store 24
+pop
+const 100.0
+store 25
+pop
+const 1.0
+store 26
+pop
+const 0.999999
+store 27
+pop
+const 1.0
+store 28
+pop
+const 0.5
+store 29
+pop
+const 0.5
+store 30
+pop
+const 0.0
+store 31
+pop
+const 0.0
+store 32
+pop
+const 0.0
+store 33
+pop
+const 1.0
+store 34
+pop
+const 0.01
+store 35
+pop
+const 0.0
+store 36
+pop
+const 0.0
+store 37
+pop
+const 0.0
+store 38
+pop
+const 0.0
+store 39
+pop
+const 0.01
+store 40
+pop
+const 0.25
+store 41
+pop
+const 0.25
+store 42
+pop
+const 0.25
+store 43
+pop
+const 0.0
+store 44
+pop
+const 64.0
+store 45
+pop
+const 48.0
+store 46
+pop
+const 0.0
+store 47
+pop
+const 0.0
+store 48
+pop
+const 0.0
+store 49
+pop
+const 0.35
+store 50
+pop
+const 0.35
+store 51
+pop
+const 0.35
+store 52
+pop
+const 0.0
+store 53
+pop
+load 26
+const 0.35
+const 0.6
+const 0.98
+load 54
+mul
+fn1 sin
+mul
+const 0.4
+const 1.047
+load 54
+mul
+fn1 sin
+mul
+add
+mul
+add
+store 26
+pop
+load 27
+const 0.35
+const 0.6
+const 0.835
+load 54
+mul
+fn1 sin
+mul
+const 0.4
+const 1.081
+load 54
+mul
+fn1 sin
+mul
+add
+mul
+add
+store 27
+pop
+load 28
+const 0.35
+const 0.6
+const 0.814
+load 54
+mul
+fn1 sin
+mul
+const 0.4
+const 1.011
+load 54
+mul
+fn1 sin
+mul
+add
+mul
+add
+store 28
+pop
+load 2
+const 0.11
+const 0.6
+const 0.374
+load 54
+mul
+fn1 sin
+mul
+const 0.4
+const 0.294
+load 54
+mul
+fn1 sin
+mul
+add
+mul
+add
+store 2
+pop
+load 3
+const 0.11
+const 0.6
+const 0.393
+load 54
+mul
+fn1 sin
+mul
+const 0.4
+const 0.223
+load 54
+mul
+fn1 sin
+mul
+add
+mul
+add
+store 3
+pop
+load 10
+const 0.01
+load 55
+const 20.0
+mod
+const 0.0
+fn2 equal
+mul
+sub
+store 10
+"""
+
+# --- per_vertex, from:
+#   ;
+#   zoom = if(above(abs(zoomexp - 1), 0.0001) * above(zoomexp, 0), pow(zoom, pow(zoomexp, rad*2 - 1)), zoom);
+per_vertex = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a time frame rad
+.code
+load 9
+const 1.0
+sub
+fn1 abs
+const 0.0001
+fn2 above
+load 9
+const 0.0
+fn2 above
+mul
+jz 21
+load 0
+load 9
+load 56
+const 2.0
+mul
+const 1.0
+sub
+fn2 pow
+fn2 pow
+jump 22
+load 0
+store 0
+"""
+
+# --- the warp shader, translated from HLSL: 10 ops, 0 loop(s), each bounded at 1024 iterations ---
+warp_shader = '''
+struct MilkU {
+    // x: time (s), y: fps (the nominal 30, as the EEL side reports), z: frame, w: progress
+    clock: vec4<f32>,
+    // bass, mid, treb, vol — MilkDrop-scaled, exactly what the EEL programs read
+    bands: vec4<f32>,
+    // the attenuated versions of the same four
+    bands_att: vec4<f32>,
+    // w, h, 1/w, 1/h of the field
+    texsize: vec4<f32>,
+    // aspectx, aspecty, 1/aspectx, 1/aspecty — the EEL convention (longer axis reads 1)
+    aspect: vec4<f32>,
+    // four uniform randoms, fresh each frame, deterministic from the preset salt
+    rand_frame: vec4<f32>,
+    // four uniform randoms, fixed for the preset's life
+    rand_preset: vec4<f32>,
+    // x: decay for this frame (already rate-converted), y: brightness, z: occlude,
+    // w: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D)
+    misc: vec4<f32>,
+    // the four corner colours hue_shader interpolates between
+    hue: array<vec4<f32>, 4>,
+    // q1..q32 as _qa.._qh
+    q: array<vec4<f32>, 8>,
+    // slow_roam_cos, roam_cos, slow_roam_sin, roam_sin
+    roam: array<vec4<f32>, 4>,
+    // the 24 rot_* matrices, 4 rows each; .xyz of a row is what float4x3 indexing reads
+    rot: array<vec4<f32>, 96>,
+}
+@group(1) @binding(0) var<uniform> U: MilkU;
+@group(1) @binding(1) var t_main: texture_2d<f32>;
+@group(1) @binding(2) var s_fw: sampler;
+@group(1) @binding(3) var s_fc: sampler;
+@group(1) @binding(4) var s_pw: sampler;
+@group(1) @binding(5) var s_pc: sampler;
+@group(1) @binding(6) var t_noise_lq: texture_2d<f32>;
+@group(1) @binding(7) var t_noise_lq_lite: texture_2d<f32>;
+@group(1) @binding(8) var t_noise_mq: texture_2d<f32>;
+@group(1) @binding(9) var t_noise_hq: texture_2d<f32>;
+@group(1) @binding(10) var t_noisevol_lq: texture_3d<f32>;
+@group(1) @binding(11) var t_noisevol_hq: texture_3d<f32>;
+@group(1) @binding(12) var t_blur1: texture_2d<f32>;
+@group(1) @binding(13) var t_blur2: texture_2d<f32>;
+@group(1) @binding(14) var t_blur3: texture_2d<f32>;
+
+fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
+}
+
+fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x * 12.92;
+    let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, x <= vec3<f32>(0.0031308));
+}
+fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x / 12.92;
+    let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, x <= vec3<f32>(0.04045));
+}
+fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+    let n = abs(steps);
+    if (n < 1.0) { return c; }
+    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    if (steps < 0.0) {
+        return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
+    }
+    return lmv_srgb_decode(floor(e * n) / n);
+}
+
+@fragment
+fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) -> @location(0) vec4<f32> {
+    var _lmv_uv: vec2<f32> = _in_uv;
+    var _lmv_uv_orig: vec2<f32> = _in_uv_orig;
+    let _lmv_p = (_lmv_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    var _lmv_rad: f32 = length(_lmv_p);
+    var _lmv_ang: f32 = atan2(_lmv_p.y, _lmv_p.x);
+    var _lmv_ret: vec3<f32> = vec3<f32>(0.0);
+    var _lmv_hue: vec3<f32> = mix(
+        mix(U.hue[0].xyz, U.hue[1].xyz, _lmv_uv.x),
+        mix(U.hue[2].xyz, U.hue[3].xyz, _lmv_uv.x),
+        _lmv_uv.y);
+    _lmv_ret = (textureSampleLevel(t_main, s_fw, _lmv_uv, 0.0)).xyz;
+    _lmv_ret = ((_lmv_ret) + ((((textureSampleLevel(t_blur2, s_fc, _lmv_uv, 0.0)).xyz) * (0.1))));
+    _lmv_ret = ((_lmv_ret) / (1.1));
+    _lmv_ret = ((_lmv_ret) - (0.02));
+    var _lmv_o = clamp(_lmv_ret, vec3<f32>(0.0), vec3<f32>(1.0));
+    _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);
+    _lmv_o = lmv_quantize(_lmv_o, U.misc.w);
+    return vec4<f32>(_lmv_o, 1.0);
+}
+'''
+
+# --- the comp shader, translated from HLSL: 31 ops, 0 loop(s), each bounded at 1024 iterations ---
+comp_shader = '''
+struct MilkU {
+    // x: time (s), y: fps (the nominal 30, as the EEL side reports), z: frame, w: progress
+    clock: vec4<f32>,
+    // bass, mid, treb, vol — MilkDrop-scaled, exactly what the EEL programs read
+    bands: vec4<f32>,
+    // the attenuated versions of the same four
+    bands_att: vec4<f32>,
+    // w, h, 1/w, 1/h of the field
+    texsize: vec4<f32>,
+    // aspectx, aspecty, 1/aspectx, 1/aspecty — the EEL convention (longer axis reads 1)
+    aspect: vec4<f32>,
+    // four uniform randoms, fresh each frame, deterministic from the preset salt
+    rand_frame: vec4<f32>,
+    // four uniform randoms, fixed for the preset's life
+    rand_preset: vec4<f32>,
+    // x: decay for this frame (already rate-converted), y: brightness, z: occlude,
+    // w: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D)
+    misc: vec4<f32>,
+    // the four corner colours hue_shader interpolates between
+    hue: array<vec4<f32>, 4>,
+    // q1..q32 as _qa.._qh
+    q: array<vec4<f32>, 8>,
+    // slow_roam_cos, roam_cos, slow_roam_sin, roam_sin
+    roam: array<vec4<f32>, 4>,
+    // the 24 rot_* matrices, 4 rows each; .xyz of a row is what float4x3 indexing reads
+    rot: array<vec4<f32>, 96>,
+}
+@group(0) @binding(0) var<uniform> U: MilkU;
+@group(0) @binding(1) var t_main: texture_2d<f32>;
+@group(0) @binding(2) var s_fw: sampler;
+@group(0) @binding(3) var s_fc: sampler;
+@group(0) @binding(4) var s_pw: sampler;
+@group(0) @binding(5) var s_pc: sampler;
+@group(0) @binding(6) var t_noise_lq: texture_2d<f32>;
+@group(0) @binding(7) var t_noise_lq_lite: texture_2d<f32>;
+@group(0) @binding(8) var t_noise_mq: texture_2d<f32>;
+@group(0) @binding(9) var t_noise_hq: texture_2d<f32>;
+@group(0) @binding(10) var t_noisevol_lq: texture_3d<f32>;
+@group(0) @binding(11) var t_noisevol_hq: texture_3d<f32>;
+@group(0) @binding(12) var t_blur1: texture_2d<f32>;
+@group(0) @binding(13) var t_blur2: texture_2d<f32>;
+@group(0) @binding(14) var t_blur3: texture_2d<f32>;
+
+fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
+}
+fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
+}
+
+fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x * 12.92;
+    let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, x <= vec3<f32>(0.0031308));
+}
+fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+    let x = max(c, vec3<f32>(0.0));
+    let lo = x / 12.92;
+    let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, x <= vec3<f32>(0.04045));
+}
+fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+    let n = abs(steps);
+    if (n < 1.0) { return c; }
+    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    if (steps < 0.0) {
+        return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
+    }
+    return lmv_srgb_decode(floor(e * n) / n);
+}
+
+@fragment
+fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {
+    var _lmv_uv: vec2<f32> = _in_uv;
+    var _lmv_uv_orig: vec2<f32> = _in_uv;
+    let _lmv_p = (_lmv_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    var _lmv_rad: f32 = length(_lmv_p);
+    var _lmv_ang: f32 = atan2(_lmv_p.y, _lmv_p.x);
+    var _lmv_ret: vec3<f32> = vec3<f32>(0.0);
+    var _lmv_hue: vec3<f32> = mix(
+        mix(U.hue[0].xyz, U.hue[1].xyz, _lmv_uv.x),
+        mix(U.hue[2].xyz, U.hue[3].xyz, _lmv_uv.x),
+        _lmv_uv.y);
+    _lmv_ret = (((((((((((textureSampleLevel(t_main, s_fw, _lmv_uv, 0.0)).xyz) * (1.0))) + (((lmv_GetBlur1(_lmv_uv)) * (3.0))))) + (((lmv_GetBlur2(_lmv_uv)) * (0.0))))) + (((lmv_GetBlur3(_lmv_uv)) * (0.0))))) + (0.0));
+    _lmv_ret = ((_lmv_ret) + (lmv_GetBlur2(((((((_lmv_uv) - (0.5))) * (0.333))) + (0.5)))));
+    _lmv_ret = ((_lmv_ret) * (1.0));
+    var _lmv_o = max(_lmv_ret, vec3<f32>(0.0));
+    _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);
+    return vec4<f32>(_lmv_o * U.misc.y, U.misc.z);
+}
+'''
+
+blur_level = 3
+
