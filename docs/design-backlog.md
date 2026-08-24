@@ -2634,3 +2634,54 @@ volume, which is most of the MilkDrop corpus's light source, and it silently inv
 gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
 
 ---
+
+## 0124 — ADR-0113's motivating claim has read "provisionally negative" since 2026-08-16, and two look gates have run without re-taking it
+
+**Raised by:** a loose-ends sweep (2026-08-24), reading an orphaned draft plan — *0108 — The field
+learns to forget*, written 2026-08-16 outside the repo, never committed and since superseded by
+Plans 0108, 0109 and 0111. Five of its six phases have landed elsewhere; this is the one that has
+not. **Owner if taken:** `architect` — an ADR Outcome is architect work.
+
+- **Verified 2026-08-24** — the ADR carries no Outcome beyond the two it was closed with:
+  `absent: Outcome \(2026-08-(?!16) in: docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md`
+
+### The finding
+
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+Context argues **"the same preset should look better here"** — linear-light HDR against the
+reference's 8-bit additive. Its second Outcome, dated 2026-08-16 at Plan 0100's close, records the
+user's verdict as **merely different, not better**, attributes it to one defect (backlog 0106, the
+field that never truncates), and then commits in as many words: *"The HDR question is re-judged
+after 0106 lands."*
+
+**0106 landed 2026-08-17.** Two look gates have run since — Plan 0108's, and
+[Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 5 on 2026-08-19,
+same seven pairs, same rig, `foo_vis_milk2` 0.2.0.0 — and 0109's gate reads three of the seven as
+**fixed**, including the portal and *Blur Mix 3*'s traces. Neither gate produced a third Outcome.
+So the ADR still tells a reader its founding claim is provisionally negative, on evidence two
+plans and four ADRs old.
+
+### Why this is an entry rather than nothing
+
+The per-pair verdicts are recorded — in the plans that ran them. But a plan doc is where a phase's
+result lives, and an ADR is where a **decision's** motivating claim lives; this ADR is the one that
+asked to be revisited, and nothing carries that ask. The 2026-08-16 wording is also the load-bearing
+half: "merely different, not better" is the sentence that would make someone question the whole
+ahead-of-time translation approach, and it is now the least current thing in the file.
+
+### What a fix would have to decide
+
+Whether the verdict can be re-taken **from the record** — 0109 Phase 5's table is on file and
+per-pair — or needs a fresh gate. Three pairs still read *washed* there, and backlog 0113 (the wash)
+is **live**, having survived Plan 0111's bisect and reversed back to the field. So a re-take today
+may honestly still read *merely different, with the wash dominating*. **That is a perfectly good
+third Outcome** — dated, naming 0113 as the remaining blocker, and saying the claim is not yet
+answerable rather than leaving 2026-08-16's silence to stand for it.
+
+### Priority
+
+**Low.** Nothing renders wrong because of this. The cost is a reader — including a future
+`architect` session — trusting a stale verdict about whether this project's whole MilkDrop
+translation strategy is worth it.
+
+---
