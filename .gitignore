@@ -30,3 +30,8 @@ Thumbs.db
 
 # Claude Code local overrides
 .claude/settings.local.json
+
+# Python bytecode from the tools/ stages (Plan 0106). The stages themselves
+# are committed; their caches are not.
+__pycache__/
+*.pyc
