@@ -361,12 +361,13 @@ Practical notes:
 #### A filter stage between `shot` and the encoder
 
 The frame stream is a pipe, so anything that speaks Y4M can sit in the middle of
-it. `tools/sd-filter/` is the first such stage. **Today it is a pass-through and
-nothing else** — it parses the header, walks the `FRAME` chunks and re-emits
-them unchanged, with no model, no weights and no GPU:
+it. `tools/sd-filter/` is the first such stage, and it runs an **img2img
+diffusion pass with ControlNet holding the render's geometry** — the attractor
+becomes canyon rock, the mandala becomes a rose window, and the shape keeps
+tracking the music because the control map is redrawn from every frame:
 
 ```
-shot --preset-file <p> --render track.wav --fps 30 --size 1920x1080   | python tools/sd-filter/sd_filter.py   | ffmpeg -f yuv4mpegpipe -i pipe:0 ... track.mp4
+shot --preset-file <p> --render track.wav --fps 30 --size 1920x1080   | python tools/sd-filter/sd_filter.py --profile quality --prompt "a vast canyon of luminous glowing rock strata"   | ffmpeg -f yuv4mpegpipe -i pipe:0 ... track.mp4
 ```
 
 Note that `--ffmpeg` is **not** used on this path: it spawns the encoder itself,
@@ -375,22 +376,50 @@ whole point of the raw-stream path, and the invocation above is the canonical on
 with a stage spliced in — the encoder half is unchanged, because the stage
 preserves the frame count and the geometry travels in the header.
 
-**Why a pass-through is worth having on its own.** It is the only part of this
-feature whose output is bit-exact and reproducible across machines, so it is the
-only part that can be a real gate; everything a later phase puts inside it is a
-model whose output is not. The check is that a stream through the stage is
-byte-identical to the same stream without it:
+**Frames in equals frames out, always** — including under `--stride N`, which
+diffuses every Nth frame and fills the gap itself rather than handing a changed
+rate downstream. A stage that dropped frames would desynchronize the audio mux,
+and that failure is *silent in the file*: nothing reports it, and you find it by
+watching four minutes of finished video. `--gap blend` crossfades between the
+diffused frames on either side of a gap (the default); `--gap held` repeats the
+last one for a deliberately stepped look.
+
+**The stage never changes the geometry, and it never squashes.** `--size` takes a
+**pixel budget** rather than a side length: the filter derives the diffusion size
+from the budget and the incoming header, rounds each axis to a multiple of 8, and
+resamples back to the stream's own size on the way out. At 16:9 the `quality`
+budget is exactly 1024x576. A `--size WxH` that disagrees with the stream's
+aspect is an **error**, not a silent squash — [ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+records the measurement behind that: at an identical pixel count the native arm
+was both the cheapest and the only one delivering every pixel it paid for.
+
+**Every render prints the cell it ran, expanded, on stderr**, so a file's
+configuration is recoverable from its own log rather than from a profile name
+whose meaning may since have moved. Pass those flags back without `--profile` and
+you get the same bytes on the same machine.
+
+**`--passthrough` is the stage with the model taken out** — it parses the header,
+walks the `FRAME` chunks and re-emits them unchanged, with no weights and no GPU.
+That is not a leftover: it is the only part of this feature whose output is
+bit-exact and reproducible across machines, so it is the only part that can be a
+real gate. Everything the model touches is not, which is why **no diffused frame
+may ever enter `core/tests/golden/`**.
 
 ```
 python tools/sd-filter/test_sd_filter.py
 ```
 
-Standard library only, no GPU. It asserts the round-trip at four geometries and
-four colour spaces, that an unmodelled header or `FRAME` tag survives verbatim,
-that a malformed stream fails loudly rather than emitting garbage, and — when a
-built `shot` is present — the end-to-end property against real rendered bytes. It
-**skips** the last group with a printed notice when there is no built `shot`,
-rather than passing quietly.
+Standard library only, no GPU, no weights — 186 checks. It asserts the
+pass-through round-trip at four geometries and four colour spaces, that an
+unmodelled header or `FRAME` tag survives verbatim, that a malformed stream fails
+loudly rather than emitting garbage, that the pixel budget lands within 0.5 % at
+five aspects with both axes on a multiple of 8, that **frames in equals frames
+out at every stride and both gap fillers** (with the model stubbed out, so the
+accounting under test is the accounting that ships), that each profile
+round-trips through its own echoed expansion, and — when a built `shot` is
+present — the end-to-end byte-identity against real rendered bytes. It **skips**
+that last group with a printed notice when there is no built `shot`, rather than
+passing quietly.
 
 The geometry is read off the stream and never assumed, which is the reason the
 header is self-describing: the same stage handles 320x180 and 1920x1080 with no
