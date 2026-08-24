@@ -1,9 +1,12 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** in-progress — Phase 1 ran 2026-08-20; **Phase 2, the stop condition, is open**
+> **Status:** in-progress — Phases 1-2 ran 2026-08-20; **the stop condition did not fire**, and
+> Phases 3-5 are amended to carry ADR-0121
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
-> **Related ADRs:** none yet — **one is owed and deliberately deferred**, see Phase 2
+> **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+> — the deferred ADR, written 2026-08-20 between Phases 2 and 3 against the spike's evidence exactly
+> as Phase 2 said it would be
 > **Hard dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) Phases 1–2, for every
 > phase except the spike. *(The transitive dependency on
 > [0099](done/0099-the-horizon-reaches-its-own-length.md) for renders past ~2 minutes is
@@ -227,6 +230,30 @@ the core, the C ABI, or `lmv.exe`.
   cuDNN autotuning make cross-machine equality false, so per
   [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) this is a
   measurement that names its configuration rather than a property.
+- **Amended 2026-08-20 by `architect`, after the Phase 2 gate, and carrying
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md).**
+  The gate approved a strided render, which the ADR resolves in favour of the frame-count contract.
+  Three additions, and the phase stays one commit:
+  - **`--stride N` emits N frames per N consumed.** The filter diffuses every Nth frame and fills
+    the gap itself, so `frames in == frames out` still holds and the canonical `ffmpeg` command
+    does not change. **Implement the held frame first** — repeat the diffused frame N times — because
+    it needs no dependency and is a complete, shippable behaviour. Then render the same clip both
+    ways and **ask the user**: the gate saw only the `minterpolate`-interpolated version and has
+    never compared it against held, so which one ships is a `human` call, not `dev`'s. If
+    interpolation wins, it is a new dependency and the ADR says `minterpolate` cannot be it.
+  - **`--profile <name>` sets a known-good combination of the existing flags**, and any flag passed
+    explicitly overrides it. The **expanded flag list is echoed on stderr** at the start of every
+    run, so a render is reproducible from what ran rather than from a profile name whose meaning may
+    have moved. Two profiles are enough to start: `quality` (768, the 20-step UniPC cell, feedback
+    0.6) and `fast` (512, the LCM 8-step `cfg 2.0` cell, stride 3).
+  - **The quality profile diffuses natively at 768 or above.** No upscaler dependency is taken; the
+    2.7x per-frame cost is the accepted price, and ADR-0121's Alternative C records the cheaper
+    route with its measurement intact in case render cost later becomes binding.
+  - **Done when**, in addition: `--stride N` is asserted to emit exactly as many frames as it
+    consumed (an exact property, no tolerance, and it extends Phase 3's byte-count gate rather than
+    replacing it); a profile's echoed expansion round-trips — passing the echoed flags without
+    `--profile` produces the same bytes on this machine; and the held-versus-interpolated question
+    has an answer from the user recorded in this log.
 
 ### Phase 5 — one command, and the documentation
 
@@ -240,6 +267,20 @@ the core, the C ABI, or `lmv.exe`.
 - **Done when:** a reader who has never run this can go from a clean checkout to an MP4 by
   following `docs/capturing.md`, and the page states plainly that nothing here ships in the
   release zip.
+- **Amended 2026-08-20 by `architect`, carrying
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md).**
+  Two additions, and the phase stays one commit:
+  - **The canonical command does not change, and the page says so.** Because `--stride` preserves
+    the frame count, the `ffmpeg` invocation carries no rate that has to agree with a flag on
+    another process. That is the property worth writing down, not the command's text.
+  - **Document the profiles as the thing a user types**, with the flag list each expands to, and
+    state that the expansion is echoed on stderr on every run. Name the render cost honestly
+    alongside them, from the measurements in the log: a 4-minute track at 30 fps is 7 200 frames,
+    which is ~6.3 h at the 768 cell and ~2.1 h at `--stride 3` **on the machine those numbers were
+    measured on** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)),
+    not a portable figure.
+  - **Done when**, in addition: `docs/capturing.md` names every profile and the flags it expands
+    to, and states the measured cost with its configuration attached.
 
 ### Phase 6 — a real track
 
@@ -264,19 +305,34 @@ stderr  -> progress and diagnostics ONLY
 
 --prompt <str>  --negative <str>  --strength <f>  --cn-scale <f>
 --feedback <f>  --seed <int>      --steps <int>   --control canny|softedge|lineart
---model <hf-id> --controlnet <hf-id>
+--model <hf-id> --controlnet <hf-id> --size <px>   --stride <int>
+--profile <name>
 ```
 
 Frame count in equals frame count out, always. A filter that drops or duplicates a frame
 desynchronizes the audio mux downstream, and that failure is silent in the file.
 
+**`--stride N` does not weaken that line, it pays for it.** Per
+[ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+the filter consumes N frames, diffuses one, and **emits N** — filling the gap itself rather than
+handing a changed rate downstream. Emitting at 30/N and teaching `ffmpeg` the new rate was the
+obvious cheaper route and is ADR-0121's rejected Alternative A: it trades a loud failure for a
+silent one, in a pipeline whose output is judged by eye hours after it ran.
+
+**`--profile <name>` is a preset of the flags above, never a separate surface.** Any flag passed
+explicitly overrides the profile, and the **expanded flag list is echoed on stderr**, so a render is
+reproducible from what ran rather than from a name whose meaning may since have moved.
+
 ## Risks & open questions
 
 - **The whole plan is gated on Phase 2, by construction.** This is the intended shape, not a
   weakness — but it does mean Phases 3–6 should not be estimated or scheduled until Phase 1 has
-  run.
+  run. **Discharged 2026-08-20:** both phases ran, the gate returned *usable with feedback* and
+  *the music reads*, and the stop condition did not fire.
 - **An ADR is owed and does not exist.** Deferred deliberately to after Phase 2 (see that phase).
-  If Phases 3+ begin without it, that is a Mode 4 blocker.
+  If Phases 3+ begin without it, that is a Mode 4 blocker. **Discharged 2026-08-20 by
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)**,
+  which amended Phases 4 and 5 in the process.
 - **Blocked on [0101](done/0101-the-engine-renders-a-music-video.md) Phases 1–2** for everything except
   the spike. The transitive block on [0099](done/0099-the-horizon-reaches-its-own-length.md) past
   ~2 minutes is **discharged** (closed 2026-08-16). Phase 1 is takeable **today** and depends on
@@ -300,8 +356,18 @@ desynchronizes the audio mux downstream, and that failure is silent in the file.
 - **No `core/` change and no C ABI change.** The core never learns that a diffusion model exists.
 - **No audio conditioning.** The image is the whole signal. Phase 2's second question is the
   measurement that would reopen this, not a hedge against it.
-- **No real-time or live path.** This is offline creator tooling. Near-real-time preview at 512²
-  looks reachable on this hardware and is a followup, not a scope.
+- **No real-time or live path.** This is offline creator tooling — and as of 2026-08-20 this bullet
+  is **stronger than it was written**, not weaker. It used to say near-real-time preview at 512²
+  *"looks reachable on this hardware"*; the Phase 2 followup spike measured that guess and it is
+  wrong. The banked cell is **1.164 s/frame at 512²** against the 0.033 s/frame locked 30 fps needs,
+  so **~35x remains**, against named levers worth ~2x (TensorRT) and ~1.3x (a T2I-Adapter). Worse,
+  the two things that make it look right both cost throughput: the approved look **requires**
+  classifier-free guidance (a second UNet evaluation per step, and two independent `cfg 1`
+  configurations agree model choice will not remove it), and coherence is bought by the feedback
+  blend, which measures 1.164 / 1.349 / 1.611 s/frame as it rises. Realtime is therefore its own
+  plan with its own ADR, reopening two alternatives this plan rejected —
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+  records the evidence it starts from and decides nothing about its architecture.
 - **No `shot`-owned child process.** The filter is a pipe stage the user composes; promoting it to
   a `--diffuse` flag is a followup and is one flag plus a spawn, not a rewrite.
 - **No timeline, cuts, or prompt automation across a track.** One prompt per render, matching
@@ -534,8 +600,10 @@ alternatives. It should be its own plan, and this plan should not grow it.
   a new `core` capability and its own ADR.
 - **`shot --diffuse <filter>`** — 0101's `--ffmpeg` ergonomics applied to this stage, once the
   pipeline has proved itself.
-- **Near-real-time preview.** If Phase 1 measures ~0.1 s/frame at 512², a live-ish preview window
-  is within reach and would change what this feature is.
+- **Near-real-time preview — measured, and it is a plan rather than a followup.** This entry
+  guessed ~0.1 s/frame at 512²; the Phase 2 followup spike measured **1.164 s/frame** for the cell
+  that actually looks right, leaving ~35x to locked 30 fps. It is still the thing to want, and it
+  is the first item the realtime plan starts from — see *What this plan does NOT do* and ADR-0121.
 - **Audio-conditioned diffusion** — denoise from the onset envelope, prompt blend on bar
   boundaries — if Phase 2 finds the dynamics flattened, or simply as the next thing to want.
 - **Demo material for [0103](0103-the-project-gets-an-audience.md)**, which needs moving images

@@ -7,7 +7,10 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0120**
+**Next free number: 0122** — **0120 is reserved, not free.**
+[Plan 0111](../plans/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names it as the ADR it
+writes if its bisect names a seam, and that lane is live in a parallel worktree; 0121 was numbered
+around it. If 0111 takes its stop branch, 0120 returns to the pool.
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -137,4 +140,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), two Outcome |
 
 | [0119](0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) | The video echo blends toward its copy rather than adding it | accepted 2026-08-19 (Plan 0109) |
+
+| [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | proposed 2026-08-20 (Plan 0106) |
 <!-- roster:end -->
