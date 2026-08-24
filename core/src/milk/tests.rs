@@ -666,6 +666,48 @@ fn per_frame_rates_become_per_second_ones() {
     assert_eq!(outputs[8], 0.0, "unnamed `warp` is off");
 }
 
+/// **A default converts on the same path a written value does** (design-backlog
+/// 0121). `FrameSlots::read`'s `None` arm returned the seeded default raw, so a
+/// bundle that never names `decay` handed the scene MilkDrop's per-frame `0.98`
+/// in a field documented as per-second — a fade of about `0.9997` a frame where
+/// the reference's is `0.5455` a second. It is latent for content and it is not
+/// latent for instruments: Plan 0109 Phase 4 measured a whole experiment through
+/// it.
+///
+/// Both sides are computed from the table rather than written as literals. A
+/// literal here would restate `convert`'s arithmetic inside the test, which is
+/// the parallel-lists failure this module's macro exists to prevent.
+#[test]
+fn an_unnamed_rate_converts_like_a_written_one() {
+    // per_frame names `zoom` and nothing else, so `decay` falls to its default.
+    let bundle = MilkBundle::from_assembly(
+        None,
+        Some(".regs zoom\n.code\nconst 1.01\nstore 0\npop\n"),
+        None,
+    )
+    .expect("the no-decay bundle decodes");
+    let mut runtime = MilkRuntime::new(bundle, 0);
+    let (_, frame) = runtime.run_frame(
+        &crate::dsp::AnalysisFrame::default(),
+        0.0,
+        1.0 / 60.0,
+        (8, 8),
+        16.0 / 9.0,
+    );
+
+    let seeded = outputs::FrameOutputs::default().decay;
+    assert_eq!(
+        frame.decay,
+        outputs::convert(seeded, outputs::Rate::Factor, seeded),
+        "an unnamed `decay` must arrive in the same vocabulary as a named one"
+    );
+    // The conversion is observable, so this cannot pass by both sides being raw.
+    assert_ne!(
+        frame.decay, seeded,
+        "`decay` is a Factor: converting it must move it"
+    );
+}
+
 /// Every input the host promises is actually written, and the aspect pair follows
 /// MilkDrop's convention rather than this engine's ratio.
 #[test]

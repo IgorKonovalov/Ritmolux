@@ -1,8 +1,9 @@
 # ADR-0118 — The MilkDrop feedback field quantizes in the encoded domain, per bundle
 
-> **Status:** accepted 2026-08-17 (Plan 0108) — carries two `Outcome` entries
+> **Status:** accepted 2026-08-17 (Plan 0108) — carries three `Outcome` entries
 > **Date:** 2026-08-17
-> **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md)
+> **Related plan(s):** [0108](../plans/done/0108-the-milkdrop-import-gets-its-tone-back.md),
+> [0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) (third `Outcome`)
 
 ## Context
 
@@ -179,6 +180,48 @@ is **not** the dominant fidelity defect of the MilkDrop import. Plan 0100's HDR 
 **negatively**: still merely different. The dominant defect is the wash itself, cause unknown, and it
 carries to [Plan 0109](../plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) with
 [backlog 0113](../design-backlog.md).
+
+## Outcome — the same field under a realistic `decay`
+
+**2026-08-19, Plan 0111 Phase 1 — nothing here is falsified; a second configuration is added, and
+the probes now state the one they run in.**
+
+This entry replaces a first draft written the same day that claimed the Context sentence was
+overstated and that Plan 0109 Phase 4's probes had been *miscalibrated*. **Both claims were wrong**,
+and the correction is worth recording because the mistake is an easy one to repeat.
+
+Plan 0111 Phase 1 fixed design-backlog 0121: `FrameSlots::read` returned the `decay` **default**
+unconverted, so a bundle naming no `decay` ran at MilkDrop's per-frame `0.98` in a field that means
+per-second. The two probes below passed `None` and therefore ran at that near-unity factor — and
+that was **deliberate**, through an escape hatch `field_trace` documents in the comment right above
+the call. Neutralizing `decay` is what makes these probes isolate the quantizer. What the fix changed
+was not their calibration but the meaning of the value they got for free. They now pass an explicit
+`NEUTRALIZED_DECAY = Some(0.98)`, which reproduces every recorded digit of the tables in their doc
+comments — verified against the committed numbers, on hardware, where they had been recorded on WARP.
+
+**So the Context stands as written.** With `decay` neutralized the unquantized field climbs to a mean
+of `0.8331` with a peak of `6.68` at frame 300 and shows no equilibrium, which is exactly *"nothing
+truncates, every dim residual survives and accumulates"*.
+
+**What is genuinely new is the second configuration** — the converted `decay` a real bundle actually
+runs at, `per_second_factor(0.98) = 0.5455`/s. There the field **does** settle, on both arms, and the
+quantizer's contribution is a lower settling point and an exactly-black background rather than the
+presence or absence of a bound:
+
+| statistic (still params, converged) | quantizer off | quantizer on | |
+|---|---|---|---|
+| field mean | 0.2963 by f450 | 0.1298 by f120 | **2.28x lower** |
+| background `edge` (zoom params) | 1.115e-4 by f450 | 1.237e-6 from f30 | **90x lower, at the floor** |
+
+Both are dev-box hardware readings, deterministic to nine decimals across three repeats — so there is
+no run-to-run spread here to derive a tolerance from, and any assertion on these must take its
+tolerance from the mechanism rather than from noise (ADR-0071).
+
+The useful way to say what this ADR buys, once `decay` is real: **this engine's field decays toward a
+nonzero equilibrium where the reference's decays to black, and the floor is what closes that gap.**
+That is a sharper statement than "the field is an unbounded integrator", which is true only with
+`decay` neutralized — the configuration the probes choose in order to see the mechanism at all, and
+not the one a converted preset runs in.
 
 ## Notes
 

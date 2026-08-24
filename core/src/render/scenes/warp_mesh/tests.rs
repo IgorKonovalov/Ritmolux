@@ -180,6 +180,111 @@ fn rad_and_ang_come_from_the_target_aspect_and_not_from_the_grid() {
     }
 }
 
+/// **`ang`'s branch cut and its handedness, pinned** — Plan 0111 Phase 4, carrying
+/// design-backlog 0119.
+///
+/// # What this settles
+///
+/// Two facts about *this engine*, both derived from
+/// [`vertex_position`]'s arithmetic and neither read off a picture:
+///
+/// - the cut is on **+x**, where `atan2`'s own range boundary is lifted into
+///   `0..tau`, and it is a genuine discontinuity of size `tau` rather than a
+///   steep gradient;
+/// - `ang` increases **counter-clockwise as seen on screen**, because
+///   `vertex_position` flips y (`py = (0.5 - y) * 2`) before the `atan2`. Texture
+///   space is y-down and the polar pair is taken y-**up**.
+///
+/// Pinned so neither can move silently. `milkconv/tests/warp_geometry.rs` asserts
+/// the engine carries the same y-down/y-up asymmetry in the emitted WGSL warp
+/// epilogue and in the draw layer, so these three agree by test rather than by
+/// coincidence.
+///
+/// # What this does **not** settle, and why the phase stopped there
+///
+/// **Whether the reference's handedness matches.** That is the actual question
+/// behind backlog 0119: MilkDrop's `atan2` has the same cut, so presets are
+/// *authored against* a discontinuity at +x and smoothing the wrap would break
+/// every preset that uses it deliberately — but if the **handedness** differs,
+/// every angle-driven per-vertex program in the corpus runs mirrored and the
+/// visible seam is a symptom rather than the defect.
+///
+/// Plan 0111 Phase 4 required that comparison be derived from the source format's
+/// convention or from the reference implementation, with the source named, and
+/// **never from a picture**. Neither is available here: the corpus is 10 347
+/// `.milk` files with no MilkDrop source and no authoring documentation beside
+/// them, and a corpus-wide search for a preset that states a rotation direction
+/// returns two files, both building their own Kardan rotation from `q` variables
+/// rather than reading the per-vertex `ang`. A `.milk` preset does not record the
+/// convention it was authored against.
+///
+/// So the phase changes no behaviour and does not claim the seam is
+/// authored-against either — that claim needs the half that is missing. What
+/// would settle it, in order of directness: MilkDrop 2's `milkdropfs.cpp` mesh
+/// setup, where the sign of the `y` handed to `atan2f` is one line; or the
+/// authoring documentation that shipped with MilkDrop; or one reference capture
+/// of a preset built to be handedness-revealing, which is a look-gate artifact
+/// and not a test.
+///
+/// Per ADR-0071's prose rule, nothing here attributes a convention to "MilkDrop"
+/// at all. It states this engine's, and names the question.
+#[test]
+fn ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen() {
+    use std::f32::consts::{FRAC_PI_2, PI, TAU};
+
+    let mesh = (64, 64);
+    let ang = |col: u32, row: u32| vertex_position(col, row, mesh, 1.0).3;
+
+    // Handedness: walking counter-clockwise on screen — right, top, left, bottom
+    // — `ang` increases. The TOP of the screen is a QUARTER turn, which is the
+    // y-flip's whole visible consequence: without it the top would read 3/4.
+    let right = ang(64, 32);
+    let top = ang(32, 0);
+    let left = ang(0, 32);
+    let bottom = ang(32, 64);
+    assert!(right.abs() < 1e-6, "+x is angle 0, got {right}");
+    assert!(
+        (top - FRAC_PI_2).abs() < 1e-5,
+        "the top is tau/4, got {top}"
+    );
+    assert!(
+        (left - PI).abs() < 1e-5,
+        "the left edge is tau/2, got {left}"
+    );
+    assert!(
+        (bottom - 3.0 * FRAC_PI_2).abs() < 1e-5,
+        "the bottom is 3*tau/4, got {bottom}"
+    );
+
+    // The cut is ON +x and it is a real discontinuity. One row above and one row
+    // below the midline, at the right edge: the two are adjacent vertices whose
+    // `ang` differ by very nearly a full turn.
+    let just_above = ang(64, 31);
+    let just_below = ang(64, 33);
+    assert!(
+        just_above < FRAC_PI_2 && just_below > 3.0 * FRAC_PI_2,
+        "the +x neighbours must straddle the wrap, got {just_above} and {just_below}"
+    );
+    let jump = just_below - just_above;
+    assert!(
+        jump > TAU * 0.9,
+        "the cut on +x must be a discontinuity of nearly a full turn, got {jump}"
+    );
+
+    // ...and nowhere else. Sweeping the ring away from +x, no adjacent pair jumps
+    // by even a quarter turn, so a program continuous in `ang` meets exactly one
+    // seam rather than several.
+    let ring: Vec<f32> = (1..64).map(|row| ang(64, row)).collect();
+    for pair in ring.windows(2) {
+        let step = (pair[1] - pair[0]).abs();
+        assert!(
+            !(FRAC_PI_2..=TAU * 0.9).contains(&step),
+            "off the +x axis `ang` must be continuous; a step of {step} is neither \
+             smooth nor the wrap"
+        );
+    }
+}
+
 /// A `[per_vertex]` binding **overrides** the scalar of the same name, and only
 /// that name — the composition rule the module docs state, asserted on the
 /// assembled vertex buffer rather than on prose.
@@ -348,6 +453,87 @@ fn every_wave_mode_builds_a_different_figure() {
                  the eight modes must be distinguishable (Plan 0100 Phase 4)"
             );
         }
+    }
+}
+
+/// **A mode-6 trace covers `1/aspect` of the frame's width** — Plan 0111 Phase 5,
+/// and the arithmetic behind design-backlog 0120's *second* symptom.
+///
+/// The entry reported two things together: an oversized waveform figure, and
+/// *Blur Mix 3*'s crisp trace spanning "roughly the middle 57 %" of the frame
+/// where the reference draws full-width traces. **They are separate defects**,
+/// and this one is provable without a capture.
+///
+/// Modes 6 and 7 lay their points on `t = i/(count-1) - 0.5` and divide the x
+/// component by `aspect` — but [`draw::uv_to_world`] multiplies x *by* aspect on
+/// the way out, so the two cancel exactly and the trace's world-space length is
+/// `2t = 2.0` **whatever the target's shape**. The frame is `2 * aspect` wide in
+/// those units, so the trace covers `1/aspect` of the width: `1/(16/9) = 0.5625`,
+/// the reported 57 %.
+///
+/// Stated the other way round, which is the useful way: **the trace is normalized
+/// to the frame's height, not its width.** On a square target that is full width,
+/// which is why nothing caught it at aspect 1 — the same coincidence ADR-0037
+/// exists for, one level down.
+///
+/// It is independent of `wave_scale`, which scales only the amplitude term, so a
+/// corrected scale constant cannot fix it and this test keeps passing if one
+/// lands. Asserted as a **property over three aspects** rather than as one frozen
+/// number, so it states the relationship and not this box's reading of it
+/// (ADR-0071).
+#[test]
+fn a_straight_wave_trace_spans_one_over_aspect_of_the_width() {
+    let waveform = trace();
+    let mut runtime = bare_runtime();
+    for aspect in [1.0f32, 4.0 / 3.0, 16.0 / 9.0] {
+        let mut geometry = draw::DrawGeometry::default();
+        let out = crate::milk::outputs::FrameOutputs {
+            wave_mode: 6.0,
+            // `mystery = 0` is the horizontal line: the angle is `mystery * PI`.
+            wave_mystery: 0.0,
+            // Amplitude out of the way, so what is measured is the `t` term alone.
+            wave_scale: 0.0,
+            ..waveform_only()
+        };
+        draw::build(
+            &mut geometry,
+            Some(&mut runtime),
+            &out,
+            &waveform,
+            0.0,
+            1.0 / 60.0,
+            aspect,
+        );
+        // Both endpoints of every segment: `a` alone misses the trace's final
+        // vertex and shortens the span by one fencepost.
+        let xs: Vec<f32> = geometry
+            .segments
+            .iter()
+            .flat_map(|s| [s.a[0], s.b[0]])
+            .collect();
+        assert!(!xs.is_empty(), "mode 6 drew nothing at aspect {aspect}");
+        let lo = xs.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = xs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let span = hi - lo;
+        // The defect, stated directly: the length does not depend on the target's
+        // shape, because the `/aspect` at the point and the `*aspect` in
+        // `uv_to_world` cancel.
+        assert!(
+            (span - 2.0).abs() < 0.02,
+            "at aspect {aspect} a horizontal mode-6 trace has world length \
+             {span:.4}; it must be 2.0 at every aspect, because that constancy \
+             IS design-backlog 0120's second symptom"
+        );
+        // ...and the consequence, in the units the defect was reported in. The
+        // frame is `2 * aspect` wide in world units.
+        let fraction = span / (2.0 * aspect);
+        let expected = 1.0 / aspect;
+        assert!(
+            (fraction - expected).abs() < 0.01,
+            "at aspect {aspect} the trace covers {fraction:.4} of the frame width \
+             where `1/aspect` predicts {expected:.4}; the reference draws these \
+             full-width at every aspect"
+        );
     }
 }
 
@@ -950,6 +1136,21 @@ fn field_trace(
 
 /// A still field with a centred deposit: the recursion is per-texel, so what it
 /// does has an arithmetic answer to compare against.
+/// The decay the two quantizer probes below run at: near-unity, so **the
+/// quantizer is the only thing bounding the field** and the experiment isolates
+/// it. Over their 300 frames (5 s at the probe's `dt`) this fades to `0.98^5 =
+/// 0.904` — present, and negligible against what the deposit adds.
+///
+/// **It is stated here rather than defaulted.** These probes used to pass `None`
+/// and get a near-unity factor for free, because `FrameSlots::read` returned the
+/// `decay` default *unconverted* — MilkDrop's per-frame `0.98` landing in a field
+/// that means per-second. Plan 0111 Phase 1 fixed that (design-backlog 0121), so
+/// `None` now yields the converted `0.5455`/s, which is a real fade and a
+/// different experiment: under it the unquantized field settles by frame 450
+/// rather than climbing. `0.98` reproduces what these two always measured, and
+/// naming it means the next fix to the fallback cannot silently re-aim them.
+const NEUTRALIZED_DECAY: Option<f32> = Some(0.98);
+
 fn still_field_params() -> Vec<(&'static str, f32)> {
     vec![
         ("zoom", 1.0),
@@ -990,10 +1191,11 @@ fn still_field_params() -> Vec<(&'static str, f32)> {
 #[test]
 fn the_field_equilibrates_only_when_the_quantizer_runs() {
     let params = still_field_params();
-    let Some(off) = field_trace(0.0, &params, 300, usize::MAX, None) else {
+    let Some(off) = field_trace(0.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY) else {
         return;
     };
-    let on = field_trace(255.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let on =
+        field_trace(255.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY).expect("the second runs");
     let (off, on) = (off.levels, on.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(
@@ -1073,10 +1275,11 @@ fn the_quantized_background_stays_black() {
             *value = 0.12;
         }
     }
-    let Some(on) = field_trace(255.0, &params, 300, usize::MAX, None) else {
+    let Some(on) = field_trace(255.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY) else {
         return;
     };
-    let off = field_trace(0.0, &params, 300, usize::MAX, None).expect("the second trace runs too");
+    let off =
+        field_trace(0.0, &params, 300, usize::MAX, NEUTRALIZED_DECAY).expect("the second runs");
     let (on, off) = (on.levels, off.levels);
     let read = |t: &[FieldLevel], n: usize| t.get(n).copied().unwrap_or_default();
     println!(

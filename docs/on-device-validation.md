@@ -297,7 +297,7 @@ or an older copy shadows the one under test and the version check means nothing.
       confirms two filed defects rather than finding new ones; anything else is new.
       _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
 
-- [ ] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
+- [x] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
       can reach lives on one menu since [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md),
       and CI builds no C++, so this is the only place any of it is exercised. Mid-playback, in this
       order:
@@ -320,7 +320,23 @@ or an older copy shadows the one under test and the version check means nothing.
       foobar2000's own in layout-editing mode ([backlog 0103](design-backlog.md)), which this plan
       made larger rather than fixing; Plan 0103 Phase 1 owns it.
       **Escalation:** same rule as above — a failure is a backlog entry or a followup plan.
-      _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18.)_
+      **Ran 2026-08-24 — all four pass, no finding.** Component rebuilt from `main` first: the
+      profile held a `foo_lmv.dll` dated 2026-08-16, predating the very menu this item drives, so
+      **date the installed artifact before trusting a carried-forward check**. Both (b) fixtures
+      were pre-flighted through `shot --preset-file` so a wrong result would convict the menu, not
+      the file. **(a) Pass** — mark on the one showing, pick dissolves across, mark follows.
+      **(b) Pass** — the new `.toml` appears without a restart, the malformed one is absent, the
+      watched preset survives the reload. **(c) Pass** — lands in `presets` itself. **(d) Pass** —
+      returns with the mark; with the file deleted it comes up on the roster default, nothing
+      surfaced, no ghost entry. **One correction this run owes back:** the restore lands at the
+      **first track boundary**, not at launch — before playback starts the panel shows the roster
+      default, so persistence looks broken to anyone who checks before pressing play. The "at every
+      start" phrasing above is what is wrong, not the code; filed as a followup on Plan 0107.
+      **Backlog 0103 confirmed failing** on a second machine, post-0107: layout-edit right-click
+      still gets the component's menu instead of Cut / Copy / Replace / Remove.
+      **Still open:** whether an explicit Reload visibly re-seeds the running scene — this run did
+      not look, and it is cheap to settle next time on a long-trail preset.
+      _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18; run 2026-08-24.)_
 
 ## How to run
 

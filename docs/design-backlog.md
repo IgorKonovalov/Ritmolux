@@ -284,6 +284,7 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0114 | A negative scale is clamped away, so MilkDrop’s standard mirror idiom collapses | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1. Both halves were engine-side. **Closed 2026-08-19** |
 | 0115 | There is no video-echo stage, and one preset in seven is unrecognisable without it | [ADR-0119](adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) + [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7. **Closed 2026-08-19** |
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
+| 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
 
 <!-- roster:end -->
 
@@ -1760,6 +1761,10 @@ tree, which is not discoverable from the panel.
 
 - **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
   `absent: is_edit_mode_enabled in: plugin-foobar/foo_lmv.cpp`
+- **Seen on-device 2026-08-24**, post-0107, at [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)
+  Phase 5: layout-edit right-click still surfaces the component's menu — now Preset ▸ and four
+  items — wholly in place of Cut / Copy / Replace / Remove. The entry's evidence was a code probe
+  plus one reporter's account; this adds a second machine and the current menu.
 
 ### Updated 2026-08-18 — the shadowing menu is now four items and a submenu
 
@@ -2207,6 +2212,67 @@ convicted at Plan 0109's:
   stroke on stroke. Black-on-black is invisible; black-on-yellow-green is glaring. Unverified against
   the reference, hence "probably".
 
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 2 bisected the chain and the wash is **not downstream**. The field was never measured on a real bundle.
+
+**The entry stays live, and its direction reverses.** The update above concluded *"the remaining
+direction is downstream of the field"*. Phase 2 measured that chain and it is not there.
+
+One statistic (`edge`, the mean over the outermost ring) at every seam, both subjects, one run,
+128x128, 300 frames, quantizer at its default 255:
+
+```text
+  seam        fog tunnel    blur mix 3    ratio     (hardware)
+  A field     0.29798886    0.01990991    14.967
+  B present   0.52298039    0.08744538     5.981
+  E display   0.74454564    0.25118530     2.964
+
+  seam        fog tunnel    blur mix 3    ratio     (DX12 WARP)
+  A field     0.29793853    0.01192657    24.981
+  B present   0.52290142    0.05914328     8.841
+  E display   0.74456638    0.24515122     3.037
+```
+
+**The plan's five seams are three**, measured rather than assumed: every post stage reports `active`
+only above zero and neither converted preset binds `bloom`, `trails` or any kaleidoscope param, so
+`PostChain::begin` hands the scene the tonemap's own input texture; and `bg_bright` defaults to `0`
+and neither binds it, so the backdrop contributes nothing. Seams B, C and D are one texture.
+
+**No seam departs upward, and the separation is already maximal at the field** — the ratio is
+`14.967` at A and lower at every seam after it, on both adapters. The **present pass** demonstrably
+compresses it (`14.967 -> 5.981`, linear against linear). So no downstream stage creates the wash,
+and Plan 0111 Phase 3 did not run.
+
+**Corrected at Plan 0111's close, 2026-08-20, and the correction matters to whoever reads the E
+column.** The first draft of this update read `15 -> 6 -> 3` as one monotone sequence and credited
+the tonemap with the second fall. **Seam E is not in the same domain as A and B.** A and B are
+linear-light means; E is a mean of sRGB-encoded code values (`HEADLESS_FORMAT = Rgba8UnormSrgb`,
+bytes over 255), and a ratio of encoded values is not the same kind of quantity as a ratio of linear
+ones ([ADR-0074](adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)).
+Encoding seam B's own two means gives `0.750` and `0.327` — ratio `2.294`, **below** the observed
+`2.964` — so the transfer function alone over-explains the whole B-to-E fall with no stage involved.
+And the tonemap is *exactly* the identity below `KNEE = 0.6`, which both backgrounds sit under; the
+empirical bound agrees, leaving under 1 % of *Fog Tunnel*'s reading for tonemap and Jensen together.
+**The tonemap is a no-op for these two subjects.** It is therefore neither ruled in nor ruled out by
+this bisect for a subject whose background clears the knee — for these two, the knee rules it out,
+not the measurement.
+
+**Why the field looked clean and is not.** Plan 0109 Phase 4's probe drives
+`MilkBundle::from_assembly(None, None, None)` — an **empty** bundle with synthetic params — so its
+`1e-6` background is a statement about a stand-in, not about any preset. Driven with *Fog Tunnel*'s own
+bundle the field background reads `0.298`: five orders of magnitude higher, and almost exactly the
+*"three orders of magnitude above the quantizer's `3.03e-4` floor"* this entry predicted from the look
+gate before anyone could measure it. **The field is where the separation already exists**, and the
+built-in warp path is back in scope.
+
+**Two caveats, neither of which moves the conclusion.** `edge` reads background only for a figure that
+does not fill the frame, and our *Fog Tunnel* draws the solid tube that is the defect — so the absolute
+`14.967` is soft while the monotonic trend, being one statistic at every seam, is not. And *Blur Mix 3*
+alone diverges `1.67x` between adapters at the field (it is the one subject with a blur chain), so any
+threshold here would be adapter-dependent; the probe asserts none.
+
+- **Verified 2026-08-19** — the field is still read back by the probe this update is built on:
+  `present: fn feedback_field in: core/src/render/scenes/warp_mesh/mod.rs`
+
 ---
 
 ## 0117 — the plugin's preset menu dispatches a snapshot index across a modal wait, and the "nothing can reload" argument is not sound
@@ -2350,6 +2416,39 @@ that uses the cut deliberately.
 wash), it shows on real content rather than only on a fixture, and the diagnosis is now specific
 enough to act on.
 
+### Update 2026-08-20 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 4 pinned **our** half and could not reach the reference's. The entry stays live, **half discharged**.
+
+**What landed.** `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` pins this engine's
+construction from `vertex_position`'s arithmetic rather than from a picture: the cut is on **+x** and
+is a genuine discontinuity of nearly a full turn (asserted against the two neighbouring vertices),
+`ang` is continuous elsewhere along the swept column, and it increases **counter-clockwise as seen on
+screen** because y is flipped before the `atan2`. `milkconv/tests/warp_geometry.rs` already holds the
+emitted WGSL epilogue and the draw layer to the same y-down/y-up asymmetry, so the three agree by
+test. Neither fact can now move silently.
+
+**What did not, and this entry's own "What a fix would be" was wrong about it.** That section says
+the question "is measurable against a converted fixture rather than arguable". **It is not.** A
+converted fixture measures *this engine*, which is the half already pinned; the missing half is the
+reference's handedness, and no `.milk` file records the convention it was authored against. The phase
+required the comparison be derived from the source format's convention or the reference
+implementation with the source named, and never from a picture — none of those exist in this
+environment. A corpus-wide search for a preset stating a rotation direction returns two files, both
+building their own Kardan rotation from `q` variables rather than reading the per-vertex `ang`.
+
+So the seam is **not** corrected and is **not** recorded as authored-against either; that second
+claim needs the missing half and asserting it would be exactly the prose error
+[ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) catches.
+
+**What would settle it, most direct first:** MilkDrop 2's `milkdropfs.cpp` mesh setup, where the sign
+of the `y` handed to `atan2f` is one line; the authoring documentation that shipped with MilkDrop; or
+one reference capture of a deliberately handedness-revealing preset, which is a look-gate artifact
+and not a test. **This is the same procurement wall 0120 and 0122
+stopped on**, and one source clears all three — which is the argument for treating it as one
+procurement question rather than three engineering ones.
+
+- **Verified 2026-08-20** — the wrap is still unconditional and still has no continuity treatment:
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mod.rs`
+
 ---
 
 ## 0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw
@@ -2390,50 +2489,199 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+
+**The amplitude half stopped, on the branch the phase was given for it.** The reference's
+normalization is not derivable from any source available in this environment: there is no MilkDrop
+source and no authoring documentation beside the corpus, and a `.milk` preset does not record the
+convention it was authored against. Nothing was changed, and matching a picture was refused — it
+would produce a number right for one preset at one wave mode and wrong for the corpus.
+
+**What the corpus does settle, and it narrows the question usefully.** Across the 552 presets in
+`milkdrop-original` that set `fWaveScale`:
+
+```text
+  n=552  min=0.0000  p10=0.0100  p25=0.2920  median=0.9724  p75=1.5540  p90=3.2350  max=100.0000
+```
+
+**The median is 0.9724 — unity.** So `fWaveScale` is authored as a multiplier *about 1*, and what is
+missing is a single **base amplitude** (what a unit-scale wave should occupy), not a per-preset or
+mode-dependent correction. That also weakens this entry's own "factor of 279 across the seven pinned
+presets, so it cannot be a bare multiplier" argument: `p10 = 0.01` means a tenth of the corpus
+authors near-zero scales deliberately, and a near-flat trace is a *visible flat line* rather than an
+invisible one, so the spread is consistent with a bare multiplier over a correct base.
+
+Any candidate constant must keep both ends of that distribution usable. Whoever takes this needs one
+of: MilkDrop 2's waveform draw, its authoring documentation, or a reference capture of a preset built
+to be amplitude-revealing.
+
+- **Verified 2026-08-19** — the scale is still a bare multiply with no normalization constant:
+  `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
 ---
 
-## 0121 — a bundle that never names `decay` reads MilkDrop's per-frame default as a per-second one
+## 0122 — a mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width
 
-**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
-close review (2026-08-19). **Owner if taken:** `dev`.
+**Raised by:** `dev`, from [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
+(2026-08-19), splitting the x-extent half out of [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
+**Owner if taken:** `dev`.
 
-- **Verified 2026-08-19** — the unresolved-slot arm returns the seeded default without converting it:
-  `present: None => d\.\$field in: core/src/milk/outputs.rs`
+- **Verified 2026-08-19** — the cancelling pair is still both halves, one at the point and one on
+  the way out: `present: fn uv_to_world in: core/src/render/scenes/warp_mesh/draw.rs`
 
 ### The finding
 
-`FrameOutputs`' table declares `decay: "decay" = 0.98, Factor`, and that one constant is used for two
-different things. `seed` writes it into the register **before** the program runs, where `0.98` is
-correctly MilkDrop's *per-frame* value. `read` returns it unchanged when the program never mentions
-`decay` — but that arm feeds a field whose own doc says "**per second** here", and the converted
-value is `per_second_factor(0.98) = 0.5455`. A bundle that never names `decay` therefore fades at
-`0.98`/s (about `0.9997` per frame) instead of `0.5455`/s: effectively not at all.
+`draw.rs`'s mode 6/7 arm places points at `t = i/(count-1) - 0.5` and divides the x component by
+`aspect`; `uv_to_world` then multiplies x **by** `aspect`. The two cancel exactly, so the trace's
+world-space length is `2t = 2.0` **whatever the target's shape**, while the frame is `2 * aspect`
+wide in those units. The trace therefore covers `1/aspect` of the width — `0.5625` at 16:9, which is
+the "roughly the middle 57 %" Plan 0109's Phase 5 gate reported for *Blur Mix 3*. The reference draws
+these full-width.
 
-`decay` is the only `Factor`-rate output, so nothing else is affected.
+Said plainly: **the trace is normalized to the frame's height rather than its width.** At aspect 1 it
+is full-width, which is why nothing caught it — the same coincidence
+[ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) exists for, one level down.
 
-**Not currently reachable from a converted preset**, which is why this is an entry rather than a bug
-report. `milkconv`'s prologue emits an assignment for **every** roster output carrying an
-initial-condition key, unconditionally, at the top of every frame — so the slot always resolves and
-the conversion always runs. The one shipped hand-written bundle
-(`core/tests/fixtures/warp_mesh_milk.toml`) names `decay` too.
-
-**It has already cost real time once**, which is the argument for fixing it rather than documenting
-it: Plan 0109 Phase 4's field probe drives an empty bundle, silently ran its whole experiment at
-`0.98`/s, and the phase's reported fade numbers could not be reproduced from the committed code until
-the close review found this. A latent unit error that only bites instruments is exactly the kind that
-bites the next instrument too.
+**It is independent of `wave_scale`,** which scales only the amplitude term, so 0120's constant
+cannot fix this and this cannot fix 0120. That independence is why the two were split.
+`a_straight_wave_trace_spans_one_over_aspect_of_the_width` pins it as a property over three aspects.
 
 ### What a fix would be
 
-Convert on the `None` arm as well, so the fallback is in the same vocabulary as the resolved value —
-roughly `convert(d.$field, Rate::$rate, d.$field)`. **It moves goldens** for any fixture whose bundle
-omits `decay`, so it wants a bless and a check of which fixtures those are, and it should not be
-slipped into an unrelated plan.
+Almost certainly dropping the `/aspect` at the point, so the length is width-normalized and the
+`uv_to_world` multiply is the only aspect term. **Unverified against the reference** — whether
+MilkDrop's mode 6 spans the full width at every aspect or is itself height-normalized is the same
+class of question as 0120's constant and 0119's handedness, and it wants the same source.
 
 ### Priority
 
-**Low-medium.** Latent for shipped content, but it is a units error sitting in the one table that
-exists to stop units errors, and its own module header says four parallel lists were replaced by that
-table precisely so a value could not silently read its neighbour.
+**Medium.** Visible on every mode-6/7 preset on any non-square display, which is every display; but
+like 0120 it makes a preset look mis-tuned rather than unrecognisable.
+
+---
+
+## 0123 — the waveform is the one un-normalized analysis output, so the OS volume slider changes the picture — and the two frontends disagree
+
+**Raised by:** `dev`, from a live-app check during [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md)
+(2026-08-19). **Owner if taken:** `architect` — this is a boundary-contract question, not a defect
+with an obvious fix. **Out of that plan's scope; nothing in it was changed for this.**
+
+- **Verified 2026-08-19** — the waveform is still documented and shipped un-normalized, alone among
+  the analysis outputs: `present: Raw amplitude in roughly in: core/src/dsp/mod.rs`
+
+### The finding, measured
+
+One `lmv.exe` instance, one preset (*Geiss - Blur Mix 3*, `nWaveMode = 6`, `fWaveScale = 3.266`), one
+clip looping, two captures ten seconds apart. **The only variable changed was the Windows master
+volume slider:**
+
+| master volume | the trace |
+|---|---|
+| 18 % | a thin near-flat ribbon with small ripple |
+| 60 % | violently active, roughly `±40 %` of frame height, halo filling the frame |
+
+Measured on the development box (Windows 10, WASAPI loopback, DX12). **That the endpoint volume is
+applied before the loopback tap is a fact about this machine's audio stack**, not a claim about
+Windows in general — ADR-0071's prose rule, and the reason it is stated this way.
+
+The same preset through `shot --audio` on a file — which reads samples at full digital scale, no
+endpoint volume anywhere — saturates the frame. So the engine's response is not weak at any point;
+only the absolute level arriving from loopback is.
+
+### Why it is a contract question rather than a bug
+
+[`core/src/dsp/mod.rs`](../core/src/dsp/mod.rs)'s `waveform` is deliberately un-normalized, and says
+so: *"normalizing it would make a quiet passage draw the same trace as a loud one — which is the
+opposite of what a scope is for."* Every other analysis output is peak-normalized under
+[ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md).
+
+**That reason conflates two different things.** A volume *knob* is not musical dynamics. A slow
+normalization against a recent peak — what ADR-0049 already does for the four bands — cancels the
+knob while leaving a quiet passage genuinely quieter than a loud one. The stated objection argues
+against *instantaneous* normalization, and nobody is proposing that.
+
+**And the two frontends disagree, which is the part that raises the stakes.** The foobar plugin pulls
+from `visualisation_stream` (`plugin-foobar/foo_lmv.cpp:3`) — the **decoded stream, before the output
+volume**. The standalone pulls **post-volume** loopback. So one core, one preset and one track give
+two different pictures depending on which frontend is running, and nothing levels them. The core is
+source-agnostic as [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) requires; what leaks is
+the *level*, and `CLAUDE.md`'s "validate at the boundary" list — sample rate, channel count, buffer
+size — does not include amplitude.
+
+### Why it surfaced now, and what it reconciles
+
+It explains a standing contradiction. [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
+reports the waveform figure rendering **larger** than the reference's; the live app at 18 % shows it
+nearly flat. Both are true. An un-normalized trace times an un-normalized `wave_scale` is
+**hypersensitive** — blown out at full scale, dead at listening volume. So 0120's missing base
+amplitude constant **cannot be the whole fix**: lowering the gain moves the entire curve down and
+makes the quiet case worse. The question is dynamic range, and 0120 should be read with this entry
+beside it.
+
+### What a fix would be
+
+Unknown, and there are at least three shapes, which is why this wants an interview rather than a
+phase. Normalize the waveform against a recent peak at the analyzer, as ADR-0049 does for the bands;
+or level at the **boundary** where audio enters the core, so both frontends deliver the same
+vocabulary and the standalone's loopback stops being the odd one out; or leave the analyzer alone and
+give the converted-preset path its own conditioning, on the argument that a native scene may
+legitimately want a true scope. The middle option is the one that matches the existing boundary rule.
+
+### Priority
+
+**Medium-high.** It makes every waveform-led converted preset look broken at ordinary listening
+volume, which is most of the MilkDrop corpus's light source, and it silently invalidates any look
+gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
+
+---
+
+## 0124 — ADR-0113's motivating claim has read "provisionally negative" since 2026-08-16, and two look gates have run without re-taking it
+
+**Raised by:** a loose-ends sweep (2026-08-24), reading an orphaned draft plan — *0108 — The field
+learns to forget*, written 2026-08-16 outside the repo, never committed and since superseded by
+Plans 0108, 0109 and 0111. Five of its six phases have landed elsewhere; this is the one that has
+not. **Owner if taken:** `architect` — an ADR Outcome is architect work.
+
+- **Verified 2026-08-24** — the ADR carries no Outcome beyond the two it was closed with:
+  `absent: Outcome \(2026-08-(?!16) in: docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md`
+
+### The finding
+
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+Context argues **"the same preset should look better here"** — linear-light HDR against the
+reference's 8-bit additive. Its second Outcome, dated 2026-08-16 at Plan 0100's close, records the
+user's verdict as **merely different, not better**, attributes it to one defect (backlog 0106, the
+field that never truncates), and then commits in as many words: *"The HDR question is re-judged
+after 0106 lands."*
+
+**0106 landed 2026-08-17.** Two look gates have run since — Plan 0108's, and
+[Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 5 on 2026-08-19,
+same seven pairs, same rig, `foo_vis_milk2` 0.2.0.0 — and 0109's gate reads three of the seven as
+**fixed**, including the portal and *Blur Mix 3*'s traces. Neither gate produced a third Outcome.
+So the ADR still tells a reader its founding claim is provisionally negative, on evidence two
+plans and four ADRs old.
+
+### Why this is an entry rather than nothing
+
+The per-pair verdicts are recorded — in the plans that ran them. But a plan doc is where a phase's
+result lives, and an ADR is where a **decision's** motivating claim lives; this ADR is the one that
+asked to be revisited, and nothing carries that ask. The 2026-08-16 wording is also the load-bearing
+half: "merely different, not better" is the sentence that would make someone question the whole
+ahead-of-time translation approach, and it is now the least current thing in the file.
+
+### What a fix would have to decide
+
+Whether the verdict can be re-taken **from the record** — 0109 Phase 5's table is on file and
+per-pair — or needs a fresh gate. Three pairs still read *washed* there, and backlog 0113 (the wash)
+is **live**, having survived Plan 0111's bisect and reversed back to the field. So a re-take today
+may honestly still read *merely different, with the wash dominating*. **That is a perfectly good
+third Outcome** — dated, naming 0113 as the remaining blocker, and saying the claim is not yet
+answerable rather than leaving 2026-08-16's silence to stand for it.
+
+### Priority
+
+**Low.** Nothing renders wrong because of this. The cost is a reader — including a future
+`architect` session — trusting a stale verdict about whether this project's whole MilkDrop
+translation strategy is worth it.
 
 ---
