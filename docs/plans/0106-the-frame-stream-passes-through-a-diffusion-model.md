@@ -1,11 +1,13 @@
 # 0106 — The frame stream passes through a diffusion model
 
 > **Status:** in-progress — Phases 1, 2, 2b and 3 are done (2026-08-20); **Phases 4 and 5 are done
-> (2026-08-24)**, which is every `dev` phase. The stop condition did not fire; **Phase 2b chose
-> `native`**, so the filter diffuses at the stream's own aspect and every square s/frame reading in
-> this document is superseded. **Only Phase 6 remains, and it is `human`.** Two Phase 4 findings are
-> owed to `architect` at the close: the `quality` profile does not ship the cell this plan names, and
-> the gap interpolator cost no new dependency — both amend ADR-0121
+> (2026-08-24)**. The stop condition did not fire; **Phase 2b chose `native`**, so the filter
+> diffuses at the stream's own aspect and every square s/frame reading in this document is
+> superseded. **Two phases remain: 6 (`human`, running 2026-08-24 on Caribou — *Odessa*, the track
+> the spike judged) and 7 (`dev`, added at the close review).** Phase 4's two findings are
+> **adjudicated**: the `quality` profile does not ship the cell this plan names and the gap
+> interpolator cost no new dependency — both are corrections to ADR-0121 rather than defects, and
+> the ADR takes them as a dated `Outcome` at the close rather than as body edits.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
@@ -348,6 +350,67 @@ the core, the C ABI, or `lmv.exe`.
   one `poll` in `step_offscreen`. Track length is no longer a bound. **The one thing to carry
   forward:** a render mode that submits its own passes outside `step_offscreen` inherits the defect
   and none of the fix.)*
+
+### Phase 7 — the gateable part actually gates, added 2026-08-24 by `architect`
+
+- **Owner skill:** dev
+- **What:** Three defects from the Mode 4 close review, all in the test and gate surface. None
+  changes what the filter draws; together they are the difference between a suite that passes
+  *here* and a suite that means something *anywhere*.
+- **Files touched:** `tools/sd-filter/test_sd_filter.py`, `standalone/src/shot/render.rs`
+  (one test), `.github/workflows/ci.yml`, `.githooks/pre-push`.
+- **Why this is a phase and not a followup:** Phase 3 called the pass-through *"the one part of
+  this feature that can be a real CI gate"* and `docs/capturing.md` repeats it as shipped fact.
+  Neither is true today — nothing runs the suite, and on any checkout but this one it would go
+  red rather than green. A claim a document makes about its own gate is worth fixing inside the
+  plan that made it.
+
+**7a — the end-to-end group fails rather than skips on every checkout but this one.**
+`test_sd_filter.py` reads `REPO/spike/clip.wav`. `spike/` is untracked *and not ignored*, and the
+repository has **no tracked `.wav` at all**; the skip guard checks only for a built `shot`. So with
+a built `shot` and no spike directory — the only configuration anyone else has, and this machine's
+too once the lane's worktree is removed — `shot` exits non-zero, `check("shot exits 0")` fails and
+the suite exits 1. **Synthesize the clip instead of guarding on it**: `wave` and `struct` are both
+standard library, `--render` takes a WAV path and does not care what is in it (the property under
+test is byte identity, not the picture), so a fraction of a second of any valid 48 kHz PCM makes
+the group *run* everywhere rather than skip. That is strictly better than a second skip, and it is
+what lets 7c mean anything. Keep the existing no-`shot` skip exactly as it is — it is correct, and
+ADR-0016's printed notice is the right shape for it.
+
+**7b — the YUV conversion is a second implementation of a `standalone/` function, and nothing
+checks the pair.** `sd_filter.py`'s `yuv444_to_rgb` / `rgb_to_yuv444` invert
+`standalone/src/shot/render.rs`'s `rgb_to_yuv` / `yuv_to_rgb` term for term — they agree today,
+verified by reading both at the close, including plane order (Y, Cb, Cr) and clamp-not-wrap. But
+the pass-through never converts and the diffused path is unassertable, so **no test in either
+language touches the seam**: a constant edited on one side ships as a colour cast across every
+frame, and no instrument in this repo would see it. Pin it with **one frozen table of RGB triples
+asserted from both sides** — the same table in the Python suite and in a new `render.rs` test,
+each carrying a comment naming the other as its twin. Include black, white, the three primaries,
+the three secondaries, mid-grey and two saturated values whose chroma terms land outside `0..=255`,
+since the clamp is the half most likely to be written differently in two languages.
+**This is a property, not a measurement** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
+the arithmetic is exact 8-bit integer output, identical on every machine, so the table is asserted
+universally and names no configuration.
+
+**7c — wire the suite into CI and the hook.** Add `python3 tools/sd-filter/test_sd_filter.py` to
+the **`links` job** — it is `ubuntu-latest`, it already carries the three Node gates for exactly
+this reason (cheap, platform-independent, cannot skip itself), and the suite is standard library
+only. Add it to `.githooks/pre-push` behind a `command -v python3` guard, mirroring the `node`
+guard three lines above it, with the same printed skip notice. **The `check` matrix is deliberately
+not the home for this**: the end-to-end group's property is the same byte identity the in-process
+group already asserts at four geometries against hostile payloads, and paying for it on three
+build matrices buys the word "real" and nothing else.
+- **Done when:**
+  - The suite passes on a checkout with **no `spike/` directory at all** and a built `shot` —
+    check it by moving the lane's `spike/` aside, not by reasoning about it. The end-to-end group
+    **runs** in that state rather than skipping, and still skips with its notice when no `shot`
+    is built.
+  - Editing one constant in either `rgb_to_yuv444` or `rgb_to_yuv` turns the other language's test
+    red. Verify by making the edit, watching it fail, and reverting — a cross-language pin that has
+    never been seen to fail is a comment, not a test.
+  - CI runs the suite on `ubuntu-latest`, and `docs/capturing.md`'s claim that the pass-through is
+    "the only part that can be a real gate" is true as written rather than aspirational.
+  - `docs/capturing.md`'s check count is refreshed if 7a/7b moved it — it currently says 186.
 
 ## Data shapes
 
