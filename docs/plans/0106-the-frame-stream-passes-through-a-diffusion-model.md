@@ -1,7 +1,8 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** in-progress — Phases 1-2 ran 2026-08-20; **the stop condition did not fire**, and
-> Phases 3-5 are amended to carry ADR-0121
+> **Status:** in-progress — Phases 1-2 ran 2026-08-20; **the stop condition did not fire**, Phases
+> 3-5 are amended to carry ADR-0121, and **Phase 2b is added** to measure the one thing every spike
+> reading missed: the stream is 16:9 and every measurement is square
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
@@ -197,6 +198,45 @@ the core, the C ABI, or `lmv.exe`.
   is the evidence this phase produces, and an ADR written before it would be recording a guess as
   a decision.
 
+### Phase 2b — the aspect measurement (GATE), added 2026-08-20
+
+- **Owner skill:** dev
+- **What:** Measure what a **16:9** frame costs and looks like through the banked cell, and ask the
+  user which handling ships. Throwaway spike work under Phase 1's umbrella — same `spike/`, no
+  repository file, no commitment.
+- **Why this phase exists.** **Every measurement in this plan is square.** The spike rendered
+  `--size 768x768`; the approved look, the 1.164 s/frame, the 2.7x for 768 and every `boil` figure
+  are all square. The stream this filter actually sits in is **1920x1080**, and *Data shapes*
+  promises the same geometry out. Nothing in this plan or
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+  says how a 16:9 frame becomes a diffusion and comes back. That is the failure this repo has a rule
+  about: **the configuration we measured at and the configuration we ship at disagree, and no
+  measurement covers the disagreement.** SD1.5 is trained at 512 square and is known to degrade off
+  it, so the answer is not derivable from what we have — it has to be looked at.
+- **Notes for the implementer:** re-render one subject at `--size 1920x1080` (the same
+  `shot --frame-at <hop>` loop Phase 1 used), then run the **same cell** — LCM 8 steps `cfg 2.0`,
+  the same prompt, the same fixed seed, feedback 0.4 — three ways, ~120 frames each:
+  1. **native non-square**, 1024x576;
+  2. **square-then-stretch**, 768x768 diffused and stretched to 16:9 on the way out;
+  3. **pad-then-crop**, letterboxed into 768x768, diffused, bars cropped off.
+
+  Record **s/frame for each** — cost tracks pixel count, so arm 1 is not free and the existing
+  timings do not transfer — and note where the model puts material in arm 3's bars. Report `boil`
+  if it is cheap, but do not lean on it: it is only interpretable when the source is moving, and
+  comparing across arms of **different geometry** is not the same-kind comparison
+  [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md)
+  requires. **The eye is the instrument here, as it was at Phase 2.**
+- **Done when:** the three clips exist, their per-frame costs are recorded in the Implementation
+  log with the machine named
+  ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)), and
+  **the user has said which arm ships**, recorded as given. If the answer is anything other than
+  square-then-stretch, the log gains a line saying that every s/frame figure above it was measured
+  square and does not carry over.
+- **What this gates, and what it does not.** It blocks **Phase 4 only**. Phase 3 is byte-identical
+  pass-through with no model in it and does not care about aspect — it can land first, or
+  alongside. Unlike Phase 2 this is **not a stop condition**: no outcome here ends the plan, it
+  chooses between three ways of doing the same thing.
+
 ### Phase 3 — the pass-through stub
 
 - **Owner skill:** dev
@@ -245,7 +285,8 @@ the core, the C ABI, or `lmv.exe`.
     explicitly overrides it. The **expanded flag list is echoed on stderr** at the start of every
     run, so a render is reproducible from what ran rather than from a profile name whose meaning may
     have moved. Two profiles are enough to start: `quality` (768, the 20-step UniPC cell, feedback
-    0.6) and `fast` (512, the LCM 8-step `cfg 2.0` cell, stride 3).
+    0.6) and `fast` (512, the LCM 8-step `cfg 2.0` cell, stride 3). **Those sizes are square and
+    provisional** — Phase 2b decides how 16:9 is handled, and its answer sets the real values.
   - **The quality profile diffuses natively at 768 or above.** No upscaler dependency is taken; the
     2.7x per-frame cost is the accepted price, and ADR-0121's Alternative C records the cheaper
     route with its measurement intact in case render cost later becomes binding.
@@ -337,8 +378,13 @@ reproducible from what ran rather than from a name whose meaning may since have 
   the spike. The transitive block on [0099](done/0099-the-horizon-reaches-its-own-length.md) past
   ~2 minutes is **discharged** (closed 2026-08-16). Phase 1 is takeable **today** and depends on
   neither.
-- **The stream format is not settled yet**, and it changes Phase 3's cost. 0101 Phase 1 owns that
-  choice and now records the measurement behind it.
+- **The stream format is settled: Y4M, `C444`, `XCOLORRANGE=FULL`, full-range BT.709**
+  (0101 Phase 1; `docs/capturing.md`). Y4M *errors* on `rgb24`, so this filter owes a YUV round-trip
+  the spike never paid — the spike read and wrote PNG files and has never seen a pipe. That is
+  Phase 3's actual work.
+- **Every spike measurement is square and the stream is 16:9.** Raised 2026-08-20; **Phase 2b
+  exists to close it** and blocks Phase 4. Until it runs, the s/frame ladder, the 2.7x for 768 and
+  the approved look are all statements about 768x768 and none of them is known to carry to 1920x1080.
 - **Weights are a multi-gigabyte first-run download from a third party.** Hugging Face model IDs
   can move or be withdrawn — `runwayml/stable-diffusion-v1-5` already did. Pin what works and
   expect to re-pin.

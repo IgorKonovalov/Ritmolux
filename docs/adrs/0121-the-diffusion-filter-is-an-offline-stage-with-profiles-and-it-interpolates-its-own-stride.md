@@ -75,7 +75,11 @@ out.** Concretely, and each clause is load-bearing:
   no A/V desynchronization is representable. The interpolator is the filter's dependency to carry.
 - **Resolution is bought natively, not by upscaling.** The quality profile diffuses at **768x768 or
   above**, at the measured 2.7x per-frame cost of 512, because the detail is then generated rather
-  than inferred. No upscaler dependency is taken.
+  than inferred. No upscaler dependency is taken. **What this clause does not decide is aspect**,
+  and the omission is named here rather than left for an implementer: every reading behind it is
+  square, the stream is 1920x1080, and SD1.5 degrades off-square in a way nothing here has looked
+  at. Plan 0106 **Phase 2b** measures the three handlings — native non-square, square-then-stretch,
+  pad-then-crop — and the answer amends this bullet before this ADR is accepted.
 - **Realtime is out of scope for Plan 0106 and becomes its own plan with its own ADR.** This ADR
   records the measurements that plan will start from, and records that it reopens two of Plan
   0106's rejected alternatives, but decides nothing about its architecture.
@@ -112,6 +116,11 @@ out.** Concretely, and each clause is load-bearing:
   ControlNets loaded.
 - **Profiles are a second surface that can rot.** A profile whose meaning drifts silently
   invalidates every render that named it. Mitigated by the stderr echo, not eliminated by it.
+- **The measurements this ADR rests on are square, and the pipe is not.** Every number quoted above
+  — 1.164 s/frame, the 2.7x for 768, the boil ladder — was taken at 768x768 or 512x512 against a
+  stream that is 1920x1080. None of them is known to carry, and the `quality`/`fast` profile values
+  are provisional until Plan 0106 Phase 2b returns. Recording this as a cost rather than repairing
+  it here is deliberate: the repair is a measurement, not a decision.
 - **Realtime remains unsolved and now has a named wall.** Anyone reading this should not expect the
   next increment to be small: the remaining bounded levers do not reach 35x, and the unbounded one
   (residual CFG) is engineering rather than configuration.
