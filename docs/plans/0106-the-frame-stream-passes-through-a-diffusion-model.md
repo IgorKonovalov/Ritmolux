@@ -1,8 +1,9 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** in-progress — Phases 1-2 ran 2026-08-20; **the stop condition did not fire**, Phases
-> 3-5 are amended to carry ADR-0121, and **Phase 2b is added** to measure the one thing every spike
-> reading missed: the stream is 16:9 and every measurement is square
+> **Status:** in-progress — Phases 1, 2, 2b and 3 are done (2026-08-20). The stop condition did not
+> fire; **Phase 2b chose `native`**, so the filter diffuses at the stream's own aspect and every
+> square s/frame reading in this document is superseded. **Phases 4-6 remain**, and Phase 4 is
+> unblocked
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
@@ -720,7 +721,36 @@ from smear the geometry introduced. It is recorded as suggestive and is not the 
 sheets `aspect_sheet.png` and `aspect_f100.png`, and the raw pre-crop squares under
 `spike/out/aspect_raw/`. All untracked, as Phase 1's artifacts are.
 
-**Verdict: pending.** The phase closes when the user names the arm that ships.
+**Verdict, 2026-08-20 — `native` ships.** Recorded as given:
+
+> *"native is the best"*
+
+So the filter diffuses at the stream's own aspect and neither squashes nor letterboxes. That is the
+arm the measurements also favour — cheapest per frame and the only one delivering every pixel it
+paid for — and, unusually for this plan, the eye and the numbers agreed without either being shown
+the other.
+
+**The conditional this phase's done-when attached to any answer other than square-then-stretch, now
+owed and discharged: every s/frame figure recorded above this entry was measured square and does not
+carry over.** Specifically, Phase 2's banked **1.164 s/frame** is a 512x512 reading, the **2.7x for
+768** is square-to-square, and the realtime gap quoted as **~35x** is computed from the 512 square
+figure. The shipping geometry is 1024x576, where the same cell measures **2.721 s/frame** — 2.34x
+the banked number, for 2.25x the pixels. **Nothing about the realtime conclusion changes**: the gap
+was already unbridgeable by the named levers, and it widens rather than narrows. What must not
+happen is a later phase quoting 1.164 as though it described a shipping render.
+
+**Two consequences for documents this phase does not own**, both routed to `architect`:
+
+1. **[ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+   is still `proposed`, and its resolution clause reads "768x768 or above"** — square, which this
+   measurement retires. The honest restatement is a **pixel budget at the stream's own aspect**
+   (589,824 px is the measured cell; 1024x576 is that budget at 16:9), plus the aspect Negative it
+   already carries being closed. The ADR itself says this answer amends the bullet before
+   acceptance.
+2. **Phase 4's provisional profile sizes need the same edit** — `quality` and `fast` are written as
+   768 and 512, which are square. They should name a pixel budget and derive the geometry from the
+   stream.
+
 
 ## Followups (after this lands)
 
