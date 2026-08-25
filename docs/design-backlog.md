@@ -2791,3 +2791,143 @@ tree, but report an untracked hit as a **warning that does not set the exit code
 `check-backlog-claims.mjs`'s advisory block already uses — keeps both and is probably the answer.
 
 **Not urgent.** One close hit it, once, and editing the offending file took a minute.
+
+## 0128 — every sanity statistic measures departure from black, so a scene that paints its own ground is unmeasurable
+
+**Raised by:** `preset-author`, routed 2026-08-25, when a deliberately flat black-and-white preset
+(`presets/fragment_tiledmono.toml`, `fragment_field` + `palette_steps = 20`) was rejected by
+`every_preset_draws_a_real_shape` at `tonal_flatness = 0.9494` against a `0.90` ceiling.
+**Owner if taken:** `architect` first — this is a question about what the sanity lens *means*, not a
+threshold to retune.
+
+- **Verified 2026-08-25** — the ceiling that convicts: `present: MAX_TONAL_FLATNESS: f32 = 0\.90 in: core/tests/sanity.rs`
+- **Verified 2026-08-25** — every statistic keys off departure from the black reference:
+  `present: fn is_lit in: core/src/render/metrics.rs`
+
+### The finding
+
+`is_lit(px, bg, eps)` is true when any of the first three channels differs from `bg` by more than
+`EPS = 10`, and `sanity` passes `BLACK` as `bg`. **All four of the lens's statistics are built on
+it** — `coverage` is lit/total, `quadrant_spread` counts lit pixels per quadrant,
+`radial_shell_occupancy` counts shells containing lit pixels, and `tonal_flatness` buckets lit pixels
+by luminance. The lens therefore encodes an unstated precondition: **the scene draws light onto a
+black ground, and black means nothing was drawn.** That holds for all eleven current systems, which
+are additive and luminous. It is about to stop holding.
+
+Two distinct failure modes, and they are not the same bug:
+
+**Dark ink on black.** When a scene draws black as a *colour*, that ink is not counted. A
+black-and-white look is then measured on its white alone and reads near `1.0` by construction,
+however much structure the frame holds. Measured at the gate's exact capture (96x96, `FRAMES = 30`,
+all bands at `LOUD = 1.0`): white 94.94 % of lit, red 0.24 %, flatness `0.9494`. The same preset at
+frame 120 reads `0.8303`, because the gate samples during the preset's own `[smoothing]` warm-up —
+worth knowing separately, since it means the statistic is read before the picture has settled. At
+1280x720 the frame is 46.7 % white, 45.9 % black, 7.0 % red, and pixels belonging to none of the
+three inks total 0.2-0.3 %, i.e. edge antialiasing. There is no gradient and no blown-out region;
+this is the *opposite* of the additive-ceiling blot the docstring describes, caught by the same net.
+
+**A light ground is worse, and this is the part that reaches Plan 0113.** If the scene paints its own
+pale paper, every pixel is lit. `coverage` goes to ~1.0, `quadrant_spread` to 4, and
+`radial_shell_occupancy` to every shell — **three of the four statistics stop carrying information at
+all**, passing any floor trivially. The fourth becomes the paper's share of the frame, so
+`tonal_flatness` now convicts a composition *for being sparse* — which for the suprematist target is
+the goal rather than the defect.
+
+### Why it is time-critical
+
+[Plan 0113](plans/0113-the-engine-paints-a-canvas.md) is **approved** and adds `shape_collage`,
+described in its own TL;DR as "the engine's first **graphic** world rather than a luminous one: no
+glow, no bloom, hard edges, solid colour", on "its own off-white paper" (`f(1.0) = 0.800`). It
+reaches flat colour through the same tonemap property this preset uses — identity below `KNEE = 0.6`.
+The plan does not mention `tonal_flatness`, `sanity`, or any metric question anywhere; its Phase 1
+done-when renders a preset, and Phase 8 ships a set. Both meet this lens.
+
+**Scope this honestly:** the routed note claimed every flat-graphic preset trips the gate, and that
+is overstated. A canvas at 85 % paper reads `0.85` and passes; one at 92 % fails. The reliable claims
+are the weaker and the stronger one — that the *pass* is uninformative because three statistics have
+gone degenerate, and that the *failure*, when it comes, arrives on the sparsest and most correct
+compositions.
+
+### What is not the answer
+
+`KNOWN_FLAT` is documented as a defect list that must stay empty ("if one ever goes over, that is a
+defect to route, not an entry to re-add"), so an exemption is not the escape hatch — this entry is
+that routing.
+
+Lifting the ink from `#000000` to `#010101` puts the black at luma ~22 after the preset's glow, over
+`EPS`, so it counts as lit and flatness falls to ~0.5. It passes today and is visually
+indistinguishable. **Rejected:** it defeats the gate by tickling a threshold rather than correcting
+the model, and it leaves the trap armed for the scene that will actually need it. The user declined
+altering content to satisfy a gate.
+
+Raising the second lit tone until the statistic moves was measured and costs the look: splitting the
+red into two palette runs cleared the gate at `0.497` and took red to 46.6 % of lit pixels, turning
+every large dark mass red.
+
+### Candidate directions, none decided
+
+- **The scene declares its ground, and the statistics measure departure from that** rather than from
+  a hardcoded `BLACK`. Most faithful to what the lens is asking; touches every call site and the
+  capture surface.
+- **A structural rescue in the shape of the one Plan 0075 added for thin strokes** — shell occupancy
+  earned its place there precisely because it could not be bought with glow. The analogue here is a
+  statistic that sees composition rather than tone.
+- **A per-system precondition**: graphic systems opt out of the tonal lens and into a different one.
+  Cheapest; risks becoming the exemption list this project already refuses.
+
+### Status of the motivating content
+
+`presets/fragment_tiledmono.toml` is finished and user-approved, sitting **untracked** in the working
+tree — not committed, because `core/build.rs` globs `presets/` and landing it would take CI red.
+Note that the same glob picks up untracked files, so a local `cargo nextest run -p lmv-core` fails on
+it today until this is settled or the file is parked elsewhere.
+
+### Measured against the real scene, 2026-08-25 — and `dev` has already hit the other half
+
+Plan 0113 turned out to be **in flight**, not pending: `plan-0113-shape-collage` carries three
+commits (the painter, the cost instrument, the tier caps). That makes the collision above
+measurable rather than predicted, and it is worse than predicted in one direction and better in
+another.
+
+**`dev` reached the same finding independently, from the coverage side.** The branch adds a
+`coverage_floor` arm for the new system whose own comment reads: *"a `shape_collage` canvas paints
+its own paper across every pixel (ADR-0123), so its lit fraction is 1.0 by construction whatever the
+elements do, and the statistic this floor is made of cannot distinguish a good canvas from an empty
+one."* It then leans on the tonal statistic as the rescue: *"The question this family actually needs
+asked is tonal, not areal — a canvas that drew no elements is a flat sheet of paper, which
+`MAX_TONAL_FLATNESS` sees and coverage does not."*
+
+**Measured on the branch's committed golden** (`core/tests/golden/shape_collage.png`, 128x128):
+
+    coverage        1.0000   exactly, confirming the comment above
+    tonal_flatness  0.7577   passes, 0.14 under the 0.90 ceiling
+    paper share     75.77 % of the canvas (bucket 14); elements hold ~24 %
+
+So today's sample canvas passes, and the black-and-white false positive is **not** yet reproduced on
+this family. The problem is what the plan builds next.
+
+**The rescue `dev` is relying on is measured only where it cannot fire.** `sanity` captures at
+`LOUD`, where Phase 6's `density` lever puts the canvas at its *fullest* — the state with the most
+elements and therefore the lowest flatness. The second, quieter capture (Plan 0058) buys exactly one
+gate, `MODERATE_MIN_COVERAGE`, and that is the areal statistic which is degenerate at `1.0` for this
+family. `quadrant_spread` and `radial_shell_occupancy` are degenerate for the same reason.
+
+The consequence is precise: **Phase 6 explicitly builds an emptying canvas** — *"`density` gates what
+fraction of the generated list is live, with elements fading in and out by age"* — and the state it
+builds is measured by nothing. A canvas that empties correctly on a quiet passage and a canvas that
+is broken and draws no elements are the same picture, a flat sheet of paper, and every statistic in
+the lens either cannot see it or is not read at the excitation where it happens.
+
+That is the sharp form of this entry, and it is a stronger claim than the one it was routed with:
+
+- the **false positive** (a correct black-and-white or sparse composition convicted) is real but
+  bounded — it needs ~90 % single-tone, which today's canvas is not;
+- the **false negative** is unbounded and already designed-in — for this family the lens has one
+  live statistic, read at the one excitation where the defect it is meant to catch cannot appear.
+
+### What this does not settle
+
+Whether the answer is a ground-relative `is_lit`, a structural statistic in the shape of Plan 0075's
+shell-occupancy rescue, reading the tonal statistic at the quiet excitation too, or a per-system
+lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
+0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.

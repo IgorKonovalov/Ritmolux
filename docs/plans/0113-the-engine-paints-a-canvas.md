@@ -1,0 +1,362 @@
+# 0113 — The engine paints a canvas
+
+> **Status:** approved
+> **Created:** 2026-08-25
+> **Owner skill(s):** dev, human
+> **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
+> **Relates to:** [design-backlog 0069](../design-backlog.md) — partially advanced, not closed.
+> **Amended 2026-08-25:** **Phase 6b added**, and Phase 6 is now blocked on
+> [Plan 0116](0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
+> Phase 1's `coverage_floor` arm correctly found that this family's lit fraction is `1.0` by
+> construction and leaned on `MAX_TONAL_FLATNESS` as the rescue; that rescue is read only at `LOUD`,
+> where Phase 6's `density` holds the canvas at its fullest, so the emptying canvas Phase 6 builds is
+> measured by nothing. Phases 1-5 and 7-8 are unaffected.
+
+## TL;DR
+
+A twelfth system, `shape_collage`, draws flat opaque elements — quads, bars, circles, triangles,
+rings, lines, arcs, checker patches — on its own off-white paper, in painter order, from one
+fullscreen distance-field pass. It is the engine's first **graphic** world rather than a luminous
+one: no glow, no bloom, hard edges, solid colour, and a black bar that genuinely sits in front of a
+red one. A seeded layout grammar composes the canvas; the music recomposes it on the beat, drifts
+and rotates it continuously, populates and empties it, and pumps individual elements. The first
+user-visible behaviour is a static Malevich rendering on screen at the end of Phase 1.
+
+## Context & problem
+
+The user asked to explore a visualisation system resembling Russian avant-garde painting — "solid
+colors, objects" — supplying six references: three Malevich suprematist canvases, Malevich's
+figurative constructivism, Kandinsky's *On White II*, and a Severini futurist collage. The
+interview settled the target at **suprematist plus Kandinsky vocabulary**, a **mandatory light
+ground**, **all four reactivity levers**, and a **seeded generated composition** rather than an
+authored one.
+
+The engine cannot draw this today, and the reason is structural rather than incidental. All eleven
+systems emit premultiplied additive colour into a linear-light composite, and additive light has no
+notion of one object being in front of another. `design-backlog 0069` files precisely this and
+prices it as a composite redesign, which is why it has sat at **Low** priority since 2026-08-05.
+
+ADR-0123 establishes that the price is wrong: a fullscreen scene emitting alpha 1 already holds the
+backdrop out entirely (measured, Plan 0091 Phase 1), the tonemap is exactly the identity below
+`KNEE = 0.6` so flat colour survives byte-identical, and bloom's threshold sits above that knee so
+hard edges stay hard for free. The capability lands as a scene, with no composite change at all.
+
+What remains genuinely uncertain is **cost**. The chosen draw path is O(elements) per pixel, and
+the bounding-box reject removes the distance evaluation but not the loop step. That is a real risk
+against the NFR floor tier, and this plan carries a stop gate for it rather than an assumption.
+
+## Decision
+
+We implement ADR-0123's fullscreen distance-field painter as a new `shape_collage` system. We
+rejected **Alternative A** (instanced quads with `over` blending) because it needs a new blend state
+and a "scene owns its clear colour" concept for a capability the fullscreen route delivers with
+none, while still requiring the same distance functions; **Alternative B** (tile-binned compute
+prepass) because it commits two passes, a bin buffer, an overflow policy and the engine's first
+compute scene before anything is known about whether the plain loop suffices; **Alternative C**
+(the `multiply` layer) because multiply is commutative and therefore cannot express occlusion at
+all; and **Alternative D** (extending `shape_field`) because that scene's contour-band machinery is
+exactly what a flat opaque element must switch off, and Plan 0098 is concurrently changing the file.
+
+Two questions this plan deliberately does not answer up front. **Whether the cost is affordable** is
+measured in Phase 2 and decided by a human in Phase 3, which can route the whole plan to
+Alternative A or B. **Which layout grammar reads as a composition rather than confetti** is decided
+in Phase 5 from rendered samples, not from prose.
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph core["core/ — no change to the composite"]
+        AF[AnalysisFrame<br/>bands, onset, beat]
+        GEN["layout generator<br/>(CPU, seeded)"]
+        BUF[("element buffer<br/>storage, tier-capped")]
+        PASS["shape_collage<br/>fullscreen SDF painter"]
+        LUT[("palette LUT<br/>A / B")]
+        CHAIN["PostChain<br/>bloom · tonemap"]
+    end
+    BD["backdrop<br/>(held out: alpha = 1)"]
+
+    AF -->|recompose edge, density, pump| GEN
+    GEN -->|"Element[] in painter order"| BUF
+    BUF --> PASS
+    LUT -->|palette coord| PASS
+    PASS -->|"rgb, alpha = 1"| CHAIN
+    BD -.->|absent under full coverage| CHAIN
+```
+
+## Implementation phases
+
+### Phase 1 — The painter draws a static canvas
+- **Owner skill:** dev
+- **What:** `shape_collage` exists as the twelfth system and renders a fixed, preset-authored
+  element list through the fullscreen distance-field painter.
+- **Files touched:** `core/src/render/scenes/shape_collage.rs` (new), `core/src/render/scenes/mod.rs`
+  (factory + `draws_through_shared_line_renderer`), `core/src/preset/schema.rs` (`SystemKind`,
+  `ALL`, `VARIANT_COUNT`, `param_names`), `presets/collage_suprematist.toml` (new),
+  `core/tests/fixtures/`.
+- **Done when:**
+  - `shot --preset collage_suprematist` renders flat quads, circles and triangles on an off-white
+    ground, in painter order, with no glow and no bloom halo.
+  - **Occlusion is demonstrated, not assumed:** a test renders two overlapping elements in both
+    array orders and asserts the overlap region takes the colour of the later element in each case,
+    and that the two frames differ there. Order is the mechanism, so this is the assertion that
+    proves it works.
+  - **Flat colour is exact:** an element authored at a palette coordinate whose resolved brightest
+    channel is at or below `KNEE` reads back from the capture at the value it was authored at, to
+    within the display's own 8-bit quantisation and nothing more. This is a property, not a
+    measurement — below the knee ADR-0046's curve is the identity, so any larger tolerance would be
+    hiding something.
+  - **The aspect comes from the render target** (ADR-0037). A circle element renders circular at
+    **1280x800**, not only at 16:9. The dev box is 2048x1152 and the usual capture is 1920x1080 —
+    both exactly 16:9 — so a test at those sizes cannot distinguish a target-derived aspect from a
+    grid-derived one, and this system computes screen-destined geometry. The 16:10 case is the one
+    that discriminates.
+  - `cargo build` fails to compile until the new variant is added to every exhaustive match
+    (`variant_roster_reminder` enforces this by construction).
+
+### Phase 2 — What an element costs
+- **Owner skill:** dev
+- **What:** The cost instrument, sweeping element count, so Phase 3 has numbers instead of an
+  argument.
+- **Files touched:** `core/tests/collage_cost.rs` (new), `core/src/render/tier.rs` (the cap).
+- **Done when:**
+  - The test sweeps element count across at least 8, 16, 32, 64 and 128 at 1080p, renders each, and
+    **prints per-frame cost with the adapter, driver, profile and window size named**.
+  - **It asserts no threshold.** Per [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+    a frame time is a fact about a GPU and a driver, not about the code. Model this file on
+    `core/tests/mark_cost.rs`, which is the in-tree precedent: it prints, it names its machine, and
+    the only thing it asserts is that it genuinely measured different configurations.
+  - **It skips on a software rasterizer with a printed notice** (ADR-0016's shape). A WARP reading
+    says nothing about the iGPU floor in `docs/nfr.md` §7, and would be a number that looks like
+    evidence and is not.
+  - The element cap is a `TierConfig` field with `Floor` and `Rich` values, so no build can ship an
+    unbounded loop. The values may be provisional at this phase; Phase 3 sets them.
+
+### Phase 3 — The stop gate
+- **Owner skill:** human
+- **What:** Read Phase 2's numbers and decide whether the fullscreen painter survives.
+- **Done when:** The user has chosen one of three, and the choice is written into this plan:
+  - **Continue** — the floor tier holds at least **32 elements** at 1080p inside the NFR §1 budget.
+    32 is counted from the user's own references, not estimated: *Suprematist Composition* has
+    roughly 35 elements and *On White II* above 40, so a canvas below this cannot render the target
+    paintings. Set the two `TierConfig` values and proceed to Phase 4.
+  - **Escalate to ADR-0123 Alternative A** (instanced quads) — if the wall is element count and the
+    canvases are sparse. Phases 4 onward are unaffected; only `shape_collage.rs`'s draw path is
+    rewritten, and Phase 1's tests still hold.
+  - **Escalate to ADR-0123 Alternative B** (tile binning) — if neither element count nor coverage
+    alone explains the cost. This is a new ADR and a new plan, not a phase here.
+
+### Phase 4 — The layout generator and a sample sheet
+- **Owner skill:** dev
+- **What:** A seeded CPU layout grammar with three candidate strategies, plus the rendered sample
+  sheet Phase 5 judges.
+- **Files touched:** `core/src/render/scenes/shape_collage/layout.rs` (new),
+  `core/tests/collage_layout.rs` (new), sample output under the scratch capture path.
+- **Done when:**
+  - Three grammars are selectable by parameter and documented in one sentence each:
+    **anchor-and-satellites** (one or two dominant elements, the rest clustered around them),
+    **diagonal-axis** (a dominant angle with elements distributed along and across it), and
+    **size-hierarchy** (a power-law size distribution with position independent of size).
+  - **The generator is deterministic**: the same seed and recomposition index produce a
+    bit-identical element list, asserted directly. No wall-clock reads and no unseeded randomness
+    (the cross-cutting determinism rule).
+  - **It allocates once.** The element vector is preallocated to the tier cap at scene construction
+    and reused by `clear()` + `push()`; a test asserts capacity does not change across a thousand
+    recompositions.
+  - A sample sheet renders at least 5 seeds x 3 grammars at 1080p, one image per cell, ready for a
+    human to compare side by side.
+
+### Phase 5 — The composition call
+- **Owner skill:** human
+- **What:** Pick the grammar (or the combination) that reads as a painting, from Phase 4's images.
+- **Done when:** The user has named the winning grammar and the plan records the choice plus, in one
+  or two sentences, **what made the losers lose** — that reason is what the content lane will need
+  and is the half that gets lost if only the verdict is written down.
+
+### Phase 6 — The music moves the canvas
+- **Owner skill:** dev
+- **What:** All four reactivity levers, on the chosen grammar's element list.
+- **Files touched:** `core/src/render/scenes/shape_collage/`, `presets/collage_suprematist.toml`.
+- **Done when:**
+  - **Recomposition:** a rising edge on a bound `recompose` expression re-runs the generator with
+    the next seed. `recompose_blend` at 0 hard-cuts; above 0 it crossfades over that many seconds.
+  - **Drift and spin:** per-element velocity and angular velocity, assigned at generation from the
+    seed and integrated by the **injected real `dt`** — never a fixed per-frame constant. A test
+    asserts that stepping 1 second as 60 frames and as 30 frames lands elements in the same place
+    to within float tolerance.
+  - **Spawn and decay:** `density` gates what fraction of the generated list is live, with elements
+    fading in and out by age. Birth order is stable, so raising `density` never reorders or pops an
+    already-live element — asserted.
+  - **Per-element pumping:** `pump_size` and `pump_alpha` modulate individual elements, **phase-
+    offset by element index** so the canvas does not breathe in unison. The property to assert is
+    that at a given instant the modulation values across live elements are not all equal — a
+    threshold on their spread would be inventing a number.
+  - The preset passes `reactivity`, which is the **only** one of the five gates that drives real PCM
+    through the analyzer; the other four synthesize their frames and would not notice a canvas that
+    ignored the music.
+
+> **Blocked on [Plan 0116](0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
+> builds a canvas the music empties, and **no gate in this repo can currently see that state.**
+> `sanity` reads `tonal_flatness` only at `LOUD`, where `density` holds the canvas at its fullest;
+> the quiet capture buys only `MODERATE_MIN_COVERAGE`, which is degenerate for this family because
+> the paper makes `coverage` exactly `1.0000` — measured on this branch's own committed golden,
+> which reads `coverage 1.0000, tonal_flatness 0.7577`. A canvas the music emptied correctly and one
+> that is broken and drew no elements are the same flat sheet of paper. **Do not weaken `density`'s
+> range to keep the gate green** — that is tuning content to a lens ADR-0126 has already ruled
+> wrong. See Phase 6b.
+
+### Phase 6b — The canvas is measured against its own paper
+
+- **Owner skill:** dev
+- **What:** Adopt [Plan 0116](0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
+  family, and retire the placeholder reasoning this branch shipped in Phase 1.
+- **Depends on:** Plan 0116 Phase 3 having landed. If it has not, **stop and say so** rather than
+  proceeding — Phase 7 does not depend on this and can be taken first.
+- **Files touched:** `core/tests/sanity.rs`, `presets/collage_suprematist.toml` (only if Phase 5
+  adjudicates it defective — not to satisfy a threshold).
+- **Done when:**
+  - The `coverage_floor` arm for `ShapeCollage` no longer rests on the premise that *"its lit
+    fraction is 1.0 by construction"*. After Plan 0116 Phase 3 that premise is false, and the
+    comment written here in Phase 1 is re-pointed rather than left standing as the reason for an
+    inherited `0.50`.
+  - The floor is re-derived from the family's own measured distribution by the rule beside it, as
+    Plan 0116 Phase 4 does for every other system.
+  - A capture at `density` low enough that no elements are live is **convicted**, and the assertion
+    demonstrably fails if reverted onto the `BLACK` predicate.
+  - **No threshold is invented for how sparse a legitimate canvas may be.** The property asserted is
+    that a bare ground and a composed canvas are separated; where a suprematist composition stops
+    being sparse and starts being empty is a content judgement and stays one.
+
+### Phase 7 — The Kandinsky vocabulary
+- **Owner skill:** dev
+- **What:** The rest of the element roster, taking the system from suprematist to *On White II*.
+- **Files touched:** `core/src/render/scenes/shape_collage/sdf.rs`, `presets/collage_onwhite.toml`
+  (new).
+- **Done when:**
+  - `bar`, `ring`, `segment`, `arc` and `checker` join `quad`, `circle` and `triangle`, each with
+    an exact axis-aligned bounding box — a loose box is a silent cost regression on the Phase 2
+    measurement, so the box is asserted to be tight for every kind.
+  - Per-element `alpha` below 1 produces a translucent crossing: where two elements overlap the
+    result is the `over` composite of both, and a test asserts the crossing region differs from
+    both parents' solid colour.
+  - `presets/collage_onwhite.toml` ships and passes all five gates.
+  - **Re-run Phase 2's cost sweep** after the roster lands. The roster puts a branch in the painter
+    loop, which is the same hazard `mark_cost.rs` was written for; a roster added without
+    re-measuring silently spends Phase 3's budget.
+
+### Phase 8 — Documentation and the shipped set
+- **Owner skill:** dev
+- **What:** The operator-doc sweep and the golden baselines.
+- **Files touched:** `presets/README.md`, `docs/presets.md`, `docs/preset-palettes.md`,
+  `README.md`, `core/tests/golden/`.
+- **Done when:**
+  - **`presets/README.md` carries the complete `shape_collage` param roster** and its structural
+    table. This row is load-bearing for the `preset-author` lane, which keeps no catalogue of its
+    own and authors against this file.
+  - **`docs/preset-palettes.md` states the knee constraint in authoring terms** — that a
+    `shape_collage` preset keeps its palette below linear 0.6 to stay flat and bloom-free, and that
+    the paper is off-white by construction because `f(1.0) = 0.800`. An author who does not know
+    this will reach for a brighter palette and lose the look without being told why.
+  - `docs/presets.md` gains any new expression-grammar surface this plan introduced, or the plan
+    records that it introduced none.
+  - Golden baselines exist for both shipped presets, blessed on **hardware**, and the bless is
+    scoped — unrelated baselines are restored before committing.
+
+## Data shapes
+
+```rust
+// illustrative — not the final interface
+/// One flat element. 64 bytes, 16-byte aligned; the array is the painter's
+/// order, so index IS depth. Colour is a PALETTE COORDINATE, not an RGB triple,
+/// so ADR-0086/0102 and the A/B crossfade apply unchanged.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct Element {
+    center_size: [f32; 4], // cx, cy, half_x, half_y  (target-aspect space)
+    shape:       [f32; 4], // angle, kind, p0, p1     (p0/p1 kind-specific)
+    tint:        [f32; 4], // palette_coord, alpha, birth, spare
+    aabb:        [f32; 4], // x0, y0, x1, y1          (precomputed reject box)
+}
+```
+
+At the reference density this is small: 128 elements is 8 KB of storage buffer, so buffer size is
+not a constraint anywhere in this plan. The cost is entirely per-pixel loop traffic.
+
+The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `density`, `scale`,
+`size_hierarchy`, `angle_bias`, `drift`, `spin`, `recompose`, `recompose_blend`, `pump_size`,
+`pump_alpha`, `palette_shift`, `color_span`, `opacity`, `edge_softness`, `seed`, `roster`.
+
+## Risks & open questions
+
+- **The per-pixel loop is the plan's real risk.** The bounding-box reject saves the distance
+  evaluation but not the loop step, so a wavefront walks every element regardless. Phase 2 measures
+  it and Phase 3 can stop the plan. This is the risk the phase order exists to expose early.
+- **The generator may produce confetti.** A seeded layout that satisfies every statistic can still
+  fail to read as a composition, and no test can tell us. Phase 5 is a human gate for exactly this,
+  and Phase 4 spends its effort on making three candidates comparable rather than on making one
+  good.
+- **Recomposition may read as a glitch rather than a cut.** Hard-cutting a whole canvas on a beat is
+  visually violent. `recompose_blend` exists as the lever; if neither extreme works, the finding is
+  content-lane feedback, not an engine defect.
+- **The beat clock counts onsets, not beats** ([ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
+  at 1.7–2.1x. A `recompose` bound to `beat_index` will fire roughly twice as often as the music's
+  beat, and Plan 0095 is the fix in flight. Author the shipped presets knowing this, and do not
+  compensate for it inside the scene — that would have to be unwound when 0095 lands.
+- **The aspect hazard has shipped three times in this repo.** This system computes screen-destined
+  geometry from a normalized space, which is exactly the shape of the bug. Phase 1's 1280x800 check
+  is the guard; keep it.
+- **No allocation in the render path.** The generator runs on the render thread at recomposition,
+  not in the audio callback, so the audio rule is not at stake — but a per-recomposition `Vec`
+  reallocation would still spike a frame. Phase 4 asserts capacity stability.
+
+## What this plan does NOT do
+
+- **It does not close `design-backlog 0069`.** Occlusion works *within* one `shape_collage` scene;
+  a collage element and a `swarm` particle still have no ordering relationship. That entry stays
+  live and takes a dated update at this plan's close naming the half that moved.
+- **It does not add engine-wide depth, sorting or a render graph.** ADR-0018 and ADR-0031 rejected
+  the render graph twice and both rejections stand.
+- **It does not deliver Malevich's figurative constructivism** (reference image 1). Figures
+  assembled from colour blocks are authored bespoke geometry, which is
+  [Plan 0092](0092-the-engine-draws-an-authored-path.md)'s territory.
+- **It does not deliver the Severini collage** (reference image 5). A dense fragmented-facet field
+  is a subdivision mechanism, not a shape roster, and would be its own ADR.
+- **It does not add `paper_alpha`**, so `shape_collage` composes as the lower ADR-0090 layer only.
+  Filed as a followup rather than built, because nothing in the reference set needs it.
+- **It does not retune the existing library** for the tonemap knee. `design-backlog 0038` owns that.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands.
+
+**Lane:** _(not yet started)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The painter draws a static canvas | dev | not started | |
+| 2 — What an element costs | dev | not started | |
+| 3 — The stop gate | human | not started | |
+| 4 — The layout generator and a sample sheet | dev | not started | |
+| 5 — The composition call | human | not started | |
+| 6 — The music moves the canvas | dev | not started | |
+| 7 — The Kandinsky vocabulary | dev | not started | |
+| 8 — Documentation and the shipped set | dev | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** none
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- `paper_alpha`, so a collage can sit as the upper ADR-0090 layer.
+- A dated update on `design-backlog 0069` recording that in-scene occlusion now exists and
+  cross-scene ordering does not.
+- Malevich's figurative constructivism, once Plan 0092's authored path lands.
+- The Severini subdivision field, if the canvas proves the style is worth extending.
