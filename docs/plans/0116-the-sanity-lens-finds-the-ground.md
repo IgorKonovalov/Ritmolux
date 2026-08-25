@@ -187,7 +187,7 @@ why this is one change at the root rather than four.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — What each candidate ground would say | dev | done | committed with this row |
+| 1 — What each candidate ground would say | dev | done | `8d4a9a9` |
 | 2 — The stop gate | human | not started | — |
 | 3 — The lens takes a ground | dev | not started | — |
 | 4 — The floors are re-derived, not re-used | dev | not started | — |
