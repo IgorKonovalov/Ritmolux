@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0120**
+**Next free number: 0121**
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -137,4 +137,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), three Outcome |
 
 | [0119](0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) | The video echo blends toward its copy rather than adding it | accepted 2026-08-19 (Plan 0109) |
+| [0120](0120-the-close-brief-is-a-section-of-the-plan.md) | The close brief is a section of the plan, written as the phases land | proposed |
 <!-- roster:end -->
