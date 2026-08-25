@@ -576,7 +576,7 @@ reproducible from what ran rather than from a name whose meaning may since have 
 | 7a—7c — the suite runs everywhere, the seam is pinned | dev | done | `d597594` |
 | 7e — one page, and a gate that keeps it there | dev | done | `1aa2f2a` |
 | 7d — the instrument | dev | done | `e1a0e98` |
-| 7d — the corrected figures | dev | done | committed with this row |
+| 7d — the corrected figures | dev | done | `b1647a6` |
 
 > **The per-phase sections below predate the implementation-log convention** (Plan 0112) and are
 > prose rather than observations. They are left as written because they carry the spike's, the
@@ -1173,6 +1173,59 @@ anchors re-pointed. None involve a file this phase changed. Not acted on.
 `### Close triggers`) is unwritten, the branch has not taken `main`'s eight commits, and the ADR-0120
 collision above is unresolved. Phases 1—6's prose sections still predate the log convention.
 
+
+### Notes
+
+**Deviations**
+
+- 7b (`d597594`): the frozen table carries **both** directions rather than the forward one the phase
+  names — across the whole 8-bit cube the forward chroma terms leave `0..=255` by exactly ±0.5
+  and no further, so five of the seven inverse rows are where the clamp is exercised.
+- 7c (`d597594`): the CI `links` job installs `numpy`, which the phase does not mention. The colour
+  table pins array functions and would otherwise skip on the one runner that cannot skip.
+- 7a (`d597594`): the no-`spike/` property was verified on a clean tree built outside the repo rather
+  than by renaming this lane's `spike/`, which was locked by the still-running Phase 6 render.
+
+**Done-when criteria not satisfied as stated**
+
+- 7d, *"the wall-clock figure agrees with an independent stopwatch over a run of at least a thousand
+  frames"*: satisfied for `fast` (1 350 frames). `quality` was measured over **270** frames, not a
+  thousand — at 7.781 s per emitted frame a thousand would have cost 2.2 hours of GPU. Both agree
+  with the stopwatch (0.84 % and 0.10 %).
+- 7b, *"two saturated values whose chroma terms land outside `0..=255`"*: not satisfiable as written
+  in the forward direction; see the deviation above.
+
+**Followups noticed, not acted on**
+
+- 52 broken markdown fragment anchors repo-wide, identical on `main`; 49 are
+  `docs/design-backlog.md#NNNN--...` bodies moved to the archive without their anchors re-pointed.
+  None involve a file this plan changed. `scripts/check-doc-links.mjs` does not validate fragments.
+- `_control` passes `long_side = max(img.size)` as both `detect_resolution` and `image_resolution`,
+  which is a candidate cause of `quality`'s 2.53x and is **unmeasured**.
+- Phases 1—6's log sections predate the implementation-log convention and are prose; this log runs
+  600 lines against `## Implementation phases`' 374.
+- `docs/adrs/0120` is claimed twice: this branch's
+  `0120-a-sidecar-tool-documents-itself-in-one-place.md` and `main`'s
+  `0120-the-close-brief-is-a-section-of-the-plan.md` (`8b68cea`), both `proposed`. Different
+  filenames, so a merge takes both. 13 files on this branch cite the number.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none.
+- **What shipped:** feature — a new `tools/sd-filter/` stage, a fourth `scripts/` gate and a new
+  canonical doc page. **No release artifact changed**: `core/`, `core-cabi/`, `plugin-foobar/`,
+  `lmv-ring/` and `packaging/` are untouched, and the only Rust in the whole plan is 85 added lines
+  of test in `standalone/src/shot/render/tests.rs`.
+- **Operator docs touched:** `README.md` and `docs/capturing.md`; `docs/diffusion-filter.md` is new.
+  Not `presets/README.md`, `docs/presets.md`, `docs/preset-palettes.md`,
+  `docs/on-device-validation.md`, `docs/nfr.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 63 reductions across 38
+  live entries, 4 unprobeable, no entry named. The plan **added** two live entries, 0125 and 0126,
+  from Phase 6's two wants.
+- **Outstanding `human` phases:** none. Phase 2 (`dc78cdd`) and Phase 6 (`79ca9bc`) are both done.
+- **Not run on this branch:** `main`'s 8 commits are not merged, so `fmt`/`clippy`/`nextest` have
+  never run on the combination.
 
 ## Followups (after this lands)
 
