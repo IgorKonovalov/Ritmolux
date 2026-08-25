@@ -203,6 +203,19 @@ A review fires **once per plan**, after the last phase lands — in a **fresh se
 not one phase. This is architectural integrity, not line-by-line style. Run five lenses in order:
 
 ### 1. Alignment with the plan/ADR
+- **Start by reading the plan's `## Implementation log`** — the brief `dev` left, written into the
+  plan as the phases landed ([ADR-0120](../../../docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md)).
+  It hands you the lane, the phase-to-commit mapping, `dev`'s notes and the close triggers, so none
+  of that has to be re-derived. **It is claims, not evidence.** You still open the tests, read the
+  diff and reach your own verdict — a close that grades the log instead of the tree has failed, in
+  exactly the way a green `cargo test` is not a passing test. **And silence in it is not
+  certification:** done-when results are reported by exception, so a criterion with no note carries
+  `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
+  to test.
+- **A missing or empty log is a `minor`, never a blocker** — note it and review from `git` exactly
+  as you did before the section existed. **A log longer than the plan's own
+  `## Implementation phases` section is also a `minor`**: the report is not allowed to outweigh the
+  contract, and since nothing gates that property, this check is the only thing behind it.
 - Did the implementation do the phases in the plan? Any missing or added without note?
 - Does every phase have a single, in-vocabulary `**Owner skill:**` tag (`dev` / `human`)?
   Missing/malformed tags are a **blocker**.
@@ -473,6 +486,11 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    the `preset-author` lane commits presets directly, gated on the behavioral suite; curating the
    *set* is yours, at this cadence. **Output: a one-line verdict in the close notes** — a duty with
    no stated trigger and no stated output is the kind this project has already proved gets skipped.
+
+   **Where the trigger is stated:** the log's `### Close triggers` bullet **`presets/` touched**
+   names the files. That is where to start looking, **not the decision** — the curation verdict is
+   yours, and `dev` states what moved and nothing about whether it earns its place.
+
    Two sweeps, both cheap:
    - **What landed.** Does the new content earn its place against what already ships — or did a
      family just converge? `shot --presets presets --report` prints the near-duplicate flags and the
@@ -510,6 +528,12 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    hours later that same day (3 entries, from two closes that ran **after** the second sweep wrote the
    rule down). The rule lived in the backlog, the ceremony that executes it lived here, and until this
    step existed the two never met.
+
+   **Where the trigger is stated:** the log's `### Close triggers` bullets **Plan header `Closes:`**
+   and **Backlog probes** name the entries this plan claims to discharge and the exit `dev` saw from
+   `node scripts/check-backlog-claims.mjs`. Both are starting points, **not the decision** — you
+   re-run the probes yourself (step 1c is unconditional), and whether an entry is discharged,
+   half-discharged or falsified stays a judgement.
 
    Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
    how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
@@ -549,6 +573,11 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    cargo release <patch|minor> --no-push --no-publish --no-confirm --execute
    ```
 
+   **Where the trigger is stated:** the log's `### Close triggers` bullet **What shipped** says
+   `feature` / `fix-only` / `docs-chore-only`. That is where to start looking, **not the decision**
+   — `dev` is forbidden from proposing a level, and you pick it yourself against what the plan
+   actually landed, per ADR-0005.
+
    The version lives once, in root `Cargo.toml` `[workspace.package].version`; both crates inherit
    it. This is a separate axis from the C ABI version (`LMV_ABI_VERSION`), which moves only on an
    `extern "C"` shape change (ADR-0003) — never couple the two.
@@ -575,6 +604,12 @@ Since Plan 0047 this project runs plan lanes in **git worktrees** — `WORK/lmv-
 the order, because getting the merge direction backwards puts a merge commit and possibly a
 duplicate version tag on `main`. The four bookkeeping steps above are the **middle** of this
 sequence, not the whole of it:
+
+**The branch name and the worktree path come from the plan's `## Implementation log` `**Lane:**`
+line** — `dev` writes it on the first phase commit. Read them there rather than asking the user; if
+the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md)),
+`git worktree list` and `git branch --show-current` recover both, and note the missing log as the
+`minor` lens 1 calls for.
 
 1. **Merge `main` into the plan branch, from the worktree** (`git merge main`), and resolve there.
    Never update the main checkout's working tree from a lane — another session may be live in it.
