@@ -218,6 +218,11 @@ pub struct Analyzer {
     onset: onset::OnsetDetector,
     bands: bands::BandSplitter,
     tempo: tempo::TempoTracker,
+    /// Layer 2's own beat clock (ADR-0109), driven by the tempo estimate rather
+    /// than by the transient stream. Nothing outside [`Self::push_interleaved`]
+    /// reads it and it publishes no grammar variable — it exists so the downbeat
+    /// fold has a unit that is a beat.
+    grid: grid::BarGrid,
     novelty: novelty::NoveltyDetector,
     /// ADR-0050 Layer 2. Reads the **normalized** bass and flux, unlike the
     /// detectors above: its accent blend weighs the two against each other, which
@@ -263,6 +268,7 @@ impl Analyzer {
             onset: onset::OnsetDetector::new(),
             bands: bands::BandSplitter::new(format.sample_rate),
             tempo: tempo::TempoTracker::new(format.sample_rate),
+            grid: grid::BarGrid::new(format.sample_rate),
             novelty: novelty::NoveltyDetector::new(format.sample_rate),
             downbeat: downbeat::DownbeatTracker::new(),
             band_gain: gain::BandNormalizer::new(format.sample_rate),
@@ -323,6 +329,7 @@ impl Analyzer {
                     // measures spectral shape, which per-band normalization
                     // flattens by construction.
                     let clock = self.tempo.process(onset_raw, beat);
+                    let grid = self.grid.process(clock.bpm, onset_raw);
                     let novelty = self.novelty.process(&raw_spectrum);
 
                     // ...and normalization happens last, on the way out.
@@ -333,9 +340,26 @@ impl Analyzer {
 
                     // The downbeat tracker sits after normalization on purpose —
                     // it weighs bass against flux, which needs a common scale.
-                    let bars =
-                        self.downbeat
-                            .process(beat, clock.beat_index, bass, onset, clock.bar);
+                    //
+                    // What it folds over is the **grid's** beat count, not
+                    // `beat_index` (ADR-0109): the latter counts transients, at
+                    // 1.35x-2.10x per musical beat, so `beat_index % 4` spanned
+                    // well under a bar and a bar-locked accent precessed across
+                    // all four alignments. Until the grid is running — the tempo
+                    // tracker needs its envelope history filled first — the old
+                    // pair is passed, which is the counter fallback ADR-0050
+                    // specifies rather than a second code path.
+                    let (fold_count, fold_phase) = if grid.running {
+                        (
+                            grid.bar_index * downbeat::BEATS_PER_BAR + grid.beat_in_bar,
+                            grid.beat_phase,
+                        )
+                    } else {
+                        (clock.beat_index, clock.bar)
+                    };
+                    let bars = self
+                        .downbeat
+                        .process(beat, fold_count, bass, onset, fold_phase);
 
                     // The oscilloscope trace: the most recent `WAVE_SAMPLES` of
                     // the window, consecutive and un-normalized (Plan 0100

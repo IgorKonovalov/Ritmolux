@@ -210,8 +210,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — the tempo estimate is measured | dev | done | `5bdce91` |
 | 2 — the octave repair | dev | done | `09abdee` |
-| 3 — the bar grid | dev | done | committed with this row |
-| 4 — the fold folds over the grid | dev | not started | — |
+| 3 — the bar grid | dev | done | `cae98a5` |
+| 4 — the fold folds over the grid | dev | done | committed with this row |
 | 5 — re-measure through the instrument | human | not started | — |
 | 6 — the authoring docs | dev | not started | — |
 
@@ -255,6 +255,22 @@ is in `grid.rs`'s module docs and is not drift: a free accumulator can settle wi
 sitting *on* the transients, which splits every accent across two cells and smears the fold it
 exists to sharpen. It lives in a new `core/src/dsp/grid.rs`, registered in `dsp/mod.rs` and read by
 nothing.
+
+**Phase 4 found a defect in Phase 3's grid, and its commit repairs it — so it touches
+`core/src/dsp/grid.rs`, which is outside the phase's stated file list.** Wiring the fold to the
+grid turned `the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio` red: the estimator
+still locked, but the accented beats no longer all read `beat_in_bar` 0. The grid's *rate* was
+exactly right (119.9 BPM against a 120 BPM stimulus, 1 grid beat per musical beat on average) and
+its phase lock was working as designed — which was the defect. Parking the envelope's energy at
+phase 0 puts the grid's cell boundary **on** the transients, so each flag landed at phase 0.98 or
+0.01 and its bucket was decided by where the 10.7 ms hop lattice fell; the grid beat count skipped
+one and repeated another across successive musical beats. `LOCK_TARGET` now parks the energy 0.12
+of a beat in, and the same stimulus reads +1 per musical beat with the phase steady at 0.11-0.12.
+
+**`core/tests/fixtures/composite_symmetry.toml` did not move, and could not have.** Its golden is
+driven by a hand-built `AnalysisFrame` (`core/tests/composite.rs:223`), never by the analyzer, so no
+DSP change reaches it — the re-bless the phase called for was structurally unreachable rather than
+merely unexercised, and no baseline-drift control was run.
 
 ## Followups (after this lands)
 
