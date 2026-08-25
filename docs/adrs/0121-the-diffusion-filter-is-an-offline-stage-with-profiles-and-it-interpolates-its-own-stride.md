@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-08-25 (Plan 0106) — carries one `Outcome`
 > **Date:** 2026-08-20
-> **Related plan(s):** [0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md)
+> **Related plan(s):** [0106](../plans/done/0106-the-frame-stream-passes-through-a-diffusion-model.md)
 
 **On the number.** This is 0121 and 0120 is skipped deliberately.
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 names **ADR-0120** as
@@ -13,7 +13,7 @@ free for the next taker.
 
 ## Context
 
-[Plan 0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md) deferred this ADR on
+[Plan 0106](../plans/done/0106-the-frame-stream-passes-through-a-diffusion-model.md) deferred this ADR on
 purpose: it is written **between Phases 2 and 3**, against the spike's evidence rather than against
 a guess about what a diffusion pass would look like. That was the right call, because the evidence
 overturned the plan's own cost model and changed what the filter has to be.

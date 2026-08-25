@@ -127,7 +127,7 @@ portable figures**
 | profile | diffusion geometry | per diffused frame | per emitted frame | peak VRAM | a 4-minute track at 30 fps (7,200 frames) |
 |---|---|---|---|---|---|
 | `quality` | 1024x576 | 7.499 s | 7.781 s | 4.88 GiB | **~15.5 hours** |
-| `fast` | 680x384 | 1.291 s | 0.693 s | 3.81 GiB | **~1.3 hours** |
+| `fast` | 680x384 | 1.291 s | 0.693 s | 3.81 GiB | **~1.4 hours** |
 
 **The two columns measure different things, and the difference is the point.**
 *Per diffused frame* is the diffusion call alone. *Per emitted frame* is the wall
@@ -136,7 +136,7 @@ carries the colour decode, the downscale in, the upscale back to the stream's
 geometry, the colour encode out, and the gap crossfades. Those run per **emitted**
 frame, so at `fast`'s stride of 3 a single diffused frame pays three of them.
 Dividing the first column by the stride does **not** give the second, and a figure
-derived that way understates `fast` by 1.54x.
+derived that way understates `fast` by 1.61x.
 
 `fast` is not a different model: it is the same cell at 44 % of the pixels with
 `--stride 3`, and the stride is where most of the saving comes from.
