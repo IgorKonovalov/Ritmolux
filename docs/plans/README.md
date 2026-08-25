@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0114** (ADRs are a separate sequence — next free there is **0124**.)
+**Next free number: 0115** (ADRs are a separate sequence — next free there is **0125**.)
 
 ## Active roster
 
@@ -16,6 +16,7 @@ someone who picked it up is reading.
 
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0114](0114-the-line-stroke-reads-as-a-drawn-line.md) | The line stroke reads as a drawn line | draft | dev, human | **Takes priority over [0087](0087-the-line-renderer-draws-a-curve.md), which is parked at its Phase 4 by user decision 2026-08-25.** 0087's look gate returned *“circles looks fine but blurred”* — the first half closed that plan's question, the second half is this one. The stroke is a quadratic falloff across the **whole** half-width, so a 14 px line is a 4 px spine in a 10 px gradient; measured with bloom, trails and `glow` all unbound, so it is the stroke and not a post stage. **Nothing regressed** — it is [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) working as specified, and `glow`/`thickness`/bloom provably cannot reach it. Carries [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) (proposed): a `softness` param plus an `fwidth`-derived one-pixel edge, where `1.0` is today's fragment byte-for-byte. **Phase 4 is a human look gate that picks the default** — deliberately, on the 0087 precedent. Reaches **all five shipped line presets** and moves every line baseline once. Contends with 0087 on `core/src/render/scenes/lines/`, which is why that one is parked rather than run beside it. |
 | [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | approved | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | approved | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
@@ -148,6 +149,14 @@ because it is large.
   Alternative C, and two other plans carry phases scoped as if it lands
   ([0092](0092-the-engine-draws-an-authored-path.md) Phase 4, [0104] Phase 4). Learning that late
   wastes work written around it.
+
+> **Amended 2026-08-25 — Lane B changed hands.** 0087 reached its Phase 4 look gate and cleared both
+> its gates (the cost stop did not fire; the verdict green-lit Phase 5), so the de-risking this
+> lane was sequenced early for is **done** and the answer 0092 and 0104 were waiting on exists:
+> arcs shipped, Alternative C not taken. But the same verdict named a second defect — the stroke
+> reads blurred — and that is [0114], which owns the same directory. **0087 parks at Phase 4 and
+> Lane B runs 0114**, so its Phase 5 biarc chain is judged on the final stroke instead of through
+> the defect. Phases 5, 6 and 7 of 0087 stay green-lit and unbuilt on a branch whose gate is green.
 
 **The one rule these two lanes need, and it is not obvious.** Both end at the golden corpus — Lane A
 adds a baseline, Lane B re-blesses 28 — and `LMV_BLESS` rewrites every baseline the run renders, not
