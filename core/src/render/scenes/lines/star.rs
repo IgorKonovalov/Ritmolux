@@ -140,7 +140,7 @@ use std::f32::consts::TAU;
 use std::rc::Rc;
 
 use super::super::Scene;
-use super::renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, hankin,
     replicate_mirror, transform_cached, turtle,
@@ -214,6 +214,12 @@ pub struct StarPatternScene {
     /// declared no `rings`, and every ring-aware branch below keys off it, so a
     /// rings-less preset takes exactly the path it took before Plan 0065.
     ring_segments: Vec<SegmentInstance>,
+    /// The ornament's **arcs** — the circular motifs, one instance each
+    /// (ADR-0098). A ring of `circle` or `arc` puts nothing in
+    /// [`ring_segments`](Self::ring_segments) and everything here, so the
+    /// ornament is present when *either* is non-empty; see
+    /// [`has_ornament`](Self::has_ornament).
+    ring_arcs: Vec<ArcInstance>,
     /// The [`RingMotion`] [`ring_segments`](Self::ring_segments) holds, i.e. this
     /// ornament's half of the hysteresis (Phase 4). A preset binding none of the
     /// three levers never leaves [`RingMotion::STATIC`] and so never rebuilds.
@@ -230,15 +236,32 @@ pub struct StarPatternScene {
     /// [`normalized_radii`] over [`combined`](Self::combined) — ADR-0059's colour
     /// axis across the *whole* figure rather than across the rosette alone.
     combined_radii: Vec<f32>,
+    /// The ornament's arcs, alongside [`combined`](Self::combined). The rosette
+    /// is an interlace of straight chords and contributes none, so this is
+    /// [`ring_arcs`](Self::ring_arcs) under the shared cap.
+    combined_arcs: Vec<ArcInstance>,
+    /// Their share of the same radial colour axis — normalized against the
+    /// **whole** figure, both kinds together, or a mandala's circles would be
+    /// coloured on a different scale from its interlace.
+    combined_arc_radii: Vec<f32>,
     /// Per-segment stroke colour for the cached rosette, rebuilt each frame into
     /// a buffer sized at build time so the fill allocates nothing.
     colors: Vec<[f32; 3]>,
+    /// The same, per arc.
+    arc_colors: Vec<[f32; 3]>,
     /// Reused per-frame draw buffer — the mirrored geometry actually rendered.
     /// Preallocated so replication allocates nothing on the hot path.
     draw_buf: Vec<SegmentInstance>,
     /// Reused buffer for the single (pre-mirror) transformed variant, replicated
     /// into [`draw_buf`](Self::draw_buf) by [`replicate_mirror`]. Preallocated.
     single_buf: Vec<SegmentInstance>,
+    /// The arc halves of [`draw_buf`](Self::draw_buf) and
+    /// [`single_buf`](Self::single_buf). Sized at `configure` from the roster
+    /// the preset declares rather than to `max_segments`: arcs are produced only
+    /// by `build_rings`, so their count is known at load and reserving the whole
+    /// segment ceiling for them would be most of a megabyte nothing uses.
+    arc_draw_buf: Vec<ArcInstance>,
+    single_arc_buf: Vec<ArcInstance>,
     /// The active tier's segment ceiling
     /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
     /// resolved once at construction (Plan 0044). A field rather than a constant
@@ -290,13 +313,19 @@ impl StarPatternScene {
             // a rings-less preset never allocates any of these.
             rings: Vec::new(),
             ring_segments: Vec::new(),
+            ring_arcs: Vec::new(),
             built_motion: RingMotion::STATIC,
             ring_rebuilds: 0,
             combined: Vec::new(),
             combined_radii: Vec::new(),
+            combined_arcs: Vec::new(),
+            combined_arc_radii: Vec::new(),
             colors: Vec::new(),
+            arc_colors: Vec::new(),
             draw_buf: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
+            arc_draw_buf: Vec::new(),
+            single_arc_buf: Vec::new(),
             max_segments,
             mirror_overflow: None,
             time: 0.0,
@@ -336,13 +365,17 @@ impl StarPatternScene {
             contact_angle_deg(self.base_contact_deg, self.variant),
         );
         let rings_moved = self.refresh_rings();
-        if !self.ring_segments.is_empty() {
+        if self.has_ornament() {
             // Either half can move under the other — the rosette on `variant`,
             // the ornament on the three ring levers — and the radial ramp is a
             // min-max over the pair, so either rebuild refills both. Bounded by
             // the two hystereses, i.e. by distance travelled rather than by frame
             // count (ADR-0060).
-            if rebuilt || rings_moved || self.combined.len() != self.combined_len() {
+            if rebuilt
+                || rings_moved
+                || self.combined.len() != self.combined_len()
+                || self.combined_arcs.len() != self.combined_arc_len()
+            {
                 self.rebuild_combined();
             }
         }
@@ -353,6 +386,22 @@ impl StarPatternScene {
             self.colors.clear();
             self.colors.resize(wanted, [0.0; 3]);
         }
+        let wanted_arcs = self.base_arcs().0.len();
+        if self.arc_colors.len() != wanted_arcs {
+            self.arc_colors.clear();
+            self.arc_colors.resize(wanted_arcs, [0.0; 3]);
+        }
+    }
+
+    /// Whether this preset declared a `rings` ornament that produced anything.
+    ///
+    /// **Both kinds, and that is the whole reason it is a method.** Before
+    /// Plan 0087 an empty `ring_segments` meant "no ornament"; a roster of
+    /// nothing but `circle` rings now leaves that empty and fills
+    /// [`ring_arcs`](Self::ring_arcs) instead, and reading the old signal would
+    /// send such a preset down the rings-less path and draw only its interlace.
+    fn has_ornament(&self) -> bool {
+        !self.ring_segments.is_empty() || !self.ring_arcs.is_empty()
     }
 
     /// Re-place the ornament if this frame's [`RingMotion`] has walked further
@@ -378,6 +427,7 @@ impl StarPatternScene {
             want,
             self.max_segments,
             &mut self.ring_segments,
+            &mut self.ring_arcs,
         );
         true
     }
@@ -386,6 +436,14 @@ impl StarPatternScene {
     /// first, then as much of the ornament as fits.
     fn combined_len(&self) -> usize {
         (self.cache.segments.len() + self.ring_segments.len()).min(self.max_segments)
+    }
+
+    /// The arc half of the same: whatever room the segments left, which is all
+    /// of the ornament's arcs unless the cap has bitten.
+    fn combined_arc_len(&self) -> usize {
+        self.ring_arcs
+            .len()
+            .min(self.max_segments.saturating_sub(self.combined_len()))
     }
 
     /// Refill [`combined`](Self::combined) (and its radii) from the cached
@@ -397,18 +455,35 @@ impl StarPatternScene {
             .extend(self.cache.segments.iter().take(self.max_segments));
         let room = self.max_segments.saturating_sub(self.combined.len());
         self.combined.extend(self.ring_segments.iter().take(room));
-        normalized_radii(&self.combined, &mut self.combined_radii);
+        // The arcs take what the segments left. One cap over both kinds, as
+        // `Motif::instances` charges them (ADR-0098): the ceiling is a statement
+        // about how much geometry a tier draws, not about one kind of it.
+        self.combined_arcs.clear();
+        let room = self.max_segments.saturating_sub(self.combined.len());
+        self.combined_arcs.extend(self.ring_arcs.iter().take(room));
+        normalized_radii(
+            &self.combined,
+            &self.combined_arcs,
+            &mut self.combined_radii,
+            &mut self.combined_arc_radii,
+        );
     }
 
     /// The geometry this frame transforms, with its colour axis: the rosette
     /// alone when no `rings` were declared — which is bit-for-bit the pre-Plan
     /// 0065 path, buffer included — and the combined figure otherwise.
     fn base(&self) -> (&[SegmentInstance], &[f32]) {
-        if self.ring_segments.is_empty() {
+        if !self.has_ornament() {
             (&self.cache.segments, &self.cache.radii)
         } else {
             (&self.combined, &self.combined_radii)
         }
+    }
+
+    /// [`base`](Self::base)'s arc half. The rosette has no arcs, so a rings-less
+    /// preset gets two empty slices and its draw is exactly what it was.
+    fn base_arcs(&self) -> (&[ArcInstance], &[f32]) {
+        (&self.combined_arcs, &self.combined_arc_radii)
     }
 }
 
@@ -479,7 +554,7 @@ impl RosetteCache {
         self.rebuilds = self.rebuilds.saturating_add(1);
         hankin::star_rosette(order, angle_deg.to_radians(), &mut self.segments);
         turtle::normalize_fit(&mut self.segments, 0.9);
-        normalized_radii(&self.segments, &mut self.radii);
+        normalized_radii(&self.segments, &[], &mut self.radii, &mut Vec::new());
         true
     }
 
@@ -521,16 +596,37 @@ impl RosetteCache {
 /// `u = 0`.** That makes `hue_spread` exactly the identity there rather than a
 /// hidden constant hue shift, which is the honest degenerate answer: no range,
 /// no ramp.
-pub(crate) fn normalized_radii(segs: &[SegmentInstance], out: &mut Vec<f32>) {
+pub(crate) fn normalized_radii(
+    segs: &[SegmentInstance],
+    arcs: &[ArcInstance],
+    out: &mut Vec<f32>,
+    arc_out: &mut Vec<f32>,
+) {
     out.clear();
+    arc_out.clear();
     let radius = |s: &SegmentInstance| -> f32 {
         let (x, y) = (0.5 * (s.a[0] + s.b[0]), 0.5 * (s.a[1] + s.b[1]));
         (x * x + y * y).sqrt()
     };
+    // An arc's centre of curvature, for the same reason a segment's midpoint:
+    // it is the one point that stands for the whole instance, and for a placed
+    // circular motif it is exactly where the copy sits on its ring.
+    let arc_radius = |a: &ArcInstance| -> f32 {
+        let (x, y) = (a.centre[0], a.centre[1]);
+        (x * x + y * y).sqrt()
+    };
+    // **One min-max over both kinds.** Normalizing each separately would give a
+    // mandala's circles their own full palette sweep independent of the
+    // interlace's, and ADR-0059's axis is the radius across the whole figure.
     let mut lo = f32::INFINITY;
     let mut hi = f32::NEG_INFINITY;
     for seg in segs {
         let r = radius(seg);
+        lo = lo.min(r);
+        hi = hi.max(r);
+    }
+    for arc in arcs {
+        let r = arc_radius(arc);
         lo = lo.min(r);
         hi = hi.max(r);
     }
@@ -545,6 +641,9 @@ pub(crate) fn normalized_radii(segs: &[SegmentInstance], out: &mut Vec<f32>) {
     };
     for seg in segs {
         out.push((radius(seg) - lo) * scale);
+    }
+    for arc in arcs {
+        arc_out.push((arc_radius(arc) - lo) * scale);
     }
 }
 
@@ -669,11 +768,68 @@ impl Motif {
         }
     }
 
-    /// **Segments** one copy of this motif contributes — the number the budget
-    /// arithmetic multiplies by `count`.
+    /// This motif as **one exact circular arc**, when it is one (ADR-0098):
+    /// a centre, a radius, and a signed angular span in the local convention.
+    ///
+    /// `None` for every member whose outline is not a circle — those stay
+    /// sampled polylines, which is the right primitive for them: a distance
+    /// field is strictly more expensive for a straight line, and a diamond and
+    /// a chevron are nothing but straight lines.
+    ///
+    /// [`outline`](Self::outline) still returns the sampled polyline for the two
+    /// that have one, and it is no longer what `build_rings` draws them with.
+    /// It is kept because it is the *reference* the arc is checked against —
+    /// `renderer/tests.rs` compares the primitive to a densely sampled polyline
+    /// of the same arc, and this is where that polyline's shape is defined.
+    fn arc_shape(self) -> Option<ArcShape> {
+        match self {
+            Motif::Circle => Some(ArcShape {
+                centre: [0.0, 0.0],
+                radius: 0.5,
+                start: 0.0,
+                sweep: TAU,
+            }),
+            // The same circle `outline` samples: centred so the arc sits on the
+            // origin like every other motif, spanning `[-H, H]` about `+x`.
+            Motif::Arc => Some(ArcShape {
+                centre: [-(ARC_RADIUS * ARC_HALF_ANGLE.cos() + arc_bulge()), 0.0],
+                radius: ARC_RADIUS,
+                start: -ARC_HALF_ANGLE,
+                sweep: 2.0 * ARC_HALF_ANGLE,
+            }),
+            _ => None,
+        }
+    }
+
+    /// **Segments** one copy of this motif contributes.
+    ///
+    /// **Zero for the two circular members since Plan 0087**: they are drawn as
+    /// one [`ArcInstance`] each and contribute no segments at all, which is
+    /// where ADR-0098's order of magnitude of tier headroom comes from — a
+    /// `circle` cost `SMOOTH_SAMPLES` of this budget and now costs one of
+    /// [`arcs`](Self::arcs).
     pub fn segments(self) -> usize {
+        if self.arc_shape().is_some() {
+            return 0;
+        }
         let n = self.vertex_count();
         if self.is_closed() { n } else { n - 1 }
+    }
+
+    /// **Arcs** one copy contributes — one for each circular member, zero for
+    /// the rest.
+    pub fn arcs(self) -> usize {
+        usize::from(self.arc_shape().is_some())
+    }
+
+    /// Instances of **either kind** one copy costs: the number the budget
+    /// arithmetic multiplies by `count` against `max_segments`.
+    ///
+    /// One budget over both kinds rather than two budgets, because the cap is a
+    /// statement about how much geometry a tier will draw and an arc is a draw
+    /// like any other. It also keeps the overflow message meaning one thing.
+    pub fn instances(self) -> usize {
+        self.segments() + self.arcs()
     }
 
     /// Write this motif's outline vertices into `out` (cleared first), in the
@@ -721,7 +877,7 @@ impl Motif {
             // would mean the chord for this one member and the centre for the
             // rest.
             Motif::Arc => {
-                let bulge = 0.5 * ARC_RADIUS * (1.0 - ARC_HALF_ANGLE.cos());
+                let bulge = arc_bulge();
                 for k in 0..=ARC_SAMPLES {
                     let psi = ARC_HALF_ANGLE * (2.0 * k as f32 / ARC_SAMPLES as f32 - 1.0);
                     out.push([
@@ -764,6 +920,27 @@ const ARC_SAMPLES: usize = 12;
 const ARC_HALF_ANGLE: f32 = std::f32::consts::FRAC_PI_3;
 /// [`Motif::Arc`]'s radius of curvature.
 const ARC_RADIUS: f32 = 0.5;
+
+/// How far [`Motif::Arc`] is shifted along `-x` so it sits centred on the origin
+/// like every other motif — otherwise `radius` would mean the chord for that one
+/// member and the centre for the rest.
+///
+/// A function rather than a `const` because `cos` is not a const fn; it is
+/// called twice at build time and never per frame.
+fn arc_bulge() -> f32 {
+    0.5 * ARC_RADIUS * (1.0 - ARC_HALF_ANGLE.cos())
+}
+
+/// One motif expressed as a circular arc — see [`Motif::arc_shape`]. In the
+/// local convention: about the motif's own centre, spanning roughly one unit,
+/// outward along `+x`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ArcShape {
+    centre: [f32; 2],
+    radius: f32,
+    start: f32,
+    sweep: f32,
+}
 
 /// The largest `count` one ring may declare, enforced at load.
 ///
@@ -953,33 +1130,68 @@ pub(crate) fn build_rings(
     motion: RingMotion,
     cap: usize,
     out: &mut Vec<SegmentInstance>,
+    arcs: &mut Vec<ArcInstance>,
 ) -> usize {
     out.clear();
+    arcs.clear();
     // What a cap-free build would emit — the only way to report the drop without
     // running the loop past the cap, which for a large `count` is the difference
     // between bounded and unbounded load-time work.
     let wanted = rings.iter().fold(0usize, |acc, ring| {
         acc.saturating_add(
             ring.motif
-                .segments()
+                .instances()
                 .saturating_mul(ring.count.max(1) as usize),
         )
     });
 
     let mut pts: Vec<[f32; 2]> = Vec::new();
     'rings: for (index, ring) in rings.iter().enumerate() {
-        ring.motif.outline(&mut pts);
-        let n = pts.len();
-        if n < 2 {
-            continue;
-        }
-        let edges = if ring.motif.is_closed() { n } else { n - 1 };
         let count = ring.count.max(1);
         // The ring's own configuration, moved. Hoisted out of the copy loop
         // because it is constant across the ring.
         let base_phase = ring.phase + ring_direction(index) * motion.phase;
         let radius = ring.radius * motion.spread;
         let scale = ring.scale * motion.scale;
+
+        // A circular motif is one arc per copy, with no interior joint at any
+        // scale (ADR-0098) — where it used to be `SMOOTH_SAMPLES` segments and
+        // as many additive beads.
+        if let Some(shape) = ring.motif.arc_shape() {
+            for i in 0..count {
+                if out.len() + arcs.len() >= cap {
+                    break 'rings;
+                }
+                let theta = TAU * i as f32 / count as f32 + base_phase;
+                let (sin, cos) = theta.sin_cos();
+                let x = shape.centre[0] * scale + radius;
+                let y = shape.centre[1] * scale;
+                arcs.push(ArcInstance {
+                    centre: [x * cos - y * sin, x * sin + y * cos],
+                    // `abs` for the reason `LineInstance::rotate_scale` gives:
+                    // a negative `scale` reflects the motif, and the reflected
+                    // circle has the same positive radius about the centre the
+                    // line above already reflected.
+                    radius: (shape.radius * scale).abs(),
+                    // Placement is one rotation for both the orientation and the
+                    // position, exactly as it is for a polyline motif — the arc
+                    // carries its own orientation, so the rotation reaches it as
+                    // an angle rather than through its endpoints.
+                    angle_start: shape.start + theta,
+                    angle_sweep: shape.sweep,
+                    color: [1.0, 1.0, 1.0],
+                    width: 0.01,
+                });
+            }
+            continue;
+        }
+
+        ring.motif.outline(&mut pts);
+        let n = pts.len();
+        if n < 2 {
+            continue;
+        }
+        let edges = if ring.motif.is_closed() { n } else { n - 1 };
         for i in 0..count {
             let theta = TAU * i as f32 / count as f32 + base_phase;
             let (sin, cos) = theta.sin_cos();
@@ -989,7 +1201,7 @@ pub(crate) fn build_rings(
                 [x * cos - y * sin, x * sin + y * cos]
             };
             for e in 0..edges {
-                if out.len() >= cap {
+                if out.len() + arcs.len() >= cap {
                     break 'rings;
                 }
                 let (Some(&a), Some(&b)) = (pts.get(e), pts.get((e + 1) % n)) else {
@@ -1020,7 +1232,7 @@ pub(crate) fn build_rings(
             }
         }
     }
-    wanted.saturating_sub(out.len())
+    wanted.saturating_sub(out.len() + arcs.len())
 }
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
@@ -1143,12 +1355,28 @@ impl Scene for StarPatternScene {
                     RingMotion::STATIC,
                     self.max_segments,
                     &mut self.ring_segments,
+                    &mut self.ring_arcs,
                 );
-                if self.ring_segments.is_empty() {
+                // The arc buffers are sized here, from the roster the preset
+                // actually declared, so the per-frame transform and mirror
+                // allocate nothing — and a preset with no circular motif
+                // reserves nothing at all.
+                // The mirror is the multiplier, and its order is capped at
+                // load (`MAX_MIRROR_ORDER`), reflection doubling it once more.
+                let arc_room = self
+                    .ring_arcs
+                    .len()
+                    .saturating_mul(2 * super::MAX_MIRROR_ORDER as usize)
+                    .min(self.max_segments);
+                self.single_arc_buf.reserve(self.ring_arcs.len());
+                self.arc_draw_buf.reserve(arc_room);
+                if !self.has_ornament() {
                     // A switch *away* from a mandala must not leave its buffers
                     // behind for `base` to pick up.
                     self.combined.clear();
                     self.combined_radii.clear();
+                    self.combined_arcs.clear();
+                    self.combined_arc_radii.clear();
                 }
                 self.refresh();
             }
@@ -1176,13 +1404,14 @@ impl Scene for StarPatternScene {
         // The rosette, the ornament, or both — see [`base`](Self::base). Taken as
         // a pair of slices *before* the colour fill so the borrow of the geometry
         // and the mutable borrow of `colors` stay on disjoint fields.
-        let (base, base_radii) = if self.ring_segments.is_empty() {
+        let (base, base_radii) = if !self.has_ornament() {
             (&self.cache.segments, &self.cache.radii)
         } else {
             (&self.combined, &self.combined_radii)
         };
-        if base.is_empty() {
+        if base.is_empty() && self.combined_arcs.is_empty() {
             self.draw_buf.clear();
+            self.arc_draw_buf.clear();
             return;
         }
 
@@ -1200,6 +1429,9 @@ impl Scene for StarPatternScene {
         for (slot, &u) in self.colors.iter_mut().zip(base_radii) {
             *slot = ramp.at(&self.palette, u);
         }
+        for (slot, &u) in self.arc_colors.iter_mut().zip(&self.combined_arc_radii) {
+            *slot = ramp.at(&self.palette, u);
+        }
         let inner = self.colors.first().copied().unwrap_or([1.0; 3]);
 
         let width = super::half_width(self.thickness);
@@ -1212,6 +1444,22 @@ impl Scene for StarPatternScene {
             self.draw_progress,
             &mut self.single_buf,
         );
+        // The same transform, the same reveal fraction. `draw_progress` is a
+        // prefix of each kind rather than of one concatenated list: the two are
+        // separate draws with separate buffers, and a fraction of each is the
+        // only rule that keeps meaning when a figure is all arcs.
+        transform_cached(
+            &self.combined_arcs,
+            self.rotation,
+            self.scale,
+            inner,
+            width,
+            self.draw_progress,
+            &mut self.single_arc_buf,
+        );
+        for (arc, &color) in self.single_arc_buf.iter_mut().zip(&self.arc_colors) {
+            arc.color = color;
+        }
         // `transform_cached` keeps a prefix (the `draw_progress` reveal), so
         // segment `i` of the output is still segment `i` of the base figure —
         // which is why the rosette comes first in `combined` and the ornament
@@ -1232,6 +1480,7 @@ impl Scene for StarPatternScene {
                 "the cached variant is capped at load, so identity cannot truncate"
             );
             std::mem::swap(&mut self.single_buf, &mut self.draw_buf);
+            std::mem::swap(&mut self.single_arc_buf, &mut self.arc_draw_buf);
             self.mirror_overflow = None;
             return;
         }
@@ -1241,6 +1490,15 @@ impl Scene for StarPatternScene {
             self.max_segments,
             &mut self.draw_buf,
         );
+        // The arcs replicate into what the segments left of the same cap — one
+        // ceiling over both kinds, as `Motif::instances` charges them.
+        let arc_dropped = replicate_mirror(
+            &self.single_arc_buf,
+            mirror,
+            self.max_segments.saturating_sub(self.draw_buf.len()),
+            &mut self.arc_draw_buf,
+        );
+        let dropped = dropped + arc_dropped;
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
@@ -1260,7 +1518,7 @@ impl Scene for StarPatternScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer.borrow_mut().draw(
+        self.renderer.borrow_mut().draw_arcs(
             queue,
             encoder,
             view,
@@ -1268,6 +1526,7 @@ impl Scene for StarPatternScene {
             self.glow,
             xform,
             &self.draw_buf,
+            &self.arc_draw_buf,
         );
     }
 }

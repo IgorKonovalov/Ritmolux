@@ -322,8 +322,8 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 |---|---|---|---|
 | 1 — the arc instance draws | dev | done | `3f9e828` |
 | 1b — a sub-floor `thickness` stops failing silently | dev | done | `b97ff64` |
-| 2 — the in-frame geometry instrument learns arcs | dev | done | committed with this row |
-| 3 — the circular motifs become arcs | dev | not started | |
+| 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
+| 3 — the circular motifs become arcs | dev | done | committed with this row |
 | 4 — does it read as a curve? | human | not started | |
 | 5 — the general curve: a biarc chain | dev | not started | |
 | 6 — the scalloped boundary | dev | not started | |
@@ -356,6 +356,51 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   half-planes with a circle — up to four disjoint angular components — and both sums are taken from
   `|sweep| * radius` either way, so the sampling changes only *where* the arc is judged to be, never
   how long it is. `standalone/src/shot/report.rs`'s `geom` legend now says "segments and arcs alike".
+- **Phase 3's stop condition did not fire, and the measurement is in `core/tests/arc_cost.rs`.**
+  A 40-member `circle` ring at 1920x1080, Floor tier, on this box (Windows 10 19045, DX12, RTX 3080
+  Laptop, release), best of three interleaved repeats, marginal cost against the same preset without
+  the ring:
+
+  | case | lit px | per-frame | vs rosette | of the 16.67 ms budget |
+  |---|---|---|---|---|
+  | rosette only | 69 437 | 0.526 ms | — | 3.2 % |
+  | `circle` x40 at motif scale 0.13 | 137 216 | 0.543 ms | +0.017 ms | 3.3 % |
+  | `circle` x40 at motif scale 0.46 | 297 578 | 0.805 ms | +0.279 ms | 4.8 % |
+  | `petal` x40 at motif scale 0.13 (960 segments) | 136 396 | 0.592 ms | +0.066 ms | 3.6 % |
+
+  Across three consecutive runs the sparse arc ring read +0.017 / +0.043 / +0.077 ms and the polyline
+  stand-in +0.066 / +0.035 / +0.106 ms — **the two are not separated by this instrument**, so the
+  claim it supports is "no more expensive than what it replaces", not "cheaper". The dense case is
+  +0.242 to +0.300 ms, several times the spread and a real reading. **Two caveats architect should
+  weigh:** this box is not the floor tier's iGPU baseline, so the reading can convict and cannot
+  acquit; and the polyline case is a `petal`, not a circle, because after this phase the engine can
+  no longer draw a circle as a polyline.
+- **No golden baseline moved, and Phase 3 expected them to.** The plan says baselines that draw a
+  circular motif will move. **None does**: no shipped preset and no golden fixture declares a `rings`
+  roster at all — the three mandala presets were retired at Plan 0065/0075 and `star_rosewindow`
+  binds no rings. So no re-bless was owed and none was taken; all eighteen read mean 0.0000 /
+  outlier 0. The bless-to-bless-against-a-control procedure the phase specifies was therefore never
+  exercised, and the first roster preset to ship will be the one that owes it.
+- **The extra pipeline did not shift WARP, against the precedent that predicted it would.**
+  `over_pipeline`'s note records that building an unused pipeline for the nine line scenes moved five
+  composite baselines. The shared `LineRenderer` now builds the arc pipeline for every line scene and
+  nothing moved. The opt-in constructor is kept anyway.
+- **Two scope steps outside Phase 3's file list, both disclosed rather than absorbed.**
+  `core/src/render/scenes/mod.rs` — two lines, because the shared renderer is built there and
+  `star_pattern` borrows it, so the phase is unreachable without them. And `presets/README.md` — the
+  motif table said `circle` costs 24 segments and a passage said a circle reads as a polygon at
+  ornament scale, both of which this phase falsified; Phase 6 is the phase scoped for that file, and
+  it sits behind a `human` gate that may never open.
+- **`core/tests/arc_cost.rs` is a new file**, for `mark_cost.rs`'s stated reason: one `#[test]` per
+  file, so a hardware device never coexists with the other suites' WARP ones.
+- **The transform and mirror went generic over a `LineInstance` trait** rather than being written
+  twice. Segment behaviour is byte-identical — the mirror's rotation is `scale = 1.0`, an IEEE
+  identity — and the golden suite confirms it at mean 0.0000.
+- **The arc GPU buffer is `max_segments` long, which roughly doubles a line renderer's buffer
+  allocation** (+720 KB at Floor, +2.1 MB at Rich, and a layered line preset builds a second one).
+  It is sized that way because the two kinds share one budget: anything that passes `build_rings`'s
+  cap check must reach the GPU or the cap would be cutting geometry silently, which ADR-0007 forbids.
+  A tighter bound needs a tier field and is architect's call.
 - **Followup noticed and not acted on — the segment path's stroke width is uniform in NDC, not in
   pixels.** Measured on a 640x480 target: the same `width` gives a horizontal stroke 24 px tall and
   a vertical one 30 px wide, the aspect ratio exactly. So a polyline circle already ships with

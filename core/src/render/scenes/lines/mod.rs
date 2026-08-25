@@ -206,40 +206,128 @@ pub fn palette(t: f32) -> [f32; 3] {
     ]
 }
 
+/// A thing [`LineRenderer`] draws, under the two transforms every generator
+/// line scene applies to its cached geometry: the per-frame rotate/scale/style
+/// ([`transform_cached`]) and the geometry mirror ([`replicate_mirror`]).
+///
+/// It exists so those two run **once** over both instance kinds rather than
+/// twice in parallel. Two copies of a rotation would be two places for a
+/// segment figure and an arc figure to drift apart under the same `rotation`
+/// binding — and the failure would render as a mandala whose circles lag its
+/// interlace, which is close to unreadable in a capture.
+pub(crate) trait LineInstance: Copy {
+    /// Rotate about the origin and scale uniformly. `sin`/`cos` are the
+    /// rotation's, passed pre-computed because the caller applies it to a whole
+    /// buffer; `angle` is the same rotation in radians, which a shape carrying
+    /// an *orientation* needs and a pair of endpoints does not.
+    fn rotate_scale(self, sin: f32, cos: f32, angle: f32, scale: f32) -> Self;
+
+    /// Reflect across the x-axis, leaving everything but position alone.
+    fn reflect_x(self) -> Self;
+
+    /// Take this frame's colour and half-width. Alpha goes to `1.0`: every
+    /// generator line scene draws through ADR-0056's additive seam.
+    fn styled(self, color: [f32; 3], width: f32) -> Self;
+}
+
+impl LineInstance for SegmentInstance {
+    fn rotate_scale(self, sin: f32, cos: f32, _angle: f32, scale: f32) -> Self {
+        let rot = |p: [f32; 2]| -> [f32; 2] {
+            [
+                (p[0] * cos - p[1] * sin) * scale,
+                (p[0] * sin + p[1] * cos) * scale,
+            ]
+        };
+        Self {
+            a: rot(self.a),
+            b: rot(self.b),
+            // Connectivity is a property of the cached structure, not of this
+            // frame's rotation/scale, so it passes straight through.
+            ..self
+        }
+    }
+
+    fn reflect_x(self) -> Self {
+        Self {
+            a: [self.a[0], -self.a[1]],
+            b: [self.b[0], -self.b[1]],
+            ..self
+        }
+    }
+
+    fn styled(self, color: [f32; 3], width: f32) -> Self {
+        Self {
+            color,
+            width,
+            alpha: 1.0,
+            ..self
+        }
+    }
+}
+
+impl LineInstance for ArcInstance {
+    fn rotate_scale(self, sin: f32, cos: f32, angle: f32, scale: f32) -> Self {
+        Self {
+            centre: [
+                (self.centre[0] * cos - self.centre[1] * sin) * scale,
+                (self.centre[0] * sin + self.centre[1] * cos) * scale,
+            ],
+            // `abs`, because a negative `scale` reflects an arc through the
+            // origin and a circle of radius `-r` is the circle of radius `r`
+            // about the reflected centre — which the centre above already is.
+            // A negative radius would instead draw nothing.
+            radius: (self.radius * scale).abs(),
+            // The half a pair of endpoints does not have: the shape carries its
+            // own orientation, so the rotation has to reach it as an angle.
+            angle_start: self.angle_start + angle,
+            ..self
+        }
+    }
+
+    fn reflect_x(self) -> Self {
+        Self {
+            centre: [self.centre[0], -self.centre[1]],
+            // Reflection maps the angle `t` to `-t`, so the span `[s, s + w]`
+            // becomes `[-s, -s - w]` — the same two endpoints and the same set
+            // of angles between them, traversed the other way.
+            angle_start: -self.angle_start,
+            angle_sweep: -self.angle_sweep,
+            ..self
+        }
+    }
+
+    fn styled(self, color: [f32; 3], width: f32) -> Self {
+        Self {
+            color,
+            width,
+            ..self
+        }
+    }
+}
+
 /// The per-frame half shared by every **generator** line scene (L-system,
 /// star): transform cached base geometry into `out` — rotate by `rotation`
 /// (radians), scale, colour, set `width`, and reveal a `progress` prefix
 /// (line-draw-on). Allocation-free into a preallocated `out`; expansion /
 /// construction lives at load, this is the only per-frame work.
-pub(crate) fn transform_cached(
-    base: &[SegmentInstance],
+pub(crate) fn transform_cached<T: LineInstance>(
+    base: &[T],
     rotation: f32,
     scale: f32,
     color: [f32; 3],
     width: f32,
     progress: f32,
-    out: &mut Vec<SegmentInstance>,
+    out: &mut Vec<T>,
 ) {
     out.clear();
     let (sin, cos) = rotation.sin_cos();
     let keep = ((base.len() as f32) * progress.clamp(0.0, 1.0)).round() as usize;
-    let rot = |p: [f32; 2]| -> [f32; 2] {
-        [
-            (p[0] * cos - p[1] * sin) * scale,
-            (p[0] * sin + p[1] * cos) * scale,
-        ]
-    };
-    for seg in base.iter().take(keep) {
-        out.push(SegmentInstance {
-            a: rot(seg.a),
-            b: rot(seg.b),
-            color,
-            width,
-            alpha: 1.0,
-            // Connectivity is a property of the cached structure, not of this
-            // frame's rotation/scale/colour, so it passes straight through.
-            joined: seg.joined,
-        });
+    for instance in base.iter().take(keep) {
+        out.push(
+            instance
+                .rotate_scale(sin, cos, rotation, scale)
+                .styled(color, width),
+        );
     }
 }
 
@@ -295,11 +383,11 @@ impl MirrorSpec {
 ///
 /// Allocation-free into a preallocated `out`; the per-frame half of every mirrored
 /// line scene.
-pub(crate) fn replicate_mirror(
-    single: &[SegmentInstance],
+pub(crate) fn replicate_mirror<T: LineInstance>(
+    single: &[T],
     mirror: MirrorSpec,
     cap: usize,
-    out: &mut Vec<SegmentInstance>,
+    out: &mut Vec<T>,
 ) -> usize {
     out.clear();
     let n = mirror.order.max(1);
@@ -311,25 +399,21 @@ pub(crate) fn replicate_mirror(
             if reflected && !mirror.reflect {
                 continue;
             }
-            // Reflect across the x-axis (optional), then rotate into the sector.
-            let map = |p: [f32; 2]| -> [f32; 2] {
-                let y = if reflected { -p[1] } else { p[1] };
-                [p[0] * cos - y * sin, p[0] * sin + y * cos]
-            };
-            for seg in single {
+            for instance in single {
                 if out.len() >= cap {
                     break;
                 }
-                out.push(SegmentInstance {
-                    a: map(seg.a),
-                    b: map(seg.b),
-                    color: seg.color,
-                    width: seg.width,
-                    alpha: seg.alpha,
-                    // A reflected or rotated copy has the same connectivity as
-                    // its source: the geometry moves, the topology does not.
-                    joined: seg.joined,
-                });
+                // Reflect across the x-axis (optional), then rotate into the
+                // sector. A reflected or rotated copy keeps its source's colour,
+                // width and connectivity: the geometry moves, the topology does
+                // not — so the scale is exactly 1.0, which is an IEEE identity
+                // and leaves the pre-Plan-0087 arithmetic byte for byte.
+                let placed = if reflected {
+                    instance.reflect_x()
+                } else {
+                    *instance
+                };
+                out.push(placed.rotate_scale(sin, cos, sector, 1.0));
             }
         }
     }
