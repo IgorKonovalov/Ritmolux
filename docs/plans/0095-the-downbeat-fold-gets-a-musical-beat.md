@@ -209,8 +209,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the tempo estimate is measured | dev | done | `5bdce91` |
-| 2 — the octave repair | dev | done | committed with this row |
-| 3 — the bar grid | dev | not started | — |
+| 2 — the octave repair | dev | done | `09abdee` |
+| 3 — the bar grid | dev | done | committed with this row |
 | 4 — the fold folds over the grid | dev | not started | — |
 | 5 — re-measure through the instrument | human | not started | — |
 | 6 — the authoring docs | dev | not started | — |
@@ -245,6 +245,16 @@ a hold on the winning lag. **The three trap rungs stay an octave off after Phase
 is that the off-beat 0.50 rung stopped flickering (15 % of its window on the other octave, now
 0 %), and all twelve rows are now stable. Every ladder rung reads the same value it read before the
 repair.
+
+**Phase 3 answered the plan's open design question — the grid is phase-locked, not free-running.**
+The risk section asked what corrects the drift without reintroducing the onset contamination; what
+shipped is a phase-locked loop over the onset **envelope** (two exponentially-decayed quadrature
+accumulators, 2 s time constant, 2 % of the error corrected per hop), which is the plan's
+"aggregate phase over a window" rather than its literal "median". The reason it is not free-running
+is in `grid.rs`'s module docs and is not drift: a free accumulator can settle with its beat boundary
+sitting *on* the transients, which splits every accent across two cells and smears the fold it
+exists to sharpen. It lives in a new `core/src/dsp/grid.rs`, registered in `dsp/mod.rs` and read by
+nothing.
 
 ## Followups (after this lands)
 
