@@ -1,6 +1,9 @@
 # 0087 — the line renderer draws a curve
 
-> **Status:** in-progress
+> **Status:** in-progress — **phases 1, 1b, 2, 3 and 4 are done and phases 5, 6 and 7 are not
+> started.** The stop condition did not fire and Phase 4's look gate returned a **green light**, so
+> Phase 5 is authorized and unbuilt. Handed to `architect` at the user's instruction before it,
+> with one thing owed that blocks a push: `check-backlog-claims.mjs` exits 1 on backlog 0098
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
@@ -455,6 +458,32 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   after the aspect divide" overstates what the shader does. **The arc reproduces it deliberately** —
   Phase 1's done-when is to match a densely-sampled polyline of the same arc, not to draw a better
   one — so changing it is a separate decision about every line scene, and an architect call.
+
+### Close triggers
+
+- **`presets/` touched:** **no `.toml`.** `presets/README.md` only — the motif table's cost column
+  (`circle` and `arc` are one instance each, not 24 and 12), the ring budget arithmetic, and the
+  standing note that a circle reads as a polygon at ornament scale, which Phase 3 falsified for
+  those two members and left true for the other five.
+- **Plan header `Closes:`** — three entries, **one of them actually closed**:
+  - [design-backlog 0098](../design-backlog.md) — **closed** by Phase 1b.
+  - [design-backlog 0073](../design-backlog.md) — **not closed.** Phase 4 answers its question for
+    the two circular motifs, but the three retired presets are not re-landed; that is Phase 7.
+  - [design-backlog 0071](../design-backlog.md) — **not closed.** The boundary curve is Phase 6.
+- **What shipped:** **feature + fix.** The arc primitive and its instrument widening (feature); the
+  sub-floor `thickness` warning (fix). No preset content.
+- **Operator docs touched:** `presets/README.md`. None of `README.md`, `docs/presets.md`,
+  `docs/preset-palettes.md`, `docs/capturing.md`, `docs/on-device-validation.md`, `docs/nfr.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, naming
+  **0098** — `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`, which Phase 1b
+  moved to `lines/mod.rs` as `MIN_HALF_WIDTH`. The claim is unchanged; the probe's path is stale.
+  **This breaks `pre-push` and the CI `links` job until it is repaired.**
+- **Outstanding `human` phases:** **Phase 7** (the retired mandalas, re-judged). Phase 4 ran and its
+  verdict is above.
+- **Outstanding `dev` phases:** **5 and 6**, neither started. Phase 5 is green-lit by Phase 4.
+- **Lane state:** `plan-0087-arc-primitive` is branched from `main` at `aa4bc5f` and `main` has since
+  moved to `1be71c8` (a parallel `lmv-plan-0095` worktree is live). A merge of `main` into this
+  branch is owed before any bless or close. Nothing here moved a golden baseline.
 
 ## Followups (after this lands)
 
