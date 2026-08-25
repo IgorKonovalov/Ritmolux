@@ -1,6 +1,6 @@
 # 0117 — the downbeat log sees the counter it folds over
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)
@@ -156,6 +156,30 @@ flowchart LR
 - **It does not repoint or reorder any existing column**, and it does not touch the C ABI,
   `CONFIDENCE_THRESHOLD`, or anything the preset grammar publishes.
 - **It does not widen `AnalysisFrame`.** The grammar surface gains nothing for an operator log.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `main` directly — the repair's whole subject is that `main` is red and unpushed at
+`c0869e6`, so there is no branch to merge back.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the tracker reports what it was handed | dev | done | committed with this row |
+| 2 — the log carries them, and the test reads them | dev | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Outstanding `human` phases:**
 
 ## Followups (after this lands)
 

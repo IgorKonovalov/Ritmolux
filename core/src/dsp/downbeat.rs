@@ -109,8 +109,12 @@ pub struct BarClock {
 ///
 /// **Diagnostics only.** It is not a grammar variable, not on the C ABI, and
 /// nothing on the analysis path reads it — [`DownbeatTracker::terms`] recomputes
-/// from state that already exists rather than caching anything, so the estimator
-/// behaves identically whether or not anyone is looking.
+/// the fold from state that already exists rather than caching it, so the
+/// estimator behaves identically whether or not anyone is looking. The two
+/// exceptions are [`Self::fold_beat`] and [`Self::grid_bar_phase`], which
+/// `process` stores because they are its *input* and nothing downstream retains
+/// them; the store is unconditional and branchless, so it is as invisible to the
+/// estimate as the recomputation is.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct DownbeatTerms {
     /// Mean accent per candidate beat-1 alignment — the fold's own output.
@@ -130,6 +134,23 @@ pub struct DownbeatTerms {
     pub beats_seen: u32,
     /// Whether these terms publish — the evidence floor **and** the gate.
     pub locked: bool,
+    /// **The counter the fold buckets by**, as of the most recent
+    /// [`DownbeatTracker::process`] — the [`grid`](super::grid)'s beat count
+    /// since Plan 0095, and `beat_index` only while the grid warms up
+    /// (ADR-0109). [`Self::scores`], [`Self::best`] and [`Self::held`] are all
+    /// indexed in *this* counter's space, and it is reported here because
+    /// nothing downstream retains it: the shell's log had no way to name the
+    /// quantity its own alignment columns were expressed in, which is what let
+    /// the two drift apart while every column stayed plausible.
+    pub fold_beat: u32,
+    /// Where that counter sits across the bar, `[0, 1)`, **ungated** — no
+    /// `alignment` is subtracted, because the question this exists to answer is
+    /// where the *grid* is, not where the estimator thinks beat 1 is.
+    ///
+    /// Honest only once the grid is running. Before that the fold is handed the
+    /// tempo tracker's onset-reset phase, so a warmup row's reading is not a
+    /// grid reading; `bpm` marks the handover.
+    pub grid_bar_phase: f32,
 }
 
 /// The three numbers behind one confidence reading. Split out so the probe can
@@ -159,6 +180,12 @@ pub struct DownbeatTracker {
     confidence: f32,
     /// A challenging alignment and how many consecutive beats it has led for.
     challenger: Option<(u32, u32)>,
+    /// The `beat_count` and clamped `beat_phase` of the most recent `process`
+    /// call, for [`DownbeatTerms::fold_beat`] / [`DownbeatTerms::grid_bar_phase`].
+    /// Recorded on **every** hop, not only on beats: the fold buckets on beats,
+    /// but the position across the bar keeps moving between them.
+    last_beat_count: u32,
+    last_beat_phase: f32,
 }
 
 impl DownbeatTracker {
@@ -173,6 +200,8 @@ impl DownbeatTracker {
             alignment: 0,
             confidence: 0.0,
             challenger: None,
+            last_beat_count: 0,
+            last_beat_phase: 0.0,
         }
     }
 
@@ -198,6 +227,11 @@ impl DownbeatTracker {
         onset: f32,
         beat_phase: f32,
     ) -> BarClock {
+        let phase = beat_phase.clamp(0.0, 1.0);
+        // Every hop, beat or not — see the field docs.
+        self.last_beat_count = beat_count;
+        self.last_beat_phase = phase;
+
         if beat {
             self.record(beat_count, accent(bass, onset));
             self.reconsider();
@@ -209,7 +243,6 @@ impl DownbeatTracker {
         let alignment = if locked { self.alignment } else { 0 };
         let shifted = beat_count.saturating_sub(alignment);
         let beat_in_bar = shifted % BEATS_PER_BAR;
-        let phase = beat_phase.clamp(0.0, 1.0);
 
         BarClock {
             beat_in_bar,
@@ -250,6 +283,10 @@ impl DownbeatTracker {
             effect_corrected: effect.corrected,
             beats_seen: self.filled as u32,
             locked: self.filled >= MIN_BEATS && effect.corrected >= CONFIDENCE_THRESHOLD,
+            fold_beat: self.last_beat_count,
+            // Ungated: `alignment` is deliberately not subtracted.
+            grid_bar_phase: ((self.last_beat_count % BEATS_PER_BAR) as f32 + self.last_beat_phase)
+                / BEATS_PER_BAR as f32,
         }
     }
 
@@ -846,5 +883,87 @@ mod tests {
         );
         let after = drive(&mut t, 16, 17, accented(0));
         assert!(after.locked, "the tracker should recover and still lock");
+    }
+
+    /// **The terms report the counter the fold was handed, not one derived from
+    /// it.** Plan 0095 repointed that counter and the shell's log kept writing
+    /// `beat_index` beside the alignment columns for want of anywhere to read
+    /// the real one; this is that reading, so the test is on whether it tracks
+    /// the *input* through cases where an inference would go wrong.
+    ///
+    /// Three of them: an arbitrary count (not a small loop index), a hop with
+    /// `beat == false` — where the fold records nothing but the position still
+    /// moves — and a count that jumps, which is what the grid handover does.
+    #[test]
+    fn the_terms_report_the_count_and_phase_the_fold_was_handed() {
+        let mut t = DownbeatTracker::new();
+
+        // (count, phase, beat) in sequence; every one must be readable back.
+        let hops: [(u32, f32, bool); 5] = [
+            (0, 0.0, true),
+            (41, 0.25, true),
+            // No beat: the fold does not record, the position still advances.
+            (41, 0.80, false),
+            (42, 0.10, true),
+            // The grid handover's jump — a whole-bar offset latched at once.
+            (108, 0.50, false),
+        ];
+        for (count, phase, beat) in hops {
+            t.process(beat, count, 0.6, 0.4, phase);
+            let terms = t.terms();
+            assert_eq!(
+                terms.fold_beat, count,
+                "fold_beat should be the count just handed in (beat = {beat})"
+            );
+            let expected = ((count % BEATS_PER_BAR) as f32 + phase) / BEATS_PER_BAR as f32;
+            assert!(
+                (terms.grid_bar_phase - expected).abs() < 1e-6,
+                "grid_bar_phase {} for count {count} phase {phase}, expected {expected}",
+                terms.grid_bar_phase
+            );
+            assert!(
+                (0.0..1.0).contains(&terms.grid_bar_phase),
+                "grid_bar_phase {} left [0, 1)",
+                terms.grid_bar_phase
+            );
+        }
+
+        // Ungated by construction: locking onto a non-zero alignment moves
+        // `held` and leaves `grid_bar_phase` exactly where the grid is.
+        let mut t = DownbeatTracker::new();
+        const OFFSET: u32 = 2;
+        let out = drive(&mut t, 40, 0, accented(OFFSET));
+        assert!(
+            out.locked,
+            "the fixture must lock for this half to mean anything"
+        );
+        let terms = t.terms();
+        assert_eq!(
+            terms.held, OFFSET,
+            "the fixture should hold alignment {OFFSET}"
+        );
+        t.process(false, 400, 0.0, 0.0, 0.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.0,
+            "count 400 is bar-aligned in grid space; a phase that subtracted the \
+             held alignment would read {}/4 instead",
+            BEATS_PER_BAR - OFFSET
+        );
+
+        // The clamp `process` applies to `beat_phase` is the one reported, at
+        // both ends: unclamped these would read 2.75 and -0.5.
+        t.process(false, 2, 0.0, 0.0, 9.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.75,
+            "the phase should clamp to 1, not wrap"
+        );
+        t.process(false, 3, 0.0, 0.0, -5.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.75,
+            "the phase should clamp to 0, not go negative"
+        );
     }
 }
