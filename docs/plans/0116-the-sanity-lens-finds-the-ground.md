@@ -1,6 +1,6 @@
 # 0116 — The sanity lens finds the ground
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Approved:** 2026-08-25
 > **Owner skill(s):** dev, human
@@ -183,4 +183,44 @@ why this is one change at the root rather than four.
 
 ## Implementation log
 
-*(none yet — `dev` appends as phases land)*
+**Lane:** `WORK/lmv-plan-0116` on `plan-0116-sanity-ground`, branched from `main` at `e022a5d`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — What each candidate ground would say | dev | done | committed with this row |
+| 2 — The stop gate | human | not started | — |
+| 3 — The lens takes a ground | dev | not started | — |
+| 4 — The floors are re-derived, not re-used | dev | not started | — |
+| 5 — Adjudicate what changed | human | not started | — |
+| 6 — The emptying canvas is actually caught | dev | not started | — |
+| 7 — Documentation | dev | not started | — |
+
+### Notes
+
+- Phase 1's harness landed as an `#[ignore]`d test **inside `core/tests/sanity.rs`**, not as a new
+  file: it then shares `coverage_floor`, `MAX_TONAL_FLATNESS`, `MIN_QUADRANTS`,
+  `MIN_STRUCTURAL_SHELLS` and `MODERATE_MIN_COVERAGE` with the gate, so "against today's floors" is
+  true by construction rather than by transcription.
+- The held-out `presets/pending/fragment_tiledmono.toml` is tabled through `include_str!` — it is
+  not in the embedded set, so `sanity_roster()` cannot reach it.
+- `shape_collage` contributes no row (Plan 0113 unmerged). The test's doc comment and the printed
+  header both say so where the table is read.
+- **Measured, at both excitations, for all three candidates: zero verdict changes.** `pass->fail 0`
+  and `fail->pass 0` against today's floors. `modal_luma` re-bases 17 of 41 presets at `LOUD` and 15
+  at `MODERATE`; `modal_border` 16 / 16; `modal_rgb` 17 / 15. ADR-0126's "17 of 41" is reproduced
+  exactly, and it costs no verdict.
+- **Measured: no candidate repairs `Tiled Rosette Mono`.** It reads `flatness` `0.9346` under the
+  `BLACK` control and `0.9413` / `0.9419` / `0.9413` under `modal_luma` / `modal_border` /
+  `modal_rgb` — all three find the paper correctly at `(245,245,245)` and all three still fail the
+  `0.90` ceiling. Phase 3's done-when names that preset, so it is **not reachable by a ground
+  estimator alone**; input to the Phase 2 gate.
+- Measured: the degeneracy ADR-0126 was raised on does clear. The fourteen presets the control
+  scores at or above `0.98` spread to `0.1645`-`0.9969` under `modal_luma` — `Tiled Rosette`
+  `1.0000` -> `0.1645`, `Ink on Paper` `1.0000` -> `0.2167`, `Vellum` `1.0000` -> `0.3704`.
+- Observed, not acted on: `coverage_floor`'s `SystemKind::ShapeField` arm states the family "has
+  zero shipped members and this floor has never gated anything", but `Facet` and `Pulse` ship and
+  `Facet` is in the table at `coverage 1.0000`. Stale on `main`; Phase 4 is where floors are
+  re-derived.
+- Deviation from the plan's Phase 3 file list, authorized by the user before Phase 1 began:
+  `presets/pending/fragment_tiledmono.toml` is to be `git mv`d into `presets/` at Phase 3, which
+  `presets/pending/README.md` records as that preset's exit condition. Not yet done.
