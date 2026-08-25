@@ -48,7 +48,7 @@ fn the_radial_axis_has_no_spread_on_the_current_rosette() {
             // ...and the normalization reports that as "no ramp" rather than
             // amplifying the float noise into a palette sweep.
             let mut u = Vec::new();
-            normalized_radii(&segs, &mut u);
+            normalized_radii(&segs, &[], &mut u, &mut Vec::new());
             assert_eq!(u.len(), segs.len());
             assert!(
                 u.iter().all(|&x| x == 0.0),
@@ -282,7 +282,7 @@ fn a_figure_with_radial_spread_still_ramps_across_it() {
         seg([0.9, 0.0], [0.9, 0.0]),
     ];
     let mut u = Vec::new();
-    normalized_radii(&segs, &mut u);
+    normalized_radii(&segs, &[], &mut u, &mut Vec::new());
     assert!((u[0] - 0.0).abs() < 1e-5, "innermost is 0, got {}", u[0]);
     assert!((u[2] - 1.0).abs() < 1e-5, "outermost is 1, got {}", u[2]);
     assert!(
@@ -327,6 +327,33 @@ fn mandala_roster() -> Vec<RingSpec> {
     ]
 }
 
+/// The motifs still drawn as sampled polylines, and the ones drawn as a single
+/// arc since Plan 0087 (ADR-0098). Every roster-wide assertion below picks the
+/// family it is about rather than iterating [`Motif::ALL`] and meaning only one
+/// of them.
+fn polyline_motifs() -> Vec<Motif> {
+    Motif::ALL
+        .iter()
+        .copied()
+        .filter(|m| m.arcs() == 0)
+        .collect()
+}
+
+fn arc_motifs() -> Vec<Motif> {
+    Motif::ALL
+        .iter()
+        .copied()
+        .filter(|m| m.arcs() > 0)
+        .collect()
+}
+
+/// The distance from the frame centre to an arc's centre of curvature — an
+/// arc's counterpart to a segment's [`midpoint_radius`], and for a placed
+/// circular motif exactly where that copy sits on its ring.
+fn arc_radius(a: &ArcInstance) -> f32 {
+    (a.centre[0] * a.centre[0] + a.centre[1] * a.centre[1]).sqrt()
+}
+
 fn midpoint_radius(s: &SegmentInstance) -> f32 {
     let (x, y) = (0.5 * (s.a[0] + s.b[0]), 0.5 * (s.a[1] + s.b[1]));
     (x * x + y * y).sqrt()
@@ -351,7 +378,7 @@ fn an_absent_roster_builds_no_ornament_at_all() {
         };
         3
     ];
-    let dropped = build_rings(&[], RingMotion::STATIC, CAP, &mut out);
+    let dropped = build_rings(&[], RingMotion::STATIC, CAP, &mut out, &mut Vec::new());
     assert_eq!(dropped, 0);
     assert!(out.is_empty(), "an empty roster clears rather than appends");
 }
@@ -378,25 +405,87 @@ fn the_motif_roster_round_trips_and_rejects_everything_else() {
     }
 }
 
-/// [`Motif::segments`] is what the budget arithmetic multiplies by `count`,
-/// so it has to agree with the outline rather than be maintained beside it.
+/// [`Motif::instances`] is what the budget arithmetic multiplies by `count`, so
+/// it has to agree with what `build_rings` actually emits rather than be
+/// maintained beside it — for **both** kinds.
 #[test]
-fn the_declared_segment_count_matches_the_outline() {
+fn the_declared_cost_matches_what_a_ring_emits() {
     let mut pts = Vec::new();
     for &m in Motif::ALL {
         m.outline(&mut pts);
         assert_eq!(pts.len(), m.vertex_count(), "{}: vertex count", m.name());
         assert!(pts.len() >= 3, "{}: a motif needs a shape", m.name());
-        let expected = if m.is_closed() {
-            pts.len()
-        } else {
-            pts.len() - 1
-        };
-        assert_eq!(m.segments(), expected, "{}: segment count", m.name());
 
         let mut out = Vec::new();
-        build_rings(&[ring(m, 1, 0.5, 1.0)], RingMotion::STATIC, CAP, &mut out);
-        assert_eq!(out.len(), m.segments(), "{}: one copy", m.name());
+        let mut arcs = Vec::new();
+        build_rings(
+            &[ring(m, 1, 0.5, 1.0)],
+            RingMotion::STATIC,
+            CAP,
+            &mut out,
+            &mut arcs,
+        );
+        assert_eq!(
+            out.len(),
+            m.segments(),
+            "{}: segments in one copy",
+            m.name()
+        );
+        assert_eq!(arcs.len(), m.arcs(), "{}: arcs in one copy", m.name());
+        assert_eq!(
+            out.len() + arcs.len(),
+            m.instances(),
+            "{}: the budget must charge what the ring emits",
+            m.name()
+        );
+    }
+}
+
+/// **The circular motifs cost one instance each and have no interior joint —
+/// asserted structurally, by the instance count, not by looking at pixels.**
+///
+/// This is ADR-0098's whole claim about the roster, as a number: a `circle` was
+/// `SMOOTH_SAMPLES` segments and `SMOOTH_SAMPLES` additively-overlapping joints,
+/// and is now one arc and none. Zero joints is not "fewer joints": there is no
+/// interior vertex for a bead to form at, at any motif `scale` and any capture
+/// size, because there is no vertex at all.
+#[test]
+fn a_circular_motif_is_one_arc_with_no_interior_joint() {
+    for m in arc_motifs() {
+        let mut out = Vec::new();
+        let mut arcs = Vec::new();
+        build_rings(
+            &[ring(m, 1, 0.5, 0.3)],
+            RingMotion::STATIC,
+            CAP,
+            &mut out,
+            &mut arcs,
+        );
+        assert_eq!(arcs.len(), 1, "{}: one copy is one arc", m.name());
+        assert!(
+            out.is_empty(),
+            "{}: an arc-drawn motif emits no segments, so it has no vertex for \
+             a joint to sit at — got {} of them",
+            m.name(),
+            out.len()
+        );
+    }
+
+    // And the saving is the order of magnitude ADR-0098 claims, against what
+    // the polyline cost — read off `vertex_count`, which still describes the
+    // outline `outline` samples.
+    for m in arc_motifs() {
+        let was = if m.is_closed() {
+            m.vertex_count()
+        } else {
+            m.vertex_count() - 1
+        };
+        assert!(
+            was >= 12 && m.instances() == 1,
+            "{}: {was} segments became {} instance",
+            m.name(),
+            m.instances()
+        );
     }
 }
 
@@ -417,6 +506,7 @@ fn a_ring_places_its_copies_evenly_around_the_frame_centre() {
                 RingMotion::STATIC,
                 CAP,
                 &mut out,
+                &mut Vec::new(),
             );
             assert_eq!(out.len(), m.segments() * count as usize);
 
@@ -480,6 +570,7 @@ fn a_placed_motif_keeps_its_outward_end_outward() {
         RingMotion::STATIC,
         CAP,
         &mut out,
+        &mut Vec::new(),
     );
     let nearest = out.iter().fold(f32::INFINITY, |acc, s| {
         acc.min((s.a[0] * s.a[0] + s.a[1] * s.a[1]).sqrt())
@@ -518,34 +609,55 @@ fn the_cap_truncates_and_the_drop_is_counted_without_being_surfaced() {
         RingMotion::STATIC,
         cap,
         &mut out,
+        &mut Vec::new(),
     );
     assert_eq!(out.len(), cap, "the cap is filled exactly");
     assert_eq!(dropped, 40 * 36 - cap, "and the rest is counted");
 
-    // The count is honest across several rings too — the second one is the
-    // whole of what a mandala over budget loses.
+    // The count is honest across several rings too, and across **both kinds**:
+    // one budget covers segments and arcs together, so a ring of circles eats
+    // into what the diamonds left. 10 diamonds at 4 segments plus 10 circles at
+    // one arc each is 50 instances against a cap of 45.
     let mut out = Vec::new();
+    let mut arcs = Vec::new();
     let dropped = build_rings(
         &[
             ring(Motif::Diamond, 10, 0.4, 0.2),
             ring(Motif::Circle, 10, 0.7, 0.2),
         ],
         RingMotion::STATIC,
-        40,
+        45,
         &mut out,
+        &mut arcs,
     );
-    assert_eq!(out.len(), 40);
-    assert_eq!(dropped, 10 * 4 + 10 * 24 - 40);
+    assert_eq!(out.len(), 40, "the diamonds fit");
+    assert_eq!(
+        arcs.len(),
+        5,
+        "and the circles take what is left of the cap"
+    );
+    assert_eq!(dropped, 10 * 4 + 10 - 45);
 
     // At the maximum a preset can declare, the whole roster still fits the
     // floor tier's cap several times over for anything but the densest
     // motif — the budget claim ADR-0079 makes, as a number.
     let widest = Motif::ALL
         .iter()
-        .map(|m| m.segments())
+        .map(|m| m.instances())
         .max()
         .unwrap_or_default();
     assert_eq!(widest, 36, "the trefoil is the densest motif");
+    // ...and the cheapest is now a circle, which used to be among the dearest.
+    // That inversion is ADR-0098's tier-headroom claim stated as an ordering.
+    assert_eq!(
+        Motif::Circle.instances(),
+        1,
+        "a circle costs one instance, where it cost SMOOTH_SAMPLES"
+    );
+    assert!(
+        Motif::Circle.instances() < Motif::Chevron.instances(),
+        "the circle is now cheaper than the cheapest polyline motif"
+    );
     assert_eq!(
         widest * MAX_RING_COUNT as usize,
         18_432,
@@ -564,26 +676,41 @@ fn the_cap_truncates_and_the_drop_is_counted_without_being_surfaced() {
 #[test]
 fn four_rings_occupy_the_interior_the_bare_rosette_leaves_empty() {
     const SHELLS: usize = 10;
-    let occupied = |segs: &[SegmentInstance]| -> usize {
+    // Both kinds, because the outermost of the four rings is `circle` and since
+    // Plan 0087 that ring is arcs. Counting segments alone would drop the shell
+    // this measurement most cares about and quietly weaken the claim.
+    let occupied = |segs: &[SegmentInstance], arcs: &[ArcInstance]| -> usize {
         let mut hit = [false; SHELLS];
-        for seg in segs {
-            let r = midpoint_radius(seg) / 0.9;
-            let k = ((r * SHELLS as f32) as usize).min(SHELLS - 1);
+        let mut mark = |r: f32| {
+            let k = ((r / 0.9 * SHELLS as f32) as usize).min(SHELLS - 1);
             if let Some(slot) = hit.get_mut(k) {
                 *slot = true;
             }
+        };
+        for seg in segs {
+            mark(midpoint_radius(seg));
+        }
+        for arc in arcs {
+            mark(arc_radius(arc));
         }
         hit.iter().filter(|h| **h).count()
     };
 
     let bare = rosette(12, 20.0);
-    let bare_shells = occupied(&bare);
+    let bare_shells = occupied(&bare, &[]);
 
     let mut rings = Vec::new();
-    build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut rings);
+    let mut ring_arcs = Vec::new();
+    build_rings(
+        &mandala_roster(),
+        RingMotion::STATIC,
+        CAP,
+        &mut rings,
+        &mut ring_arcs,
+    );
     let mut combined = bare.clone();
     combined.extend(rings.iter());
-    let mandala_shells = occupied(&combined);
+    let mandala_shells = occupied(&combined, &ring_arcs);
 
     println!(
         "radial shells occupied (of {SHELLS}): bare rosette {bare_shells}, \
@@ -599,18 +726,32 @@ fn four_rings_occupy_the_interior_the_bare_rosette_leaves_empty() {
         "a four-ring mandala must reach the interior, got {mandala_shells}"
     );
 
-    // And the segment count is the other half of "materially more figure",
-    // comfortably inside the budget ADR-0079 quotes.
-    assert_eq!(combined.len(), 1_116, "24 interlace + 1 092 ornament");
-    assert!(combined.len() * 17 < CAP, "room for the interlace on top");
+    // And the instance count is the other half of "materially more figure",
+    // comfortably inside the budget ADR-0079 quotes — now much further inside
+    // it than when the roster was authored, because the 24-copy `circle` ring
+    // fell from 576 segments to 24 arcs (ADR-0098).
+    let total = combined.len() + ring_arcs.len();
+    assert_eq!(ring_arcs.len(), 24, "the circle ring is 24 arcs");
+    assert_eq!(
+        combined.len(),
+        540,
+        "24 interlace + 516 polyline ornament, the circle ring having left it"
+    );
+    assert_eq!(
+        total, 564,
+        "and 564 instances all told, against 1 116 before"
+    );
+    assert!(total * 17 < CAP, "room for the interlace on top");
 
     // The radial colour axis was identically flat on the bare rosette (see
     // the module docs); over the combined figure it is a real range, which
     // is what makes `hue_spread` a live lever on a mandala preset.
     let mut u = Vec::new();
-    normalized_radii(&combined, &mut u);
-    let lo = u.iter().copied().fold(f32::INFINITY, f32::min);
-    let hi = u.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let mut arc_u = Vec::new();
+    normalized_radii(&combined, &ring_arcs, &mut u, &mut arc_u);
+    let both = || u.iter().chain(arc_u.iter()).copied();
+    let lo = both().fold(f32::INFINITY, f32::min);
+    let hi = both().fold(f32::NEG_INFINITY, f32::max);
     assert!(
         (lo - 0.0).abs() < 1e-5 && (hi - 1.0).abs() < 1e-5,
         "the ramp must span 0..1, got {lo}..{hi}"
@@ -646,8 +787,20 @@ fn order_zero_draws_no_interlace_and_never_reuses_a_stale_rosette() {
 fn the_ornament_is_deterministic() {
     let mut a = Vec::new();
     let mut b = Vec::new();
-    build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut a);
-    build_rings(&mandala_roster(), RingMotion::STATIC, CAP, &mut b);
+    build_rings(
+        &mandala_roster(),
+        RingMotion::STATIC,
+        CAP,
+        &mut a,
+        &mut Vec::new(),
+    );
+    build_rings(
+        &mandala_roster(),
+        RingMotion::STATIC,
+        CAP,
+        &mut b,
+        &mut Vec::new(),
+    );
     assert_eq!(a, b, "same roster -> identical geometry");
     assert!(a.iter().all(|s| s.a[0].is_finite() && s.a[1].is_finite()));
 }
@@ -683,7 +836,13 @@ fn the_static_motion_is_the_identity_and_the_radial_levers_are_multipliers() {
 
     let mut declared = Vec::new();
     let mut moved = Vec::new();
-    build_rings(&roster, RingMotion::STATIC, CAP, &mut declared);
+    build_rings(
+        &roster,
+        RingMotion::STATIC,
+        CAP,
+        &mut declared,
+        &mut Vec::new(),
+    );
     build_rings(
         &roster,
         RingMotion::from_params(
@@ -693,6 +852,7 @@ fn the_static_motion_is_the_identity_and_the_radial_levers_are_multipliers() {
         ),
         CAP,
         &mut moved,
+        &mut Vec::new(),
     );
     assert_eq!(
         declared, moved,
@@ -711,12 +871,19 @@ fn the_static_motion_is_the_identity_and_the_radial_levers_are_multipliers() {
         .collect();
     let mut want = Vec::new();
     let mut got = Vec::new();
-    build_rings(&by_hand, RingMotion::STATIC, CAP, &mut want);
+    build_rings(
+        &by_hand,
+        RingMotion::STATIC,
+        CAP,
+        &mut want,
+        &mut Vec::new(),
+    );
     build_rings(
         &roster,
         RingMotion::from_params(0.0, spread, scale),
         CAP,
         &mut got,
+        &mut Vec::new(),
     );
     assert_eq!(want, got, "spread and scale are multipliers on the roster");
 }
@@ -739,11 +906,16 @@ fn a_positive_ring_phase_turns_adjacent_rings_opposite_ways() {
 
     // Four single-copy rings at the same radius: each copy's centre sits at
     // exactly its ring's own phase, so the turn is readable as an angle.
+    //
+    // A **polyline** motif, so this stays an assertion about placement rather
+    // than about which primitive draws it; the arc counterpart is asserted
+    // directly below, on the same roster, because placement is the one thing
+    // that had to be re-derived for a shape carrying its own orientation.
     const RADIUS: f32 = 0.6;
     let roster: Vec<RingSpec> = (0..4)
-        .map(|_| ring(Motif::Circle, 1, RADIUS, 0.12))
+        .map(|_| ring(Motif::Petal, 1, RADIUS, 0.12))
         .collect();
-    let per_ring = Motif::Circle.segments();
+    let per_ring = Motif::Petal.segments();
 
     let turn = 0.35f32;
     let mut out = Vec::new();
@@ -752,8 +924,47 @@ fn a_positive_ring_phase_turns_adjacent_rings_opposite_ways() {
         RingMotion::from_params(turn, 1.0, 1.0),
         CAP,
         &mut out,
+        &mut Vec::new(),
     );
     assert_eq!(out.len(), per_ring * roster.len());
+
+    // The same four rings drawn as arcs: one instance per ring, and its centre
+    // is where the polyline's centroid is.
+    let arc_roster: Vec<RingSpec> = (0..4)
+        .map(|_| ring(Motif::Circle, 1, RADIUS, 0.12))
+        .collect();
+    let mut arcs = Vec::new();
+    build_rings(
+        &arc_roster,
+        RingMotion::from_params(turn, 1.0, 1.0),
+        CAP,
+        &mut Vec::new(),
+        &mut arcs,
+    );
+    assert_eq!(arcs.len(), arc_roster.len(), "one arc per single-copy ring");
+    for (index, arc) in arcs.iter().enumerate() {
+        let angle = arc.centre[1].atan2(arc.centre[0]);
+        let want = ring_direction(index) * turn;
+        assert!(
+            (angle - want).abs() < 1e-3,
+            "arc ring {index} turned to {angle}, expected {want}"
+        );
+        assert!(
+            (arc_radius(arc) - RADIUS).abs() < 1e-3,
+            "arc ring {index} left its radius: {}",
+            arc_radius(arc)
+        );
+        // The placement is one rotation for the orientation **and** the
+        // position: a circle looks the same at any orientation, so the only
+        // way to see that half is in the angle the instance carries.
+        assert!(
+            (arc.angle_start - want).abs() < 1e-3,
+            "arc ring {index} carries start {} rather than the ring's own turn \
+             {want} — a motif whose orientation matters would be placed \
+             unrotated",
+            arc.angle_start
+        );
+    }
 
     for (index, chunk) in out.chunks(per_ring).enumerate() {
         let c = centroid(chunk);
@@ -789,7 +1000,7 @@ fn a_positive_ring_phase_turns_adjacent_rings_opposite_ways() {
 fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
     const RADIUS: f32 = 0.5;
     const SCALE: f32 = 0.2;
-    let roster = vec![ring(Motif::Circle, 1, RADIUS, SCALE)];
+    let roster = vec![ring(Motif::Petal, 1, RADIUS, SCALE)];
     let extent = |segs: &[SegmentInstance]| -> (f32, f32) {
         let c = centroid(segs);
         let r = (c[0] * c[0] + c[1] * c[1]).sqrt();
@@ -804,7 +1015,7 @@ fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
     };
 
     let mut base = Vec::new();
-    build_rings(&roster, RingMotion::STATIC, CAP, &mut base);
+    build_rings(&roster, RingMotion::STATIC, CAP, &mut base, &mut Vec::new());
     let (r0, reach0) = extent(&base);
 
     let mut spread = Vec::new();
@@ -813,6 +1024,7 @@ fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
         RingMotion::from_params(0.0, 1.6, 1.0),
         CAP,
         &mut spread,
+        &mut Vec::new(),
     );
     let (r1, reach1) = extent(&spread);
     assert!((r1 / r0 - 1.6).abs() < 1e-3, "spread must scale the radius");
@@ -827,6 +1039,7 @@ fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
         RingMotion::from_params(0.0, 1.0, 2.5),
         CAP,
         &mut scaled,
+        &mut Vec::new(),
     );
     let (r2, reach2) = extent(&scaled);
     assert!((r2 - r0).abs() < 1e-4, "scale must not move the ring");
@@ -839,6 +1052,29 @@ fn spread_moves_the_rings_out_and_scale_only_grows_the_motifs() {
     // roster structural and the draw buffer allocation-free once built.
     assert_eq!(base.len(), spread.len());
     assert_eq!(base.len(), scaled.len());
+
+    // The same two levers on an arc-drawn ring, where "how big a copy is" is
+    // the instance's own radius rather than a spread of vertices.
+    let arc_roster = vec![ring(Motif::Circle, 1, RADIUS, SCALE)];
+    let arc_extent = |motion: RingMotion| -> (f32, f32) {
+        let mut arcs = Vec::new();
+        build_rings(&arc_roster, motion, CAP, &mut Vec::new(), &mut arcs);
+        let arc = arcs.first().copied().expect("one arc");
+        (arc_radius(&arc), arc.radius)
+    };
+    let (ar0, areach0) = arc_extent(RingMotion::STATIC);
+    let (ar1, areach1) = arc_extent(RingMotion::from_params(0.0, 1.6, 1.0));
+    let (ar2, areach2) = arc_extent(RingMotion::from_params(0.0, 1.0, 2.5));
+    assert!(
+        (ar1 / ar0 - 1.6).abs() < 1e-3 && (areach1 - areach0).abs() < 1e-5,
+        "spread must move an arc's ring without resizing it, got \
+         {ar0}->{ar1} at radius {areach0}->{areach1}"
+    );
+    assert!(
+        (ar2 - ar0).abs() < 1e-4 && (areach2 / areach0 - 2.5).abs() < 1e-3,
+        "scale must resize an arc without moving its ring, got \
+         {ar0}->{ar2} at radius {areach0}->{areach2}"
+    );
 }
 
 /// The three levers run per frame from author expressions, so
@@ -875,7 +1111,7 @@ fn the_ring_levers_survive_everything_an_expression_can_produce() {
 
     // A moved motion still places finite geometry.
     let mut out = Vec::new();
-    build_rings(&mandala_roster(), hot, CAP, &mut out);
+    build_rings(&mandala_roster(), hot, CAP, &mut out, &mut Vec::new());
     assert!(out.iter().all(|s| s.a[0].is_finite() && s.b[1].is_finite()));
 }
 
@@ -1007,9 +1243,19 @@ fn the_ring_levers_are_bindable_and_default_to_the_static_configuration() {
 /// mandala uses is the whole figure.
 #[test]
 fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
-    for &m in Motif::ALL {
+    // The polyline family only. The two circular motifs have no vertices to
+    // join since Plan 0087, which
+    // `a_circular_motif_is_one_arc_with_no_interior_joint` asserts directly;
+    // iterating the whole roster here would silently assert nothing about them.
+    for m in polyline_motifs() {
         let mut out = Vec::new();
-        build_rings(&[ring(m, 1, 0.5, 0.3)], RingMotion::STATIC, CAP, &mut out);
+        build_rings(
+            &[ring(m, 1, 0.5, 0.3)],
+            RingMotion::STATIC,
+            CAP,
+            &mut out,
+            &mut Vec::new(),
+        );
         let flags: Vec<u32> = out.iter().map(|s| s.joined).collect();
         if m.is_closed() {
             assert!(
@@ -1036,4 +1282,289 @@ fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
             }
         }
     }
+}
+
+// -----------------------------------------------------------------------
+// The circular motif is round at every scale (Plan 0087 Phase 3, ADR-0098)
+// -----------------------------------------------------------------------
+
+/// The square target the roundness measurement runs at. Square so a polar
+/// sweep about the frame centre needs no aspect correction of its own — the
+/// aspect claim is Phase 1's, and `renderer/tests.rs` runs its control at 4:3
+/// where a wrong one shows.
+const ROUND_SIZE: u32 = 768;
+
+/// Spokes in the polar sweep. Not a multiple of `SMOOTH_SAMPLES`, so a spoke
+/// cannot systematically land on a polygon vertex or systematically miss one.
+const SPOKES: usize = 181;
+
+/// Draw one ring's geometry through a bare [`LineRenderer`] into a linear
+/// target and read the light back, unclamped.
+fn round_capture(segments: &[SegmentInstance], arcs: &[ArcInstance]) -> Option<Vec<f32>> {
+    use crate::render::capture;
+    use crate::render::context::RenderContext;
+    use crate::render::scenes::lines::{LineRenderer, ViewTransform};
+
+    const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+    let ctx = match RenderContext::new_headless(ROUND_SIZE, ROUND_SIZE, true) {
+        Ok(ctx) => ctx,
+        Err(_) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+    };
+    let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("round-target"),
+        size: wgpu::Extent3d {
+            width: ROUND_SIZE,
+            height: ROUND_SIZE,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&Default::default());
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("round"),
+        });
+    // The line pass loads rather than clears; in the shipped chain the
+    // background pass owns the clear, so this stands in for it.
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("round-clear"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: &view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+
+    let mut renderer = LineRenderer::new_with_arcs(
+        &ctx.device,
+        FORMAT,
+        segments.len().max(1),
+        arcs.len().max(1),
+        "round",
+    );
+    renderer.draw_arcs(
+        &ctx.queue,
+        &mut encoder,
+        &view,
+        1.0,
+        1.0,
+        ViewTransform::default(),
+        segments,
+        arcs,
+    );
+
+    let (buffer, padded_bpr) = capture::create_linear_readback(&ctx.device, ROUND_SIZE, ROUND_SIZE);
+    capture::record_copy(
+        &mut encoder,
+        &texture,
+        &buffer,
+        padded_bpr,
+        ROUND_SIZE,
+        ROUND_SIZE,
+    );
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+    Some(
+        capture::read_back_linear(&ctx.device, &buffer, ROUND_SIZE, ROUND_SIZE, padded_bpr)
+            .expect("read back the roundness capture"),
+    )
+}
+
+/// Walk out from the frame centre along `SPOKES` evenly spaced rays and report,
+/// per ray, **where** the stroke's light sits and **how much** of it there is:
+/// its brightness-weighted mean radius in pixels, and the integral of
+/// brightness along the ray.
+///
+/// Both are integrals rather than peaks, and that is what makes them
+/// measurable. A peak sample is the brightest *pixel* near the centreline, so
+/// it moves with where the pixel grid happens to fall relative to the stroke —
+/// on a 4.6 px half-width that alone spreads the reading 21 % around a ring
+/// that is perfectly uniform. An integral over a bilinearly sampled ray has no
+/// such phase: a **round** stroke puts its light at the same radius on every
+/// ray, and an **unbeaded** one puts the same amount of it there.
+fn polar_profile(px: &[f32], max_radius_px: f32) -> Vec<(f32, f32)> {
+    let n = ROUND_SIZE as usize;
+    let centre = ROUND_SIZE as f32 / 2.0;
+    // Bilinear, so the walk resolves the stroke rather than the pixel grid.
+    let sample = |x: f32, y: f32| -> f32 {
+        let (x0, y0) = (x.floor(), y.floor());
+        let (fx, fy) = (x - x0, y - y0);
+        let at = |ix: f32, iy: f32| -> f32 {
+            if ix < 0.0 || iy < 0.0 || ix >= n as f32 || iy >= n as f32 {
+                return 0.0;
+            }
+            px.get((iy as usize * n + ix as usize) * 4)
+                .copied()
+                .unwrap_or(0.0)
+        };
+        let top = at(x0, y0) * (1.0 - fx) + at(x0 + 1.0, y0) * fx;
+        let bottom = at(x0, y0 + 1.0) * (1.0 - fx) + at(x0 + 1.0, y0 + 1.0) * fx;
+        top * (1.0 - fy) + bottom * fy
+    };
+    (0..SPOKES)
+        .map(|k| {
+            let theta = std::f32::consts::TAU * k as f32 / SPOKES as f32;
+            let (sin, cos) = theta.sin_cos();
+            let (mut sum, mut weighted) = (0.0f32, 0.0f32);
+            // Quarter-pixel steps: finer than the stroke being integrated, so
+            // the reading is limited by the stroke and not by the walk.
+            let steps = (max_radius_px * 4.0) as usize;
+            for step in 0..=steps {
+                let r = step as f32 / 4.0;
+                let v = sample(centre + r * cos - 0.5, centre - r * sin - 0.5);
+                sum += v;
+                weighted += v * r;
+            }
+            (if sum > 0.0 { weighted / sum } else { 0.0 }, sum)
+        })
+        .collect()
+}
+
+/// **A `circle` motif is round, and evenly bright, at ornament scale and at
+/// full frame** — the resolution-independence claim ADR-0098 makes, checked at
+/// the small scale where the polygon was visible rather than at the large one
+/// where it was not.
+///
+/// The control is the **same circle as a `SMOOTH_SAMPLES` polyline**, which is
+/// exactly what shipped and what the user rejected: `Motif::outline` still
+/// returns it, so the two sides of the comparison come from one definition.
+///
+/// # What the polyline actually fails on, and it is not roundness
+///
+/// The chord error of a 24-gon is `r * (1 - cos(pi/24))`, about 0.86 % of the
+/// radius — a fifth of a pixel at ornament scale, which no capture can see.
+/// The **bead** is what is visible: ADR-0041 extends each joined end by a half
+/// width, the composite is additive, and 24 vertices sum to 24 bright spots
+/// around the ring. So the assertion that discriminates is on *brightness
+/// around the ring*, and the roundness arm is asserted of the arc alone, at
+/// both scales, as the resolution claim.
+#[test]
+fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
+    // `scale` 0.13 is the retired `star_mandala`'s outermost ring; 1.8 fills the
+    // frame. A motif spans roughly one unit, so the drawn radius is half of it.
+    for motif_scale in [0.13f32, 1.8] {
+        let radius_world = 0.5 * motif_scale;
+        let radius_px = radius_world * ROUND_SIZE as f32 / 2.0;
+        let roster = vec![ring(Motif::Circle, 1, 0.0, motif_scale)];
+
+        let mut segments = Vec::new();
+        let mut arcs = Vec::new();
+        build_rings(&roster, RingMotion::STATIC, CAP, &mut segments, &mut arcs);
+        assert!(
+            segments.is_empty() && arcs.len() == 1,
+            "the circle motif must be exactly one arc"
+        );
+        // A visible stroke at both scales; the profile is read off its peak, so
+        // the width only has to resolve.
+        let width = 0.012;
+        for arc in &mut arcs {
+            arc.width = width;
+        }
+
+        let Some(drawn) = round_capture(&[], &arcs) else {
+            return;
+        };
+        let profile = polar_profile(&drawn, ROUND_SIZE as f32 / 2.0);
+        let radii: Vec<f32> = profile.iter().map(|p| p.0).collect();
+        let light: Vec<f32> = profile.iter().map(|p| p.1).collect();
+        let lo = radii.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = radii.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let vlo = light.iter().copied().fold(f32::INFINITY, f32::min);
+        let vhi = light.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+
+        eprintln!(
+            "arc circle at motif scale {motif_scale} ({radius_px:.1} px \
+             radius): light at radius {lo:.2}..{hi:.2} px, light per ray \
+             {vlo:.3}..{vhi:.3} ({:.1} % spread)",
+            (vhi - vlo) / vhi * 100.0
+        );
+        assert!(
+            vlo > 1.0,
+            "the stroke is not resolved at motif scale {motif_scale} (dimmest \
+             ray carries {vlo:.3}) — the profile below would be read off noise"
+        );
+        // Round: the light sits at one radius on every ray, and the radius it
+        // is meant to sit at is the arc's own.
+        assert!(
+            hi - lo <= 0.5,
+            "the arc-drawn circle's light sits between {lo:.2} and {hi:.2} px \
+             at motif scale {motif_scale} — it is not round"
+        );
+        assert!(
+            (0.5 * (lo + hi) - radius_px).abs() <= 1.0,
+            "the arc-drawn circle sits at {:.2} px where its own geometry puts \
+             it at {radius_px:.2}",
+            0.5 * (lo + hi)
+        );
+        // Unbeaded: it has no interior vertex, so nothing sums anywhere.
+        assert!(
+            vhi - vlo <= 0.05 * vhi,
+            "the arc-drawn circle carries between {vlo:.3} and {vhi:.3} light \
+             per ray around the ring at motif scale {motif_scale}, and an arc \
+             has no joint for a bead to form at"
+        );
+    }
+
+    // --- The control: the same circle as the polyline that shipped. ---
+    //
+    // Built from `Motif::outline`, placed by the same arithmetic `build_rings`
+    // uses for a polyline motif, and joined the way a closed chain is
+    // (ADR-0041) — which is the whole of what makes the beads.
+    const MOTIF_SCALE: f32 = 0.13;
+    let mut pts = Vec::new();
+    Motif::Circle.outline(&mut pts);
+    let n = pts.len();
+    let polyline: Vec<SegmentInstance> = (0..n)
+        .filter_map(|e| {
+            let a = *pts.get(e)?;
+            let b = *pts.get((e + 1) % n)?;
+            Some(SegmentInstance {
+                a: [a[0] * MOTIF_SCALE, a[1] * MOTIF_SCALE],
+                b: [b[0] * MOTIF_SCALE, b[1] * MOTIF_SCALE],
+                color: [1.0, 1.0, 1.0],
+                width: 0.012,
+                joined: JOINED_A | JOINED_B,
+                alpha: 1.0,
+            })
+        })
+        .collect();
+    assert_eq!(polyline.len(), n, "the control is the full 24-gon");
+
+    let Some(drawn) = round_capture(&polyline, &[]) else {
+        return;
+    };
+    let profile = polar_profile(&drawn, ROUND_SIZE as f32 / 2.0);
+    let light: Vec<f32> = profile.iter().map(|p| p.1).collect();
+    let vlo = light.iter().copied().fold(f32::INFINITY, f32::min);
+    let vhi = light.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    eprintln!(
+        "polyline circle at motif scale {MOTIF_SCALE}: light per ray \
+         {vlo:.3}..{vhi:.3} ({:.1} % spread)",
+        (vhi - vlo) / vhi * 100.0
+    );
+    assert!(
+        vhi - vlo > 0.05 * vhi,
+        "the {n}-gon control varies by only {:.3} in light around the ring, so \
+         the arc's uniformity above is not distinguishing it from anything — \
+         check that the control is still joined (ADR-0041), which is what sums \
+         a bead at every vertex",
+        vhi - vlo
+    );
 }

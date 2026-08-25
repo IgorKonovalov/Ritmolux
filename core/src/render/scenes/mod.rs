@@ -470,9 +470,15 @@ pub(crate) fn create_all(
     // whichever line scene is active — only one draws per frame. (Two separate
     // line pipelines with byte-identical vertex layouts also mis-render on the
     // DX12 WARP software adapter the capture tests use; one renderer avoids it.)
-    let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new(
+    // `new_with_arcs`, not `new`: `star_pattern`'s circular motifs are one arc
+    // instance each since Plan 0087 (ADR-0098), and the arc buffer holds
+    // `max_segments` because the two kinds share **one** budget — everything
+    // that passes `build_rings`'s cap check must reach the GPU, or a cap would
+    // be silently cutting geometry, which ADR-0007 forbids.
+    let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new_with_arcs(
         device,
         surface_format,
+        tier.max_segments,
         tier.max_segments,
         "lines",
     )));
@@ -530,9 +536,13 @@ pub(crate) fn create_layer_scene(
         device,
         surface_format,
         &mut || {
-            Rc::new(RefCell::new(lines::LineRenderer::new(
+            // Arcs too — a `[layer]` may be a `star_pattern`, and a layer that
+            // could not draw them would render a mandala with its circles
+            // missing rather than fail.
+            Rc::new(RefCell::new(lines::LineRenderer::new_with_arcs(
                 device,
                 surface_format,
+                tier.max_segments,
                 tier.max_segments,
                 "layer-lines",
             )))

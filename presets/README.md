@@ -1446,15 +1446,23 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > rather than by brightness.
 >
 > **`star_rosewindow` (Rose Window, Plan 0075 cohort 1) is the shipped `rings`
-> preset today**, and it stays at interlace scale deliberately — the reason is
-> design-backlog 0073: every motif is a parametric outline sampled to straight
-> segments, so at ornament scale the vertices show and a circle reads as a
+> preset today**, and it stayed at interlace scale deliberately — the reason was
+> design-backlog 0073: every motif was a parametric outline sampled to straight
+> segments, so at ornament scale the vertices showed and a circle read as a
 > polygon. That is what retired the first three rings presets (`star_mandala`,
 > `star_mandala_six`, `star_weave`, 2026-08-06). The ornament-scale mandala
 > register moved to an analytic iso-contour fold (`reaction_gilt`, itself since
 > retired at Plan 0075 cohort 3) and now lives in `fragment_mandala` (Banded
-> Mandala), which has no geometry to facet. Read Rose Window's header before
-> authoring the next rings preset.
+> Mandala), which has no geometry to facet.
+>
+> **Plan 0087 removed that ceiling for `circle` and `arc` and not for the other
+> five.** Those two are single per-pixel arcs now, so a ring of them is round at
+> any scale and carries no vertex beads; `petal`, `teardrop` and `trefoil` are
+> still sampled outlines and still facet where the retired mandalas did. **The
+> three retired presets have not been re-judged** — that is the plan's own
+> Phase 7 — so read Rose Window's header before authoring the next rings preset,
+> and treat "a curved motif reads at ornament scale" as true of the two circular
+> members only.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -2882,15 +2890,27 @@ the ones you already know.
 0065 Phase 3 and closed on purpose — a look outside it routes back through
 `architect` + `dev`, it is not a preset-side extension point:
 
-| `motif`    | what it is                                                | segments per copy |
+| `motif`    | what it is                                                | instances per copy |
 |------------|-----------------------------------------------------------|-------------------|
-| `circle`   | a plain bead; the ring that reads as a dotted orbit        | 24 |
+| `circle`   | a plain bead; the ring that reads as a dotted orbit        | **1 arc** |
 | `petal`    | a pointed oval (vesica), cusped at both ends along the radius | 24 |
 | `teardrop` | round outward, cusped inward — the only motif with an unambiguous "which way is out" | 24 |
 | `diamond`  | a four-vertex rhombus, long along the radius               | 4  |
-| `arc`      | an **open** outward-bulging arc, chord tangential; the nearest this roster comes to a scalloped boundary | 12 |
+| `arc`      | an **open** outward-bulging arc, chord tangential; the nearest this roster comes to a scalloped boundary | **1 arc** |
 | `trefoil`  | a three-lobed rose — the densest member, and the one that reads as ornament rather than as a bead | 36 |
 | `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
+
+> **`circle` and `arc` are drawn as real curves, and they are now the two
+> cheapest members** (Plan 0087, [ADR-0098]). Each is a single instance whose
+> stroke is a distance evaluated per pixel, so it has **no vertices at any
+> scale**: it is round at `scale = 0.13` and at full frame, and there is no
+> interior joint for a bead to sum at. Where a `circle` cost 24 segments and 24
+> additively-overlapping joints, it now costs one instance and none. The other
+> five stay sampled polylines, which is the right primitive for them — a
+> distance field is strictly more expensive for a straight line, and a `diamond`
+> and a `chevron` are nothing but straight lines.
+>
+> [ADR-0098]: ../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
 
 > **`star` and `triangle` were cut** at the same sitting and are load errors now.
 > The property they were cut on is the one to judge a candidate by: *does it hold
@@ -2898,11 +2918,12 @@ the ones you already know.
 > and dissolves into texture by ×32; `triangle` duplicates `chevron`'s role at
 > twelve times the cost.
 
-**The segment budget, and what happens when you exceed it.** A ring costs
-`count × segments-per-copy`, and the interlace adds `2n` on top. The floor tier's
-ceiling is **20 000** segments (60 000 at rich), so the shipped four-ring mandala
-at `36 + 12×4 + 18×24 + 24×24 = 1 092` plus a 24-segment interlace uses about
-6 % of it. Two things to know:
+**The instance budget, and what happens when you exceed it.** A ring costs
+`count × instances-per-copy`, and the interlace adds `2n` on top. Segments and
+arcs share **one** ceiling — **20 000** at the floor tier, 60 000 at rich — so the
+four-ring mandala roster at `36 + 12×4 + 18×24 + 24×1 = 540` plus a 24-segment
+interlace uses under 3 % of it. (That roster cost 1 092 before Plan 0087; the
+24-copy `circle` ring fell from 576 segments to 24 arcs.) Two things to know:
 
 - **Truncation at the cap is silent.** The build stops emitting and nothing warns
   you — no load error, no `--report` column. The figure simply ends part-way
