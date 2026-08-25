@@ -1,8 +1,8 @@
 # ADR-0120 — The close brief is a section of the plan, written as the phases land
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-25 (Plan 0112)
 > **Date:** 2026-08-25
-> **Related plan(s):** [0112](../plans/0112-the-handoff-stops-being-a-chat-message.md)
+> **Related plan(s):** [0112](../plans/done/0112-the-handoff-stops-being-a-chat-message.md)
 
 ## Context
 

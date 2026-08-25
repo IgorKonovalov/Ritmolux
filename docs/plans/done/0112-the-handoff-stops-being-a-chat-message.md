@@ -1,10 +1,17 @@
 # 0112 — The handoff stops being a chat message
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-25. All three phases landed on `main`
+> (`9d8b359`, `51053b0`, `1708b79`, close block `f4ee668`). Mode 4: **no blockers, no majors, two
+> minors.** Verified against the tree: the template skeleton carries all four blocks and the size
+> rule; `dev`'s Step 3 writes the row inside the phase commit and Step 4 commits the close block
+> before printing a three-line pointer; Mode 4 lens 1 opens on the log and states it is claims, not
+> evidence, with silence explicitly not certification. All three doc gates exit 0, and the log's own
+> backlog-probe reading (61 reductions, 36 live entries, 4 unprobeable, 14 advisory moves) reproduced
+> exactly. The plan dogfooded its own convention — every phase commit carries its log row.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
-> **Related ADRs:** [0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) (proposed),
-> resting on [0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md)
+> **Related ADRs:** [0120](../../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) (accepted),
+> resting on [0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md)
 
 ## TL;DR
 
@@ -31,7 +38,7 @@ scrollback. Moves no pixels, touches no Rust.
 The user's report: *"when dev finishes work, I have to manually pass prompt and details to a new
 architect session."* That copy-paste is the visible symptom. The underlying defect, and the reason
 it blocks parallel lanes, is in
-[ADR-0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) — the brief is synchronous,
+[ADR-0120](../../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) — the brief is synchronous,
 single-copy, and does not cross the worktree boundary.
 
 Two facts shape the design, and both are already in the tree:
@@ -81,9 +88,9 @@ fresh-session boundary, which is the point of the seam and is not being automate
 ## Implementation phases
 
 Every phase edits harness markdown only. No Rust, no `presets/`, no `scripts/`. All three are
-tagged `dev` on the [Plan 0067](done/0067-the-curation-route.md) Phase 4 precedent (`docs(skills):`,
+tagged `dev` on the [Plan 0067](0067-the-curation-route.md) Phase 4 precedent (`docs(skills):`,
 commit `be7204c`) — the owner vocabulary has no word for a harness-editing phase, which is a known
-wart already filed as a followup by [Plan 0104](0104-the-library-stops-being-lopsided.md).
+wart already filed as a followup by [Plan 0104](../0104-the-library-stops-being-lopsided.md).
 
 Each phase's done-when is a property of the resulting file, checkable by reading it. `node
 scripts/check-doc-links.mjs` must exit 0 at the end of every phase — it covers `.claude/skills/**`
@@ -128,7 +135,7 @@ as well as `docs/`, and these phases add relative links in both.
   - The `### Close triggers` heading itself says these are **facts for architect to verify and
     decide from**, and the bullets contain no recommendation — in particular **no suggested version
     bump level**, which is architect-owned per
-    [ADR-0005](../adrs/0005-versioning-and-release-cadence.md).
+    [ADR-0005](../../adrs/0005-versioning-and-release-cadence.md).
   - The blockquote states the size rule as a property, not a constant: **the log stays shorter than
     the plan's own `## Implementation phases` section.** It self-scales with the plan, it encodes
     that the contract outweighs the report, and it is checkable by looking. It is deliberately
@@ -267,7 +274,7 @@ as well as `docs/`, and these phases add relative links in both.
 - **Does not add a gate** for the log's presence, shape or size.
 - **Does not backfill** the seven in-flight plans with an empty skeleton — Phase 2 has `dev` create
   the section on demand instead.
-- **Does not touch the `preset-author` handoff.** [`docs/design-backlog.md`](../design-backlog.md)
+- **Does not touch the `preset-author` handoff.** [`docs/design-backlog.md`](../../design-backlog.md)
   remains that lane's inbox, unchanged.
 - **Does not automate any part of the close ceremony.** The log states facts; architect performs
   every step.

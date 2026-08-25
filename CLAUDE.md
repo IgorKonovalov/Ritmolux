@@ -103,8 +103,9 @@ was added per [ADR-0017](docs/adrs/0017-preset-author-skill-lane.md)):
 | `preset-author` | preset **content** — `.toml` presets, expression bindings, `[curve]`/`[generator]` config; never engine Rust | "make an aurora-style preset", "a look that pulses on the beat", "tune rose_star", "make it more organic", "design a preset for the drop" |
 
 **The hard split: `architect` designs, `dev` builds, `preset-author` composes content — never
-invert.** The architect never writes production code; `dev` never authors plans/ADRs and never
-reviews its own work; `preset-author` never touches engine Rust (a look needing a new scene, param,
+invert.** The architect never writes production code; `dev` authors no ADRs and writes only two
+things inside a plan — the `Status:` line and the `## Implementation log` — and never reviews its
+own work; `preset-author` never touches engine Rust (a look needing a new scene, param,
 or grammar capability routes back to `architect` + `dev` as feedback, and `dev` — not the author —
 embeds a preset into the shipped set). The handoffs are `architect → dev` (the user's "go"),
 `dev → architect` (the plan's own `## Implementation log`, which `dev` writes as the phases land,
