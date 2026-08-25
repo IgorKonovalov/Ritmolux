@@ -23,10 +23,11 @@
 
 use super::layout::{self, Grammar, Recipe};
 use super::{
-    AUTHORED_COUNT, DEFAULT_ANGLE_BIAS, DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, DEFAULT_SEED,
-    Element, KIND_CIRCLE, KIND_QUAD, KIND_TRIANGLE, MAX_EDGE_SOFTNESS, MAX_SCALE, MAX_SEED,
-    MIN_SCALE, PARAMS, SUPREMATIST, ShapeCollageScene, Spec, applied_angle_bias, applied_count,
-    applied_edge_softness, applied_scale, applied_seed, triangle_vertices,
+    ALL_KINDS, AUTHORED_COUNT, DEFAULT_ANGLE_BIAS, DEFAULT_APERTURE, DEFAULT_CHECKER_CELLS,
+    DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, DEFAULT_SEED, Element, KIND_CIRCLE, KIND_QUAD,
+    MAX_EDGE_SOFTNESS, MAX_SCALE, MAX_SEED, MIN_SCALE, PARAMS, SUPREMATIST, ShapeCollageScene,
+    Spec, applied_angle_bias, applied_count, applied_edge_softness, applied_scale, applied_seed,
+    checker_cells, kind_name,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
@@ -89,83 +90,18 @@ fn the_vocabulary_carries_the_canvas_knobs() {
     }
 }
 
-/// **The bounding box is tight for every kind.**
-///
-/// A loose box does not draw anything wrong — it costs a distance evaluation at
-/// every pixel it wrongly admits, which is a silent regression against the
-/// Phase 2 cost measurement. So it is asserted rather than inspected: for each
-/// kind, at each of several rotations, the box's own half extents are compared
-/// against the extents recovered from the shape's actual geometry.
-#[test]
-fn every_kind_gets_a_tight_bounding_box() {
-    /// The largest relative slack a box may have over the true extent. Not zero:
-    /// the recovered extents below go through the same `sin_cos` the builder
-    /// does, so this is float agreement, not a tolerance on tightness.
-    const SLACK: f32 = 1e-4;
-
-    for &(kind, label) in &[
-        (KIND_QUAD, "quad"),
-        (KIND_CIRCLE, "circle"),
-        (KIND_TRIANGLE, "triangle"),
-    ] {
-        for angle_deg in [0.0f32, 17.0, 45.0, 90.0, 133.0, -62.0] {
-            let (hx, hy) = (0.31f32, 0.17f32);
-            let e = Element::build(Spec {
-                kind,
-                center: [0.2, -0.4],
-                half: [hx, hy],
-                angle_deg,
-                coord: 0.5,
-                alpha: 1.0,
-            });
-            let (bx, by) = ((e.aabb[2] - e.aabb[0]) * 0.5, (e.aabb[3] - e.aabb[1]) * 0.5);
-
-            // The true extent, recovered from the shape's own geometry rather
-            // than from the builder's formula, so the two can disagree.
-            let (sa, ca) = angle_deg.to_radians().sin_cos();
-            let support = |px: f32, py: f32| ((ca * px - sa * py).abs(), (sa * px + ca * py).abs());
-            let (tx, ty) = if kind == KIND_TRIANGLE {
-                triangle_vertices(hx, hy)
-                    .iter()
-                    .fold((0.0f32, 0.0f32), |acc, v| {
-                        let (x, y) = support(v[0], v[1]);
-                        (acc.0.max(x), acc.1.max(y))
-                    })
-            } else {
-                // Sampled around the boundary: the four corners for a quad, the
-                // parametric circle for an ellipse. 4096 samples resolve the
-                // extent far finer than SLACK.
-                let mut tx = 0.0f32;
-                let mut ty = 0.0f32;
-                if kind == KIND_QUAD {
-                    for (px, py) in [(hx, hy), (-hx, hy), (hx, -hy), (-hx, -hy)] {
-                        let (x, y) = support(px, py);
-                        tx = tx.max(x);
-                        ty = ty.max(y);
-                    }
-                } else {
-                    for i in 0..4096 {
-                        let t = i as f32 / 4096.0 * std::f32::consts::TAU;
-                        let (x, y) = support(hx * t.cos(), hy * t.sin());
-                        tx = tx.max(x);
-                        ty = ty.max(y);
-                    }
-                }
-                (tx, ty)
-            };
-
-            let slack_x = bx / tx - 1.0;
-            let slack_y = by / ty - 1.0;
-            assert!(
-                slack_x.abs() <= SLACK && slack_y.abs() <= SLACK,
-                "{label} at {angle_deg} deg: box half-extents ({bx:.6}, {by:.6}) against the \
-                 shape's own ({tx:.6}, {ty:.6}) — slack ({slack_x:+.2e}, {slack_y:+.2e}). \
-                 A box that is too large is a silent cost regression; one that is too \
-                 small clips the element."
-            );
-        }
-    }
-}
+// **The bounding-box check is rendered, not computed** — see
+// [`every_kind_is_contained_by_its_own_bounding_box`] further down.
+//
+// A CPU-only version lived here through Phases 1 to 6 and was **retired at
+// Phase 7 because its method could not see the defect it existed for**: it
+// compared the box's own half extents against half extents recovered from the
+// geometry, and a half extent is symmetric by construction. The triangle is
+// not — its apex sits at `+hy` and its base at `-hy/2` — so a box a quarter of
+// the figure's height too tall on one side passed it for six phases. Comparing
+// a computed box against *drawn pixels* is the check that bites, and it reaches
+// a failure the CPU version never could: a Rust formula disagreeing with the
+// WGSL it is supposed to bound.
 
 // ---------------------------------------------------------------------------
 // The layout grammar (Plan 0113 Phase 4)
@@ -180,6 +116,7 @@ fn recipe(grammar: Grammar, seed: u64, recompose: u64, count: usize) -> Recipe {
         recompose,
         size_hierarchy: 0.5,
         angle_bias: -0.384,
+        roster: layout::Roster::Suprematist,
     }
 }
 
@@ -721,6 +658,8 @@ fn the_later_element_wins_the_overlap() {
         angle_deg: 0.0,
         coord: 0.15,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     };
     let vertical = Spec {
         kind: KIND_QUAD,
@@ -729,6 +668,8 @@ fn the_later_element_wins_the_overlap() {
         angle_deg: 0.0,
         coord: 0.65,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     };
 
     let h_only = at(W, H, 0.5, 0.0); // inside the horizontal bar alone
@@ -893,6 +834,156 @@ fn headless(width: u32, height: u32) -> Option<Renderer> {
     }
 }
 
+/// **Every kind's bounding box contains what it draws, tightly** — rendered,
+/// not computed (Plan 0113 Phase 7).
+///
+/// A loose box draws nothing wrong; it costs a distance evaluation at every
+/// pixel it wrongly admits, which is a silent regression against Phase 2's cost
+/// measurement. A box that is too *small* clips the element, which is a visible
+/// defect the picture would show.
+///
+/// This renders each kind alone and measures the drawn pixels' own extent
+/// against the stored `aabb`, which is the assertion that actually bites: the
+/// box is computed in Rust and the shape is drawn in WGSL, so a CPU formula that
+/// disagrees with its shader is exactly the failure this catches and a CPU-only
+/// check could not.
+#[test]
+fn every_kind_is_contained_by_its_own_bounding_box() {
+    const W: u32 = 400;
+    const H: u32 = 400;
+    /// Slack either way, as a fraction of the box's half extent. Generous enough
+    /// to absorb the one-pixel coverage ramp (which is 1/200 of the box here)
+    /// and nothing else.
+    const SLACK: f32 = 0.04;
+
+    let Some(ctx) = context(W, H) else {
+        return;
+    };
+
+    for kind in ALL_KINDS {
+        for angle_deg in [0.0f32, 31.0, -67.0] {
+            let spec = Spec {
+                angle_deg,
+                ..Spec::new(kind, [0.0, 0.0], [0.62, 0.30], angle_deg, 0.15, 1.0)
+            };
+            let element = Element::build(spec);
+            let img = paint(&ctx, W, H, &[spec]);
+
+            // The drawn extent: every pixel that is not the paper.
+            let paper = rgb(&img, 2, 2);
+            let (mut lo_x, mut hi_x, mut lo_y, mut hi_y) = (W, 0u32, H, 0u32);
+            let mut drawn = 0u32;
+            for y in 0..H {
+                for x in 0..W {
+                    let p = rgb(&img, x, y);
+                    if (0..3).any(|c| i32::from(p[c]).abs_diff(i32::from(paper[c])) > 12) {
+                        drawn += 1;
+                        lo_x = lo_x.min(x);
+                        hi_x = hi_x.max(x);
+                        lo_y = lo_y.min(y);
+                        hi_y = hi_y.max(y);
+                    }
+                }
+            }
+            let name = kind_name(kind);
+            assert!(
+                drawn > 200,
+                "{name} at {angle_deg} deg drew {drawn} pixels — it is not on screen, \
+                 so nothing below is being measured"
+            );
+
+            // The box, in the same pixel space. Canvas x is scaled by the target
+            // aspect (1.0 here) and NDC y is up while the capture is top-down.
+            let aspect = W as f32 / H as f32;
+            let to_px_x = |v: f32| (v / aspect * 0.5 + 0.5) * W as f32;
+            let to_px_y = |v: f32| (0.5 - v * 0.5) * H as f32;
+            let (bx0, bx1) = (to_px_x(element.aabb[0]), to_px_x(element.aabb[2]));
+            let (by0, by1) = (to_px_y(element.aabb[3]), to_px_y(element.aabb[1]));
+            let slack_px = SLACK * (bx1 - bx0).max(by1 - by0);
+
+            println!(
+                "{name:8} {angle_deg:>6.1} deg  drawn x {lo_x}..{hi_x} y {lo_y}..{hi_y}  \
+                 box x {bx0:.1}..{bx1:.1} y {by0:.1}..{by1:.1}"
+            );
+
+            // Contained: nothing is drawn outside the box.
+            assert!(
+                lo_x as f32 >= bx0 - slack_px
+                    && (hi_x as f32) <= bx1 + slack_px
+                    && lo_y as f32 >= by0 - slack_px
+                    && (hi_y as f32) <= by1 + slack_px,
+                "{name} at {angle_deg} deg draws OUTSIDE its bounding box — the reject \
+                 clips the element. drawn x {lo_x}..{hi_x} y {lo_y}..{hi_y}, box \
+                 x {bx0:.1}..{bx1:.1} y {by0:.1}..{by1:.1}"
+            );
+            // Tight: the box does not stand off from what is drawn.
+            assert!(
+                lo_x as f32 <= bx0 + slack_px
+                    && (hi_x as f32) >= bx1 - slack_px
+                    && lo_y as f32 <= by0 + slack_px
+                    && (hi_y as f32) >= by1 - slack_px,
+                "{name} at {angle_deg} deg has a LOOSE bounding box — every pixel it \
+                 wrongly admits costs a distance evaluation, which is a cost \
+                 regression no picture shows. drawn x {lo_x}..{hi_x} y {lo_y}..{hi_y}, \
+                 box x {bx0:.1}..{bx1:.1} y {by0:.1}..{by1:.1}"
+            );
+        }
+    }
+}
+
+/// **A translucent crossing is the `over` composite of both elements** — the
+/// half of Kandinsky's vocabulary that is not a shape (Plan 0113 Phase 7).
+///
+/// Two overlapping elements at `alpha` below 1: the crossing must differ from
+/// *both* parents' own colour, which is what distinguishes a composite from
+/// either one winning outright.
+#[test]
+fn a_translucent_crossing_is_neither_parent() {
+    const W: u32 = 192;
+    const H: u32 = 120;
+    let Some(ctx) = context(W, H) else {
+        return;
+    };
+
+    let horizontal = Spec::new(KIND_QUAD, [0.0, 0.0], [0.7, 0.15], 0.0, 0.15, 0.55);
+    let vertical = Spec::new(KIND_QUAD, [0.0, 0.0], [0.15, 0.7], 0.0, 0.65, 0.55);
+    let img = paint(&ctx, W, H, &[horizontal, vertical]);
+
+    let h_only = rgb(&img, at(W, H, 0.5, 0.0).0, at(W, H, 0.5, 0.0).1);
+    let v_only = rgb(&img, at(W, H, 0.0, 0.5).0, at(W, H, 0.0, 0.5).1);
+    let cross = rgb(&img, at(W, H, 0.0, 0.0).0, at(W, H, 0.0, 0.0).1);
+    let paper = rgb(&img, 2, 2);
+    println!("paper {paper:?} h {h_only:?} v {v_only:?} crossing {cross:?}");
+
+    assert_ne!(
+        h_only, paper,
+        "the translucent element vanished into the paper"
+    );
+    assert_ne!(cross, h_only, "the crossing is just the first element");
+    assert_ne!(cross, v_only, "the crossing is just the second element");
+    assert_ne!(cross, paper, "the crossing is bare paper");
+}
+
+/// A `checker`'s cell count is forced **even**, which is what makes its bounding
+/// box exact: with an odd count two opposite corner cells are empty and the box
+/// stands off the patch.
+#[test]
+fn a_checkers_cell_count_is_even() {
+    assert_eq!(checker_cells(DEFAULT_CHECKER_CELLS), DEFAULT_CHECKER_CELLS);
+    assert_eq!(checker_cells(3.0), 4.0);
+    // `round` goes half away from zero, so 5 lands on 6 rather than 4 — both
+    // are even, which is the property this asserts.
+    assert_eq!(checker_cells(5.0), 6.0);
+    assert_eq!(checker_cells(0.0), 2.0);
+    assert_eq!(checker_cells(-9.0), 2.0);
+    assert_eq!(checker_cells(1e9), 32.0);
+    assert_eq!(checker_cells(f32::NAN), DEFAULT_CHECKER_CELLS);
+    for probe in [2.0f32, 7.0, 13.4, 31.0] {
+        let n = checker_cells(probe);
+        assert_eq!(n % 2.0, 0.0, "checker_cells({probe}) = {n} is odd");
+    }
+}
+
 /// **The aspect comes from the render target, and this test bites**
 /// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
 ///
@@ -913,14 +1004,14 @@ fn headless(width: u32, height: u32) -> Option<Renderer> {
 /// 199 x 199 at both sizes.
 #[test]
 fn a_circle_element_is_round_at_sixteen_by_ten() {
-    let circle = [Spec {
-        kind: KIND_CIRCLE,
-        center: [0.0, 0.0],
-        half: [0.5, 0.5],
-        angle_deg: 0.0,
-        coord: 0.15,
-        alpha: 1.0,
-    }];
+    let circle = [Spec::new(
+        KIND_CIRCLE,
+        [0.0, 0.0],
+        [0.5, 0.5],
+        0.0,
+        0.15,
+        1.0,
+    )];
 
     for (w, h) in [(1280u32, 800u32), (500, 800)] {
         let Some(ctx) = context(w, h) else {

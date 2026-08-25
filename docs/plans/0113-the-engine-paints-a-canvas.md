@@ -342,8 +342,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 3 — The stop gate | human | **continue** | de69a52 |
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
-| 6 — The music moves the canvas | dev | done | committed with this row |
-| 7 — The Kandinsky vocabulary | dev | not started | |
+| 6 — The music moves the canvas | dev | done | 47ef35d |
+| 7 — The Kandinsky vocabulary | dev | done | committed with this row |
 | 8 — Documentation and the shipped set | dev | not started | |
 
 ### Notes
@@ -401,6 +401,47 @@ not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and i
 is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
 numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
 one the tier is quoted against.
+
+**Phase 7 — the roster reading the plan settled on.** `bar` and `segment` both
+plausibly meant "a straight line with thickness", and `quad` already draws a
+rectangle at any elongation, so a plain rectangular `bar` would have duplicated
+it. Put to the user, who chose: **`bar` is a rounded-cap stroke** (distinct from
+`quad`'s sharp corners) and **`segment` is a circular sector**, completing the
+circle family beside `ring` (annulus) and `arc` (annular sector). Eight kinds,
+none duplicating another.
+
+**Phase 7 — a defect that had shipped since Phase 1, found by changing the test's
+method.** The plan asks the bounding box be asserted tight for every kind. The
+Phase 1 check did that on the CPU, comparing the box's **half extents** against
+half extents recovered from the geometry — and a half extent is symmetric by
+construction. **The triangle is not**: its apex sits at `+hy` and its base at
+`-hy/2`, so its box was a quarter of the figure's height too tall on one side,
+and passed for six phases. Sectors have the same shape of asymmetry. Boxes are
+now a `(min, max)` pair rather than a half extent, and the check **renders each
+kind and measures drawn pixels against the stored box** — which also reaches a
+failure the CPU version never could: a Rust formula disagreeing with the WGSL it
+is supposed to bound. The CPU-only test was retired rather than kept, and the
+note where it stood says why.
+
+**Phase 7 — the cost re-measure came in cheaper, not dearer.** The roster puts a
+branch in the innermost loop, which is the hazard the re-run exists for. At the
+shipped configuration a 40-element canvas costs **3.23 ms, 19.4 % of the 60 Hz
+budget**, against 4.82 ms and 28.9 % before it — **0.058 ms an element against
+0.09**. The branch is not what this loop costs; *coverage* is, which is the same
+conclusion `mark_cost.rs` reached about the shaped-mark branch. Rings, sectors
+and checker patches light far less of their bounding box than a quad does. The
+two tables are not a controlled before/after — Phase 4 changed the element source
+between them — and `collage_cost.rs` says so next to both.
+
+**Phase 7 — notes.**
+
+- `presets/README.md` for the fourth time (the `roster` param), for Phase 1's
+  reason.
+- Both shipped presets clear all five gates. `On White`: coverage 1.0000,
+  quadrants 4, flatness 0.7152, shells 10/10, animation 0.0201, reactivity
+  `bass=0.0384` against a 0.02 floor.
+- The golden fixture did not move: it runs the default `roster`, and every new
+  kind is reachable only through a param a preset must set.
 
 **Phase 6 — a look defect the tests could not see, and its two causes.** A
 filmstrip of the shipped preset under a click track came back with every frame
