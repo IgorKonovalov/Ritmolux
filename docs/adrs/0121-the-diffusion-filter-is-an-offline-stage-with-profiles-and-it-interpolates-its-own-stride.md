@@ -1,6 +1,6 @@
 # ADR-0121 — The diffusion filter is an offline stage with profiles, and it interpolates its own stride
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-25 (Plan 0106) — carries one `Outcome`
 > **Date:** 2026-08-20
 > **Related plan(s):** [0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md)
 
@@ -201,3 +201,59 @@ its own ADR and its own plan, starting from the evidence recorded here.
   signal than a yes, but it is not the same answer, and this ADR does not treat it as one.
 - The spike's artifacts (contact sheets, ten clips, per-run `cell.json`) live untracked in the lane
   at `WORK/lmv-plan-0106/spike/` and are the only record of what the gate actually judged.
+
+## Outcome (added at Plan 0106's close, 2026-08-25)
+
+Plan 0106 built this and then falsified three things it says. All three are recorded here rather
+than edited into the body above, which stands as what was decided against the evidence available on
+2026-08-20. **The Decision itself survives intact** — one offline stage, profiles echoed as flags,
+and a stride that preserves the frame count are all exactly what shipped.
+
+**1. The `quality` profile does not ship the cell this ADR names.** The profile bullet describes it
+as the 20-step UniPC cell at 589,824 px. Rendered at that geometry it draws **white contour
+line-work over the attractor rather than material** — at feedback 0.4 and 0.6 alike, so feedback is
+not the cause — for **6.24 s/frame against the LCM cfg 2.0 cell's 2.97** at the same budget. The
+20-step cell does not survive the move off 512/768 square, which nothing here anticipated because
+every reading behind this ADR was square. `quality` was retuned to the LCM cell on the user's
+explicit call, and the 20-step cell remains one flag away (`--scheduler unipc --steps 20 --cfg 7.0`).
+The comparison is in Plan 0106's implementation log; both arms are in the lane's `spike/out/`.
+
+**2. The interpolator cost no new dependency, so the Negative that predicted one is weaker than
+written.** That clause expected a RIFE-class weight download and named a held frame as the honest
+first implementation. What shipped as the **default** is `--gap blend`, a crossfade using
+`PIL.Image.blend` — and PIL is already required by the diffusion path, so the filter took on nothing.
+The clause's *substance* survives and should not be read as retracted: a crossfade **dissolves, it
+does not follow motion**, which is a real limitation and the reason `--gap held` still exists. The
+phase rendered held, blend and `minterpolate` from identical anchors and the user chose blend.
+
+**3. Every per-frame figure in this ADR is diffusion-only, and the wall-clock cost is higher.** The
+spike harness times its sampler call alone, as does the shipped filter; the colour conversions,
+both resamples and the gap crossfades sit outside the timer, and `_emit` runs **per emitted frame**.
+Plan 0106's Phase 6 render measured the shipped filter at **0.753 s/frame wall against the 0.536 s
+its own instrument reported — a factor of 1.406** — and the same plan's Phase 7d fixes the
+instrument and the documents. What that does to the claims above is worth being precise about,
+because it is less than it sounds:
+
+- **Every ratio survives untouched.** The 3.1x banked speedup, the boil figures, and the
+  native-versus-square arms (2.721 / 2.871 / 2.913) are all comparisons *within one instrument*, so
+  the scope error cancels. The decision this ADR rests on is unaffected.
+- **The absolute extrapolations are optimistic.** "~6.3 hours" and "~2.1 hours" for a 4-minute track
+  convert a diffusion-only number into wall-clock time, and a real render pays the untimed remainder.
+- **The realtime conclusion hardens rather than softens.** The ~35x gap was computed from a
+  diffusion-only figure, so the true gap is *wider*. This is the second time that has been true here
+  — the Negative already recorded it once for the square-versus-native caveat — and it points the
+  same way both times.
+
+**4. Phase 2's third question has been asked and answered.** The Notes record that *"is this
+something they would publish?"* was never put in those terms. Plan 0106's Phase 6 put it, on a
+full 5:15 track: *"interesting ... as a way to make clip for music its fine"*, wanting **higher
+resolution** and **more variety**. A qualified yes, filed as backlog 0125 and 0126 rather than
+absorbed. The resolution want partially reopens **Alternative C**, which this ADR records as
+rejected by the same user — worth knowing before anyone designs against it, since that rejection
+predates anyone having watched five minutes of output.
+
+**On the number, resolved.** The opening note reserved 0120 for Plan 0111 Phase 3 and said it would
+return to the pool if that plan took its stop branch. **It did** — Phase 3 never ran, on Phase 2's
+stop condition — and 0120 was taken 2026-08-25 by
+[ADR-0120](0120-a-sidecar-tool-documents-itself-in-one-place.md), the documentation design pass for
+this same filter. The sequence is dense and nothing is held.
