@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0113** (ADRs are a separate sequence — next free there is **0121**.)
+**Next free number: 0113** (ADRs are a separate sequence — next free there is **0123**.)
 
 ## Active roster
 
@@ -22,7 +22,6 @@ someone who picked it up is reading.
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Its hard dependency is discharged — [0091](done/0091-the-figure-fills-the-frame.md) closed 2026-08-16 and `shape_field` is the scene this draws into.** Soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Amended 2026-08-16: a new Phase 1 fixes backlog [0102](../design-backlog.md) + [0103](../design-backlog.md) before anything advertises the component**, which Plan 0102's Phase 5 found starves foobar2000's own UI until playback starts. That phase is a surface-lifetime design pass, is ADR-worthy, and its fix only reaches users on the next tag — so the release must be green before Phase 5 submits. The rest is outreach whose done-whens are **artifacts, not outcomes**. Phase 3's soft want [0101](done/0101-the-engine-renders-a-music-video.md) **closed 2026-08-17 — motion can be recorded now, but its Phase 5 found a 1080p render reads as an upscale ([backlog 0110](../design-backlog.md)), so demo material made before that lands shows the engine at its grainiest.** |
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and ~~its four wait on [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1~~ — **that wait is discharged: 0108 Phase 1 landed 2026-08-17, so the four `warp_mesh` worlds are authorable now.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
-| [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) | The frame stream passes through a diffusion model | in-progress | dev, human | **Phases 1-2 ran 2026-08-20 and the stop condition did not fire** — the gate returned *usable with feedback*, *the music reads*, and an ask for realtime + higher resolution. **The deferred ADR is written: [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (proposed)** — profiles, native 768, and `--stride N` that emits N so the frame-count contract holds; **realtime is out of scope and becomes its own plan**, measured at ~35x remaining. Phases 3-5 amended to carry it. **Phase 2b added 2026-08-20**: every spike reading is square (768x768) and the stream is 1920x1080, so the aspect handling is measured before Phase 4, which it blocks — Phase 3 is unaffected and takeable now. Phase 4 also owes the user a held-versus-interpolated call. Ships a script, no weights and no runtime; `core/` untouched. Contends with nothing (`tools/` + `docs/` only). |
 
 **Added 2026-08-19, from a MilkDrop backlog round after
 [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
@@ -181,9 +180,6 @@ would revert most quietly.
   the one plan safe to run beside a lane that is blessing. **Read
   [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) first** — `beat_index` counts
   onsets, not beats, and two authoring docs still say otherwise.
-- **[0106](0106-the-frame-stream-passes-through-a-diffusion-model.md)** — `tools/` and `docs/` only,
-  contends with nothing. **Live in a worktree**: Phases 1–2 ran 2026-08-20, the stop condition did
-  not fire, and ADR-0121 is written. Phases 3–5 remain, and they are small.
 
 ### What this sequence assumes
 
@@ -245,8 +241,8 @@ renderer, and they sort into two groups that barely interact:
   `AddressMode::Repeat`, and Repeat shifts rather than reflects — which is why Phase 3 names a
   different hypothesis with arithmetic behind it.
 
-- **Out of sequence by design, and now past its gate:
-  [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md).** It went first because its
+- **Out of sequence by design, and now closed:
+  [0106](done/0106-the-frame-stream-passes-through-a-diffusion-model.md).** It went first because its
   Phase 1 depended on nothing and its Phase 2 could have ended it for the cost of one afternoon.
   **That bet paid 2026-08-20**: the spike ran, the look gate passed, and
   [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
@@ -747,6 +743,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md) — closed 2026-08-25. Review: **no blockers, no majors, four minors** (repaired at close). ADR renumbered 0120 → **0122**: two lanes took the number the same day.
 
 - [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md) — closed 2026-08-25. Review: **no blockers, no majors, two minors.** Version: **none** (docs/chore-only). Log: 43 lines vs a 146-line phase section.
 - [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md) — closed 2026-08-20. Review: **no blockers, one major, two minors.** The bisect stopped: the wash is at the **field**. Phase 6 void.

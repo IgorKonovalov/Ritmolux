@@ -35,3 +35,9 @@ Thumbs.db
 # are committed; their caches are not.
 __pycache__/
 *.pyc
+
+# Reference render output kept locally (Plan 0106). `shot --render` clips are
+# hundreds of megabytes of derived binary; they live here so the evidence behind
+# a shipped cost figure outlives the worktree that produced it, and they are
+# never committed. renders/README.md says what each one is.
+renders/

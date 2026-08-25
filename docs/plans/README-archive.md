@@ -13,6 +13,75 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)
+  — closed 2026-08-25, eleven commits on `plan-0106-diffusion-filter` from `3c15e79` to
+  `b1647a6`, merged at `a5c4407`. Review: **no blockers, no majors, four minors** (all repaired at
+  the close). Version: **minor**, a feature plan — though it moves **no release artifact**:
+  `core/`, `core-cabi/`, `plugin-foobar/`, `lmv-ring/` and `packaging/` are untouched and the only
+  Rust is 85 lines of test.
+
+  **What shipped.** `tools/sd-filter/` — a Python stdin→stdout stage between `shot --render` and
+  `ffmpeg` that runs img2img with ControlNet holding the geometry, so an attractor becomes a canyon
+  and a mandala becomes a rose window while the shape keeps tracking the music. The repository
+  ships **a script and a `requirements.txt`; no model, no weights, no Python runtime**, so
+  [NFR §4](../nfr.md#4-size-and-dependencies)'s ~10 MB cap is untouched.
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+  carries the design: profiles, a pixel-budget `--size`, and `--stride N` emitting N so the
+  frame-count contract holds and the canonical `ffmpeg` line never has to agree with a flag on
+  another process. That contract held over a 9,466-frame render.
+
+  **The plan's own shape is the reusable part.** Phase 2 was a **stop condition owned by `human`**
+  — one afternoon's spike, and if the look was unusable the plan ended there with a diagnosis and
+  nothing built. It did not fire. Phase 2b was then inserted mid-plan for exactly the reason this
+  repo has a rule about: **every measurement was square (768²) and the stream is 1920x1080**, so
+  the configuration measured and the configuration shipped disagreed and nothing covered the
+  disagreement. Measuring it chose `native` over squash-then-stretch and letterbox on **both** cost
+  and detail (2.721 s/frame at 100 % of its pixels, against 2.871 at 75 % and 2.913 at 56 %), so no
+  upscaler dependency was taken.
+
+  **Phase 7 is what a close review is for.** Five items, none changing what the filter draws.
+  Phase 3 had called the pass-through *"the one part of this feature that can be a real CI gate"*
+  and `docs/capturing.md` repeated it as shipped fact, while the suite read an untracked
+  `spike/clip.wav` and would have gone **red** on any other checkout; it now synthesizes its own
+  WAV and **runs** everywhere. The Python YUV conversion was a second implementation of a
+  `standalone/` function with **nothing checking the pair** — now pinned by one frozen table of
+  RGB triples asserted from both languages, each naming the other as its twin, with its sensitivity
+  measured rather than assumed (±0.0005 on any forward constant).
+
+  **The cost figures were wrong twice, in different ways, and that is the finding.**
+  [ADR-0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md) collapsed three
+  documentation copies into `docs/diffusion-filter.md` behind a fourth `scripts/` gate; then the
+  instrument itself proved to be timing `self.pipe(...)` alone while `_emit`'s per-emitted-frame
+  upscale and colour encode sat outside the timer — so a **stride-3 anchor paid three of them
+  uncounted**. Against a stopwatch on an idle GPU, `fast`'s scope error was 1.54x and `quality`'s
+  number was wrong about the **machine**: a *square* 768² reading carried into a profile that has
+  diffused at 1024x576 since Phase 2b, understating it **2.53x**. A 4-minute track at `quality`
+  costs ~15.5 hours, not the ~5.9 documented.
+
+  **Two things the close falsified, both in the plan's own log.** The Phase 6 `attractor_leviathan`
+  run absorbed an 8.98-hour laptop suspend, so its wall clock is not a measurement — the tidy
+  `1.406 x 1.188 = 1.670` decomposition and the *"within 2.5 % of predicted"* confirmation both
+  fall, and the section now carries a dated correction. And `docs/diffusion-filter.md` shipped two
+  arithmetic slips of its own (7,200 × 0.693 s is 1.4 hours, not 1.3; the in-table scope factor is
+  1.61x, not the 1.54x carried over from an earlier run), repaired at the close.
+
+  **The ADR number collided.** Two lanes took **0120** on 2026-08-25 in different worktrees with
+  different filenames, so the merge took both silently rather than conflicting. `main`'s was
+  accepted and cited from `CLAUDE.md` and two skills, so this lane's renumbered to **0122**, and
+  both ADRs now carry the account. **The general lesson: a returned-to-the-pool number is a race
+  across parallel lanes, and nothing in the repository detects it** — the next-free-number line is
+  advisory, and two branches read the same value.
+
+  **What outlived the plan.** Phase 6 returned a qualified yes — *"as a way to make clip for music
+  its fine"* — with two wants **filed rather than absorbed**, as design-backlog 0125 (resolution)
+  and 0126 (variety). Realtime is measured at ~35x from locked 30 fps and is its own plan, not a
+  followup. The headline followup remains the diffused frame re-entering the renderer as a sampled
+  texture, which needs a new `core` capability and its own ADR. Two unrepaired observations are
+  recorded, both pre-existing on `main` and neither this plan's: 52 broken markdown **fragment**
+  anchors that `scripts/check-doc-links.mjs` does not validate, and a `_control` call passing
+  `max(img.size)` as both `detect_resolution` and `image_resolution`, a candidate cause of
+  `quality`'s 2.53x that nothing has measured.
+
 - [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md)
   — closed 2026-08-25, three `dev` phases on `main` (`9d8b359`, `51053b0`, `1708b79`) plus the
   close block `f4ee668`. Review: **no blockers, no majors, two minors.** Harness only: no Rust, no

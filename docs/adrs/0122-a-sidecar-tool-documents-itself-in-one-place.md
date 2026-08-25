@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-08-25 (Plan 0106 Phase 7e)
 > **Date:** 2026-08-25
-> **Related plan(s):** [0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md) Phase 7e
+> **Related plan(s):** [0106](../plans/done/0106-the-frame-stream-passes-through-a-diffusion-model.md) Phase 7e
 
 **On the number.** This ADR was written as **0120** on the plan lane and renumbered to **0122** at
 the close, 2026-08-25. 0120 had been reserved for
