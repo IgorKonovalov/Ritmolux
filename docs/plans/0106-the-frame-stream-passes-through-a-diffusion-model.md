@@ -1,13 +1,13 @@
 # 0106 — The frame stream passes through a diffusion model
 
-> **Status:** in-progress — Phases 1, 2, 2b and 3 are done (2026-08-20); **Phases 4 and 5 are done
-> (2026-08-24)**. The stop condition did not fire; **Phase 2b chose `native`**, so the filter
+> **Status:** in-progress — Phases 1, 2, 2b, 3, 4, 5 and **6** are done, and **7a, 7b, 7c and
+> 7e landed 2026-08-25**. The stop condition did not fire; **Phase 2b chose `native`**, so the filter
 > diffuses at the stream's own aspect and every square s/frame reading in this document is
-> superseded. **Two phases remain: 6 (`human`, running 2026-08-24 on Caribou — *Odessa*, the track
-> the spike judged) and 7 (`dev`, added at the close review).** Phase 4's two findings are
-> **adjudicated**: the `quality` profile does not ship the cell this plan names and the gap
-> interpolator cost no new dependency — both are corrections to ADR-0121 rather than defects, and
-> the ADR takes them as a dated `Outcome` at the close rather than as body edits.
+> superseded. **One thing remains: 7d's second half** — the instrument is fixed and gated, but the
+> stopwatch run and the two corrected figures need a quiet GPU and the card is held by an unrelated
+> job. `docs/diffusion-filter.md` and `README.md` are **knowingly stale on cost** until it runs; see
+> the Phase 7 implementation log for exactly what is owed. Phase 4's two findings are **adjudicated**
+> and ADR-0121 has taken them as a dated `Outcome`.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0120](../adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md) — written
@@ -1081,6 +1081,90 @@ and `ffmpeg` were all still alive nine hours later, having simply been suspended
 supervising shell was killed, and an in-progress `ffmpeg` output has no `moov` atom, so `ffprobe`
 reports *"Invalid data found"* on a file that is merely unfinished. Neither is a defect. A long
 render wants sleep disabled; a partial output wants `ffprobe` read as "still writing", not "corrupt".
+
+
+### Phase 7 — the gateable part actually gates, 2026-08-25
+
+**7a, 7b, 7c and 7e are done; 7d is half done and its second half is paused on a busy GPU.**
+Commits `d597594` (7a—7c), `1aa2f2a` (7e), `e1a0e98` (7d, instrument only).
+
+**7a.** The end-to-end group read `REPO/spike/clip.wav`, untracked and present on one machine, so
+on any other checkout with a built `shot` it **failed** rather than skipped. It now synthesizes its
+own 48 kHz WAV from `wave` and `struct`. Verified the way the done-when asks — except that
+`spike/` could not be renamed (two orphaned Phase 6 processes still hold handles on it, see below),
+so the property was checked on a **clean tree built in the scratchpad** with no `spike/` at all,
+which is strictly stronger than moving the directory aside. The group **runs** there, and still
+skips with its notice when no `shot` is built.
+
+**7b.** A frozen 19-row table, asserted from both sides, each naming the other as its twin.
+**Both halves were seen to fail and reverted.** The first attempt did not: editing the green luma
+weight by —0.0002 left every row unmoved, so rather than pick a bigger edit the table's real
+sensitivity was **measured** — it catches any single-coefficient edit of ±0.0005 or larger, and
+that floor is now stated on both sides. Below it a luma edit shifts a channel by under 0.05 of one
+8-bit level, which is beneath the format's own quantization and cannot produce the cast the pin
+exists to catch. The Rust side agreed with the Python-generated table on all 19 rows first time.
+
+**One deviation from 7b as written, and it is in the table's favour.** The phase asks for "two
+saturated values whose chroma terms land outside `0..=255`". Across the entire 8-bit cube the
+**forward** chroma terms reach exactly ±0.5 past each end and no further — pure red's Cr is 255.5
+and pure cyan's is 0.5, and those two rows are the whole forward-direction clamp. The clamp that
+genuinely bites is on the **inverse**, where an arbitrary YUV triple is the image of no RGB one and
+the terms leave the range by hundreds. So the table carries **both directions**, and five of the
+seven inverse rows clamp.
+
+**7c.** Wired into the CI `links` job and `.githooks/pre-push` behind a `python3` guard. **CI
+installs `numpy`**, because the 7b group pins array functions and would otherwise skip on the one
+runner that cannot skip anything else. The end-to-end group skips on that runner, which builds no
+`shot`; that is not a hole, since the same byte identity is asserted in-process at four geometries.
+The check count moved 186 → **207**, with 188 without `numpy` and 183 without a built `shot` — all
+three measured, not derived.
+
+**7e.** `docs/diffusion-filter.md` is the canonical page. `docs/capturing.md` drops 127 lines to 19
+(2 121 → **2 015**, against ADR-0120's predicted ~2 006) and keeps only the pipe-level fact;
+`tools/sd-filter/README.md` becomes install plus a pointer; `README.md` keeps a paragraph, a link
+and one marked orientation figure. `scripts/check-filter-figures.mjs` is the fourth gate.
+**Both of its bite paths were seen to fail and reverted.** Its first run put **all 1 816 prose lines
+of `docs/capturing.md` in scope** — an ancestor heading inherited its descendant's mention, so the
+`# H1` matched and swallowed the file; a section now qualifies on its **own** lines only.
+`scripts/fixtures/filter-figures/` pins five breaks and, more importantly, **four silences**.
+
+**Anchors were checked by hand**, since `check-doc-links.mjs` does not validate fragments.
+**No anchor into any file this phase changed is broken** — the
+`capturing.md#a-filter-stage-between-shot-and-the-encoder` heading was kept deliberately so inbound
+links survive the rewrite under it. The repo does carry **52 broken fragment anchors**, but they are
+**pre-existing and unrelated**: the identical 52 are on `main`. 49 of them point at
+`docs/design-backlog.md#NNNN--...` bodies that were moved to the archive without their anchors being
+re-pointed — which is close-ceremony step 3c's known hazard, accumulated. Reported, not fixed:
+repairing them is outside this plan.
+
+**7d, first half.** `report()` now prints a **wall-clock** cost per emitted frame (elapsed from the
+head of the stream, divided by frames emitted, with the model load named separately) **and** the
+diffusion-call mean, no longer divided by the stride and no longer wearing the other's label, plus
+one line saying what the gap between them is. Eight checks cover the arithmetic and the labelling —
+which is exactly what was wrong — and need no GPU.
+
+**7d, second half: NOT DONE, and deliberately not faked.** It needs a quiet GPU and another process
+(PID 6756, a Python 3.12 job unrelated to this plan) is holding the card at 98 % with 4.3 GB. Phase 6
+recorded that two diffusion jobs on this 8 GB card contend rather than parallelize, so a figure
+measured now would be a measurement of the contention — the same class of error this phase exists
+to fix, one level over. Still owed:
+
+- one run of the **fixed** instrument over 1 000+ frames, stopwatched externally, to confirm the two
+  agree;
+- the corrected figures in `docs/diffusion-filter.md`'s marked region and `README.md`'s orientation
+  line, each saying **which** cost it is.
+
+**What the corrected `fast` figure already is, from Phase 6 and awaiting only confirmation:**
+`attractor_leviathan` — the preset the table names — ran at **0.650 s per emitted frame wall
+clock** over 9 466 frames, against 0.451 s documented. `quality` has never been measured on a real
+track and is the genuine gap. The two documents are **knowingly stale** until that run happens; the
+plan's own order (*"Fix the instrument first, then the documents from what it reports"*) is why they
+were left rather than corrected from a broken instrument.
+
+**Two orphaned processes from Phase 6 are still alive** (`shot.exe` 14844 and the spike venv's
+`python.exe` 15456, both started 2026-08-24 23:37:46, the sleep incident this log already records).
+They hold no GPU compute but they do hold file handles on `spike/`, which is why that directory
+cannot be renamed or removed. Left running: they are not mine to kill.
 
 
 ## Followups (after this lands)
