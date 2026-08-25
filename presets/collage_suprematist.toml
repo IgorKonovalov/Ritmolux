@@ -32,15 +32,17 @@
 # nothing flat left to be flat.
 #
 # WHAT DRIVES WHAT
-#   pan_x/y  the canvas floats - the only continuous motion this file has
-#   scale    a slow breath, plus the low end - the whole canvas leans in
-#   count    the composition builds and empties with the mid range
+#   recompose   the canvas RECOMPOSES on a strong onset - a new arrangement
+#   density     elements arrive and leave with the mid range
+#   drift/spin  every element carries its own slow travel and turn
+#   pump_size   the low end swells individual elements, phase-offset
+#   scale       a slow breath, plus the low end - the whole canvas leans in
+#   saturation  the top end, on chroma rather than on luminance
 #
-# All three are placeholders for the real reactivity: Plan 0113 Phase 6 brings
-# recomposition on the beat, per-element drift and spin, spawn/decay and
-# per-element pumping, and this file gets them then. Until it does, `count` is
-# the only thing that changes what is ON the canvas, and it moves through whole
-# elements - the scene quantizes it, so an eased value does not half-draw one.
+# THE ONE THING TO KNOW BEFORE RETUNING THE BEAT: `beat_index` counts ONSETS,
+# about 1.7-2.1x per musical beat (ADR-0109), so anything hung off it fires
+# roughly twice as often as the music does. Plan 0095 is the fix in flight. Do
+# NOT compensate for it here - that would have to be unwound when 0095 lands.
 
 system = "shape_collage"
 name   = "Suprematist"
@@ -86,28 +88,61 @@ paper = "0.9375"
 # visibly jumped size on every hit, which reads as a zoom and not as a canvas.
 scale = "1.00 + 0.045 * sin(time * 0.135) + clamp(bass * 0.1176, 0, 0.10)"
 
-# THE CANVAS FLOATS, AND THIS IS THE WHOLE OF THE CONTINUOUS MOTION until Phase 6
-# gives the elements their own drift and spin. Two sines at rates that do not
-# divide into each other, so the path never closes into a visible loop; the
-# offset on y keeps the two from starting together.
+# THE WHOLE CANVAS FLOATS, AND EVERY ELEMENT ALSO CARRIES ITS OWN TRAVEL.
+# The two are deliberately different motions: `pan_*` slides the composition as
+# one rigid thing, `drift` and `spin` let the elements move RELATIVE to each
+# other, which is what stops the canvas reading as a photograph being panned
+# across. Each element's direction and turn are drawn from the seed at
+# generation, so this is reproducible rather than random.
 #
-# The rates are not taste. A `shape_collage` canvas covers EVERY pixel - the
+# The pan rates are not taste. A `shape_collage` canvas covers EVERY pixel - the
 # paper is the ground - so the whole frame is its footprint, and the motion gate
 # measures a mean over all of it rather than over a sparse figure's own lit
 # pixels. Motion here therefore has to come from element EDGES sweeping, which is
 # a small share of the frame, and a 46 s breath alone moved 0.0006 against the
-# gate's 0.01 floor. These rates put the canvas at roughly a pixel and a half of
-# travel per 0.4 s at 96 px, which is a slow float to the eye and a real number
-# to the gate.
+# gate's 0.01 floor.
 pan_x = "0.15 * sin(time * 0.62)"
 pan_y = "0.10 * sin(time * 0.81 + 1.1)"
 
-# THE COMPOSITION FILLS AND EMPTIES. Nine elements is the canvas reduced to its
-# structural bars and the black disc; fourteen is the whole of it. The scene
-# floors this to a whole element, so the count steps rather than fading - which
-# is the honest behaviour until Phase 6's `density` gives elements an age to
-# fade over.
-count = "9 + clamp(mid * 5.88, 0, 5)"
+drift = "0.85 + clamp(bass * 0.71, 0, 0.6)"
+spin  = "0.5 + clamp(mid * 0.59, 0, 0.5)"
+
+# THE COMPOSITION FILLS AND EMPTIES, AND NOW IT FADES RATHER THAN STEPS.
+# `count` is the canvas's full size and is fixed; `density` is what gates how
+# many of those are live, and an element crossing the gate fades in or out over
+# about half a second instead of appearing. Birth order is stable, so a rising
+# density only ever ADDS - nothing already on the canvas moves or changes colour
+# when the mid range swells.
+count   = "14"
+density = "0.72 + clamp(mid * 0.33, 0, 0.28)"
+
+# THE CANVAS RECOMPOSES ON ROUGHLY ONE BEAT IN EIGHT, AND THE RATE IS THE WHOLE
+# OF THE TUNING HERE. The scene is edge-triggered, so this is a level that goes
+# high for one beat and low again; `hash` is seeded and pure, so the sequence is
+# reproducible run to run rather than random, and irregular rather than periodic
+# - the canvas does not recompose on a metronome.
+#
+# THE FIRST DRAFT GATED ON `onset > 0.82` AND THAT WAS THE DEFECT. Under a click
+# track `onset` normalizes against its own recent peak (ADR-0049) and reaches
+# 1.0 on every click, so the canvas recomposed several times a second and spent
+# almost all of its time mid-blend. A filmstrip showed it: every frame pale,
+# because a crossfade in flight is two canvases sharing one frame. A canvas needs
+# to be still long enough to be read as a composition.
+#
+# `beat_index` counts ONSETS at about 1.7-2.1x the musical beat (ADR-0109), so
+# one in eight of these is nearer one in four real beats. That is deliberate and
+# NOT compensated for here - Plan 0095 is the fix in flight, and a preset that
+# corrected for it would have to be unwound when it lands.
+recompose       = "select(hash(beat_index) > 0.88, 1, 0)"
+# Short and non-zero: at 0 the cut is violent, and a canvas is a slower thing
+# than a strobe.
+recompose_blend = "0.35"
+
+# INDIVIDUAL ELEMENTS SWELL, THE CANVAS DOES NOT. Each element carries its own
+# phase, drawn at generation, so they breathe past each other rather than
+# together - a field of oscillators sharing a phase reads as one sheet flashing,
+# which is the swarm's twinkle finding. Depth only; the rate is the engine's.
+pump_size = "clamp(bass * 0.176, 0, 0.15)"
 
 # THE TOP END GOES ON COLOUR, NOT ON LIGHT. There is no brightness param in this
 # scene and there is deliberately nothing to blow out - the colours are already
@@ -126,7 +161,13 @@ scale = 0.5
 # together - but not zero: an element appearing is a hard event either way, and a
 # quarter second keeps a single mid-range transient from flickering one in and
 # out again.
-count = 0.25
+density = 0.3
+# The two motion multipliers settle rather than snap - a drift that answers each
+# hit reads as a stutter, not as travel.
+drift = 0.6
+spin  = 0.6
+# Short: the swell is the one thing here that should land ON the beat.
+pump_size = 0.12
 # Short: the chroma lift is the one thing here that should arrive with the beat
 # rather than behind it.
 saturation = 0.2

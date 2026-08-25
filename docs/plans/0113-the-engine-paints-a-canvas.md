@@ -341,8 +341,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 2 — What an element costs | dev | done | 6038d25 |
 | 3 — The stop gate | human | **continue** | de69a52 |
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
-| 5 — The composition call | human | **diagonal-axis + hierarchy spread** | committed with this row |
-| 6 — The music moves the canvas | dev | not started | |
+| 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
+| 6 — The music moves the canvas | dev | done | committed with this row |
 | 7 — The Kandinsky vocabulary | dev | not started | |
 | 8 — Documentation and the shipped set | dev | not started | |
 
@@ -401,6 +401,42 @@ not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and i
 is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
 numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
 one the tier is quoted against.
+
+**Phase 6 — a look defect the tests could not see, and its two causes.** A
+filmstrip of the shipped preset under a click track came back with every frame
+**pale** — the flat opaque colour this whole system exists for, washed toward the
+paper. Both causes are recorded because only one of them is a preset bug:
+
+- **The crossfade leaked paper at its midpoint.** The two canvases composite
+  *sequentially* with `over` rather than being mixed, so at linear weights a
+  pixel covered by both reads `t(1-t)*paper + (1-t)^2*A + t*B` — a quarter bare
+  paper at `t = 0.5`. Fixed with **equal-power (`sqrt`) weights**, the same fix
+  audio uses for a pan: the leak falls from 25 % to under 9 % and the ends are
+  unchanged.
+- **The preset recomposed several times a second.** It gated on `onset > 0.82`,
+  and `onset` normalizes against its own recent peak (ADR-0049), so under a click
+  track it reaches 1.0 on *every click*. The canvas was almost never not
+  mid-blend. Re-gated on `select(hash(beat_index) > 0.88, 1, 0)` — roughly one
+  beat in eight, seeded so it is reproducible and irregular rather than periodic.
+
+Neither is visible to any gate in the suite: the frames were within every floor
+while the look was gone. **The instrument that found it was `shot --signal
+click:110 --strip 8`**, and it is worth reaching for on any phase that adds
+motion.
+
+**Phase 6 — notes.**
+
+- **The storage buffer is twice the tier cap**, because a recomposition crossfade
+  has two whole canvases in the per-pixel loop at once. That is the one moment a
+  preset pays double, and it is the only place Phase 3's cost decision is
+  exceeded — bounded by the blend's own duration.
+- **The authored control's *motion* is seeded even though its geometry is not.**
+  A control that could not drift would make `drift` and `spin` silently inert on
+  the one layout a preset gets by default. The determinism test asserts the
+  geometry is seed-independent and the motion is not.
+- **`presets/README.md` again**, for the third time, for Phase 1's reason.
+- Reactivity after the levers landed: `bass=0.0511 mid=0.0202 treb=0.0168
+  onset=0.0068` against a `0.02` floor, up from `0.0342` at Phase 1.
 
 **Phase 4 — deviations.**
 

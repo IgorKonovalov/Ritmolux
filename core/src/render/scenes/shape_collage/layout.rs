@@ -58,7 +58,7 @@
 )]
 
 use super::super::SeededRng;
-use super::{Element, KIND_CIRCLE, KIND_QUAD, KIND_TRIANGLE, SUPREMATIST, Spec};
+use super::{KIND_CIRCLE, KIND_QUAD, KIND_TRIANGLE, SUPREMATIST, Spec};
 
 /// The canvas's own domain, half-extents. Roughly 3:2 — between a 16:10 frame
 /// and a square one, so a wide window shows a small margin and a tall one crops
@@ -120,6 +120,31 @@ impl Grammar {
     }
 }
 
+/// One generated element, with the per-element motion the music drives
+/// (Plan 0113 Phase 6).
+///
+/// **The motion is drawn at generation, from the same seeded stream as the
+/// geometry**, so a canvas's drift and spin are as reproducible as its layout —
+/// two renders of one seed move identically. Nothing here is a position: these
+/// are the *rates*, and the scene integrates them against the injected real
+/// `dt`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Placed {
+    /// The element as composed, before any time has passed.
+    pub(crate) spec: Spec,
+    /// Canvas units per second at `drift = 1`.
+    pub(crate) vel: [f32; 2],
+    /// Radians per second at `spin = 1`.
+    pub(crate) spin: f32,
+    /// This element's pump phase, `0..1`. **Offset per element** so the canvas
+    /// does not breathe in unison — a field of oscillators sharing one phase
+    /// pulses as one sheet, which is the swarm's `twinkle` finding applied here.
+    pub(crate) phase: f32,
+    /// How live this element is, `0..1`. **Not generated** — the scene eases it
+    /// toward the `density` gate every frame, and snaps it on a fresh canvas.
+    pub(crate) fade: f32,
+}
+
 /// Everything a canvas is a function of. **`generate` reads nothing else**, so
 /// two equal recipes produce bit-identical element lists — the determinism the
 /// plan asks be asserted directly.
@@ -152,6 +177,38 @@ fn stream(recipe: &Recipe) -> SeededRng {
             .wrapping_mul(0x9E37_79B9_7F4A_7C15)
             .wrapping_add(recipe.recompose.wrapping_mul(0xD1B5_4A32_D192_ED03)),
     )
+}
+
+/// The drift speed an element is given at `drift = 1`, in canvas units a
+/// second, before its own `0.3..1` share of it.
+///
+/// A canvas is 2 units tall, so at the top of the range an element crosses it in
+/// about a minute — the pace of a composition that is *alive* rather than one
+/// that is travelling. `drift` above 1 is legal and is how a preset asks for
+/// more.
+const DRIFT_SPEED: f32 = 0.035;
+/// The angular speed at `spin = 1`, radians a second, before the element's own
+/// signed `-1..1` share. A full turn in about a minute and a half at the top of
+/// the range, for the same reason.
+const SPIN_SPEED: f32 = 0.07;
+
+/// Draw one element's motion and wrap it into a [`Placed`].
+///
+/// Called by every grammar at generation, off the same stream as the geometry,
+/// so `drift` and `spin` are reproducible per seed rather than per run.
+fn motion(rng: &mut SeededRng, spec: Spec) -> Placed {
+    let theta = rng.range(0.0, std::f32::consts::TAU);
+    let speed = DRIFT_SPEED * rng.range(0.3, 1.0);
+    Placed {
+        spec,
+        vel: [theta.cos() * speed, theta.sin() * speed],
+        spin: SPIN_SPEED * rng.range(-1.0, 1.0),
+        phase: rng.next_f32(),
+        // Snapped by the scene against the density gate before the first frame;
+        // a fresh canvas does not fade itself in, because the recomposition
+        // blend is what covers a canvas *changing*.
+        fade: 1.0,
+    }
 }
 
 /// One element's palette coordinate, drawn from the plateau centres. Never the
@@ -248,19 +305,24 @@ fn place(center: [f32; 2], half: [f32; 2]) -> [f32; 2] {
 ///
 /// **Allocation-free**: `out` keeps its capacity, and `count` is held inside it
 /// by the caller. Pure — see [`Recipe`].
-pub(crate) fn generate(out: &mut Vec<Element>, recipe: &Recipe) {
+pub(crate) fn generate(out: &mut Vec<Placed>, recipe: &Recipe) {
     let count = recipe.count.min(out.capacity());
     out.clear();
     if count == 0 {
         return;
     }
+    let mut control = stream(recipe);
     if recipe.grammar == Grammar::Authored {
         // The control. Cycles the authored roster if asked for more than it
         // holds, which keeps the element count honest without inventing a
         // fifteenth authored element.
         for i in 0..count {
             if let Some(&spec) = SUPREMATIST.get(i % SUPREMATIST.len()) {
-                out.push(Element::build(spec));
+                // The control is a fixed composition, so its motion is drawn
+                // from a stream of its own rather than left undrawn: a static
+                // canvas that cannot drift would make `drift` silently inert on
+                // the one layout a preset gets by default.
+                out.push(motion(&mut control, spec));
             }
         }
         return;
@@ -280,7 +342,7 @@ pub(crate) fn generate(out: &mut Vec<Element>, recipe: &Recipe) {
 /// The anchors go in **first**, so everything else paints over them — which is
 /// what makes them read as ground rather than as foreground clutter, and is a
 /// property of the painter's order rather than of their size.
-fn anchor_satellites(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
+fn anchor_satellites(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
     let anchors = if rng.next_f32() < 0.45 { 2 } else { 1 };
     let anchors = anchors.min(count);
     let mut centres = [[0.0f32; 2]; 2];
@@ -297,14 +359,15 @@ fn anchor_satellites(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRn
         // the compact kinds are capped small by `draw_extents` anyway.
         let unit = rng.range(0.78, 1.0);
         let half = draw_extents(rng, KIND_QUAD, unit);
-        out.push(Element::build(Spec {
+        let spec = Spec {
             kind: KIND_QUAD,
             center: place([cx, cy], half),
             half,
             angle_deg: (recipe.angle_bias + rng.range(-0.15, 0.15)).to_degrees(),
             coord: draw_coord(rng),
             alpha: 1.0,
-        }));
+        };
+        out.push(motion(rng, spec));
     }
 
     for i in anchors..count {
@@ -329,7 +392,7 @@ fn anchor_satellites(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRn
         // says — an anchor grammar in which a satellite can match its anchor has
         // no anchor.
         let half = draw_extents(rng, kind, 0.42 * power_size(rank, recipe.size_hierarchy));
-        out.push(Element::build(Spec {
+        let spec = Spec {
             kind,
             center: place(
                 [
@@ -342,7 +405,8 @@ fn anchor_satellites(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRn
             angle_deg: (recipe.angle_bias + rng.range(-0.6, 0.6)).to_degrees(),
             coord: draw_coord(rng),
             alpha: 1.0,
-        }));
+        };
+        out.push(motion(rng, spec));
     }
 }
 
@@ -383,7 +447,7 @@ fn reach(cos_a: f32, sin_a: f32) -> f32 {
 /// horizontal band with the top and bottom empty. So the across-axis spread and
 /// the angle jitter below are `size-hierarchy`'s, and the placement is this
 /// grammar's. Both numbers are marked; they are the combination, not tuning.
-fn diagonal_axis(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
+fn diagonal_axis(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
     let (sin_a, cos_a) = recipe.angle_bias.sin_cos();
     // The two axes of the band, each reaching the canvas edge in its own
     // direction — see `reach` for the shear this replaced.
@@ -412,25 +476,26 @@ fn diagonal_axis(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, c
             // the forms relate to the axis instead of being welded to it.
             rng.range(-0.45, 0.45)
         };
-        out.push(Element::build(Spec {
+        let spec = Spec {
             kind,
             center: place([x, y], half),
             half,
             angle_deg: (recipe.angle_bias + jitter).to_degrees(),
             coord: draw_coord(rng),
             alpha: 1.0,
-        }));
+        };
+        out.push(motion(rng, spec));
     }
 }
 
 /// Power-law sizes with **position independent of size** — the grammar that
 /// deliberately has no centre, so Phase 5 can see whether a canvas needs one.
-fn size_hierarchy(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
+fn size_hierarchy(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
     for i in 0..count {
         let rank = i as f32 / count.max(1) as f32;
         let kind = draw_kind(rng);
         let half = draw_extents(rng, kind, power_size(rank, recipe.size_hierarchy));
-        out.push(Element::build(Spec {
+        let spec = Spec {
             kind,
             // Uniform over the whole canvas, and drawn from the same stream
             // whatever the size is — that independence IS this grammar.
@@ -445,6 +510,7 @@ fn size_hierarchy(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, 
             angle_deg: (recipe.angle_bias + rng.range(-1.2, 1.2)).to_degrees(),
             coord: draw_coord(rng),
             alpha: 1.0,
-        }));
+        };
+        out.push(motion(rng, spec));
     }
 }
