@@ -265,6 +265,91 @@ fn the_colour_conversion_round_trips_to_within_a_level() {
     assert_eq!(y, 182, "0.7152 x 255 = 182.4; BT.601 would read 150");
 }
 
+/// The frozen colour table, asserted here and in `tools/sd-filter/test_sd_filter.py`.
+///
+/// THE TWIN OF THIS TEST is the `RGB_TO_YUV` / `YUV_TO_RGB` tables in
+/// `tools/sd-filter/test_sd_filter.py`, which assert these exact numbers against
+/// that tool's `rgb_to_yuv444` / `yuv444_to_rgb`. Neither file may be edited
+/// alone: a one-sided edit reddens the side it was made on, and that is the
+/// whole mechanism.
+///
+/// Why it exists (Plan 0106 Phase 7b). The diffusion filter re-implements this
+/// conversion in Python because it has to decode the stream to diffuse it, and
+/// nothing checked the pair. The filter's pass-through never converts and its
+/// diffused output is not reproducible across machines, so no test on either
+/// side of the seam touched it — a constant edited in one language would ship as
+/// a colour cast across every diffused frame, and no instrument in this repo
+/// could see it.
+///
+/// What this pin is sensitive to, measured rather than assumed: it reddens on any
+/// single-coefficient edit of ±0.0005 or larger, in either direction, to any of
+/// the five forward constants. Below that it starts to miss — the worst case a
+/// ±0.0002 luma edit can shift a channel is 0.05 of one 8-bit level, which is
+/// under the quantization floor of the format itself and cannot produce a cast
+/// the pin exists to catch. Structural errors — swapped Cb/Cr, BT.601 weights, a
+/// missing +128, a wrap where the clamp belongs — move these rows by tens of
+/// levels and are caught outright.
+///
+/// This is a property, not a measurement (ADR-0071): the output is exact 8-bit
+/// integers on every machine, so the table names no configuration and carries no
+/// tolerance. It is deliberately separate from the round-trip sweep above, which
+/// asserts a *tolerance* on the pair composed — a different question, and one
+/// that cannot catch a matching error made in both directions.
+#[test]
+fn the_colour_table_is_pinned_to_its_python_twin() {
+    // RGB -> planar C444. Pure red's Cr computes to 255.5 and pure cyan's to
+    // 0.5, so those two rows are the whole forward-direction clamp: across the
+    // entire 8-bit cube the chroma terms reach exactly half a level past each
+    // end and no further.
+    const RGB_TO_YUV: &[([u8; 3], [u8; 3])] = &[
+        ([0, 0, 0], [0, 128, 128]),
+        ([255, 255, 255], [255, 128, 128]),
+        ([128, 128, 128], [128, 128, 128]),
+        ([255, 0, 0], [54, 99, 255]), // Cr 255.5 -> clamped, not wrapped
+        ([0, 255, 0], [182, 30, 12]), // luma 182: BT.709; BT.601 would read 150
+        ([0, 0, 255], [18, 255, 116]),
+        ([0, 255, 255], [201, 157, 1]), // Cr 0.5, the other end of the same edge
+        ([255, 0, 255], [73, 226, 244]),
+        ([255, 255, 0], [237, 1, 140]),
+        ([250, 7, 7], [59, 100, 250]),
+        ([7, 7, 250], [25, 250, 117]),
+        ([18, 52, 86], [47, 149, 109]),
+    ];
+
+    // Planar C444 -> RGB. This is where the clamp genuinely bites: an arbitrary
+    // YUV triple is not the image of any RGB one, so the terms leave `0..=255`
+    // by a wide margin. Five of these seven rows clamp at one end or the other,
+    // which is why the inverse direction carries its own table rather than being
+    // asserted as a round-trip of the one above.
+    const YUV_TO_RGB: &[([u8; 3], [u8; 3])] = &[
+        ([0, 0, 0], [0, 84, 0]),            // R -201.6 and B -237.5, both clamped low
+        ([255, 255, 255], [255, 172, 255]), // R 455 and B 490, both clamped high
+        ([128, 128, 128], [128, 128, 128]),
+        ([16, 240, 16], [0, 47, 224]),
+        ([240, 16, 240], [255, 209, 32]),
+        ([200, 20, 235], [255, 170, 0]),
+        ([54, 128, 255], [254, 0, 54]),
+    ];
+
+    for &([r, g, b], want) in RGB_TO_YUV {
+        let (y, u, v) = rgb_to_yuv(r, g, b);
+        assert_eq!(
+            [y, u, v],
+            want,
+            "rgb({r},{g},{b}) — moved; so must the twin table in tools/sd-filter/test_sd_filter.py"
+        );
+    }
+
+    for &([y, u, v], want) in YUV_TO_RGB {
+        let (r, g, b) = yuv_to_rgb(y, u, v);
+        assert_eq!(
+            [r, g, b],
+            want,
+            "yuv({y},{u},{v}) — moved; so must the twin table in tools/sd-filter/test_sd_filter.py"
+        );
+    }
+}
+
 /// A written frame is the marker plus three full-resolution planes, in the order
 /// the header's `C444` promises — asserted on bytes, since a plane-order slip
 /// swaps the red and blue of every exported video.
