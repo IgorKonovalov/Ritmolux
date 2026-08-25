@@ -13,6 +13,60 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md)
+  — closed 2026-08-25, three `dev` phases on `main` (`9d8b359`, `51053b0`, `1708b79`) plus the
+  close block `f4ee668`. Review: **no blockers, no majors, two minors.** Harness only: no Rust, no
+  `presets/`, no `scripts/`, no CI. Version: **none** — a deliberate docs/chore-only call under
+  [ADR-0005](../adrs/0005-versioning-and-release-cadence.md), since the plan moves no shipping
+  artifact.
+
+  **The `dev → architect` brief stopped being synchronous.** Per
+  [ADR-0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md), `dev` now appends a
+  `## Implementation log` section to the plan itself — lane, a `phase | owner | state | commit`
+  table written one row per phase **inside that phase's own commit**, then a close block — and
+  prints a three-line pointer instead of pasting a brief. The fresh-session boundary is untouched;
+  what changed is that a finished worktree lane is now self-describing and can sit on disk and wait
+  its turn, which is what makes parallel lanes practical. The plan specified a practice `dev` had
+  already invented ad hoc four times (0100, 0108, 0110, 0111).
+
+  **The log is thin by design, and the design is the interesting part.** It carries `dev`'s
+  *observations, never `dev`'s conclusions*: no per-criterion `[pass]` list — the one the old chat
+  template carried was cut rather than moved — no self-review, no narrative. The stated reason is
+  anchoring: a file anchors a reviewer far harder than a chat message, because it is still there on
+  the second read and travels with the plan forever, and the whole value of the close is that
+  architect reaches its own verdict. The counterweight is stated just as loudly in all three places
+  the rule appears: **thinness applies to `dev`'s opinions, never to `dev`'s findings** — a
+  deviation from the plan and an unmet done-when are always disclosed. Mode 4 gained the matching
+  sentence that **silence in the log is not certification**, without which the thinness bought to
+  protect the review would read as a review already performed.
+
+  **The two write cadences had different readers, and the plan resolved it rather than papering
+  over it.** A phase row rides inside the phase commit and is read by architect; a *mid-session
+  handoff* note is read by a resuming `dev` in the same lane, where anchoring does not apply, and
+  needs exactly what the thin rule forbids — diagnosis, candidate fixes, tip state. So resume
+  detail is **scaffolding**: written freely, and removed when the phase it was written for lands.
+  Without that rule mid-plan richness survives to the close and defeats the thin rule by a side
+  door, in the one case nobody is watching.
+
+  **Nothing gates the log — deliberately, and the acceptance is on the record.** The size rule is a
+  relative property (the log stays shorter than the plan's own `## Implementation phases` section),
+  self-scaling and checkable by eye; a fourth doc gate was considered and declined as premature,
+  against a project history that has measured convention-only discipline failing before
+  ([ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md): *"One line per
+  plan"*, regrown 7.1x in eight days). **Revisit trigger: two logs breaching the size property, or
+  a log going missing twice.** The plan's own log came in at **43 lines against a 146-line phase
+  section**, so the first exercise cleared it by 3.4x.
+
+  **What the close verified, and the two minors.** All three phases dogfooded the convention —
+  every phase commit carries its own log row, with SHAs backfilled on the next commit. All three doc
+  gates exit 0, and the log's backlog-probe reading reproduced exactly (61 reductions, 36 live
+  entries, 4 unprobeable, 14 advisory path moves, nothing convicted). The minors were both
+  doc-freshness: four surviving statements that `dev` "never writes plans or ADRs" — in `CLAUDE.md`,
+  both skill bodies and `dev`'s frontmatter `description:` — which the new seam falsifies by one
+  section, repaired at the close; and the `preset-author` lane's own handoff prose, left alone since
+  the plan scoped it out. `dev` had disclosed the frontmatter one itself under `### Notes`, which is
+  the counterweight rule working on its first run.
+
 - [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md)
   — closed 2026-08-20, four `dev` phases across seven commits `b8c8524`..`afc65d6`. Review: **no
   blockers, one major, two minors.** Phase 3 did not run, on Phase 2's stop condition; **Phase 6

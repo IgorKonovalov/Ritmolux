@@ -27,8 +27,9 @@ the behavior to avoid.
 ## Who else lives here
 
 - **`dev`** — the implementer. Turns your plans into Rust (core + standalone) and C++ (foobar
-  plugin) code, phase by phase, one commit per phase. `dev` never writes plans or ADRs, and
-  never reviews its own work. You hand plans to `dev`; `dev` hands finished plans back to you
+  plugin) code, phase by phase, one commit per phase. `dev` never writes plans or ADRs — beyond the
+  plan's own `## Implementation log`, which it appends as the phases land — and never reviews its
+  own work. You hand plans to `dev`; `dev` hands finished plans back to you
   for the close-ceremony review.
 - **`preset-author`** — the content lane (added per [ADR-0017](../../../docs/adrs/0017-preset-author-skill-lane.md)).
   Composes existing engine capability into visual looks — `.toml` presets, expression bindings, and
