@@ -1,6 +1,6 @@
 # 0095 — the downbeat fold gets a musical beat
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-15
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md),
@@ -198,6 +198,35 @@ flowchart LR
   `LMV_ABI_VERSION` stays 4.
 - **It does not choose the accent cue.** ADR-0097's shortlist stays deferred until the fold has a
   bar-scale unit and Phase 5 has re-read the decomposition on it.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0095` on `plan-0095-musical-bar-grid`, branched from `main` at `1be71c8`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the tempo estimate is measured | dev | done | committed with this row |
+| 2 — the octave repair | dev | not started | — |
+| 3 — the bar grid | dev | not started | — |
+| 4 — the fold folds over the grid | dev | not started | — |
+| 5 — re-measure through the instrument | human | not started | — |
+| 6 — the authoring docs | dev | not started | — |
+
+**Phase 1's table** (`cargo nextest run -p lmv-core --test tempo_probe --no-capture`), the reading
+Phase 2 chooses against:
+
+| case | truth | p10 | median | p90 | octave | err | oct-jump |
+|---|---|---|---|---|---|---|---|
+| click train, 60-200 BPM (8 rungs) | — | — | — | — | **x1 on all 8** | max 0.4 % | 0 % |
+| off-beat clicks at 0.30, 90 BPM | 90.0 | 89.9 | 90.0 | 90.1 | x1 | 0.0 % | 0 % |
+| off-beat clicks at 0.50, 90 BPM | 90.0 | 90.0 | 180.4 | 180.5 | **x2** | 0.2 % | 15 % |
+| off-beat clicks at 0.80, 90 BPM | 90.0 | 180.4 | 180.4 | 180.5 | **x2** | 0.2 % | 0 % |
+| half-time, beats 2/4 at 0.70, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
+| half-time, beats 2/4 at 0.50, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
+| half-time, beats 2/4 at 0.25, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
 
 ## Followups (after this lands)
 
