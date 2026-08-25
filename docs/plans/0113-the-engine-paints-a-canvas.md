@@ -468,6 +468,24 @@ before/after.
   coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
   against a 0.02 floor.
 
+**Not merged, and `main` moved 27 commits under this lane.** The two lanes' code
+has never met — ADR-0053's step 2/3 is outstanding. Three files overlap
+textually (`docs/presets.md`, `presets/README.md`, this plan). Two commits
+collide with what this plan *wrote*, and neither is a conflict git will show:
+
+- **Plan 0095 closed without fixing the beat clock.** It closed by documenting
+  that `beat_index` counts onsets, and `docs/presets.md` on `main` now states
+  that **no fixed multiplier converts** and that `mod(beat_index, N)` never means
+  N beats. **Both shipped presets and the `presets/README.md` section written
+  here say "1.7-2.1x" and "Plan 0095 is the fix in flight".** Stale, and the
+  multiplier is now contradicted by main's own docs. Content repair, not a
+  merge resolution.
+- **ADR-0126 / Plan 0116 rebuilt the sanity lens**, and a backlog entry on `main`
+  is titled *the sanity lens cannot measure a scene that paints its own ground* —
+  which is this scene. The `coverage_floor` arm added here and the `animation`
+  footprint observation above may duplicate or contradict it. Worth reading
+  before the review rather than after.
+
 ### Close triggers
 
 - **`presets/` touched:** yes — `collage_suprematist.toml` and
