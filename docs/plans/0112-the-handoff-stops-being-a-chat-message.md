@@ -289,23 +289,33 @@ as well as `docs/`, and these phases add relative links in both.
 |---|---|---|---|
 | 1 — the plan template carries the log skeleton | dev | done | `9d8b359` |
 | 2 — `dev` writes the log as the phases land | dev | done | `51053b0` |
-| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | done | committed with this row |
+| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | done | `1708b79` |
 
 ### Notes
 
-_(deviations from the plan — what was done differently, and the commit; done-when criteria that
-could not be met as stated; followups noticed and not acted on. One line each, no justification.)_
+- Step 4 no longer prints the `git log --oneline` the old brief pasted; the pointer is the three
+  named lines and nothing else. Commit `51053b0`.
+- The plan does not say how a row names the commit it rides in. Rows read `committed with this row`
+  while in flight and are backfilled with the real SHA on the next commit — the Plan 0110 precedent
+  (`committed with this log`). The last row is backfilled by this close-block commit.
+- Followup, not acted on: `dev`'s frontmatter `description:` still says "does not author or edit
+  plans/ADRs", which is now inaccurate by one section. Outside every phase's done-when, and editing
+  a skill description risks its triggering.
 
 ### Close triggers
 
 _(facts for architect to verify and decide from — not recommendations.)_
 
-- **`presets/` touched:** —
-- **Plan header `Closes:`** —
-- **What shipped:** —
-- **Operator docs touched:** —
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** —
-- **Outstanding `human` phases:** —
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none — the header names no `design-backlog` entry.
+- **What shipped:** harness markdown only — `.claude/skills/**` and `CLAUDE.md`. No Rust, no
+  `presets/`, no `scripts/`, no CI.
+- **Operator docs touched:** none from Mode 4's sweep table. `CLAUDE.md` was edited (the handoff
+  sentence) and is not on that table.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 61 reductions hold across
+  36 live entries, 4 unprobeable. Advisory names 14 moved paths, one of them `docs/plans/README.md`
+  under entry 0038, touched 2026-08-25 by this plan's own approval commit.
+- **Outstanding `human` phases:** none — all three phases are `dev` and all three landed.
 
 ## Followups (after this lands)
 
