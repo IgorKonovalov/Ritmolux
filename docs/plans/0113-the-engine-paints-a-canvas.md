@@ -176,6 +176,33 @@ flowchart LR
     human to compare side by side.
 
 ### Phase 5 — The composition call
+- **Decided 2026-08-25: `diagonal-axis` wins, with `size-hierarchy`'s spread
+  folded into it.** Judged from 20 rendered cells (4 strategies x 5 seeds at
+  1080p), then from a 16-cell head-to-head of the two finalists at 8 seeds.
+  **What made the losers lose**, which is the half that does not survive as a
+  verdict alone:
+  - **`anchor-and-satellites` leaves the canvas half empty.** Its satellites orbit
+    one off-centre point, so the composition sits in a region and a large part of
+    the frame stays bare — a picture with a subject, but not one that uses the
+    canvas.
+  - **`size-hierarchy` reads as scattered rather than composed.** Position is
+    independent of size by construction, which is the grammar's whole definition,
+    and the consequence is that nothing relates to anything: a range of sizes with
+    no structure holding them together.
+  - **`diagonal-axis` wins because the dominant angle *is* the suprematist
+    organising principle** — the reference canvases are built on it, so this
+    grammar inherits their structure while the other two have to invent one.
+  - **But it did not win outright**, and the combination is the verdict rather
+    than a tune: `size-hierarchy` used the *frame* better. `diagonal-axis` hugged
+    its axis so tightly that a canvas read as one band across the middle with the
+    top and bottom empty. So the across-axis spread and the angle jitter are the
+    runner-up's; the placement is the winner's.
+- **A defect the gate found, which no test would have.** The band ran at about
+  **-15 deg while `angle_bias` asked for -22**, because the axis direction was
+  rotated in unit space and *then* scaled anisotropically by the canvas's own
+  shape, while each element's rotation was applied afterwards and was not. The
+  elements and the band they were distributed along were at different angles.
+  Fixed in `layout::reach`; only a rendered canvas shows this.
 - **Owner skill:** human
 - **What:** Pick the grammar (or the combination) that reads as a painting, from Phase 4's images.
 - **Done when:** The user has named the winning grammar and the plan records the choice plus, in one
@@ -313,8 +340,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 1 — The painter draws a static canvas | dev | done | 046b9f3 |
 | 2 — What an element costs | dev | done | 6038d25 |
 | 3 — The stop gate | human | **continue** | de69a52 |
-| 4 — The layout generator and a sample sheet | dev | done | committed with this row |
-| 5 — The composition call | human | not started | |
+| 4 — The layout generator and a sample sheet | dev | done | a008327 |
+| 5 — The composition call | human | **diagonal-axis + hierarchy spread** | committed with this row |
 | 6 — The music moves the canvas | dev | not started | |
 | 7 — The Kandinsky vocabulary | dev | not started | |
 | 8 — Documentation and the shipped set | dev | not started | |

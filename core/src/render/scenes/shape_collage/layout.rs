@@ -346,19 +346,60 @@ fn anchor_satellites(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRn
     }
 }
 
-/// A dominant angle, with elements distributed along it and narrowly across it.
+/// Half the chord through the canvas centre along direction `(cos_a, sin_a)`.
+///
+/// **This is what makes the band run at the angle it was asked for.** The
+/// canvas is wider than it is tall, so rotating a unit vector and *then*
+/// scaling its components by `CANVAS_X` and `CANVAS_Y` shears the direction: a
+/// `-22 deg` axis came out at about `-15 deg` on screen while every element sat
+/// correctly at `-22 deg`, so the elements and the band they were distributed
+/// along were at different angles. Found at Plan 0113's Phase 5 gate, in the
+/// samples rather than in a test — a rendered canvas is the only thing that
+/// shows it.
+///
+/// The direction here is already in square canvas units, so it is used as-is and
+/// only its *reach* is a function of the canvas shape.
+fn reach(cos_a: f32, sin_a: f32) -> f32 {
+    let x = if cos_a.abs() > 1e-4 {
+        CANVAS_X / cos_a.abs()
+    } else {
+        f32::INFINITY
+    };
+    let y = if sin_a.abs() > 1e-4 {
+        CANVAS_Y / sin_a.abs()
+    } else {
+        f32::INFINITY
+    };
+    x.min(y)
+}
+
+/// A dominant angle, with elements distributed along it and spread across it.
+///
+/// **The winner of Plan 0113's Phase 5 gate, with the runner-up's spread folded
+/// in.** The verdict was that this grammar's organising axis is the suprematist
+/// diagonal the reference canvases are actually built on — which the other two
+/// have to invent — but that `size-hierarchy` used the *frame* better, because
+/// this one's population hugged the axis so tightly that a canvas read as one
+/// horizontal band with the top and bottom empty. So the across-axis spread and
+/// the angle jitter below are `size-hierarchy`'s, and the placement is this
+/// grammar's. Both numbers are marked; they are the combination, not tuning.
 fn diagonal_axis(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
     let (sin_a, cos_a) = recipe.angle_bias.sin_cos();
+    // The two axes of the band, each reaching the canvas edge in its own
+    // direction — see `reach` for the shear this replaced.
+    let along_reach = reach(cos_a, sin_a);
+    let across_reach = reach(-sin_a, cos_a);
     for i in 0..count {
         let rank = i as f32 / count.max(1) as f32;
-        // Along the axis: spread over its whole length. Across it: a squared
-        // uniform, so the population hugs the axis and the picture reads as one
-        // direction rather than as a cloud.
-        let along = rng.range(-1.0, 1.0);
+        let along = rng.range(-1.0, 1.0) * along_reach;
+        // **The Phase 5 combination.** Still biased toward the axis — that bias
+        // is what makes the direction legible — but `sqrt` where the first draft
+        // squared, and 0.8 of the reach where it took 0.45. The squared version
+        // pinned everything to a stripe.
         let across = rng.range(-1.0, 1.0);
-        let across = across * across.abs() * 0.45;
-        let x = (along * cos_a - across * sin_a) * CANVAS_X;
-        let y = (along * sin_a + across * cos_a) * CANVAS_Y;
+        let across = across * across.abs().sqrt() * 0.8 * across_reach;
+        let x = along * cos_a - across * sin_a;
+        let y = along * sin_a + across * cos_a;
         let kind = draw_kind(rng);
         let half = draw_extents(rng, kind, power_size(rank, recipe.size_hierarchy));
         // Most elements lie ALONG the axis; a minority cross it, which is what
@@ -367,7 +408,9 @@ fn diagonal_axis(out: &mut Vec<Element>, recipe: &Recipe, rng: &mut SeededRng, c
         let jitter = if crossing {
             std::f32::consts::FRAC_PI_2 + rng.range(-0.3, 0.3)
         } else {
-            rng.range(-0.18, 0.18)
+            // The other half of the combination: +-26 deg rather than +-10, so
+            // the forms relate to the axis instead of being welded to it.
+            rng.range(-0.45, 0.45)
         };
         out.push(Element::build(Spec {
             kind,
