@@ -386,7 +386,7 @@ evaluation, and `x`/`y`/`rad`/`ang` for a per-vertex one.
 | `mid_raw` | Absolute mid magnitude. | Raw and small (mean `0.006`). |
 | `treb_raw` | Absolute treble magnitude. | Raw and small (mean `0.006`). |
 | `onset_raw` | Absolute spectral flux. | Raw and very small (mean `0.002`). |
-| `beat_index` | Monotone beat counter, `0` on the first beat. | Integer-valued. `mod(beat_index, 4)` for "every 4th beat". |
+| `beat_index` | Monotone **onset** counter, `0` before the first detection. | Integer-valued, and **not a musical period** — `mod(beat_index, 4)` is not "every 4th beat". See [Musical time](#musical-time). |
 | `time_since_beat` | Seconds since the last beat; exactly `0` on a beat hop. | A retriggered ramp — good for decays. |
 | `beat_in_bar` | Which beat of the bar, `0`–`3`. | `beat_in_bar == 0` is the downbeat. |
 | `bar_index` | Bar counter — monotone except across an alignment change. | `mod(bar_index, 8)` for an 8-bar arc, which a lock can repeat or drop one bar of. |
@@ -406,9 +406,11 @@ use the `*_raw` twin and expect the old tiny magnitudes.
 The five musical-time variables come from the beat tracker, and the three
 bar-position ones sit behind a confidence gate with a counter fallback, so they are
 always periodic and never confidently wrong about the music (ADR-0050). 4/4 is
-assumed. **They are not equals in practice: the gate is shut about 94 % of audible
-time on real 4/4, so the bar trio is usually the counter fallback** — measured, and
-diagnosed, in [Musical time](#musical-time) below. Build structure on `beat_index`.
+assumed. **None of the five is a dependable musical period.** `beat_index` counts
+onset detections rather than beats (ADR-0109), and the bar trio is the counter
+fallback most of the time — both measured, and diagnosed, in
+[Musical time](#musical-time) below. Read that section before you build structure
+on any of them.
 
 > **`tempo` is the one variable that is not roughly `0–1`.** It is `0` until the
 > tempo tracker warms up (the first several seconds of audio), then jumps to a
@@ -838,15 +840,17 @@ Five variables place you in the music rather than measuring it (ADR-0050):
 
 | variable | range | meaning |
 |---|---|---|
-| `beat_index` | `0`, `1`, `2`, … | monotone beat counter since the stream started |
-| `time_since_beat` | seconds | `0` exactly on a beat, climbing to the next |
+| `beat_index` | `0`, `1`, `2`, … | monotone **onset-detection** counter — see the trap below |
+| `time_since_beat` | seconds | `0` exactly on a detection, climbing to the next |
 | `beat_in_bar` | `0`–`3` | which beat of the bar this is |
 | `bar_index` | `0`, `1`, `2`, … | bar counter (see the note below on monotonicity) |
 | `bar_phase` | `0`–`1` | position across the whole bar |
 
-`bar` is **beat** phase under a historical name, kept because too much shipped
-content binds it; `bar_phase` is the real bar position. That is the one naming trap
-here.
+Two naming traps live here, not one. `bar` is **beat** phase under a historical
+name, kept because too much shipped content binds it; `bar_phase` is the real bar
+position. And `beat_index` / `time_since_beat` are named for beats but driven by
+the **onset detector**, which is the larger trap of the two — the section below it
+is about exactly that.
 
 These make phrase-scale structure a one-liner:
 
@@ -854,41 +858,81 @@ These make phrase-scale structure a one-liner:
 select(beat_in_bar == 0, 1.4, 1.0)        # accent every downbeat
 0.5 + 0.5 * sin(bar_phase * tau)          # a sweep that breathes with the bar
 select(mod(bar_index, 8) < 4, 0.2, 0.8)   # an 8-bar A/B alternation
-1.0 - clamp(time_since_beat * 6, 0, 1)    # a decay retriggered by every beat
+1.0 - clamp(time_since_beat * 6, 0, 1)    # a decay retriggered by every detection
 ```
 
-`beat_in_bar`, `bar_index` and `bar_phase` come from a downbeat estimator that
-publishes **only while it is confident**, and falls back to plain `beat_index`
-counters otherwise. So they are always periodic and always usable, and never
-confidently wrong about where the bar starts — you cannot see which mode is
-active, deliberately, and you do not need to. 4/4 is assumed.
-
-> **How often is it actually locked? About 6 % of audible time.** Measured over
-> 98 minutes of *unambiguous* 4/4 through the live app (Plan 0068 Phase 3):
-> **6.8 %** on four-on-the-floor techno, **0.14 %** on backbeat rock/pop — 352
-> locked rows in 5900. Restricting to clear 4/4 does not rescue it; the older
-> "roughly 6 %" estimate was right, and it is the ceiling rather than a floor to
-> improve from by picking better material.
+> **`beat_index` counts onsets, not beats, and no fixed multiplier converts
+> between them.** It increments on the onset detector's flag —
+> `flux > mean + 1.5 sigma` with a 96 ms refractory and no tempo gating — so a
+> hi-hat, a snare rattle and a chord change each advance it. Measured against the
+> real beat on live material: **1.35x–2.10x** detections per musical beat across
+> Plan 0086's three genres and **1.20x / 1.22x / 2.28x** across Plan 0095's, and
+> it wanders between 1x, 2x and 4x *within a single track*. That instability is
+> the finding: there is no "about twice as often" to correct for.
 >
-> The cause is diagnosed, not mysterious. The accent the estimator folds is 70 %
-> bass band, on the assumption that the kick marks the bar. In four-on-the-floor
-> the kick marks *every beat*; in a backbeat it marks *1 and 3*, a half-bar, which
-> is why the genre with the clearer accent scores worse. See
+> **So `mod(beat_index, N)` never means N beats.** `mod(beat_index, 16)` is not
+> four bars of four — this document said it was, and that is retracted. What
+> `beat_index` *is* good for is anything that only wants to change on activity
+> without claiming a period: `hash(beat_index)` to re-roll a colour or a count on
+> each hit, or a modulus chosen as a rough "every so often" and read as such.
+> See [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md).
+
+`beat_in_bar`, `bar_index` and `bar_phase` come from a downbeat estimator that
+publishes **only while it is confident**, and falls back to plain counters
+otherwise. So they are always periodic and always usable, and never confidently
+wrong about where the bar starts — you cannot see which mode is active,
+deliberately, and you do not need to. 4/4 is assumed.
+
+> **How often is it locked? Roughly 2–4 % of hops on material with bar-scale
+> accents, and near zero on material without.** Since Plan 0095 the estimator
+> folds accent history over a **tempo-driven bar grid** instead of over
+> `beat_index`, so the four alignments it chooses between are alignments of a unit
+> that is a **stable multiple of the beat** rather than a wandering one — a real
+> bar when the tempo estimate is on the right octave, half or double one when it
+> is not. Re-measured through the live app on three genres, each paired against a
+> reconstruction of the pre-0095 fold on the same capture, the share of hops over
+> the `0.25` confidence gate moved:
+>
+> | | rock/pop | hip-hop | techno |
+> |---|---|---|---|
+> | over the gate, old → new | 0.00 → **2.36 %** | 0.79 → **3.67 %** | 4.16 → **0.42 %** |
+>
+> **The hip-hop column carries that caveat.** Its capture read a `bpm` median of
+> 165 on a track that counts at ~90 — an octave high, which
+> [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md) records as the
+> half of the ambiguity the autocorrelation has no evidence to settle — so the
+> grid's "bar" there spanned two musical beats. A stable two, not a wandering
+> 1.35-2.10, which is the whole improvement; but not a bar.
+>
+> **Techno declining is the repair working, not a regression.** Four-on-the-floor
+> puts a kick on every beat, so there is no bar-scale accent structure to find; the
+> old fold's 4.16 % came from bucketing a counter that ran at 2.28 detections per
+> beat, making its "bar" 1.75 musical beats long and aliasing its four buckets onto
+> the kick/hat alternation — a real 4-periodicity that is not a bar. A gate that
+> shuts on material with no bar accent is the honest outcome, and a confidently
+> wrong downbeat is what ADR-0050 calls worse than none.
+>
+> The remaining ceiling is diagnosed, not mysterious: the accent the estimator
+> folds is 70 % bass band, on the assumption that the kick marks the bar. In
+> four-on-the-floor the kick marks *every beat*; in a backbeat it marks *1 and 3*,
+> a half-bar. See
 > [ADR-0082](adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
-> `Outcome`.
+> `Outcome` and [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md).
 >
 > **What this means when you write a preset:** the four one-liners above are all
-> still correct and safe, but on most material `beat_in_bar == 0` fires on a beat
-> the counter chose rather than one the music did, and it will not agree with
-> where *you* hear the downbeat. If a look must land on the real bar line, it
+> still correct and safe, but most of the time `beat_in_bar == 0` fires on a beat
+> the counter chose rather than one the music did, and it will not reliably agree
+> with where *you* hear the downbeat. If a look must land on the real bar line, it
 > cannot today. If it only needs a periodic four-beat pulse, these deliver it —
-> just do not read the names as a promise about the music. `mod(beat_index, 16)`
-> is the honest way to write "four bars of four".
+> just do not read the names as a promise about the music. And do **not** fall back
+> to `mod(beat_index, 16)`: the bar trio is the closest unit to a bar there is, and
+> `beat_index` is not a musical period at all.
 
 **`bar_index` is monotone except across an alignment change.** It is
-`(beat_index - alignment) / 4`, and `alignment` moves on the beat the estimator
-locks, drops back to the counter, or is overtaken by a challenger — so at that
-one beat the counter can repeat a bar or skip forward one. It never moves by
+`(beat count - alignment) / 4` — where the beat count is the **bar grid's**, and
+`beat_index` only while the grid warms up — and `alignment` moves on the beat the
+estimator locks, drops back to the counter, or is overtaken by a challenger, so at
+that one beat the counter can repeat a bar or skip forward one. It never moves by
 more than a bar and hysteresis makes it rare (a challenger has to lead for three
 bars first), but if you write `mod(bar_index, 8)` for an 8-bar arc, know that a
 lock landing mid-phrase can repeat or drop one bar of it. That is the deliberate

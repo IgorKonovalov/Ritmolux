@@ -45,6 +45,14 @@ tuple = "mod(floor(time * 0.22), 12)"
 brightness = "0.9"
 fade = "0.84 - clamp(bass * 0.05, 0, 0.05)"
 size = "0.20 + clamp(treb * 0.08, 0, 0.06) + beat * 0.06"
+# THE FLOOR IS NOT 8 BARS. `beat_index` counts ONSET DETECTIONS, not musical
+# beats (ADR-0109) - measured at 1.2x to 2.3x per beat depending on the material,
+# and unstable inside a single track, so no fixed multiplier converts it. `mod(
+# beat_index, 32)` is every 32 DETECTIONS: somewhere around 14 to 27 musical
+# beats. That is fine for what this clause is - a guaranteed re-scatter on
+# material too quiet to trip the onset gate - but it is not a phrase boundary and
+# nothing here should be tuned as if it were. Re-tuning to a musical period is a
+# preset-author followup (Plan 0095).
 reseed = "max(onset > 0.60, min(beat, mod(beat_index, 32) == 0))"
 
 # Bloom runs BEFORE the remap, so the halo arrives as luminance and the remap

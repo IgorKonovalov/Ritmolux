@@ -41,8 +41,17 @@ morph = "clamp(0.5 - 0.5 * cos(time * 0.13) + clamp(bass * 0.10, 0, 0.08), 0, 1)
 
 # Recovery, not decoration - see the header. The `beat_index` clause is the
 # load-bearing half: an onset gate alone would leave quiet material with no way
-# back at all, and the collapse this repairs is permanent. Every 16 beats is
-# ~8 s at 120 BPM, well inside one 48 s round trip.
+# back at all, and the collapse this repairs is permanent.
+#
+# NOT EVERY 16 BEATS. `beat_index` counts ONSET DETECTIONS rather than musical
+# beats (ADR-0109), at 1.2x to 2.3x per beat depending on the material and
+# unstable inside one track, so no fixed multiplier converts it. This comment
+# used to read "every 16 beats is ~8 s at 120 BPM"; 16 detections is roughly
+# 3.5 to 7 s there. The conclusion survives the correction and is why the clause
+# is still right - the ceiling it needs is "well inside one 48 s round trip",
+# and a SHORTER period is further inside it, not closer to the edge. What does
+# not survive is reading the 16 as musical. Re-tuning to a musical period is a
+# preset-author followup (Plan 0095).
 reseed = "max(onset > 0.45, min(beat, mod(beat_index, 16) == 0))"
 
 brightness = "1.4"
