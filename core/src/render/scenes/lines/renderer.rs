@@ -78,6 +78,56 @@ pub struct SegmentInstance {
     pub alpha: f32,
 }
 
+/// One **circular arc**: a centre and radius in world space, a signed angular
+/// span in radians, an RGB colour and a half-width in NDC-y units — the same
+/// conventions [`SegmentInstance`] uses, so the two kinds place geometry in one
+/// coordinate system and stroke it to one profile.
+///
+/// Expanded in the vertex shader to a single bounding quad and shaded by the
+/// **per-pixel distance to the arc** ([ADR-0098]) rather than by an
+/// interpolated across-the-stroke coordinate. So a `circle` is one instance
+/// with no vertices at any resolution, where the segment path needs one
+/// instance and one additive joint per sample.
+///
+/// **No `joined` field: an arc has no interior joints**, which is the whole
+/// point of the primitive. Where two arcs in a chain meet they overlap by
+/// [ADR-0041]'s half-width as any two strokes do, and the additive composite
+/// sums that overlap exactly as it does for segments — the bead is reduced by
+/// there being fewer joints, not by a joint doing anything different.
+///
+/// **No `alpha` field either.** Every arc producer draws through ADR-0056's
+/// additive seam, where the coverage a premultiplied fragment carries is the
+/// stroke's own falloff; the OVER range [`LineRenderer::draw_split`] serves is
+/// a MilkDrop waveform, which is segments. A future over-blended arc adds the
+/// field **last**, for the reason [`SegmentInstance::alpha`] records.
+///
+/// **Field order is shader-location order**, and that is load-bearing for the
+/// same reason it is on [`SegmentInstance`]: `vertex_attr_array!` derives each
+/// attribute's byte offset from the order of the locations, so a field inserted
+/// anywhere but the end silently re-points every attribute after it.
+///
+/// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
+/// [ADR-0041]: ../../../../../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ArcInstance {
+    /// Centre of curvature (world space).
+    pub centre: [f32; 2],
+    /// Radius (world space). The arc's centreline, not either stroke edge.
+    pub radius: f32,
+    /// Where the span starts, in radians, measured the usual way from `+x`.
+    pub angle_start: f32,
+    /// How far it sweeps, **signed**. `|sweep|` may exceed `PI`, and a full
+    /// circle is one instance at `sweep = TAU`.
+    pub angle_sweep: f32,
+    /// RGB colour (pre-brightness; additive blend sums overlaps).
+    pub color: [f32; 3],
+    /// Half-width in NDC-y units — the same quantity, in the same space, as
+    /// [`SegmentInstance::width`]. Named `width` to match its sibling; it is a
+    /// half-width in both.
+    pub width: f32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
@@ -203,6 +253,175 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 fn shader_source() -> String {
     format!("const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = {JOINED_B}u;\n{SHADER_BODY}")
 }
+
+/// The arc pipeline's WGSL, **a separate shader module** from [`SHADER_BODY`]
+/// and built only when a scene asked for arcs.
+///
+/// Separate rather than two more entry points in the one module, so a
+/// `LineRenderer` without arcs creates exactly the resources it created before
+/// this existed. Appending to the shared module would have changed what every
+/// line scene compiles, and on the WARP software adapter the golden suite
+/// captures on, a changed resource is a changed picture (ADR-0058).
+///
+/// # What the fragment computes, and in which space
+///
+/// The arc is authored in **world space**, which is isotropic on screen: the
+/// vertex shader divides x by the aspect on the way out, so a world circle is a
+/// circle in pixels. The **stroke**, though, is a half-width in NDC - that is
+/// what the segment path strokes (`nrm * width` is applied after the aspect
+/// divide), and this primitive has to draw the same picture as a densely
+/// sampled polyline of the same arc, not a better one.
+///
+/// So the distance is taken where each half is exact and converted once:
+/// `abs(length(p - c) - r)` is the exact **world** radial distance, and
+/// dividing by the NDC length of that distance's own gradient expresses it in
+/// the NDC metric the stroke is measured in. Outside the angular span the
+/// distance is to the nearer endpoint, which is a point, so that arm
+/// approximates nothing.
+///
+/// **The aspect is the render target's** ([ADR-0037]): it arrives in the
+/// uniform `draw` was handed, and there is no internal grid, texture or second
+/// size anywhere in this shader for another one to come from. This family has
+/// shipped that bug three times, which is why the control renders at a
+/// non-16:9 target where a grid-derived aspect and the target's disagree.
+///
+/// [ADR-0037]: ../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
+const ARC_SHADER: &str = r#"
+struct Uniforms {
+    v: vec4<f32>,
+    view: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> u: Uniforms;
+
+const TAU: f32 = 6.2831853071795864;
+const QUARTER_TURN: f32 = 1.5707963267948966;
+
+struct VsOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) ndc: vec2<f32>,
+    @location(1) @interpolate(flat) centre: vec2<f32>,
+    @location(2) @interpolate(flat) radius: f32,
+    // (lo, hi): the span's two ends in increasing order, so the sweep's sign
+    // stops mattering past this point and the two endpoints are the same two
+    // points either way.
+    @location(3) @interpolate(flat) span: vec2<f32>,
+    @location(4) @interpolate(flat) color: vec3<f32>,
+    @location(5) @interpolate(flat) width: f32,
+}
+
+@vertex
+fn vs_main(
+    @builtin(vertex_index) vi: u32,
+    @location(0) centre: vec2<f32>,
+    @location(1) radius: f32,
+    @location(2) angle_start: f32,
+    @location(3) angle_sweep: f32,
+    @location(4) color: vec3<f32>,
+    @location(5) width: f32,
+) -> VsOut {
+    // The unit square, expanded to the arc's own bounding box below.
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0),
+    );
+    let c = corners[vi];
+    let aspect = max(u.v.x, 0.1);
+
+    // Shared ViewTransform (ADR-0018), applied exactly as the segment shader
+    // applies it: in world space, before the aspect divide. A uniform zoom
+    // scales the radius with the centre; stroke width does not move.
+    let centre_v = centre * u.view.x + u.view.yz;
+    let radius_v = radius * u.view.x;
+
+    let a0 = angle_start;
+    let a1 = angle_start + angle_sweep;
+    let lo = min(a0, a1);
+    let hi = max(a0, a1);
+
+    // The centreline's bounding box: the two ends always, plus each axis
+    // extreme the span actually reaches. A full turn reaches all four and the
+    // box is the whole circle; a short span gets a box barely bigger than its
+    // own chord, which is what keeps the shaded area near the stroke's.
+    let end0 = vec2<f32>(cos(a0), sin(a0));
+    let end1 = vec2<f32>(cos(a1), sin(a1));
+    var lo_dir = min(end0, end1);
+    var hi_dir = max(end0, end1);
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        let ang = f32(k) * QUARTER_TURN;
+        // The smallest representative of `ang` modulo TAU at or above `lo`.
+        let t = ang + TAU * ceil((lo - ang) / TAU);
+        if (t <= hi) {
+            let d = vec2<f32>(cos(ang), sin(ang));
+            lo_dir = min(lo_dir, d);
+            hi_dir = max(hi_dir, d);
+        }
+    }
+
+    // The stroke reaches `width` in NDC on every side, so the world-space pad
+    // is anisotropic even though the stroke is not: one NDC x unit is `aspect`
+    // world units. The 2 % is slack for the distance being a first-order
+    // expression of a curved level set - see the fragment.
+    let pad = vec2<f32>(width * aspect, width) * 1.02;
+    let lo_w = centre_v + radius_v * lo_dir - pad;
+    let hi_w = centre_v + radius_v * hi_dir + pad;
+    let p = mix(lo_w, hi_w, c);
+    let ndc = vec2<f32>(p.x / aspect, p.y);
+
+    var out: VsOut;
+    out.pos = vec4<f32>(ndc, 0.0, 1.0);
+    out.ndc = ndc;
+    out.centre = centre_v;
+    out.radius = radius_v;
+    out.span = vec2<f32>(lo, hi);
+    out.color = color;
+    out.width = width;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    let aspect = max(u.v.x, 0.1);
+    // Back into the isotropic world space the arc is authored in.
+    let p = vec2<f32>(in.ndc.x * aspect, in.ndc.y);
+    let q = p - in.centre;
+    let len = length(q);
+
+    // Inside the span, or past one of its ends? The same modulo reduction the
+    // vertex shader uses, so an arc that wraps the branch cut of atan2 is not
+    // a special case.
+    let theta = atan2(q.y, q.x);
+    let t = theta + TAU * ceil((in.span.x - theta) / TAU);
+
+    var d: f32;
+    if (t <= in.span.y) {
+        // The exact world radial distance, converted into the NDC metric by
+        // the NDC length of its own gradient: moving one NDC unit along x
+        // covers `aspect` world units, so a radial step is worth that much
+        // less NDC where the arc runs vertically.
+        let dir = select(vec2<f32>(1.0, 0.0), q / len, len > 1e-6);
+        let grad = length(vec2<f32>(dir.x * aspect, dir.y));
+        d = abs(len - in.radius) / max(grad, 1e-6);
+    } else {
+        // Past an end: the distance to the nearer endpoint. A point has an
+        // exact NDC distance, so this arm approximates nothing.
+        let e0 = in.centre + in.radius * vec2<f32>(cos(in.span.x), sin(in.span.x));
+        let e1 = in.centre + in.radius * vec2<f32>(cos(in.span.y), sin(in.span.y));
+        let d0 = length(vec2<f32>((p.x - e0.x) / aspect, p.y - e0.y));
+        let d1 = length(vec2<f32>((p.x - e1.x) / aspect, p.y - e1.y));
+        d = min(d0, d1);
+    }
+
+    // The segment path's profile on the arc's own distance: bright core,
+    // quadratic falloff to the stroke edge. Premultiplied, so colour and alpha
+    // carry the same coverage and the quad outside the stroke writes nothing
+    // at all rather than opaque black (ADR-0056). The glow multiplier scales
+    // the LIGHT, not the coverage, exactly as it does for a segment.
+    let falloff = max(0.0, 1.0 - d / max(in.width, 1e-8));
+    let g = falloff * falloff;
+    return vec4<f32>(in.color * g * u.v.y, g);
+}
+"#;
 
 // ---------------------------------------------------------------------------
 // The in-frame geometry diagnostic (Plan 0069, ADR-0083)
@@ -393,11 +612,31 @@ pub struct LineRenderer {
     /// moved five composite baselines while changing nothing a driver would
     /// render differently.
     over_pipeline: Option<wgpu::RenderPipeline>,
+    /// The [`ArcInstance`] pipeline, drawn in the same additive pass from its
+    /// own buffer — [`ARC_SHADER`] and [ADR-0098].
+    ///
+    /// **`None` unless the scene asked for it**
+    /// ([`LineRenderer::new_with_arcs`]), for the reason
+    /// [`over_pipeline`](Self::over_pipeline) records and with the same
+    /// evidence behind it: building a pipeline nobody binds still allocates on
+    /// the device, and on WARP a changed allocation order changes what a later
+    /// pass resolves to. It **shares the bind-group layout, the bind group and
+    /// the pipeline layout** with the segment pipelines — one uniform, one
+    /// layout, so ADR-0058 has nothing new to separate. Only the vertex layout
+    /// and the shader module differ.
+    ///
+    /// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
+    arc_pipeline: Option<wgpu::RenderPipeline>,
     instances: wgpu::Buffer,
+    /// The arc instance buffer, `Some` exactly when
+    /// [`arc_pipeline`](Self::arc_pipeline) is.
+    arcs: Option<wgpu::Buffer>,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     /// Maximum segments the instance buffer holds; extra are dropped by `draw`.
     capacity: usize,
+    /// Maximum arcs the arc buffer holds; `0` when there is no arc pipeline.
+    arc_capacity: usize,
 }
 
 impl LineRenderer {
@@ -412,7 +651,7 @@ impl LineRenderer {
         capacity: usize,
         label: &str,
     ) -> Self {
-        Self::build(device, surface_format, capacity, label, false)
+        Self::build(device, surface_format, capacity, label, false, 0)
     }
 
     /// [`new`](Self::new), plus the second pipeline
@@ -426,7 +665,25 @@ impl LineRenderer {
         capacity: usize,
         label: &str,
     ) -> Self {
-        Self::build(device, surface_format, capacity, label, true)
+        Self::build(device, surface_format, capacity, label, true, 0)
+    }
+
+    /// [`new`](Self::new), plus the arc pipeline and an `arc_capacity`-instance
+    /// arc buffer ([`ArcInstance`], ADR-0098).
+    ///
+    /// Only a scene that actually draws arcs should call this — see
+    /// [`arc_pipeline`](Self::arc_pipeline) for why building it unconditionally
+    /// is not free. `arc_capacity` is its own budget rather than a share of
+    /// `capacity`: an arc replaces many segments, so the two counts are not the
+    /// same order and sizing one from the other would waste most of it.
+    pub fn new_with_arcs(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        arc_capacity: usize,
+        label: &str,
+    ) -> Self {
+        Self::build(device, surface_format, capacity, label, false, arc_capacity)
     }
 
     fn build(
@@ -435,6 +692,7 @@ impl LineRenderer {
         capacity: usize,
         label: &str,
         split: bool,
+        arc_capacity: usize,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(&format!("{label}-shader")),
@@ -530,13 +788,80 @@ impl LineRenderer {
         let over_pipeline =
             split.then(|| make(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over"));
 
+        // The arc pipeline (ADR-0098). Its own shader module and vertex layout,
+        // the *same* bind layout, bind group and pipeline layout as above, and
+        // the same additive blend — so an arc and a segment emit into one pass
+        // through one uniform and cannot drift apart on aspect, glow or the
+        // view transform.
+        let arcs = (arc_capacity > 0).then(|| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(&format!("{label}-arc-instances")),
+                size: (arc_capacity * std::mem::size_of::<ArcInstance>()) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        });
+        let arc_pipeline = arcs.is_some().then(|| {
+            let arc_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(&format!("{label}-arc-shader")),
+                source: wgpu::ShaderSource::Wgsl(ARC_SHADER.into()),
+            });
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(&format!("{label}-arc-pipeline")),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &arc_shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<ArcInstance>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x2,
+                            1 => Float32,
+                            2 => Float32,
+                            3 => Float32,
+                            4 => Float32x3,
+                            5 => Float32,
+                        ],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &arc_shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: surface_format,
+                        blend: Some(crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        });
+
+        // Zero unless the pipeline exists, so `draw_all` needs no second test:
+        // a renderer without arcs clamps every arc batch to nothing.
+        let arc_capacity = if arc_pipeline.is_some() {
+            arc_capacity
+        } else {
+            0
+        };
+
         Self {
             pipeline,
             over_pipeline,
+            arc_pipeline,
             instances,
+            arcs,
             uniforms,
             bind_group,
             capacity,
+            arc_capacity,
         }
     }
 
@@ -544,6 +869,13 @@ impl LineRenderer {
     /// this and surfaces any drop at load (ADR-0007 cap must never be silent).
     pub fn capacity(&self) -> usize {
         self.capacity
+    }
+
+    /// Arcs the arc buffer can hold — `0` when this renderer was not built with
+    /// [`new_with_arcs`](Self::new_with_arcs), in which case
+    /// [`draw_arcs`](Self::draw_arcs) draws none.
+    pub fn arc_capacity(&self) -> usize {
+        self.arc_capacity
     }
 
     /// Draw `segments` as thick glowing quads at the given `aspect` and `glow`
@@ -610,6 +942,80 @@ impl LineRenderer {
         segments: &[SegmentInstance],
         n_additive: usize,
     ) {
+        self.draw_all(
+            queue,
+            encoder,
+            view,
+            aspect,
+            glow,
+            xform,
+            segments,
+            n_additive,
+            &[],
+        );
+    }
+
+    /// [`draw`](Self::draw), plus `arcs` — [`ArcInstance`]s stroked by the
+    /// per-pixel distance field (ADR-0098) **in the same additive pass**, from
+    /// the same uniform, after the segments.
+    ///
+    /// One pass rather than two for the reason [`draw_split`](Self::draw_split)
+    /// gives: a second pass would mean a second load of the attachment and a
+    /// second set of uniforms to keep in step. Additive blending is
+    /// order-independent, so "after the segments" is a statement about the
+    /// command stream and not about the picture.
+    ///
+    /// Arcs beyond [`arc_capacity`](Self::arc_capacity) are dropped defensively,
+    /// exactly as segments beyond `capacity` are; a renderer built without the
+    /// arc pipeline has a capacity of zero and draws none.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw` — this is that signature plus the arc batch"
+    )]
+    pub fn draw_arcs(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+        glow: f32,
+        xform: super::ViewTransform,
+        segments: &[SegmentInstance],
+        arcs: &[ArcInstance],
+    ) {
+        self.draw_all(
+            queue,
+            encoder,
+            view,
+            aspect,
+            glow,
+            xform,
+            segments,
+            segments.len(),
+            arcs,
+        );
+    }
+
+    /// The one body behind [`draw`](Self::draw),
+    /// [`draw_split`](Self::draw_split) and [`draw_arcs`](Self::draw_arcs):
+    /// one buffer upload per kind, one uniform write, one render pass.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw` — this is that signature plus the partition index \
+                  and the arc batch"
+    )]
+    fn draw_all(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+        glow: f32,
+        xform: super::ViewTransform,
+        segments: &[SegmentInstance],
+        n_additive: usize,
+        arcs: &[ArcInstance],
+    ) {
         let count = segments.len().min(self.capacity);
         let drawn = segments.get(..count).unwrap_or(&[]);
 
@@ -625,8 +1031,14 @@ impl LineRenderer {
             LAST_EXTENT.with(|slot| slot.set(Some(extent)));
         }
 
+        let arc_count = arcs.len().min(self.arc_capacity);
+        let arcs_drawn = arcs.get(..arc_count).unwrap_or(&[]);
+
         if !drawn.is_empty() {
             queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(drawn));
+        }
+        if let (Some(buffer), false) = (&self.arcs, arcs_drawn.is_empty()) {
+            queue.write_buffer(buffer, 0, bytemuck::cast_slice(arcs_drawn));
         }
         queue.write_buffer(
             &self.uniforms,
@@ -655,17 +1067,28 @@ impl LineRenderer {
             occlusion_query_set: None,
             multiview_mask: None,
         });
-        if drawn.is_empty() {
+        if drawn.is_empty() && arcs_drawn.is_empty() {
             return; // nothing to stroke; the backdrop shows through
         }
         // Clamped to what actually reached the buffer: `n_additive` counts into
         // `segments`, which may be longer than `drawn`.
         let split = n_additive.min(drawn.len()) as u32;
         pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, self.instances.slice(..));
         if split > 0 {
             pass.set_pipeline(&self.pipeline);
+            pass.set_vertex_buffer(0, self.instances.slice(..));
             pass.draw(0..6, 0..split);
+        }
+        // Between the two segment ranges rather than after both: an arc is
+        // additive light, and the OVER range has to land on top of the light it
+        // covers. No scene draws both today; the ordering is here so that the
+        // day one does, it is already right.
+        if let (Some(pipeline), Some(buffer), false) =
+            (&self.arc_pipeline, &self.arcs, arcs_drawn.is_empty())
+        {
+            pass.set_pipeline(pipeline);
+            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.draw(0..6, 0..arcs_drawn.len() as u32);
         }
         if (drawn.len() as u32) > split {
             // Falls back to the additive pipeline when the scene did not ask for
@@ -673,6 +1096,7 @@ impl LineRenderer {
             // is unreachable in practice: the only caller that passes a partition
             // is the one that built with `new_split`.
             pass.set_pipeline(self.over_pipeline.as_ref().unwrap_or(&self.pipeline));
+            pass.set_vertex_buffer(0, self.instances.slice(..));
             pass.draw(0..6, split..drawn.len() as u32);
         }
     }

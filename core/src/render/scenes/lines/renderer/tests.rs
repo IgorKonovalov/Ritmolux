@@ -636,3 +636,466 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
          arm exists"
     );
 }
+
+// -----------------------------------------------------------------------
+// The arc instance draws the same curve as the polyline (Plan 0087 Phase 1,
+// ADR-0098)
+// -----------------------------------------------------------------------
+
+/// The control's render target. **Deliberately 4:3, not 16:9**: the aspect
+/// ADR-0037 asks about is only observable where a grid-derived aspect and the
+/// target's *disagree*, and at 1920x1080 (and at this box's 2048x1152) they
+/// coincide exactly. Twice the golden suite's 128 so a stroke a few pixels
+/// across still has an interior.
+const ARC_W: u32 = 320;
+const ARC_H: u32 = 240;
+/// The aspect the draw is handed — the render target's, and the only one in
+/// scope here.
+const ARC_ASPECT: f32 = ARC_W as f32 / ARC_H as f32;
+
+/// Samples in the polyline the arc is compared against. Dense enough that the
+/// chord sagitta — `r * (1 - cos(pi / N))`, about 1e-5 world units at this N
+/// and radius — is four orders below the stroke it is drawn with, so any
+/// difference the comparison finds is the primitive's and not the sampling's.
+const ARC_SAMPLES: usize = 512;
+
+/// The stroke the comparison is drawn at, in NDC-y half-width — `thickness`
+/// around 2, which is what the line presets actually ship (`presets/README.md`
+/// gives the working range as 1.5 to 3.2).
+const ARC_WIDTH: f32 = 0.006;
+
+/// Render `segments` and `arcs` through one `LineRenderer` into a linear
+/// `Rgba16Float` target and read the light back, unclamped and untonemapped.
+///
+/// `arc_capacity` is a parameter rather than derived from `arcs.len()` so a
+/// caller can build a renderer *without* the arc pipeline and confirm it draws
+/// no arcs.
+fn arc_capture(
+    segments: &[SegmentInstance],
+    arcs: &[super::ArcInstance],
+    arc_capacity: usize,
+) -> Option<Vec<f32>> {
+    use crate::render::capture;
+    use crate::render::context::RenderContext;
+
+    const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+    let ctx = match RenderContext::new_headless(ARC_W, ARC_H, true) {
+        Ok(ctx) => ctx,
+        Err(_) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+    };
+    let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("arc-control-target"),
+        size: wgpu::Extent3d {
+            width: ARC_W,
+            height: ARC_H,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&Default::default());
+    // The pass loads rather than clears (the background pass owns the clear in
+    // the shipped chain), so clear this target once here.
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("arc-control"),
+        });
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("arc-control-clear"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: &view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+
+    let mut renderer = if arc_capacity > 0 {
+        super::LineRenderer::new_with_arcs(
+            &ctx.device,
+            FORMAT,
+            segments.len().max(1),
+            arc_capacity,
+            "arc-control",
+        )
+    } else {
+        super::LineRenderer::new(&ctx.device, FORMAT, segments.len().max(1), "arc-control")
+    };
+    renderer.draw_arcs(
+        &ctx.queue,
+        &mut encoder,
+        &view,
+        ARC_ASPECT,
+        1.0,
+        ViewTransform::default(),
+        segments,
+        arcs,
+    );
+
+    let (buffer, padded_bpr) = capture::create_linear_readback(&ctx.device, ARC_W, ARC_H);
+    capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, ARC_W, ARC_H);
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+    Some(
+        capture::read_back_linear(&ctx.device, &buffer, ARC_W, ARC_H, padded_bpr)
+            .expect("read back the arc control"),
+    )
+}
+
+/// A closed circle of `ARC_SAMPLES` **unjoined** segments about `centre`.
+///
+/// Unjoined on purpose: ADR-0041's join extends each flagged end by a half
+/// width, so at this sampling density every vertex would overlap its
+/// neighbours by most of a stroke and the additive composite would sum to
+/// something far brighter than either primitive draws. That bead is the defect
+/// this plan exists to remove, not the baseline the arc should match — the
+/// question here is whether the two draw the same *curve*.
+fn sampled_circle(centre: [f32; 2], radius: f32, width: f32) -> Vec<SegmentInstance> {
+    let point = |k: usize| {
+        let t = std::f32::consts::TAU * k as f32 / ARC_SAMPLES as f32;
+        [centre[0] + radius * t.cos(), centre[1] + radius * t.sin()]
+    };
+    (0..ARC_SAMPLES)
+        .map(|k| SegmentInstance {
+            a: point(k),
+            b: point(k + 1),
+            color: [1.0, 1.0, 1.0],
+            width,
+            joined: 0,
+            alpha: 1.0,
+        })
+        .collect()
+}
+
+/// Mean per-channel difference and the largest single-channel byte outlier
+/// between two linear captures — the golden suite's own two statistics
+/// (`core/tests/golden.rs`), computed the same way so its tolerances mean here
+/// what they mean there.
+fn arc_diff(a: &[f32], b: &[f32]) -> (f32, u8) {
+    let (mut sum, mut worst) = (0.0f64, 0.0f32);
+    let mut n = 0usize;
+    for (x, y) in a.chunks_exact(4).zip(b.chunks_exact(4)) {
+        for c in 0..3 {
+            let (x, y) = (x[c].clamp(0.0, 1.0), y[c].clamp(0.0, 1.0));
+            let d = (x - y).abs();
+            sum += d as f64;
+            if d > worst {
+                worst = d;
+            }
+            n += 1;
+        }
+    }
+    (
+        (sum / n.max(1) as f64) as f32,
+        (worst * 255.0).round().min(255.0) as u8,
+    )
+}
+
+/// The golden suite's tolerances, quoted rather than re-invented — Phase 1's
+/// done-when is "within the golden suite's own drift tolerance", and these are
+/// the two numbers `core/tests/golden.rs` holds every baseline to.
+const ARC_MEAN_TOL: f32 = 0.02;
+const ARC_OUTLIER_TOL: u8 = 48;
+
+/// **An arc draws the same curve a densely-sampled polyline of it does**, at a
+/// non-16:9 target, to within the golden suite's own drift tolerance.
+///
+/// This is the primitive's whole claim: one instance with no vertices at any
+/// resolution is a *drawing of the same circle*, not a different look. The two
+/// captures differ only in how the stroke's distance is found — the polyline
+/// interpolates a coordinate across a quad per chord, the arc evaluates
+/// `abs(length(p - c) - r)` per pixel — so where they agree, the per-pixel
+/// distance field is the same picture.
+///
+/// # Why the aspect check bites here and nowhere else
+///
+/// The arc is authored in world space and the target is 4:3, so the circle
+/// reaches NDC x of `r / aspect` and NDC y of `r`. Take the aspect from
+/// anything but the render target and the two primitives stop agreeing:
+/// the polyline's squash comes from the vertex shader's divide (which is
+/// handed the target's aspect by `draw`), and a wrongly-sourced aspect in the
+/// arc shader squashes its ellipse by a different factor. **Verified to bite**
+/// by temporarily replacing the arc fragment's `u.v.x` with a fixed 1.0: this
+/// comparison goes from mean 0.0000 / outlier 1 to mean **0.0044** / outlier
+/// **255**, and the lit-pixel count falls from 628 to 408.
+///
+/// **It is the outlier arm that convicts, and that is worth knowing before
+/// anyone tunes these two numbers.** A wrongly-sourced aspect moves a thin
+/// closed curve, so it is wrong by everything on a few hundred pixels and
+/// right on the other seventy-six thousand — the mean lands at 0.0044 and
+/// stays comfortably *inside* the 0.02 the golden suite allows. Dropping the
+/// max-outlier arm would leave this test green on the bug it exists for.
+#[test]
+fn an_arc_draws_the_same_curve_as_a_dense_polyline() {
+    const CENTRE: [f32; 2] = [0.1, -0.05];
+    const RADIUS: f32 = 0.55;
+
+    let segments = sampled_circle(CENTRE, RADIUS, ARC_WIDTH);
+    let arc = super::ArcInstance {
+        centre: CENTRE,
+        radius: RADIUS,
+        angle_start: 0.0,
+        angle_sweep: std::f32::consts::TAU,
+        color: [1.0, 1.0, 1.0],
+        width: ARC_WIDTH,
+    };
+
+    let Some(polyline) = arc_capture(&segments, &[], 0) else {
+        return;
+    };
+    let Some(drawn) = arc_capture(&[], &[arc], 4) else {
+        return;
+    };
+
+    // Non-vacuity first: two black frames agree perfectly and prove nothing.
+    let lit = |px: &[f32]| px.chunks_exact(4).filter(|t| t[0] > 0.01).count();
+    let (lit_polyline, lit_arc) = (lit(&polyline), lit(&drawn));
+    let total = (ARC_W * ARC_H) as usize;
+    let (mean, outlier) = arc_diff(&polyline, &drawn);
+    eprintln!(
+        "arc vs {ARC_SAMPLES}-segment polyline at {ARC_W}x{ARC_H} (aspect \
+         {ARC_ASPECT:.4}): {lit_polyline} lit pixels vs {lit_arc} of {total}; \
+         mean {mean:.4} (tol {ARC_MEAN_TOL}) outlier {outlier} (tol \
+         {ARC_OUTLIER_TOL})"
+    );
+    assert!(
+        lit_polyline * 200 > total && lit_arc * 200 > total,
+        "one of the two captures is nearly empty ({lit_polyline} and {lit_arc} \
+         of {total} pixels lit) — the comparison below would pass on black \
+         against black"
+    );
+
+    assert!(
+        mean <= ARC_MEAN_TOL && outlier <= ARC_OUTLIER_TOL,
+        "the arc and a {ARC_SAMPLES}-segment polyline of the same circle draw \
+         different pictures: mean {mean:.4} (tol {ARC_MEAN_TOL}), worst \
+         single-channel byte {outlier} (tol {ARC_OUTLIER_TOL})"
+    );
+}
+
+/// **The stroke profile is the segment path's**: a bright core falling
+/// quadratically to zero at the stroke edge, not a flat bar and not a linear
+/// ramp.
+///
+/// Read off the column through the circle's centre, where the arc runs
+/// horizontally and its distance is measured along y — so the profile is
+/// sampled in the very axis the half-width is quoted in and no aspect
+/// conversion enters. That makes the expected value a **closed form** rather
+/// than a shape to match: a pixel whose centre sits at NDC `y` is exactly
+/// `|y - radius|` from the circle there, so the fragment must emit
+/// `(1 - d / width)^2` and nothing else.
+#[test]
+fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
+    const CENTRE: [f32; 2] = [0.0, 0.0];
+    const RADIUS: f32 = 0.5;
+    // Fat enough that a dozen rows land across the half-width; the property
+    // does not depend on the width, only the resolution of the check does.
+    const WIDTH: f32 = 0.08;
+
+    let arc = super::ArcInstance {
+        centre: CENTRE,
+        radius: RADIUS,
+        angle_start: 0.0,
+        angle_sweep: std::f32::consts::TAU,
+        color: [1.0, 1.0, 1.0],
+        width: WIDTH,
+    };
+    let Some(drawn) = arc_capture(&[], &[arc], 4) else {
+        return;
+    };
+
+    // `color` and the glow multiplier are both 1 and the target was cleared to
+    // black, so the red channel *is* the fragment's coverage `g`.
+    let column = (ARC_W / 2) as usize;
+    let at = |row: usize| drawn[(row * ARC_W as usize + column) * 4];
+    // Pixel centres sit at +0.5, and row 0 is NDC y = +1.
+    let ndc_y = |row: usize| 1.0 - 2.0 * (row as f32 + 0.5) / ARC_H as f32;
+
+    let (mut worst, mut checked, mut peak) = (0.0f32, 0usize, 0.0f32);
+    for row in 0..(ARC_H / 2) as usize {
+        let d = (ndc_y(row) - RADIUS).abs();
+        if d > WIDTH {
+            continue; // outside the stroke; the arc writes nothing there
+        }
+        let falloff = 1.0 - d / WIDTH;
+        let want = falloff * falloff;
+        let got = at(row);
+        worst = worst.max((got - want).abs());
+        peak = peak.max(got);
+        checked += 1;
+    }
+    eprintln!(
+        "arc stroke profile at {ARC_W}x{ARC_H}: {checked} rows across the \
+         stroke, peak {peak:.4}, worst |measured - (1 - d/w)^2| {worst:.4}"
+    );
+
+    assert!(
+        checked >= 16 && peak > 0.8,
+        "only {checked} rows fell across the stroke and the brightest reached \
+         {peak:.4} — the profile is not resolved and the assertion below \
+         would be vacuous"
+    );
+    // The composite is `Rgba16Float`, so a value near 1 is stored to about
+    // 1/1024; the rest is the rasterizer agreeing with the pixel-centre
+    // convention this reconstructs `d` from. It is slack, not a tolerance: the
+    // property is an exact equality in real arithmetic.
+    const PROFILE_SLACK: f32 = 0.01;
+    assert!(
+        worst <= PROFILE_SLACK,
+        "the arc's across-the-stroke profile departs from `(1 - d/w)^2` by \
+         {worst:.4} (slack {PROFILE_SLACK}) — a flat bar, a linear ramp or a \
+         stroke of the wrong width here would all be a different look drawn \
+         on the same curve"
+    );
+
+    // The other half of "like a segment": the same cut through the segment
+    // path's own stroke must land on the same numbers. Without this the check
+    // above pins the arc to a formula rather than to its sibling.
+    let flat = [SegmentInstance {
+        a: [-1.0, RADIUS],
+        b: [1.0, RADIUS],
+        color: [1.0, 1.0, 1.0],
+        width: WIDTH,
+        joined: 0,
+        alpha: 1.0,
+    }];
+    let Some(segment) = arc_capture(&flat, &[], 0) else {
+        return;
+    };
+    let mut worst_pair = 0.0f32;
+    for row in 0..(ARC_H / 2) as usize {
+        if (ndc_y(row) - RADIUS).abs() > WIDTH {
+            continue;
+        }
+        worst_pair = worst_pair.max((at(row) - segment[(row * ARC_W as usize + column) * 4]).abs());
+    }
+    eprintln!("arc vs segment cross-section: worst per-row difference {worst_pair:.4}");
+    assert!(
+        worst_pair <= PROFILE_SLACK,
+        "the arc's stroke and a straight segment's differ by {worst_pair:.4} \
+         across their own cross-sections — the two primitives are not drawing \
+         the same stroke"
+    );
+}
+
+/// A renderer built **without** the arc pipeline draws no arcs, rather than
+/// panicking or silently binding the segment pipeline to arc instances.
+///
+/// The capability is opt-in for the reason `over_pipeline` records — an unused
+/// pipeline still allocates, and on WARP a changed allocation order changes a
+/// later pass — so "did not ask for it" has to be a defined state and not an
+/// accident.
+#[test]
+fn a_renderer_without_the_arc_pipeline_draws_no_arcs() {
+    let arc = super::ArcInstance {
+        centre: [0.0, 0.0],
+        radius: 0.5,
+        angle_start: 0.0,
+        angle_sweep: std::f32::consts::TAU,
+        color: [1.0, 1.0, 1.0],
+        width: 0.02,
+    };
+    let Some(drawn) = arc_capture(&[], &[arc], 0) else {
+        return;
+    };
+    let lit = drawn.chunks_exact(4).filter(|t| t[0] > 0.001).count();
+    assert_eq!(
+        lit, 0,
+        "{lit} pixels are lit by a renderer that was never given an arc \
+         pipeline"
+    );
+}
+
+/// An arc's **angular span** is honoured: a quarter turn lights roughly a
+/// quarter of what the full circle does, and it lights it on the side the span
+/// names.
+///
+/// The count is a ratio against the arc's own full circle rather than an
+/// absolute pixel number, so it stays a property of the geometry rather than a
+/// number recorded off this capture size ([ADR-0071]).
+///
+/// [ADR-0071]: ../../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+#[test]
+fn an_arcs_angular_span_is_what_it_draws() {
+    const RADIUS: f32 = 0.6;
+    const WIDTH: f32 = 0.02;
+    let arc = |start: f32, sweep: f32| super::ArcInstance {
+        centre: [0.0, 0.0],
+        radius: RADIUS,
+        angle_start: start,
+        angle_sweep: sweep,
+        color: [1.0, 1.0, 1.0],
+        width: WIDTH,
+    };
+    let quarter = std::f32::consts::FRAC_PI_2;
+
+    let Some(full) = arc_capture(&[], &[arc(0.0, std::f32::consts::TAU)], 4) else {
+        return;
+    };
+    let Some(first) = arc_capture(&[], &[arc(0.0, quarter)], 4) else {
+        return;
+    };
+    let lit = |px: &[f32]| px.chunks_exact(4).filter(|t| t[0] > 0.01).count();
+    // Which half of the frame the light is in. Rows count down from NDC y = +1,
+    // so the first quadrant (angles 0..pi/2) is the TOP right.
+    let quadrant = |px: &[f32]| {
+        let mut counts = [0usize; 4];
+        for (i, t) in px.chunks_exact(4).enumerate() {
+            if t[0] <= 0.01 {
+                continue;
+            }
+            let (x, y) = (i % ARC_W as usize, i / ARC_W as usize);
+            let right = x >= ARC_W as usize / 2;
+            let top = y < ARC_H as usize / 2;
+            counts[usize::from(right) + 2 * usize::from(top)] += 1;
+        }
+        counts
+    };
+
+    let (lit_full, lit_first) = (lit(&full), lit(&first));
+    let counts = quadrant(&first);
+    eprintln!(
+        "arc span: full circle {lit_full} lit, quarter {lit_first} lit \
+         (ratio {:.3}); the quarter's quadrant counts (bl, br, tl, tr) are \
+         {counts:?}",
+        lit_first as f32 / lit_full.max(1) as f32
+    );
+    assert!(
+        lit_full > 0 && lit_first > 0,
+        "nothing drew ({lit_full} and {lit_first} lit)"
+    );
+    // A quarter of the circle plus two endpoint caps, each a half-disc of the
+    // stroke's own radius — so a little over a quarter, never a half.
+    let ratio = lit_first as f32 / lit_full as f32;
+    assert!(
+        (0.2..0.35).contains(&ratio),
+        "a quarter-turn arc lit {ratio:.3} of what the full circle lit, which \
+         is not a quarter plus its two endpoint caps"
+    );
+    // Top-right is index 3 by the packing above. Everything else is a cap
+    // spilling a pixel or two over an axis, so the quadrant the span names must
+    // dominate rather than merely lead.
+    let elsewhere: usize = counts[0] + counts[1] + counts[2];
+    assert!(
+        counts[3] > elsewhere * 4,
+        "the 0..pi/2 arc put {} pixels in the top-right quadrant against \
+         {elsewhere} everywhere else — the span is not selecting the side it \
+         names",
+        counts[3]
+    );
+}
