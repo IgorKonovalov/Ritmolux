@@ -86,8 +86,9 @@ as well as `docs/`, and these phases add relative links in both.
   `## Implementation log` section, so the affordance is visible before the first phase runs.
 - **Files touched:** `.claude/skills/architect/references/templates/plan.md`
 - **Done when:**
-  - `## Implementation log` is the template's **final** section, after
-    `## Followups (after this lands)`.
+  - `## Implementation log` sits **immediately before `## Followups (after this lands)`** — the
+    placement all four existing logs already use (0100, 0108, 0110, 0111), so the contract sections
+    stay together above it and the forward-looking section stays last.
   - It opens with a blockquote saying who writes it (`dev`), when (one row per phase, close block
     at the end), and that **the phases above remain the contract while the log is what happened**.
   - The blockquote states the claims-not-evidence rule in one sentence: architect verifies every
@@ -128,6 +129,11 @@ as well as `docs/`, and these phases add relative links in both.
   - Step 3 says the log carries **deltas, not a recap** — no diffs, no self-review, no restatement
     of the phase text — and that a phase whose row would say nothing beyond `done` says exactly
     that.
+  - Step 3 distinguishes the two write cadences and does not let them contradict each other: a
+    **phase row rides inside that phase's commit**, while a **mid-session handoff** — the session
+    is being cleared or compacted between phases — finishes the unit in flight and lands the log
+    update as its own `docs(plans): …` commit, so the handoff is legible in the log. That second
+    case is existing practice and is what the four hand-rolled logs were written for.
   - Step 4 no longer instructs pasting a filled-in brief into chat. What it prints names the plan
     (number, title, path), the lane (branch and worktree path, or `main`), and the fresh-session
     invocation. Nothing else.
@@ -172,11 +178,19 @@ as well as `docs/`, and these phases add relative links in both.
   reason the claims-not-evidence sentence appears in three places (the template blockquote, the
   `dev` reference, Mode 4 lens 1). If a future close reads as a grading of the log rather than of
   the tree, that is the symptom.
-- **Nothing gates the log's presence or its size.** Deliberate, and argued in ADR-0120's
+- **Nothing gates the log's presence or its size, and the size risk is measured rather than
+  feared.** The four logs already in the tree run **86, 118, 219 and 305 lines** (0108, 0110, 0111,
+  0100) — 0100's is longer than that plan's entire phase section. So "deltas, not a recap" is a
+  discipline the existing instances do *not* keep, and Phase 2 states it against that evidence
+  rather than as a platitude. Leaving it ungated is deliberate, and argued in ADR-0120's
   Consequences: a gate would fire on architect at the close, after `dev`'s session is gone. If a
-  log goes missing twice, or a log outgrows the plan's own phase section, revisit — a
+  log goes missing twice, or one outgrows its plan's phase section again, revisit — a
   `roster:begin cap=` region is the obvious instrument and `scripts/check-index-rows.mjs` already
   implements it.
+- **Architect also appends to closed plans**, in a section after the log (0100's
+  `## Phases 7 and 8, run at the close`, 0110's `## Close review`, 0108's `## The look gate`).
+  Nothing in this plan forbids that and nothing in it specifies it; if the two conventions start
+  colliding, that is an architect-side question for a later pass.
 - **`.claude/skills/**` writes have been intermittent** across sessions in this project. They have
   succeeded in the sessions that attempted them; if a write is refused, that is a `human` task and
   the phase escalates rather than working around it.
@@ -196,17 +210,6 @@ as well as `docs/`, and these phases add relative links in both.
   every step.
 - **Touches no Rust, no presets, no scripts, no CI.** Nothing renders differently and the version
   bump for this plan is a judgement architect makes at the close like any other.
-
-## Followups (after this lands)
-
-- **Run the next real close through the route and record the friction.** This plan's own log (the
-  skeleton below) is the first exercise, but it is a docs-only plan with no `presets/`, no
-  `Closes:`, and nothing for steps 3b or 3c to bite on — so the trigger bullets go untested until a
-  code plan closes through them.
-- **Revisit gating** if a log goes missing twice, or grows past the phase section it accompanies.
-- **The mid-plan resume path** is now implied but not specified: a fresh `dev` session picking up an
-  in-flight plan should read the log to find where it is. Worth one line in `dev`'s Step 2 if the
-  first resume proves awkward.
 
 ## Implementation log
 
@@ -238,3 +241,14 @@ _(facts for architect to verify and decide from — not recommendations.)_
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** —
 - **Outstanding `human` phases:** —
 - **Final-phase done-when results:** —
+
+## Followups (after this lands)
+
+- **Run the next real close through the route and record the friction.** This plan's own log (the
+  skeleton below) is the first exercise, but it is a docs-only plan with no `presets/`, no
+  `Closes:`, and nothing for steps 3b or 3c to bite on — so the trigger bullets go untested until a
+  code plan closes through them.
+- **Revisit gating** if a log goes missing twice, or grows past the phase section it accompanies.
+- **The mid-plan resume path** is now implied but not specified: a fresh `dev` session picking up an
+  in-flight plan should read the log to find where it is. Worth one line in `dev`'s Step 2 if the
+  first resume proves awkward.
