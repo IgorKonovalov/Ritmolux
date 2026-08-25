@@ -295,8 +295,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The painter draws a static canvas | dev | done | committed with this row |
-| 2 — What an element costs | dev | not started | |
+| 1 — The painter draws a static canvas | dev | done | 046b9f3 |
+| 2 — What an element costs | dev | done | committed with this row |
 | 3 — The stop gate | human | not started | |
 | 4 — The layout generator and a sample sheet | dev | not started | |
 | 5 — The composition call | human | not started | |
@@ -343,6 +343,22 @@ twelfth variant exists rather than at the phase that would have owned it:
   requires two overlapping elements rendered in *both* array orders, and no
   preset can reverse a compiled-in roster. It does not exist in a shipped build
   (`Scene::feedback_field`'s argument).
+
+**Phase 2 — files outside the phase's list.** `core/src/render/tier.rs`'s
+`collage_elements` landed in Phase 1, because the scene's constructor sizes its
+storage buffer from it. `core/src/render/context.rs` and `core/src/render/mod.rs`
+gained a `Renderer::adapter_description()`: the phase requires the report to name
+its adapter and driver, and no accessor existed — `RenderContext` kept only the
+`is_software` flag. Nothing on a render path reads it.
+
+**Phase 2 — the reading, and what it was taken on.** The full table is in
+`core/tests/collage_cost.rs`'s module docs. The one thing the plan should carry
+into Phase 3: **`Renderer::new_headless` asks for no power preference, so on this
+box it selected the AMD *integrated* GPU rather than the discrete one.** That is
+not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and it
+is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
+numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
+one the tier is quoted against.
 
 **Phase 1 — observation for the review.** The animation gate's `footprint_diff`
 statistic (ADR-0091) exists so a sparse figure's motion is not diluted into the
