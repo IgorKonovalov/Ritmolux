@@ -127,6 +127,21 @@ flowchart LR
     unbounded loop. The values may be provisional at this phase; Phase 3 sets them.
 
 ### Phase 3 — The stop gate
+- **Decided 2026-08-25: CONTINUE.** `TierConfig::collage_elements` is **Floor 40,
+  Rich 96**. Two things the gate settled that the plan did not ask for, and that
+  the content lane needs more than the verdict:
+  - **The user's working density is 8 to 14 elements**, judged from rendered
+    canvases at 8 / 14 / 32 / 64 / 128. Denser canvases were rejected **on sight,
+    not on cost** — at 64 the forms stop reading as objects floating in space and
+    start reading as a fragmented facet field, which is the Severini territory
+    this plan puts out of scope. So the cost was never the binding constraint:
+    the fidelity ceiling arrived well before the budget one.
+  - **The cap was then set from the densest thing the plan still has to build**,
+    not from the taste above and not from the budget — Kandinsky's *On White II*,
+    which ADR-0123 counts at just above 40. The user chose to keep Phase 7 aimed
+    at the painting rather than at their own density, so 40 sits **exactly on**
+    that count. A `collage_onwhite` that needs a forty-first element moves this
+    number; it must not be quietly truncated.
 - **Owner skill:** human
 - **What:** Read Phase 2's numbers and decide whether the fullscreen painter survives.
 - **Done when:** The user has chosen one of three, and the choice is written into this plan:
@@ -296,8 +311,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The painter draws a static canvas | dev | done | 046b9f3 |
-| 2 — What an element costs | dev | done | committed with this row |
-| 3 — The stop gate | human | not started | |
+| 2 — What an element costs | dev | done | 6038d25 |
+| 3 — The stop gate | human | **continue** | committed with this row |
 | 4 — The layout generator and a sample sheet | dev | not started | |
 | 5 — The composition call | human | not started | |
 | 6 — The music moves the canvas | dev | not started | |
@@ -360,6 +375,27 @@ is much the closer model of what `docs/nfr.md` §1's floor tier targets — read
 numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
 one the tier is quoted against.
 
+**Phase 3 — a correction to the numbers the gate was first shown.** The sweep was
+retargeted to the shipped cap (rungs `8/16/24/32/40`; above the cap
+`applied_count` clamps, so two rungs there would render one canvas and the
+instrument's own non-vacuity assertion would fire). Re-measured, **every rung
+came in about 4 ms cheaper than the pre-Phase-3 sweep reported** — 32 elements
+reads 26 % of the 60 Hz budget where the first table said 45 %. Nothing about the
+8- or 32-element cases changed; the *sweep* went from ~20 s of GPU work to ~2 s,
+and this box's adapter is a **power-shared integrated GPU** whose clocks drop
+under sustained load. The interleaving protected the comparison — both sweeps
+agree the cost is linear — but not the absolute numbers. `collage_cost.rs` carries
+the finding and both tables. **The gate's verdict is unaffected**, and in the
+safe direction: the cap it chose is cheaper than it was told.
+
+**Phase 3 — followup, not fixed here.** `shape_collage::applied_count` clamps to
+the cap **silently**, where ADR-0007 requires `max_segments` surface a
+`CapOverflow` rather than cut geometry without saying so. That was harmless while
+the cap sat far above any authored canvas; it is not harmless now that Phase 7's
+target sits exactly on it. Not fixed in this phase because the surfaced channel is
+`CapOverflow`, whose `OverflowContext` enum is shared with the line scenes —
+widening it is an architect call. Recorded under Followups.
+
 **Phase 1 — observation for the review.** The animation gate's `footprint_diff`
 statistic (ADR-0091) exists so a sparse figure's motion is not diluted into the
 empty frame around it — it means over the *lit* pixels only. A `shape_collage`
@@ -379,6 +415,11 @@ everything. The number this preset ships at was chosen against that floor.
 
 ## Followups (after this lands)
 
+- **The collage element cap clamps silently.** ADR-0007 requires a cap never be a
+  silent cut, and `max_segments` surfaces a `CapOverflow` for exactly this; the
+  collage cap does not, and since Phase 3 it sits exactly on the element count
+  Phase 7's `collage_onwhite` needs. Widening `OverflowContext` is an architect
+  call because that enum is shared with the line scenes.
 - `paper_alpha`, so a collage can sit as the upper ADR-0090 layer.
 - A dated update on `design-backlog 0069` recording that in-scene occlusion now exists and
   cross-scene ordering does not.

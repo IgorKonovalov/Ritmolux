@@ -44,39 +44,56 @@
 //!
 //! **Taken 2026-08-25 on the development box** — Windows 10 19045, DX12,
 //! **AMD Radeon(TM) Graphics, an INTEGRATED GPU**, driver 30.0.13002.1001,
-//! 1920x1080, floor tier, 100 frames of slope, best of three interleaved
-//! repeats:
+//! 1920x1080, floor tier, release, 100 frames of slope, best of three
+//! interleaved repeats. Two runs of the shipped rungs, and the pre-Phase-3 sweep
+//! that ran to 128 against a provisional cap:
 //!
-//! | elements | release | share of 16.67 ms | debug | over 8 elements (release) |
+//! | elements | run A | run B | share of 16.67 ms | over 8 elements |
 //! |---|---|---|---|---|
-//! | 8   | **6.034 ms** | 36.2 % | 6.341 ms | — |
-//! | 16  | **6.627 ms** | 39.8 % | 6.677 ms | +0.593 ms |
-//! | 32  | **7.565 ms** | 45.4 % | 8.038 ms | +1.530 ms |
-//! | 64  | **10.149 ms** | 60.9 % | 9.585 ms | +4.115 ms |
-//! | 128 | **14.962 ms** | 89.8 % | 14.544 ms | +8.927 ms |
+//! | 8  | **2.113 ms** | 2.368 ms | 12.7-14.2 % | — |
+//! | 16 | **2.794 ms** | 3.209 ms | 16.8-19.3 % | +0.68 / +0.84 ms |
+//! | 24 | **3.597 ms** | 3.953 ms | 21.6-23.7 % | +1.48 / +1.59 ms |
+//! | 32 | **4.383 ms** | 4.458 ms | 26.3-26.7 % | +2.27 / +2.09 ms |
+//! | 40 | **4.824 ms** | 5.137 ms | 28.9-30.8 % | +2.71 / +2.77 ms |
 //!
-//! **The element cost is linear and it is 0.074 ms an element** — 0.0741,
-//! 0.0638, 0.0735, 0.0744 across the four rungs above 8, which is as flat as
-//! this instrument resolves. Extrapolating the line back gives an intercept of
-//! about **5.4 ms**: the frame's fixed cost at this size on this GPU — the
-//! backdrop pass, the linear-light composite's own bandwidth and the tonemap —
-//! and *not* something this scene can be charged for. The two profiles agree to
-//! within the run-to-run spread, which is expected: this is GPU work, and unlike
-//! `mark_cost.rs` there is no per-object CPU update to dominate a debug build.
+//! **The element cost is linear at roughly 0.09 ms an element** (0.085-0.105
+//! across the rungs and the two runs), over an intercept of about **1.4-1.6 ms**
+//! that is the frame's own fixed cost at this size — the backdrop pass, the
+//! linear-light composite's bandwidth, the tonemap — and *not* this scene's to
+//! be charged for.
 //!
-//! **The adapter is the integrated one, and that is the useful accident here.**
+//! ## The sweep's own total load moves its absolute numbers, on this GPU
+//!
+//! **This is the instrument's one real trap and it is worth stating before the
+//! numbers are quoted anywhere.** The pre-Phase-3 sweep ran rungs of 8/16/32/64/
+//! 128 and read **6.034 / 6.627 / 7.565 / 10.149 / 14.962 ms** — nearly 4 ms
+//! higher at the 8-element rung than the same rung reads above. Nothing about
+//! the 8-element case changed. What changed is that the *sweep* went from about
+//! two seconds of GPU work to about twenty, and this is a **power-shared
+//! integrated GPU**: sustained load drops its clocks, and the light rungs were
+//! measured on a throttled part alongside the heavy ones.
+//!
+//! Interleaving (see [`per_frame_ms`]) is what keeps that from corrupting the
+//! *comparison* — every rung rides the same drift, which is why both sweeps
+//! agree that the cost is linear — but it cannot keep the **absolute** numbers
+//! from moving with how heavy the heaviest rung is. So:
+//!
+//! - **Quote the shipped-rung table, not the old one.** A canvas at the floor
+//!   cap costs about 30 % of the 60 Hz budget, not 90 %. The old sweep priced
+//!   its light rungs on a part that was throttled by work no shipped preset can
+//!   ask for, since the cap is 40.
+//! - **A rung above the cap is not just uninformative, it is misleading**, for
+//!   this reason as well as the clamping one.
+//!
+//! ## The adapter is the integrated one, and that is the useful accident
+//!
 //! `Renderer::new_headless` asks for no power preference, so on this box it gets
 //! the iGPU rather than the discrete GPU — and `docs/nfr.md` §1's floor tier
-//! targets a ~2015-iGPU-class machine, so a modern iGPU is much the closer
-//! model of it than the RTX 3080 `mark_cost.rs` recorded its table on. Read the
+//! targets a ~2015-iGPU-class machine, so a modern iGPU is much the closer model
+//! of it than the RTX 3080 `mark_cost.rs` recorded its table on. Read the
 //! numbers as an *optimistic* floor-tier reading rather than as a desktop one:
-//! this iGPU is a decade newer than the one the tier is quoted against.
-//!
-//! Phase 3 owns what follows from this. What the sweep says and does not say:
-//! at the plan's 32-element bar the canvas costs **45 % of the 60 Hz budget on
-//! an integrated GPU**, with the element loop itself accounting for 1.53 ms of
-//! it; the floor cap of 128 lands at 90 %, which is inside the budget and has
-//! no room in it for anything else.
+//! this iGPU is a decade newer than the one the tier is quoted against, and it
+//! throttles, as the paragraph above found the hard way.
 //!
 //! One `#[test]` per file (its own binary → its own process), so the hardware
 //! device never coexists with the other suites' WARP ones.
@@ -103,12 +120,17 @@ use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tie
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
 
-/// The rungs. Plan 0113 Phase 3's continue condition is **32 elements at the
-/// floor tier inside the NFR §1 budget**, counted from the reference canvases
-/// rather than estimated: *Suprematist Composition* has roughly 35 elements and
-/// *On White II* above 40. 8 and 16 bracket it from below, 64 and 128 from
-/// above, and 128 is the floor tier's own cap.
-const COUNTS: [usize; 5] = [8, 16, 32, 64, 128];
+/// The rungs, spanning the floor tier's shipped range: the sparse end a preset
+/// is actually authored at, up to
+/// [`collage_elements`](TierConfig::collage_elements)' own value.
+///
+/// **The top rung tracks the cap and must stay at or below it.** Past the cap
+/// `applied_count` clamps, so two rungs above it would render the same canvas —
+/// very stable numbers about nothing, which is exactly what the non-vacuity
+/// assertion at the bottom of this file exists to catch. The pre-Phase-3 sweep
+/// ran to 128 against a provisional cap; that reading is preserved in the table
+/// below because it is the evidence Phase 3 was decided on.
+const COUNTS: [usize; 5] = [8, 16, 24, 32, 40];
 
 /// Frame counts either side of the slope. The short run pays the same fixed
 /// costs as the long one — preset load, first-frame pipeline warm, the single
