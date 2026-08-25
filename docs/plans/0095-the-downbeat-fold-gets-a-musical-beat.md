@@ -212,18 +212,52 @@ flowchart LR
 | 2 — the octave repair | dev | done | `09abdee` |
 | 3 — the bar grid | dev | done | `cae98a5` |
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
-| 5 — re-measure through the instrument | human | not started | — |
+| 5 — re-measure through the instrument | human | **deferred by the user, 2026-08-25** | — |
 | 6 — the authoring docs | dev | not started | — |
 
-**Session stopped at Phase 5, the `human` gate.** Phases 1-4 are landed and the whole suite is
-green (`cargo nextest run -p lmv-core`, 725 passed). Phase 6 is `dev` but sits behind Phase 5: one
-of its done-whens — "the bar trio's entry reflects whatever Phase 5 measured" — cannot be written
-until the capture is read, so the phase was left whole rather than half-written. What Phase 6 needs
-from Phase 5 is the publish rate per genre against the 2.89 / 1.59 / 2.27 % baseline, and whether
-the backbeat rock/pop degeneracy signature survives. **Nothing in Phases 1-4 changed what
-`beat_index` counts, so Phase 5's detections-per-beat column will still read 1.7-2.1x** — that is
-the plan's own prediction and not a null result; what must have changed is that the *fold* no longer
-tracks it.
+**Session stopped at Phase 5, and the user deferred the capture to a later sitting.** Phases 1-4
+are landed and the whole suite is green (`cargo nextest run -p lmv-core`, 725 passed). Phase 6 is
+`dev` but sits behind Phase 5: one of its done-whens — "the bar trio's entry reflects whatever
+Phase 5 measured" — cannot be written until the capture is read, so the phase was left whole rather
+than half-written. **The plan is therefore parked, not finished, and it is not ready for its close
+review.**
+
+What Phase 6 needs from Phase 5 is the publish rate per genre against the 2.89 / 1.59 / 2.27 %
+baseline, and whether the backbeat rock/pop degeneracy signature survives. **Nothing in Phases 1-4
+changed what `beat_index` counts, so Phase 5's detections-per-beat column will still read
+1.7-2.1x** — that is the plan's own prediction and not a null result; what must have changed is
+that the *fold* no longer tracks it.
+
+### Running the deferred capture
+
+From this worktree, so the app under test is the one with the grid — an installed build or a
+`main` build measures the defect rather than the repair:
+
+```
+cargo build -p standalone --release --bin lmv
+target\release\lmv.exe --downbeat-log spike\after-techno.log
+```
+
+Repeat for `spike\after-hiphop.log` and `spike\after-rockpop.log`. Four things that bite:
+
+- **Pass an explicit path each time.** A bare `--downbeat-log` always writes
+  `%APPDATA%\light-music-visualizer\downbeat.log`, so the second capture clobbers the first.
+  `spike/` is gitignored and is the lane's home for measurement logs.
+- **Keep the window visible.** Rows come off the frame path, which returns early while occluded or
+  zero-sized, so a minimized window logs nothing and it is only discoverable afterwards.
+- **240 s per genre**, matching Plan 0086 Phase 2, same three classes: techno ~130, instrumental
+  hip-hop, backbeat rock/pop. Play through the default output device; loopback picks it up.
+- The preset is irrelevant — the log is analysis-side.
+
+**One decision left open, and it is the user's.** Plan 0086's baseline was captured on 2026-08-15,
+on code without the grid, on tracks that plan never names — so reading a fresh capture against its
+table compares across two unknowns at once. A **paired control** — each track captured twice, once
+off a `main` build and once off this lane, back to back — costs ~24 minutes of playback instead of
+~12 and turns the comparison into a paired measurement on identical material, which is the
+bless-to-bless-against-a-control discipline this repo already applies to goldens. Rock/pop alone
+would be ~8 minutes and is the genre carrying ADR-0097's degeneracy signature. The single-arm
+reading is defensible too — the effect being looked for is large — but it inherits Plan 0086's own
+`n = 1 track per genre` caveat on top of the code/material confound.
 
 **Phase 1's table** (`cargo nextest run -p lmv-core --test tempo_probe --no-capture`), the reading
 Phase 2 chooses against:
