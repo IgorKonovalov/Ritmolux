@@ -231,12 +231,21 @@ fn the_generator_is_a_pure_function_of_its_recipe() {
         assert_eq!(a.len(), 24, "{grammar:?}: wrong element count");
 
         if grammar == Grammar::Authored {
-            // The control is a fixed list, so it is *supposed* to ignore the
-            // seed — asserting that is what keeps the sweep below honest about
-            // which arm it is testing.
+            // The control's **geometry** is a fixed list, so it ignores the seed
+            // — asserting that is what keeps the sweep below honest about which
+            // arm it is testing. Its *motion* is seeded like every other
+            // grammar's, deliberately: a control that could not drift would make
+            // `drift` and `spin` silently inert on the one layout a preset gets
+            // by default. So the comparison is on the specs, not on the whole.
             let mut c = Vec::with_capacity(CAP);
             layout::generate(&mut c, &recipe(grammar, 8, 4, 24));
-            assert_eq!(a, c, "the authored control must not vary with the seed");
+            let geometry = |v: &[layout::Placed]| v.iter().map(|p| p.spec).collect::<Vec<_>>();
+            assert_eq!(
+                geometry(&a),
+                geometry(&c),
+                "the authored control's geometry must not vary with the seed"
+            );
+            assert_ne!(a, c, "the control's motion must still be seeded");
             continue;
         }
 
@@ -318,8 +327,12 @@ fn the_control_is_the_authored_canvas() {
     let mut v = Vec::with_capacity(CAP);
     layout::generate(&mut v, &recipe(Grammar::Authored, 0, 0, AUTHORED_COUNT));
     assert_eq!(v.len(), AUTHORED_COUNT);
-    let expected: Vec<Element> = SUPREMATIST.iter().copied().map(Element::build).collect();
-    assert_eq!(v, expected, "the control drifted from the authored roster");
+    let specs: Vec<Spec> = v.iter().map(|p| p.spec).collect();
+    assert_eq!(
+        specs,
+        SUPREMATIST.to_vec(),
+        "the control drifted from the authored roster"
+    );
 
     let mut wrapped = Vec::with_capacity(CAP);
     layout::generate(
@@ -331,7 +344,8 @@ fn the_control_is_the_authored_canvas() {
         v.as_slice(),
         "the authored prefix must not move when the control is asked for more"
     );
-    assert_eq!(&wrapped[AUTHORED_COUNT..], &expected[..3], "it must cycle");
+    let wrapped_specs: Vec<Spec> = wrapped[AUTHORED_COUNT..].iter().map(|p| p.spec).collect();
+    assert_eq!(wrapped_specs, SUPREMATIST[..3].to_vec(), "it must cycle");
 }
 
 /// A seed is quantized and bounded, and the bound is where `f32` stops being
@@ -357,6 +371,268 @@ fn the_angle_bias_wraps() {
         "negative angles wrap into the same circle"
     );
     assert!((at(f32::NAN) - DEFAULT_ANGLE_BIAS.to_radians()).abs() < 1e-6);
+}
+
+// ---------------------------------------------------------------------------
+// The music moves the canvas (Plan 0113 Phase 6)
+// ---------------------------------------------------------------------------
+
+/// A GPU-free scene, for the motion assertions. Building one needs a device, so
+/// these go through a headless context and then never touch it again — every
+/// claim below is about the CPU-side element array.
+fn scene(ctx: &RenderContext) -> ShapeCollageScene {
+    ShapeCollageScene::new(&ctx.device, ctx.surface_format(), CAP)
+}
+
+/// Drive `frames` steps of `dt` and return the composed element centres.
+fn walk(scene: &mut ShapeCollageScene, frames: u32, dt: f32) -> Vec<[f32; 2]> {
+    for _ in 0..frames {
+        scene.advance(dt);
+    }
+    scene
+        .composed()
+        .iter()
+        .map(|e| [e.center_size[0], e.center_size[1]])
+        .collect()
+}
+
+/// **The canvas moves with real time, not with frames** (ADR-0012).
+///
+/// One second stepped as 60 frames and as 30 must land every element in the same
+/// place. A drift integrated by a fixed per-frame constant — the defect this
+/// guards — would put the 60-frame run twice as far.
+///
+/// Non-vacuity is the second half and it is not decoration: the elements have to
+/// have *moved*, or two identical still canvases would pass this perfectly.
+#[test]
+fn a_second_of_drift_is_a_second_at_any_frame_rate() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    let params = [
+        ("layout", 2.0),
+        ("seed", 5.0),
+        ("drift", 1.0),
+        ("spin", 1.0),
+    ];
+
+    let mut still = scene(&ctx);
+    for (name, value) in params {
+        still.set_param(name, value);
+    }
+    let start = walk(&mut still, 1, 0.0);
+
+    let mut fast = scene(&ctx);
+    let mut slow = scene(&ctx);
+    for (name, value) in params {
+        fast.set_param(name, value);
+        slow.set_param(name, value);
+    }
+    let at_60 = walk(&mut fast, 60, 1.0 / 60.0);
+    let at_30 = walk(&mut slow, 30, 1.0 / 30.0);
+
+    assert_eq!(at_60.len(), at_30.len());
+    assert!(!at_60.is_empty(), "the probe canvas is empty");
+
+    let mut moved = 0.0f32;
+    for ((a, b), s) in at_60.iter().zip(at_30.iter()).zip(start.iter()) {
+        let gap = ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt();
+        assert!(
+            gap < 1e-4,
+            "an element landed at {a:?} after 60 frames and {b:?} after 30 — one \
+             second of drift must be one second of drift at any frame rate, so \
+             this is a per-frame constant somewhere instead of the injected dt"
+        );
+        moved = moved.max(((a[0] - s[0]).powi(2) + (a[1] - s[1]).powi(2)).sqrt());
+    }
+    println!("one second of drift moved the furthest element {moved:.5} canvas units");
+    assert!(
+        moved > 1e-3,
+        "nothing moved in a second, so this compared two still canvases: {moved}"
+    );
+}
+
+/// **Raising `density` never reorders or pops an already-live element.**
+///
+/// Birth order is the array's own order and the gate is a prefix, so growing it
+/// extends the live set and touches nothing already in it. Asserted on the
+/// *colours and kinds* in painter order rather than on positions, because those
+/// are what an element's identity is — a reorder would shuffle them.
+#[test]
+fn raising_density_only_ever_adds() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    let mut s = scene(&ctx);
+    s.set_param("layout", 2.0);
+    s.set_param("seed", 12.0);
+    s.set_param("count", 20.0);
+
+    let mut previous: Vec<[f32; 2]> = Vec::new();
+    let mut counts = Vec::new();
+    for step in 0..=10 {
+        s.set_param("density", step as f32 / 10.0);
+        // Long enough for every fade to finish, so "live" means visible.
+        s.advance(1.0);
+        let live: Vec<[f32; 2]> = s
+            .composed()
+            .iter()
+            .filter(|e| e.tint[1] > 0.5)
+            .map(|e| [e.tint[0], e.shape[2]])
+            .collect();
+        assert!(
+            live.len() >= previous.len(),
+            "density {} produced {} live elements, down from {}",
+            step as f32 / 10.0,
+            live.len(),
+            previous.len()
+        );
+        assert_eq!(
+            &live[..previous.len()],
+            previous.as_slice(),
+            "raising density to {} reordered or replaced an element that was \
+             already live — the gate must be a PREFIX of the birth order",
+            step as f32 / 10.0
+        );
+        counts.push(live.len());
+        previous = live;
+    }
+    println!("live elements as density rises 0 -> 1: {counts:?}");
+    assert!(
+        counts.first() < counts.last(),
+        "density did nothing across its whole range: {counts:?}"
+    );
+}
+
+/// **The canvas does not breathe in unison.**
+///
+/// `pump_size` and `pump_alpha` are phase-offset per element, so at any instant
+/// the modulation across live elements differs. The plan asks for exactly this
+/// property and no threshold on the spread — a number there would be inventing
+/// one — so the assertion is that the values are *not all equal*, plus the
+/// non-vacuity that the pump moved anything at all.
+#[test]
+fn the_pump_is_phase_offset_across_elements() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    let mut s = scene(&ctx);
+    s.set_param("layout", 2.0);
+    s.set_param("seed", 3.0);
+    s.set_param("count", 16.0);
+    s.set_param("pump_size", 0.4);
+    s.set_param("pump_alpha", 0.5);
+    // A quarter of a pump period in, so no element sits at a node by accident.
+    s.advance(0.45);
+
+    let sizes: Vec<f32> = s.composed().iter().map(|e| e.center_size[2]).collect();
+    let alphas: Vec<f32> = s.composed().iter().map(|e| e.tint[1]).collect();
+    assert!(
+        sizes.len() > 4,
+        "the probe canvas is too small to say anything"
+    );
+
+    // Against the same canvas with the pump off: the ratio is the modulation,
+    // which is what has to differ across elements rather than the raw size.
+    let mut flat = scene(&ctx);
+    flat.set_param("layout", 2.0);
+    flat.set_param("seed", 3.0);
+    flat.set_param("count", 16.0);
+    flat.advance(0.45);
+    let base: Vec<f32> = flat.composed().iter().map(|e| e.center_size[2]).collect();
+
+    let ratios: Vec<f32> = sizes
+        .iter()
+        .zip(base.iter())
+        .map(|(a, b)| a / b.max(1e-6))
+        .collect();
+    let lo = ratios.iter().copied().fold(f32::INFINITY, f32::min);
+    let hi = ratios.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    println!(
+        "size modulation across {} elements: {lo:.4}..{hi:.4}",
+        ratios.len()
+    );
+    assert!(
+        hi > lo,
+        "every element is pumping by exactly {lo} — the phase offset is not \
+         reaching them, so the canvas breathes as one sheet"
+    );
+    assert!(
+        (hi - 1.0).abs() > 1e-4 || (lo - 1.0).abs() > 1e-4,
+        "the pump modulated nothing at all"
+    );
+
+    let a_lo = alphas.iter().copied().fold(f32::INFINITY, f32::min);
+    let a_hi = alphas.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    println!("alpha across elements: {a_lo:.4}..{a_hi:.4}");
+    assert!(a_hi > a_lo, "every element carries the same alpha");
+}
+
+/// **`recompose` is edge-triggered, and `recompose_blend` decides cut or fade.**
+///
+/// A held gate must recompose once, not every frame — the swarm's `reseed`
+/// contract, and the reason `prev_recompose` survives `reset_params`. At blend
+/// zero the new canvas is complete on the next frame; above zero both canvases
+/// are on screen for that many seconds.
+#[test]
+fn a_recomposition_fires_once_per_edge() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    let mut s = scene(&ctx);
+    s.set_param("layout", 2.0);
+    s.set_param("seed", 9.0);
+    s.set_param("count", 12.0);
+    s.advance(1.0 / 60.0);
+    let first: Vec<f32> = s.composed().iter().map(|e| e.tint[0]).collect();
+    assert_eq!(s.composed().len(), 12, "the hard-cut canvas is one canvas");
+
+    // Hold the gate high across several frames: exactly one recomposition.
+    for _ in 0..5 {
+        s.set_param("recompose", 1.0);
+        s.advance(1.0 / 60.0);
+    }
+    assert_eq!(
+        s.recompositions(),
+        1,
+        "a HELD gate recomposed more than once — it must be edge-triggered"
+    );
+    let second: Vec<f32> = s.composed().iter().map(|e| e.tint[0]).collect();
+    assert_ne!(first, second, "the recomposition drew the same canvas");
+    assert_eq!(
+        s.composed().len(),
+        12,
+        "at recompose_blend = 0 the cut is hard, so only one canvas is drawn"
+    );
+
+    // Drop and raise again: a second edge, a second recomposition.
+    s.set_param("recompose", 0.0);
+    s.advance(1.0 / 60.0);
+    s.set_param("recompose", 1.0);
+    s.advance(1.0 / 60.0);
+    assert_eq!(s.recompositions(), 2, "a fresh edge must fire again");
+
+    // With a blend, both canvases are live for its duration and neither after.
+    let mut b = scene(&ctx);
+    b.set_param("layout", 2.0);
+    b.set_param("seed", 9.0);
+    b.set_param("count", 12.0);
+    b.set_param("recompose_blend", 0.5);
+    b.advance(1.0 / 60.0);
+    b.set_param("recompose", 1.0);
+    b.advance(1.0 / 60.0);
+    assert_eq!(
+        b.composed().len(),
+        24,
+        "mid-blend both canvases are on screen"
+    );
+    b.set_param("recompose", 0.0);
+    b.advance(0.6);
+    assert_eq!(
+        b.composed().len(),
+        12,
+        "past its duration the blend is finished and the outgoing canvas is gone"
+    );
 }
 
 // ---------------------------------------------------------------------------

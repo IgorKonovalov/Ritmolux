@@ -298,7 +298,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_collage`   | `count` `layout` `seed` `size_hierarchy` `angle_bias` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
+| `shape_collage`   | `count` `layout` `seed` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -1289,9 +1289,7 @@ an omission.
 
 Where the elements come from is `layout`'s answer: either the scene's own
 authored suprematist canvas of fourteen elements, or one of three **seeded
-layout grammars**. Plan 0113 Phase 6 will give the elements recomposition,
-drift, spin, spawn/decay and per-element pumping — **so expect this roster to
-grow**, not to be the final shape.
+layout grammars**. What the music then does to them is the second table below.
 
 | param | what it does |
 |---|---|
@@ -1306,6 +1304,23 @@ grow**, not to be the final shape.
 | `edge_softness` | extra pixels of coverage ramp past the one-pixel analytic edge. **`0` is the hard edge and is the default.** This is an escape from the look, not a quality knob — antialiasing is already exact at `0`. |
 | `color_span`, `palette_shift` | scale and offset applied to every element's stored palette coordinate, so a whole canvas can be recoloured or drifted through the gradient at once. Both are the identity by default. |
 | `saturation`, `palette_mix` | the shared palette controls, unchanged. |
+
+**The four reactivity levers.** Every one of them defaults to the identity, so a
+preset that binds none of them draws a still canvas.
+
+| param | what it does |
+|---|---|
+| `recompose` | **rising past `0.5` recomposes the canvas once.** Edge-triggered, like `reseed` on the particle scenes and for the same reason: a sustained gate must not re-run the generator every frame. Each recomposition advances the generator's recomposition index, so successive canvases differ without the preset changing `seed`. |
+| `recompose_blend` | seconds the recomposition crossfades over. **`0` — the default — is a hard cut.** Above it, both canvases are on screen for that long and the outgoing one dissolves through the paper as the new one arrives. Note the cost: a blend has two whole canvases in the per-pixel loop, so it is the one moment a preset pays double. |
+| `density` | what fraction of `count` is live, `0..1`. Elements fade in and out over about half a second rather than popping. **Birth order is stable**: raising `density` only ever *adds* — an element already on the canvas never moves, changes colour, or loses its place in the painter's order. |
+| `drift`, `spin` | multipliers on each element's own velocity and angular velocity, drawn from the seed at generation. `1` is a slow travel — an element crosses the canvas in about a minute — and higher is legal. Integrated against real elapsed time, so the canvas moves identically at any refresh rate. An element reaching the canvas edge **wraps** to the other side. |
+| `pump_size`, `pump_alpha` | depths of a per-element swell in size and in opacity. **Phase-offset per element**, so the canvas does not breathe in unison — a field of oscillators sharing a phase reads as one sheet flashing. The *rate* is the engine's and is not a parameter; drive the depth from the music. |
+
+> **`beat_index` counts onsets, not beats** ([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
+> at about 1.7-2.1x. A `recompose` hung off it fires roughly twice as often as
+> the music's beat. Author knowing that, and **do not compensate for it inside a
+> preset** — Plan 0095 is the fix in flight and a compensated preset would have
+> to be unwound when it lands.
 
 > **Keep the palette under linear 0.6 and the look is free.** This is the one
 > authoring fact this system has, and it comes off the tonemap rather than off

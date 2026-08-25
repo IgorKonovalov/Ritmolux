@@ -352,7 +352,7 @@ pub(crate) struct Element {
 
 /// A hand-authored element, in the terms a composition is written in. Turned
 /// into an [`Element`] — bounding box and all — by [`Element::build`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Spec {
     /// One of [`KIND_QUAD`], [`KIND_CIRCLE`], [`KIND_TRIANGLE`].
     pub(crate) kind: f32,
@@ -575,6 +575,37 @@ const DEFAULT_SIZE_HIERARCHY: f32 = 0.5;
 /// leaning the same way the control does.
 const DEFAULT_ANGLE_BIAS: f32 = -22.0;
 
+/// `density` default — every generated element is live.
+const DEFAULT_DENSITY: f32 = 1.0;
+/// `drift`, `spin`, `recompose`, `recompose_blend`, `pump_size`, `pump_alpha`
+/// defaults. **Every one of them is the identity**, so a preset that binds none
+/// of Phase 6's levers draws exactly the still canvas Phase 5 settled on — which
+/// is what lets the golden baseline survive this phase unchanged.
+const DEFAULT_DRIFT: f32 = 0.0;
+const DEFAULT_SPIN: f32 = 0.0;
+const DEFAULT_RECOMPOSE: f32 = 0.0;
+const DEFAULT_RECOMPOSE_BLEND: f32 = 0.0;
+const DEFAULT_PUMP: f32 = 0.0;
+
+/// `recompose` rises past this to recompose once — **edge-triggered**, the
+/// engine's convention and its reason (`swarm`, `particles`): a sustained beat
+/// flag must not re-run the generator every frame.
+const RECOMPOSE_THRESHOLD: f32 = 0.5;
+/// The longest crossfade `recompose_blend` may name, in seconds. Past this a
+/// recomposition is no longer an event.
+const MAX_BLEND_SECS: f32 = 10.0;
+/// How long an element takes to fade in or out when `density` moves it across
+/// the gate. Short enough to read as an arrival, long enough not to pop.
+const FADE_SECS: f32 = 0.45;
+/// The internal pump oscillator's rate, in Hz.
+///
+/// A constant rather than a parameter, deliberately: `pump_size` and
+/// `pump_alpha` are **depths**, and an author drives them from the music. What
+/// this sets is only how fast the per-element phases sweep past each other, and
+/// a second rate knob would be one more thing to keep in step with the beat for
+/// no visual gain the depth does not already give.
+const PUMP_RATE: f32 = 0.55;
+
 /// The largest `seed` a preset can name. `f32` represents integers exactly to
 /// `2^24`, and past that a "different seed" silently is not one — so the range
 /// ends where the type stops being able to tell two seeds apart.
@@ -591,9 +622,36 @@ pub struct ShapeCollageScene {
     lut_texture_b: wgpu::Texture,
     palette: Palette,
     palette_dirty: bool,
-    /// The element array, preallocated to the tier cap and refilled in place —
-    /// never reallocated (the plan's no-allocation-in-the-render-path duty).
+    /// The element array the GPU reads, rebuilt every frame from [`Self::live`]
+    /// (and [`Self::outgoing`] during a blend) with this frame's time applied.
+    ///
+    /// **Capacity is twice the tier cap**, because a recomposition crossfade has
+    /// two whole canvases on screen at once — see [`Self::blend`].
     elements: Vec<Element>,
+    /// The live canvas, as generated: geometry plus per-element motion rates.
+    live: Vec<layout::Placed>,
+    /// The canvas being crossfaded *out* of, during a recomposition.
+    outgoing: Vec<layout::Placed>,
+    /// Crossfade progress, `0..=1`. `1.0` means no blend is in flight and
+    /// [`Self::outgoing`] is not drawn.
+    blend: f32,
+    /// Seconds the blend in flight runs over, captured at the edge so a preset
+    /// changing `recompose_blend` mid-blend does not change its own duration.
+    blend_secs: f32,
+    /// Real seconds since the scene was built, accumulated from the **injected**
+    /// `dt` (`Scene::advance`). Every motion below is a function of this, never
+    /// of a per-frame constant, which is what makes the canvas move identically
+    /// at any refresh rate (ADR-0012).
+    elapsed: f32,
+    /// [`Self::elapsed`] when the live canvas was composed, so a recomposition
+    /// starts its drift from zero rather than teleporting.
+    born: f32,
+    /// The same for [`Self::outgoing`].
+    outgoing_born: f32,
+    /// How many recompositions have fired — the generator's recomposition index.
+    recompose_count: u64,
+    /// Previous frame's `recompose` level, for rising-edge detection.
+    prev_recompose: f32,
     /// The recipe [`Self::elements`] was last built from, so an unchanged canvas
     /// neither regenerates nor re-uploads. `None` before the first build.
     built: Option<layout::Recipe>,
@@ -622,6 +680,17 @@ pub struct ShapeCollageScene {
     size_hierarchy: f32,
     /// The canvas's dominant angle in **degrees**, raw as the preset bound it.
     angle_bias: f32,
+    /// What fraction of the generated list is live, raw as the preset bound it.
+    density: f32,
+    /// Per-element drift and spin multipliers, raw as the preset bound them.
+    drift: f32,
+    spin: f32,
+    /// This frame's `recompose` level, and how long its crossfade should run.
+    recompose: f32,
+    recompose_blend: f32,
+    /// Per-element pump depths, raw as the preset bound them.
+    pump_size: f32,
+    pump_alpha: f32,
     scale: f32,
     pan_x: f32,
     pan_y: f32,
@@ -660,7 +729,8 @@ impl ShapeCollageScene {
         });
         let storage = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("shape-collage-elements"),
-            size: (cap * std::mem::size_of::<Element>()) as u64,
+            // Twice the cap: a recomposition crossfade draws two whole canvases.
+            size: (2 * cap * std::mem::size_of::<Element>()) as u64,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -749,7 +819,16 @@ impl ShapeCollageScene {
             lut_texture_b,
             palette: Palette::default_spectrum(),
             palette_dirty: true,
-            elements: Vec::with_capacity(cap),
+            elements: Vec::with_capacity(2 * cap),
+            live: Vec::with_capacity(cap),
+            outgoing: Vec::with_capacity(cap),
+            blend: 1.0,
+            blend_secs: 0.0,
+            elapsed: 0.0,
+            born: 0.0,
+            outgoing_born: 0.0,
+            recompose_count: 0,
+            prev_recompose: 0.0,
             built: None,
             dirty: false,
             #[cfg(test)]
@@ -759,6 +838,13 @@ impl ShapeCollageScene {
             seed: DEFAULT_SEED,
             size_hierarchy: DEFAULT_SIZE_HIERARCHY,
             angle_bias: DEFAULT_ANGLE_BIAS,
+            density: DEFAULT_DENSITY,
+            drift: DEFAULT_DRIFT,
+            spin: DEFAULT_SPIN,
+            recompose: DEFAULT_RECOMPOSE,
+            recompose_blend: DEFAULT_RECOMPOSE_BLEND,
+            pump_size: DEFAULT_PUMP,
+            pump_alpha: DEFAULT_PUMP,
             scale: DEFAULT_SCALE,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -781,19 +867,17 @@ impl ShapeCollageScene {
     fn recipe(&self) -> layout::Recipe {
         layout::Recipe {
             grammar: layout::Grammar::from_param(self.layout),
-            count: applied_count(self.count, self.elements.capacity()),
+            count: applied_count(self.count, self.live.capacity()),
             seed: applied_seed(self.seed),
-            // Phase 6 advances this on a rising edge of `recompose`; until then
-            // every canvas is the seed's first composition.
-            recompose: 0,
+            recompose: self.recompose_count,
             size_hierarchy: applied_size_hierarchy(self.size_hierarchy),
             angle_bias: applied_angle_bias(self.angle_bias),
         }
     }
 
-    /// Regenerate the element array if the recipe moved, unless a test has
-    /// installed its own. A no-op when nothing changed, so the common frame
-    /// neither regenerates nor re-uploads.
+    /// Regenerate the live canvas if the recipe moved, unless a test has
+    /// installed its own. A no-op when nothing changed, so the common frame does
+    /// not re-run the generator.
     fn rebuild(&mut self) {
         #[cfg(test)]
         if self.specs_override {
@@ -803,9 +887,154 @@ impl ShapeCollageScene {
         if self.built == Some(recipe) {
             return;
         }
-        layout::generate(&mut self.elements, &recipe);
+        layout::generate(&mut self.live, &recipe);
+        self.snap_fades();
+        self.born = self.elapsed;
         self.built = Some(recipe);
+    }
+
+    /// Set every live element's fade straight to its density target.
+    ///
+    /// A **fresh canvas does not fade itself in**: `density` is the spawn/decay
+    /// lever and it animates when it moves, but a canvas arriving is covered by
+    /// the recomposition blend instead. Without this a two-frame capture would
+    /// read every element at partial alpha.
+    fn snap_fades(&mut self) {
+        let live_count = self.live_count(self.live.len());
+        for (i, p) in self.live.iter_mut().enumerate() {
+            p.fade = if i < live_count { 1.0 } else { 0.0 };
+        }
+    }
+
+    /// How many of `total` elements the `density` gate admits.
+    ///
+    /// **A prefix, and that is the whole of the stability guarantee.** Birth
+    /// order is the array's own order, so raising `density` only ever *extends*
+    /// the live set — an element that is already live keeps its index, its
+    /// colour and its place in the painter's order, and nothing reorders or
+    /// pops. Any scheme that picked a live *subset* per frame would fail that.
+    fn live_count(&self, total: usize) -> usize {
+        let d = if self.density.is_finite() {
+            self.density.clamp(0.0, 1.0)
+        } else {
+            DEFAULT_DENSITY
+        };
+        // `ceil`, so any density above zero keeps at least one element: a canvas
+        // that vanishes entirely is indistinguishable from a broken one.
+        ((total as f32 * d).ceil() as usize).min(total)
+    }
+
+    /// Advance the recomposition edge, the crossfade and the per-element fades
+    /// by `dt` real seconds, then rebuild the GPU array for this instant.
+    ///
+    /// Split out of [`Scene::render`] so it can be driven — and inspected —
+    /// without a GPU, which is what the frame-rate-independence assertion needs.
+    fn step(&mut self, dt: f32) {
+        let dt = if dt.is_finite() && dt > 0.0 { dt } else { 0.0 };
+        self.elapsed += dt;
+
+        // **The recomposition edge.** Rising past the threshold recomposes once;
+        // a held gate does not fire again, which is why the previous level
+        // survives `reset_params`.
+        let rising =
+            self.recompose >= RECOMPOSE_THRESHOLD && self.prev_recompose < RECOMPOSE_THRESHOLD;
+        self.prev_recompose = self.recompose;
+        #[cfg(test)]
+        let rising = rising && !self.specs_override;
+        if rising {
+            self.recompose_count = self.recompose_count.wrapping_add(1);
+            std::mem::swap(&mut self.live, &mut self.outgoing);
+            self.outgoing_born = self.born;
+            let recipe = self.recipe();
+            layout::generate(&mut self.live, &recipe);
+            self.snap_fades();
+            self.born = self.elapsed;
+            self.built = Some(recipe);
+            self.blend_secs = applied_blend_secs(self.recompose_blend);
+            // At zero seconds this is already finished, which is the hard cut.
+            self.blend = if self.blend_secs > 0.0 { 0.0 } else { 1.0 };
+        } else if self.blend < 1.0 {
+            self.blend = if self.blend_secs > 0.0 {
+                (self.blend + dt / self.blend_secs).min(1.0)
+            } else {
+                1.0
+            };
+        }
+
+        // The density gate, eased so an element arrives and leaves rather than
+        // popping. Frame-rate independent: the step is `dt / FADE_SECS`.
+        let live_count = self.live_count(self.live.len());
+        let step = if FADE_SECS > 0.0 { dt / FADE_SECS } else { 1.0 };
+        for (i, p) in self.live.iter_mut().enumerate() {
+            let target = if i < live_count { 1.0 } else { 0.0 };
+            if p.fade < target {
+                p.fade = (p.fade + step).min(target);
+            } else if p.fade > target {
+                p.fade = (p.fade - step).max(target);
+            }
+        }
+
+        self.compose();
+    }
+
+    /// Rebuild the GPU element array for this instant, from the live canvas and
+    /// — while a recomposition crossfades — the outgoing one under it.
+    fn compose(&mut self) {
+        #[cfg(test)]
+        if self.specs_override {
+            return;
+        }
+        let drift = finite_or(self.drift, DEFAULT_DRIFT);
+        let spin = finite_or(self.spin, DEFAULT_SPIN);
+        let pump_size = finite_or(self.pump_size, DEFAULT_PUMP);
+        let pump_alpha = finite_or(self.pump_alpha, DEFAULT_PUMP);
+        let blend = self.blend.clamp(0.0, 1.0);
+
+        self.elements.clear();
+        // **Equal-power weights, not linear ones**, and this is the difference
+        // between a dissolve and a wash. The two canvases composite
+        // *sequentially* with `over` rather than being mixed, so at linear
+        // weights a pixel covered by both reads
+        // `t(1-t)*paper + (1-t)^2*A + t*B` — a quarter of it is bare paper at
+        // the midpoint, and a preset recomposing often sits there permanently.
+        // The frames go pale, which is what a filmstrip under a click track
+        // showed at Plan 0113 Phase 6. `sqrt` weights are the same fix audio
+        // uses for an equal-power pan: they take the paper leak at the midpoint
+        // from 25 % to under 9 %, and they still reach 0 and 1 at the ends.
+        let out_alpha = (1.0 - blend).sqrt();
+        let in_alpha = blend.sqrt();
+
+        // The outgoing canvas goes in FIRST, so the incoming one paints over it —
+        // array order is depth, and a recomposition should arrive on top of what
+        // it replaces rather than under it.
+        if blend < 1.0 {
+            let age = self.elapsed - self.outgoing_born;
+            for p in &self.outgoing {
+                self.elements.push(apply_time(
+                    p, age, drift, spin, pump_size, pump_alpha, out_alpha,
+                ));
+            }
+        }
+        let age = self.elapsed - self.born;
+        for p in &self.live {
+            self.elements.push(apply_time(
+                p, age, drift, spin, pump_size, pump_alpha, in_alpha,
+            ));
+        }
         self.dirty = true;
+    }
+
+    /// The element array this scene would upload right now — the composed
+    /// canvas at this instant, after drift, spin, fades and the blend.
+    #[cfg(test)]
+    pub(crate) fn composed(&self) -> &[Element] {
+        &self.elements
+    }
+
+    /// How many recompositions have fired, for the edge-trigger assertion.
+    #[cfg(test)]
+    pub(crate) fn recompositions(&self) -> u64 {
+        self.recompose_count
     }
 
     /// Install an element array of the test's own, in painter order, in place of
@@ -853,6 +1082,62 @@ fn applied_count(count: f32, cap: usize) -> usize {
         return 0;
     }
     (n as usize).min(cap)
+}
+
+/// A finite value, or the default for a broken binding. The one-line form of
+/// the fallback every conditioner here performs.
+fn finite_or(value: f32, default: f32) -> f32 {
+    if value.is_finite() { value } else { default }
+}
+
+/// The crossfade duration a bound `recompose_blend` names, in seconds. Exactly
+/// zero — the default — is the hard cut.
+fn applied_blend_secs(blend: f32) -> f32 {
+    if blend.is_finite() {
+        blend.clamp(0.0, MAX_BLEND_SECS)
+    } else {
+        DEFAULT_RECOMPOSE_BLEND
+    }
+}
+
+/// **One element at one instant**: the generated element with `age` seconds of
+/// drift, spin and pumping applied, and its alpha scaled by the crossfade.
+///
+/// `age` is real seconds since this element's canvas was composed, accumulated
+/// from the **injected** `dt` — so the position is a pure function of elapsed
+/// time and not of how many frames it took to get there (ADR-0012). That is the
+/// property the frame-rate test asserts.
+fn apply_time(
+    p: &layout::Placed,
+    age: f32,
+    drift: f32,
+    spin: f32,
+    pump_size: f32,
+    pump_alpha: f32,
+    canvas_alpha: f32,
+) -> Element {
+    // One oscillator per element, **phase-offset at generation**, so the canvas
+    // does not breathe in unison.
+    let pump = (std::f32::consts::TAU * (age * PUMP_RATE + p.phase)).sin();
+    // Never to zero or below: an element scaled through zero inverts, and the
+    // distance functions would draw it inside out on the way.
+    let size = (1.0 + pump_size * pump).max(0.05);
+    let alpha = p.spec.alpha * p.fade * canvas_alpha * (1.0 + pump_alpha * pump).clamp(0.0, 1.0);
+    // Drift **wraps** into the canvas rather than travelling off it: over a long
+    // set a linear drift empties the canvas entirely, and a wrap at the edge is
+    // the cheaper artefact. It is also what keeps the position a pure function
+    // of `age`, which a bounce would not be.
+    let wrap = |v: f32, half: f32| (v + half).rem_euclid(2.0 * half) - half;
+    Element::build(Spec {
+        center: [
+            wrap(p.spec.center[0] + p.vel[0] * drift * age, layout::CANVAS_X),
+            wrap(p.spec.center[1] + p.vel[1] * drift * age, layout::CANVAS_Y),
+        ],
+        half: [p.spec.half[0] * size, p.spec.half[1] * size],
+        angle_deg: p.spec.angle_deg + (p.spin * spin * age).to_degrees(),
+        alpha,
+        ..p.spec
+    })
 }
 
 /// The generator's seed for a bound `seed`.
@@ -908,6 +1193,13 @@ pub const PARAMS: &[&str] = &[
     "seed",
     "size_hierarchy",
     "angle_bias",
+    "density",
+    "drift",
+    "spin",
+    "recompose",
+    "recompose_blend",
+    "pump_size",
+    "pump_alpha",
     "scale",
     "pan_x",
     "pan_y",
@@ -940,6 +1232,18 @@ impl Scene for ShapeCollageScene {
         self.seed = DEFAULT_SEED;
         self.size_hierarchy = DEFAULT_SIZE_HIERARCHY;
         self.angle_bias = DEFAULT_ANGLE_BIAS;
+        self.density = DEFAULT_DENSITY;
+        self.drift = DEFAULT_DRIFT;
+        self.spin = DEFAULT_SPIN;
+        self.recompose_blend = DEFAULT_RECOMPOSE_BLEND;
+        self.pump_size = DEFAULT_PUMP;
+        self.pump_alpha = DEFAULT_PUMP;
+        // `prev_recompose` is deliberately NOT reset — this runs every frame
+        // before the bindings are routed, and resetting the previous level would
+        // turn a held gate into an edge per frame, recomposing continuously
+        // instead of on the beat. `swarm::reset_params` makes the same omission
+        // for the same reason.
+        self.recompose = DEFAULT_RECOMPOSE;
         self.scale = DEFAULT_SCALE;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -959,6 +1263,13 @@ impl Scene for ShapeCollageScene {
             "seed" => self.seed = value,
             "size_hierarchy" => self.size_hierarchy = value,
             "angle_bias" => self.angle_bias = value,
+            "density" => self.density = value,
+            "drift" => self.drift = value,
+            "spin" => self.spin = value,
+            "recompose" => self.recompose = value,
+            "recompose_blend" => self.recompose_blend = value,
+            "pump_size" => self.pump_size = value,
+            "pump_alpha" => self.pump_alpha = value,
             "scale" => self.scale = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -978,6 +1289,18 @@ impl Scene for ShapeCollageScene {
         // the preset expressions bound to its parameters.
     }
 
+    /// Advance the canvas by `dt` real seconds (ADR-0012).
+    ///
+    /// **The whole of this scene's animation hangs off this argument** — the
+    /// recomposition edge, the crossfade, the density fades, and every element's
+    /// drift, spin and pump. Nothing here reads a clock or assumes a frame rate,
+    /// so a second of music moves the canvas the same distance at 30 Hz and at
+    /// 144 Hz.
+    fn advance(&mut self, dt: f32) {
+        self.rebuild();
+        self.step(dt);
+    }
+
     fn render(
         &mut self,
         queue: &wgpu::Queue,
@@ -991,7 +1314,12 @@ impl Scene for ShapeCollageScene {
             self.palette_dirty = false;
         }
 
-        self.rebuild();
+        // `advance` has already stepped the canvas for this frame; a renderer
+        // that never calls it (there is none) still gets a composed canvas.
+        if self.built.is_none() {
+            self.rebuild();
+            self.compose();
+        }
         // A zero-length write is not a legal `write_buffer`, and an empty canvas
         // needs no upload: the loop reads `count` entries and stops.
         if self.dirty && !self.elements.is_empty() {
