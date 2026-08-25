@@ -1,6 +1,6 @@
 # 0087 — the line renderer draws a curve
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
@@ -310,6 +310,45 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   Plan 0067 curation route in the `preset-author` lane.
 - **It does not make sample resolution authorable.** ADR-0098 Alternative A, rejected — and it would
   become dead surface the moment the arc path exists.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0087` on `plan-0087-arc-primitive`, branched from `main` at `aa4bc5f`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the arc instance draws | dev | done | committed with this row |
+| 1b — a sub-floor `thickness` stops failing silently | dev | not started | |
+| 2 — the in-frame geometry instrument learns arcs | dev | not started | |
+| 3 — the circular motifs become arcs | dev | not started | |
+| 4 — does it read as a curve? | human | not started | |
+| 5 — the general curve: a biarc chain | dev | not started | |
+| 6 — the scalloped boundary | dev | not started | |
+| 7 — the retired mandalas, re-judged | human | not started | |
+
+### Notes
+
+- **Phase 1's ADR-0058 obligation is discharged by the second of its two arms: there is no new
+  bind-group layout.** The arc pipeline reuses the segment pipelines' bind layout, bind group and
+  pipeline layout unchanged — only the vertex layout and the shader module differ — so nothing is
+  owed to that ADR's enumeration. The hardware-vs-WARP comparison it asks for was run anyway
+  (`prefer_software` flipped for one run): identical on every statistic, including the quadrant
+  counts.
+- **The aspect control bites on the max-outlier arm, not the mean.** Sourcing the arc fragment's
+  aspect wrongly (a fixed `1.0`) takes the arc-vs-polyline comparison from mean 0.0000 / outlier 1
+  to mean **0.0044** / outlier **255** — the mean stays *inside* the golden suite's 0.02, because a
+  thin closed curve is wrong on a few hundred pixels and right on seventy-six thousand. Recorded in
+  the test's own docstring.
+- **Followup noticed and not acted on — the segment path's stroke width is uniform in NDC, not in
+  pixels.** Measured on a 640x480 target: the same `width` gives a horizontal stroke 24 px tall and
+  a vertical one 30 px wide, the aspect ratio exactly. So a polyline circle already ships with
+  fatter left and right sides than top and bottom, and `SegmentInstance::width`'s "uniform on screen
+  after the aspect divide" overstates what the shader does. **The arc reproduces it deliberately** —
+  Phase 1's done-when is to match a densely-sampled polyline of the same arc, not to draw a better
+  one — so changing it is a separate decision about every line scene, and an architect call.
 
 ## Followups (after this lands)
 
