@@ -211,9 +211,19 @@ flowchart LR
 | 1 — the tempo estimate is measured | dev | done | `5bdce91` |
 | 2 — the octave repair | dev | done | `09abdee` |
 | 3 — the bar grid | dev | done | `cae98a5` |
-| 4 — the fold folds over the grid | dev | done | committed with this row |
+| 4 — the fold folds over the grid | dev | done | `d4e7cec` |
 | 5 — re-measure through the instrument | human | not started | — |
 | 6 — the authoring docs | dev | not started | — |
+
+**Session stopped at Phase 5, the `human` gate.** Phases 1-4 are landed and the whole suite is
+green (`cargo nextest run -p lmv-core`, 725 passed). Phase 6 is `dev` but sits behind Phase 5: one
+of its done-whens — "the bar trio's entry reflects whatever Phase 5 measured" — cannot be written
+until the capture is read, so the phase was left whole rather than half-written. What Phase 6 needs
+from Phase 5 is the publish rate per genre against the 2.89 / 1.59 / 2.27 % baseline, and whether
+the backbeat rock/pop degeneracy signature survives. **Nothing in Phases 1-4 changed what
+`beat_index` counts, so Phase 5's detections-per-beat column will still read 1.7-2.1x** — that is
+the plan's own prediction and not a null result; what must have changed is that the *fold* no longer
+tracks it.
 
 **Phase 1's table** (`cargo nextest run -p lmv-core --test tempo_probe --no-capture`), the reading
 Phase 2 chooses against:
