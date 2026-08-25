@@ -2965,6 +2965,17 @@ lens, is a real decision with real alternatives and belongs in an ADR. It should
 close, when that plan's own new rustdoc link had to be repointed by hand because nothing would have
 caught it. **Owner if taken:** `dev` — the checker change is small and the repairs are mechanical.
 
+- **PROMOTED AND INVERTED, 2026-08-25, hours after it was filed —**
+  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) +
+  [Plan 0118](plans/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md). **The finding
+  below is sound and the remedy it proposes was rejected.** Asked whether to guard these links, the
+  user's answer was to stop writing them: a maintained checker to protect 89 links that do not
+  resolve in rustdoc, exist to save one `grep`, and encode the most brittle possible reference to a
+  document whose lifecycle includes being moved, is the wrong trade against deleting them once.
+  ADR-0127 Alternative A records that reasoning. Plan 0118 Phase 3 deletes all 89 in favour of
+  bare-number citations, and its gate rejects the *form* rather than validating the target. **This
+  entry closes when that plan closes**, not now — the eleven breaks it names are still on `main`.
+
 - **Verified 2026-08-25** — the walk collects markdown and nothing else: `present: endsWith\("\.md"\) in: scripts/check-doc-links.mjs`
 - **Verified 2026-08-25** — Rust sources carry the same link form: `present: \]: \.\./\.\./docs/ in: core/src/render/tests.rs`
 
