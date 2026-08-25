@@ -1165,7 +1165,7 @@ One tab-separated row per **beat**, header on a fresh file:
 
 | column | what it is |
 |---|---|
-| `beat` | the beat clock's `beat_index` — gaps mean beats the render loop coalesced |
+| `beat` | the beat clock's `beat_index` — gaps mean beats the render loop coalesced. **Not the counter the fold buckets by**; that is `fold_beat`, below |
 | `s0`..`s3` | mean accent per candidate beat-1 alignment: the 4/4 fold's own output |
 | `best` | the alignment the fold favours right now |
 | `held` | the alignment actually held, which lags `best` by the hysteresis |
@@ -1178,10 +1178,21 @@ One tab-separated row per **beat**, header on a fresh file:
 | `bpm` | the tempo tracker's estimate — read the **row rate** against it (see below) |
 | `time_since_beat` | how stale this row's band levels are: they come from the latest analysis hop, not necessarily the hop the beat fired on |
 | `unix_ms` | the time axis. Deltas between rows are the inter-detection interval, and it lines a capture up against a `diagnostics.log` from the same session |
+| `fold_beat` | **the counter `s0..s3`, `best` and `held` are indexed in** — the grid's tempo-driven beat count once the grid runs, `beat_index` before that. Bucket the accent by `fold_beat % 4`, never by `beat % 4` |
+| `grid_bar_phase` | where `fold_beat` sits across the bar, `[0, 1)`, **ungated** — no alignment subtracted, so it says where the *grid* is rather than where the estimator thinks beat 1 is. **Only a grid reading where `bpm > 0`**; on a warmup row it is the tempo tracker's onset-reset phase, so do not average the column down the whole file |
 
-> The last three are **appended, never interleaved** — the frozen-prefix rule
+> The last five are **appended, never interleaved** — the frozen-prefix rule
 > `diagnostics.log` follows — so a capture taken before they existed stays
 > parseable by column name.
+
+**`beat` and `fold_beat` are two different counters, and only the second one
+indexes the alignment block.** They were one number until Plan 0095 moved the fold
+onto the bar grid ([ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md));
+`beat` still means `beat_index`, unchanged, so that every capture taken before
+that keeps parsing and stays comparable. Reading `s0..s3` against `beat % 4`
+produces a plausible, wrong answer — on the synthesized 4/4 in
+`standalone/src/downbeatlog.rs` it puts the accent on phase 0 while the fold
+reports 3 — which is what these two columns exist to stop.
 
 **Read the row rate against `bpm` before reading anything else.** The beat flag
 that paces these rows comes from the onset detector — an adaptive threshold on
@@ -1190,8 +1201,9 @@ spectral flux with a 96 ms refractory — and it is **not tempo-gated**
 (`core/src/dsp/tempo.rs`). So `rows / seconds` against `bpm / 60` is the number of
 detections per musical beat, and it is **not** guaranteed to be 1. On a synthesized
 clip with one transient per beat it measures exactly 1.00; on real material with
-hats it does not, and where it does not, `beat_index % 4` spans less than a bar and
-the four alignments are not the four beats of one.
+hats it does not — which is why the fold stopped bucketing by `beat_index` in
+Plan 0095, and why the ratio is still worth reading: it is the size of the gap
+between the `beat` column and `fold_beat`.
 
 **Reading it is what tells the three stories apart** — the reason the plan spends
 a phase capturing before choosing a repair:
