@@ -120,13 +120,51 @@ For **each phase in order**:
    catch yourself writing a placeholder assertion to clear a done-when, **stop and escalate** —
    either the done-when is testable as stated (write the real assertion) or the plan is wrong
    (route to architect, see "When the plan is wrong").
-4. **Commit the phase** — conventional commit per `references/commit-conventions.md`. **Stage only
-   this phase's files, by explicit path — never `git add -A` / `.` / `--all` / `:/`** (a
-   `PreToolUse` hook denies broad staging). `git status` first; if you see files that aren't
+4. **Write this phase's log row into the plan.** `## Implementation log` is the plan's own section
+   for it, sitting just above `## Followups`. Fill the `**Lane:**` line the first time (branch and
+   worktree path, or `main` directly), then set this phase's row in the `phase | owner | state |
+   commit` table. The row for the phase you are committing right now reads `committed with this
+   row`; backfill the real SHA into the previous phase's row as you go, so every landed row but the
+   one in flight carries one. **The edit rides inside this phase's own commit** — never a separate
+   commit — and is staged by explicit path alongside the phase's files. If the plan predates this
+   convention and has no `## Implementation log` section, **create it** from the skeleton in
+   `.claude/skills/architect/references/templates/plan.md`; a missing skeleton is not a reason to
+   skip the log.
+
+   **Observations, never conclusions.** The log says *where to look*; architect decides *how it
+   went*. So: **no per-criterion `[pass]` list**, no self-review, no narrative of how the phase
+   went. A phase with nothing to say beyond `done` says exactly that and writes no note. The reason
+   is not tidiness — a written brief anchors a reader far harder than a chat message does, and the
+   entire value of the close review is that architect reaches its own verdict.
+
+   **Thinness applies to your opinions, never to your findings.** A deviation from the plan is
+   **always** disclosed — what you did differently and the commit, and nothing arguing it was fine.
+   A done-when criterion you could not satisfy as stated is **always** noted, with what you did
+   instead. Silence on everything else is what carries your belief that the rest passed; an
+   undisclosed deviation is a defect no diff can reveal.
+
+   **Two cadences, one section.** The phase row above rides inside the phase's commit. A
+   **mid-session handoff** is the other case: when the session is being cleared or compacted between
+   phases, finish the unit in flight and land the log update as its own `docs(plans): …` commit, so
+   the handoff itself is legible in the log.
+
+   **The two have different readers, which is what resolves the contradiction between them.** A
+   handoff note is read by a *resuming `dev`* — the same lane continuing, so anchoring does not
+   apply — and it needs precisely what the thin rule forbids: the diagnosis behind an unfinished
+   symptom, the candidate fixes and what each costs, the test and lint state at the tip, whatever a
+   fresh session would otherwise rediscover. Write that freely. But it is **scaffolding**: **remove
+   it when the phase it was written for lands**, leaving only whatever qualifies as a finding.
+   Mid-plan richness that survives to the close anchors the reviewer in exactly the case where
+   nobody is watching for it. If you skip the removal, the size rule is the visible symptom — the
+   log stays shorter than the plan's own `## Implementation phases` section.
+5. **Commit the phase** — conventional commit per `references/commit-conventions.md`. **Stage only
+   this phase's files plus the plan, by explicit path — never `git add -A` / `.` / `--all` / `:/`**
+   (a `PreToolUse` hook denies broad staging). `git status` first; if you see files that aren't
    yours, leave them and surface them. On Windows, commit the message via the **PowerShell tool's
    single-quoted here-string** (`@'...'@`, closing `'@` at column 0, plain-ASCII body) — the Bash
-   tool mangles here-strings.
-5. **Move to the next phase.** Don't pause for review — the architect reviews after the last phase.
+   tool mangles here-strings; if the body needs a double quote, write it to a file and use
+   `git commit -F`.
+6. **Move to the next phase.** Don't pause for review — the architect reviews after the last phase.
 
 Rules that compound across phases:
 
@@ -143,16 +181,33 @@ Rules that compound across phases:
   layer. See `.claude/skills/architect/references/best-practices.md` — you implement against it
   whether or not the phase restates it. A phase doesn't pass done-when if it violates these.
 
-### Step 4 — After the last phase: prompt the close ceremony
+### Step 4 — After the last phase: complete the close block, then point at it
 
 Once the **final** phase's done-when is verified and its commit landed:
 
-1. **Show the git log** for the plan: `git log --oneline -n <count of commits this session>` — the
-   user scans it before pushing.
-2. **Prompt the close ceremony** using `references/close-ceremony-prompt.md` — inline the filled-in
-   version. It tells the user to start a **fresh** `/architect` session that will (a) review the
-   whole plan in-conversation, (b) flip the plan to `done`, (c) `git mv` it to `docs/plans/done/`,
-   and refresh the indexes.
+1. **Complete the close block in the plan's `## Implementation log`, and commit it** — as a
+   `docs(plans): …` commit, staged by explicit path. Backfill the final phase's real SHA into its
+   row, write the `### Notes` (deviations, unmet done-whens, followups noticed and not acted on —
+   and nothing else; empty is a valid answer), and fill every `### Close triggers` bullet:
+   `presets/` touched, the plan header's `Closes:` entries, what shipped (feature / fix-only /
+   docs-chore-only), which operator docs moved, the exit of
+   `node scripts/check-backlog-claims.mjs`, and which `human` phases remain. Those are raw
+   `git`-derived facts and they carry **no recommendation** — in particular **no suggested version
+   bump**, which is architect's call per
+   [ADR-0005](../../../docs/adrs/0005-versioning-and-release-cadence.md). Strip any resume
+   scaffolding a mid-session handoff left behind. `references/close-ceremony-prompt.md` is the
+   field guide for every one of these fields.
+
+   **This happens before you print anything.** A pointer to an unwritten log is the one failure
+   this step must not produce.
+2. **Print the pointer** — three lines, and nothing else:
+   - the **plan**: number, title, path;
+   - the **lane**: branch and worktree path, or `main`;
+   - the **fresh-session invocation** the user runs next.
+
+   No brief, no diff, no pasted `git log`: the brief is the log, and its table already carries the
+   phase-to-commit mapping. The user still starts a fresh `/architect` session — that boundary is
+   the point of the seam, not the friction — and architect reads the log there.
 
 Then **stop.** Don't start the next plan in the same session — the fresh-session boundary keeps
 the architect's review context clean.
@@ -174,8 +229,11 @@ escalation.
 
 ## What you do NOT do
 
-- **You do not write or edit plans** (except flipping `Status: draft → in-progress` at Step 2) or
-  **ADRs or diagrams.** If implementation reveals an ADR is wrong, stop and route to architect.
+- **You write exactly two things inside a plan** — the `Status:` line at Step 2, and the
+  `## Implementation log` section as the phases land. Nothing else in a plan, and no **ADRs or
+  diagrams**, are yours: **editing a phase block is prohibited**, and a plan that turns out wrong
+  is still an escalation, never an edit. If implementation reveals an ADR is wrong, stop and route
+  to architect.
 - **You do not start without explicit "go".** `/dev` alone is a request to introduce yourself and
   wait, not a "go".
 - **You do not push, open PRs, or run `gh`.** Stage and commit only — the user pushes.
@@ -206,7 +264,8 @@ Read on demand:
   commands, and the three-lane ownership map.
 - `references/commit-conventions.md` — conventional-commit types/scopes for this repo, when to
   split commits.
-- `references/close-ceremony-prompt.md` — the exact message you send at the end of the last phase.
+- `references/close-ceremony-prompt.md` — the field guide for the `## Implementation log`: how
+  to fill each field, why the log is thin, and the three-line pointer you print at Step 4.
 
 The architect's references are also authoritative when you need to ground a decision:
 
