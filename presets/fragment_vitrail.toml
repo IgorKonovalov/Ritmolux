@@ -16,13 +16,20 @@
 # NO ROTATION anywhere (standing verdict): the vault's depth comes from a pure
 # outward fb_zoom echo (no fb_rotate - the same de-rotation Neon Tunnel was
 # retuned to), the fold's angle is pinned, and the rose does not spin - its
-# life is phase drift plus the per-phrase `d` re-cut below.
+# life is phase drift plus the latched `d` re-cut below.
 #
-# The window's SHAPE is beat-latched: `d` snaps to a new chord count every
-# four beats via hash(floor(beat_index/4)), deliberately UNSMOOTHED - a Maurer
-# figure at fractional d is a valid curve, but sweeping d re-shapes the whole
-# figure continuously and reads as writhing; the phrase-boundary cut reads as
-# a new window instead (the Shatter re-cut, in line vocabulary).
+# The window's SHAPE is detection-latched: `d` snaps to a new chord count every
+# four ONSET DETECTIONS via hash(floor(beat_index/4)), deliberately UNSMOOTHED -
+# a Maurer figure at fractional d is a valid curve, but sweeping d re-shapes the
+# whole figure continuously and reads as writhing; the hard cut reads as a new
+# window instead (the Shatter re-cut, in line vocabulary).
+#
+# THAT IS NOT A PHRASE BOUNDARY, and this file used to call it one. `beat_index`
+# counts detections rather than musical beats (ADR-0109), at 1.2x to 2.3x per
+# beat depending on the material and unstable inside a single track, so four of
+# them is roughly two to three musical beats - under a bar. The cut is meant to
+# be structural and surprising, which it still is; the musical reading of the
+# arithmetic was the error. Re-tuning is a preset-author followup (Plan 0095).
 system = "fragment_field"
 name = "Vitrail"
 
@@ -96,8 +103,8 @@ mix    = "0.42 + clamp(bass * 0.55, 0, 0.47)"
 family = "maurer_rose"
 
 [layer.params]
-# A dense rose; d re-cuts per phrase (see header), n stays put so the family
-# resemblance holds across cuts.
+# A dense rose; d re-cuts every four onset detections (see header - NOT per
+# phrase), n stays put so the family resemblance holds across cuts.
 # Chord counts kept low (29-53) - a first draft at d 59+ rendered gauze, not
 # a window; fewer chords and a thicker line read as leading and glass.
 n             = "6"
@@ -138,18 +145,21 @@ scale         = "0.80"
 # colours rather than one pink thread.
 hue           = "0.15"
 saturation    = "1.35"
-# Each beat traces the window anew - the phase runs 0->1 inside each beat and
-# holds complete through the back half, so the draw reads as a stroke, not a
+# Each detection traces the window anew - the phase runs 0->1 inside each ramp
+# and holds complete through the back half, so the draw reads as a stroke, not a
 # strobe. GUARDED for silence: `bar` is 0 until the beat tracker runs, and an
 # unguarded ride left the window entirely absent from the quiet frame - the
-# figure rests complete when no beats flow.
+# figure rests complete when no detections flow.
 # SWEEP SHORTENED 2026-08-16, same call, and this is the half that actually made
-# it visible. `bar` is the BEAT phase, and `tempo.rs` resets it on every detected
-# onset - which fires 1.7-2.1x per musical beat (ADR-0109). So this sweep does
-# not restart once a beat, it restarts about twice, and at `bar * 2.2` the window
-# spent much of its life part-drawn. At 3.4 it completes in under a third of the
-# phase and rests complete for the remainder, so the stroke still reads without
-# the figure being perpetually half there.
+# it visible. `bar` is the BEAT phase, and `tempo.rs` still resets it on every
+# detected onset - which is NOT once per musical beat (ADR-0109) but a
+# material-dependent 1.2x to 2.3x, unstable inside one track. So this sweep does
+# not restart once a beat, it restarts more often than that and irregularly, and
+# at `bar * 2.2` the window spent much of its life part-drawn. At 3.4 it
+# completes in well under the ramp and rests complete for the remainder, so the
+# stroke still reads without the figure being perpetually half there.
+# NOTE Plan 0095: the bar grid it added drives `bar_phase`, not `bar` - `bar` is
+# deliberately unchanged, so everything above still holds.
 draw_progress = "select(beat_index > 0, clamp(bar * 3.4, 0, 1), 1)"
 hue_spread    = "0.70"
 palette_mix   = "0"

@@ -102,10 +102,20 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
   (`bar_phase` is the real one); **`tempo` is BPM, not `0..1`** — scale it (`tempo / 180`) or compare
   it (`tempo > 128`); `novelty` is experimental. The four `*_raw` escapes carry the pre-v2 absolute
   magnitudes (means `0.040 / 0.006 / 0.006 / 0.002`) — reach for them only when a look genuinely
-  wants absolute loudness. `beat_index` and `time_since_beat` are always tracked; `beat_in_bar`,
-  `bar_index` and `bar_phase` ride a **gated** downbeat estimator measured at a ~3 % lock rate on
-  real music, so they are counter-derived nearly always — **build an arc on `beat_index` and treat
-  the bar trio as decorative**. **`index` is not audio** — it is the per-element position (Plan
+  wants absolute loudness. **No musical-time variable is a dependable musical period, and the old
+  advice here — "build an arc on `beat_index` and treat the bar trio as decorative" — is retracted
+  in both halves.** `beat_index` and `time_since_beat` are always tracked but count **onset
+  detections**, not beats (ADR-0109): 1.35x-2.10x per musical beat across Plan 0086's genres,
+  1.20x / 1.22x / 2.28x across Plan 0095's, wandering between 1x, 2x and 4x inside one track, so
+  no fixed multiplier converts them and `mod(beat_index, 16)` is **not** four bars. Use
+  `beat_index` only where a change on activity is the point (`hash(beat_index)` re-rolls a colour
+  or a count per hit). `beat_in_bar`, `bar_index` and `bar_phase` ride a **gated** downbeat
+  estimator that since Plan 0095 folds over a tempo-driven bar grid, so its unit is a real bar:
+  measured over the 0.25 gate at 2.36 % (rock/pop) and 3.67 % (hip-hop) — roughly 2-4 % on material
+  with bar-scale accents — and 0.42 % on four-on-the-floor techno, which has no bar-scale accent to
+  find. So they are still counter-derived most of the time; bind them freely (they stay periodic
+  and never claim a wrong beat 1), but do not author a look whose whole point is landing on the
+  real bar line. **`index` is not audio** — it is the per-element position (Plan
   0034), see below.
 - **Constants:** `pi`, `tau`.
 - **Functions (17):** `sin cos abs floor sqrt log min max pow mod clamp lerp smoothstep select bin

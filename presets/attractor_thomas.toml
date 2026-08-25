@@ -88,21 +88,30 @@ size   = "0.60 - clamp((bass + mid) * 0.070, 0, 0.120) + clamp(treb * 0.117, 0, 
 # transient-free material this is the slowest attractor for - normalization
 # raises a quiet mix's onset but cannot invent a transient that is not there, so
 # the cloud could hold one pose indefinitely. The second term guarantees a
-# re-scatter every 24 beats whatever the material does; `max` is or, so the
+# re-scatter every 24 DETECTIONS whatever the material does; `max` is or, so the
 # onset trigger is untouched on anything that hits.
 #
+# NOT SIX BARS, AND NOT 24 BEATS. `beat_index` counts ONSET DETECTIONS rather
+# than musical beats (ADR-0109), at 1.2x to 2.3x per beat depending on the
+# material and unstable inside one track, so no fixed multiplier converts it.
+# Every 24 detections lands somewhere around 11 to 20 musical beats. What this
+# clause needs is only an upper bound on how long the cloud can hold a pose, and
+# that survives the correction intact - but the period is not musical and must
+# not be tuned as though it were. Re-tuning is a preset-author followup (Plan
+# 0095).
+#
 # IT IS GATED ON `beat`, AND THAT IS NOT DECORATION. `mod(beat_index, 24) == 0`
-# alone is true for the WHOLE of every 24th beat - a full beat of continuous
+# alone is true for the WHOLE hop span between two detections - continuous
 # re-scattering, which wipes the accumulation rather than nudging it - and
-# worse, `beat_index` is 0 before the tracker has seen a beat at all, so on
+# worse, `beat_index` is 0 before the tracker has seen anything at all, so on
 # quiet material it would hold the reseed on from startup and the cloud would
-# never accumulate. `beat` is 1 only on the hop a beat fires, so the pair is a
-# single-frame pulse.
+# never accumulate. `beat` is 1 only on the hop a detection fires, so the pair is
+# a single-frame pulse.
 # The onset half re-derived for a disturbance: 0.69 was calibrated while a
 # reseed REPLACED the cloud, so reluctance protected the accumulation. ADR-0066
 # (Plan 0057 Phase 3) made it a bounded in-place jitter. Onset means measured
 # 0.033 (click:120) / 0.153 (dynamic:110) / 0.391 (chord), ~0.20 real music,
-# all against a 1.000 peak. The every-24th-beat pulse is unchanged.
+# all against a 1.000 peak. The every-24th-detection pulse is unchanged.
 reseed = "max(onset > 0.40, min(beat, mod(beat_index, 24) == 0))"
 
 # COLOUR - near-neutral by design; the remap discards hue and a desaturated
