@@ -1,6 +1,6 @@
 # 0112 — The handoff stops being a chat message
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) (proposed),
