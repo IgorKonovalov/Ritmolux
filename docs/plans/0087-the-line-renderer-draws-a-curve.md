@@ -324,16 +324,48 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 | 1b — a sub-floor `thickness` stops failing silently | dev | done | `b97ff64` |
 | 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
 | 3 — the circular motifs become arcs | dev | done | `82c031f` |
-| 4 — does it read as a curve? | human | **next — the session stopped here** | |
+| 4 — does it read as a curve? | human | done | verdict in the notes |
 | 5 — the general curve: a biarc chain | dev | not started | |
 | 6 — the scalloped boundary | dev | not started | |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
 ### Notes
 
-- **The session stopped at Phase 4, which is the plan's own gate.** Phases 1, 1b, 2 and 3 are the
-  contiguous `dev` run; Phase 4 is `human` and can send the whole plan to ADR-0098's Alternative C,
-  which is why the expensive half (Phase 5's biarc fit) sits behind it and was not started.
+- **Phase 4's verdict, in the user's own words: _"circles looks fine but blurred"_.** Judged
+  2026-08-25 in the running app, on the arc build alone at 1186x958, `rich` tier, against the three
+  retired mandalas at their honest tunings recovered from `654304a^` (`star_mandala`,
+  `star_mandala_six`, `star_weave` — `glow = 1.0`, no trails, no bloom). Against the phase's two
+  questions: the arc-drawn ring **reads as drawn curves**, and **no bead was reported on it**. By the
+  phase's own routing that is the "yes" that green-lights Phase 5.
+- **The verdict was taken twice, and the first take judged the wrong build.** Both builds were
+  launched side by side — the arc one and a control built at `509eaff`, the tip before circles became
+  arcs — and the first screenshot returned was the control's: its circles carry the stippled,
+  scalloped edge an arc cannot produce, since an arc has no vertices. The second take ran the arc
+  build alone. **The lesson is cheap and worth keeping: a two-window A/B needs the windows
+  distinguishable in the window itself**, not just in the launch command.
+- **A defect Phase 4 does not ask about, named by the user at both takes and not fixed by this plan:
+  the stroke reads blurred and semi-transparent.** Measured on the **arc** build's own frame, on a
+  preset binding no bloom, no trails and no `glow`, so it is the stroke and not a post stage:
+
+  | quantity | reading |
+  |---|---|
+  | a ~14 px stroke's cross-section | `28 45 68 91 113 134 156 177 198 215 225 223 211 192 170 149 128 106 83 60 40` |
+  | of that stroke, within 10 % of peak | **4 px** |
+  | of that stroke, above half peak | 13 px |
+  | lit pixels in the frame reaching >= 200/255 | **13.0 %** (control: 16.1 %) |
+  | lit pixels in the frame reaching >= 100/255 | 32.1 % (control: 33.4 %) |
+
+  That is [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)'s `(1 - d/w)^2`
+  applied across the **whole** half-width: a thin bright spine inside a wide gradient. **Phase 1's
+  done-when required the arc to reproduce it exactly** — "a drawing of the same curve rather than a
+  different look" — and it does, at mean 0.0000, so the reading is identical either side of this
+  plan. A stroke that reads as a drawn line wants a flat core and a ~1 px antialiased edge instead;
+  that is a fragment change in `renderer.rs` reaching all four line families, moving every line
+  baseline, and reopening what `glow` multiplies. **Architect's call, and this plan is not the place
+  for it** — it is neither of Phase 4's two questions and it was not caused by anything here.
+- **The two remaining `dev` phases were not started.** Phase 5 (the biarc chain) is green-lit by the
+  verdict above but is the plan's expensive half, and the session's agreed scope was the contiguous
+  `dev` run ending at Phase 4.
 - **`node scripts/check-backlog-claims.mjs` now exits 1, and repairing it is an architect call.**
   Backlog 0098's probe is `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`
   and Phase 1b moved that constant into `lines/mod.rs` as `MIN_HALF_WIDTH`, so the probe no longer
