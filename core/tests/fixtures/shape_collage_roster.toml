@@ -1,0 +1,72 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `shape_collage` scene's SECOND baseline (Plan 0113 Phase 7): the five
+# Kandinsky kinds, the seeded layout grammar, and translucent crossings - none of
+# which the rostered `shape_collage.toml` can reach.
+#
+# WHY A SECOND FIXTURE IS NEEDED HERE, which is the bar `EXTRA_FIXTURES` sets:
+# the rostered one runs `layout = 0` (the authored fourteen-element canvas, the
+# scene's default) and `roster = 0` (quad, circle, triangle). Those are not
+# incidental settings - they are the DEFAULTS, and defaults are what a drift
+# baseline should pin. But it means no baseline in this suite executes a single
+# line of `sd_bar`, `sd_ring`, `sd_segment`, `sd_arc` or `sd_checker`, nor a line
+# of the layout grammar, nor the `over` composite of a translucent element. No
+# edit to `shape_collage.toml` that kept its picture could reach any of them.
+#
+# So this fixture is deliberately the whole of the other half:
+#
+#  - `roster = "1"` opens all eight kinds. The generator's weighting draws every
+#    one of the five new ones at 40 elements, and about one element in four at an
+#    alpha below 1 - which is the ONLY place in this suite where two elements
+#    composite `over` each other rather than one hiding the other.
+#  - `layout = "2"` is the diagonal-axis grammar Plan 0113 Phase 5 chose. At the
+#    default (`0`) the element list is a compiled-in array and the entire seeded
+#    generator - four grammars, the power-law sizing, the placement rule - is
+#    unreached.
+#  - `seed`, `size_hierarchy` and `angle_bias` are pinned rather than left
+#    default so the canvas is a definite composition instead of whatever the
+#    defaults happen to become.
+#  - `count = "40"` is the floor tier's element cap, so this baseline also pins
+#    the loop at its shipped worst case.
+#
+# The palette is the same eight flat plateaus the other fixture uses and for the
+# same reason: seven under the tonemap's KNEE where the curve is the identity, so
+# every element's fill is exact, and the eighth - the paper - deliberately above
+# it, because `f(1.0) = 0.800` makes pure white unreachable.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule): at 160x100 over
+# 60 frames, WARP mean rgb 208.434 204.518 203.997 against hardware 208.481
+# 204.552 204.027, frame_diff 0.000214. Inside the noise floor, so this baseline
+# pins a picture hardware also draws.
+system = "shape_collage"
+name   = "fixture_shape_collage_roster"
+
+[palette]
+stops = [
+  { at = 0.0000, color = "#1a1a1a" },
+  { at = 0.1249, color = "#1a1a1a" },
+  { at = 0.1251, color = "#8c1c24" },
+  { at = 0.2499, color = "#8c1c24" },
+  { at = 0.2501, color = "#8f7a1c" },
+  { at = 0.3749, color = "#8f7a1c" },
+  { at = 0.3751, color = "#22407e" },
+  { at = 0.4999, color = "#22407e" },
+  { at = 0.5001, color = "#2f6b46" },
+  { at = 0.6249, color = "#2f6b46" },
+  { at = 0.6251, color = "#5c5f66" },
+  { at = 0.7499, color = "#5c5f66" },
+  { at = 0.7501, color = "#6b3352" },
+  { at = 0.8749, color = "#6b3352" },
+  { at = 0.8751, color = "#e6e3d8" },
+  { at = 1.0000, color = "#e6e3d8" },
+]
+
+[params]
+paper          = "0.9375"
+scale          = "1.0"
+count          = "40"
+layout         = "2"
+roster         = "1"
+seed           = "29"
+size_hierarchy = "0.62"
+angle_bias     = "-24"

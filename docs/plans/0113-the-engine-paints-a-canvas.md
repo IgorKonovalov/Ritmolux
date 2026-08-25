@@ -343,8 +343,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
 | 6 — The music moves the canvas | dev | done | 47ef35d |
-| 7 — The Kandinsky vocabulary | dev | done | committed with this row |
-| 8 — Documentation and the shipped set | dev | not started | |
+| 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
+| 8 — Documentation and the shipped set | dev | done | committed with this row |
 
 ### Notes
 
@@ -401,6 +401,36 @@ not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and i
 is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
 numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
 one the tier is quoted against.
+
+**Phase 8 — the golden done-when, read against the suite it names.** The phase
+asks for "golden baselines for **both shipped presets**, blessed on **hardware**".
+The suite does neither by design: ADR-0023 pins **frozen fixtures** and states
+that shipped presets are guarded behaviourally and never pixel-pinned (so the
+content lane can tune them), and the suite is WARP-only because macOS has no
+software Metal (ADR-0016). Delivered as the intent rather than the letter: the
+rostered fixture already pins the system, and a **second fixture**
+(`shape_collage_roster`) went in through `EXTRA_FIXTURES` — the documented escape
+hatch, whose bar is that the rostered one structurally cannot reach the code
+under test. It cannot: at the scene's defaults (`layout = 0`, `roster = 0`) no
+baseline executes a line of the layout grammar or of the five new distance
+functions, and none composites two translucent elements. Blessed on WARP as the
+suite requires, adapter-compared against hardware first (frame_diff 0.000214).
+
+**Phase 8 — the bless rewrote a baseline it had no business touching.**
+`LMV_BLESS=1` is not scoped to the fixture being added, and it rewrote
+`shape_collage.png` for a **one-byte** difference on a single pixel against a
+tolerance of 48. Restored from git and re-checked without the flag: it passes.
+Only `shape_collage_roster.png` is new in the commit.
+
+**Phase 8 — `docs/presets.md` gained a systems-table row and no grammar.** The
+phase asks the plan record it either way: **this plan introduced no new
+expression-grammar surface at all** — no function, no variable, no table. Every
+lever it added is a named `[params]` binding, and the shipped presets reach the
+beat through `hash`, `select` and `beat_index`, all of which predate it.
+
+**Phase 8 — the root README said "Ten built-in rendering systems" and was already
+wrong before this plan**: `warp_mesh` made eleven at Plan 0100 and the line did
+not move. Now twelve.
 
 **Phase 7 — the roster reading the plan settled on.** `bar` and `segment` both
 plausibly meant "a straight line with thickness", and `quad` already draws a
