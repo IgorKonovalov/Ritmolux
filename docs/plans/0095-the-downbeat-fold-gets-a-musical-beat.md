@@ -9,6 +9,9 @@
 > [ADR-0097](../adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md)
 > **Succeeds:** [0086](done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md), which measured the
 > defect this plan repairs and shipped the instrument it is measured with
+> **Reviewed:** 2026-08-25 (Mode 4) - no blockers, four majors, all one shape. **Phase 7 below
+> is the repair pass**; the fourth major (an `Outcome` on ADR-0109, which claims the tempo estimate
+> was settled when only its *stability* was) is architect-owned and lands at the close.
 
 ## TL;DR
 
@@ -166,6 +169,100 @@ flowchart LR
   reflects whatever Phase 5 measured; and the six preset headers state the period they actually
   get. **The presets' expressions are not re-tuned** — that is content work and the
   `preset-author` lane's, and it is listed as a followup rather than done here.
+
+### Phase 7 — the review findings are repaired
+
+- **Owner skill:** dev
+- **Why this phase exists:** the Mode 4 close review (2026-08-25) found no blockers and four
+  majors, all one shape — **the shipped docs and the test set generalize past what the captures
+  measured**, on the axis the implementation log itself flags. The fourth is architect-owned (an
+  `Outcome` on ADR-0109) and is not here. These six are.
+- **Files touched:** `core/src/dsp/mod.rs`, `core/src/dsp/grid.rs`, `core/src/dsp/tempo.rs`,
+  `core/src/dsp/downbeat.rs`, `docs/presets.md`, `presets/README.md`,
+  `.claude/skills/preset-author/SKILL.md`, `presets/attractor_walkdejong.toml`,
+  `presets/shape_pulse.toml`.
+
+**7a — `bar_index` stops stepping backwards at the grid handover.** `mod.rs` switches
+`fold_count` from `clock.beat_index` to the grid's beat count, which restarts at `0`, so the
+published `bar_index` jumps back once per stream at ~4.2 s. Measured through the real `Analyzer`:
+**1 bar** on a 120 BPM click train, **2** on `offbeat_click_track(90, 0.8)`, **3** on
+`click_track(200)` and on `dynamic_groove(124)` — larger on material with a denser onset stream.
+`docs/presets.md` asserts it *"never moves by more than a bar"*, and nothing tests it.
+
+The repair is a one-time offset, **not** a doc correction: capture `grid_offset` on the first hop
+where `grid.running` turns true, as `clock.beat_index` rounded **up to the next multiple of
+`BEATS_PER_BAR`**, and fold over `grid_offset + grid.bar_index * BEATS_PER_BAR +
+grid.beat_in_bar`. Rounding to a whole bar is what makes this safe: the offset is invisible to
+`beat_in_bar` and to the fold's four buckets (whose phase is arbitrary anyway — `alignment`
+absorbs it), and it leaves the published `bar_index` continuing forward across the handover.
+
+- **Done when:** the published `bar_index` is monotone across the handover on every stimulus above
+  and on `dynamic_groove`, asserted by a test that drives PCM through the analyzer rather than the
+  tracker directly — the handover only exists at that level. The one remaining non-monotonicity is
+  the alignment change `bar_index_steps_back_across_an_alignment_change` already pins, and
+  `docs/presets.md`'s "never more than a bar" becomes true rather than deleted.
+
+**7b — the grid is probed where the tempo estimate is an octave off.** Every `grid.rs` test and
+`the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio` drive **one transient per beat**
+— the single configuration where the grid, the tempo estimate and `beat_index` all agree, so no
+test at it can say which of the three the grid actually followed. That is the coincidence
+[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) is about, one subsystem
+over. The uncovered case is not hypothetical: Phase 2 proved the halving direction undiscriminable,
+`offbeat_click_track(90, ., 0.5)` and `(., 0.8)` read `bpm` 180, and the live hip-hop capture read
+a 165.4 median on a track that counts at ~90.
+
+The property to assert is **not** that the grid finds a bar there — it provably cannot. It is that
+**the grid tracks whatever rate it is handed**: across a settled window its beat rate matches the
+estimator's own `bpm` within the tolerance
+`the_grid_advances_one_bar_per_four_musical_beats` already states, and the bar counter stays
+monotone. That is the reading which separates *"the grid tracks and the accent feature is weak"*
+from *"the grid does not track on this material"* — the pair the Phase 5 captures could not
+separate, because no log column carries the grid.
+
+- **Done when:** that test exists on at least the two off-beat stimuli whose estimate sits an
+  octave high, and its failure message says which of the two readings it caught.
+
+**7c — the operator docs stop claiming a bar the captures did not measure.** `presets/README.md`
+says *"so its unit really is a bar"* and `.claude/skills/preset-author/SKILL.md` says *"so its
+unit is a real bar"*, the latter citing the hip-hop 3.67 % — the one capture where the estimate
+sat an octave high and the grid's bar therefore spanned two musical beats. The log records this;
+the docs an author reads do not, and this lane keeps no catalogue of its own.
+
+- **Done when:** both files state what was earned — the grid's bar is a **stable integer multiple
+  of the beat**, which is a real bar when the tempo estimate is on the right octave and half or
+  double one when it is not — and the hip-hop figure carries that caveat where it is cited. The
+  numbers themselves do not move; only the claim attached to them.
+
+**7d — `tempo.rs:182`'s trap figure matches the probe.** The doc comment on
+`TempoTracker::hold` cites *"77.7-94.5 %"* for the off-beat traps; the shipped probe prints
+**75.2 %** and **90.7 %**. The clean range on the same line (80.0-88.5 %) matches exactly, so it
+is the trap figure alone that is stale, from an earlier probe configuration. The argument survives
+— the ranges still overlap — but the number is the evidence the argument cites.
+
+- **Done when:** the comment's numbers are the ones
+  `the_octave_ambiguity_is_one_sided` prints, and it names that test as where they come from, so
+  the next edit to the trap set has somewhere to look.
+
+**7e — the two stale `(beat_index - alignment) / 4` doc comments.** `core/src/dsp/mod.rs:160`
+(`AnalysisFrame::bar_index`) and `core/src/dsp/downbeat.rs:488` still carry the derivation Phase 4
+falsified. `docs/presets.md` was corrected in Phase 6; the Rust API doc for the same variable was
+not, and `downbeat.rs:488` is inside the file Phase 4 edited.
+
+- **Done when:** both read the grid's beat count, with `beat_index` named as the warmup fallback,
+  matching the wording `docs/presets.md` already landed on. A repo-wide grep for the old
+  derivation returns only ADR-0050 and the archive, which are historical records and stay as
+  written.
+
+**7f — the two preset headers Phase 6's file list missed.**
+`presets/attractor_walkdejong.toml:44` states *"Every 16 beats is ~8 s at 120 BPM, well inside one
+48 s round trip"* — the exact arithmetic Phase 6 retracts, load-bearing in its own sentence, in a
+file that is not among the plan's six. `presets/shape_pulse.toml:123` cites "1.7-2.1x", narrower
+than the 1.20x-2.28x these captures measured.
+
+- **Done when:** both headers state the period they actually get, in the shape the six already
+  landed on, and their conclusions are re-checked rather than assumed — `walkdejong`'s round-trip
+  claim survives the correction (16 detections is ~3.5-7 s, still inside 48 s) and should say so
+  rather than quietly dropping the number. **No expression changes**, same as Phase 6.
 
 ## Risks & open questions
 
