@@ -5,6 +5,12 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
 > **Relates to:** [design-backlog 0069](../design-backlog.md) — partially advanced, not closed.
+> **Amended 2026-08-25:** **Phase 6b added**, and Phase 6 is now blocked on
+> [Plan 0116](0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
+> Phase 1's `coverage_floor` arm correctly found that this family's lit fraction is `1.0` by
+> construction and leaned on `MAX_TONAL_FLATNESS` as the rescue; that rescue is read only at `LOUD`,
+> where Phase 6's `density` holds the canvas at its fullest, so the emptying canvas Phase 6 builds is
+> measured by nothing. Phases 1-5 and 7-8 are unaffected.
 
 ## TL;DR
 
@@ -188,6 +194,38 @@ flowchart LR
   - The preset passes `reactivity`, which is the **only** one of the five gates that drives real PCM
     through the analyzer; the other four synthesize their frames and would not notice a canvas that
     ignored the music.
+
+> **Blocked on [Plan 0116](0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
+> builds a canvas the music empties, and **no gate in this repo can currently see that state.**
+> `sanity` reads `tonal_flatness` only at `LOUD`, where `density` holds the canvas at its fullest;
+> the quiet capture buys only `MODERATE_MIN_COVERAGE`, which is degenerate for this family because
+> the paper makes `coverage` exactly `1.0000` — measured on this branch's own committed golden,
+> which reads `coverage 1.0000, tonal_flatness 0.7577`. A canvas the music emptied correctly and one
+> that is broken and drew no elements are the same flat sheet of paper. **Do not weaken `density`'s
+> range to keep the gate green** — that is tuning content to a lens ADR-0126 has already ruled
+> wrong. See Phase 6b.
+
+### Phase 6b — The canvas is measured against its own paper
+
+- **Owner skill:** dev
+- **What:** Adopt [Plan 0116](0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
+  family, and retire the placeholder reasoning this branch shipped in Phase 1.
+- **Depends on:** Plan 0116 Phase 3 having landed. If it has not, **stop and say so** rather than
+  proceeding — Phase 7 does not depend on this and can be taken first.
+- **Files touched:** `core/tests/sanity.rs`, `presets/collage_suprematist.toml` (only if Phase 5
+  adjudicates it defective — not to satisfy a threshold).
+- **Done when:**
+  - The `coverage_floor` arm for `ShapeCollage` no longer rests on the premise that *"its lit
+    fraction is 1.0 by construction"*. After Plan 0116 Phase 3 that premise is false, and the
+    comment written here in Phase 1 is re-pointed rather than left standing as the reason for an
+    inherited `0.50`.
+  - The floor is re-derived from the family's own measured distribution by the rule beside it, as
+    Plan 0116 Phase 4 does for every other system.
+  - A capture at `density` low enough that no elements are live is **convicted**, and the assertion
+    demonstrably fails if reverted onto the `BLACK` predicate.
+  - **No threshold is invented for how sparse a legitimate canvas may be.** The property asserted is
+    that a bare ground and a composed canvas are separated; where a suprematist composition stops
+    being sparse and starts being empty is a content judgement and stays one.
 
 ### Phase 7 — The Kandinsky vocabulary
 - **Owner skill:** dev
