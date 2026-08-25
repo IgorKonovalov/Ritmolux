@@ -562,6 +562,28 @@ reproducible from what ran rather than from a name whose meaning may since have 
 
 ## Implementation log
 
+**Lane:** `WORK/lmv-plan-0106` on `plan-0106-diffusion-filter`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the spike renders | dev | done | `3c15e79` (no repository files; artifacts under untracked `spike/`) |
+| 2 — the look gate | human | done | `dc78cdd` |
+| 2b — the aspect measurement | dev | done | `3376bbd`, closed `aa5cb52` |
+| 3 — the pass-through stub | dev | done | `b87d823` |
+| 4 — the filter does the work | dev | done | `92aedf7` |
+| 5 — one command, and the documentation | dev | done | `4f683bf` |
+| 6 — a real track | human | done | `79ca9bc` |
+| 7a—7c — the suite runs everywhere, the seam is pinned | dev | done | `d597594` |
+| 7e — one page, and a gate that keeps it there | dev | done | `1aa2f2a` |
+| 7d — the instrument | dev | done | `e1a0e98` |
+| 7d — the corrected figures | dev | in flight | — |
+
+> **The per-phase sections below predate the implementation-log convention** (Plan 0112) and are
+> prose rather than observations. They are left as written because they carry the spike's, the
+> speed ladder's and Phase 2b's measurements, which are findings rather than scaffolding — which
+> is also why this log runs longer than `## Implementation phases` above.
+
+
 ### Phase 1 — the spike ran, 2026-08-20
 
 By `dev`, in the lane `WORK/lmv-plan-0106` on branch `plan-0106-diffusion-filter`, branched from
@@ -1085,86 +1107,57 @@ render wants sleep disabled; a partial output wants `ffprobe` read as "still wri
 
 ### Phase 7 — the gateable part actually gates, 2026-08-25
 
-**7a, 7b, 7c and 7e are done; 7d is half done and its second half is paused on a busy GPU.**
-Commits `d597594` (7a—7c), `1aa2f2a` (7e), `e1a0e98` (7d, instrument only).
+Deviations, findings and measurements only.
 
-**7a.** The end-to-end group read `REPO/spike/clip.wav`, untracked and present on one machine, so
-on any other checkout with a built `shot` it **failed** rather than skipped. It now synthesizes its
-own 48 kHz WAV from `wave` and `struct`. Verified the way the done-when asks — except that
-`spike/` could not be renamed (two orphaned Phase 6 processes still hold handles on it, see below),
-so the property was checked on a **clean tree built in the scratchpad** with no `spike/` at all,
-which is strictly stronger than moving the directory aside. The group **runs** there, and still
-skips with its notice when no `shot` is built.
+**Deviation, 7b (`d597594`).** The phase asks for two saturated RGB values whose chroma terms land
+outside `0..=255`. Across the whole 8-bit cube the forward chroma terms reach exactly ±0.5 past
+each end and no further — pure red's Cr is 255.5, pure cyan's is 0.5 — so the frozen table
+carries **both directions**, and five of its seven inverse rows are where the clamp is exercised.
 
-**7b.** A frozen 19-row table, asserted from both sides, each naming the other as its twin.
-**Both halves were seen to fail and reverted.** The first attempt did not: editing the green luma
-weight by —0.0002 left every row unmoved, so rather than pick a bigger edit the table's real
-sensitivity was **measured** — it catches any single-coefficient edit of ±0.0005 or larger, and
-that floor is now stated on both sides. Below it a luma edit shifts a channel by under 0.05 of one
-8-bit level, which is beneath the format's own quantization and cannot produce the cast the pin
-exists to catch. The Rust side agreed with the Python-generated table on all 19 rows first time.
+**Deviation, 7c (`d597594`).** CI installs `numpy` in the `links` job. The colour table pins array
+functions, so without it that group would skip on the one runner that cannot skip anything else.
 
-**One deviation from 7b as written, and it is in the table's favour.** The phase asks for "two
-saturated values whose chroma terms land outside `0..=255`". Across the entire 8-bit cube the
-**forward** chroma terms reach exactly ±0.5 past each end and no further — pure red's Cr is 255.5
-and pure cyan's is 0.5, and those two rows are the whole forward-direction clamp. The clamp that
-genuinely bites is on the **inverse**, where an arbitrary YUV triple is the image of no RGB one and
-the terms leave the range by hundreds. So the table carries **both directions**, and five of the
-seven inverse rows clamp.
+**Finding, 7b.** The table's first bite attempt passed — a —0.0002 edit to the green luma weight
+moves no row. Its sensitivity was measured rather than assumed and is stated on both sides: it
+catches any single-coefficient edit of ±0.0005 or larger, below which the shift is under 0.05 of
+one 8-bit level.
 
-**7c.** Wired into the CI `links` job and `.githooks/pre-push` behind a `python3` guard. **CI
-installs `numpy`**, because the 7b group pins array functions and would otherwise skip on the one
-runner that cannot skip anything else. The end-to-end group skips on that runner, which builds no
-`shot`; that is not a hole, since the same byte identity is asserted in-process at four geometries.
-The check count moved 186 → **207**, with 188 without `numpy` and 183 without a built `shot` — all
-three measured, not derived.
+**Finding, 7e.** The figure gate's first run put all 1 816 prose lines of `docs/capturing.md` in
+scope — an ancestor heading inherited its descendant's mention, so the `# H1` matched. A section
+now qualifies on its own lines only.
 
-**7e.** `docs/diffusion-filter.md` is the canonical page. `docs/capturing.md` drops 127 lines to 19
-(2 121 → **2 015**, against ADR-0120's predicted ~2 006) and keeps only the pipe-level fact;
-`tools/sd-filter/README.md` becomes install plus a pointer; `README.md` keeps a paragraph, a link
-and one marked orientation figure. `scripts/check-filter-figures.mjs` is the fourth gate.
-**Both of its bite paths were seen to fail and reverted.** Its first run put **all 1 816 prose lines
-of `docs/capturing.md` in scope** — an ancestor heading inherited its descendant's mention, so the
-`# H1` matched and swallowed the file; a section now qualifies on its **own** lines only.
-`scripts/fixtures/filter-figures/` pins five breaks and, more importantly, **four silences**.
+**Finding, against Phase 6's own log.** The `attractor_leviathan` variant recorded there is
+contaminated. Its diffusion mean reads 11.853 s against `star_rosewindow`'s 1.608 s, and one sample
+absorbed 32 335 s — the 8.98-hour suspend the same log describes. Its wall clock spans 2026-08-24
+23:37:46 to 2026-08-25 11:05:06 for 9 466 frames (`spike/p6/run.log`). Phase 6's **preset 1.188x**
+factor and its **0.650 s/frame, within 2.5 % of predicted** confirmation both rest on that reading.
+The process pair that log calls suspended was still running, and exited on completion at 11:05:06.
 
-**Anchors were checked by hand**, since `check-doc-links.mjs` does not validate fragments.
-**No anchor into any file this phase changed is broken** — the
-`capturing.md#a-filter-stage-between-shot-and-the-encoder` heading was kept deliberately so inbound
-links survive the rewrite under it. The repo does carry **52 broken fragment anchors**, but they are
-**pre-existing and unrelated**: the identical 52 are on `main`. 49 of them point at
-`docs/design-backlog.md#NNNN--...` bodies that were moved to the archive without their anchors being
-re-pointed — which is close-ceremony step 3c's known hazard, accumulated. Reported, not fixed:
-repairing them is outside this plan.
+**Measurement, 7d, `--profile fast`** — `attractor_leviathan`, 1920x1080 in and out, 1 350 frames
+from `spike/p7/seg45.wav`, RTX 3080 Laptop 8 GB, torch 2.6.0+cu124, GPU otherwise idle. Clip and log
+kept at `spike/p7/`:
 
-**7d, first half.** `report()` now prints a **wall-clock** cost per emitted frame (elapsed from the
-head of the stream, divided by frames emitted, with the model load named separately) **and** the
-diffusion-call mean, no longer divided by the stride and no longer wearing the other's label, plus
-one line saying what the gap between them is. Eight checks cover the arithmetic and the labelling —
-which is exactly what was wrong — and need no GPU.
+| | instrument | external stopwatch |
+|---|---|---|
+| elapsed | 936.1 s | 944 s |
+| per emitted frame | 0.693 s | 0.699 s |
 
-**7d, second half: NOT DONE, and deliberately not faked.** It needs a quiet GPU and another process
-(PID 6756, a Python 3.12 job unrelated to this plan) is holding the card at 98 % with 4.3 GB. Phase 6
-recorded that two diffusion jobs on this 8 GB card contend rather than parallelize, so a figure
-measured now would be a measurement of the contention — the same class of error this phase exists
-to fix, one level over. Still owed:
+0.84 % apart; the difference is `shot` startup, shader compilation and `ffmpeg` finalize, outside the
+stage. Diffusion call alone 1.291 s over 450 diffused; peak VRAM 3.81 GiB; model load 40.7 s of the
+elapsed. The shipped figures are 1.354 s and 0.451 s.
 
-- one run of the **fixed** instrument over 1 000+ frames, stopwatched externally, to confirm the two
-  agree;
-- the corrected figures in `docs/diffusion-filter.md`'s marked region and `README.md`'s orientation
-  line, each saying **which** cost it is.
+**Finding, ADR number collision.** `main` carries
+`docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md` (commit `8b68cea`); this branch carries
+`docs/adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md`. Both `proposed`, different
+filenames, so a merge takes both silently. 13 files on this branch cite the number.
 
-**What the corrected `fast` figure already is, from Phase 6 and awaiting only confirmation:**
-`attractor_leviathan` — the preset the table names — ran at **0.650 s per emitted frame wall
-clock** over 9 466 frames, against 0.451 s documented. `quality` has never been measured on a real
-track and is the genuine gap. The two documents are **knowingly stale** until that run happens; the
-plan's own order (*"Fix the instrument first, then the documents from what it reports"*) is why they
-were left rather than corrected from a broken instrument.
+**Finding, unrelated to this plan.** The repo carries 52 broken markdown fragment anchors, identical
+on `main`; 49 point at `docs/design-backlog.md#NNNN--...` bodies moved to the archive without their
+anchors re-pointed. None involve a file this phase changed. Not acted on.
 
-**Two orphaned processes from Phase 6 are still alive** (`shot.exe` 14844 and the spike venv's
-`python.exe` 15456, both started 2026-08-24 23:37:46, the sleep incident this log already records).
-They hold no GPU compute but they do hold file handles on `spike/`, which is why that directory
-cannot be renamed or removed. Left running: they are not mine to kill.
+**Not done.** 7d's `quality` measurement, and the corrected figures in `docs/diffusion-filter.md`'s
+marked region and `README.md`'s orientation line. Both documents state the superseded numbers until
+that lands.
 
 
 ## Followups (after this lands)
