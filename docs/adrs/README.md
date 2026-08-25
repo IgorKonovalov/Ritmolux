@@ -7,10 +7,11 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0122.** *(0120 was reserved for
+**Next free number: 0123.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
-pool when that phase did not run, on Phase 2's stop condition; it was then taken 2026-08-25. The
-sequence is dense again and nothing is held.)*
+pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
+2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
+sidecar ADR renumbered to 0122 at its close. The sequence is dense again and nothing is held.)*
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -140,8 +141,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), three Outcome |
 
 | [0119](0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) | The video echo blends toward its copy rather than adding it | accepted 2026-08-19 (Plan 0109) |
-
-| [0120](0120-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | proposed 2026-08-25 (Plan 0106) |
-
+| [0120](0120-the-close-brief-is-a-section-of-the-plan.md) | The close brief is a section of the plan, written as the phases land | accepted 2026-08-25 (0112) |
 | [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | accepted 2026-08-25 (Plan 0106), one Outcome |
+| [0122](0122-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | accepted 2026-08-25 (Plan 0106) |
 <!-- roster:end -->

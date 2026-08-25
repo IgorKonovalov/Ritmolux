@@ -10,7 +10,7 @@
 > and ADR-0121 has taken them as a dated `Outcome`.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0120](../adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md) — written
+> **Related ADRs:** [0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md) — written
 > 2026-08-25, the documentation design pass; and
 > [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
 > — the deferred ADR, written 2026-08-20 between Phases 2 and 3 against the spike's evidence exactly
@@ -410,7 +410,7 @@ group already asserts at four geometries against hostile payloads, and paying fo
 build matrices buys the word "real" and nothing else.
 
 **7e — the feature's documentation collapses to one page, and a gate keeps it there. Do this
-BEFORE 7d.** Carries [ADR-0120](../adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md).
+BEFORE 7d.** Carries [ADR-0122](../adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md).
 The filter is documented in three files, and profiles, `--size`, `--stride` and the check are each
 written out **in full, in different words**, in both `docs/capturing.md` and
 `tools/sd-filter/README.md` — so the copies cannot be diffed and disagree silently by construction.
@@ -1089,7 +1089,7 @@ variant: `attractor_leviathan` — the preset the documented 1.354 was measured 
 s/frame** wall-clock against 0.634 predicted (0.451 x 1.406), within 2.5 %. So the shipped figure is
 a **sound diffusion-only number for its own preset**, and the two errors are independent: a scope
 mislabel that affects everything, and a genuine per-preset difference. Phase 7d fixes the
-instrument; ADR-0120 fixes where the numbers live.
+instrument; ADR-0122 (written as 0120) fixes where the numbers live.
 
 **Two hypotheses died on the way, both worth recording so they are not re-run.** Thermal throttling:
 the rate was **flat** across every interval (0.6365, 0.642) and `nvidia-smi` showed no throttle

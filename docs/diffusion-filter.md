@@ -11,7 +11,7 @@ the check are stated here and nowhere else; [`docs/capturing.md`](capturing.md),
 [`tools/sd-filter/README.md`](../tools/sd-filter/README.md) and the top-level
 [`README.md`](../README.md) are pointers that carry no figure of their own, and a
 gate holds them to that
-([ADR-0120](adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md)). A
+([ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)). A
 followup adds a section here rather than a fourth copy elsewhere.
 
 **Nothing here ships.** No model, no weights and no Python runtime are in the

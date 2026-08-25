@@ -13,7 +13,7 @@
 //
 // So this gate enforces the ABSENCE of copies, not the agreement of copies. A
 // same-value check across a known list would have reproduced the miss exactly —
-// the copy that broke it was the one outside the list. See ADR-0120.
+// the copy that broke it was the one outside the list. See ADR-0122.
 //
 // Usage:  node scripts/check-filter-figures.mjs [root]
 // Exit 0 = every cost figure is in the canonical page (or on the one whitelisted
@@ -39,7 +39,7 @@
 //
 // DATED RECORDS ARE OUT OF SCOPE, and deliberately: plans, ADRs and the backlog
 // record what was true when they were written, and are not instructions to a
-// reader. ADR-0120 accepts that half explicitly.
+// reader. ADR-0122 accepts that half explicitly.
 //
 // THE GATE'S OWN HOLES, named here rather than left to be discovered:
 //   1. A figure spelled in words ("roughly fifty-four minutes") is not matched.
@@ -276,7 +276,7 @@ for (const file of files) {
 
 if (orientationLines > 1) {
   violations.push(
-    `${orientationLines} orientation lines carry figures; ADR-0120 allows exactly one`,
+    `${orientationLines} orientation lines carry figures; ADR-0122 allows exactly one`,
   );
 }
 
@@ -303,7 +303,7 @@ if (violations.length > 0) {
   for (const v of violations) console.error(`  ${v}`);
   console.error(
     "\nThe diffusion filter's numbers live in docs/diffusion-filter.md and\n" +
-      "nowhere else (ADR-0120). Every other mention is a pointer that carries no\n" +
+      "nowhere else (ADR-0122). Every other mention is a pointer that carries no\n" +
       "figure of its own, so a correction has exactly one place to land.\n" +
       "\n" +
       "  - move the figure into the <!-- figures:begin --> region of the\n" +

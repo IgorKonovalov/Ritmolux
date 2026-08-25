@@ -9,7 +9,7 @@ tracking the music.
 [`docs/diffusion-filter.md`](../../docs/diffusion-filter.md).** The canonical
 command, the profiles, the flags, what it costs and what the check covers all live
 there and only there, so a correction has one place to land
-([ADR-0120](../../docs/adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md)).
+([ADR-0122](../../docs/adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)).
 This file is how to install it, and nothing else.
 
 **Nothing here ships.** No model, no weights and no Python runtime are in the
