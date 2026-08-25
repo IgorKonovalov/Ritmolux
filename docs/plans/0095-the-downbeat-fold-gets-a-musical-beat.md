@@ -212,52 +212,61 @@ flowchart LR
 | 2 — the octave repair | dev | done | `09abdee` |
 | 3 — the bar grid | dev | done | `cae98a5` |
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
-| 5 — re-measure through the instrument | human | **deferred by the user, 2026-08-25** | — |
+| 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
 | 6 — the authoring docs | dev | not started | — |
 
-**Session stopped at Phase 5, and the user deferred the capture to a later sitting.** Phases 1-4
-are landed and the whole suite is green (`cargo nextest run -p lmv-core`, 725 passed). Phase 6 is
-`dev` but sits behind Phase 5: one of its done-whens — "the bar trio's entry reflects whatever
-Phase 5 measured" — cannot be written until the capture is read, so the phase was left whole rather
-than half-written. **The plan is therefore parked, not finished, and it is not ready for its close
-review.**
+**Phase 5 ran 2026-08-25**, three genres through the live app on the user's own material, ~5 min
+each (`spike/after-{techno,rockpop,hiphop}.log`, gitignored). Phase 6 is still `dev` and still
+unwritten; the plan is not yet ready for its close review.
 
-What Phase 6 needs from Phase 5 is the publish rate per genre against the 2.89 / 1.59 / 2.27 %
-baseline, and whether the backbeat rock/pop degeneracy signature survives. **Nothing in Phases 1-4
-changed what `beat_index` counts, so Phase 5's detections-per-beat column will still read
-1.7-2.1x** — that is the plan's own prediction and not a null result; what must have changed is
-that the *fold* no longer tracks it.
+**The capture is single-arm — but the control was recovered offline, and that is the reading to
+trust.** Comparing against Plan 0086's table means comparing across different code *and* different
+tracks. A `downbeat.log` row carries `beat` (the old fold's bucket index) and the `bass`/`onset` it
+folded, so the **pre-0095 fold was reconstructed from each capture's own rows**
+(`spike/replay-old-fold.mjs`): same audio, same detections, same accent formula. Not bit-exact —
+the logged band levels can be stale by `time_since_beat`, and the *new* arm cannot be reconstructed
+because no log column carries the grid — but it removes the material confound entirely.
 
-### Running the deferred capture
+| paired, same audio | rock/pop | hip-hop | techno |
+|---|---|---|---|
+| `effect_raw` med, old → new | 0.0746 → **0.1680** | 0.0998 → **0.1178** | 0.0744 → 0.0493 |
+| `effect_corrected` med, old → new | 0.0000 → **0.0780** | 0.0018 → **0.0217** | 0.0000 → 0.0000 |
+| `effect_corrected` p90, old → new | 0.0843 → **0.2060** | 0.1445 → **0.1821** | 0.1231 → 0.0418 |
+| rows with corrected > 0 | 37.0 → **87.2 %** | 51.0 → **56.2 %** | 38.9 → 21.0 % |
+| **rows over the 0.25 gate** | **0.00 → 2.36 %** | **0.79 → 3.67 %** | **4.16 → 0.42 %** |
+| publish rate vs 0086 baseline | 2.27 → 2.36 % | 1.59 → 3.67 % | 2.89 → 0.42 % |
+| detections per beat (new capture) | 1.20x | 1.22x | 2.28x |
+| `best == held` | 23.3 → 63.8 % | — → 57.8 % | 37.2 → 48.1 % |
+| sorted profile (new) | .525/.473/.404/.275 | .581/.513/.467/.415 | .614/.570/.540/.504 |
 
-From this worktree, so the app under test is the one with the grid — an installed build or a
-`main` build measures the defect rather than the repair:
+**Two of three genres improve on every measure; techno regresses tenfold, and `dev`'s reading is
+that the regression is the repair working — which is exactly the claim architect should test
+hardest.** Four-on-the-floor has a kick on every beat, so there is no bar-scale accent structure to
+find. The old fold bucketed by a counter running at 2.28 detections per beat, making its "bar"
+1.75 musical beats long and aliasing its four buckets onto the kick/hat alternation — a real
+4-periodicity that is **not a bar**. It scored well and locked 4.16 % of the time onto a musically
+meaningless phase, which is precisely the confidently-wrong downbeat ADR-0050 calls worse than
+none. Given a true bar, the fold finds little there and declines to publish.
 
-```
-cargo build -p standalone --release --bin lmv
-target\release\lmv.exe --downbeat-log spike\after-techno.log
-```
+**The gate is now the binding constraint where it never was.** On rock/pop `effect_corrected` p90
+is 0.2060 against `CONFIDENCE_THRESHOLD` 0.25: the distribution moved up *under* the gate rather
+than through it. ADR-0082's reason for that threshold was argued when the estimator had no signal
+at all, which is no longer the case — a successor question, not this plan's to move.
 
-Repeat for `spike\after-hiphop.log` and `spike\after-rockpop.log`. Four things that bite:
+**Three things the capture did not settle, kept because they bound the claim:**
 
-- **Pass an explicit path each time.** A bare `--downbeat-log` always writes
-  `%APPDATA%\light-music-visualizer\downbeat.log`, so the second capture clobbers the first.
-  `spike/` is gitignored and is the lane's home for measurement logs.
-- **Keep the window visible.** Rows come off the frame path, which returns early while occluded or
-  zero-sized, so a minimized window logs nothing and it is only discoverable afterwards.
-- **240 s per genre**, matching Plan 0086 Phase 2, same three classes: techno ~130, instrumental
-  hip-hop, backbeat rock/pop. Play through the default output device; loopback picks it up.
-- The preset is irrelevant — the log is analysis-side.
-
-**One decision left open, and it is the user's.** Plan 0086's baseline was captured on 2026-08-15,
-on code without the grid, on tracks that plan never names — so reading a fresh capture against its
-table compares across two unknowns at once. A **paired control** — each track captured twice, once
-off a `main` build and once off this lane, back to back — costs ~24 minutes of playback instead of
-~12 and turns the comparison into a paired measurement on identical material, which is the
-bless-to-bless-against-a-control discipline this repo already applies to goldens. Rock/pop alone
-would be ~8 minutes and is the genre carrying ADR-0097's degeneracy signature. The single-arm
-reading is defensible too — the effect being looked for is large — but it inherits Plan 0086's own
-`n = 1 track per genre` caveat on top of the code/material confound.
+- **No instrument sees the grid.** Neither `downbeat.log` nor `diagnostics.log` carries
+  `beat_in_bar`, `bar_index` or anything from `grid.rs` — Plan 0086 built the log before the grid
+  existed. So "the grid tracks and the accent feature is weak" and "the grid does not track on real
+  material" are not separable from these captures; the synthetic evidence for the former is in
+  `grid.rs`'s tests and `the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio`.
+- **The hip-hop tempo spanned the octave**: `bpm` p10/med/p90 read 89.3 / 165.4 / 181.4 on a track
+  that counts at ~90. Phase 2's hold suppresses hop-to-hop flicker, not a sustained switch, and the
+  halving direction is the one Phase 2 measured as undiscriminable. At 2x the grid's bar spans two
+  musical beats — a stable integer relationship, unlike the old wandering ratio, but not a bar.
+  Plan 0086 recorded this genre's tempo as unresolved too (ear ~90, estimator 137.7 then).
+- **n = 1 track per genre**, as in Plan 0086. The paired control removes the material confound
+  between the arms; it does not make one track per genre representative.
 
 **Phase 1's table** (`cargo nextest run -p lmv-core --test tempo_probe --no-capture`), the reading
 Phase 2 chooses against:
