@@ -311,6 +311,7 @@ than the 1.20x-2.28x these captures measured.
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
 | 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
 | 6 — the authoring docs | dev | done | `80f346f` |
+| 7 — the review findings are repaired | dev | done | code `cd00aa1`, docs committed with this row |
 
 **Phase 6 took `.claude/skills/preset-author/SKILL.md:105-107` as the skill-lane target instead of
 the `references/` the phase names.** No file under `references/` mentions `beat_index` or the bar
@@ -318,8 +319,7 @@ trio; SKILL.md carried the sharpest statement of the idiom anywhere ("build an a
 and treat the bar trio as decorative", plus a "~3 % lock rate").
 
 **Phase 5 ran 2026-08-25**, three genres through the live app on the user's own material, ~5 min
-each (`spike/after-{techno,rockpop,hiphop}.log`, gitignored). Phase 6 is still `dev` and still
-unwritten; the plan is not yet ready for its close review.
+each (`spike/after-{techno,rockpop,hiphop}.log`, gitignored).
 
 **The capture is single-arm — but the control was recovered offline, and that is the reading to
 trust.** Comparing against Plan 0086's table means comparing across different code *and* different
@@ -427,6 +427,17 @@ driven by a hand-built `AnalysisFrame` (`core/tests/composite.rs:223`), never by
 DSP change reaches it — the re-bless the phase called for was structurally unreachable rather than
 merely unexercised, and no baseline-drift control was run.
 
+**Phase 7a's test was run against the defect before it was run against the repair.** Neutralising
+the offset to `0` in `mod.rs` and re-running
+`the_grid_handover_does_not_step_the_bar_backwards` fails at
+`click 120: bar_index went backwards, 1 then 0 (hop 414, bpm 119.9, beat_index 7)` — the exact seam
+the review measured, and the reason the test is not tautological. Restored and green after.
+
+**Phase 7b's residual is 0.02 bars over 14 s**, against the 0.05 the sibling rate test states, so
+the looser tolerance the phase allowed for was not needed and the two tests hold the same number.
+On both off-beat stimuli the estimate averaged 180.4 BPM against a 90 BPM truth, which the test
+asserts as its own entry requirement rather than assuming.
+
 ### Notes
 
 - **Deviation, Phase 6:** the skill-lane target was `.claude/skills/preset-author/SKILL.md` rather
@@ -434,25 +445,32 @@ merely unexercised, and no baseline-drift control was run.
 - **Deviation, Phase 6:** `docs/presets.md`'s `bar_index` note documented it as
   `(beat_index - alignment) / 4`, which Phase 4 made stale; corrected to the grid's beat count in
   the same commit, though the phase's stated scope was `beat_index`'s meaning.
-- **Not acted on:** `core/src/dsp/mod.rs:160` still carries that same stale
-  `(beat_index - alignment) / 4` derivation for `AnalysisFrame::bar_index` — a Phase 4 doc-comment
-  miss, outside Phase 6's file list, left as found.
-- **Not acted on:** `presets/attractor_walkdejong.toml:43-45` makes the falsified claim the phase
-  retracts ("Every 16 beats is ~8 s at 120 BPM") and is not among the plan's six;
-  `presets/shape_pulse.toml:123` states "about 1.7-2.1x per musical beat", narrower than the
-  1.20x-2.28x these captures measured. Neither is in the phase's file list.
-- **Followup:** the six presets' expressions are unchanged by construction — the Phase 6 diff over
-  `presets/*.toml` contains no non-comment line — so the `preset-author` re-tune the plan lists
-  under `## Followups` is still open.
+- **Was:** the two "not acted on" items above — `core/src/dsp/mod.rs:160`'s stale derivation and
+  the `attractor_walkdejong` / `shape_pulse` headers — were repaired by Phase 7e and 7f. They are
+  left written here because the review found them from this section.
+- **Deviation, Phase 7e:** the sub-item named two doc comments; `core/src/dsp/mod.rs` carried a
+  **third** instance of the same falsehood in the same struct — `AnalysisFrame::beat_index`'s own
+  doc read "Monotone count of beats since the stream started", and `beat_in_bar`'s read
+  "`beat_index % 4`". Both corrected in the same commit. The file is in the phase's list; the
+  sub-item did not name these two fields.
+- **Deviation, Phase 7c:** the sub-item named `presets/README.md` and the skill's `SKILL.md`;
+  `docs/presets.md` carried the identical claim ("alignments of a real bar") and was corrected
+  alongside them. In the phase's file list, not in the sub-item's sentence.
+- **Followup:** the six presets' expressions are unchanged by construction — the Phase 6 and
+  Phase 7 diffs over `presets/*.toml` contain no non-comment line — so the `preset-author` re-tune
+  the plan lists under `## Followups` is still open.
 
 ### Close triggers
 
 - **`presets/` touched:** yes — `presets/README.md` and the six named `.toml`
   (`attractor_valentine`, `attractor_torusknot`, `attractor_thomas`, `attractor_dragon`,
-  `curve_nightbloom`, `fragment_vitrail`), comments only in the `.toml`.
+  `curve_nightbloom`, `fragment_vitrail`), plus `attractor_walkdejong` and `shape_pulse` at
+  Phase 7f. Comments only in every `.toml` — the diff over `presets/*.toml` across the whole plan
+  contains no non-comment line.
 - **`Closes:` entries in the plan header:** none — the header carries no `Closes:` line.
-- **What shipped:** feature (Phases 2-4 change analysis behaviour: `fix(dsp)` `09abdee`,
-  `feat(dsp)` `cae98a5`, `feat(dsp)` `d4e7cec`) plus test-only `5bdce91` and this docs phase.
+- **What shipped:** feature (Phases 2-4 and 7a change analysis behaviour: `fix(dsp)` `09abdee`,
+  `feat(dsp)` `cae98a5`, `feat(dsp)` `d4e7cec`, and Phase 7a's `fix(dsp)`) plus test-only `5bdce91`
+  and the two docs phases.
 - **Operator docs moved:** `docs/presets.md`, `presets/README.md`,
   `.claude/skills/preset-author/SKILL.md`. Not moved: `docs/nfr.md`, `docs/capturing.md`,
   `docs/releasing.md`, `docs/specs/`, `CLAUDE.md`, `docs/adrs/`.
@@ -462,8 +480,11 @@ merely unexercised, and no baseline-drift control was run.
   (`core/src/dsp/downbeat.rs`, and `presets/README.md`), **0021** and **0092** (`core/src`).
 - **`human` phases remaining:** none — Phase 5 ran 2026-08-25.
 - **Gates run at the tip:** `check-doc-links.mjs` OK, `check-index-rows.mjs` OK,
-  `cargo fmt --all --check` clean, `cargo nextest run -p lmv-core --test sanity --test reactivity
-  --test preset --test hygiene` 63 passed / 0 failed.
+  `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` clean,
+  and the **whole** `cargo nextest run -p lmv-core` at 727 passed / 0 failed / 3 skipped (725
+  before Phase 7; the two added are `the_grid_handover_does_not_step_the_bar_backwards` and
+  `the_grid_tracks_a_wrong_octave_estimate`). The narrower four-target run the earlier close block
+  cited is superseded by this one.
 
 ## Followups (after this lands)
 

@@ -120,11 +120,16 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
 
 `beat_in_bar`, `bar_index` and `bar_phase` come from a **gated** downbeat
 estimator and are counter-derived whenever it is not confident. Since Plan 0095
-that estimator folds over a tempo-driven bar grid rather than over `beat_index`,
-so its unit really is a bar. Re-measured through the live app on three genres —
-paired against a reconstruction of the pre-0095 fold on the same captures — the
-share of hops over the `0.25` confidence gate moved **0.00 -> 2.36 %** on
-rock/pop, **0.79 -> 3.67 %** on hip-hop and **4.16 -> 0.42 %** on techno.
+that estimator folds over a **tempo-driven** bar grid rather than over
+`beat_index`, so its unit is a stable multiple of the beat instead of a
+wandering one — a real bar when the tempo estimate is on the right octave, and
+half or double one when it is not. That caveat is not theoretical: on the
+hip-hop capture below the estimate read a 165 BPM median on a track that counts
+at ~90, so its "bar" there spanned two musical beats. Re-measured through the
+live app on three genres — paired against a reconstruction of the pre-0095 fold
+on the same captures — the share of hops over the `0.25` confidence gate moved
+**0.00 -> 2.36 %** on rock/pop, **0.79 -> 3.67 %** on hip-hop (at that wrong
+octave) and **4.16 -> 0.42 %** on techno.
 
 Read that as **roughly 2-4 % on material with bar-scale accents, near zero on
 material without.** Four-on-the-floor puts a kick on every beat, so there is no

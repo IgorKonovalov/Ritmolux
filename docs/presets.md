@@ -885,14 +885,23 @@ deliberately, and you do not need to. 4/4 is assumed.
 > **How often is it locked? Roughly 2–4 % of hops on material with bar-scale
 > accents, and near zero on material without.** Since Plan 0095 the estimator
 > folds accent history over a **tempo-driven bar grid** instead of over
-> `beat_index`, so the four alignments it chooses between are alignments of a real
-> bar. Re-measured through the live app on three genres, each paired against a
+> `beat_index`, so the four alignments it chooses between are alignments of a unit
+> that is a **stable multiple of the beat** rather than a wandering one — a real
+> bar when the tempo estimate is on the right octave, half or double one when it
+> is not. Re-measured through the live app on three genres, each paired against a
 > reconstruction of the pre-0095 fold on the same capture, the share of hops over
 > the `0.25` confidence gate moved:
 >
 > | | rock/pop | hip-hop | techno |
 > |---|---|---|---|
 > | over the gate, old → new | 0.00 → **2.36 %** | 0.79 → **3.67 %** | 4.16 → **0.42 %** |
+>
+> **The hip-hop column carries that caveat.** Its capture read a `bpm` median of
+> 165 on a track that counts at ~90 — an octave high, which
+> [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md) records as the
+> half of the ambiguity the autocorrelation has no evidence to settle — so the
+> grid's "bar" there spanned two musical beats. A stable two, not a wandering
+> 1.35-2.10, which is the whole improvement; but not a bar.
 >
 > **Techno declining is the repair working, not a regression.** Four-on-the-floor
 > puts a kick on every beat, so there is no bar-scale accent structure to find; the
