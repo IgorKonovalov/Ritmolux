@@ -222,7 +222,7 @@ bit-exact and reproducible across machines, so it is the only part that can be a
 real gate. Everything the model touches is not, which is why **no diffused frame
 may ever enter `core/tests/golden/`**.
 
-**207 checks**, standard library plus `numpy`, no GPU and no weights. It asserts
+**215 checks**, standard library plus `numpy`, no GPU and no weights. It asserts
 the pass-through round-trip at four geometries and four colour spaces, that an
 unmodelled header or `FRAME` tag survives verbatim, that a malformed stream fails
 loudly rather than emitting garbage, that the pixel budget lands within 0.5 % at
@@ -235,8 +235,8 @@ sides.
 
 Two groups skip on their own terms, each with a printed notice rather than a quiet
 pass: the colour table needs `numpy`, and the end-to-end group needs a built
-`shot`. The counts are **207** with both, 188 without `numpy`, 183 without a built
-`shot`. CI runs the suite on `ubuntu-latest` and installs `numpy` so that group
+`shot`. The counts are **215** with both, 196 without `numpy`, 210 without a built
+`shot` — measured 2026-08-25 by running it three ways, not derived. CI runs the suite on `ubuntu-latest` and installs `numpy` so that group
 runs there; `.githooks/pre-push` runs it behind a `python3` guard.
 
 ## Known sharp edges
