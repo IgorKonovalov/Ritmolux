@@ -74,6 +74,28 @@ impl std::fmt::Display for RenderError {
 
 impl std::error::Error for RenderError {}
 
+/// One line naming a GPU and its driver, for an ADR-0071 report.
+///
+/// Every field is taken verbatim from wgpu rather than interpreted; a report
+/// that paraphrases its machine is worse than one that quotes it. Empty fields
+/// are dropped so a backend that reports no driver string does not print an
+/// empty pair of parentheses.
+fn describe_adapter(info: &wgpu::AdapterInfo) -> String {
+    let mut out = if info.name.is_empty() {
+        "unnamed adapter".to_string()
+    } else {
+        info.name.clone()
+    };
+    out.push_str(&format!(" ({:?}, {:?})", info.backend, info.device_type));
+    if !info.driver.is_empty() {
+        out.push_str(&format!(", driver {}", info.driver));
+    }
+    if !info.driver_info.is_empty() {
+        out.push_str(&format!(" {}", info.driver_info));
+    }
+    out
+}
+
 /// Owns the wgpu instance, surface, device, and queue for one output window.
 ///
 /// `surface` is `None` for a **headless** context (Plan 0013): a device+queue
@@ -91,6 +113,16 @@ pub struct RenderContext {
     /// rasterizer can't render faithfully (e.g. fullscreen-scene + background
     /// pipeline coexistence, a documented WARP quirk).
     is_software: bool,
+    /// The selected adapter's own description — name, backend, device type and
+    /// driver — kept as a formatted string rather than as `wgpu::AdapterInfo` so
+    /// no consumer has to name a wgpu type to read it.
+    ///
+    /// **This exists for `ADR-0071` reports, and only for them.** A frame time is
+    /// a fact about a GPU and a driver rather than about the code, so a test that
+    /// prints one has to be able to say which GPU and which driver; before Plan
+    /// 0113 Phase 2 nothing in the crate could. Nothing on a render path reads
+    /// it.
+    adapter: String,
 }
 
 impl RenderContext {
@@ -153,13 +185,16 @@ impl RenderContext {
         config.desired_maximum_frame_latency = 2;
         surface.configure(&device, &config);
 
-        let is_software = adapter.get_info().device_type == wgpu::DeviceType::Cpu;
+        let info = adapter.get_info();
+        let is_software = info.device_type == wgpu::DeviceType::Cpu;
+        let adapter = describe_adapter(&info);
         Ok(Self {
             surface: Some(surface),
             device,
             queue,
             config,
             is_software,
+            adapter,
         })
     }
 
@@ -200,13 +235,16 @@ impl RenderContext {
             view_formats: vec![],
         };
 
-        let is_software = adapter.get_info().device_type == wgpu::DeviceType::Cpu;
+        let info = adapter.get_info();
+        let is_software = info.device_type == wgpu::DeviceType::Cpu;
+        let adapter = describe_adapter(&info);
         Ok(Self {
             surface: None,
             device,
             queue,
             config,
             is_software,
+            adapter,
         })
     }
 
@@ -230,6 +268,12 @@ impl RenderContext {
     /// Whether the active adapter is a CPU/software rasterizer (see the field).
     pub(crate) fn is_software(&self) -> bool {
         self.is_software
+    }
+
+    /// The active adapter's description — name, backend, device type, driver —
+    /// for a report that has to name the machine it was taken on (ADR-0071).
+    pub(crate) fn adapter(&self) -> &str {
+        &self.adapter
     }
 
     /// Re-apply the current configuration (after a Lost/Outdated surface).
