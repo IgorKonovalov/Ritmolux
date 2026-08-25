@@ -446,6 +446,16 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // test's printed distribution when the first one ships**, at half the
         // family minimum like every floor above.
         SystemKind::WarpMesh => 0.50,
+        // **Not derived from a distribution either**, and for this family it may
+        // never need to be: a `shape_collage` canvas paints its own paper across
+        // every pixel (ADR-0123), so its lit fraction is 1.0 by construction
+        // whatever the elements do, and the statistic this floor is made of
+        // cannot distinguish a good canvas from an empty one. Inherited from
+        // `FragmentField` on the same structural argument as the two above.
+        // **The question this family actually needs asked is tonal, not areal**
+        // — a canvas that drew no elements is a flat sheet of paper, which
+        // `MAX_TONAL_FLATNESS` sees and coverage does not.
+        SystemKind::ShapeCollage => 0.50,
     }
 }
 
@@ -462,6 +472,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Emitter => "emitter",
         SystemKind::ShapeField => "shape_field",
         SystemKind::WarpMesh => "warp_mesh",
+        SystemKind::ShapeCollage => "shape_collage",
     }
 }
 

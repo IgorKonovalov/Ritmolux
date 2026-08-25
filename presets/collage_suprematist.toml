@@ -1,0 +1,132 @@
+# Suprematist - flat opaque planes on off-white paper, in painter order.
+# The first shipped world on `shape_collage` (ADR-0123, Plan 0113).
+#
+# THE MECHANISM: every other system in this engine draws LIGHT, and additive
+# light has no notion of one object being in front of another. This one draws a
+# GRAPHIC. A pixel starts at the paper colour and walks the element array in
+# array order, compositing each with `over` - so the black bar genuinely sits in
+# front of the blue plane, and the array index IS the depth. There is no glow,
+# no bloom and no halo anywhere in this file, and that is not restraint: it is
+# what the palette below buys.
+#
+# -- THE ONE AUTHORING FACT THIS FILE EXISTS TO RECORD ---------------------------
+#
+# THE PALETTE STAYS UNDER THE TONEMAP'S KNEE, AND THAT ONE CONSTRAINT IS WHAT
+# MAKES THE LOOK. ADR-0046's curve is exactly the identity below linear 0.6, so a
+# colour whose brightest channel sits at or under it reaches the display
+# byte-identical - flat, unshaded, the colour that was authored. Bloom's
+# threshold sits ABOVE that same knee, so a canvas living under it gets no halo
+# either, and the edges stay hard. Two properties, one constraint, no parameter.
+#
+# Seven of the eight plateaus below are under it. The eighth is the paper, and it
+# is deliberately over: `f(1.0) = 0.800`, so pure white is unreachable and
+# near-white costs a linear emission above 1 - which re-enters bloom's threshold
+# and forfeits the free hard edge. Off-white is the affordable ground, and both
+# of the reference canvases this world comes from are off-white anyway. Reach for
+# a brighter palette here and the look goes, without anything telling you why.
+#
+# THE STOPS ARE PLATEAUS, NOT A GRADIENT. Each element's coordinate lands in the
+# interior of one band, so its fill is one exact colour rather than a sample off
+# a ramp. The pairs 0.0002 apart are the hard transitions. If you retune this,
+# keep that shape - a smooth ramp would shade every element and there would be
+# nothing flat left to be flat.
+#
+# WHAT DRIVES WHAT
+#   pan_x/y  the canvas floats - the only continuous motion this file has
+#   scale    a slow breath, plus the low end - the whole canvas leans in
+#   count    the composition builds and empties with the mid range
+#
+# All three are placeholders for the real reactivity: Plan 0113 Phase 6 brings
+# recomposition on the beat, per-element drift and spin, spawn/decay and
+# per-element pumping, and this file gets them then. Until it does, `count` is
+# the only thing that changes what is ON the canvas, and it moves through whole
+# elements - the scene quantizes it, so an eased value does not half-draw one.
+
+system = "shape_collage"
+name   = "Suprematist"
+
+[palette]
+stops = [
+  # black
+  { at = 0.0000, color = "#111111" },
+  { at = 0.1249, color = "#111111" },
+  # red
+  { at = 0.1251, color = "#8a1420" },
+  { at = 0.2499, color = "#8a1420" },
+  # ochre
+  { at = 0.2501, color = "#96751e" },
+  { at = 0.3749, color = "#96751e" },
+  # blue
+  { at = 0.3751, color = "#1e3a8a" },
+  { at = 0.4999, color = "#1e3a8a" },
+  # green
+  { at = 0.5001, color = "#1d5c34" },
+  { at = 0.6249, color = "#1d5c34" },
+  # grey
+  { at = 0.6251, color = "#4a4a4a" },
+  { at = 0.7499, color = "#4a4a4a" },
+  # plum
+  { at = 0.7501, color = "#5a1f4a" },
+  { at = 0.8749, color = "#5a1f4a" },
+  # THE PAPER. Linear 0.851, the one plateau over the knee - see the header.
+  { at = 0.8751, color = "#d9d5c8" },
+  { at = 1.0000, color = "#d9d5c8" },
+]
+
+[params]
+# A RAW palette coordinate, and pinned. `color_span` and `palette_shift` move the
+# elements' colours; the ground must not travel with them, so this number is not
+# reachable through either and is written here directly.
+paper = "0.9375"
+
+# THE CANVAS LEANS, IT DOES NOT PUMP. A ~47 s sine so the picture is alive in
+# silence, plus the low end gained from the cap by the house rule (C / 0.85 for
+# bass) so a typical passage sits near half of it and a peak reaches it. The
+# smoothing constant below is long to match: at a short tau the elements
+# visibly jumped size on every hit, which reads as a zoom and not as a canvas.
+scale = "1.00 + 0.045 * sin(time * 0.135) + clamp(bass * 0.1176, 0, 0.10)"
+
+# THE CANVAS FLOATS, AND THIS IS THE WHOLE OF THE CONTINUOUS MOTION until Phase 6
+# gives the elements their own drift and spin. Two sines at rates that do not
+# divide into each other, so the path never closes into a visible loop; the
+# offset on y keeps the two from starting together.
+#
+# The rates are not taste. A `shape_collage` canvas covers EVERY pixel - the
+# paper is the ground - so the whole frame is its footprint, and the motion gate
+# measures a mean over all of it rather than over a sparse figure's own lit
+# pixels. Motion here therefore has to come from element EDGES sweeping, which is
+# a small share of the frame, and a 46 s breath alone moved 0.0006 against the
+# gate's 0.01 floor. These rates put the canvas at roughly a pixel and a half of
+# travel per 0.4 s at 96 px, which is a slow float to the eye and a real number
+# to the gate.
+pan_x = "0.15 * sin(time * 0.62)"
+pan_y = "0.10 * sin(time * 0.81 + 1.1)"
+
+# THE COMPOSITION FILLS AND EMPTIES. Nine elements is the canvas reduced to its
+# structural bars and the black disc; fourteen is the whole of it. The scene
+# floors this to a whole element, so the count steps rather than fading - which
+# is the honest behaviour until Phase 6's `density` gives elements an age to
+# fade over.
+count = "9 + clamp(mid * 5.88, 0, 5)"
+
+# THE TOP END GOES ON COLOUR, NOT ON LIGHT. There is no brightness param in this
+# scene and there is deliberately nothing to blow out - the colours are already
+# at the palette's own levels, and pushing them would take the canvas over the
+# knee and lose the flat fill and the hard edge together. So the treble drives
+# `saturation` instead: the planes come up in chroma rather than in luminance,
+# which is a graphic move rather than a luminous one. The base sits slightly
+# under 1 so there is somewhere to come up FROM.
+saturation = "0.93 + clamp(treb * 0.0824, 0, 0.07)"
+
+[smoothing]
+# Long, deliberately. At 0.15 the bass term punched and the whole canvas read as
+# a zoom; half a second is the picture leaning into the low end.
+scale = 0.5
+# Shorter than the breath and different from it, so the two never resolve
+# together - but not zero: an element appearing is a hard event either way, and a
+# quarter second keeps a single mid-range transient from flickering one in and
+# out again.
+count = 0.25
+# Short: the chroma lift is the one thing here that should arrive with the beat
+# rather than behind it.
+saturation = 0.2

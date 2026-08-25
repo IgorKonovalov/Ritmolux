@@ -1,6 +1,6 @@
 # 0113 — The engine paints a canvas
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
@@ -291,11 +291,11 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 
 > Written by `dev` — one row per phase as that phase's commit lands.
 
-**Lane:** _(not yet started)_
+**Lane:** branch `plan-0113-shape-collage`, worktree `WORK/lmv-plan-0113`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The painter draws a static canvas | dev | not started | |
+| 1 — The painter draws a static canvas | dev | done | committed with this row |
 | 2 — What an element costs | dev | not started | |
 | 3 — The stop gate | human | not started | |
 | 4 — The layout generator and a sample sheet | dev | not started | |
@@ -305,6 +305,52 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 8 — Documentation and the shipped set | dev | not started | |
 
 ### Notes
+
+**Phase 1 — files outside the phase's list.** Five test files and one doc were
+touched that the phase does not name, each because a gate fires the moment the
+twelfth variant exists rather than at the phase that would have owned it:
+
+- `core/tests/{animation,reactivity,sanity,geometry_extent}.rs` — exhaustive
+  `SystemKind` matches, which is the mechanism the phase's own last done-when
+  describes. `sanity.rs` also needed a `coverage_floor` value; it is inherited
+  from `FragmentField` on `ShapeField`'s and `WarpMesh`'s structural argument,
+  and the arm records that coverage cannot judge this family at all — a
+  `shape_collage` canvas lights every pixel by construction.
+- `core/tests/golden.rs` — the exhaustive fixture roster.
+- `presets/README.md` — Phase 8's file.
+  `every_declared_param_is_documented_in_the_presets_readme` fails as soon as a
+  param is declared, so the roster row and a `shape_collage` section landed here
+  instead. Phase 7 and Phase 8 extend both.
+
+**Phase 1 — deviations.**
+
+- **The shipped preset carries motion and a band binding the plan does not
+  introduce until Phase 6.** All five gates sweep every embedded preset, so a
+  preset that ships in Phase 1 is held to `animation` and `reactivity` in
+  Phase 1. `scale`'s slow breath alone measured **0.0006** against the animation
+  gate's `0.01` floor, so `pan_x`/`pan_y` were added as a whole-canvas float
+  (**0.0219**), and `saturation` on the top end was added after the first
+  reactivity reading came in at **0.0209** against a `0.02` floor
+  (now **0.0342**). Both are marked in the preset as placeholders for Phase 6's
+  levers.
+- **The element struct's `shape` field carries `[cos, sin, kind, p0]`, not the
+  plan's `[angle, kind, p0, p1]`**, and `p1` moved to `tint.w`. The plan calls
+  the struct illustrative; the reason for the change is that an angle costs a
+  trig pair per pixel per element in the innermost loop, and puts the geometry on
+  `sin`'s implementation-defined precision, which ADR-0096 rules out elsewhere.
+  Size and alignment are unchanged at 64 bytes.
+- **The scene carries a `#[cfg(test)]` element-array override.** The done-when
+  requires two overlapping elements rendered in *both* array orders, and no
+  preset can reverse a compiled-in roster. It does not exist in a shipped build
+  (`Scene::feedback_field`'s argument).
+
+**Phase 1 — observation for the review.** The animation gate's `footprint_diff`
+statistic (ADR-0091) exists so a sparse figure's motion is not diluted into the
+empty frame around it — it means over the *lit* pixels only. A `shape_collage`
+canvas lights every pixel, because the paper is the ground, so its footprint is
+the whole frame and the dilution ADR-0091 removed returns by another door: the
+gate reads a full-coverage graphic scene the way the pre-0091 gate read
+everything. The number this preset ships at was chosen against that floor.
 
 ### Close triggers
 
