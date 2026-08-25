@@ -213,7 +213,7 @@ flowchart LR
 | 3 — the bar grid | dev | done | `cae98a5` |
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
 | 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
-| 6 — the authoring docs | dev | done | `committed with this row` |
+| 6 — the authoring docs | dev | done | `80f346f` |
 
 **Phase 6 took `.claude/skills/preset-author/SKILL.md:105-107` as the skill-lane target instead of
 the `references/` the phase names.** No file under `references/` mentions `beat_index` or the bar
