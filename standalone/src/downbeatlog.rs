@@ -81,7 +81,7 @@ use lmv_core::dsp::AnalysisFrame;
 ///   fold is handed the tempo tracker's onset-reset phase instead.
 ///
 /// [Plan 0095]: ../../docs/plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md
-/// [Plan 0117]: ../../docs/plans/0117-the-downbeat-log-sees-the-counter-it-folds-over.md
+/// [Plan 0117]: ../../docs/plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md
 const HEADER: &str = "beat\ts0\ts1\ts2\ts3\tbest\theld\teffect_raw\tnull_share\t\
                       effect_corrected\tbeats_seen\tlocked\tbass\tmid\ttreb\tonset\t\
                       bpm\ttime_since_beat\tunix_ms\tfold_beat\tgrid_bar_phase\n";

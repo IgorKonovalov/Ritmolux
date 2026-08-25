@@ -13,6 +13,54 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0117 — The downbeat log sees the counter it folds over](done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)
+  — closed 2026-08-25, two phase commits on `main` directly (`fa5f040`, `28641ec`) plus the close
+  block at `b02244d`. No worktree: the plan's whole subject was that `main` was red and unpushed at
+  `c0869e6`, so there was no branch to merge back. Review: **no blockers, one major, six minors, two
+  nits.** Version: **minor**, `0.77.0` → `0.78.0`.
+
+  **What shipped.** `DownbeatTerms` gained `fold_beat` and `grid_bar_phase`, recorded by
+  `DownbeatTracker::process` on **every** hop rather than only on beats, and `--downbeat-log`
+  appends both after `unix_ms`. Plan 0095 had repointed the fold from `beat_index` onto the bar
+  grid's count without sweeping the one reader in a second crate, so the log's `beat` column and its
+  `s0`..`s3`/`best`/`held` block silently stopped being the same counter — every column still
+  plausible, every capture still parseable, and the answer to a different question than the names
+  promise. `beat` was deliberately **not** repointed: changing what a published column means, same
+  parse and same range, is the failure ADR-0109's Alternative B was rejected for. Nothing reached
+  the C ABI (`LMV_ABI_VERSION` unchanged), `AnalysisFrame`, or the preset grammar.
+
+  **The plan's own stated risk did not fire, and that is the reading worth keeping.**
+  `a_synthesized_4_4_favours_the_alignment_it_was_built_with` was red on `main`: the accent is
+  unambiguously on phase 0 measured by the `beat` column (mean bass 0.364 against 0.032 / 0.004 /
+  0.006) and the fold reported `best = 3`. Measured on the counter the fold actually buckets by, it
+  passes, with `bpm` reading 119.96 on a clip built at 120 — **the first end-to-end reading of the
+  fold through the grid**, and the stimulus was not touched to get it. The test reads the settled
+  window only (`bpm > 0`), which the close verified is exactly `BarGrid`'s own `running` condition
+  rather than an approximation of it.
+
+  **What the review found.** The one `major` is not this plan's defect but was surfaced by it:
+  `scripts/check-doc-links.mjs` walks `.md` files only, and Rust doc comments carry the identical
+  `[label]: ../../docs/...` form. **Eleven are broken on `main`**, one of them the exact class step
+  1b exists to prevent (a `plans/done/` move never repointed, `core/src/render/tests.rs:1284`).
+  Filed as [design-backlog 0129](../design-backlog.md); this plan's own new link was repointed by
+  hand at the close, which is what nothing would have caught. The minors: the implementation log
+  asserted two sibling tests passed unchanged when one of them necessarily could not (a bare
+  `DownbeatTerms` struct literal stops compiling when the struct gains fields) — and the plan's
+  done-when was unmeetable as written, which is an `architect` miss rather than a `dev` one; the
+  plan's Decision says `LMV_ABI_VERSION` stays **4** when it is **6** (a stale number inherited from
+  ADR-0109's own `Outcome`, corrected in both at the close); `docs/design-backlog.md` 0042 and
+  ADR-0109's `Outcome` both still said this instrument did not exist; and `spike/replay-old-fold.mjs`
+  is absent **by policy** (`.gitignore` ignores `spike/`, Plan 0106) rather than by accident — with
+  the consequence, worth stating once, that the paired control behind ADR-0109's `Outcome` and
+  backlog 0042's headline numbers cannot be re-run.
+
+  **What outlived the plan.** `the_header_labels_the_row_and_the_score_block_is_the_meter` now sets
+  `fold_beat: 337` against the frame's `beat_index: 412`. That is the "two sources that agree on the
+  one configuration we test at" habit done right: the test is structurally unable to pass if the log
+  reads the frame instead of the terms. The instrument backlog 0042 called its cheapest next step
+  now exists and **has measured nothing** — spending a capture through it is a `human` call, and
+  whichever plan runs it owns the amendment to ADR-0109.
+
 - [0095 — The downbeat fold gets a musical beat](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
   — closed 2026-08-25, seven phase commits on `plan-0095-musical-bar-grid` from `5bdce91` to
   `4caac3c`, merged at `6507f41`. **Reviewed twice**: 2026-08-25 over phases 1-6 (no blockers, four
