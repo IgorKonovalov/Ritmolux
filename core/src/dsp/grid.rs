@@ -69,6 +69,24 @@ const LOCK_TAU_SECS: f32 = 2.0;
 /// [`MIN_BPM`]: super::tempo
 const LOCK_GAIN: f32 = 0.02;
 
+/// Where in the beat the lock parks the envelope's energy, in beats.
+///
+/// **Not zero, and this is the whole difference between a grid that sharpens the
+/// fold and one that shreds it.** Aiming the energy at the beat's start is the
+/// obvious choice and it puts the grid's cell boundary exactly on the music's
+/// transients — so the very samples the fold reads land on a knife edge, and
+/// which cell each one falls into is decided by where the 10.7 ms hop lattice
+/// happens to sit. Measured on a 120 BPM kick pattern before this constant
+/// existed: the grid's beat count skipped one and repeated another across
+/// successive musical beats, while its average rate was exactly right.
+///
+/// 0.12 of a beat is 60 ms at 120 BPM — several hops of margin on either side of
+/// the transient, and small enough that `bar_phase` still reads near zero on the
+/// downbeat. The energy is parked *after* the beat starts, which is also the
+/// physically honest place for it: the reading is a centroid of a decaying
+/// transient, so the attack that produced it sits earlier still.
+const LOCK_TARGET: f32 = 0.12;
+
 /// Where the grid stands this hop.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct GridPosition {
@@ -139,7 +157,10 @@ impl BarGrid {
         let angle = TAU * self.beat_phase;
         self.cos_acc = self.cos_acc * self.decay + onset.max(0.0) * angle.cos();
         self.sin_acc = self.sin_acc * self.decay + onset.max(0.0) * angle.sin();
-        let error = self.sin_acc.atan2(self.cos_acc) / TAU;
+        let mut error = self.sin_acc.atan2(self.cos_acc) / TAU - LOCK_TARGET;
+        if error < -0.5 {
+            error += 1.0;
+        }
 
         // Advance by the tempo, pulled toward that energy. Clamped non-negative
         // so the grid can only ever stall, never reverse.
