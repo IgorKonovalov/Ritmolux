@@ -249,3 +249,21 @@ against a `CONFIDENCE_THRESHOLD` of 0.25 — the distribution moved up *under* t
 through it. ADR-0082's reason for that threshold was argued when the estimator had no signal at all,
 which is no longer true. Moving it is not this decision's to make, and it now has evidence to be
 made against.
+
+## Outcome addendum (2026-08-25, from Plan 0117)
+
+**One sentence above is now false, and it is the one a reader acts on.** The `Outcome`'s
+"`--downbeat-log` predates the grid and carries no column from it" was true when it was written and
+stayed true for the length of one plan. [Plan 0117](../plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)
+appended `fold_beat` and `grid_bar_phase` to that log, sourced from `DownbeatTerms` rather than from
+`AnalysisFrame`, so the instrument now reports the counter the fold was actually handed.
+
+**What that does and does not change.** The reading built on it — "the grid tracks and the accent
+feature is weak" versus "the grid does not track on this material" — is still inseparable **from
+every capture taken to date**, because none of them carries the columns. The tool exists; the
+measurement has not been spent. Whichever plan runs that capture owns the amendment that reads it.
+
+**A second correction, smaller.** The paragraph above beginning "What did not move, as promised"
+says `LMV_ABI_VERSION` stays 4. The claim that matters is right — the ABI shape did not move, and
+has not moved since — but the constant was already 6 when that sentence was written
+(`core-cabi/src/lib.rs`), and Plan 0117 repeated the wrong number from here.

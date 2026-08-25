@@ -1,12 +1,16 @@
 # 0117 — the downbeat log sees the counter it folds over
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-25. Both phases landed (`fa5f040`, `28641ec`);
+> `cargo nextest run --workspace` re-run at the close reads 962 passed / 0 failed / 3 skipped,
+> `fmt` and `clippy --workspace --all-targets` clean, all three doc gates exit 0. Mode 4 review:
+> **no blockers, one major** (relative links inside Rust doc comments are unguarded — eleven
+> broken on `main`, filed as [design-backlog 0129](../../design-backlog.md)), six minors.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)
-> (its `Outcome` names the gap this fills), [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md),
-> [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
-> **Succeeds:** [0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md), whose close this
+> **Related ADRs:** [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)
+> (its `Outcome` names the gap this fills), [ADR-0052](../../adrs/0052-analysis-diagnostics-are-native-only.md),
+> [ADR-0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
+> **Succeeds:** [0095](0095-the-downbeat-fold-gets-a-musical-beat.md), whose close this
 > repairs — the blocker below was found by the `pre-push` hook after that plan's review had already
 > passed it, because both the plan's close block and the review ran `-p lmv-core` rather than the
 > workspace
@@ -57,7 +61,7 @@ question than the one its column names promise.
 **Add two columns; do not repoint `beat`.** `beat` keeps meaning `beat_index` because Plan 0086's
 baseline captures and `replay-old-fold.mjs` both read it, and silently changing what a published
 column means — same parse, same range, different quantity — is precisely the failure
-[ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)'s Alternative B was rejected for.
+[ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)'s Alternative B was rejected for.
 Repeating it one layer out would be worse, not better, for being a log rather than a grammar
 variable.
 
@@ -71,7 +75,7 @@ and phase it was handed and reports them in the struct the log already reads. Th
 diagnostic reporting *the tracker's own input* — the thing that changed invisibly — and keeps it off
 the published grammar surface, which the preset engine reads and which has no business growing a
 field for an operator log. Diagnostics stay native-only per
-[ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md); `LMV_ABI_VERSION` stays 4.
+[ADR-0052](../../adrs/0052-analysis-diagnostics-are-native-only.md); `LMV_ABI_VERSION` stays 4.
 
 ## Architecture diagram
 

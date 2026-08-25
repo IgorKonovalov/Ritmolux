@@ -488,6 +488,14 @@ correction.
 
 ## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
 
+- **The instrument half is now built, 2026-08-25 — the entry stays live and its headline number is
+  untouched.** [Plan 0117](plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)
+  appended `fold_beat` and `grid_bar_phase` to `--downbeat-log`, so the sentence closing the bullet
+  below — *"an instrument that logs `beat_in_bar` / `bar_index` ... is the cheapest next step and is
+  not yet filed"* — is discharged. **Nothing was measured with it.** The two readings that bullet
+  says are inseparable are still inseparable, because no capture carries the columns; what changed
+  is that spending a capture is now a `human` call rather than an unbuilt prerequisite.
+- **Verified 2026-08-25** — the columns exist: `present: fold_beat in: standalone/src/downbeatlog.rs`
 - **HALF-DISCHARGED 2026-08-25, and the entry stays live** — [Plan 0095](plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md)
   closed, and it built the repair the 2026-08-15 bullet said was still unbuilt: the fold now buckets
   over a tempo-driven bar grid (`core/src/dsp/grid.rs`) instead of over `beat_index`. **The cause
@@ -2948,3 +2956,44 @@ Whether the answer is a ground-relative `is_lit`, a structural statistic in the 
 shell-occupancy rescue, reading the tonal statistic at the quiet excitation too, or a per-system
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
+
+---
+
+## 0129 — the doc-link gate walks `.md` only, so the same links inside Rust doc comments rot unwatched
+
+**Raised by:** `architect`, at [Plan 0117](plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)'s
+close, when that plan's own new rustdoc link had to be repointed by hand because nothing would have
+caught it. **Owner if taken:** `dev` — the checker change is small and the repairs are mechanical.
+
+- **Verified 2026-08-25** — the walk collects markdown and nothing else: `present: endsWith\("\.md"\) in: scripts/check-doc-links.mjs`
+- **Verified 2026-08-25** — Rust sources carry the same link form: `present: \]: \.\./\.\./docs/ in: core/src/render/tests.rs`
+
+### The finding
+
+`scripts/check-doc-links.mjs` exists because a close ceremony's `git mv` breaks relative links in
+both directions, and by Plan 0060's close that had reached 74 breaks across 23 files. The gate now
+holds every `.md` in the repo — and only those. Rust doc comments use the identical markdown
+definition form (`[label]: ../../docs/...`), resolve relative to the **file**, and break the same way.
+
+**Eleven are broken on `main` today**, in two classes:
+
+    core/src/render/tests.rs:1284         -> ../../docs/plans/0053-...md
+    core/src/render/tests.rs:1112,1164,1165,1282,1283
+    core/src/render/scenes/emitter/tests.rs:1479
+    core/src/render/scenes/particles/mod.rs:359
+    core/src/render/scenes/particles/tests.rs:2506
+    standalone/src/shot/render.rs:103,106
+
+The first is **exactly the class step 1b of the close ceremony exists to prevent**: Plan 0053 moved
+to `plans/done/` and the citation was never repointed. The other ten are wrong-depth `../` counts —
+a link written from a file's own directory when it needed one or two more levels — which suggests
+they have never resolved at all.
+
+### Why it is worth doing rather than noting
+
+The repair is one directory walk and one extension test wider than the existing one; the link
+extraction, the code-span skipping and the reporting are already written and already handle this
+form. What it buys is that the close ceremony's most-missed step stops having a second file class it
+cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
+are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
+links are repaired or deleted — several may have been decorative from the start.
