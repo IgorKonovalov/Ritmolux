@@ -208,8 +208,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the tempo estimate is measured | dev | done | committed with this row |
-| 2 — the octave repair | dev | not started | — |
+| 1 — the tempo estimate is measured | dev | done | `5bdce91` |
+| 2 — the octave repair | dev | done | committed with this row |
 | 3 — the bar grid | dev | not started | — |
 | 4 — the fold folds over the grid | dev | not started | — |
 | 5 — re-measure through the instrument | human | not started | — |
@@ -227,6 +227,24 @@ Phase 2 chooses against:
 | half-time, beats 2/4 at 0.70, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
 | half-time, beats 2/4 at 0.50, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
 | half-time, beats 2/4 at 0.25, 150 BPM | 150.0 | 75.0 | 75.0 | 75.0 | **/2** | 0.0 % | 0 % |
+
+**Phase 2 did not settle the octave, and the reading that says why is
+`the_octave_ambiguity_is_one_sided`** in the same file. Correlation at the winning lag's octave
+neighbours, as a share of the peak:
+
+| direction | clean click trains | trap |
+|---|---|---|
+| halving (corr at 2L) — "is the beat slower?" | 80.0 - 88.5 % | off-beat: 75.2 - 90.7 % |
+| doubling (corr at L/2) — "is the beat faster?" | -4.0 - -2.4 % | half-time: 37.5 - 79.7 % |
+
+Every periodic signal correlates at twice its own lag, so the halving column does not separate and
+a preference rule taking the slower reading moved the 140/165/200 rungs down an octave in trial. The
+doubling column does separate, and was refused: it fires on a 60-100 BPM track with events between
+the beats, which is the capture set's hip-hop. So the repair is the third candidate — a margin plus
+a hold on the winning lag. **The three trap rungs stay an octave off after Phase 2**; what changed
+is that the off-beat 0.50 rung stopped flickering (15 % of its window on the other octave, now
+0 %), and all twelve rows are now stable. Every ladder rung reads the same value it read before the
+repair.
 
 ## Followups (after this lands)
 

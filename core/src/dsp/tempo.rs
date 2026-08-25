@@ -2,7 +2,9 @@
 //!
 //! The time base is the analyzer's hop count, never the wall clock: BPM is the
 //! lag of the strongest mean-subtracted autocorrelation of the recent onset
-//! envelope (parabolically refined for sub-hop precision), and `bar` is a 0..1
+//! envelope (parabolically refined for sub-hop precision, and **held against
+//! challengers** so two near-tied peaks cannot trade it hop by hop — Plan 0095
+//! Phase 2, see [`TempoTracker::hold`]), and `bar` is a 0..1
 //! phase advanced each hop by the current BPM and snapped to 0 on every
 //! detected beat. Pure and allocation-free after construction — the envelope
 //! history is a fixed array and every pass is iterator-based, so the same
@@ -27,6 +29,19 @@ const ENV_HISTORY: usize = 384;
 const MIN_BPM: f32 = 60.0;
 const MAX_BPM: f32 = 200.0;
 
+/// A challenging lag must lead the held one's correlation by this fraction
+/// before it even starts counting toward a switch, so two near-tied peaks
+/// cannot trade the estimate back and forth hop by hop. Named and sized after
+/// [`downbeat`](super::downbeat)'s alignment switch, which solves the same
+/// problem one layer up.
+const SWITCH_MARGIN: f32 = 0.15;
+
+/// Consecutive hops a leading challenger must hold before the estimate moves —
+/// ~0.5 s at a 10.7 ms hop. The envelope history is 4.1 s, so a real tempo
+/// change arrives gradually as the window fills and leads for far longer than
+/// this; what it excludes is the flicker at a tie.
+const SWITCH_HOPS: u32 = 48;
+
 /// Rolling onset-envelope autocorrelator producing a BPM estimate and a beat
 /// phase.
 pub struct TempoTracker {
@@ -42,6 +57,12 @@ pub struct TempoTracker {
     max_lag: usize,
     /// Latest BPM estimate (0 until warm / when no periodicity is found).
     bpm: f32,
+    /// The lag the estimate is currently published at; `0` until the first
+    /// positive periodicity is found. See [`TempoTracker::hold`].
+    held_lag: usize,
+    /// A challenging lag and how many consecutive hops it has led for.
+    challenger_lag: usize,
+    challenger_hops: u32,
     /// Beat phase in [0, 1): 0 at each beat, ramping toward the next.
     phase: f32,
     /// Beats detected so far. `beat_index` publishes this less one, so the first
@@ -83,6 +104,9 @@ impl TempoTracker {
             min_lag: min_lag.max(1),
             max_lag,
             bpm: 0.0,
+            held_lag: 0,
+            challenger_lag: 0,
+            challenger_hops: 0,
             phase: 0.0,
             beats_seen: 0,
             hops_since_beat: 0,
@@ -125,9 +149,10 @@ impl TempoTracker {
     }
 
     /// Lag of the strongest mean-subtracted autocorrelation peak in the search
-    /// range, refined to sub-hop precision, converted to BPM. Keeps the last
-    /// estimate if no positive periodicity is present.
-    fn estimate_bpm(&self) -> f32 {
+    /// range, held against beat-to-beat challengers, refined to sub-hop
+    /// precision and converted to BPM. Keeps the last estimate if no positive
+    /// periodicity is present.
+    fn estimate_bpm(&mut self) -> f32 {
         let mean = self.env.iter().sum::<f32>() / ENV_HISTORY as f32;
 
         let mut best_lag = self.min_lag;
@@ -143,23 +168,85 @@ impl TempoTracker {
             return self.bpm;
         }
 
-        // Parabolic interpolation across the peak's neighbors for sub-hop lag
-        // precision (keeps the estimate off the coarse integer-lag grid).
-        let refined = if best_lag > self.min_lag && best_lag < self.max_lag {
-            let yl = self.corr_at(best_lag - 1, mean);
-            let yr = self.corr_at(best_lag + 1, mean);
-            let denom = yl - 2.0 * best + yr;
+        let lag = self.hold(best_lag, best, mean);
+        60.0 / (self.refine(lag, mean) * self.hop_sec)
+    }
+
+    /// Which lag the estimate actually publishes: the argmax once it has led the
+    /// incumbent by a margin for long enough, and the incumbent until then.
+    ///
+    /// **This does not settle the octave, and it is not trying to** (Plan 0095
+    /// Phase 1). The probe measured both directions of the ambiguity on
+    /// synthesized clips with known truth: a clean click train's correlation at
+    /// *twice* the winning lag reads 80.0-88.5 % of the peak — a plain property
+    /// of any periodic signal — against 77.7-94.5 % for material whose accent
+    /// period really is twice the click period, so the two are not separable by
+    /// magnitude, and a rule that preferred the slower reading dragged the 140,
+    /// 165 and 200 BPM rungs down an octave. What is separable is *stability*:
+    /// the estimator recomputes an argmax from scratch every hop and has no
+    /// memory, so two near-tied peaks make it flicker hop to hop (measured at
+    /// 15 % of the window on the off-beat rung where the two peaks cross). A
+    /// margin plus a hold turns a flickering answer into a stable one, which is
+    /// the property a bar grid needs from it (ADR-0109).
+    fn hold(&mut self, best_lag: usize, best: f32, mean: f32) -> usize {
+        // Cold start, or a held lag left stale by a rebuild of the bounds.
+        if self.held_lag < self.min_lag || self.held_lag > self.max_lag {
+            self.held_lag = best_lag;
+            self.clear_challenger();
+            return best_lag;
+        }
+        // Adjacent lags are the same answer drifting, not a challenger: follow
+        // them, so a slowly-moving tempo is tracked rather than resisted.
+        if best_lag.abs_diff(self.held_lag) <= 1 {
+            self.held_lag = best_lag;
+            self.clear_challenger();
+            return best_lag;
+        }
+        // A challenger has to lead by a real margin before it starts counting,
+        // and then hold that lead for a stretch rather than a hop.
+        let incumbent = self.corr_at(self.held_lag, mean);
+        if best <= incumbent * (1.0 + SWITCH_MARGIN) {
+            self.clear_challenger();
+            return self.held_lag;
+        }
+        let hops = if self.challenger_lag.abs_diff(best_lag) <= 1 {
+            self.challenger_hops.saturating_add(1)
+        } else {
+            1
+        };
+        self.challenger_lag = best_lag;
+        if hops >= SWITCH_HOPS {
+            self.held_lag = best_lag;
+            self.clear_challenger();
+            best_lag
+        } else {
+            self.challenger_hops = hops;
+            self.held_lag
+        }
+    }
+
+    fn clear_challenger(&mut self) {
+        self.challenger_lag = 0;
+        self.challenger_hops = 0;
+    }
+
+    /// Parabolic interpolation across `lag`'s neighbors for sub-hop precision
+    /// (keeps the estimate off the coarse integer-lag grid).
+    fn refine(&self, lag: usize, mean: f32) -> f32 {
+        if lag > self.min_lag && lag < self.max_lag {
+            let y = self.corr_at(lag, mean);
+            let yl = self.corr_at(lag - 1, mean);
+            let yr = self.corr_at(lag + 1, mean);
+            let denom = yl - 2.0 * y + yr;
             let delta = if denom.abs() > f32::EPSILON {
                 (0.5 * (yl - yr) / denom).clamp(-0.5, 0.5)
             } else {
                 0.0
             };
-            best_lag as f32 + delta
+            lag as f32 + delta
         } else {
-            best_lag as f32
-        };
-
-        60.0 / (refined * self.hop_sec)
+            lag as f32
+        }
     }
 
     /// Mean-subtracted autocorrelation at `lag`, iterator-based (no indexing).
