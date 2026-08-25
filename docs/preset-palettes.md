@@ -822,6 +822,59 @@ to one tone — and spend the `[layer]` slot on the figure.
 
 ---
 
+## Flat colour on `shape_collage` — stay under the knee (ADR-0123, Plan 0113)
+
+`shape_collage` is the one system that draws a **graphic** rather than light: flat
+opaque elements on their own paper, hard-edged, in painter order. Everything that
+makes that look work comes from a single palette constraint, and it comes off the
+tonemap rather than off any parameter.
+
+**Keep every element colour's brightest channel at or under linear `0.6`.**
+
+That is [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
+`KNEE`, and below it the tonemap curve is **exactly the identity** — so the colour
+you author is the colour that reaches the display, flat and unshaded, to within
+the 8-bit write's own rounding. Bloom's threshold sits *above* that same knee, so
+a canvas living under it also gets no halo and its edges stay hard. **One
+constraint, both properties, and neither is a parameter you can reach for
+instead.** Author a brighter palette and you lose the flat fill and the hard edge
+together, with nothing to tell you why.
+
+**The paper is the deliberate exception.** The curve's own table records
+`f(1.0) = 0.800` and 1.0 is asymptotically unreachable, so pure white paper does
+not exist: `#ffffff` presents at about 80 % and anything near it costs a linear
+emission well over 1, which re-enters bloom's threshold and forfeits the free hard
+edge. **Off-white is the affordable ground**, and both of the reference canvases
+this system was built from are off-white anyway. `#e6e3d8` and `#d9d5c8` are what
+the two shipped presets use.
+
+**Author the palette as plateaus, not as a gradient.** An element takes *one*
+colour off the LUT at its coordinate, so a smooth ramp shades every element by
+wherever it happens to sit. A pair of stops a ten-thousandth apart is a hard
+transition:
+
+```toml
+[palette]
+stops = [
+  { at = 0.0000, color = "#1a1a1a" },   # band 0 — an element at coord 0.0625
+  { at = 0.1249, color = "#1a1a1a" },
+  { at = 0.1251, color = "#8c1c24" },   # band 1 — an element at coord 0.1875
+  { at = 0.2499, color = "#8c1c24" },
+  # … six more, the last one the paper …
+]
+```
+
+**Eight bands is not arbitrary.** The layout grammar draws each element's colour
+from eight evenly spaced coordinates at band centres (`k/8 + 1/16`) and reserves
+the last for the paper, so an eight-plateau palette resolves every generated
+element exactly and no element ever draws the ground's own colour and vanishes.
+Other counts work; their elements just land wherever those eight coordinates fall.
+
+`presets/collage_suprematist.toml` and `presets/collage_onwhite.toml` are both
+built this way and carry the arithmetic in their headers.
+
+---
+
 ## Worked example — a cohesive warm fragment field
 
 ```toml

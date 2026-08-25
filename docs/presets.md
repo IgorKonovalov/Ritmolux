@@ -149,6 +149,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies (ADR-0057). |
 | `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours (ADR-0105). |
 | `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own (ADR-0113). |
+| `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light (ADR-0123). |
 
 This table used to carry a per-system count of curated presets. It is gone rather than
 corrected: at the Plan 0054 close six of its eight numbers were wrong (`parametric_curve`
