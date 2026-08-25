@@ -30,3 +30,20 @@ Thumbs.db
 
 # Claude Code local overrides
 .claude/settings.local.json
+
+# Python bytecode from the tools/ stages (Plan 0106). The stages themselves
+# are committed; their caches are not.
+__pycache__/
+*.pyc
+
+# Reference render output kept locally (Plan 0106). `shot --render` clips are
+# hundreds of megabytes of derived binary; they live here so the evidence behind
+# a shipped cost figure outlives the worktree that produced it, and they are
+# never committed. renders/README.md says what each one is.
+renders/
+
+# Lane spike scratch (Plan 0106). Throwaway spike work lives under spike/ in a
+# plan's worktree - renders, venvs, frame dumps, measurement logs. It was
+# untracked AND unignored until this close, which is how a test came to read
+# spike/clip.wav and pass on exactly one machine (Plan 0106 Phase 7a).
+spike/

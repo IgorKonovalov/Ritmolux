@@ -1,0 +1,51 @@
+# Plan 0106 - the environment the diffusion filter runs in.
+#
+# NOTHING HERE SHIPS. No model, no weights and no Python runtime are in the
+# release zip; `lmv.exe` and `foo_lmv.dll` do not change size, and NFR section 4's
+# ~10 MB soft cap is untouched. This file exists so a creator can build the
+# sidecar, not so the project can depend on it.
+#
+#   python -m venv .venv
+#   .venv/Scripts/python -m pip install -r tools/sd-filter/requirements.txt
+#
+# The first run then downloads several gigabytes of weights from Hugging Face.
+#
+# WHY torch IS PINNED WITH ITS +cu124 LOCAL VERSION AND AN INDEX. Phase 1 spent
+# an afternoon on this: `pip install diffusers transformers accelerate
+# controlnet_aux` on top of a working CUDA torch REPLACED torch 2.6.0+cu124 with
+# a CPU build from PyPI - `controlnet_aux` declares a bare `torch` - and the run
+# then died at `pipe.to("cuda")` with "Torch not compiled with CUDA enabled",
+# after a 13-minute weight download. A plausible-looking environment that fails
+# at the first frame is the failure this pin exists to prevent. If pip resolves
+# a CPU wheel anyway, install the two torch lines on their own first, with
+# --index-url https://download.pytorch.org/whl/cu124, then this file.
+#
+# torchvision is version-locked to torch (mismatched, it raises "operator
+# torchvision::nms does not exist"), so the pair is pinned together or not at
+# all. `controlnet_aux` reaches torchvision through timm.
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+torch==2.6.0+cu124
+torchvision==0.21.0+cu124
+
+diffusers==0.39.0
+transformers==5.15.1
+accelerate==1.14.0
+peft==0.20.0
+safetensors==0.8.0
+huggingface_hub==1.28.0
+
+# The control map: HED (softedge) and lineart come from controlnet_aux, canny
+# from opencv. timm is controlnet_aux's own dependency and is pinned with it
+# because it moves fast.
+controlnet_aux==0.0.10
+timm==1.0.28
+opencv-python==4.11.0.86
+
+numpy==1.26.4
+pillow==12.3.0
+
+# These are the versions the Plan 0106 spike measured on (RTX 3080 Laptop 8 GB,
+# driver 581.42, Python 3.12, Windows). Hugging Face model IDs can move or be
+# withdrawn - `runwayml/stable-diffusion-v1-5` already did - so expect to re-pin
+# both these and the model IDs in sd_filter.py rather than to inherit them.

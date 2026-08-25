@@ -131,6 +131,36 @@ jobs:
       # written. Unlike the pre-push hook this cannot skip itself for want of a
       # Node, which is what makes it the backstop rather than the gate.
       - run: node scripts/check-backlog-claims.mjs
+      # And the fourth of the same family (ADR-0122): the diffusion filter's cost
+      # figures live in docs/diffusion-filter.md and nowhere else. The feature was
+      # documented in three files at once, and a correction at Plan 0106's close
+      # enumerated two of the three copies and missed the third - so this asserts
+      # that duplicates do not EXIST rather than that they agree, which is the
+      # only shape that would have caught it.
+      - run: node scripts/check-filter-figures.mjs
+      # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
+      # this job rather than in the `check` matrix for the same reasons the three
+      # gates above do: it is cheap, platform-independent, needs no GPU, no
+      # weights and no model, and it cannot skip itself here. Its property -
+      # byte identity through the pass-through - is asserted in-process at four
+      # geometries against payloads chosen to be hostile to a text-mode handle,
+      # so paying for it on three build matrices would buy the word "real" and
+      # nothing else.
+      #
+      # numpy is installed for exactly one group: the frozen colour table that
+      # pins tools/sd-filter's YUV conversion to standalone/src/shot/render.rs's
+      # (Phase 7b). Those conversions are array functions, so without numpy that
+      # group skips - and the Rust half of the same pin, which runs in `check`,
+      # would be the only half anything ever ran.
+      #
+      # The end-to-end group skips here, because this job builds no `shot`. That
+      # is deliberate and it is not a hole: it asserts the same byte identity the
+      # in-process group already covers, through a subprocess.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --quiet numpy
+      - run: python tools/sd-filter/test_sd_filter.py
 
   # Supply-chain gate (deny.toml): advisories, licenses, bans, sources.
   # Platform-independent (reads Cargo.lock + the [graph] targets in deny.toml),

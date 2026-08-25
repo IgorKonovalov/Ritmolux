@@ -358,6 +358,27 @@ Practical notes:
   **334 MB, growth -8.1 MB, peak 342 MB** on the Windows dev box (2026-08-17,
   hardware adapter, release). Where the old retention would have reached ~4.4 GB.
 
+#### A filter stage between `shot` and the encoder
+
+The frame stream is a pipe, so anything that speaks Y4M can sit in the middle of
+it. `tools/sd-filter/` is the first such stage: an img2img diffusion pass with
+ControlNet holding the render's geometry, so the attractor becomes canyon rock
+while the shape keeps tracking the music. **It is documented in one place, and
+that place is [`docs/diffusion-filter.md`](diffusion-filter.md)** — setup, the one
+canonical command, the flags and what it costs. Nothing on that path ships in the
+release zip.
+
+`--ffmpeg` is **not** used there: it spawns the encoder itself, which leaves no
+seam to insert a stage into. Composing the pipe by hand is the whole point of the
+raw-stream path.
+
+**The encoder line is invariant, and that is the pipe-level fact worth keeping
+here.** A stage in the middle changes the picture and never the frame count, so
+the `ffmpeg` invocation above never learns a rate that has to agree with a flag on
+another process. There is no `-r` to keep in sync and no way to desynchronize the
+audio silently — which is why the encoder half of that pipe is unchanged,
+character for character, whether or not a stage is in it.
+
 ### The three calibration traps
 
 `--set` is a **held** stimulus: it writes the analysis frame directly and that

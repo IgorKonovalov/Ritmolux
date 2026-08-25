@@ -421,7 +421,7 @@ struct SeamTrace {
 `milkconv/tests/draw_layer.rs`. **No active plan touches these** —
 [0104](../0104-the-library-stops-being-lopsided.md) authors `presets/*.toml` (including the four
 `warp_mesh` worlds, which read the params this plan may re-mean: if Phase 3 changes what `gamma`
-does, tell that lane), and [0106](../0106-the-frame-stream-passes-through-a-diffusion-model.md) is
+does, tell that lane), and [0106](0106-the-frame-stream-passes-through-a-diffusion-model.md) is
 `tools/` + `docs/` only. Safe to run in a worktree lane alongside either.
 
 ## Implementation log

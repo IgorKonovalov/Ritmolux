@@ -322,6 +322,22 @@ See **[`docs/capturing.md`](docs/capturing.md#--render-a-music-video-from-a-trac
 for the frame-rate rules, the exact `ffmpeg` command line it generates, and what
 it reports about a long render.
 
+### Through a diffusion model
+
+Because the render is a pipe, a stage can sit in the middle of it.
+**[`tools/sd-filter/`](tools/sd-filter/README.md)** is one: an img2img pass with
+ControlNet holding the render's geometry, so the attractor becomes canyon rock
+and the mandala becomes a rose window while the shape keeps tracking the music.
+
+It is **creator tooling you build yourself, and none of it ships** — no model, no
+weights, no Python runtime in the release zip. It needs a CUDA GPU, a Python
+environment and a first-run download of several gigabytes of weights.
+
+<!-- figures:orientation --> A four-minute track takes about **1.4 hours** at the `fast` profile, on the machine named beside that figure — the one thing worth knowing before you start.
+
+**[`docs/diffusion-filter.md`](docs/diffusion-filter.md) is the whole of it** —
+setup, the one canonical command, the flags, and what it costs everywhere else.
+
 ## Visual QA / headless capture
 
 Scenes can be rendered **with no window** — the core draws into an offscreen
