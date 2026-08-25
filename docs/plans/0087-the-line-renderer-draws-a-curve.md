@@ -323,14 +323,29 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 | 1 — the arc instance draws | dev | done | `3f9e828` |
 | 1b — a sub-floor `thickness` stops failing silently | dev | done | `b97ff64` |
 | 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
-| 3 — the circular motifs become arcs | dev | done | committed with this row |
-| 4 — does it read as a curve? | human | not started | |
+| 3 — the circular motifs become arcs | dev | done | `82c031f` |
+| 4 — does it read as a curve? | human | **next — the session stopped here** | |
 | 5 — the general curve: a biarc chain | dev | not started | |
 | 6 — the scalloped boundary | dev | not started | |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
 ### Notes
 
+- **The session stopped at Phase 4, which is the plan's own gate.** Phases 1, 1b, 2 and 3 are the
+  contiguous `dev` run; Phase 4 is `human` and can send the whole plan to ADR-0098's Alternative C,
+  which is why the expensive half (Phase 5's biarc fit) sits behind it and was not started.
+- **`node scripts/check-backlog-claims.mjs` now exits 1, and repairing it is an architect call.**
+  Backlog 0098's probe is `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`
+  and Phase 1b moved that constant into `lines/mod.rs` as `MIN_HALF_WIDTH`, so the probe no longer
+  matches. The claim is unchanged and the entry is the one this plan closes; the gate's own message
+  says a falsified entry is architect's to correct, close or split, and `docs/design-backlog.md` is
+  outside every `dev` phase's scope. **It breaks `pre-push` and the CI `links` job until it is
+  repaired.**
+- **Phase 4's control needs choosing, because the obvious one no longer exists.** The phase says to
+  judge "an arc-drawn `circle` ring against the polyline version". After Phase 3 the engine cannot
+  draw a `circle` ring as a polyline at all, so the comparison is either against a build from before
+  `82c031f` or against a `petal`/`teardrop` ring, which is a different figure. `arc_cost.rs` took the
+  second route and says why it is a stand-in.
 - **Phase 1's ADR-0058 obligation is discharged by the second of its two arms: there is no new
   bind-group layout.** The arc pipeline reuses the segment pipelines' bind layout, bind group and
   pipeline layout unchanged — only the vertex layout and the shader module differ — so nothing is
