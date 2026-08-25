@@ -213,7 +213,12 @@ flowchart LR
 | 3 — the bar grid | dev | done | `cae98a5` |
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
 | 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
-| 6 — the authoring docs | dev | not started | — |
+| 6 — the authoring docs | dev | done | `committed with this row` |
+
+**Phase 6 took `.claude/skills/preset-author/SKILL.md:105-107` as the skill-lane target instead of
+the `references/` the phase names.** No file under `references/` mentions `beat_index` or the bar
+trio; SKILL.md carried the sharpest statement of the idiom anywhere ("build an arc on `beat_index`
+and treat the bar trio as decorative", plus a "~3 % lock rate").
 
 **Phase 5 ran 2026-08-25**, three genres through the live app on the user's own material, ~5 min
 each (`spike/after-{techno,rockpop,hiphop}.log`, gitignored). Phase 6 is still `dev` and still
@@ -324,6 +329,44 @@ of a beat in, and the same stimulus reads +1 per musical beat with the phase ste
 driven by a hand-built `AnalysisFrame` (`core/tests/composite.rs:223`), never by the analyzer, so no
 DSP change reaches it — the re-bless the phase called for was structurally unreachable rather than
 merely unexercised, and no baseline-drift control was run.
+
+### Notes
+
+- **Deviation, Phase 6:** the skill-lane target was `.claude/skills/preset-author/SKILL.md` rather
+  than `references/` — the row above says why.
+- **Deviation, Phase 6:** `docs/presets.md`'s `bar_index` note documented it as
+  `(beat_index - alignment) / 4`, which Phase 4 made stale; corrected to the grid's beat count in
+  the same commit, though the phase's stated scope was `beat_index`'s meaning.
+- **Not acted on:** `core/src/dsp/mod.rs:160` still carries that same stale
+  `(beat_index - alignment) / 4` derivation for `AnalysisFrame::bar_index` — a Phase 4 doc-comment
+  miss, outside Phase 6's file list, left as found.
+- **Not acted on:** `presets/attractor_walkdejong.toml:43-45` makes the falsified claim the phase
+  retracts ("Every 16 beats is ~8 s at 120 BPM") and is not among the plan's six;
+  `presets/shape_pulse.toml:123` states "about 1.7-2.1x per musical beat", narrower than the
+  1.20x-2.28x these captures measured. Neither is in the phase's file list.
+- **Followup:** the six presets' expressions are unchanged by construction — the Phase 6 diff over
+  `presets/*.toml` contains no non-comment line — so the `preset-author` re-tune the plan lists
+  under `## Followups` is still open.
+
+### Close triggers
+
+- **`presets/` touched:** yes — `presets/README.md` and the six named `.toml`
+  (`attractor_valentine`, `attractor_torusknot`, `attractor_thomas`, `attractor_dragon`,
+  `curve_nightbloom`, `fragment_vitrail`), comments only in the `.toml`.
+- **`Closes:` entries in the plan header:** none — the header carries no `Closes:` line.
+- **What shipped:** feature (Phases 2-4 change analysis behaviour: `fix(dsp)` `09abdee`,
+  `feat(dsp)` `cae98a5`, `feat(dsp)` `d4e7cec`) plus test-only `5bdce91` and this docs phase.
+- **Operator docs moved:** `docs/presets.md`, `presets/README.md`,
+  `.claude/skills/preset-author/SKILL.md`. Not moved: `docs/nfr.md`, `docs/capturing.md`,
+  `docs/releasing.md`, `docs/specs/`, `CLAUDE.md`, `docs/adrs/`.
+- **`node scripts/check-backlog-claims.mjs`:** exit 0 — "64 stated reductions still hold across all
+  39 live entries (4 unprobeable)". Its advisory names 17 moved probe paths; the ones this plan's
+  own commits moved are **0032** and **0123** (`core/src/dsp/mod.rs`), **0042**
+  (`core/src/dsp/downbeat.rs`, and `presets/README.md`), **0021** and **0092** (`core/src`).
+- **`human` phases remaining:** none — Phase 5 ran 2026-08-25.
+- **Gates run at the tip:** `check-doc-links.mjs` OK, `check-index-rows.mjs` OK,
+  `cargo fmt --all --check` clean, `cargo nextest run -p lmv-core --test sanity --test reactivity
+  --test preset --test hygiene` 63 passed / 0 failed.
 
 ## Followups (after this lands)
 
