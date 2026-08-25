@@ -107,7 +107,9 @@ invert.** The architect never writes production code; `dev` never authors plans/
 reviews its own work; `preset-author` never touches engine Rust (a look needing a new scene, param,
 or grammar capability routes back to `architect` + `dev` as feedback, and `dev` — not the author —
 embeds a preset into the shipped set). The handoffs are `architect → dev` (the user's "go"),
-`dev → architect` (the fresh-session close-ceremony review), and `preset-author → architect`/`dev`
+`dev → architect` (the plan's own `## Implementation log`, which `dev` writes as the phases land,
+plus a three-line pointer at it — [ADR-0120](docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md);
+the review itself still happens in a fresh session), and `preset-author → architect`/`dev`
 (engine-gap feedback, and curation of a strong preset). All are manual on purpose — their value is
 the clean-context boundary.
 

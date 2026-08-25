@@ -288,8 +288,8 @@ as well as `docs/`, and these phases add relative links in both.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the plan template carries the log skeleton | dev | done | `9d8b359` |
-| 2 — `dev` writes the log as the phases land | dev | done | committed with this row |
-| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | not started | — |
+| 2 — `dev` writes the log as the phases land | dev | done | `51053b0` |
+| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | done | committed with this row |
 
 ### Notes
 
