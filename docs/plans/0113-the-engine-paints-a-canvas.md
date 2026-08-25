@@ -344,243 +344,150 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
 | 6 — The music moves the canvas | dev | done | 47ef35d |
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
-| 8 — Documentation and the shipped set | dev | done | committed with this row |
+| 8 — Documentation and the shipped set | dev | done | b31a4e7 |
 
 ### Notes
 
-**Phase 1 — files outside the phase's list.** Five test files and one doc were
-touched that the phase does not name, each because a gate fires the moment the
-twelfth variant exists rather than at the phase that would have owned it:
+**Two phase blocks were edited, which `dev` is not supposed to do.** Phase 3's and
+Phase 5's human decisions are written into their own phase blocks rather than
+here, because both phases' done-when says the choice is written into the plan and
+a gate's verdict is not a `dev` opinion. Flagged rather than left to be noticed.
 
-- `core/tests/{animation,reactivity,sanity,geometry_extent}.rs` — exhaustive
-  `SystemKind` matches, which is the mechanism the phase's own last done-when
-  describes. `sanity.rs` also needed a `coverage_floor` value; it is inherited
-  from `FragmentField` on `ShapeField`'s and `WarpMesh`'s structural argument,
-  and the arm records that coverage cannot judge this family at all — a
-  `shape_collage` canvas lights every pixel by construction.
-- `core/tests/golden.rs` — the exhaustive fixture roster.
-- `presets/README.md` — Phase 8's file.
-  `every_declared_param_is_documented_in_the_presets_readme` fails as soon as a
-  param is declared, so the roster row and a `shape_collage` section landed here
-  instead. Phase 7 and Phase 8 extend both.
+**Defects found, in the order they were found.**
 
-**Phase 1 — deviations.**
+- **The triangle's bounding box was a quarter of the figure too tall on one side,
+  and had been since Phase 1** (found at Phase 7). The check compared the box's
+  **half extents** against half extents recovered from the geometry, and a half
+  extent is symmetric by construction — but a triangle's apex is at `+hy` and its
+  base at `-hy/2`. Sectors have the same asymmetry. Boxes are now a `(min, max)`
+  pair, and the check **renders each kind and measures drawn pixels against the
+  stored box**, which also reaches what the CPU version could not: a Rust formula
+  disagreeing with the WGSL it bounds. The CPU-only test was retired, not kept;
+  the note where it stood says why.
+- **The canvas rendered washed pale under real audio** (found at Phase 6, by
+  `shot --signal click:110 --strip 8`, while every gate in the suite stayed
+  green). Two independent causes. The crossfade composites the two canvases
+  *sequentially* with `over` rather than mixing, so at linear weights a pixel
+  covered by both is `t(1-t)*paper + (1-t)^2*A + t*B` — a quarter bare paper at
+  the midpoint; fixed with equal-power (`sqrt`) weights, which take the leak under
+  9 %. And the preset gated recomposition on `onset > 0.82`, which under a click
+  track fires on *every click* because `onset` normalizes against its own recent
+  peak (ADR-0049), so the canvas was almost never not mid-blend; re-gated to
+  roughly one beat in eight.
+- **The diagonal grammar's band ran at −15° while `angle_bias` asked for −22°**
+  (found at the Phase 5 gate, in the samples). The axis was rotated in unit space
+  and *then* scaled anisotropically by the canvas's shape, while each element's
+  own rotation was not — so the elements and the band they lay along were at
+  different angles.
+- **All three grammars were rewritten before the Phase 5 sheet was rendered.**
+  Every element was sized as though its half extent were a full one, so dominant
+  forms came out as near-square slabs ~1.5 canvas units across. The replacement
+  rule is taken from the authored canvas rather than invented: the elongation
+  ceiling falls as an element grows, so a large element is necessarily a bar.
 
-- **The shipped preset carries motion and a band binding the plan does not
-  introduce until Phase 6.** All five gates sweep every embedded preset, so a
-  preset that ships in Phase 1 is held to `animation` and `reactivity` in
-  Phase 1. `scale`'s slow breath alone measured **0.0006** against the animation
-  gate's `0.01` floor, so `pan_x`/`pan_y` were added as a whole-canvas float
-  (**0.0219**), and `saturation` on the top end was added after the first
-  reactivity reading came in at **0.0209** against a `0.02` floor
-  (now **0.0342**). Both are marked in the preset as placeholders for Phase 6's
-  levers.
-- **The element struct's `shape` field carries `[cos, sin, kind, p0]`, not the
-  plan's `[angle, kind, p0, p1]`**, and `p1` moved to `tint.w`. The plan calls
-  the struct illustrative; the reason for the change is that an angle costs a
-  trig pair per pixel per element in the innermost loop, and puts the geometry on
+**Deviations from the plan.**
+
+- **Phase 4 added a fourth `layout` option — the authored canvas as a control —
+  and made it the default.** The plan implies the grammar replaces Phase 1's list.
+  Reasons: the golden baseline and the shipped preset would otherwise move
+  *underneath* Phase 5 rather than after it, and the authored canvas was the only
+  composition a human had approved. Golden re-ran clean without a re-bless, which
+  is the evidence the control is byte-for-byte Phase 1's canvas.
+- **Phase 4's two list-level done-whens are asserted in the unit tests, not in
+  `core/tests/collage_layout.rs`.** Bit-identical output and capacity across a
+  thousand recompositions are claims about the element array, which an
+  integration test cannot see without making `Element` and `generate` public.
+  The integration test asserts what only it can — that the whole path carries a
+  seed and a grammar to the frame.
+- **Phase 6 advances a recomposition *index*, not "the next seed"** as its
+  done-when words it. The plan's Phase 4 uses the same index language, and a
+  preset's `seed` stays its identity.
+- **Phase 8's golden done-when asks for baselines of "both shipped presets,
+  blessed on hardware".** The suite does neither by design — ADR-0023 pins frozen
+  fixtures and never pixel-pins shipped presets, and ADR-0016 makes it WARP-only.
+  Delivered as intent: a second fixture through `EXTRA_FIXTURES`, whose bar (the
+  rostered one structurally cannot reach the code) is met, blessed on WARP and
+  adapter-compared against hardware first.
+- **The element struct's `shape` carries `[cos, sin, kind, p0]`, not the plan's
+  `[angle, …]`** (the plan calls the struct illustrative). An angle costs a trig
+  pair per pixel per element in the innermost loop and puts the geometry on
   `sin`'s implementation-defined precision, which ADR-0096 rules out elsewhere.
-  Size and alignment are unchanged at 64 bytes.
+- **The shipped preset carried motion and a band binding from Phase 1**, which
+  the plan does not introduce until Phase 6: all five gates sweep every embedded
+  preset, so a preset shipping in Phase 1 is held to `animation` and `reactivity`
+  in Phase 1. `scale`'s breath alone measured 0.0006 against a 0.01 floor.
 - **The scene carries a `#[cfg(test)]` element-array override.** The done-when
-  requires two overlapping elements rendered in *both* array orders, and no
-  preset can reverse a compiled-in roster. It does not exist in a shipped build
-  (`Scene::feedback_field`'s argument).
+  needs two elements rendered in *both* array orders and no preset can reverse a
+  compiled-in roster (`Scene::feedback_field`'s argument).
 
-**Phase 2 — files outside the phase's list.** `core/src/render/tier.rs`'s
-`collage_elements` landed in Phase 1, because the scene's constructor sizes its
-storage buffer from it. `core/src/render/context.rs` and `core/src/render/mod.rs`
-gained a `Renderer::adapter_description()`: the phase requires the report to name
-its adapter and driver, and no accessor existed — `RenderContext` kept only the
-`is_software` flag. Nothing on a render path reads it.
+**Files outside the phases' lists.** `core/tests/{animation,reactivity,sanity,
+geometry_extent,golden}.rs` — exhaustive `SystemKind` matches, which the Phase 1
+done-when describes. `sanity.rs` also needed a `coverage_floor`; it is inherited
+from `FragmentField` and the arm records that coverage cannot judge this family at
+all, since the canvas lights every pixel. `core/src/render/{context,mod}.rs` — a
+`Renderer::adapter_description()`, because Phase 2 requires the report name its
+adapter and driver and nothing could. `core/src/render/tier.rs`'s cap landed in
+Phase 1 rather than Phase 2, because the constructor sizes its buffer from it.
+`presets/README.md` in four separate phases, because the documentation gate fires
+the moment a param is declared.
 
-**Phase 2 — the reading, and what it was taken on.** The full table is in
-`core/tests/collage_cost.rs`'s module docs. The one thing the plan should carry
-into Phase 3: **`Renderer::new_headless` asks for no power preference, so on this
-box it selected the AMD *integrated* GPU rather than the discrete one.** That is
-not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and it
-is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
-numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
-one the tier is quoted against.
+**Measurements, and one that was wrong when first reported.** Phase 3 was shown a
+sweep whose rungs ran to 128; retargeted to the shipped cap it came in **~4 ms
+cheaper at every rung** (32 elements: 26 % of the 60 Hz budget, not 45 %). Nothing
+about those cases changed — the sweep went from ~20 s of GPU work to ~2 s, and
+this box's adapter is a **power-shared integrated GPU** whose clocks drop under
+sustained load. The interleaving protected the comparison, not the absolute
+numbers. The gate's verdict is unaffected and in the safe direction. Phase 7's
+required re-measure after the roster landed came in cheaper again (0.058 ms an
+element against 0.09): the branch is not what the loop costs, coverage is.
+`collage_cost.rs` carries all three tables and says the two are not a controlled
+before/after.
 
-**Phase 8 — the golden done-when, read against the suite it names.** The phase
-asks for "golden baselines for **both shipped presets**, blessed on **hardware**".
-The suite does neither by design: ADR-0023 pins **frozen fixtures** and states
-that shipped presets are guarded behaviourally and never pixel-pinned (so the
-content lane can tune them), and the suite is WARP-only because macOS has no
-software Metal (ADR-0016). Delivered as the intent rather than the letter: the
-rostered fixture already pins the system, and a **second fixture**
-(`shape_collage_roster`) went in through `EXTRA_FIXTURES` — the documented escape
-hatch, whose bar is that the rostered one structurally cannot reach the code
-under test. It cannot: at the scene's defaults (`layout = 0`, `roster = 0`) no
-baseline executes a line of the layout grammar or of the five new distance
-functions, and none composites two translucent elements. Blessed on WARP as the
-suite requires, adapter-compared against hardware first (frame_diff 0.000214).
+**Observations for the review.**
 
-**Phase 8 — the bless rewrote a baseline it had no business touching.**
-`LMV_BLESS=1` is not scoped to the fixture being added, and it rewrote
-`shape_collage.png` for a **one-byte** difference on a single pixel against a
-tolerance of 48. Restored from git and re-checked without the flag: it passes.
-Only `shape_collage_roster.png` is new in the commit.
-
-**Phase 8 — `docs/presets.md` gained a systems-table row and no grammar.** The
-phase asks the plan record it either way: **this plan introduced no new
-expression-grammar surface at all** — no function, no variable, no table. Every
-lever it added is a named `[params]` binding, and the shipped presets reach the
-beat through `hash`, `select` and `beat_index`, all of which predate it.
-
-**Phase 8 — the root README said "Ten built-in rendering systems" and was already
-wrong before this plan**: `warp_mesh` made eleven at Plan 0100 and the line did
-not move. Now twelve.
-
-**Phase 7 — the roster reading the plan settled on.** `bar` and `segment` both
-plausibly meant "a straight line with thickness", and `quad` already draws a
-rectangle at any elongation, so a plain rectangular `bar` would have duplicated
-it. Put to the user, who chose: **`bar` is a rounded-cap stroke** (distinct from
-`quad`'s sharp corners) and **`segment` is a circular sector**, completing the
-circle family beside `ring` (annulus) and `arc` (annular sector). Eight kinds,
-none duplicating another.
-
-**Phase 7 — a defect that had shipped since Phase 1, found by changing the test's
-method.** The plan asks the bounding box be asserted tight for every kind. The
-Phase 1 check did that on the CPU, comparing the box's **half extents** against
-half extents recovered from the geometry — and a half extent is symmetric by
-construction. **The triangle is not**: its apex sits at `+hy` and its base at
-`-hy/2`, so its box was a quarter of the figure's height too tall on one side,
-and passed for six phases. Sectors have the same shape of asymmetry. Boxes are
-now a `(min, max)` pair rather than a half extent, and the check **renders each
-kind and measures drawn pixels against the stored box** — which also reaches a
-failure the CPU version never could: a Rust formula disagreeing with the WGSL it
-is supposed to bound. The CPU-only test was retired rather than kept, and the
-note where it stood says why.
-
-**Phase 7 — the cost re-measure came in cheaper, not dearer.** The roster puts a
-branch in the innermost loop, which is the hazard the re-run exists for. At the
-shipped configuration a 40-element canvas costs **3.23 ms, 19.4 % of the 60 Hz
-budget**, against 4.82 ms and 28.9 % before it — **0.058 ms an element against
-0.09**. The branch is not what this loop costs; *coverage* is, which is the same
-conclusion `mark_cost.rs` reached about the shaped-mark branch. Rings, sectors
-and checker patches light far less of their bounding box than a quad does. The
-two tables are not a controlled before/after — Phase 4 changed the element source
-between them — and `collage_cost.rs` says so next to both.
-
-**Phase 7 — notes.**
-
-- `presets/README.md` for the fourth time (the `roster` param), for Phase 1's
-  reason.
-- Both shipped presets clear all five gates. `On White`: coverage 1.0000,
-  quadrants 4, flatness 0.7152, shells 10/10, animation 0.0201, reactivity
-  `bass=0.0384` against a 0.02 floor.
-- The golden fixture did not move: it runs the default `roster`, and every new
-  kind is reachable only through a param a preset must set.
-
-**Phase 6 — a look defect the tests could not see, and its two causes.** A
-filmstrip of the shipped preset under a click track came back with every frame
-**pale** — the flat opaque colour this whole system exists for, washed toward the
-paper. Both causes are recorded because only one of them is a preset bug:
-
-- **The crossfade leaked paper at its midpoint.** The two canvases composite
-  *sequentially* with `over` rather than being mixed, so at linear weights a
-  pixel covered by both reads `t(1-t)*paper + (1-t)^2*A + t*B` — a quarter bare
-  paper at `t = 0.5`. Fixed with **equal-power (`sqrt`) weights**, the same fix
-  audio uses for a pan: the leak falls from 25 % to under 9 % and the ends are
-  unchanged.
-- **The preset recomposed several times a second.** It gated on `onset > 0.82`,
-  and `onset` normalizes against its own recent peak (ADR-0049), so under a click
-  track it reaches 1.0 on *every click*. The canvas was almost never not
-  mid-blend. Re-gated on `select(hash(beat_index) > 0.88, 1, 0)` — roughly one
-  beat in eight, seeded so it is reproducible and irregular rather than periodic.
-
-Neither is visible to any gate in the suite: the frames were within every floor
-while the look was gone. **The instrument that found it was `shot --signal
-click:110 --strip 8`**, and it is worth reaching for on any phase that adds
-motion.
-
-**Phase 6 — notes.**
-
-- **The storage buffer is twice the tier cap**, because a recomposition crossfade
-  has two whole canvases in the per-pixel loop at once. That is the one moment a
-  preset pays double, and it is the only place Phase 3's cost decision is
-  exceeded — bounded by the blend's own duration.
-- **The authored control's *motion* is seeded even though its geometry is not.**
-  A control that could not drift would make `drift` and `spin` silently inert on
-  the one layout a preset gets by default. The determinism test asserts the
-  geometry is seed-independent and the motion is not.
-- **`presets/README.md` again**, for the third time, for Phase 1's reason.
-- Reactivity after the levers landed: `bass=0.0511 mid=0.0202 treb=0.0168
-  onset=0.0068` against a `0.02` floor, up from `0.0342` at Phase 1.
-
-**Phase 4 — deviations.**
-
-- **A fourth `layout` option was added: the authored canvas, as a control**, and
-  it is the default. The plan implies the grammar replaces Phase 1's element
-  list; it does not. Two reasons, and the second is the load-bearing one: the
-  golden baseline and the shipped preset would otherwise move underneath Phase 5
-  rather than after it, and the authored canvas is **the only composition a human
-  has approved** — the Phase 3 gate judged it at 8 and 14 elements and chose that
-  density from it. A sample sheet of three generated candidates with nothing to
-  judge them against is how a gate picks the best of three bad options. Golden
-  re-ran clean without a re-bless, which is the evidence the control is byte-for-byte
-  Phase 1's canvas.
-- **The plan's two list-level done-whens are asserted in the unit tests, not in
-  `core/tests/collage_layout.rs`.** Bit-identical output for an equal recipe, and
-  capacity across a thousand recompositions, are claims about the element array,
-  which an integration test cannot see without making `Element` and `generate`
-  public — a real widening of the crate's surface for a test's convenience
-  (`marks` is `pub(crate)` for the same reason). The integration test asserts what
-  only it can: that the whole path from preset to pixel carries a seed and a
-  grammar to the frame. Both files say which half they hold.
-- **`presets/README.md` again**, for Phase 1's reason — four new params, and the
-  documentation gate fires when they are declared.
-
-**Phase 4 — the first three grammars were wrong and were rewritten before the
-sheet was rendered.** Worth recording because the defect is not one a test would
-have caught and the gate would have judged it as if it were the grammar: every
-element was sized as though its half-extent were a full extent, so a "dominant"
-form came out ~1.5 canvas units across — a near-square slab — and the canvases
-read as four slabs in a corner. The fix is a rule taken from the authored canvas
-rather than invented (`draw_extents`): **the elongation ceiling falls as an
-element grows**, so a large element is necessarily a bar and only a small one is
-blocky, which is what the reference canvases do. A second pass added `place`,
-because clamping an element's *centre* to the canvas lets a 0.7-unit bar hang
-half off the edge.
-
-**Phase 3 — a correction to the numbers the gate was first shown.** The sweep was
-retargeted to the shipped cap (rungs `8/16/24/32/40`; above the cap
-`applied_count` clamps, so two rungs there would render one canvas and the
-instrument's own non-vacuity assertion would fire). Re-measured, **every rung
-came in about 4 ms cheaper than the pre-Phase-3 sweep reported** — 32 elements
-reads 26 % of the 60 Hz budget where the first table said 45 %. Nothing about the
-8- or 32-element cases changed; the *sweep* went from ~20 s of GPU work to ~2 s,
-and this box's adapter is a **power-shared integrated GPU** whose clocks drop
-under sustained load. The interleaving protected the comparison — both sweeps
-agree the cost is linear — but not the absolute numbers. `collage_cost.rs` carries
-the finding and both tables. **The gate's verdict is unaffected**, and in the
-safe direction: the cap it chose is cheaper than it was told.
-
-**Phase 3 — followup, not fixed here.** `shape_collage::applied_count` clamps to
-the cap **silently**, where ADR-0007 requires `max_segments` surface a
-`CapOverflow` rather than cut geometry without saying so. That was harmless while
-the cap sat far above any authored canvas; it is not harmless now that Phase 7's
-target sits exactly on it. Not fixed in this phase because the surfaced channel is
-`CapOverflow`, whose `OverflowContext` enum is shared with the line scenes —
-widening it is an architect call. Recorded under Followups.
-
-**Phase 1 — observation for the review.** The animation gate's `footprint_diff`
-statistic (ADR-0091) exists so a sparse figure's motion is not diluted into the
-empty frame around it — it means over the *lit* pixels only. A `shape_collage`
-canvas lights every pixel, because the paper is the ground, so its footprint is
-the whole frame and the dilution ADR-0091 removed returns by another door: the
-gate reads a full-coverage graphic scene the way the pre-0091 gate read
-everything. The number this preset ships at was chosen against that floor.
+- **The `animation` gate's `footprint_diff` statistic (ADR-0091) does not fit a
+  full-coverage scene.** It means over the *lit* pixels so a sparse figure's
+  motion is not diluted into the empty frame around it; a `shape_collage` canvas
+  lights every pixel, so its footprint is the whole frame and the dilution
+  ADR-0091 removed returns by another door. The shipped preset's drift rate was
+  chosen against that floor.
+- **The element cap clamps silently**, where ADR-0007 requires `max_segments`
+  surface a `CapOverflow`. Harmless while the cap sat far above any canvas; not
+  harmless now that Phase 7's `collage_onwhite` sits exactly on it. Under
+  Followups: widening `OverflowContext` touches an enum shared with the line
+  scenes.
+- **A recomposition crossfade puts two whole canvases in the per-pixel loop**, so
+  the storage buffer is twice the tier cap and a blend is the one moment a preset
+  exceeds Phase 3's cost decision — bounded by the blend's own duration.
+- **`LMV_BLESS=1` is not scoped**: it rewrote `shape_collage.png` for a one-byte
+  difference against a tolerance of 48. Restored from git and re-checked clean.
+- **The root README said "Ten built-in rendering systems" and had been wrong since
+  `warp_mesh` made eleven.** Now twelve.
+- Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000,
+  flatness 0.7094, animation 0.0263, reactivity `bass=0.0511`. `On White`:
+  coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
+  against a 0.02 floor.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes — `collage_suprematist.toml` and
+  `collage_onwhite.toml` are new, and `presets/README.md` gained the
+  `shape_collage` roster row, a param table and an authoring section (touched in
+  four separate phases; see Notes).
+- **Plan header `Closes:`** none.
+- **What shipped:** feature. A twelfth system, its seeded layout grammar, its four
+  reactivity levers, an eight-kind element roster, two shipped presets, two golden
+  fixtures and a cost instrument.
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`,
+  `docs/preset-palettes.md`, `README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. Four
+  unprobeable claims, unchanged — `0038`, `0069`, `0079`, `0110`. **`0069` is
+  this plan's own entry** and its probe still reads as unprobeable because the
+  entry is the absence of a mechanism; it needs the dated update the plan's
+  Followups name, which is architect's at close.
+- **Outstanding `human` phases:** none. Phase 3 decided *continue*, Floor 40 /
+  Rich 96; Phase 5 decided *diagonal-axis with size-hierarchy's spread*. Both
+  verdicts and their reasons are in their own phase blocks.
 
 ## Followups (after this lands)
 
