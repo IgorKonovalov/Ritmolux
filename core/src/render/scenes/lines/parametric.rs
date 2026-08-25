@@ -44,10 +44,6 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
-/// Maps the `thickness` parameter (a small integer-ish stroke weight) to an
-/// NDC-y half-width; `thickness = 2` gives a comfortably thick projector line.
-const WIDTH_SCALE: f32 = 0.003;
-
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = 6.0;
 const DEFAULT_D: f32 = 71.0;
@@ -338,7 +334,7 @@ impl Scene for ParametricCurveScene {
         // pass below walks it along the path. Keeping the sampler colour-agnostic
         // is what leaves the curve maths free of any palette knowledge.
         let color = ramp.at(&self.palette, 0.0);
-        let width = (self.thickness * WIDTH_SCALE).max(0.0005);
+        let width = super::half_width(self.thickness);
 
         // Sample the single curve, then replicate it under the geometry mirror
         // (Phase 4). At the default identity spec this is a 1:1 copy, so an

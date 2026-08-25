@@ -45,6 +45,36 @@ pub use star::StarPatternScene;
 /// this path.
 pub use super::{CapOverflow, GeneratorConfig, OverflowContext};
 
+/// Maps the `thickness` parameter (a small integer-ish stroke weight) to an
+/// NDC-y half-width; `thickness = 2` gives a comfortably thick projector line.
+///
+/// One constant for all four line scenes, so a `thickness` that reads well on
+/// the rose reads the same on the mandala.
+pub const WIDTH_SCALE: f32 = 0.003;
+
+/// The smallest half-width a stroke is drawn at, whatever `thickness` asks for.
+///
+/// It exists to stop a zero or negative `thickness` degenerating the quad into
+/// a line of zero area, and it stays: the defect
+/// [design-backlog 0098](../../../../../docs/design-backlog.md) records is the
+/// **silence** around it, not the clamp.
+pub const MIN_HALF_WIDTH: f32 = 0.0005;
+
+/// The `thickness` at which [`MIN_HALF_WIDTH`] stops binding — about `0.167`.
+///
+/// **Below this every value renders identically**, because they all clamp to the
+/// same floor: a dead zone about 0.27 px wide at 1080p, which rasterizes as a
+/// broken dotted line rather than as a stroke. Derived from the two constants
+/// above rather than written out, so the load-time warning that quotes it
+/// (`preset::schema`) cannot drift from the floor it describes.
+pub const MIN_USEFUL_THICKNESS: f32 = MIN_HALF_WIDTH / WIDTH_SCALE;
+
+/// The NDC-y half-width a line scene strokes `thickness` at — the one place the
+/// scale and the floor are applied, shared by all four line scenes.
+pub fn half_width(thickness: f32) -> f32 {
+    (thickness * WIDTH_SCALE).max(MIN_HALF_WIDTH)
+}
+
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset
 /// switch and blow the segment cap (ADR-0007 Risks). Curated presets stay well

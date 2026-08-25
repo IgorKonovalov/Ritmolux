@@ -294,3 +294,136 @@ fn overflow_truncates_and_reports_the_drop() {
     assert_eq!(out.len(), 250, "output is truncated at the cap");
     assert_eq!(dropped, 600 - 250, "the exact drop is reported");
 }
+
+// -----------------------------------------------------------------------
+// The stroke floor's dead zone (Plan 0087 Phase 1b, design-backlog 0098)
+// -----------------------------------------------------------------------
+
+/// A `parametric_curve` preset drawing a static rose at `thickness`, with every
+/// other key frozen. Deliberately the same figure the golden fixture draws, so
+/// the only thing varying across the captures below is the stroke.
+fn thickness_preset(thickness: f32) -> String {
+    format!(
+        r#"
+system = "parametric_curve"
+name   = "thickness_{thickness}"
+
+[curve]
+family = "maurer_rose"
+
+[params]
+n             = "6"
+d             = "71"
+samples       = "361"
+scale         = "0.8"
+spin          = "0"
+hue           = "0.55"
+thickness     = "{thickness}"
+brightness    = "0.9"
+draw_progress = "1"
+"#
+    )
+}
+
+/// Capture that preset headless, on the software adapter.
+///
+/// Builds and drops **one** renderer per call rather than holding three: a
+/// second live device in a binary is what the software adapter falls over on,
+/// and building GPU resources mid-run shifts what a later stage resolves to on
+/// WARP.
+fn capture_at_thickness(thickness: f32) -> Option<crate::render::CaptureImage> {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 256,
+        height: 256,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let preset =
+        Preset::from_toml_str(&thickness_preset(thickness)).expect("the thickness fixture parses");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    Some(
+        renderer
+            .capture_preset(&name, &AnalysisFrame::default(), 4)
+            .expect("capture the thickness fixture"),
+    )
+}
+
+/// **Below [`MIN_USEFUL_THICKNESS`] every value draws the identical picture** —
+/// which is what makes the range dead, and why re-tuning inside it disproves
+/// the correct hypothesis.
+///
+/// `fragment_vitrail` shipped at `0.016`; the content lane swept it to `0.022`
+/// and `0.038` looking for a change, saw none, discarded the thickness
+/// hypothesis as disproved and went on to sweep chord count and sample count.
+/// All three clamp to [`MIN_HALF_WIDTH`].
+///
+/// **Both halves matter.** Without the second — a value above the threshold
+/// drawing something *different* — this test would pass just as happily on a
+/// renderer that ignored `thickness` altogether.
+#[test]
+fn every_sub_floor_thickness_renders_identically_and_a_useful_one_does_not() {
+    // The two historical values from the `fragment_vitrail` sweep, and one the
+    // library actually ships at. Read out of `let`s so the straddle is checked
+    // against the constant rather than restated as a comment.
+    let (low_t, higher_t, useful_t) = (0.016f32, 0.038f32, 1.8f32);
+    let floor = MIN_USEFUL_THICKNESS;
+    assert!(
+        low_t < floor && higher_t < floor && useful_t > floor,
+        "the fixtures must straddle {floor}, or this test compares nothing"
+    );
+
+    let Some(low) = capture_at_thickness(low_t) else {
+        return;
+    };
+    let Some(higher) = capture_at_thickness(higher_t) else {
+        return;
+    };
+    let Some(useful) = capture_at_thickness(useful_t) else {
+        return;
+    };
+
+    // Non-vacuity: the figure has to be on screen, or "identical" is two black
+    // frames agreeing.
+    let lit =
+        |img: &crate::render::CaptureImage| img.rgba.chunks_exact(4).filter(|p| p[0] > 8).count();
+    eprintln!(
+        "thickness captures: {low_t} lights {} px, {higher_t} lights {} px, \n         {useful_t} lights {} px",
+        lit(&low),
+        lit(&higher),
+        lit(&useful)
+    );
+    assert!(
+        lit(&low) > 0 && lit(&useful) > 0,
+        "one of the captures drew nothing"
+    );
+
+    // The dead zone: byte-for-byte, not within a tolerance. Two values that
+    // clamp to the same half-width feed the identical geometry to the identical
+    // pipeline, so anything other than equality would be a different defect.
+    assert_eq!(
+        low.rgba, higher.rgba,
+        "thickness 0.016 and 0.038 drew different pictures — they clamp to the \
+         same half-width, so the dead zone this warns about is not where the \
+         warning says it is"
+    );
+
+    // And the other side of it, or the assertion above is satisfied by a
+    // renderer that never reads `thickness` at all.
+    assert_ne!(
+        low.rgba, useful.rgba,
+        "thickness 0.016 and 1.8 drew the same picture — `thickness` is not \
+         reaching the stroke, and the equality above proves nothing"
+    );
+}

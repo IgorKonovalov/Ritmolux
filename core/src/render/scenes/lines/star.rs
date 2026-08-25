@@ -148,9 +148,6 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
-/// Maps `thickness` to an NDC-y half-width (see the parametric scene).
-const WIDTH_SCALE: f32 = 0.003;
-
 /// How far (degrees of contact angle) `variant` reaches either side of the
 /// preset's base angle — a pointier star at `0`, a blunter one at `2`. This is
 /// the span the three precomputed variants used to sit at (`-24 / 0 / +24`), kept
@@ -1205,7 +1202,7 @@ impl Scene for StarPatternScene {
         }
         let inner = self.colors.first().copied().unwrap_or([1.0; 3]);
 
-        let width = (self.thickness * WIDTH_SCALE).max(0.0005);
+        let width = super::half_width(self.thickness);
         transform_cached(
             base,
             self.rotation,

@@ -65,9 +65,6 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
-/// Maps `thickness` to an NDC-y half-width (see the parametric scene).
-const WIDTH_SCALE: f32 = 0.003;
-
 const DEFAULT_VISIBLE_DEPTH: f32 = 1.0;
 const DEFAULT_ROTATION: f32 = 0.0;
 const DEFAULT_HUE: f32 = 0.3;
@@ -432,7 +429,7 @@ impl Scene for LSystemScene {
         );
         let trunk = self.depth_colors.first().copied().unwrap_or([1.0; 3]);
 
-        let width = (self.thickness * WIDTH_SCALE).max(0.0005);
+        let width = super::half_width(self.thickness);
         transform_cached(
             base,
             self.rotation,
