@@ -251,6 +251,106 @@ mod tests {
         }
     }
 
+    /// **The grid tracks the estimate it is handed, including a wrong one**
+    /// (Plan 0095 Phase 7b).
+    ///
+    /// Every other test in this file — and the end-to-end
+    /// `the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio` — drives
+    /// exactly one transient per musical beat, which is the single configuration
+    /// where the grid, the tempo estimate and `beat_index` all agree. No test at
+    /// that configuration can say which of the three the grid actually followed.
+    /// This one splits them: on material with strong off-beat energy the
+    /// estimator reads the octave above (Phase 1's table, and Phase 2's
+    /// `the_octave_ambiguity_is_one_sided` shows that direction has no
+    /// discriminating evidence in the autocorrelation), so the grid's "bar"
+    /// spans two musical beats rather than four.
+    ///
+    /// **The property asserted is deliberately not "it finds a bar" — it
+    /// provably cannot here.** It is that the grid advances at the rate it was
+    /// given, and monotonically. That is the reading which separates *the grid
+    /// tracks and the accent feature is weak* from *the grid does not track on
+    /// this material* — the pair Phase 5's captures could not tell apart,
+    /// because no log column carries the grid.
+    ///
+    /// The envelope is the analyzer's own, not this file's synthetic spike: the
+    /// coupling under test is `(bpm, onset_raw)` as the analyzer actually
+    /// produces them.
+    #[test]
+    fn the_grid_tracks_a_wrong_octave_estimate() {
+        use crate::audio::AudioFormat;
+        use crate::dsp::Analyzer;
+
+        let format = AudioFormat {
+            sample_rate: SR,
+            channels: 1,
+        };
+        let truth = 90.0f32;
+        for offbeat in [0.5f32, 0.8] {
+            let pcm = crate::signal::offbeat_click_track(truth, 24.0, offbeat, format);
+            let mut analyzer = Analyzer::new(format).expect("valid format");
+            let mut grid = BarGrid::new(SR);
+
+            // Settle past the tracker's warmup and the lock's pull-in, then
+            // measure the rate against the estimate published over that window.
+            let settle = hops(10.0);
+            let mut start = GridPosition::default();
+            let mut bpm_sum = 0.0f64;
+            let mut measured = 0usize;
+            let mut prev_bar = 0u32;
+            for (hop, samples) in pcm.chunks(HOP_SIZE * format.channels as usize).enumerate() {
+                analyzer.push_interleaved(samples);
+                let f = analyzer.take_frame();
+                let pos = grid.process(f.bpm, f.onset_raw);
+                if hop == settle {
+                    start = pos;
+                }
+                if hop > settle {
+                    bpm_sum += f.bpm as f64;
+                    measured += 1;
+                    assert!(
+                        pos.bar_index >= prev_bar,
+                        "off-beat {offbeat}: the grid went backwards at hop {hop}, \
+                         {prev_bar} then {}",
+                        pos.bar_index
+                    );
+                }
+                prev_bar = pos.bar_index;
+            }
+            let mean_bpm = (bpm_sum / measured.max(1) as f64) as f32;
+            let end = grid.process(mean_bpm, 0.0);
+
+            // Entry requirement, asserted rather than assumed: this case is only
+            // the case it claims to be while the estimate really is an octave
+            // high. If the estimator is ever repaired, this fires and says so
+            // rather than quietly testing the easy configuration.
+            assert!(
+                mean_bpm > truth * 1.5,
+                "off-beat {offbeat}: this test covers the wrong-octave case and the \
+                 estimate is no longer wrong ({mean_bpm:.1} against a {truth:.0} truth) \
+                 — the octave case needs a new stimulus, or this test needs retiring"
+            );
+
+            let window = measured as f32 * HOP_SIZE as f32 / SR as f32;
+            let counted =
+                (end.bar_index as f32 + end.bar_phase) - (start.bar_index as f32 + start.bar_phase);
+            let expected = window / (60.0 / mean_bpm) / BEATS_PER_BAR as f32;
+            // The same 0.05 bars `the_grid_advances_one_bar_per_four_musical
+            // _beats` states, and it is not tight here by accident: the estimate
+            // moves within the window and `counted` is compared against its
+            // mean, yet the residual measures 0.02 bars over 14 s.
+            assert!(
+                (counted - expected).abs() <= 0.05,
+                "off-beat {offbeat}: the estimate averaged {mean_bpm:.1} BPM over \
+                 {window:.1} s, which is {expected:.3} bars of the grid's own beat; \
+                 it counted {counted:.3} — the grid is not tracking what it was handed"
+            );
+            assert!(
+                end.running,
+                "off-beat {offbeat}: the grid should be running"
+            );
+        }
+    }
+
     /// The lock claim: wherever the grid's phase starts, the envelope's spikes
     /// end up near the start of a grid beat rather than straddling one.
     ///

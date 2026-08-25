@@ -485,7 +485,9 @@ mod tests {
     /// size of the step.**
     ///
     /// Three places documented it as monotone and it is not: `bar_index` is
-    /// `(beat_index - alignment) / BEATS_PER_BAR`, so the beat the estimator locks
+    /// `(beat count - alignment) / BEATS_PER_BAR` — the [`grid`](super::grid)'s
+    /// beat count since Plan 0095, `beat_index` only while the grid warms up — so
+    /// the beat the estimator locks
     /// onto a non-zero alignment subtracts up to three beats and the counter can
     /// step back by one bar. Plan 0049 chose to soften those docs rather than
     /// publish a second never-decreasing counter — the counter would need
@@ -639,6 +641,87 @@ mod tests {
         assert_eq!(SWITCH_MARGIN, 0.15, "the challenger margin does not move");
         assert_eq!(HYSTERESIS_BEATS, 12, "the switch hysteresis does not move");
         assert_eq!(BEATS_PER_BAR, 4, "4/4 is still assumed (ADR-0050)");
+    }
+
+    /// **The grid handover does not step the bar backwards** (Plan 0095 Phase
+    /// 7a). The fold counts `beat_index` until the tempo tracker warms up and
+    /// the grid's own count — which starts at zero — from then on, several
+    /// seconds into *every* stream. Before the whole-bar offset that seam walked
+    /// `bar_index` back one bar on a 120 BPM click train and three on
+    /// `dynamic_groove(124)`, once per stream, in the first few seconds.
+    ///
+    /// This has to drive PCM through the analyzer rather than the tracker: the
+    /// handover exists only where the two counters meet, and no test of this
+    /// module alone can reach it. The stimuli are chosen for onset density,
+    /// which is what sets the size of the step — the denser the detections, the
+    /// further `beat_index` has run by the time the grid starts.
+    ///
+    /// The alignment change stays the *one* place `bar_index` may step back, and
+    /// `bar_index_steps_back_across_an_alignment_change` still pins that at
+    /// exactly one bar. So this asserts monotonicity over the warmup window
+    /// only, where no alignment can have been chosen yet.
+    #[test]
+    fn the_grid_handover_does_not_step_the_bar_backwards() {
+        use crate::audio::AudioFormat;
+        use crate::dsp::{Analyzer, HOP_SIZE, WARMUP_HOPS};
+
+        let format = AudioFormat {
+            sample_rate: 48_000,
+            channels: 1,
+        };
+        // Enough past the tracker's ~4.1 s envelope history that the handover is
+        // inside the window, and short enough that a lock cannot have settled.
+        let secs = 8.0;
+        let clips: [(&str, Vec<f32>); 4] = [
+            ("click 120", crate::signal::click_track(120.0, secs, format)),
+            ("click 200", crate::signal::click_track(200.0, secs, format)),
+            (
+                "groove 124",
+                crate::signal::dynamic_groove(124.0, secs, format),
+            ),
+            (
+                "off-beat 90 at 0.80",
+                crate::signal::offbeat_click_track(90.0, secs, 0.8, format),
+            ),
+        ];
+
+        for (label, pcm) in clips {
+            let mut analyzer = Analyzer::new(format).expect("valid format");
+            let mut prev = 0u32;
+            let mut saw_the_handover = false;
+            let mut warm = false;
+            for (hop, samples) in pcm
+                .chunks(HOP_SIZE * format.channels as usize)
+                .enumerate()
+                .skip(WARMUP_HOPS)
+            {
+                let _ = hop;
+                analyzer.push_interleaved(samples);
+                let f = analyzer.take_frame();
+                if !warm && f.bpm > 0.0 {
+                    warm = true;
+                    saw_the_handover = true;
+                }
+                assert!(
+                    f.bar_index >= prev,
+                    "{label}: bar_index went backwards, {prev} then {} \
+                     (hop {hop}, bpm {:.1}, beat_index {})",
+                    f.bar_index,
+                    f.bpm,
+                    f.beat_index
+                );
+                prev = f.bar_index;
+            }
+            assert!(
+                saw_the_handover,
+                "{label}: the tracker never warmed up, so this clip never \
+                 exercised the handover it exists to cover"
+            );
+            assert!(
+                prev > 0,
+                "{label}: the clip should have advanced at least one bar"
+            );
+        }
     }
 
     /// The whole analysis path is byte-deterministic across the new wiring: one
