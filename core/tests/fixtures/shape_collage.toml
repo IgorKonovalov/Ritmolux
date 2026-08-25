@@ -1,0 +1,70 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `shape_collage` scene's drift baseline (Plan 0113 Phase 1, ADR-0123): flat
+# opaque elements painted on their own paper and composited in painter order by
+# one fullscreen distance-field pass. This is the engine's first graphic world
+# rather than a luminous one, and the fixture is deliberately the whole of that
+# claim rather than the scene's defaults:
+#
+#  - The palette is EIGHT FLAT PLATEAUS, not a gradient. Each element's palette
+#    coordinate lands in the interior of one, so its colour is exact rather than
+#    interpolated - which is what makes "flat colour" a property this baseline
+#    can pin at all. A stop pair 0.0002 apart is the hard transition between
+#    plateaus; a smooth ramp here would blur every element's fill and the
+#    baseline would stop being about flatness.
+#  - Seven of the eight plateaus sit AT OR UNDER the tonemap's KNEE = 0.6
+#    (ADR-0046), where the curve is exactly the identity, so those colours reach
+#    the display byte-identical. The eighth is the paper at linear 0.851, which
+#    is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
+#    unreachable, off-white is the affordable ground, and this fixture is what
+#    would notice if that ever stopped being true.
+#  - `count` is left at its default, which is the authored fourteen-element
+#    canvas. Fourteen is ADR-0123's count for Malevich's `Suprematism`, the
+#    sparsest canvas in the reference set.
+#  - `paper = "0.9375"` is the eighth plateau's interior. It is a RAW coordinate:
+#    `color_span` and `palette_shift` move the elements and must not drag the
+#    ground with them, so this number is not reachable through them.
+#
+# WHAT WOULD PIN IDENTICALLY IF THE SCENE WERE BROKEN, and therefore what this
+# fixture is shaped to catch: a painter that ignored array order would draw the
+# same fourteen shapes in the wrong overlaps, and the frames DIFFER - the black
+# bar crossing the blue plane is the second element in the list precisely so
+# that overlap is in the baseline. `the_later_element_wins_the_overlap` in
+# `core/src/render/scenes/shape_collage/tests.rs` is the direct assertion; this
+# is the drift guard over the whole picture.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule, and this scene
+# adds a bind-group layout so the rule is live rather than ceremonial): at
+# 160x100 over 2 frames, WARP mean rgb 211.712 207.595 203.726 against hardware
+# 211.700 207.551 203.741, frame_diff 0.000146. Inside the noise floor, so this
+# baseline pins a picture hardware also draws.
+#
+# The layout is a single group - sampler, two LUT textures, the uniform, then a
+# fragment-visible read-only STORAGE buffer - and that last entry is a shape
+# nothing else in core/src holds, so no allowlist entry is needed.
+system = "shape_collage"
+name   = "fixture_shape_collage"
+
+[palette]
+stops = [
+  { at = 0.0000, color = "#111111" },
+  { at = 0.1249, color = "#111111" },
+  { at = 0.1251, color = "#8a1420" },
+  { at = 0.2499, color = "#8a1420" },
+  { at = 0.2501, color = "#96751e" },
+  { at = 0.3749, color = "#96751e" },
+  { at = 0.3751, color = "#1e3a8a" },
+  { at = 0.4999, color = "#1e3a8a" },
+  { at = 0.5001, color = "#1d5c34" },
+  { at = 0.6249, color = "#1d5c34" },
+  { at = 0.6251, color = "#4a4a4a" },
+  { at = 0.7499, color = "#4a4a4a" },
+  { at = 0.7501, color = "#5a1f4a" },
+  { at = 0.8749, color = "#5a1f4a" },
+  { at = 0.8751, color = "#d9d5c8" },
+  { at = 1.0000, color = "#d9d5c8" },
+]
+
+[params]
+paper = "0.9375"
+scale = "1.0"

@@ -298,6 +298,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_collage`   | `count` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -1274,6 +1275,54 @@ MilkDrop had two channels. Where the reference tells two of its wave modes apart
 by drawing the left channel against the right, this draws the one trace at the
 separation the reference's own parameters name. It is the same figure with the
 channel difference removed.
+
+### `shape_collage` — flat opaque elements on their own paper (Plan 0113)
+
+**This is the one system in the engine where one object is in front of another.**
+Every other scene emits additive light, and additive light has no ordering: a
+black bar over a red one simply adds. `shape_collage` paints instead. Each pixel
+starts at the **paper** colour and walks an array of flat elements *in array
+order*, compositing each with `over`, so the array index is the depth
+([ADR-0123](../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+There is no glow param, no bloom, and no soft edge — that is the vocabulary, not
+an omission.
+
+The element list is currently the scene's own authored suprematist canvas of
+fourteen elements; `count` says how many of them are live. Plan 0113 Phase 4
+replaces that list with a seeded layout grammar, and Phase 6 gives the elements
+recomposition, drift, spin, spawn/decay and per-element pumping — **so treat this
+roster as the Phase 1 surface and expect it to grow**, not as the final shape.
+
+| param | what it does |
+|---|---|
+| `count` | how many elements of the canvas are live, in painter order. **Quantized to a whole element CPU-side** — an eased binding does not half-draw one — and bounded by the tier's element cap. A non-finite value falls back to the whole authored canvas rather than to a blank frame. |
+| `scale` | the canvas's size in the frame. `1.0` is the composition as composed. |
+| `paper` | the ground's palette coordinate. **A raw coordinate**: `color_span` and `palette_shift` move the *elements* and deliberately do not drag the ground with them, so a colour drift does not take the paper along. |
+| `opacity` | a global multiplier on every element's own alpha. `1.0` — fully opaque — is the look; below it the whole canvas turns translucent over the paper. |
+| `edge_softness` | extra pixels of coverage ramp past the one-pixel analytic edge. **`0` is the hard edge and is the default.** This is an escape from the look, not a quality knob — antialiasing is already exact at `0`. |
+| `color_span`, `palette_shift` | scale and offset applied to every element's stored palette coordinate, so a whole canvas can be recoloured or drifted through the gradient at once. Both are the identity by default. |
+| `saturation`, `palette_mix` | the shared palette controls, unchanged. |
+
+> **Keep the palette under linear 0.6 and the look is free.** This is the one
+> authoring fact this system has, and it comes off the tonemap rather than off
+> any parameter — see
+> [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
+> paragraph on the knee in [`docs/preset-palettes.md`](../docs/preset-palettes.md).
+> Below the knee ADR-0046's curve is exactly the identity, so a colour arrives at
+> the display *as authored* — flat, unshaded — and bloom's threshold sits above
+> that same knee, so the edges stay hard with no halo. One constraint, both
+> properties, no parameter. Reach for a brighter palette and you lose the flat
+> fill and the hard edge together, and nothing will tell you why.
+>
+> The **paper** is the deliberate exception: `f(1.0) = 0.800` makes pure white
+> unreachable, so an off-white ground is the affordable one. Both of the
+> reference canvases this system was built from are off-white anyway.
+
+**Author the palette as plateaus, not as a gradient.** An element takes one
+colour off the LUT at its coordinate, so a smooth ramp shades every element by
+where it happens to sit. A pair of stops a ten-thousandth apart is a hard
+transition; `presets/collage_suprematist.toml` is eight flat bands built that
+way, and its header carries the arithmetic.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 

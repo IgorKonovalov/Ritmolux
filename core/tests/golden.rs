@@ -64,6 +64,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
         SystemKind::Emitter => ("emitter", include_str!("fixtures/emitter.toml")),
         SystemKind::ShapeField => ("shape_field", include_str!("fixtures/shape_field.toml")),
         SystemKind::WarpMesh => ("warp_mesh", include_str!("fixtures/warp_mesh.toml")),
+        SystemKind::ShapeCollage => ("shape_collage", include_str!("fixtures/shape_collage.toml")),
     }
 }
 

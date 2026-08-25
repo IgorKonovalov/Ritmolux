@@ -315,6 +315,26 @@ pub struct TierConfig {
     /// the content lane, which is why shipped presets are authored against the
     /// floor.
     pub max_segments: usize,
+
+    /// Cap on how many flat elements a `shape_collage` canvas may hold
+    /// ([ADR-0123](../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+    ///
+    /// **The one capacity here that bounds a per-pixel loop**, which is what
+    /// makes it load-bearing rather than a memory number. Every other count in
+    /// this struct bounds work paid once per particle, per vertex or per
+    /// segment; this one bounds work every *fragment* pays, so a frame costs
+    /// `elements x pixels` and ADR-0123 prices the bounding-box reject alone —
+    /// before anything is drawn — at roughly `6N` operations per pixel. The
+    /// buffer is irrelevant at any value either tier would take: 64 bytes an
+    /// element, so 128 elements is 8 KB.
+    ///
+    /// **Both values are provisional.** `core/tests/collage_cost.rs` (Plan 0113
+    /// Phase 2) sweeps the count on hardware and prints the ladder; Phase 3 is
+    /// the human gate that reads it and sets these two numbers, and may instead
+    /// route the draw path to ADR-0123's Alternative A. Until then the floor
+    /// value is "large enough that the sweep reaches its own top rung", not a
+    /// measured budget — and it is deliberately not a number to quote.
+    pub collage_elements: usize,
 }
 
 impl TierConfig {
@@ -329,6 +349,7 @@ impl TierConfig {
         emitter_objects: 2_000,
         mesh_grid: (64, 48),
         max_segments: 20_000,
+        collage_elements: 128,
     };
 
     /// The midrange-discrete tier.
@@ -349,6 +370,7 @@ impl TierConfig {
         emitter_objects: 6_000,
         mesh_grid: (88, 66),
         max_segments: 60_000,
+        collage_elements: 256,
     };
 
     /// The config for `tier`.
