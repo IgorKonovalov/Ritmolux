@@ -241,7 +241,7 @@ def run(src, dst, log=None, stage=None):
             dst.write(markers.popleft())
             dst.write(out)
             frames_out += 1
-        stage.report()
+        stage.report(frames_out)
 
     dst.flush()
     if frames_out != frames_in or markers:
@@ -375,14 +375,21 @@ class DiffusionStage:
         self.anchor = None   # last diffused output, as an image (gap: blend)
         self.gaps = 0        # gap frames waiting on the next anchor
         self.index = 0
-        self.times = []      # seconds per diffused frame, for the closing report
+        self.times = []      # seconds inside the diffusion call, per diffused frame
+        self.started = None  # perf_counter at the head of the stream (wall clock)
+        self.load_seconds = 0.0   # of that wall clock, what the model build took
         self.log = None
 
     # -- lifecycle
 
     def begin(self, fmt, log=None):
+        import time
+
         from PIL import Image
 
+        # The wall clock starts here, at the head of the stream, and it is the
+        # only timer that sees everything this stage does (Plan 0106 Phase 7d).
+        self.started = time.perf_counter()
         if fmt.colour != b"444":
             raise ConfigError(
                 "diffusion needs a C444 stream (this one is C%s); `shot --render` "
@@ -401,7 +408,9 @@ class DiffusionStage:
                    ", resampled from %dx%d and back" % (fmt.width, fmt.height)),
                 file=log, flush=True,
             )
+        build_started = time.perf_counter()
         self._build(log)
+        self.load_seconds = time.perf_counter() - build_started
 
     def _build(self, log):
         import torch
@@ -513,25 +522,57 @@ class DiffusionStage:
         self.prev = out
         return out
 
-    def report(self):
-        """What this run cost, in the units every measurement here is quoted in.
+    def report(self, emitted=0):
+        """What this run cost, as the wall clock sees it and as the model does.
 
-        A measurement naming its configuration, never a property (ADR-0071):
-        s/frame is per *diffused* frame, so a strided run's cost per emitted
-        frame is this divided by the stride.
+        TWO numbers, deliberately not collapsed into one (Plan 0106 Phase 7d).
+        They measure different things and the difference is the finding:
+
+        - the WALL CLOCK covers the whole stream, so it carries `_read`'s colour
+          decode and downscale, `_emit`'s upscale back to the stream's geometry
+          and its RGB->YUV encode, the gap crossfades, and the model load. `_emit`
+          runs per EMITTED frame, so at stride N one anchor pays N full-resolution
+          upscales and N full-frame colour encodes;
+        - the DIFFUSION MEAN times `self.pipe(...)` alone, and nothing else.
+
+        Until this phase only the second existed, and it was divided by the stride
+        and printed as "per emitted frame" - which is the label the documents took
+        and it was wrong about its own scope. On the Phase 6 render the two
+        differed by 1.406x, and one number cannot carry both.
+
+        Both are measurements naming their configuration, never properties
+        (ADR-0071): seconds on one machine, one model, one geometry.
         """
         if not (self.log and self.times):
             return
+        import time
+
         mean = sum(self.times) / len(self.times)
+        diffused = len(self.times)
+
+        if self.started is not None and emitted > 0:
+            elapsed = time.perf_counter() - self.started
+            print(
+                "sd-filter: %d emitted in %.1f s = %.3f s per emitted frame, WALL "
+                "CLOCK (model load %.1f s of that)"
+                % (emitted, elapsed, elapsed / emitted, self.load_seconds),
+                file=self.log, flush=True,
+            )
+
         note = ""
         if self.pipe is not None:
             import torch
 
             note = ", peak VRAM %.2f GiB" % (torch.cuda.max_memory_reserved() / 2 ** 30)
         print(
-            "sd-filter: %d diffused, mean %.3f s/frame (%.3f s per emitted frame "
-            "at stride %d)%s"
-            % (len(self.times), mean, mean / self.cfg["stride"], self.cfg["stride"], note),
+            "sd-filter: %d diffused, mean %.3f s in the diffusion CALL alone "
+            "(stride %d)%s"
+            % (diffused, mean, self.cfg["stride"], note),
+            file=self.log, flush=True,
+        )
+        print(
+            "sd-filter: the gap between the two is colour conversion and "
+            "resampling, which the wall clock counts and the call timer does not",
             file=self.log, flush=True,
         )
 
