@@ -1,6 +1,6 @@
 # 0112 — The handoff stops being a chat message
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md) (proposed),
@@ -282,11 +282,12 @@ as well as `docs/`, and these phases add relative links in both.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(to be filled: `main` directly, or worktree path + branch)_
+**Lane:** `main` directly, no worktree. A parallel lane is live at `WORK/lmv-plan-0106` on branch
+`plan-0106-diffusion-filter`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the plan template carries the log skeleton | dev | not started | — |
+| 1 — the plan template carries the log skeleton | dev | done | committed with this row |
 | 2 — `dev` writes the log as the phases land | dev | not started | — |
 | 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | not started | — |
 
