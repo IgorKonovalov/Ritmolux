@@ -13,6 +13,79 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0095 — The downbeat fold gets a musical beat](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+  — closed 2026-08-25, seven phase commits on `plan-0095-musical-bar-grid` from `5bdce91` to
+  `4caac3c`, merged at `6507f41`. **Reviewed twice**: 2026-08-25 over phases 1-6 (no blockers, four
+  majors, all one shape), and again at the close over **Phase 7**, which was authored in the session
+  that produced the first review and had therefore never had a fresh-context read — no blockers, one
+  major, three minors, one nit. Version: **minor**, `0.76.0` → `0.77.0` — Phases 2, 3, 4 and 7a all
+  change analysis behaviour.
+
+  **What shipped.** `core/src/dsp/grid.rs`, a beat clock driven by the autocorrelated tempo rather
+  than by the transient stream, and `DownbeatTracker` now folds its four 4/4 alignments over *that*
+  count. `beat`, `beat_index` and `time_since_beat` are untouched, so no preset's flash timing moved
+  and no golden baseline re-blessed — the plan's whole reason for being safe to run beside a
+  blessing lane. The grid is **phase-locked, not free-running**: two exponentially-decayed
+  quadrature accumulators over the onset envelope, 2 % of the error corrected per hop, parking the
+  envelope's energy `LOCK_TARGET = 0.12` of a beat in. That constant is Phase 4's finding, not a
+  tuning knob — parking the energy at phase 0 puts the grid's cell boundary *on* the transients, and
+  the measured result was a grid whose average rate was exactly right while its beat count skipped
+  one and repeated another across successive musical beats.
+
+  **What was measured, and the control this project had not managed before.** Phase 5 re-ran Plan
+  0086's three-genre capture, then reconstructed the **pre-0095 fold from each capture's own logged
+  rows** — same audio, same detections, same accent formula — so the two arms differ only in the
+  code. Over the `0.25` gate: rock/pop `0.00 → 2.36 %`, hip-hop `0.79 → 3.67 %`, techno
+  `4.16 → 0.42 %`. The techno decline is read as the repair working: the old fold's "bar" was 1.75
+  musical beats long and its four buckets aliased onto the kick/hat alternation, so its 4.16 % was a
+  confident lock onto a musically meaningless phase. That reading is sound on its load-bearing half
+  and unproven on its other half, and the plan says so: **no instrument in this repo sees the grid**,
+  so *the grid tracks and the accent feature is weak* and *the grid does not track on this material*
+  are still inseparable from a capture.
+
+  **The octave was not settled, and that is the close's headline.**
+  [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) put settling it on the critical
+  path and named exactly one alternative — stop with a diagnosis. Phase 2 did neither: it settled
+  *stability* (a switch margin plus a hold on the winning lag; the off-beat 0.50 rung went from 15 %
+  of its window on the wrong octave to 0 %, all twelve probe rows stable, every ladder rung
+  unchanged) and shipped on a third reading the ADR had not anticipated — that the fold needs a
+  **stable** unit, not a bar, and the four alignments absorb an arbitrary phase. The ADR was accepted
+  **with a dated `Outcome`** recording that narrowing rather than left claiming what it claimed.
+  `the_octave_ambiguity_is_one_sided` asserts the non-separability as a property from one run: the
+  clean floor (80.0 %) sits below the trap ceiling (90.7 %), re-read at this close.
+
+  **Phase 7 — the first review's four majors, all one shape: the docs and tests generalized past
+  what the captures measured.** 7a found the published `bar_index` stepping *backwards* once per
+  stream where the fold hands over from `beat_index` to the grid's count, which restarts at zero —
+  back one bar on a 120 BPM click train, three on `dynamic_groove(124)`, while `docs/presets.md`
+  promised it "never moves by more than a bar" and nothing tested it. The repair is a whole-bar
+  offset latched on the first running hop, which is free precisely because a whole-bar shift cannot
+  reach `beat_in_bar` or the fold's buckets. 7b added the test for the configuration nothing covered
+  — every grid test drove one transient per beat, the single case where the grid, the tempo estimate
+  and `beat_index` all agree, so none of them could say which the grid followed. 7c-7f corrected
+  three docs claiming the unit "really is a bar" while citing the one capture that contradicts it
+  (hip-hop, `bpm` median 165 on a ~90 BPM track), a stale trap figure in `tempo.rs`, five stale doc
+  comments, and two preset headers Phase 6's file list had missed.
+
+  **The close's own findings.** One major: `the_grid_does_not_move_layer_1`'s first arm compares "an
+  analyzer with a grid" against "an analyzer without one", which stopped being two different things
+  at Phase 4 when the grid moved *inside* the analyzer — both runs now step it, so the arm cannot
+  fail while its doc comment still claims it "catches any feedback from the grid into Layer 1". The
+  arm's own comment predicted its expiry and it was not retired. The property survives structurally
+  in the same test's second arm. Three minors: the handover test's "no alignment can have been
+  chosen yet" premise is argued rather than asserted; 7b's rate window is measured one hop short of
+  the grid position it compares against; and the three genre figures reach `presets/README.md`
+  without the `n = 1 track per genre` caveat the plan's own log states.
+
+  **What outlived the plan.** Two clocks now live in the analysis path and a reader has to know
+  which one a variable came from — ADR-0109 priced that and it is now real. The successor question
+  is sharper than when the plan opened: on rock/pop the corrected effect size's p90 reached 0.2060
+  against a `CONFIDENCE_THRESHOLD` of 0.25, so the distribution moved up **under** the gate rather
+  than through it, and ADR-0082's reason for that threshold was argued when the estimator had no
+  signal at all. ADR-0097's accent-cue shortlist is finally askable, and the six presets' bar
+  arithmetic is a `preset-author` followup — Phase 6 and 7 corrected their comments and changed no
+  expression, verified: the `presets/*.toml` diff across the whole plan contains no non-comment line.
+
 - [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)
   — closed 2026-08-25, eleven commits on `plan-0106-diffusion-filter` from `3c15e79` to
   `b1647a6`, merged at `a5c4407`. Review: **no blockers, no majors, five minors** (all repaired at

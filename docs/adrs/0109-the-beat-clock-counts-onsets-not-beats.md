@@ -1,8 +1,8 @@
 # ADR-0109 — the beat clock counts onsets, not beats, and Layer 2 gets its own grid
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-15
-> **Related plan(s):** [0095 — the downbeat fold gets a musical beat](../plans/0095-the-downbeat-fold-gets-a-musical-beat.md),
+> **Related plan(s):** [0095 — the downbeat fold gets a musical beat](../plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md),
 > measured by [0086 — the downbeat finds a cue that is not the kick](../plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md)
 > **Supplements:** [ADR-0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md),
 > [ADR-0097](0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md)
@@ -184,3 +184,68 @@ oscillating between two candidates, exactly as a kick on 1 and 3 predicts. It is
 swamped by the fold-unit defect, but it is present, on the predicted material, in the predicted
 direction. It becomes answerable once the fold has a bar-scale unit, which is why ADR-0097's
 Alternative A is deferred rather than refused.
+
+## Outcome (2026-08-25, from Plan 0095)
+
+**The Decision's second paragraph did not hold, and the plan neither met it nor took the exit it
+named.** "Settling the tempo estimate is part of this decision, not a follow-on ... the repair is
+not credible without it" was written against a Negative that offered exactly one alternative — "if
+it cannot be settled the fold has no trustworthy grid and the plan stops there, having spent its
+cost on a diagnosis". Plan 0095 Phase 2 did not settle the octave and did not stop. It found a third
+reading this ADR did not anticipate, and shipped on it.
+
+**What Phase 2 settled was *stability*, not the octave.** The repair is a switch margin plus a hold
+on the winning autocorrelation lag. It removed the hop-to-hop flicker — the off-beat 0.50 rung went
+from 15 % of its window on the wrong octave to 0 %, and all twelve probe rows are now stable — and
+every ladder rung reads the value it read before the repair. The three trap rungs stay an octave
+off. That the octave *cannot* be settled from this evidence is asserted rather than asserted-of:
+`the_octave_ambiguity_is_one_sided` (`core/tests/tempo_probe.rs`) takes both bounds from one run and
+asserts the clean floor sits below the trap ceiling, so no threshold on the halving column separates
+"a periodic signal" from "a signal whose accent period is twice its click period". The doubling
+column does separate and was refused, because it fires on 60-100 BPM material with events between
+the beats — which is this capture set's hip-hop.
+
+**The third reading, stated so it can be argued with:** the fold does not need a *bar*, it needs a
+**stable** unit. A grid locked an octave high gives the fold a repeatable bucket that is two musical
+beats rather than four, and the fold's four alignments absorb an arbitrary phase by construction —
+so a stably-wrong octave is degraded but usable, where the wandering 1.35-2.10 ratio this ADR
+measured was not usable at all. This is a real narrowing of the Decision, not a technicality, and
+two claims in the body inherit it:
+
+- **"Layer 2 becomes able to be right"** (Positive) is now *able to be right on material whose tempo
+  the estimator reads on the correct octave*.
+- **"The only visible change is that `beat_in_bar`, `bar_index` and `bar_phase` start meaning what
+  their names say"** (Positive) overstates it. They mean a stable multiple of the beat.
+
+**It is not hypothetical, and it reached the docs before it was caught.** Phase 5's hip-hop capture
+read a `bpm` median of 165.4 on a track that counts at ~90, so its grid bar spanned two musical
+beats — and that same capture's 3.67 % over the gate was cited in three authoring documents as
+evidence the unit "really is a bar". Plan 0095 Phase 7c repaired all three.
+
+**The repair is nonetheless measured, and against a control this project had not managed before.**
+Phase 5 reconstructed the pre-0095 fold from each capture's own logged rows, so both arms read the
+same audio and the same detections. Rock/pop moved 0.00 → 2.36 % over the gate and hip-hop
+0.79 → 3.67 %; techno fell 4.16 → 0.42 %, which Plan 0095 reads as the repair working — the old
+fold's "bar" was 1.75 musical beats long and its four buckets aliased onto the kick/hat alternation,
+so its 4.16 % was a confident lock onto a musically meaningless phase, the failure
+[ADR-0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) calls worse than none.
+That reading is sound on its load-bearing half — the old number cannot have been a true downbeat
+lock at any octave — and unproven on its other half: **no instrument in this repo sees the grid**,
+so "the grid tracks and the accent feature is weak" and "the grid does not track on this material"
+remain inseparable from a capture. `--downbeat-log` predates the grid and carries no column from it.
+
+**What this ADR's Notes said, re-read.** Plan 0068's 6.79 % / 0.14 % genre split still has not
+reproduced. Phase 5's third reading of detections-per-beat is 1.20x / 1.22x / 2.28x — the two lower
+than Plan 0086's 1.76x / 1.35-2.10x and techno's *higher* than its 1.73x — on one track per genre,
+as before. The fold-unit finding does not depend on it and still does not.
+
+**What did not move, as promised:** `beat`, `beat_index` and `time_since_beat` are bit-identical;
+`CONFIDENCE_THRESHOLD`, `SWITCH_MARGIN` and `HYSTERESIS_BEATS` are unchanged and asserted by
+`the_gate_constants_have_not_moved`; `LMV_ABI_VERSION` stays 4; the six presets' expressions are
+untouched and their comments corrected.
+
+**The successor question this leaves.** On rock/pop the corrected effect size's p90 reached 0.2060
+against a `CONFIDENCE_THRESHOLD` of 0.25 — the distribution moved up *under* the gate rather than
+through it. ADR-0082's reason for that threshold was argued when the estimator had no signal at all,
+which is no longer true. Moving it is not this decision's to make, and it now has evidence to be
+made against.
