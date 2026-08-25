@@ -31,6 +31,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -355,6 +356,50 @@ check("blend crossfades between the anchors on either side",
       "got %r" % (payloads,))
 check("blend's tail is held, because there is no next anchor",
       pump(synth(8, 8, 8), stage=CountingStage(cell(stride=3, gap="blend")))[1] == 8)
+
+print()
+print("the closing report separates the two costs it measures:")
+
+# Plan 0106 Phase 7d. The instrument used to time the diffusion call alone, divide
+# by the stride and print the result as "per emitted frame" - which is the label
+# three documents took, and it was wrong about its own SCOPE rather than about the
+# machine: _read's colour decode and downscale and _emit's upscale and encode all
+# sit outside that timer, and _emit runs per EMITTED frame. On the Phase 6 render
+# the wall clock was 1.406x the number being printed.
+#
+# What is assertable here without a GPU is the arithmetic and the labelling, which
+# is exactly what was wrong. The agreement between the wall clock and an external
+# stopwatch is a measurement on one machine and is recorded in the plan, not here.
+stage = CountingStage(cell(stride=3))
+stage.log = io.StringIO()
+stage.times = [1.5, 1.6, 1.7]        # three diffusion calls, mean 1.6 s
+stage.started = time.perf_counter() - 60.0   # 60 s of wall clock
+stage.load_seconds = 12.0
+stage.report(90)                     # ...over 90 emitted frames
+
+out = stage.log.getvalue()
+check("the wall-clock line is per EMITTED frame", "0.667 s per emitted frame" in out,
+      "got %r" % (out,))
+check("  ... and says it is the wall clock", "WALL CLOCK" in out, out)
+check("  ... and separates out the model load", "model load 12.0 s" in out, out)
+check("the diffusion mean is printed as well", "mean 1.600 s in the diffusion CALL" in out,
+      out)
+check("  ... and is NOT relabelled as per emitted frame",
+      out.count("per emitted frame") == 1, out)
+check("the two are named as different scopes",
+      "colour conversion and resampling" in out, out)
+
+# 0.667 against 0.533 is the whole point: 1.600 / 3 is what the old instrument
+# printed, and it is not the cost of an emitted frame.
+check("the two numbers genuinely differ at this stride",
+      abs(60.0 / 90 - 1.6 / 3) > 0.1, "%r vs %r" % (60.0 / 90, 1.6 / 3))
+
+# A stage that never diffused prints nothing rather than dividing by zero.
+quiet = CountingStage(cell(stride=1))
+quiet.log = io.StringIO()
+quiet.report(0)
+check("a run with no diffused frame reports nothing", quiet.log.getvalue() == "",
+      "got %r" % (quiet.log.getvalue(),))
 
 print()
 print("a profile is reproducible from its own echo:")
