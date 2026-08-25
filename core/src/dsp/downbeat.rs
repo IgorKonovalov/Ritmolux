@@ -9,7 +9,11 @@
 //!
 //! The method: accumulate a bass-weighted accent per detected beat, fold that
 //! history over the four candidate beat-1 alignments of a 4/4 hypothesis, and
-//! take the strongest. Confidence is **how much of the accent variation the
+//! take the strongest. **What the four alignments are alignments *of* changed in
+//! Plan 0095**: the fold buckets by the [`grid`](super::grid)'s tempo-driven beat
+//! count, not by `beat_index`, which counts transients at 1.35x-2.10x per musical
+//! beat and so gave the fold a unit that was not a beat and a "bar" that was not
+//! a bar (ADR-0109). Confidence is **how much of the accent variation the
 //! alignment explains**, corrected for the share noise alone would explain, so a
 //! pattern with no accent structure scores near zero rather than picking a winner
 //! by coincidence. Below a threshold the estimator does not publish, and switching
@@ -17,9 +21,10 @@
 //!
 //! **The gate chooses an alignment, nothing else.** Locked and unlocked output
 //! come from one formula, differing only in whether the alignment is the
-//! estimate or `0` — so the fallback is `beat_index`-derived counters by
-//! construction, not by a parallel code path that could drift. That is what
-//! makes "worst case, it behaves exactly like the counters" a structural claim.
+//! estimate or `0` — so the fallback is counters derived from whatever beat
+//! count it was handed, by construction rather than by a parallel code path that
+//! could drift. That is what makes "worst case, it behaves exactly like the
+//! counters" a structural claim.
 //!
 //! 4/4 is assumed and documented. Pure and allocation-free after construction:
 //! state is fixed arrays and the only clock is the beat stream (NFR section 6).
@@ -76,7 +81,7 @@ pub struct BarClock {
     /// Which beat of the bar this is, `0..BEATS_PER_BAR`.
     pub beat_in_bar: u32,
     /// Bar counter — **monotone except across an alignment change**, since it is
-    /// `(beat_index - alignment) / BEATS_PER_BAR` and `alignment` moves when the
+    /// `(beat_count - alignment) / BEATS_PER_BAR` and `alignment` moves when the
     /// estimator locks, drops back, or is overtaken by a challenger. See
     /// `bar_index_steps_back_across_an_alignment_change`, which pins the size of
     /// that step at one bar.
@@ -104,8 +109,12 @@ pub struct BarClock {
 ///
 /// **Diagnostics only.** It is not a grammar variable, not on the C ABI, and
 /// nothing on the analysis path reads it — [`DownbeatTracker::terms`] recomputes
-/// from state that already exists rather than caching anything, so the estimator
-/// behaves identically whether or not anyone is looking.
+/// the fold from state that already exists rather than caching it, so the
+/// estimator behaves identically whether or not anyone is looking. The two
+/// exceptions are [`Self::fold_beat`] and [`Self::grid_bar_phase`], which
+/// `process` stores because they are its *input* and nothing downstream retains
+/// them; the store is unconditional and branchless, so it is as invisible to the
+/// estimate as the recomputation is.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct DownbeatTerms {
     /// Mean accent per candidate beat-1 alignment — the fold's own output.
@@ -125,6 +134,23 @@ pub struct DownbeatTerms {
     pub beats_seen: u32,
     /// Whether these terms publish — the evidence floor **and** the gate.
     pub locked: bool,
+    /// **The counter the fold buckets by**, as of the most recent
+    /// [`DownbeatTracker::process`] — the [`grid`](super::grid)'s beat count
+    /// since Plan 0095, and `beat_index` only while the grid warms up
+    /// (ADR-0109). [`Self::scores`], [`Self::best`] and [`Self::held`] are all
+    /// indexed in *this* counter's space, and it is reported here because
+    /// nothing downstream retains it: the shell's log had no way to name the
+    /// quantity its own alignment columns were expressed in, which is what let
+    /// the two drift apart while every column stayed plausible.
+    pub fold_beat: u32,
+    /// Where that counter sits across the bar, `[0, 1)`, **ungated** — no
+    /// `alignment` is subtracted, because the question this exists to answer is
+    /// where the *grid* is, not where the estimator thinks beat 1 is.
+    ///
+    /// Honest only once the grid is running. Before that the fold is handed the
+    /// tempo tracker's onset-reset phase, so a warmup row's reading is not a
+    /// grid reading; `bpm` marks the handover.
+    pub grid_bar_phase: f32,
 }
 
 /// The three numbers behind one confidence reading. Split out so the probe can
@@ -140,7 +166,7 @@ struct Effect {
 /// Folds per-beat accents over the four 4/4 alignments and publishes a bar
 /// position when the winner is convincing enough.
 pub struct DownbeatTracker {
-    /// `beat_index % BEATS_PER_BAR` for each recorded accent.
+    /// `beat_count % BEATS_PER_BAR` for each recorded accent.
     phases: [u32; ACCENT_HISTORY],
     /// Accent strength for each recorded accent, same order.
     values: [f32; ACCENT_HISTORY],
@@ -148,12 +174,18 @@ pub struct DownbeatTracker {
     filled: usize,
     /// Write cursor into the ring.
     cursor: usize,
-    /// The alignment currently held: which `beat_index % BEATS_PER_BAR` is beat 1.
+    /// The alignment currently held: which `beat_count % BEATS_PER_BAR` is beat 1.
     alignment: u32,
     /// Latest confidence in `alignment` — see `effect_size`.
     confidence: f32,
     /// A challenging alignment and how many consecutive beats it has led for.
     challenger: Option<(u32, u32)>,
+    /// The `beat_count` and clamped `beat_phase` of the most recent `process`
+    /// call, for [`DownbeatTerms::fold_beat`] / [`DownbeatTerms::grid_bar_phase`].
+    /// Recorded on **every** hop, not only on beats: the fold buckets on beats,
+    /// but the position across the bar keeps moving between them.
+    last_beat_count: u32,
+    last_beat_phase: f32,
 }
 
 impl DownbeatTracker {
@@ -168,24 +200,40 @@ impl DownbeatTracker {
             alignment: 0,
             confidence: 0.0,
             challenger: None,
+            last_beat_count: 0,
+            last_beat_phase: 0.0,
         }
     }
 
     /// Advance one hop.
     ///
-    /// `beat` and `beat_index` come from the beat clock; `bass` and `onset` are
-    /// the **normalized** levels; `beat_phase` is the `0..1` position through the
+    /// `beat` flags a transient this hop; `bass` and `onset` are the
+    /// **normalized** levels; `beat_phase` is the `0..1` position through the
     /// current beat, which becomes the sub-beat part of `bar_phase`.
+    ///
+    /// **`beat_count` is the counter this folds over, and since Plan 0095 it is
+    /// not `beat_index`.** It is the [`grid`](super::grid)'s beat count, which is
+    /// driven by the tempo estimate; `beat_index` counts transients, at 1.35x to
+    /// 2.10x per musical beat, so folding over it spanned well under a bar and a
+    /// bar-locked accent precessed across all four alignments instead of
+    /// accumulating in one (ADR-0109). The analyzer still passes `beat_index`
+    /// while the grid warms up, which is the fallback ADR-0050 specifies and the
+    /// behaviour this module had throughout.
     pub fn process(
         &mut self,
         beat: bool,
-        beat_index: u32,
+        beat_count: u32,
         bass: f32,
         onset: f32,
         beat_phase: f32,
     ) -> BarClock {
+        let phase = beat_phase.clamp(0.0, 1.0);
+        // Every hop, beat or not — see the field docs.
+        self.last_beat_count = beat_count;
+        self.last_beat_phase = phase;
+
         if beat {
-            self.record(beat_index, accent(bass, onset));
+            self.record(beat_count, accent(bass, onset));
             self.reconsider();
         }
 
@@ -193,9 +241,8 @@ impl DownbeatTracker {
         // One formula for both paths: the gate only decides whether the alignment
         // is the estimate or zero.
         let alignment = if locked { self.alignment } else { 0 };
-        let shifted = beat_index.saturating_sub(alignment);
+        let shifted = beat_count.saturating_sub(alignment);
         let beat_in_bar = shifted % BEATS_PER_BAR;
-        let phase = beat_phase.clamp(0.0, 1.0);
 
         BarClock {
             beat_in_bar,
@@ -236,6 +283,10 @@ impl DownbeatTracker {
             effect_corrected: effect.corrected,
             beats_seen: self.filled as u32,
             locked: self.filled >= MIN_BEATS && effect.corrected >= CONFIDENCE_THRESHOLD,
+            fold_beat: self.last_beat_count,
+            // Ungated: `alignment` is deliberately not subtracted.
+            grid_bar_phase: ((self.last_beat_count % BEATS_PER_BAR) as f32 + self.last_beat_phase)
+                / BEATS_PER_BAR as f32,
         }
     }
 
@@ -244,13 +295,13 @@ impl DownbeatTracker {
         clippy::indexing_slicing,
         reason = "cursor is kept modulo ACCENT_HISTORY, a valid index into both fixed arrays"
     )]
-    fn record(&mut self, beat_index: u32, value: f32) {
+    fn record(&mut self, beat_count: u32, value: f32) {
         let value = if value.is_finite() {
             value.max(0.0)
         } else {
             0.0
         };
-        self.phases[self.cursor] = beat_index % BEATS_PER_BAR;
+        self.phases[self.cursor] = beat_count % BEATS_PER_BAR;
         self.values[self.cursor] = value;
         self.cursor = (self.cursor + 1) % ACCENT_HISTORY;
         self.filled = (self.filled + 1).min(ACCENT_HISTORY);
@@ -471,7 +522,9 @@ mod tests {
     /// size of the step.**
     ///
     /// Three places documented it as monotone and it is not: `bar_index` is
-    /// `(beat_index - alignment) / BEATS_PER_BAR`, so the beat the estimator locks
+    /// `(beat count - alignment) / BEATS_PER_BAR` — the [`grid`](super::grid)'s
+    /// beat count since Plan 0095, `beat_index` only while the grid warms up — so
+    /// the beat the estimator locks
     /// onto a non-zero alignment subtracts up to three beats and the counter can
     /// step back by one bar. Plan 0049 chose to soften those docs rather than
     /// publish a second never-decreasing counter — the counter would need
@@ -607,6 +660,146 @@ mod tests {
         );
     }
 
+    /// **The gate did not move.** Plan 0095 changed what the fold folds over and
+    /// nothing about what it takes to publish: ADR-0082's reason for the
+    /// threshold is untouched by the unit underneath it, and an estimator that
+    /// starts locking more often because its bar is right is the outcome that
+    /// was wanted — an estimator that starts locking more often because the bar
+    /// is easier to clear would be the same repair silently undone.
+    ///
+    /// Asserted as constants rather than read off the diff, because the diff is
+    /// exactly where a threshold change hides in a plan that touches this file.
+    #[test]
+    fn the_gate_constants_have_not_moved() {
+        assert_eq!(
+            CONFIDENCE_THRESHOLD, 0.25,
+            "the publish gate is ADR-0082's and this plan does not move it"
+        );
+        assert_eq!(SWITCH_MARGIN, 0.15, "the challenger margin does not move");
+        assert_eq!(HYSTERESIS_BEATS, 12, "the switch hysteresis does not move");
+        assert_eq!(BEATS_PER_BAR, 4, "4/4 is still assumed (ADR-0050)");
+    }
+
+    /// **The grid handover does not step the bar backwards** (Plan 0095 Phase
+    /// 7a). The fold counts `beat_index` until the tempo tracker warms up and
+    /// the grid's own count — which starts at zero — from then on, several
+    /// seconds into *every* stream. Before the whole-bar offset that seam walked
+    /// `bar_index` back one bar on a 120 BPM click train and three on
+    /// `dynamic_groove(124)`, once per stream, in the first few seconds.
+    ///
+    /// This has to drive PCM through the analyzer rather than the tracker: the
+    /// handover exists only where the two counters meet, and no test of this
+    /// module alone can reach it. The stimuli are chosen for onset density,
+    /// which is what sets the size of the step — the denser the detections, the
+    /// further `beat_index` has run by the time the grid starts.
+    ///
+    /// The alignment change stays the *one* place `bar_index` may step back, and
+    /// `bar_index_steps_back_across_an_alignment_change` still pins that at
+    /// exactly one bar. So this asserts monotonicity over the warmup window
+    /// only, where no alignment can have been chosen yet.
+    #[test]
+    fn the_grid_handover_does_not_step_the_bar_backwards() {
+        use crate::audio::AudioFormat;
+        use crate::dsp::{Analyzer, HOP_SIZE, WARMUP_HOPS};
+
+        let format = AudioFormat {
+            sample_rate: 48_000,
+            channels: 1,
+        };
+        // Enough past the tracker's ~4.1 s envelope history that the handover is
+        // inside the window, and short enough that a lock cannot have settled.
+        let secs = 8.0;
+        let clips: [(&str, Vec<f32>); 4] = [
+            ("click 120", crate::signal::click_track(120.0, secs, format)),
+            ("click 200", crate::signal::click_track(200.0, secs, format)),
+            (
+                "groove 124",
+                crate::signal::dynamic_groove(124.0, secs, format),
+            ),
+            (
+                "off-beat 90 at 0.80",
+                crate::signal::offbeat_click_track(90.0, secs, 0.8, format),
+            ),
+        ];
+
+        for (label, pcm) in clips {
+            let mut analyzer = Analyzer::new(format).expect("valid format");
+            let mut prev = 0u32;
+            let mut saw_the_handover = false;
+            let mut warm = false;
+            for (hop, samples) in pcm
+                .chunks(HOP_SIZE * format.channels as usize)
+                .enumerate()
+                .skip(WARMUP_HOPS)
+            {
+                let _ = hop;
+                analyzer.push_interleaved(samples);
+                let f = analyzer.take_frame();
+                if !warm && f.bpm > 0.0 {
+                    warm = true;
+                    saw_the_handover = true;
+                }
+                assert!(
+                    f.bar_index >= prev,
+                    "{label}: bar_index went backwards, {prev} then {} \
+                     (hop {hop}, bpm {:.1}, beat_index {})",
+                    f.bar_index,
+                    f.bpm,
+                    f.beat_index
+                );
+                prev = f.bar_index;
+            }
+            assert!(
+                saw_the_handover,
+                "{label}: the tracker never warmed up, so this clip never \
+                 exercised the handover it exists to cover"
+            );
+            assert!(
+                prev > 0,
+                "{label}: the clip should have advanced at least one bar"
+            );
+        }
+    }
+
+    /// The whole analysis path is byte-deterministic across the new wiring: one
+    /// buffer through two fresh analyzers, and the published bar trio agrees bit
+    /// for bit. The grid sits on the hot path between the tempo tracker and this
+    /// module, so "the same PCM gives the same bars" is the property that would
+    /// break first if it ever read a clock or carried state across a run.
+    #[test]
+    fn the_analyzer_publishes_the_same_bars_for_the_same_buffer() {
+        use crate::audio::AudioFormat;
+        use crate::dsp::{Analyzer, HOP_SIZE};
+
+        let format = AudioFormat {
+            sample_rate: 48_000,
+            channels: 1,
+        };
+        let pcm = crate::signal::dynamic_groove(124.0, 12.0, format);
+        let run = || {
+            let mut analyzer = Analyzer::new(format).expect("valid format");
+            let mut series = Vec::new();
+            for samples in pcm.chunks(HOP_SIZE * format.channels as usize) {
+                analyzer.push_interleaved(samples);
+                let f = analyzer.take_frame();
+                series.push((
+                    f.beat_in_bar,
+                    f.bar_index,
+                    f.bar_phase.to_bits(),
+                    f.downbeat_confidence.to_bits(),
+                    f.downbeat_locked,
+                ));
+            }
+            series
+        };
+        let first = run();
+        assert_eq!(first, run(), "the same buffer must publish the same bars");
+        assert!(
+            first.iter().any(|r| r.1 > 0),
+            "the clip should have advanced at least one bar"
+        );
+    }
+
     /// The fallback path is byte-deterministic — the phase's third done-when.
     #[test]
     fn the_fallback_path_is_byte_deterministic() {
@@ -690,5 +883,87 @@ mod tests {
         );
         let after = drive(&mut t, 16, 17, accented(0));
         assert!(after.locked, "the tracker should recover and still lock");
+    }
+
+    /// **The terms report the counter the fold was handed, not one derived from
+    /// it.** Plan 0095 repointed that counter and the shell's log kept writing
+    /// `beat_index` beside the alignment columns for want of anywhere to read
+    /// the real one; this is that reading, so the test is on whether it tracks
+    /// the *input* through cases where an inference would go wrong.
+    ///
+    /// Three of them: an arbitrary count (not a small loop index), a hop with
+    /// `beat == false` — where the fold records nothing but the position still
+    /// moves — and a count that jumps, which is what the grid handover does.
+    #[test]
+    fn the_terms_report_the_count_and_phase_the_fold_was_handed() {
+        let mut t = DownbeatTracker::new();
+
+        // (count, phase, beat) in sequence; every one must be readable back.
+        let hops: [(u32, f32, bool); 5] = [
+            (0, 0.0, true),
+            (41, 0.25, true),
+            // No beat: the fold does not record, the position still advances.
+            (41, 0.80, false),
+            (42, 0.10, true),
+            // The grid handover's jump — a whole-bar offset latched at once.
+            (108, 0.50, false),
+        ];
+        for (count, phase, beat) in hops {
+            t.process(beat, count, 0.6, 0.4, phase);
+            let terms = t.terms();
+            assert_eq!(
+                terms.fold_beat, count,
+                "fold_beat should be the count just handed in (beat = {beat})"
+            );
+            let expected = ((count % BEATS_PER_BAR) as f32 + phase) / BEATS_PER_BAR as f32;
+            assert!(
+                (terms.grid_bar_phase - expected).abs() < 1e-6,
+                "grid_bar_phase {} for count {count} phase {phase}, expected {expected}",
+                terms.grid_bar_phase
+            );
+            assert!(
+                (0.0..1.0).contains(&terms.grid_bar_phase),
+                "grid_bar_phase {} left [0, 1)",
+                terms.grid_bar_phase
+            );
+        }
+
+        // Ungated by construction: locking onto a non-zero alignment moves
+        // `held` and leaves `grid_bar_phase` exactly where the grid is.
+        let mut t = DownbeatTracker::new();
+        const OFFSET: u32 = 2;
+        let out = drive(&mut t, 40, 0, accented(OFFSET));
+        assert!(
+            out.locked,
+            "the fixture must lock for this half to mean anything"
+        );
+        let terms = t.terms();
+        assert_eq!(
+            terms.held, OFFSET,
+            "the fixture should hold alignment {OFFSET}"
+        );
+        t.process(false, 400, 0.0, 0.0, 0.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.0,
+            "count 400 is bar-aligned in grid space; a phase that subtracted the \
+             held alignment would read {}/4 instead",
+            BEATS_PER_BAR - OFFSET
+        );
+
+        // The clamp `process` applies to `beat_phase` is the one reported, at
+        // both ends: unclamped these would read 2.75 and -0.5.
+        t.process(false, 2, 0.0, 0.0, 9.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.75,
+            "the phase should clamp to 1, not wrap"
+        );
+        t.process(false, 3, 0.0, 0.0, -5.0);
+        assert_eq!(
+            t.terms().grid_bar_phase,
+            0.75,
+            "the phase should clamp to 0, not go negative"
+        );
     }
 }

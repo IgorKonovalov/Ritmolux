@@ -616,6 +616,24 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    Never update the main checkout's working tree from a lane — another session may be live in it.
 2. **Re-run the whole gate** (`fmt` + `clippy` + `nextest`) after that merge. It is the first moment
    the two lanes' code has met; no earlier run covers the combination.
+
+   **`nextest` here means `--workspace`, not `-p lmv-core`,** and the distinction has already cost a
+   close. Plan 0095 moved the downbeat fold from `beat_index` onto a new bar grid; `standalone/`'s
+   `--downbeat-log` writes `beat_index` beside the fold's own alignment scores, so the two columns
+   stopped being commensurable and a `standalone` test went red. **`standalone/` was not touched by
+   that plan at all** — the diff over its whole range is empty there. `dev`'s close block cited
+   `cargo nextest run -p lmv-core`, the Mode 4 review re-ran the same scope and passed it, and the
+   red was found by the `pre-push` hook — which runs `--workspace` — *after* the plan was closed,
+   merged, version-bumped and tagged. A core edit's blast radius does not stop at `core/`, and a
+   package-scoped run is structurally unable to see where it lands.
+
+   ```sh
+   cargo nextest run --workspace     # what the close owes; -p <crate> is not a substitute
+   ```
+
+   The same asymmetry is why `clippy` above is already written `--workspace --all-targets`. Note the
+   hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
+   its `nextest` step is filtered (`-E "$NEXTEST_FILTER"`) rather than complete.
 3. **Then steps 1–4 above** — plan status, ADRs, both READMEs, and `cargo release <level>` — all
    **on the branch**. The version is chosen against what `main` actually reached, not against the
    branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the

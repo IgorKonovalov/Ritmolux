@@ -120,8 +120,10 @@ palette_steps   = "9"
 # `hash` is seeded and pure, so this is reproducible rather than random - the same
 # preset draws the same sequence every run. The two calls are offset by 50 to
 # decorrelate them; without that they would step together and read as one event.
-# `beat_index` counts ONSETS, about 1.7-2.1x per musical beat (ADR-0109), so the
-# wander is already irregular against the pulse, which is the "no pattern" part.
+# `beat_index` counts ONSETS, 1.2x to 2.3x per musical beat depending on the
+# material (ADR-0109, widened from the 1.7-2.1x this comment used to state by
+# Plan 0095's own captures) and unstable inside one track, so the wander is
+# already irregular against the pulse, which is the "no pattern" part.
 # Both are eased below, so a step arrives as a settling rather than a switch.
 palette_contour = "0.50 + hash(beat_index) * 0.35"
 gamma           = "1.86 + 0.07 * sin(time * 0.23) + hash(beat_index + 50) * 0.07"
