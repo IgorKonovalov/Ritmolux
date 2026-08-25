@@ -25,6 +25,7 @@ pub mod bands;
 pub mod downbeat;
 pub mod fft;
 pub mod gain;
+pub mod grid;
 pub mod novelty;
 pub mod onset;
 pub mod tempo;
