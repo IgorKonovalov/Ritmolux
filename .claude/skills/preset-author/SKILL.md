@@ -110,9 +110,12 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
   no fixed multiplier converts them and `mod(beat_index, 16)` is **not** four bars. Use
   `beat_index` only where a change on activity is the point (`hash(beat_index)` re-rolls a colour
   or a count per hit). `beat_in_bar`, `bar_index` and `bar_phase` ride a **gated** downbeat
-  estimator that since Plan 0095 folds over a tempo-driven bar grid, so its unit is a real bar:
-  measured over the 0.25 gate at 2.36 % (rock/pop) and 3.67 % (hip-hop) — roughly 2-4 % on material
-  with bar-scale accents — and 0.42 % on four-on-the-floor techno, which has no bar-scale accent to
+  estimator that since Plan 0095 folds over a tempo-driven bar grid, so its unit is a **stable
+  multiple of the beat** — a real bar when the tempo estimate is on the right octave, half or double
+  one when it is not (the hip-hop capture below read 165 BPM on a ~90 BPM track, so its bar spanned
+  two beats). Measured over the 0.25 gate at 2.36 % (rock/pop) and 3.67 % (hip-hop, at that wrong
+  octave) — roughly 2-4 % on material with bar-scale accents — and 0.42 % on four-on-the-floor
+  techno, which has no bar-scale accent to
   find. So they are still counter-derived most of the time; bind them freely (they stay periodic
   and never claim a wrong beat 1), but do not author a look whose whole point is landing on the
   real bar line. **`index` is not audio** — it is the per-element position (Plan
