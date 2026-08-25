@@ -1,16 +1,23 @@
-# ADR-0120 — A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading
+# ADR-0122 — A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-25 (Plan 0106 Phase 7e)
 > **Date:** 2026-08-25
 > **Related plan(s):** [0106](../plans/0106-the-frame-stream-passes-through-a-diffusion-model.md) Phase 7e
 
-**On the number.** 0120 was reserved for
-[Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and has **returned
-to the pool**: that phase did not run, on Phase 2's stop condition, so the ADR it would have written
-does not exist.
+**On the number.** This ADR was written as **0120** on the plan lane and renumbered to **0122** at
+the close, 2026-08-25. 0120 had been reserved for
+[Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
+pool when that phase did not run, on Phase 2's stop condition — and
 [ADR-0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
-own numbering note anticipated this case in as many words — *"If 0111 takes its stop branch, 0120
-stays free for the next taker."* This is the next taker, and the number is dense again.
+own numbering note anticipated exactly that case: *"If 0111 takes its stop branch, 0120 stays free
+for the next taker."* Two lanes then took it on the same day, in different worktrees, neither able
+to see the other: `main` accepted
+[ADR-0120](0120-the-close-brief-is-a-section-of-the-plan.md) at Plan 0112's close, and this lane
+wrote a different 0120. The filenames differ, so the merge took both silently rather than
+conflicting. `main`'s was already accepted and cited from `CLAUDE.md` and two skills, so this one
+moved. **The general lesson is that a returned-to-the-pool number is a race across parallel lanes,
+and nothing in the repository detects the collision** — the next-free-number line in
+[`README.md`](README.md) is advisory, and two branches read the same value.
 
 ## Context
 

@@ -112,7 +112,7 @@ other file is measured against, and there can only be one of it per tree.
 |------|------|----------|
 | `README.md` | an orientation figure quoting a number in no canonical region | reported, naming the number |
 | `orientation-elsewhere.md` | the orientation marker used outside `README.md` | reported as a misplaced whitelist |
-| both of the above | **two** orientation lines carrying figures | reported separately — ADR-0120 allows one |
+| both of the above | **two** orientation lines carrying figures | reported separately — ADR-0122 allows one |
 | `stray.md` | a cost figure in a section that names the filter | reported |
 | `tools/sd-filter/README.md` | a cost figure in a file whose **path** names the filter, under no naming heading | reported |
 
@@ -127,7 +127,7 @@ full of unrelated timings. Four cases assert it stays quiet:
 | a figure in a dated record | `docs/plans/0001-a-record.md`, full of them | not scanned at all |
 | a figure spelled in words | *Thirteen minutes* in `tools/sd-filter/README.md` | not reported — hole 1, named in the checker's header |
 
-The third of those is ADR-0120's own accepted scope limit, and the second and fourth are the
+The third of those is ADR-0122's own accepted scope limit, and the second and fourth are the
 checker's documented holes. All four are pinned here as **behavior** rather than left as accidents,
 so that a future attempt to widen the scan fails this fixture loudly instead of quietly convicting
 prose it was never meant to reach.

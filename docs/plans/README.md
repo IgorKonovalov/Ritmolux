@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0112** (ADRs are a separate sequence — next free there is **0120**.)
+**Next free number: 0113** (ADRs are a separate sequence — next free there is **0121**.)
 
 ## Active roster
 
@@ -748,6 +748,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 
+- [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md) — closed 2026-08-25. Review: **no blockers, no majors, two minors.** Version: **none** (docs/chore-only). Log: 43 lines vs a 146-line phase section.
 - [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md) — closed 2026-08-20. Review: **no blockers, one major, two minors.** The bisect stopped: the wash is at the **field**. Phase 6 void.
 - [0109 — The MilkDrop import gets its geometry back](done/0109-the-milkdrop-import-gets-its-geometry-back.md) — closed 2026-08-19. Review: **no blockers, two majors (repaired at close), three minors.** The gate falsified three claims; ADR-0119 + a Phase 7 followed.
 - [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md) — closed 2026-08-19. Review: **no blockers, one major, three minors.** Phase 6 read 2026-08-20: run `32272926929`, **92.31 %** vs floor 91.

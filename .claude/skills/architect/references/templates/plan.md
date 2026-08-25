@@ -74,6 +74,44 @@ solved. Call out real-time hazards (allocation in a hot path, ABI lifetime quest
 Cut the scope explicitly. Tempting-to-bundle things that are out of scope; reference future plans
 by name if you can.
 
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/lmv-plan-NNNN` on
+`plan-NNNN-<slug>`)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — <name> | <dev \| human> | <done \| not started \| abandoned> | `<sha>` |
+| 2 — <name> | … | … | … |
+
+### Notes
+
+_(deviations from the plan — what `dev` did differently, and the commit, with no justification;
+done-when criteria that could not be satisfied as stated, by exception only — there is no `[pass]`
+list and silence means the rest passed; followups noticed and not acted on. One line each. Not:
+narrative, self-assessment, "nothing notable", or any restatement of the phase text. Empty is a
+valid answer and needs no sentence saying so.)_
+
+### Close triggers
+
+_(facts for architect to verify and decide from — not recommendations. In particular no suggested
+version bump: the level is architect's call per ADR-0005.)_
+
+- **`presets/` touched:** _(yes + which files, or no)_
+- **Plan header `Closes:`** _(the `design-backlog NNNN` entries named in the header, or none)_
+- **What shipped:** _(feature / fix-only / docs-chore-only)_
+- **Operator docs touched:** _(from Mode 4's sweep table — `README.md`, `presets/README.md`,
+  `docs/presets.md`, `docs/preset-palettes.md`, `docs/capturing.md`, `docs/on-device-validation.md`,
+  `docs/nfr.md` — or none)_
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** _(exit code, and any entry named)_
+- **Outstanding `human` phases:** _(which, or none)_
+
 ## Followups (after this lands)
 
 Track followups as a list so they don't get lost. Empty at draft time is fine.

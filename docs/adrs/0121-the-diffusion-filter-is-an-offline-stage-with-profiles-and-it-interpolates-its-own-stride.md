@@ -254,6 +254,9 @@ predates anyone having watched five minutes of output.
 
 **On the number, resolved.** The opening note reserved 0120 for Plan 0111 Phase 3 and said it would
 return to the pool if that plan took its stop branch. **It did** — Phase 3 never ran, on Phase 2's
-stop condition — and 0120 was taken 2026-08-25 by
-[ADR-0120](0120-a-sidecar-tool-documents-itself-in-one-place.md), the documentation design pass for
-this same filter. The sequence is dense and nothing is held.
+stop condition — and 0120 was then taken **twice on 2026-08-25**, by two lanes that could not see
+each other: `main` accepted [ADR-0120](0120-the-close-brief-is-a-section-of-the-plan.md) at Plan
+0112's close, and this lane wrote the documentation design pass for this same filter. The filenames
+differ, so the merge took both silently. That second one is
+[ADR-0122](0122-a-sidecar-tool-documents-itself-in-one-place.md), renumbered at this plan's close;
+its own numbering note carries the full account. The sequence is dense and nothing is held.
