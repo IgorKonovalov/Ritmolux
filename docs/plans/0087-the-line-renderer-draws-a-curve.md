@@ -320,8 +320,8 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the arc instance draws | dev | done | committed with this row |
-| 1b — a sub-floor `thickness` stops failing silently | dev | not started | |
+| 1 — the arc instance draws | dev | done | `3f9e828` |
+| 1b — a sub-floor `thickness` stops failing silently | dev | done | committed with this row |
 | 2 — the in-frame geometry instrument learns arcs | dev | not started | |
 | 3 — the circular motifs become arcs | dev | not started | |
 | 4 — does it read as a curve? | human | not started | |
@@ -342,6 +342,15 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   to mean **0.0044** / outlier **255** — the mean stays *inside* the golden suite's 0.02, because a
   thin closed curve is wrong on a few hundred pixels and right on seventy-six thousand. Recorded in
   the test's own docstring.
+- **Phase 1b moved the floor into one place rather than warning about four copies of it.**
+  `WIDTH_SCALE` and the `0.0005` clamp were duplicated in `lsystem.rs`, `parametric.rs`,
+  `spectrum.rs` and `star.rs`; they are now `lines::half_width` and the threshold the warning quotes
+  is `MIN_HALF_WIDTH / WIDTH_SCALE`, derived rather than restated. The arithmetic is unchanged and
+  the golden suite reads mean 0.0000 on all eighteen baselines.
+- **`Expr::as_const` is new, and it is what bounds the warning's scope.** It reports the value a
+  binding rests at, `None` for anything naming a variable — so an animated `thickness` that passes
+  through the dead zone is silent, which is the honest limit of a load-time check and is asserted
+  as such.
 - **Followup noticed and not acted on — the segment path's stroke width is uniform in NDC, not in
   pixels.** Measured on a 640x480 target: the same `width` gives a horizontal stroke 24 px tall and
   a vertical one 30 px wide, the aspect ratio exactly. So a polyline circle already ships with

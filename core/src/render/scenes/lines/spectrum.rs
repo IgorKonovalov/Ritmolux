@@ -75,10 +75,6 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
 use crate::render::palette::{self, Palette, desaturate};
 
-/// Maps `thickness` to an NDC-y half-width — the same scale the other line
-/// scenes use, so a `thickness` that reads well on the rose reads the same here.
-const WIDTH_SCALE: f32 = 0.003;
-
 /// Largest element count a `[spectrum]` table may ask for — the band count
 /// itself, because above it the 64 → N reduction stops being a partition of the
 /// array. The loader validates against this, and the render layer sizes its
@@ -775,7 +771,7 @@ impl Scene for SpectrumScene {
                 *slot = element_length(level, base, scale);
             }
             if let Some(slot) = self.widths.get_mut(i) {
-                *slot = (thickness * WIDTH_SCALE).max(0.0005);
+                *slot = super::half_width(thickness);
             }
             if let Some(slot) = self.colors.get_mut(i) {
                 *slot = [

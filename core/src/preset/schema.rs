@@ -638,6 +638,40 @@ impl Preset {
             }
         }
 
+        // A `thickness` resting inside the stroke floor's dead zone (Plan 0087
+        // Phase 1b, design-backlog 0098). Every value below
+        // `MIN_USEFUL_THICKNESS` clamps to the same half-width, so the whole
+        // range renders identically and re-tuning inside it changes nothing —
+        // which is what makes it expensive: the obvious experiment *disproves
+        // the correct hypothesis*. `fragment_vitrail` shipped at 0.016, two
+        // orders below the 1.5-3.2 every other line preset uses, and its Maurer
+        // rose read as scattered dots for its whole shipped life while the
+        // content lane swept chord count and sample count first.
+        //
+        // A warning rather than an error, in ADR-0020's shape and on its
+        // surface: the value is in range and the preset is otherwise good.
+        // Only a binding that *rests* at such a value is reported — see
+        // `Expr::as_const`.
+        if system.param_names().contains(&"thickness") {
+            for binding in &params {
+                if binding.name != "thickness" {
+                    continue;
+                }
+                let Some(value) = binding.expr.as_const() else {
+                    continue;
+                };
+                if value < crate::render::scenes::lines::MIN_USEFUL_THICKNESS {
+                    warnings.push(format!(
+                        "parameter 'thickness' rests at {value}, inside the stroke floor's dead \
+                         zone: every value below {:.3} renders the identical hairline (about \
+                         0.27 px at 1080p), so tuning within that range changes nothing. Line \
+                         presets ship between 1.5 and 3.2",
+                        crate::render::scenes::lines::MIN_USEFUL_THICKNESS
+                    ));
+                }
+            }
+        }
+
         // Palette selection (ADR-0021): validated at this boundary into a
         // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
         // error, never a panic. `None` -> the default `spectrum`. `[palette_b]`

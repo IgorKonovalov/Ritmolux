@@ -962,6 +962,24 @@ impl Expr {
         self.uses_index
     }
 
+    /// The value this expression **always** takes, when it takes only one.
+    ///
+    /// `Some` exactly when the compiled root is a constant — a literal, or
+    /// anything the compiler folded to one (`2 * 0.008` folds; `bass * 0` does
+    /// not, and deliberately: the fold is syntactic and a binding that names a
+    /// variable is not resting anywhere).
+    ///
+    /// Read by the loader, which can only warn about a value it knows a binding
+    /// *rests* at. An expression that sweeps through a bad range is not
+    /// something a load-time check can see, and pretending otherwise would put
+    /// a false warning on every preset that animates the parameter.
+    pub fn as_const(&self) -> Option<f32> {
+        match self.root {
+            Node::Const(c) => Some(c),
+            _ => None,
+        }
+    }
+
     /// Whether this expression references any per-vertex position variable
     /// (`x`, `y`, `rad`, `ang`) — Plan 0100 Phase 1. Free to call; the answer was
     /// computed at compile.

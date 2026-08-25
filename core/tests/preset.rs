@@ -2232,3 +2232,94 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
         "expected the comparison flags to be covered, saw {compared}"
     );
 }
+
+/// Plan 0087 Phase 1b, closing [design-backlog 0098]: a `thickness` **resting**
+/// inside the stroke floor's dead zone warns, in ADR-0020's shape and on its
+/// surface.
+///
+/// The floor maps every `thickness` below about `0.167` to the same NDC
+/// half-width — roughly 0.27 px at 1080p — so the whole range renders
+/// identically. That is what made the defect expensive: `fragment_vitrail`
+/// shipped at `0.016`, and re-tuning it to `0.022` and `0.038` changed nothing
+/// at all, so the correct hypothesis was discarded as disproved. The value is
+/// in range, the preset loads clean, and before this nothing said so.
+///
+/// [design-backlog 0098]: ../../docs/design-backlog.md
+#[test]
+fn a_thickness_resting_in_the_dead_zone_warns() {
+    let src = r#"
+system = "parametric_curve"
+name = "Hairline"
+
+[params]
+thickness = "0.016"
+"#;
+    let preset = Preset::from_toml_str(src).expect("a dead-zone thickness still loads");
+    assert_eq!(
+        preset.warnings.len(),
+        1,
+        "one dead-zone thickness, one warning, got {:?}",
+        preset.warnings
+    );
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("thickness") && warning.contains("0.016"),
+        "the warning names the param and the value it rests at: {warning}"
+    );
+
+    // The binding survives — a warning must not silently drop what it warns
+    // about (ADR-0020).
+    assert!(
+        preset.params.iter().any(|b| b.name == "thickness"),
+        "the binding is kept"
+    );
+}
+
+/// The same check is silent on a value above the floor, on a system with no
+/// `thickness` at all, and on a binding that **animates** through the dead zone
+/// rather than resting in it.
+///
+/// The third is the one worth stating: a load-time check can only see a value a
+/// binding rests at. Warning on an expression because it *could* dip low would
+/// put a false positive on every preset that drives the stroke from the audio.
+#[test]
+fn the_dead_zone_warning_stays_quiet_where_it_cannot_know() {
+    let cases = [
+        // Above the floor: the ordinary case, and the overwhelming majority.
+        (
+            r#"
+system = "parametric_curve"
+[params]
+thickness = "2.0"
+"#,
+            "a useful thickness",
+        ),
+        // A system whose roster has no `thickness` - the name is unknown there
+        // and warns for that reason instead, which is a different check.
+        (
+            r#"
+system = "swarm"
+[params]
+force = "1.2"
+"#,
+            "a system with no thickness",
+        ),
+        // Animated: it passes through the dead zone and rests nowhere.
+        (
+            r#"
+system = "parametric_curve"
+[params]
+thickness = "2.0 + clamp(bass * 0.9, 0, 0.8)"
+"#,
+            "an animated thickness",
+        ),
+    ];
+    for (src, what) in cases {
+        let preset = Preset::from_toml_str(src).expect("valid preset");
+        assert!(
+            !preset.warnings.iter().any(|w| w.contains("dead zone")),
+            "{what} tripped the dead-zone warning: {:?}",
+            preset.warnings
+        );
+    }
+}
