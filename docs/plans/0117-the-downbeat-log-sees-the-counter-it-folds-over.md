@@ -168,7 +168,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the tracker reports what it was handed | dev | done | `fa5f040` |
-| 2 — the log carries them, and the test reads them | dev | done | committed with this row |
+| 2 — the log carries them, and the test reads them | dev | done | `28641ec` |
 
 ### Notes
 
