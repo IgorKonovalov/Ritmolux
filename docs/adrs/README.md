@@ -143,5 +143,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 
 | [0120](0120-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | proposed 2026-08-25 (Plan 0106) |
 
-| [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | proposed 2026-08-20 (Plan 0106) |
+| [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | accepted 2026-08-25 (Plan 0106), one Outcome |
 <!-- roster:end -->
