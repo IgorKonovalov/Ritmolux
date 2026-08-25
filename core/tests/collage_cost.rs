@@ -62,6 +62,34 @@
 //! linear-light composite's bandwidth, the tonemap — and *not* this scene's to
 //! be charged for.
 //!
+//! ## Re-measured after the full roster landed, and it got *cheaper*
+//!
+//! Plan 0113 Phase 7 requires this sweep be re-run once the eight-kind roster is
+//! in, because the roster puts a branch in the painter's innermost loop — the
+//! hazard `mark_cost.rs` exists for. Same box, same day, probe now at the shipped
+//! configuration (`layout = 2`, `roster = 1`, the full vocabulary):
+//!
+//! | elements | ms/frame | share of 16.67 ms | over 8 elements |
+//! |---|---|---|---|
+//! | 8  | **1.366 ms** | 8.2 % | — |
+//! | 16 | **1.778 ms** | 10.7 % | +0.41 ms |
+//! | 24 | **2.353 ms** | 14.1 % | +0.99 ms |
+//! | 32 | **2.725 ms** | 16.3 % | +1.36 ms |
+//! | 40 | **3.226 ms** | 19.4 % | +1.86 ms |
+//!
+//! **0.058 ms an element against 0.09, and a full canvas at 19 % of the budget
+//! against 29 %.** The branch is not what this loop costs — *coverage* is, the
+//! same conclusion `mark_cost.rs` reached about the shaped-mark branch. The
+//! eight-kind roster draws rings, sectors and checker patches, which light far
+//! less of their own bounding box than a quad does, so the added branch is
+//! comfortably repaid by the pixels it does not shade.
+//!
+//! The two tables are **not** a controlled before/after: Phase 4 replaced the
+//! element source between them (a cycling authored roster, then a seeded layout
+//! grammar), so the canvases differ in size distribution as well as in kind.
+//! What both support is the shape of the answer — linear in element count, with
+//! an intercept that belongs to the frame rather than to the scene.
+//!
 //! ## The sweep's own total load moves its absolute numbers, on this GPU
 //!
 //! **This is the instrument's one real trap and it is worth stating before the
@@ -155,7 +183,8 @@ fn probe(count: usize) -> Preset {
          {{ at = 0.5, color = \"#8a1420\" }},\n\
          {{ at = 1.0, color = \"#d9d5c8\" }},\n\
          ]\n\
-         [params]\ncount = \"{count}\"\nscale = \"1.0\"\npaper = \"1.0\"\n"
+         [params]\ncount = \"{count}\"\nscale = \"1.0\"\npaper = \"1.0\"\n\
+         layout = \"2\"\nroster = \"1\"\nseed = \"29\"\nsize_hierarchy = \"0.62\"\n"
     );
     Preset::from_toml_str(&toml).expect("the cost probe preset parses")
 }

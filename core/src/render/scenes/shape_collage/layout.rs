@@ -58,7 +58,10 @@
 )]
 
 use super::super::SeededRng;
-use super::{KIND_CIRCLE, KIND_QUAD, KIND_TRIANGLE, SUPREMATIST, Spec};
+use super::{
+    KIND_ARC, KIND_BAR, KIND_CHECKER, KIND_CIRCLE, KIND_QUAD, KIND_RING, KIND_SEGMENT,
+    KIND_TRIANGLE, SUPREMATIST, Spec,
+};
 
 /// The canvas's own domain, half-extents. Roughly 3:2 — between a 16:10 frame
 /// and a square one, so a wide window shows a small margin and a tall one crops
@@ -165,6 +168,8 @@ pub(crate) struct Recipe {
     /// The canvas's dominant angle, in **radians**. Conditioned CPU-side from
     /// the `angle_bias` param.
     pub(crate) angle_bias: f32,
+    /// Which kinds the canvas draws from (Plan 0113 Phase 7).
+    pub(crate) roster: Roster,
 }
 
 /// The generator's own seeding, so `seed` and `recompose` cannot collide into
@@ -223,15 +228,102 @@ fn draw_coord(rng: &mut SeededRng) -> f32 {
 /// Weighted toward the quad — about two in three — because a suprematist canvas
 /// is mostly bars and planes, and a roster drawn uniformly reads as a shape
 /// sampler rather than as a painting.
-fn draw_kind(rng: &mut SeededRng) -> f32 {
+fn draw_kind(rng: &mut SeededRng, roster: Roster) -> f32 {
     let r = rng.next_f32();
-    if r < 0.66 {
-        KIND_QUAD
-    } else if r < 0.85 {
-        KIND_CIRCLE
-    } else {
-        KIND_TRIANGLE
+    match roster {
+        Roster::Suprematist => {
+            if r < 0.66 {
+                KIND_QUAD
+            } else if r < 0.85 {
+                KIND_CIRCLE
+            } else {
+                KIND_TRIANGLE
+            }
+        }
+        // **Still quad-weighted, and deliberately.** *On White II* adds lines,
+        // arcs, rings and checker patches to a canvas that is still mostly
+        // planes; a roster drawn flat across eight kinds reads as a shape
+        // sampler rather than as a painting, which is the same finding the
+        // three-kind weighting above came from.
+        Roster::Kandinsky => {
+            if r < 0.34 {
+                KIND_QUAD
+            } else if r < 0.50 {
+                KIND_BAR
+            } else if r < 0.62 {
+                KIND_CIRCLE
+            } else if r < 0.72 {
+                KIND_TRIANGLE
+            } else if r < 0.83 {
+                KIND_RING
+            } else if r < 0.90 {
+                KIND_ARC
+            } else if r < 0.96 {
+                KIND_SEGMENT
+            } else {
+                KIND_CHECKER
+            }
+        }
     }
+}
+
+/// Which kinds a canvas draws from — the `roster` param, quantized CPU-side.
+///
+/// Two, not a bitmask: a mask would be the more flexible surface and it is the
+/// wrong one here, because an **eased** binding sweeping through a bitmask is
+/// meaningless in a way an eased selector is merely blunt. A preset that wants
+/// one specific kind authors it; a preset that wants a *world* picks which of
+/// the two the references describe.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Roster {
+    /// `quad`, `circle`, `triangle` — Malevich's vocabulary, and the default, so
+    /// a preset that says nothing draws the canvas Phase 5 settled on.
+    Suprematist,
+    /// All eight — Kandinsky's *On White II* adds lines, rings, arcs, sectors
+    /// and checker patches on top.
+    Kandinsky,
+}
+
+impl Roster {
+    /// The roster a bound `roster` selects. Anything off the list falls back to
+    /// the suprematist three rather than to a vocabulary nobody asked for.
+    pub(crate) fn from_param(roster: f32) -> Roster {
+        if roster.is_finite() && roster.round() as i64 == 1 {
+            Roster::Kandinsky
+        } else {
+            Roster::Suprematist
+        }
+    }
+}
+
+/// The two kind-specific parameters, drawn per element off the same stream.
+///
+/// `p0` is the sector half-aperture and `p1` the checker's cells per axis, and
+/// **both are drawn for every element whatever its kind** — deliberately. Drawing
+/// them conditionally would make the RNG stream's shape depend on which kind came
+/// out of it, so a roster change would re-roll every element after the first one
+/// that differed. Two draws an element is nothing; a layout that shifts when an
+/// unrelated param moves is a real defect.
+fn draw_kind_params(rng: &mut SeededRng, roster: Roster) -> (f32, f32, f32) {
+    // A quarter turn to most of a full one: narrower reads as a splinter, and
+    // past this a sector is a disc with a notch.
+    let aperture = rng.range(0.45, 2.6);
+    // 2 to 8, forced even downstream by `checker_cells`.
+    let cells = (rng.range(2.0, 8.99)).floor();
+    // **Translucent crossings, and only on the Kandinsky roster.** *On White II*
+    // overlaps its forms and lets both show; a suprematist canvas does not, and
+    // an opaque plane is what that half of the reference set is made of. About
+    // one element in four, so a crossing is an event rather than the condition
+    // of the whole canvas.
+    let roll = rng.next_f32();
+    let alpha = if roster == Roster::Kandinsky && roll < 0.26 {
+        // Not lower: below about 0.4 a crossing stops reading as two elements
+        // and starts reading as a third, paler one.
+        0.45 + roll
+    } else {
+        1.0
+    };
+    (aperture, cells, alpha)
 }
 
 /// A size drawn from a power law whose steepness is `hierarchy`, as a `0..1`
@@ -270,6 +362,27 @@ fn draw_extents(rng: &mut SeededRng, kind: f32, unit: f32) -> [f32; 2] {
     if kind == KIND_TRIANGLE {
         let size = 0.06 + 0.14 * unit;
         return [size, size * rng.range(0.8, 1.25)];
+    }
+    // The circle family reads its half extents as **radius, then thickness**
+    // (`sdf.rs`'s table), so its "elongation" is a stroke weight rather than a
+    // shape. A ring at a bar's proportions would be a hairline circle, which is
+    // the one thing *On White II*'s rings are not.
+    if kind == KIND_RING || kind == KIND_ARC {
+        let radius = 0.06 + 0.30 * unit;
+        return [radius, radius * rng.range(0.08, 0.30)];
+    }
+    if kind == KIND_SEGMENT {
+        // A sector's `hy` is unused as a shape; keeping it equal to the radius
+        // means nothing downstream reads a stale thickness off it.
+        let radius = 0.05 + 0.26 * unit;
+        return [radius, radius];
+    }
+    if kind == KIND_CHECKER {
+        // Blockier than a quad and smaller: a checker patch is a *texture*, and
+        // one drawn at a dominant plane's size stops reading as an element and
+        // starts reading as a background.
+        let size = 0.07 + 0.22 * unit;
+        return [size, size * rng.range(0.45, 1.0)];
     }
     let size = 0.055 + 0.665 * unit;
     // `0.13 / size` is "the short axis stays about a small element's width
@@ -359,13 +472,16 @@ fn anchor_satellites(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng
         // the compact kinds are capped small by `draw_extents` anyway.
         let unit = rng.range(0.78, 1.0);
         let half = draw_extents(rng, KIND_QUAD, unit);
+        let (aperture, cells, alpha) = draw_kind_params(rng, recipe.roster);
         let spec = Spec {
             kind: KIND_QUAD,
             center: place([cx, cy], half),
             half,
             angle_deg: (recipe.angle_bias + rng.range(-0.15, 0.15)).to_degrees(),
             coord: draw_coord(rng),
-            alpha: 1.0,
+            alpha,
+            p0: aperture,
+            p1: cells,
         };
         out.push(motion(rng, spec));
     }
@@ -387,11 +503,12 @@ fn anchor_satellites(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng
         // draft did piled every satellite on top of its anchor.)
         let radius = rng.range(0.18, 1.05);
         let theta = rng.range(0.0, std::f32::consts::TAU);
-        let kind = draw_kind(rng);
+        let kind = draw_kind(rng, recipe.roster);
         // Satellites are the small half of the range whatever the hierarchy
         // says — an anchor grammar in which a satellite can match its anchor has
         // no anchor.
         let half = draw_extents(rng, kind, 0.42 * power_size(rank, recipe.size_hierarchy));
+        let (aperture, cells, alpha) = draw_kind_params(rng, recipe.roster);
         let spec = Spec {
             kind,
             center: place(
@@ -404,7 +521,9 @@ fn anchor_satellites(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng
             half,
             angle_deg: (recipe.angle_bias + rng.range(-0.6, 0.6)).to_degrees(),
             coord: draw_coord(rng),
-            alpha: 1.0,
+            alpha,
+            p0: aperture,
+            p1: cells,
         };
         out.push(motion(rng, spec));
     }
@@ -464,7 +583,7 @@ fn diagonal_axis(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, co
         let across = across * across.abs().sqrt() * 0.8 * across_reach;
         let x = along * cos_a - across * sin_a;
         let y = along * sin_a + across * cos_a;
-        let kind = draw_kind(rng);
+        let kind = draw_kind(rng, recipe.roster);
         let half = draw_extents(rng, kind, power_size(rank, recipe.size_hierarchy));
         // Most elements lie ALONG the axis; a minority cross it, which is what
         // keeps a diagonal composition from reading as a single striped texture.
@@ -476,13 +595,16 @@ fn diagonal_axis(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, co
             // the forms relate to the axis instead of being welded to it.
             rng.range(-0.45, 0.45)
         };
+        let (aperture, cells, alpha) = draw_kind_params(rng, recipe.roster);
         let spec = Spec {
             kind,
             center: place([x, y], half),
             half,
             angle_deg: (recipe.angle_bias + jitter).to_degrees(),
             coord: draw_coord(rng),
-            alpha: 1.0,
+            alpha,
+            p0: aperture,
+            p1: cells,
         };
         out.push(motion(rng, spec));
     }
@@ -493,8 +615,9 @@ fn diagonal_axis(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, co
 fn size_hierarchy(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, count: usize) {
     for i in 0..count {
         let rank = i as f32 / count.max(1) as f32;
-        let kind = draw_kind(rng);
+        let kind = draw_kind(rng, recipe.roster);
         let half = draw_extents(rng, kind, power_size(rank, recipe.size_hierarchy));
+        let (aperture, cells, alpha) = draw_kind_params(rng, recipe.roster);
         let spec = Spec {
             kind,
             // Uniform over the whole canvas, and drawn from the same stream
@@ -509,7 +632,9 @@ fn size_hierarchy(out: &mut Vec<Placed>, recipe: &Recipe, rng: &mut SeededRng, c
             half,
             angle_deg: (recipe.angle_bias + rng.range(-1.2, 1.2)).to_degrees(),
             coord: draw_coord(rng),
-            alpha: 1.0,
+            alpha,
+            p0: aperture,
+            p1: cells,
         };
         out.push(motion(rng, spec));
     }

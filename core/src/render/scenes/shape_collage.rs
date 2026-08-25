@@ -87,6 +87,46 @@ use crate::render::palette::{self, Palette};
 pub(crate) const KIND_QUAD: f32 = 0.0;
 pub(crate) const KIND_CIRCLE: f32 = 1.0;
 pub(crate) const KIND_TRIANGLE: f32 = 2.0;
+/// The Kandinsky half of the roster (Plan 0113 Phase 7). `sdf.rs` carries what
+/// each kind's half extents and `p0`/`p1` mean.
+pub(crate) const KIND_BAR: f32 = 3.0;
+pub(crate) const KIND_RING: f32 = 4.0;
+pub(crate) const KIND_SEGMENT: f32 = 5.0;
+pub(crate) const KIND_ARC: f32 = 6.0;
+pub(crate) const KIND_CHECKER: f32 = 7.0;
+
+/// Every kind, for the rendered sweep that must cover the roster.
+///
+/// `#[cfg(test)]`: the shipped painter selects a kind by number in WGSL and has
+/// no use for a Rust roster, so this exists only so the box check cannot quietly
+/// stop covering a kind someone added.
+#[cfg(test)]
+pub(crate) const ALL_KINDS: [f32; 8] = [
+    KIND_QUAD,
+    KIND_CIRCLE,
+    KIND_TRIANGLE,
+    KIND_BAR,
+    KIND_RING,
+    KIND_SEGMENT,
+    KIND_ARC,
+    KIND_CHECKER,
+];
+
+/// The name each kind goes by in `presets/README.md` and in a failure message.
+/// `#[cfg(test)]` for [`ALL_KINDS`]'s reason — nothing shipped names a kind.
+#[cfg(test)]
+pub(crate) fn kind_name(kind: f32) -> &'static str {
+    match kind as i32 {
+        0 => "quad",
+        1 => "circle",
+        2 => "triangle",
+        3 => "bar",
+        4 => "ring",
+        5 => "segment",
+        6 => "arc",
+        _ => "checker",
+    }
+}
 
 /// Half the base of the unit triangle, i.e. `cos(30 deg)`. The triangle is
 /// equilateral and inscribed in the unit circle — apex at `(0, 1)`, base corners
@@ -148,18 +188,9 @@ struct Params {
     d: vec4<f32>,
 }
 
-// One flat element, 64 bytes. **The array is the painter's order, so the index
-// IS the depth.**
-struct Element {
-    // cx, cy, half_x, half_y — canvas space
-    center_size: vec4<f32>,
-    // cos(angle), sin(angle), kind, p0 (kind-specific)
-    shape: vec4<f32>,
-    // palette coordinate, alpha, birth, p1 (kind-specific)
-    tint: vec4<f32>,
-    // x0, y0, x1, y1 — the precomputed TIGHT reject box, canvas space
-    aabb: vec4<f32>,
-}
+// `Element` and every distance function are declared by the chunk `sdf.rs`
+// splices in ahead of this body — the struct travels with the functions that
+// read it, which is also what makes the chunk parse on its own.
 
 // **A bind-group layout shape nothing else in the crate holds** (ADR-0058: two
 // byte-identical layouts alias on the DX12 WARP adapter, and the whole golden
@@ -189,70 +220,6 @@ fn palette_at(t: f32) -> vec3<f32> {
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(t, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(t, 0.5), 0.0).rgb;
     return mix(ca, cb, clamp(params.c.y, 0.0, 1.0));
-}
-
-// Exact signed distance to an axis-aligned box of half extents h.
-fn sd_box(p: vec2<f32>, h: vec2<f32>) -> f32 {
-    let q = abs(p) - h;
-    return length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0);
-}
-
-// An ellipse's distance, approximated by the unit-circle distance scaled back by
-// the smaller half axis. **Exact when hx == hy**, which is the circle case the
-// aspect test measures; elliptical elements get a distance that is correct in
-// sign and slightly conservative in magnitude, which moves an edge by well under
-// the one pixel the coverage ramp spans. The exact ellipse distance is iterative
-// and this runs per pixel per element.
-fn sd_ellipse(p: vec2<f32>, h: vec2<f32>) -> f32 {
-    return (length(p / h) - 1.0) * min(h.x, h.y);
-}
-
-// Exact signed distance to the triangle with the three given vertices
-// (Inigo Quilez's `sdTriangle`). Exact rather than a unit-space approximation
-// because the vertices are also what the CPU-side bounding box is built from,
-// so the box is tight by construction.
-fn sd_triangle(p: vec2<f32>, v0: vec2<f32>, v1: vec2<f32>, v2: vec2<f32>) -> f32 {
-    let e0 = v1 - v0;
-    let e1 = v2 - v1;
-    let e2 = v0 - v2;
-    let w0 = p - v0;
-    let w1 = p - v1;
-    let w2 = p - v2;
-    let q0 = w0 - e0 * clamp(dot(w0, e0) / dot(e0, e0), 0.0, 1.0);
-    let q1 = w1 - e1 * clamp(dot(w1, e1) / dot(e1, e1), 0.0, 1.0);
-    let q2 = w2 - e2 * clamp(dot(w2, e2) / dot(e2, e2), 0.0, 1.0);
-    let s = sign(e0.x * e2.y - e0.y * e2.x);
-    var d = min(
-        vec2<f32>(dot(q0, q0), s * (w0.x * e0.y - w0.y * e0.x)),
-        vec2<f32>(dot(q1, q1), s * (w1.x * e1.y - w1.y * e1.x)),
-    );
-    d = min(d, vec2<f32>(dot(q2, q2), s * (w2.x * e2.y - w2.y * e2.x)));
-    return -sqrt(d.x) * sign(d.y);
-}
-
-// One element's signed distance at canvas point p.
-fn element_distance(e: Element, p: vec2<f32>) -> f32 {
-    let h = max(e.center_size.zw, vec2<f32>(1e-5));
-    let ca = e.shape.x;
-    let sa = e.shape.y;
-    let d = p - e.center_size.xy;
-    // Into the element's own frame: rotate by -angle, with the pair the CPU
-    // precomputed (see the module docs).
-    let q = vec2<f32>(ca * d.x + sa * d.y, -sa * d.x + ca * d.y);
-    let kind = e.shape.z;
-    if (kind < 0.5) {
-        return sd_box(q, h);
-    }
-    if (kind < 1.5) {
-        return sd_ellipse(q, h);
-    }
-    let s3 = 0.8660254;
-    return sd_triangle(
-        q,
-        vec2<f32>(0.0, h.y),
-        vec2<f32>(-s3 * h.x, -0.5 * h.y),
-        vec2<f32>(s3 * h.x, -0.5 * h.y),
-    );
 }
 
 @fragment
@@ -368,6 +335,72 @@ pub(crate) struct Spec {
     /// Per-element alpha. `1.0` is the opaque element this scene is for; below
     /// it the crossing is an `over` composite of both (Plan 0113 Phase 7).
     pub(crate) alpha: f32,
+    /// Kind-specific shape parameters — `sdf.rs`'s table says what each kind
+    /// reads. `segment` and `arc` take their half-aperture in radians from `p0`;
+    /// `checker` takes its cells-per-axis from `p1`. Inert on every other kind,
+    /// and nothing warns: that is the roster's own documentation's job.
+    pub(crate) p0: f32,
+    pub(crate) p1: f32,
+}
+
+impl Spec {
+    /// A spec with the kind-specific parameters at their defaults, which is what
+    /// the three original kinds want and what a caller that does not care
+    /// should write.
+    #[cfg(test)]
+    pub(crate) fn new(
+        kind: f32,
+        center: [f32; 2],
+        half: [f32; 2],
+        angle_deg: f32,
+        coord: f32,
+        alpha: f32,
+    ) -> Spec {
+        Spec {
+            kind,
+            center,
+            half,
+            angle_deg,
+            coord,
+            alpha,
+            p0: DEFAULT_APERTURE,
+            p1: DEFAULT_CHECKER_CELLS,
+        }
+    }
+}
+
+/// `segment` and `arc` half-aperture default, in radians — a quarter turn either
+/// side, so an unparameterised sector is a half disc rather than a sliver or a
+/// whole one.
+const DEFAULT_APERTURE: f32 = std::f32::consts::FRAC_PI_2;
+/// `checker` cells per axis, default. Even, for the reason `checker_cells`
+/// gives.
+const DEFAULT_CHECKER_CELLS: f32 = 4.0;
+
+/// The cells-per-axis a `checker` actually uses: **even**, at least two.
+///
+/// Even is load-bearing rather than tidy. With an even count the cells at both
+/// ends of each axis are filled, so the patch's drawn extent is its box and the
+/// bounding box below is exact. With an odd count two opposite corners are empty
+/// and the box would be loose in a way no picture shows — which is precisely the
+/// silent cost regression Phase 7 asks be asserted away.
+pub(crate) fn checker_cells(p1: f32) -> f32 {
+    if !p1.is_finite() {
+        return DEFAULT_CHECKER_CELLS;
+    }
+    let n = (p1 * 0.5).round() * 2.0;
+    n.clamp(2.0, 32.0)
+}
+
+/// The half-aperture a `segment` or `arc` actually uses, radians, held inside
+/// `(0, PI]` — zero is an invisible sliver and past PI the sector is the whole
+/// disc twice over.
+pub(crate) fn aperture(p0: f32) -> f32 {
+    if p0.is_finite() {
+        p0.clamp(0.02, std::f32::consts::PI)
+    } else {
+        DEFAULT_APERTURE
+    }
 }
 
 impl Element {
@@ -384,34 +417,122 @@ impl Element {
         let [cx, cy] = spec.center;
         let [hx, hy] = [spec.half[0].abs(), spec.half[1].abs()];
 
-        let (ex, ey) = if spec.kind < 0.5 {
+        // **The box is a min/max pair, not a half extent, and that matters for
+        // two kinds.** A triangle's apex is at `+hy` while its base sits at
+        // `-hy/2`, and a sector reaches its radius only where its own span does
+        // — both are *asymmetric about their centre*, so a symmetric box stands
+        // off them. It shipped that way through Phase 1 (a quarter of the
+        // triangle's height of empty box on one side) because the check was
+        // CPU-only and compared half extents to half extents; the rendered check
+        // in `tests` is what found it.
+        let kind = spec.kind;
+        let (lo, hi) = if !(0.5..=6.5).contains(&kind) {
             // A rotated rectangle: the support function of the four corners.
-            (ca.abs() * hx + sa.abs() * hy, sa.abs() * hx + ca.abs() * hy)
-        } else if spec.kind < 1.5 {
+            // `checker` shares it — its cell count is forced even, so the cells
+            // at both ends of each axis are filled and the patch's drawn extent
+            // is its box (`checker_cells`).
+            symmetric(ca.abs() * hx + sa.abs() * hy, sa.abs() * hx + ca.abs() * hy)
+        } else if kind < 1.5 {
             // A rotated ellipse: the exact extent of the parametric form.
-            (
+            symmetric(
                 ((hx * ca) * (hx * ca) + (hy * sa) * (hy * sa)).sqrt(),
                 ((hx * sa) * (hx * sa) + (hy * ca) * (hy * ca)).sqrt(),
             )
+        } else if kind < 2.5 {
+            // The triangle, over its three rotated vertices — built from the same
+            // three points the shader's distance uses. **Asymmetric**: the apex
+            // is at `+hy` and the base at `-hy/2`, so a symmetric box would stand
+            // a quarter of the figure's height off its bottom edge.
+            hull(
+                triangle_vertices(hx, hy)
+                    .iter()
+                    .map(|&[vx, vy]| [ca * vx - sa * vy, sa * vx + ca * vy]),
+            )
+        } else if kind < 3.5 {
+            // A capsule is a segment swept by a disc, so its extent is the
+            // rotated segment's plus the radius on both axes — exact, and the one
+            // place a Minkowski sum makes the box trivial.
+            let r = hy.min(hx);
+            let half = (hx - r).max(0.0);
+            symmetric(ca.abs() * half + r, sa.abs() * half + r)
+        } else if kind < 4.5 {
+            // A ring's outer boundary is the circle of radius hx, so its box is
+            // that square whatever the rotation.
+            symmetric(hx, hx)
         } else {
-            // The triangle: the extent of its three rotated vertices. Built from
-            // the same three points the shader's distance uses.
-            let verts = triangle_vertices(hx, hy);
-            let mut ex = 0.0f32;
-            let mut ey = 0.0f32;
-            for [vx, vy] in verts {
-                ex = ex.max((ca * vx - sa * vy).abs());
-                ey = ey.max((sa * vx + ca * vy).abs());
+            // `segment` and `arc`: a circular sector, so the box is taken over the
+            // sector's angular span in the WORLD frame, and it is **asymmetric**
+            // for the obvious reason — a sector reaches its radius only where it
+            // opens. The candidates are exhaustive: a circular arc can only touch
+            // an axis extreme at a cardinal angle or at one of its own ends, and
+            // the figure is otherwise bounded by its straight edges.
+            let a = aperture(spec.p0);
+            // An `arc` is an annulus cut by the sector, so its near edge sits at
+            // `hx - thickness` rather than at the apex.
+            let inner = if kind < 5.5 {
+                0.0
+            } else {
+                (hx - hy.min(hx)).max(0.0)
+            };
+            let mut points: Vec<[f32; 2]> = Vec::with_capacity(9);
+            // A `segment`'s apex is its own centre; an `arc` has none.
+            if kind < 5.5 {
+                points.push([0.0, 0.0]);
             }
-            (ex, ey)
+            for end in [-a, a] {
+                let (se, ce) = (angle + end).sin_cos();
+                for radius in [inner, hx] {
+                    points.push([radius * ce, radius * se]);
+                }
+            }
+            for k in 0..4 {
+                let phi = k as f32 * std::f32::consts::FRAC_PI_2;
+                // Angular distance from the sector's world-frame axis, wrapped
+                // into [-PI, PI].
+                let tau = std::f32::consts::TAU;
+                let raw = phi - angle;
+                let delta = raw - tau * ((raw + std::f32::consts::PI) / tau).floor();
+                if delta.abs() <= a {
+                    points.push([hx * phi.cos(), hx * phi.sin()]);
+                }
+            }
+            hull(points.into_iter())
         };
 
         Element {
             center_size: [cx, cy, hx, hy],
-            shape: [ca, sa, spec.kind, 0.0],
-            tint: [spec.coord, spec.alpha, 0.0, 0.0],
-            aabb: [cx - ex, cy - ey, cx + ex, cy + ey],
+            shape: [ca, sa, spec.kind, aperture(spec.p0)],
+            tint: [spec.coord, spec.alpha, 0.0, checker_cells(spec.p1)],
+            aabb: [cx + lo[0], cy + lo[1], cx + hi[0], cy + hi[1]],
         }
+    }
+}
+
+/// A box centred on the element, as the `(min, max)` offset pair every arm of
+/// [`Element::build`] returns. For the kinds that are symmetric about their own
+/// centre, which is most of them.
+fn symmetric(ex: f32, ey: f32) -> ([f32; 2], [f32; 2]) {
+    ([-ex, -ey], [ex, ey])
+}
+
+/// The `(min, max)` box of a point set — for the kinds whose figure is **not**
+/// centred on the element's own centre, where a half extent would be a box with
+/// empty space on one side.
+fn hull(points: impl Iterator<Item = [f32; 2]>) -> ([f32; 2], [f32; 2]) {
+    let mut lo = [f32::INFINITY; 2];
+    let mut hi = [f32::NEG_INFINITY; 2];
+    for p in points {
+        for axis in 0..2 {
+            if let (Some(l), Some(h), Some(v)) = (lo.get_mut(axis), hi.get_mut(axis), p.get(axis)) {
+                *l = l.min(*v);
+                *h = h.max(*v);
+            }
+        }
+    }
+    if lo[0].is_finite() {
+        (lo, hi)
+    } else {
+        ([0.0; 2], [0.0; 2])
     }
 }
 
@@ -447,6 +568,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.4375,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     // The black bar that crosses it — the occlusion this scene exists for.
     Spec {
@@ -456,6 +579,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.0625,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -464,6 +589,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.3125,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -472,6 +599,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 12.0,
         coord: 0.1875,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_CIRCLE,
@@ -480,6 +609,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 0.0,
         coord: 0.0625,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -488,6 +619,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.5625,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_TRIANGLE,
@@ -496,6 +629,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 8.0,
         coord: 0.6875,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -504,6 +639,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 62.0,
         coord: 0.1875,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -512,6 +649,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.8125,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -520,6 +659,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 40.0,
         coord: 0.0625,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_CIRCLE,
@@ -528,6 +669,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 0.0,
         coord: 0.1875,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     // Down in the empty lower-left rather than beside the ochre bar's end: at
     // its first placement it touched that bar, and two same-coloured elements
@@ -540,6 +683,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -18.0,
         coord: 0.3125,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_QUAD,
@@ -548,6 +693,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: -22.0,
         coord: 0.4375,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
     Spec {
         kind: KIND_TRIANGLE,
@@ -556,6 +703,8 @@ const SUPREMATIST: &[Spec] = &[
         angle_deg: 190.0,
         coord: 0.0625,
         alpha: 1.0,
+        p0: DEFAULT_APERTURE,
+        p1: DEFAULT_CHECKER_CELLS,
     },
 ];
 
@@ -563,6 +712,9 @@ const SUPREMATIST: &[Spec] = &[
 /// [`Grammar::Authored`](layout::Grammar::Authored) cycles.
 pub(crate) const AUTHORED_COUNT: usize = SUPREMATIST.len();
 
+/// `roster` default — the suprematist three, so a preset that says nothing
+/// draws the canvas Phase 5 settled on.
+const DEFAULT_ROSTER: f32 = 0.0;
 /// `layout` default — the authored control, not a grammar (see `layout.rs`).
 const DEFAULT_LAYOUT: f32 = 0.0;
 /// `seed` default.
@@ -680,6 +832,8 @@ pub struct ShapeCollageScene {
     size_hierarchy: f32,
     /// The canvas's dominant angle in **degrees**, raw as the preset bound it.
     angle_bias: f32,
+    /// Which kinds the canvas draws from, raw as the preset bound it.
+    roster: f32,
     /// What fraction of the generated list is live, raw as the preset bound it.
     density: f32,
     /// Per-element drift and spin multipliers, raw as the preset bound them.
@@ -715,11 +869,16 @@ impl ShapeCollageScene {
         // At least one element's worth: a zero-length storage buffer is invalid,
         // and a tier could in principle name a small cap.
         let cap = cap.max(1);
+        // The roster's `Element` struct and its distance functions are spliced
+        // in ahead of the painter's own body, exactly as the two particle scenes
+        // splice in `marks`: the chunk declares no bindings and no entry points,
+        // so the pipeline's layout is unchanged by it.
+        let source = format!("{}{SHADER}", sdf::wgsl());
         let shader = gpu::fullscreen_shader(
             device,
             "shape-collage-shader",
             gpu::FULLSCREEN_VS_NDC,
-            SHADER,
+            &source,
         );
         let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("shape-collage-params"),
@@ -838,6 +997,7 @@ impl ShapeCollageScene {
             seed: DEFAULT_SEED,
             size_hierarchy: DEFAULT_SIZE_HIERARCHY,
             angle_bias: DEFAULT_ANGLE_BIAS,
+            roster: DEFAULT_ROSTER,
             density: DEFAULT_DENSITY,
             drift: DEFAULT_DRIFT,
             spin: DEFAULT_SPIN,
@@ -872,6 +1032,7 @@ impl ShapeCollageScene {
             recompose: self.recompose_count,
             size_hierarchy: applied_size_hierarchy(self.size_hierarchy),
             angle_bias: applied_angle_bias(self.angle_bias),
+            roster: layout::Roster::from_param(self.roster),
         }
     }
 
@@ -1193,6 +1354,7 @@ pub const PARAMS: &[&str] = &[
     "seed",
     "size_hierarchy",
     "angle_bias",
+    "roster",
     "density",
     "drift",
     "spin",
@@ -1232,6 +1394,7 @@ impl Scene for ShapeCollageScene {
         self.seed = DEFAULT_SEED;
         self.size_hierarchy = DEFAULT_SIZE_HIERARCHY;
         self.angle_bias = DEFAULT_ANGLE_BIAS;
+        self.roster = DEFAULT_ROSTER;
         self.density = DEFAULT_DENSITY;
         self.drift = DEFAULT_DRIFT;
         self.spin = DEFAULT_SPIN;
@@ -1263,6 +1426,7 @@ impl Scene for ShapeCollageScene {
             "seed" => self.seed = value,
             "size_hierarchy" => self.size_hierarchy = value,
             "angle_bias" => self.angle_bias = value,
+            "roster" => self.roster = value,
             "density" => self.density = value,
             "drift" => self.drift = value,
             "spin" => self.spin = value,
@@ -1365,6 +1529,7 @@ impl Scene for ShapeCollageScene {
 }
 
 pub(crate) mod layout;
+pub(crate) mod sdf;
 
 #[cfg(test)]
 mod tests;
