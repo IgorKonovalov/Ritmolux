@@ -311,7 +311,7 @@ than the 1.20x-2.28x these captures measured.
 | 4 — the fold folds over the grid | dev | done | `d4e7cec` |
 | 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
 | 6 — the authoring docs | dev | done | `80f346f` |
-| 7 — the review findings are repaired | dev | done | code `cd00aa1`, docs committed with this row |
+| 7 — the review findings are repaired | dev | done | code `cd00aa1`, docs `4caac3c` |
 
 **Phase 6 took `.claude/skills/preset-author/SKILL.md:105-107` as the skill-lane target instead of
 the `references/` the phase names.** No file under `references/` mentions `beat_index` or the bar
@@ -427,16 +427,13 @@ driven by a hand-built `AnalysisFrame` (`core/tests/composite.rs:223`), never by
 DSP change reaches it — the re-bless the phase called for was structurally unreachable rather than
 merely unexercised, and no baseline-drift control was run.
 
-**Phase 7a's test was run against the defect before it was run against the repair.** Neutralising
-the offset to `0` in `mod.rs` and re-running
-`the_grid_handover_does_not_step_the_bar_backwards` fails at
-`click 120: bar_index went backwards, 1 then 0 (hop 414, bpm 119.9, beat_index 7)` — the exact seam
-the review measured, and the reason the test is not tautological. Restored and green after.
+**Phase 7a's test was run against the defect before the repair.** With the offset neutralised to
+`0`, `the_grid_handover_does_not_step_the_bar_backwards` fails at `click 120: bar_index went
+backwards, 1 then 0 (hop 414, bpm 119.9, beat_index 7)` — the seam the review measured.
 
-**Phase 7b's residual is 0.02 bars over 14 s**, against the 0.05 the sibling rate test states, so
-the looser tolerance the phase allowed for was not needed and the two tests hold the same number.
-On both off-beat stimuli the estimate averaged 180.4 BPM against a 90 BPM truth, which the test
-asserts as its own entry requirement rather than assuming.
+**Phase 7b's residual is 0.02 bars over 14 s**, so the looser tolerance the phase allowed for was
+not needed and both rate tests hold the sibling's 0.05. The estimate averaged 180.4 BPM against a
+90 BPM truth on both stimuli, which the test asserts as its entry requirement rather than assuming.
 
 ### Notes
 
@@ -445,17 +442,14 @@ asserts as its own entry requirement rather than assuming.
 - **Deviation, Phase 6:** `docs/presets.md`'s `bar_index` note documented it as
   `(beat_index - alignment) / 4`, which Phase 4 made stale; corrected to the grid's beat count in
   the same commit, though the phase's stated scope was `beat_index`'s meaning.
-- **Was:** the two "not acted on" items above — `core/src/dsp/mod.rs:160`'s stale derivation and
-  the `attractor_walkdejong` / `shape_pulse` headers — were repaired by Phase 7e and 7f. They are
-  left written here because the review found them from this section.
+- **Was:** the two "not acted on" items above were repaired by Phase 7e and 7f — left written
+  because the review found them from this section.
 - **Deviation, Phase 7e:** the sub-item named two doc comments; `core/src/dsp/mod.rs` carried a
-  **third** instance of the same falsehood in the same struct — `AnalysisFrame::beat_index`'s own
-  doc read "Monotone count of beats since the stream started", and `beat_in_bar`'s read
-  "`beat_index % 4`". Both corrected in the same commit. The file is in the phase's list; the
-  sub-item did not name these two fields.
-- **Deviation, Phase 7c:** the sub-item named `presets/README.md` and the skill's `SKILL.md`;
-  `docs/presets.md` carried the identical claim ("alignments of a real bar") and was corrected
-  alongside them. In the phase's file list, not in the sub-item's sentence.
+  **third** instance in the same struct — `AnalysisFrame::beat_index`'s doc read "Monotone count of
+  beats since the stream started" and `beat_in_bar`'s read "`beat_index % 4`". Both corrected in
+  the same commit; the file is in the phase's list, these two fields were not in its sentence.
+- **Deviation, Phase 7c:** `docs/presets.md` carried the identical "alignments of a real bar" claim
+  and was corrected alongside the two the sub-item named. In the file list, not in its sentence.
 - **Followup:** the six presets' expressions are unchanged by construction — the Phase 6 and
   Phase 7 diffs over `presets/*.toml` contain no non-comment line — so the `preset-author` re-tune
   the plan lists under `## Followups` is still open.
