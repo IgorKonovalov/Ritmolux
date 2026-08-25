@@ -321,8 +321,8 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the arc instance draws | dev | done | `3f9e828` |
-| 1b — a sub-floor `thickness` stops failing silently | dev | done | committed with this row |
-| 2 — the in-frame geometry instrument learns arcs | dev | not started | |
+| 1b — a sub-floor `thickness` stops failing silently | dev | done | `b97ff64` |
+| 2 — the in-frame geometry instrument learns arcs | dev | done | committed with this row |
 | 3 — the circular motifs become arcs | dev | not started | |
 | 4 — does it read as a curve? | human | not started | |
 | 5 — the general curve: a biarc chain | dev | not started | |
@@ -351,6 +351,11 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   binding rests at, `None` for anything naming a variable — so an animated `thickness` that passes
   through the dead zone is silent, which is the honest limit of a load-time check and is asserted
   as such.
+- **Phase 2 measures an arc by sub-chords rather than in closed form**, 64 of them, a power of two
+  so an unclipped arc still sums to exactly 1.0. The closed form is the intersection of four
+  half-planes with a circle — up to four disjoint angular components — and both sums are taken from
+  `|sweep| * radius` either way, so the sampling changes only *where* the arc is judged to be, never
+  how long it is. `standalone/src/shot/report.rs`'s `geom` legend now says "segments and arcs alike".
 - **Followup noticed and not acted on — the segment path's stroke width is uniform in NDC, not in
   pixels.** Measured on a 640x480 target: the same `width` gives a horizontal stroke 24 px tall and
   a vertical one 30 px wide, the aspect ratio exactly. So a polyline circle already ships with

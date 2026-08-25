@@ -38,7 +38,7 @@ fn a_figure_inside_the_frame_measures_exactly_one() {
         seg([0.2, -0.9], [1.5, 0.9]),
         seg([-1.55, 0.0], [1.55, 0.1]),
     ];
-    let extent = measure_extent(&segments, 1.6, ViewTransform::default());
+    let extent = measure_extent(&segments, &[], 1.6, ViewTransform::default());
     assert!(extent.total_len > 0.0, "the fixture must draw something");
     assert_eq!(
         extent.in_frame_len, extent.total_len,
@@ -55,7 +55,7 @@ fn a_figure_outside_the_frame_measures_exactly_zero() {
         seg([2.0, 2.0], [3.0, 3.0]),
         seg([-4.0, 1.5], [4.0, 1.5]), // spans the width, above the top edge
     ];
-    let extent = measure_extent(&segments, 1.0, ViewTransform::default());
+    let extent = measure_extent(&segments, &[], 1.0, ViewTransform::default());
     assert!(extent.total_len > 0.0, "the fixture must draw something");
     assert_eq!(extent.in_frame_len, 0.0);
     assert_eq!(extent.fraction(), Some(0.0));
@@ -86,7 +86,7 @@ fn a_crossing_segment_contributes_its_clipped_share() {
         ([-2.0, 1.5], [2.0, 1.5], 0.0),
     ];
     for (a, b, want) in cases {
-        let extent = measure_extent(&[seg(a, b)], 1.0, ViewTransform::default());
+        let extent = measure_extent(&[seg(a, b)], &[], 1.0, ViewTransform::default());
         let got = extent.fraction().expect("the segment has a length");
         assert!(
             (got - want).abs() < EPS,
@@ -110,8 +110,8 @@ fn a_crossing_segment_contributes_its_clipped_share() {
 fn the_rectangle_follows_the_aspect_the_draw_is_handed() {
     let across = [seg([0.0, 0.0], [2.0, 0.0])];
     let up = [seg([0.0, 0.0], [0.0, 2.0])];
-    let square = measure_extent(&across, 1.0, ViewTransform::default());
-    let wide = measure_extent(&across, 2.0, ViewTransform::default());
+    let square = measure_extent(&across, &[], 1.0, ViewTransform::default());
+    let wide = measure_extent(&across, &[], 2.0, ViewTransform::default());
     assert!((square.fraction().expect("length") - 0.5).abs() < EPS);
     assert_eq!(
         wide.fraction(),
@@ -119,7 +119,7 @@ fn the_rectangle_follows_the_aspect_the_draw_is_handed() {
         "at aspect 2 the same horizontal segment fits exactly"
     );
     for aspect in [1.0, 2.0, 3.5] {
-        let vertical = measure_extent(&up, aspect, ViewTransform::default());
+        let vertical = measure_extent(&up, &[], aspect, ViewTransform::default());
         assert!(
             (vertical.fraction().expect("length") - 0.5).abs() < EPS,
             "the frame's half-height is 1.0 at every aspect, got {vertical:?} at {aspect}"
@@ -143,13 +143,13 @@ fn the_view_transform_moves_the_figure_against_the_frame() {
         ..Default::default()
     };
     assert_eq!(
-        measure_extent(&segments, 1.0, ViewTransform::default()).fraction(),
+        measure_extent(&segments, &[], 1.0, ViewTransform::default()).fraction(),
         Some(1.0)
     );
-    let zoomed = measure_extent(&segments, 1.0, zoomed);
+    let zoomed = measure_extent(&segments, &[], 1.0, zoomed);
     assert!((zoomed.fraction().expect("length") - 0.5).abs() < EPS);
     assert_eq!(
-        measure_extent(&segments, 1.0, panned).fraction(),
+        measure_extent(&segments, &[], 1.0, panned).fraction(),
         Some(0.0),
         "panned up by a full half-height, the segment sits on and above the edge"
     );
@@ -162,15 +162,213 @@ fn the_view_transform_moves_the_figure_against_the_frame() {
 fn nothing_drawn_reports_no_fraction() {
     assert_eq!(DrawExtent::default().fraction(), None);
     assert_eq!(
-        measure_extent(&[], 1.6, ViewTransform::default()).fraction(),
+        measure_extent(&[], &[], 1.6, ViewTransform::default()).fraction(),
         None
     );
     // A degenerate segment is length zero wherever it sits, so it moves
     // neither sum — a figure collapsed to a point is `sanity.rs`'s question.
     let degenerate = [seg([9.0, 9.0], [9.0, 9.0])];
     assert_eq!(
-        measure_extent(&degenerate, 1.6, ViewTransform::default()).fraction(),
+        measure_extent(&degenerate, &[], 1.6, ViewTransform::default()).fraction(),
         None
+    );
+}
+
+// -----------------------------------------------------------------------
+// The in-frame measure counts arcs too (Plan 0087 Phase 2, ADR-0083)
+// -----------------------------------------------------------------------
+
+/// An arc with everything but its geometry held constant — colour and width
+/// are not part of this measurement, which is length and not area.
+fn marc(centre: [f32; 2], radius: f32, start: f32, sweep: f32) -> super::ArcInstance {
+    super::ArcInstance {
+        centre,
+        radius,
+        angle_start: start,
+        angle_sweep: sweep,
+        color: [1.0, 1.0, 1.0],
+        width: 0.01,
+    }
+}
+
+/// **An arc's own length is what it contributes**, and an arc inside the frame
+/// measures exactly 1.0 — the same exactness the segment path has, and for the
+/// same reason: both sums are taken from `|sweep| * radius`, so a sub-arc that
+/// is not clipped adds the identical value to each.
+#[test]
+fn an_arc_inside_the_frame_measures_exactly_one_and_its_own_length() {
+    let quarter = std::f32::consts::FRAC_PI_2;
+    let arc = marc([0.0, 0.0], 0.5, 0.0, quarter);
+    let extent = measure_extent(&[], &[arc], 1.6, ViewTransform::default());
+
+    // The length is the arc's, not its chord's — a quarter of a circle of
+    // radius 0.5 is `0.5 * pi/2`, where the chord would be `0.5 * sqrt(2)`.
+    let want = 0.5 * quarter;
+    assert!(
+        (extent.total_len - want).abs() < EPS,
+        "a quarter arc of radius 0.5 measured {} long, not {want} — a chord \
+         sum would give {}",
+        extent.total_len,
+        0.5 * std::f32::consts::SQRT_2
+    );
+    assert_eq!(
+        extent.in_frame_len, extent.total_len,
+        "an unclipped arc must accumulate the identical sum twice"
+    );
+    assert_eq!(extent.fraction(), Some(1.0));
+}
+
+/// **An arc half outside the frame reports half**, and the expected value is
+/// derived from the arc's own geometry rather than recorded off a run.
+///
+/// A full circle centred on the top edge of a square frame: exactly half of it
+/// — the half below `y = 1` — is inside, by symmetry, whatever the radius. So
+/// the number this must report is `0.5` because of where the circle sits, not
+/// because a previous run said so.
+///
+/// Without this, an arc-drawing preset would read *better*-framed than it is:
+/// the arc would contribute nothing to either sum, the denominator would shrink
+/// to whatever segments remained, and a figure half off the frame would report
+/// the fraction of the part that is still on it.
+#[test]
+fn an_arc_half_outside_the_frame_reports_half_of_its_own_length() {
+    // Centred on the top edge (y = 1) of the square frame `[-1, 1]^2`, and
+    // small enough not to reach the left or right edges.
+    let arc = marc([0.0, 1.0], 0.4, 0.0, std::f32::consts::TAU);
+    let extent = measure_extent(&[], &[arc], 1.0, ViewTransform::default());
+
+    let want_len = 0.4 * std::f32::consts::TAU;
+    assert!(
+        (extent.total_len - want_len).abs() < EPS,
+        "the circle's length is {want_len}, measured {}",
+        extent.total_len
+    );
+    let got = extent.fraction().expect("the arc has a length");
+    // Slack for the sub-chord sampling: each of the `ARC_STEPS` sub-arcs is
+    // judged by its chord, and only the two straddling the edge can disagree
+    // with the arc, by at most their own sagitta.
+    let slack = 4.0 / super::ARC_STEPS as f32;
+    assert!(
+        (got - 0.5).abs() < slack,
+        "a circle centred on the frame's top edge measured {got}, and by \
+         symmetry exactly half of it is inside"
+    );
+}
+
+/// The fraction **moves in the right direction** as the same arc is pushed off
+/// the frame: monotonically down, exactly 1.0 while it is wholly inside, and
+/// exactly 0.0 once it is wholly outside.
+///
+/// A direction rather than a table of values, so the check survives a change to
+/// how the sub-arcs are counted.
+#[test]
+fn pushing_an_arc_off_the_frame_lowers_its_fraction_monotonically() {
+    let mut previous = f32::INFINITY;
+    let mut readings = Vec::new();
+    for step in 0..=8 {
+        let y = step as f32 * 0.35;
+        let arc = marc([0.0, y], 0.4, 0.0, std::f32::consts::TAU);
+        let got = measure_extent(&[], &[arc], 1.0, ViewTransform::default())
+            .fraction()
+            .expect("the arc has a length");
+        assert!(
+            got <= previous + EPS,
+            "the fraction rose from {previous} to {got} as the arc moved \
+             further off the frame"
+        );
+        previous = got;
+        readings.push(got);
+    }
+    eprintln!("arc pushed off the top edge, fraction per 0.35 step: {readings:?}");
+    assert_eq!(
+        readings.first().copied(),
+        Some(1.0),
+        "the arc starts wholly inside the frame and must measure exactly 1.0"
+    );
+    assert_eq!(
+        readings.last().copied(),
+        Some(0.0),
+        "at y = 2.8 with radius 0.4 the arc is wholly outside and must measure \
+         exactly 0.0"
+    );
+}
+
+/// The view transform reaches arcs exactly as it reaches segments: `zoom`
+/// scales the radius with the centre and `pan` moves both, in world space
+/// before the aspect divide — which is what the vertex shader does.
+#[test]
+fn the_view_transform_moves_an_arc_against_the_frame() {
+    let arc = marc([0.0, 0.0], 0.4, 0.0, std::f32::consts::TAU);
+    assert_eq!(
+        measure_extent(&[], &[arc], 1.0, ViewTransform::default()).fraction(),
+        Some(1.0)
+    );
+    // Zoomed by 4 the radius is 1.6, well past the frame's half-height, so most
+    // of the circle is out; panned up by 2 it is gone entirely.
+    let zoomed = measure_extent(
+        &[],
+        &[arc],
+        1.0,
+        ViewTransform {
+            zoom: 4.0,
+            ..Default::default()
+        },
+    );
+    let fraction = zoomed.fraction().expect("the arc has a length");
+    assert!(
+        (0.0..1.0).contains(&fraction),
+        "a 4x zoom must push the circle past the frame, got {fraction}"
+    );
+    assert!(
+        (zoomed.total_len - 4.0 * 0.4 * std::f32::consts::TAU).abs() < 1e-4,
+        "zoom scales the arc's length with its radius, got {}",
+        zoomed.total_len
+    );
+    assert_eq!(
+        measure_extent(
+            &[],
+            &[arc],
+            1.0,
+            ViewTransform {
+                pan: [0.0, 2.0],
+                ..Default::default()
+            }
+        )
+        .fraction(),
+        Some(0.0),
+        "panned two half-heights up, the whole circle is above the frame"
+    );
+}
+
+/// Segments and arcs in one batch share **one denominator** — the fraction is
+/// over everything drawn, not over one kind of it.
+#[test]
+fn a_mixed_batch_measures_over_both_kinds() {
+    // A segment wholly inside, and a circle wholly outside above it.
+    let inside = seg([-0.5, 0.0], [0.5, 0.0]);
+    let outside = marc([0.0, 3.0], 0.4, 0.0, std::f32::consts::TAU);
+    let both = measure_extent(&[inside], &[outside], 1.0, ViewTransform::default());
+    let alone = measure_extent(&[inside], &[], 1.0, ViewTransform::default());
+
+    assert_eq!(
+        alone.fraction(),
+        Some(1.0),
+        "the segment alone is wholly inside"
+    );
+    assert_eq!(
+        both.in_frame_len, alone.in_frame_len,
+        "the off-frame arc adds nothing to the numerator"
+    );
+    assert!(
+        both.total_len > alone.total_len,
+        "the off-frame arc must widen the denominator — that is the whole \
+         obligation: an arc contributing nothing would make an arc-drawing \
+         preset read better-framed than it is"
+    );
+    let got = both.fraction().expect("the batch has length");
+    assert!(
+        got < 1.0,
+        "the mixed batch measured {got}; half its drawn length is off the frame"
     );
 }
 

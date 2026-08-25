@@ -933,10 +933,11 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         if show_geometry {
             let _ = writeln!(
                 out,
-                "  geom is the in-frame geometry fraction: the share of drawn segment \
-                 length inside the frame, at the fully-driven capture (ADR-0083). Read \
-                 it while tuning `scale` — no absolute threshold orders the library, \
-                 and two shipped presets deliberately leave the frame"
+                "  geom is the in-frame geometry fraction: the share of drawn line \
+                 length — segments and arcs alike — inside the frame, at the \
+                 fully-driven capture (ADR-0083). Read it while tuning `scale` — no \
+                 absolute threshold orders the library, and two shipped presets \
+                 deliberately leave the frame"
             );
         }
         // The footprint reading (Plan 0077 Phase 4, backlog 0088), its own

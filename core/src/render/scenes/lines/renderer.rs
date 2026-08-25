@@ -440,6 +440,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// not counted, so a thick stroke leaving the frame is under-counted. That is
 /// the right measure for *overshoot* and a poor one for anything else.
 ///
+/// **Arcs count too** (Plan 0087 Phase 2). An [`ArcInstance`] contributes its
+/// own arc length, `|sweep| * radius`, to both sums. This is a correctness
+/// obligation of the arc primitive rather than a feature: an arc contributing
+/// nothing would shrink the denominator, and every arc-drawing preset would
+/// read better-framed than it is — the more so as the primitive replaces whole
+/// motifs, where the missing length is most of the figure.
+///
 /// [ADR-0083]: ../../../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DrawExtent {
@@ -557,6 +564,55 @@ fn in_frame_fraction(a: [f32; 2], b: [f32; 2], aspect: f32) -> f32 {
     t1 - t0
 }
 
+/// Sub-arcs one [`ArcInstance`] is measured in — a **power of two**, which is
+/// load-bearing.
+///
+/// Each sub-arc is clipped by its own chord and weighted `1 / ARC_STEPS`, so an
+/// arc wholly inside the frame accumulates that weight exactly `ARC_STEPS`
+/// times. At a power of two the weight is exact in binary and the sum is
+/// **exactly 1.0**, which is what keeps an unclipped figure measuring exactly
+/// its own length — the property `in_frame_fraction` is written to preserve for
+/// segments.
+///
+/// Sixty-four puts 5.6 degrees in a sub-arc of a full circle, whose chord
+/// departs from it by `r * (1 - cos(2.8 deg))`, about `0.0012 * r`. The error is
+/// a function of the angle per step alone, so it does not grow with radius.
+const ARC_STEPS: usize = 64;
+
+/// The world-space length of `arc` and the share of it inside
+/// `[-aspect, aspect] x [-1, 1]`, under the same view transform the vertex
+/// shader applies.
+///
+/// Measured as [`ARC_STEPS`] sub-arcs clipped by their own chords rather than by
+/// solving the circle against the four edges: the closed form needs the
+/// intersection of four half-planes with a circle, which is up to four disjoint
+/// angular components and considerably more code than the property is worth.
+/// Both sums are taken from the arc's **own** length (`|sweep| * radius`), never
+/// from the chords', so the sub-chord sampling changes only *where* the arc is
+/// judged to be, never how long it is.
+fn measure_arc(arc: &ArcInstance, aspect: f32, xform: super::ViewTransform) -> (f32, f32) {
+    let [pan_x, pan_y] = xform.pan;
+    let centre = [
+        arc.centre[0] * xform.zoom + pan_x,
+        arc.centre[1] * xform.zoom + pan_y,
+    ];
+    let radius = arc.radius * xform.zoom;
+    let len = (radius * arc.angle_sweep).abs();
+    if len <= 0.0 || !len.is_finite() {
+        return (0.0, 0.0); // a degenerate (or non-finite) arc measures nothing
+    }
+    let step = 1.0 / ARC_STEPS as f32;
+    let at = |k: usize| {
+        let t = arc.angle_start + arc.angle_sweep * k as f32 * step;
+        [centre[0] + radius * t.cos(), centre[1] + radius * t.sin()]
+    };
+    let mut inside = 0.0;
+    for k in 0..ARC_STEPS {
+        inside += in_frame_fraction(at(k), at(k + 1), aspect) * step;
+    }
+    (len, len * inside)
+}
+
 /// Measure `segments` against the frame — the diagnostic's whole computation.
 ///
 /// **The aspect is a parameter, and it is the only source of one in here**
@@ -570,6 +626,7 @@ fn in_frame_fraction(a: [f32; 2], b: [f32; 2], aspect: f32) -> f32 {
 /// frame by `zoom` or `pan_y` has overshot just as surely as one scaled off it.
 fn measure_extent(
     segments: &[SegmentInstance],
+    arcs: &[ArcInstance],
     aspect: f32,
     xform: super::ViewTransform,
 ) -> DrawExtent {
@@ -590,6 +647,13 @@ fn measure_extent(
         // `len * 1.0` is `len` exactly, so an unclipped figure adds the same
         // value to both sums and the fraction is exactly 1.0.
         extent.in_frame_len += len * in_frame_fraction(a, b, aspect);
+    }
+    // Arcs, into the same two sums: the fraction is over everything drawn, and
+    // a batch of both kinds has one denominator.
+    for arc in arcs {
+        let (len, in_frame) = measure_arc(arc, aspect, xform);
+        extent.total_len += len;
+        extent.in_frame_len += in_frame;
     }
     extent
 }
@@ -1018,6 +1082,8 @@ impl LineRenderer {
     ) {
         let count = segments.len().min(self.capacity);
         let drawn = segments.get(..count).unwrap_or(&[]);
+        let arc_count = arcs.len().min(self.arc_capacity);
+        let arcs_drawn = arcs.get(..arc_count).unwrap_or(&[]);
 
         // The in-frame geometry diagnostic (Plan 0069, ADR-0083). Off in the
         // shipped path, and it reads `drawn` — the segments that actually reach
@@ -1027,12 +1093,9 @@ impl LineRenderer {
         // (ADR-0037), under the same `max(0.1)` clamp the uniform and the shader
         // apply, so the rectangle is the one the frame actually shows.
         if EXTENT_ON.with(std::cell::Cell::get) {
-            let extent = measure_extent(drawn, aspect.max(0.1), xform);
+            let extent = measure_extent(drawn, arcs_drawn, aspect.max(0.1), xform);
             LAST_EXTENT.with(|slot| slot.set(Some(extent)));
         }
-
-        let arc_count = arcs.len().min(self.arc_capacity);
-        let arcs_drawn = arcs.get(..arc_count).unwrap_or(&[]);
 
         if !drawn.is_empty() {
             queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(drawn));
