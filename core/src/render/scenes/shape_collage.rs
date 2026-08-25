@@ -559,48 +559,26 @@ const SUPREMATIST: &[Spec] = &[
     },
 ];
 
-/// The seed the provisional filler draws under. Fixed rather than a parameter:
-/// Plan 0113 Phase 4 owns the seeded generator and its `seed` param, and a
-/// second seed surface here would be one to retire immediately.
-const FILLER_SEED: u64 = 0x5150_3113;
-
-/// How many elements the authored canvas holds — the default `count`, and the
-/// point past which [`fill`] starts inventing.
+/// How many elements the authored canvas holds — the default `count`, and what
+/// [`Grammar::Authored`](layout::Grammar::Authored) cycles.
 pub(crate) const AUTHORED_COUNT: usize = SUPREMATIST.len();
 
-/// Fill `out` with `count` elements, clearing it first.
-///
-/// **Allocation-free**: `out` is preallocated to the tier cap at construction
-/// and `count` is clamped to its capacity, so `clear` + `push` never reallocates.
-///
-/// Up to [`AUTHORED_COUNT`] this is exactly [`SUPREMATIST`] and touches no RNG
-/// at all, which is what makes the authored canvas — and the golden fixture that
-/// pins it — a fixed picture. Past it, elements are the authored roster's kinds
-/// and colours scattered by the seeded RNG. **That filler is a Phase 2
-/// instrument, not a composition**: `core/tests/collage_cost.rs` needs an
-/// element count it can sweep to 128, and Plan 0113 Phase 4 replaces the whole
-/// of this with the real layout grammar.
-pub(crate) fn fill(out: &mut Vec<Element>, count: usize) {
-    let count = count.min(out.capacity());
-    out.clear();
-    let mut rng = super::SeededRng::new(FILLER_SEED);
-    for i in 0..count {
-        let Some(&spec) = SUPREMATIST.get(i % AUTHORED_COUNT) else {
-            break;
-        };
-        if i < AUTHORED_COUNT {
-            out.push(Element::build(spec));
-            continue;
-        }
-        let shrink = rng.range(0.35, 0.8);
-        out.push(Element::build(Spec {
-            center: [rng.range(-1.1, 1.1), rng.range(-0.95, 0.95)],
-            half: [spec.half[0] * shrink, spec.half[1] * shrink],
-            angle_deg: rng.range(-90.0, 90.0),
-            ..spec
-        }));
-    }
-}
+/// `layout` default — the authored control, not a grammar (see `layout.rs`).
+const DEFAULT_LAYOUT: f32 = 0.0;
+/// `seed` default.
+const DEFAULT_SEED: f32 = 0.0;
+/// `size_hierarchy` default — a middling fall from the largest form to the
+/// smallest, so the generated grammars have a range without being dominated.
+const DEFAULT_SIZE_HIERARCHY: f32 = 0.5;
+/// `angle_bias` default, in **degrees** as an author writes it. `-22` is the
+/// authored canvas's own dominant angle, so a generated canvas starts out
+/// leaning the same way the control does.
+const DEFAULT_ANGLE_BIAS: f32 = -22.0;
+
+/// The largest `seed` a preset can name. `f32` represents integers exactly to
+/// `2^24`, and past that a "different seed" silently is not one — so the range
+/// ends where the type stops being able to tell two seeds apart.
+const MAX_SEED: f32 = 16_777_216.0;
 
 /// The flat-graphic canvas: opaque elements over their own paper, composited in
 /// one fullscreen distance-field pass.
@@ -616,9 +594,9 @@ pub struct ShapeCollageScene {
     /// The element array, preallocated to the tier cap and refilled in place —
     /// never reallocated (the plan's no-allocation-in-the-render-path duty).
     elements: Vec<Element>,
-    /// How many elements [`Self::elements`] currently holds, so an unchanged
-    /// `count` neither rebuilds nor re-uploads.
-    built: usize,
+    /// The recipe [`Self::elements`] was last built from, so an unchanged canvas
+    /// neither regenerates nor re-uploads. `None` before the first build.
+    built: Option<layout::Recipe>,
     /// Whether [`Self::elements`] has changed since the last upload.
     dirty: bool,
     /// A test has installed its own element array, so the canvas must not be
@@ -635,6 +613,15 @@ pub struct ShapeCollageScene {
     /// to the rebuild — an eased binding is continuous even where the arithmetic
     /// needs an integer.
     count: f32,
+    /// Which layout grammar composes the canvas, raw as the preset bound it.
+    /// `layout::Grammar::from_param` quantizes it.
+    layout: f32,
+    /// The preset's seed, raw as the preset bound it.
+    seed: f32,
+    /// How steeply generated sizes fall, raw as the preset bound it.
+    size_hierarchy: f32,
+    /// The canvas's dominant angle in **degrees**, raw as the preset bound it.
+    angle_bias: f32,
     scale: f32,
     pan_x: f32,
     pan_y: f32,
@@ -763,11 +750,15 @@ impl ShapeCollageScene {
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             elements: Vec::with_capacity(cap),
-            built: usize::MAX,
+            built: None,
             dirty: false,
             #[cfg(test)]
             specs_override: false,
             count: AUTHORED_COUNT as f32,
+            layout: DEFAULT_LAYOUT,
+            seed: DEFAULT_SEED,
+            size_hierarchy: DEFAULT_SIZE_HIERARCHY,
+            angle_bias: DEFAULT_ANGLE_BIAS,
             scale: DEFAULT_SCALE,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -782,19 +773,38 @@ impl ShapeCollageScene {
         }
     }
 
-    /// Refill the element array for a live count of `count`, unless a test has
+    /// The canvas this scene's parameters currently describe.
+    ///
+    /// Every field is conditioned **here**, CPU-side: a grammar selector, an
+    /// element count and a seed all need to be integral, and an eased binding
+    /// sweeps continuously through the values in between.
+    fn recipe(&self) -> layout::Recipe {
+        layout::Recipe {
+            grammar: layout::Grammar::from_param(self.layout),
+            count: applied_count(self.count, self.elements.capacity()),
+            seed: applied_seed(self.seed),
+            // Phase 6 advances this on a rising edge of `recompose`; until then
+            // every canvas is the seed's first composition.
+            recompose: 0,
+            size_hierarchy: applied_size_hierarchy(self.size_hierarchy),
+            angle_bias: applied_angle_bias(self.angle_bias),
+        }
+    }
+
+    /// Regenerate the element array if the recipe moved, unless a test has
     /// installed its own. A no-op when nothing changed, so the common frame
-    /// neither rebuilds nor re-uploads.
-    fn rebuild(&mut self, count: usize) {
+    /// neither regenerates nor re-uploads.
+    fn rebuild(&mut self) {
         #[cfg(test)]
         if self.specs_override {
             return;
         }
-        if count == self.built {
+        let recipe = self.recipe();
+        if self.built == Some(recipe) {
             return;
         }
-        fill(&mut self.elements, count);
-        self.built = count;
+        layout::generate(&mut self.elements, &recipe);
+        self.built = Some(recipe);
         self.dirty = true;
     }
 
@@ -806,7 +816,7 @@ impl ShapeCollageScene {
         for &spec in specs.iter().take(self.elements.capacity()) {
             self.elements.push(Element::build(spec));
         }
-        self.built = self.elements.len();
+        self.built = None;
         self.dirty = true;
         self.specs_override = true;
     }
@@ -845,6 +855,40 @@ fn applied_count(count: f32, cap: usize) -> usize {
     (n as usize).min(cap)
 }
 
+/// The generator's seed for a bound `seed`.
+///
+/// Truncated to a whole number and held in `0..=`[`MAX_SEED`]. The ceiling is
+/// not arbitrary: an `f32` represents integers exactly only to `2^24`, so past
+/// it two "different" seeds can be the same value and a `recompose` would stop
+/// advancing. A non-finite binding falls back to the default rather than to
+/// whatever `as u64` makes of a NaN.
+fn applied_seed(seed: f32) -> u64 {
+    if !seed.is_finite() {
+        return DEFAULT_SEED as u64;
+    }
+    seed.clamp(0.0, MAX_SEED).floor() as u64
+}
+
+/// The size-hierarchy exponent's input, held in `0..=1`.
+fn applied_size_hierarchy(hierarchy: f32) -> f32 {
+    if hierarchy.is_finite() {
+        hierarchy.clamp(0.0, 1.0)
+    } else {
+        DEFAULT_SIZE_HIERARCHY
+    }
+}
+
+/// The canvas's dominant angle in **radians**, from a param an author writes in
+/// degrees. Wrapped rather than clamped — an angle has no ends, and a `spin`
+/// binding walking past 360 must not stick at a bound.
+fn applied_angle_bias(degrees: f32) -> f32 {
+    if degrees.is_finite() {
+        degrees.rem_euclid(360.0).to_radians()
+    } else {
+        DEFAULT_ANGLE_BIAS.to_radians()
+    }
+}
+
 /// The `edge_softness` the shader is handed, in pixels of extra ramp.
 fn applied_edge_softness(softness: f32) -> f32 {
     if softness.is_finite() {
@@ -860,6 +904,10 @@ fn applied_edge_softness(softness: f32) -> f32 {
 /// drift.
 pub const PARAMS: &[&str] = &[
     "count",
+    "layout",
+    "seed",
+    "size_hierarchy",
+    "angle_bias",
     "scale",
     "pan_x",
     "pan_y",
@@ -888,6 +936,10 @@ impl Scene for ShapeCollageScene {
 
     fn reset_params(&mut self) {
         self.count = AUTHORED_COUNT as f32;
+        self.layout = DEFAULT_LAYOUT;
+        self.seed = DEFAULT_SEED;
+        self.size_hierarchy = DEFAULT_SIZE_HIERARCHY;
+        self.angle_bias = DEFAULT_ANGLE_BIAS;
         self.scale = DEFAULT_SCALE;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -903,6 +955,10 @@ impl Scene for ShapeCollageScene {
     fn set_param(&mut self, name: &str, value: f32) {
         match name {
             "count" => self.count = value,
+            "layout" => self.layout = value,
+            "seed" => self.seed = value,
+            "size_hierarchy" => self.size_hierarchy = value,
+            "angle_bias" => self.angle_bias = value,
             "scale" => self.scale = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -935,7 +991,7 @@ impl Scene for ShapeCollageScene {
             self.palette_dirty = false;
         }
 
-        self.rebuild(applied_count(self.count, self.elements.capacity()));
+        self.rebuild();
         // A zero-length write is not a legal `write_buffer`, and an empty canvas
         // needs no upload: the loop reads `count` entries and stops.
         if self.dirty && !self.elements.is_empty() {
@@ -979,6 +1035,8 @@ impl Scene for ShapeCollageScene {
         pass.draw(0..3, 0..1);
     }
 }
+
+pub(crate) mod layout;
 
 #[cfg(test)]
 mod tests;

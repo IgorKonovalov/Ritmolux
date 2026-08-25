@@ -312,8 +312,8 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 |---|---|---|---|
 | 1 — The painter draws a static canvas | dev | done | 046b9f3 |
 | 2 — What an element costs | dev | done | 6038d25 |
-| 3 — The stop gate | human | **continue** | committed with this row |
-| 4 — The layout generator and a sample sheet | dev | not started | |
+| 3 — The stop gate | human | **continue** | de69a52 |
+| 4 — The layout generator and a sample sheet | dev | done | committed with this row |
 | 5 — The composition call | human | not started | |
 | 6 — The music moves the canvas | dev | not started | |
 | 7 — The Kandinsky vocabulary | dev | not started | |
@@ -374,6 +374,41 @@ not the machine `mark_cost.rs` recorded its table on (an RTX 3080 Laptop), and i
 is much the closer model of what `docs/nfr.md` §1's floor tier targets — read the
 numbers as an optimistic floor-tier reading, on an iGPU a decade newer than the
 one the tier is quoted against.
+
+**Phase 4 — deviations.**
+
+- **A fourth `layout` option was added: the authored canvas, as a control**, and
+  it is the default. The plan implies the grammar replaces Phase 1's element
+  list; it does not. Two reasons, and the second is the load-bearing one: the
+  golden baseline and the shipped preset would otherwise move underneath Phase 5
+  rather than after it, and the authored canvas is **the only composition a human
+  has approved** — the Phase 3 gate judged it at 8 and 14 elements and chose that
+  density from it. A sample sheet of three generated candidates with nothing to
+  judge them against is how a gate picks the best of three bad options. Golden
+  re-ran clean without a re-bless, which is the evidence the control is byte-for-byte
+  Phase 1's canvas.
+- **The plan's two list-level done-whens are asserted in the unit tests, not in
+  `core/tests/collage_layout.rs`.** Bit-identical output for an equal recipe, and
+  capacity across a thousand recompositions, are claims about the element array,
+  which an integration test cannot see without making `Element` and `generate`
+  public — a real widening of the crate's surface for a test's convenience
+  (`marks` is `pub(crate)` for the same reason). The integration test asserts what
+  only it can: that the whole path from preset to pixel carries a seed and a
+  grammar to the frame. Both files say which half they hold.
+- **`presets/README.md` again**, for Phase 1's reason — four new params, and the
+  documentation gate fires when they are declared.
+
+**Phase 4 — the first three grammars were wrong and were rewritten before the
+sheet was rendered.** Worth recording because the defect is not one a test would
+have caught and the gate would have judged it as if it were the grammar: every
+element was sized as though its half-extent were a full extent, so a "dominant"
+form came out ~1.5 canvas units across — a near-square slab — and the canvases
+read as four slabs in a corner. The fix is a rule taken from the authored canvas
+rather than invented (`draw_extents`): **the elongation ceiling falls as an
+element grows**, so a large element is necessarily a bar and only a small one is
+blocky, which is what the reference canvases do. A second pass added `place`,
+because clamping an element's *centre* to the canvas lets a 0.7-unit bar hang
+half off the edge.
 
 **Phase 3 — a correction to the numbers the gate was first shown.** The sweep was
 retargeted to the shipped cap (rungs `8/16/24/32/40`; above the cap

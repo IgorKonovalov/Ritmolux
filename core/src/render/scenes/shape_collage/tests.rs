@@ -21,10 +21,12 @@
 
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
+use super::layout::{self, Grammar, Recipe};
 use super::{
-    AUTHORED_COUNT, DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, Element, KIND_CIRCLE, KIND_QUAD,
-    KIND_TRIANGLE, MAX_EDGE_SOFTNESS, MAX_SCALE, MIN_SCALE, PARAMS, ShapeCollageScene, Spec,
-    applied_count, applied_edge_softness, applied_scale, fill, triangle_vertices,
+    AUTHORED_COUNT, DEFAULT_ANGLE_BIAS, DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, DEFAULT_SEED,
+    Element, KIND_CIRCLE, KIND_QUAD, KIND_TRIANGLE, MAX_EDGE_SOFTNESS, MAX_SCALE, MAX_SEED,
+    MIN_SCALE, PARAMS, SUPREMATIST, ShapeCollageScene, Spec, applied_angle_bias, applied_count,
+    applied_edge_softness, applied_scale, applied_seed, triangle_vertices,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
@@ -165,35 +167,196 @@ fn every_kind_gets_a_tight_bounding_box() {
     }
 }
 
-/// The authored canvas is exactly the authored canvas: at or below
-/// [`AUTHORED_COUNT`] the filler touches no RNG, so the picture the golden
-/// fixture pins is a fixed list and not a seeded one.
-#[test]
-fn the_authored_canvas_is_not_generated() {
-    let mut a = Vec::with_capacity(CAP);
-    let mut b = Vec::with_capacity(CAP);
-    fill(&mut a, AUTHORED_COUNT);
-    fill(&mut b, CAP);
-    assert_eq!(a.len(), AUTHORED_COUNT);
-    assert_eq!(b.len(), CAP);
-    assert_eq!(
-        a.as_slice(),
-        &b[..AUTHORED_COUNT],
-        "the authored prefix must not move when the filler runs past it"
-    );
+// ---------------------------------------------------------------------------
+// The layout grammar (Plan 0113 Phase 4)
+// ---------------------------------------------------------------------------
+
+/// A recipe with everything but the fields a test varies held fixed.
+fn recipe(grammar: Grammar, seed: u64, recompose: u64, count: usize) -> Recipe {
+    Recipe {
+        grammar,
+        count,
+        seed,
+        recompose,
+        size_hierarchy: 0.5,
+        angle_bias: -0.384,
+    }
 }
 
-/// Filling never reallocates: the vector is sized to the tier cap once and
-/// refilled in place, which is what keeps a recomposition off the allocator.
+/// The three grammars and the control, for tests that sweep all four.
+const GRAMMARS: [Grammar; 4] = [
+    Grammar::Authored,
+    Grammar::AnchorSatellites,
+    Grammar::DiagonalAxis,
+    Grammar::SizeHierarchy,
+];
+
+/// `layout` selects a grammar by number, quantized CPU-side, and anything the
+/// roster does not name falls back to the **control** rather than to a grammar
+/// nobody asked for. This mapping is what `presets/README.md` documents.
 #[test]
-fn filling_reuses_the_allocation() {
+fn the_layout_selector_is_quantized_and_falls_back() {
+    assert_eq!(Grammar::from_param(0.0), Grammar::Authored);
+    assert_eq!(Grammar::from_param(1.0), Grammar::AnchorSatellites);
+    assert_eq!(Grammar::from_param(2.0), Grammar::DiagonalAxis);
+    assert_eq!(Grammar::from_param(3.0), Grammar::SizeHierarchy);
+    // An eased binding passes through everything in between.
+    assert_eq!(Grammar::from_param(1.4), Grammar::AnchorSatellites);
+    assert_eq!(Grammar::from_param(1.6), Grammar::DiagonalAxis);
+    // Off the roster, and broken.
+    assert_eq!(Grammar::from_param(9.0), Grammar::Authored);
+    assert_eq!(Grammar::from_param(-1.0), Grammar::Authored);
+    assert_eq!(Grammar::from_param(f32::NAN), Grammar::Authored);
+}
+
+/// **The generator is deterministic**, and it is a function of the recipe and
+/// nothing else — no wall clock, no unseeded randomness (the cross-cutting
+/// rule). Asserted on the element list directly rather than on a rendered
+/// frame, so a difference cannot hide under a rasterizer's tolerance.
+///
+/// The second half is the one that makes the first half worth anything: a
+/// generator that ignored its seed would satisfy "same seed, same list"
+/// perfectly.
+#[test]
+fn the_generator_is_a_pure_function_of_its_recipe() {
+    for grammar in GRAMMARS {
+        let mut a = Vec::with_capacity(CAP);
+        let mut b = Vec::with_capacity(CAP);
+        layout::generate(&mut a, &recipe(grammar, 7, 3, 24));
+        layout::generate(&mut b, &recipe(grammar, 7, 3, 24));
+        assert_eq!(
+            a, b,
+            "{grammar:?}: the same recipe produced two different canvases"
+        );
+        assert_eq!(a.len(), 24, "{grammar:?}: wrong element count");
+
+        if grammar == Grammar::Authored {
+            // The control is a fixed list, so it is *supposed* to ignore the
+            // seed — asserting that is what keeps the sweep below honest about
+            // which arm it is testing.
+            let mut c = Vec::with_capacity(CAP);
+            layout::generate(&mut c, &recipe(grammar, 8, 4, 24));
+            assert_eq!(a, c, "the authored control must not vary with the seed");
+            continue;
+        }
+
+        // A different seed, and a different recomposition, each produce a
+        // different canvas — and the two axes do not collide into one stream.
+        let mut seeded = Vec::with_capacity(CAP);
+        layout::generate(&mut seeded, &recipe(grammar, 8, 3, 24));
+        assert_ne!(a, seeded, "{grammar:?}: the seed does not reach the canvas");
+
+        let mut recomposed = Vec::with_capacity(CAP);
+        layout::generate(&mut recomposed, &recipe(grammar, 7, 4, 24));
+        assert_ne!(
+            a, recomposed,
+            "{grammar:?}: the recomposition index does not reach the canvas"
+        );
+        assert_ne!(
+            seeded, recomposed,
+            "{grammar:?}: seed and recomposition index collided into the same \
+             stream — `seed + 1` and `recompose + 1` must not be the same canvas"
+        );
+    }
+}
+
+/// **It allocates once.** The element vector is sized to the tier cap at scene
+/// construction and reused by `clear` + `push`; a thousand recompositions across
+/// every grammar and every count must not move its capacity.
+///
+/// This is the plan's no-allocation duty. The generator runs on the render
+/// thread rather than in the audio callback, so the real-time rule is not at
+/// stake — but a reallocation mid-frame is still a spike.
+#[test]
+fn a_thousand_recompositions_never_reallocate() {
     let mut v = Vec::with_capacity(CAP);
     let cap = v.capacity();
-    for count in [0usize, 1, AUTHORED_COUNT, CAP, CAP * 4, 3] {
-        fill(&mut v, count);
-        assert_eq!(v.capacity(), cap, "fill({count}) reallocated");
-        assert!(v.len() <= cap);
+    for i in 0..1_000u64 {
+        let grammar = GRAMMARS[(i % GRAMMARS.len() as u64) as usize];
+        // Counts either side of the cap, including zero and past it.
+        let count = (i as usize * 7) % (CAP * 2 + 1);
+        layout::generate(&mut v, &recipe(grammar, i, i * 3, count));
+        assert_eq!(
+            v.capacity(),
+            cap,
+            "recomposition {i} ({grammar:?}, count {count}) reallocated"
+        );
+        assert!(
+            v.len() <= cap,
+            "recomposition {i} produced {} elements over a cap of {cap}",
+            v.len()
+        );
     }
+}
+
+/// The three grammars compose **different** canvases from the same seed. Without
+/// this the sample sheet Phase 5 judges could be three renders of one strategy.
+#[test]
+fn the_three_grammars_are_distinct() {
+    let mut lists = Vec::new();
+    for grammar in [
+        Grammar::AnchorSatellites,
+        Grammar::DiagonalAxis,
+        Grammar::SizeHierarchy,
+    ] {
+        let mut v = Vec::with_capacity(CAP);
+        layout::generate(&mut v, &recipe(grammar, 11, 0, 20));
+        lists.push((grammar, v));
+    }
+    for (i, (ga, a)) in lists.iter().enumerate() {
+        for (gb, b) in lists.iter().skip(i + 1) {
+            assert_ne!(a, b, "{ga:?} and {gb:?} composed the same canvas");
+        }
+    }
+}
+
+/// The authored control is exactly the authored canvas at its own count, and
+/// cycles rather than inventing past it — so the golden fixture and the shipped
+/// preset pin a fixed picture, and Phase 5 has a fixed point to judge against.
+#[test]
+fn the_control_is_the_authored_canvas() {
+    let mut v = Vec::with_capacity(CAP);
+    layout::generate(&mut v, &recipe(Grammar::Authored, 0, 0, AUTHORED_COUNT));
+    assert_eq!(v.len(), AUTHORED_COUNT);
+    let expected: Vec<Element> = SUPREMATIST.iter().copied().map(Element::build).collect();
+    assert_eq!(v, expected, "the control drifted from the authored roster");
+
+    let mut wrapped = Vec::with_capacity(CAP);
+    layout::generate(
+        &mut wrapped,
+        &recipe(Grammar::Authored, 0, 0, AUTHORED_COUNT + 3),
+    );
+    assert_eq!(
+        &wrapped[..AUTHORED_COUNT],
+        v.as_slice(),
+        "the authored prefix must not move when the control is asked for more"
+    );
+    assert_eq!(&wrapped[AUTHORED_COUNT..], &expected[..3], "it must cycle");
+}
+
+/// A seed is quantized and bounded, and the bound is where `f32` stops being
+/// able to tell two seeds apart rather than an arbitrary ceiling.
+#[test]
+fn the_seed_is_quantized_and_bounded() {
+    assert_eq!(applied_seed(0.0), 0);
+    assert_eq!(applied_seed(41.9), 41);
+    assert_eq!(applied_seed(-5.0), 0);
+    assert_eq!(applied_seed(1e30), MAX_SEED as u64);
+    assert_eq!(applied_seed(f32::NAN), DEFAULT_SEED as u64);
+}
+
+/// The dominant angle **wraps** rather than clamping — an angle has no ends, and
+/// a param walking past 360 must not stick at a bound.
+#[test]
+fn the_angle_bias_wraps() {
+    let at = |d: f32| applied_angle_bias(d);
+    assert!((at(0.0) - 0.0).abs() < 1e-6);
+    assert!((at(360.0) - 0.0).abs() < 1e-5, "360 must be 0, not a bound");
+    assert!(
+        (at(-330.0) - at(30.0)).abs() < 1e-5,
+        "negative angles wrap into the same circle"
+    );
+    assert!((at(f32::NAN) - DEFAULT_ANGLE_BIAS.to_radians()).abs() < 1e-6);
 }
 
 // ---------------------------------------------------------------------------

@@ -298,7 +298,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_collage`   | `count` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
+| `shape_collage`   | `count` `layout` `seed` `size_hierarchy` `angle_bias` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -1287,15 +1287,19 @@ order*, compositing each with `over`, so the array index is the depth
 There is no glow param, no bloom, and no soft edge — that is the vocabulary, not
 an omission.
 
-The element list is currently the scene's own authored suprematist canvas of
-fourteen elements; `count` says how many of them are live. Plan 0113 Phase 4
-replaces that list with a seeded layout grammar, and Phase 6 gives the elements
-recomposition, drift, spin, spawn/decay and per-element pumping — **so treat this
-roster as the Phase 1 surface and expect it to grow**, not as the final shape.
+Where the elements come from is `layout`'s answer: either the scene's own
+authored suprematist canvas of fourteen elements, or one of three **seeded
+layout grammars**. Plan 0113 Phase 6 will give the elements recomposition,
+drift, spin, spawn/decay and per-element pumping — **so expect this roster to
+grow**, not to be the final shape.
 
 | param | what it does |
 |---|---|
 | `count` | how many elements of the canvas are live, in painter order. **Quantized to a whole element CPU-side** — an eased binding does not half-draw one — and bounded by the tier's element cap. A non-finite value falls back to the whole authored canvas rather than to a blank frame. |
+| `layout` | which composition builds the element list. `0` the **authored canvas** (a fixed fourteen-element composition; ignores `seed`), `1` **anchor-and-satellites** (one or two dominant planes with the rest clustered around them — the picture has a subject), `2` **diagonal-axis** (a dominant angle with elements along it and narrowly across it — the picture has a direction), `3` **size-hierarchy** (power-law sizes with position independent of size — a range but no centre). Quantized; anything off the roster falls back to `0`. |
+| `seed` | which canvas a grammar composes. Whole numbers, `0` to `16777216` — the ceiling is where an `f32` stops telling two seeds apart, not an arbitrary limit. Inert on `layout = 0`. |
+| `size_hierarchy` | `0..1`, how steeply generated sizes fall from the largest element to the smallest. `0` is a nearly uniform canvas; `1` is a few dominant forms over many small ones. Inert on `layout = 0`. |
+| `angle_bias` | the canvas's dominant angle, in **degrees**. Each grammar scatters around it differently — tightly on `1` and `2`, loosely on `3`. Wraps rather than clamping, so a drifting binding keeps turning. Inert on `layout = 0`. |
 | `scale` | the canvas's size in the frame. `1.0` is the composition as composed. |
 | `paper` | the ground's palette coordinate. **A raw coordinate**: `color_span` and `palette_shift` move the *elements* and deliberately do not drag the ground with them, so a colour drift does not take the paper along. |
 | `opacity` | a global multiplier on every element's own alpha. `1.0` — fully opaque — is the look; below it the whole canvas turns translucent over the paper. |
@@ -1323,6 +1327,13 @@ colour off the LUT at its coordinate, so a smooth ramp shades every element by
 where it happens to sit. A pair of stops a ten-thousandth apart is a hard
 transition; `presets/collage_suprematist.toml` is eight flat bands built that
 way, and its header carries the arithmetic.
+
+**Eight is not a coincidence.** A layout grammar draws each element's colour
+from **eight evenly spaced coordinates at band centres** (`k/8 + 1/16`), and
+reserves the last for the paper so a generated element never draws the ground's
+own colour and vanishes. An eight-plateau palette therefore resolves every
+generated element exactly; a palette with a different number of bands still
+works, but its elements land wherever those eight coordinates happen to fall.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
