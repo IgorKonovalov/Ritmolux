@@ -1,6 +1,6 @@
 # 0115 — The engine becomes a live video source
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
