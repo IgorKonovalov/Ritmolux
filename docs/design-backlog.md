@@ -2881,3 +2881,53 @@ every large dark mass red.
 tree — not committed, because `core/build.rs` globs `presets/` and landing it would take CI red.
 Note that the same glob picks up untracked files, so a local `cargo nextest run -p lmv-core` fails on
 it today until this is settled or the file is parked elsewhere.
+
+### Measured against the real scene, 2026-08-25 — and `dev` has already hit the other half
+
+Plan 0113 turned out to be **in flight**, not pending: `plan-0113-shape-collage` carries three
+commits (the painter, the cost instrument, the tier caps). That makes the collision above
+measurable rather than predicted, and it is worse than predicted in one direction and better in
+another.
+
+**`dev` reached the same finding independently, from the coverage side.** The branch adds a
+`coverage_floor` arm for the new system whose own comment reads: *"a `shape_collage` canvas paints
+its own paper across every pixel (ADR-0123), so its lit fraction is 1.0 by construction whatever the
+elements do, and the statistic this floor is made of cannot distinguish a good canvas from an empty
+one."* It then leans on the tonal statistic as the rescue: *"The question this family actually needs
+asked is tonal, not areal — a canvas that drew no elements is a flat sheet of paper, which
+`MAX_TONAL_FLATNESS` sees and coverage does not."*
+
+**Measured on the branch's committed golden** (`core/tests/golden/shape_collage.png`, 128x128):
+
+    coverage        1.0000   exactly, confirming the comment above
+    tonal_flatness  0.7577   passes, 0.14 under the 0.90 ceiling
+    paper share     75.77 % of the canvas (bucket 14); elements hold ~24 %
+
+So today's sample canvas passes, and the black-and-white false positive is **not** yet reproduced on
+this family. The problem is what the plan builds next.
+
+**The rescue `dev` is relying on is measured only where it cannot fire.** `sanity` captures at
+`LOUD`, where Phase 6's `density` lever puts the canvas at its *fullest* — the state with the most
+elements and therefore the lowest flatness. The second, quieter capture (Plan 0058) buys exactly one
+gate, `MODERATE_MIN_COVERAGE`, and that is the areal statistic which is degenerate at `1.0` for this
+family. `quadrant_spread` and `radial_shell_occupancy` are degenerate for the same reason.
+
+The consequence is precise: **Phase 6 explicitly builds an emptying canvas** — *"`density` gates what
+fraction of the generated list is live, with elements fading in and out by age"* — and the state it
+builds is measured by nothing. A canvas that empties correctly on a quiet passage and a canvas that
+is broken and draws no elements are the same picture, a flat sheet of paper, and every statistic in
+the lens either cannot see it or is not read at the excitation where it happens.
+
+That is the sharp form of this entry, and it is a stronger claim than the one it was routed with:
+
+- the **false positive** (a correct black-and-white or sparse composition convicted) is real but
+  bounded — it needs ~90 % single-tone, which today's canvas is not;
+- the **false negative** is unbounded and already designed-in — for this family the lens has one
+  live statistic, read at the one excitation where the defect it is meant to catch cannot appear.
+
+### What this does not settle
+
+Whether the answer is a ground-relative `is_lit`, a structural statistic in the shape of Plan 0075's
+shell-occupancy rescue, reading the tonal statistic at the quiet excitation too, or a per-system
+lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
+0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
