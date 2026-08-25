@@ -331,10 +331,12 @@ and the mandala becomes a rose window while the shape keeps tracking the music.
 
 It is **creator tooling you build yourself, and none of it ships** — no model, no
 weights, no Python runtime in the release zip. It needs a CUDA GPU, a Python
-environment and a first-run download of several gigabytes of weights, and a
-four-minute track takes roughly an hour at the `fast` profile on the machine those
-numbers were measured on. The canonical command is in
-[`docs/capturing.md`](docs/capturing.md#a-filter-stage-between-shot-and-the-encoder).
+environment and a first-run download of several gigabytes of weights.
+
+<!-- figures:orientation --> A four-minute track takes about **54 minutes** at the `fast` profile, on the machine named beside that figure — the one thing worth knowing before you start.
+
+**[`docs/diffusion-filter.md`](docs/diffusion-filter.md) is the whole of it** —
+setup, the one canonical command, the flags, and what it costs everywhere else.
 
 ## Visual QA / headless capture
 

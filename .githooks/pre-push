@@ -75,6 +75,14 @@ echo "pre-push: running the fast subset (doc links, backlog claims, sd-filter, f
 # to do work that is already done. Same cost class as the link check: a parse of
 # one markdown file plus a bounded number of regex scans.
 #
+# The filter-figure gate rides it too (Plan 0106 Phase 7e, ADR-0120). It asserts
+# that the diffusion filter's cost figures live in docs/diffusion-filter.md and
+# nowhere else. Same cost class as the three beside it, and the same history: the
+# feature was documented in three files at once, and a correction at Plan 0106's
+# close enumerated two of the three copies and missed the third. It checks that
+# duplicates do not EXIST rather than that they agree, because the copy that broke
+# it was the one outside the list anyone was checking.
+#
 # The index-row gate rides it too (Plan 0105 Phase 5, ADR-0116). It holds every
 # row inside a marked roster region to 320 bytes, because the three index files
 # had grown rows that summarize the documents they point at — docs/adrs/README.md
@@ -88,8 +96,9 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
     run_step "node scripts/check-backlog-claims.mjs" node scripts/check-backlog-claims.mjs
+    run_step "node scripts/check-filter-figures.mjs" node scripts/check-filter-figures.mjs
 else
-    echo "pre-push: skipping the doc-link, index-row and backlog-claim checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim and filter-figure checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in

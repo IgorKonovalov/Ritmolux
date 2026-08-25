@@ -361,129 +361,23 @@ Practical notes:
 #### A filter stage between `shot` and the encoder
 
 The frame stream is a pipe, so anything that speaks Y4M can sit in the middle of
-it. `tools/sd-filter/` is the first such stage, and it runs an **img2img
-diffusion pass with ControlNet holding the render's geometry** — the attractor
-becomes canyon rock, the mandala becomes a rose window, and the shape keeps
-tracking the music because the control map is redrawn from every frame:
+it. `tools/sd-filter/` is the first such stage: an img2img diffusion pass with
+ControlNet holding the render's geometry, so the attractor becomes canyon rock
+while the shape keeps tracking the music. **It is documented in one place, and
+that place is [`docs/diffusion-filter.md`](diffusion-filter.md)** — setup, the one
+canonical command, the flags and what it costs. Nothing on that path ships in the
+release zip.
 
-**One command, and there is deliberately only one.** It is the canonical
-`--ffmpeg` invocation above with a stage spliced into the middle — the encoder
-half is unchanged, character for character:
+`--ffmpeg` is **not** used there: it spawns the encoder itself, which leaves no
+seam to insert a stage into. Composing the pipe by hand is the whole point of the
+raw-stream path.
 
-```bash
-cargo run -p standalone --release --example shot -- \
-    --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 --tier rich \
-  | .venv/Scripts/python tools/sd-filter/sd_filter.py \
-      --profile quality --prompt "a vast canyon of luminous glowing rock strata" \
-  | ffmpeg -hide_banner -nostats -y -f yuv4mpegpipe -i pipe:0 -i track.wav \
-      -map 0:v:0 -map 1:a:0 \
-      -c:v libx264 -preset medium -crf 18 \
-      -pix_fmt yuv420p -color_range pc -colorspace bt709 -color_primaries bt709 \
-      -color_trc bt709 \
-      -c:a aac -b:a 192k -shortest track.mp4
-```
-
-Note that `--ffmpeg` is **not** used on this path: it spawns the encoder itself,
-which leaves no seam to insert a stage into. Composing the pipe by hand is the
-whole point of the raw-stream path.
-
-**That command does not change when the filter's settings do**, and that is the
-property worth writing down rather than the text of the command. Because
-`--stride N` preserves the frame count, the encoder never learns a rate that has
-to agree with a flag on another process — there is no `-r` to keep in sync and no
-way to desynchronize the audio silently. Change the profile, the stride or the
-prompt and the third line of the pipe is still the third line of the pipe.
-
-**Prerequisites, stated plainly: a CUDA GPU, a Python environment you build
-yourself, and a first-run download of several gigabytes of weights from Hugging
-Face.** Setup, the flag reference and the sharp edges are in
-[`tools/sd-filter/README.md`](../tools/sd-filter/README.md).
-**Nothing on this path ships in the release zip** — no model, no weights, no
-Python runtime; `lmv.exe` and `foo_lmv.dll` do not change size, and
-[NFR §4](nfr.md#4-size-and-dependencies)'s budget is untouched. This is creator
-tooling built from a source checkout.
-
-#### The profiles are what you type
-
-A profile is a named set of flags and nothing else; any flag passed explicitly
-overrides it, and **the expansion is echoed on stderr at the start of every run**,
-so a finished file's configuration is recoverable from its own log rather than
-from a profile name whose meaning may since have moved. Pass the echoed flags
-back without `--profile` and you get the same bytes on the same machine.
-
-| profile | expands to |
-|---|---|
-| `quality` | `--model Lykon/dreamshaper-8 --controlnet lllyasviel/control_v11p_sd15_softedge --control softedge --scheduler lcm --steps 8 --cfg 2.0 --strength 0.75 --cn-scale 0.6 --feedback 0.6 --stride 1 --gap blend --size 589824 --seed 1234 --lcm-lora latent-consistency/lcm-lora-sdv1-5` |
-| `fast` | the same, with `--feedback 0.4 --stride 3 --size 262144` |
-
-`--prompt` is required and neither profile supplies one: the image is the whole
-signal, and there is no default worth having. Without one the filter exits **2
-before importing torch**, so a forgotten prompt costs a second rather than a
-multi-gigabyte download.
-
-**What a render costs**, measured on the dev box — RTX 3080 Laptop 8 GB, torch
-2.6.0+cu124, Python 3.12 — rendering `attractor_leviathan` at 1920x1080 in and
-out. A measurement naming its configuration, **not a portable figure**
-([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
-
-| profile | diffusion geometry | per diffused frame | per emitted frame | 4 minutes at 30 fps |
-|---|---|---|---|---|
-| `quality` | 1024x576 | 2.966 s | 2.966 s | **~5.9 hours** |
-| `fast` | 680x384 | 1.354 s | 0.451 s | **~54 minutes** |
-
-Each run prints its own mean when it finishes, so nobody has to trust that table
-for their own machine.
-
-**Frames in equals frames out, always** — including under `--stride N`, which
-diffuses every Nth frame and fills the gap itself rather than handing a changed
-rate downstream. A stage that dropped frames would desynchronize the audio mux,
-and that failure is *silent in the file*: nothing reports it, and you find it by
-watching four minutes of finished video. `--gap blend` crossfades between the
-diffused frames on either side of a gap (the default); `--gap held` repeats the
-last one for a deliberately stepped look.
-
-**The stage never changes the geometry, and it never squashes.** `--size` takes a
-**pixel budget** rather than a side length: the filter derives the diffusion size
-from the budget and the incoming header, rounds each axis to a multiple of 8, and
-resamples back to the stream's own size on the way out. At 16:9 the `quality`
-budget is exactly 1024x576. A `--size WxH` that disagrees with the stream's
-aspect is an **error**, not a silent squash — [ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
-records the measurement behind that: at an identical pixel count the native arm
-was both the cheapest and the only one delivering every pixel it paid for.
-
-**Every render prints the cell it ran, expanded, on stderr**, so a file's
-configuration is recoverable from its own log rather than from a profile name
-whose meaning may since have moved. Pass those flags back without `--profile` and
-you get the same bytes on the same machine.
-
-**`--passthrough` is the stage with the model taken out** — it parses the header,
-walks the `FRAME` chunks and re-emits them unchanged, with no weights and no GPU.
-That is not a leftover: it is the only part of this feature whose output is
-bit-exact and reproducible across machines, so it is the only part that can be a
-real gate. Everything the model touches is not, which is why **no diffused frame
-may ever enter `core/tests/golden/`**.
-
-```
-python tools/sd-filter/test_sd_filter.py
-```
-
-Standard library only, no GPU, no weights — 207 checks. It asserts the
-pass-through round-trip at four geometries and four colour spaces, that an
-unmodelled header or `FRAME` tag survives verbatim, that a malformed stream fails
-loudly rather than emitting garbage, that the pixel budget lands within 0.5 % at
-five aspects with both axes on a multiple of 8, that **frames in equals frames
-out at every stride and both gap fillers** (with the model stubbed out, so the
-accounting under test is the accounting that ships), that each profile
-round-trips through its own echoed expansion, and — when a built `shot` is
-present — the end-to-end byte-identity against real rendered bytes. It **skips**
-that last group with a printed notice when there is no built `shot`, rather than
-passing quietly, and skips the colour-table group the same way when `numpy` is
-absent - 207 is the count with both present, 188 without numpy, 183 without a
-built `shot`.
-
-The geometry is read off the stream and never assumed, which is the reason the
-header is self-describing: the same stage handles 320x180 and 1920x1080 with no
-flag, and a truncated frame is an error rather than a short write.
+**The encoder line is invariant, and that is the pipe-level fact worth keeping
+here.** A stage in the middle changes the picture and never the frame count, so
+the `ffmpeg` invocation above never learns a rate that has to agree with a flag on
+another process. There is no `-r` to keep in sync and no way to desynchronize the
+audio silently — which is why the encoder half of that pipe is unchanged,
+character for character, whether or not a stage is in it.
 
 ### The three calibration traps
 

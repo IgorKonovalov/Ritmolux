@@ -1,12 +1,12 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Three checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+Four checkers in `scripts/` take an optional `root` argument so they can be run against a tree
 other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written. `index-rows/` is the
 exception and inverts it — see its section below.
 
-`check-doc-links.mjs` and `check-index-rows.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-doc-links.mjs`, `check-index-rows.mjs` and `check-filter-figures.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -96,3 +96,38 @@ of changing what the markers mean without anyone noticing.
 The per-file region count the checker prints on success is the mitigation for that hole, and it
 is what the second case exercises — a deleted marker shows up as a region that vanished rather
 than as a file that quietly stopped being checked.
+
+## `filter-figures/` — for `check-filter-figures.mjs`
+
+```
+node scripts/check-filter-figures.mjs scripts/fixtures/filter-figures
+```
+
+Expect **exit 1 and exactly five breaks**. Note the root: unlike the three above this checker is
+pointed at its own subdirectory rather than at `scripts/fixtures`, because it needs a
+`docs/diffusion-filter.md` at the root it is given — the canonical page is the reference set every
+other file is measured against, and there can only be one of it per tree.
+
+| File | Case | Expected |
+|------|------|----------|
+| `README.md` | an orientation figure quoting a number in no canonical region | reported, naming the number |
+| `orientation-elsewhere.md` | the orientation marker used outside `README.md` | reported as a misplaced whitelist |
+| both of the above | **two** orientation lines carrying figures | reported separately — ADR-0120 allows one |
+| `stray.md` | a cost figure in a section that names the filter | reported |
+| `tools/sd-filter/README.md` | a cost figure in a file whose **path** names the filter, under no naming heading | reported |
+
+The silences matter more than the breaks here, because over-broad scanning is how this gate would
+become useless: `docs/capturing.md` is two thousand lines about tooling that *does* ship and is
+full of unrelated timings. Four cases assert it stays quiet:
+
+| Case | Seeded as | Expected |
+|------|-----------|----------|
+| a figure in a section that does not name the filter | `~150 ms` and `30 s` under two unrelated headings in `stray.md` | not reported |
+| a figure inside fenced code, in a section that does | a `2.966 s` comment in a `bash` block | not reported — a command line is not a claim |
+| a figure in a dated record | `docs/plans/0001-a-record.md`, full of them | not scanned at all |
+| a figure spelled in words | *Thirteen minutes* in `tools/sd-filter/README.md` | not reported — hole 1, named in the checker's header |
+
+The third of those is ADR-0120's own accepted scope limit, and the second and fourth are the
+checker's documented holes. All four are pinned here as **behavior** rather than left as accidents,
+so that a future attempt to widen the scan fails this fixture loudly instead of quietly convicting
+prose it was never meant to reach.
