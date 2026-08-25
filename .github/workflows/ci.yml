@@ -131,6 +131,13 @@ jobs:
       # written. Unlike the pre-push hook this cannot skip itself for want of a
       # Node, which is what makes it the backstop rather than the gate.
       - run: node scripts/check-backlog-claims.mjs
+      # And the fourth of the same family (ADR-0120): the diffusion filter's cost
+      # figures live in docs/diffusion-filter.md and nowhere else. The feature was
+      # documented in three files at once, and a correction at Plan 0106's close
+      # enumerated two of the three copies and missed the third - so this asserts
+      # that duplicates do not EXIST rather than that they agree, which is the
+      # only shape that would have caught it.
+      - run: node scripts/check-filter-figures.mjs
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no
