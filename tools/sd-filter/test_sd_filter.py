@@ -6,9 +6,15 @@ which is the property that makes this stage, alone in this feature, gateable.
 
     python tools/sd-filter/test_sd_filter.py
 
-The end-to-end half needs a built `shot`; without one it SKIPS with a printed
-notice rather than passing quietly (ADR-0016), because a check that reports
-success when it did not run is worse than one that is absent.
+The end-to-end half needs a built `shot` and nothing else - it synthesizes its
+own WAV from the standard library, so it RUNS on any checkout rather than
+depending on a file that exists on one machine. Without a built `shot` it SKIPS
+with a printed notice rather than passing quietly (ADR-0016), because a check
+that reports success when it did not run is worse than one that is absent.
+
+One group has a dependency: the colour-table pin needs `numpy`, because the
+conversions it pins are array functions. It skips with the same notice when
+numpy is absent, and CI installs numpy so that it does not.
 
 What is NOT here, deliberately: any assertion about what the model draws. That
 output is not reproducible across machines - fp16 reduction order and cuDNN
@@ -18,11 +24,14 @@ geometry arithmetic, and the reproducibility of a configuration from its echo.
 """
 
 import io
+import math
 import os
 import shlex
+import struct
 import subprocess
 import sys
 import tempfile
+import wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -55,6 +64,29 @@ def synth(width, height, frames, colour=b"444"):
         # and a payload of zeroes would not notice.
         out.write(bytes(((i * 7 + j) % 256) for j in range(n)))
     return out.getvalue()
+
+
+def synth_wav(path, seconds=0.5, rate=48000, channels=2):
+    """A valid 16-bit PCM WAV, written from the standard library alone.
+
+    This group used to read `spike/clip.wav` - untracked, unignored, and present
+    on exactly one machine. With a built `shot` and no spike directory, which is
+    the only configuration anyone else has, `shot` exited non-zero and the group
+    FAILED rather than skipped. The property under test is byte identity through
+    the filter, not the picture, so any valid audio does; synthesizing it is what
+    lets this group run everywhere instead of adding a second skip.
+    """
+    n = int(rate * seconds)
+    with wave.open(path, "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        pcm = bytearray()
+        for i in range(n):
+            level = int(20000 * math.sin(2.0 * math.pi * 220.0 * i / rate))
+            pcm += struct.pack("<" + "h" * channels, *([level] * channels))
+        w.writeframes(bytes(pcm))
+    return path
 
 
 def pump(data, stage=None):
@@ -165,6 +197,86 @@ for bad, why in [("768x768", "aspect disagrees"), ("1024x577", "not a multiple o
         check("--size %s is refused (%s)" % (bad, why), False, "did not raise")
     except sd_filter.ConfigError:
         check("--size %s is refused (%s)" % (bad, why), True)
+
+print()
+print("the colour conversion is pinned to its Rust twin:")
+
+# THE TWIN OF THIS TABLE IS `the_colour_table_is_pinned_to_its_python_twin` in
+# standalone/src/shot/render/tests.rs. It asserts these exact numbers against
+# `rgb_to_yuv` / `yuv_to_rgb`. Neither file may be edited alone: that is the
+# whole mechanism, and a one-sided edit reddens the side it was made on.
+#
+# Why it exists. This module's conversions are a second implementation of
+# render.rs's, in another language, and until Plan 0106 Phase 7b nothing checked
+# the pair. The pass-through never converts and the diffused path is
+# unassertable, so a constant edited on one side ships as a colour cast across
+# every frame and no instrument in this repo can see it.
+#
+# This is a PROPERTY, not a measurement (ADR-0071): the arithmetic is exact
+# 8-bit integer output, identical on every machine, so it names no
+# configuration and carries no tolerance.
+#
+# What this pin is sensitive to, measured rather than assumed: it reddens on any
+# single-coefficient edit of +/-0.0005 or larger, in either direction, to any of
+# the five forward constants. Below that it starts to miss - the worst case a
+# +/-0.0002 luma edit can shift a channel is 0.05 of one 8-bit level, which is
+# under the quantization floor of the format itself and cannot produce a cast
+# the pin exists to catch. Structural errors - swapped Cb/Cr, BT.601 weights, a
+# missing +128, a wrap where the clamp belongs - move these rows by tens of
+# levels and are caught outright.
+#
+# What the rows are for: black, white and mid-grey (the neutral axis - a swapped
+# coefficient moves them off it), the three primaries and three secondaries (the
+# luma weights, and BT.709 against BT.601), and two saturated ramps. The clamp
+# is the half most likely to be written differently in two languages, so it is
+# exercised deliberately - see the note on each table below.
+
+# RGB -> planar C444. Pure red's Cr computes to 255.5 and pure cyan's to 0.5, so
+# those two rows are the whole forward-direction clamp: across the entire 8-bit
+# cube the chroma terms reach exactly half a level past each end and no further.
+RGB_TO_YUV = [
+    ((0, 0, 0), (0, 128, 128)),
+    ((255, 255, 255), (255, 128, 128)),
+    ((128, 128, 128), (128, 128, 128)),
+    ((255, 0, 0), (54, 99, 255)),       # Cr 255.5 -> clamped, not wrapped
+    ((0, 255, 0), (182, 30, 12)),       # luma 182: BT.709; BT.601 would read 150
+    ((0, 0, 255), (18, 255, 116)),
+    ((0, 255, 255), (201, 157, 1)),     # Cr 0.5, the other end of the same edge
+    ((255, 0, 255), (73, 226, 244)),
+    ((255, 255, 0), (237, 1, 140)),
+    ((250, 7, 7), (59, 100, 250)),
+    ((7, 7, 250), (25, 250, 117)),
+    ((18, 52, 86), (47, 149, 109)),
+]
+
+# Planar C444 -> RGB. This is where the clamp genuinely bites: an arbitrary YUV
+# triple is not the image of any RGB one, so the terms leave 0..=255 by a wide
+# margin. Five of these seven rows clamp at one end or the other, which is why
+# the inverse direction carries its own table rather than being asserted as a
+# round-trip of the one above.
+YUV_TO_RGB = [
+    ((0, 0, 0), (0, 84, 0)),            # R -201.6 and B -237.5, both clamped low
+    ((255, 255, 255), (255, 172, 255)), # R 455 and B 490, both clamped high
+    ((128, 128, 128), (128, 128, 128)),
+    ((16, 240, 16), (0, 47, 224)),
+    ((240, 16, 240), (255, 209, 32)),
+    ((200, 20, 235), (255, 170, 0)),
+    ((54, 128, 255), (254, 0, 54)),
+]
+
+try:
+    import numpy as _np
+except ImportError:
+    print("  SKIPPED: no numpy, and the conversions under test are array functions")
+    print("  (the Rust half of this pin still runs under `cargo test`)")
+else:
+    for rgb, yuv in RGB_TO_YUV:
+        got = tuple(sd_filter.rgb_to_yuv444(_np.array([[rgb]], dtype=_np.uint8)))
+        check("rgb %-15s -> yuv %s" % (rgb, yuv), got == yuv, "got %r" % (got,))
+    for yuv, rgb in YUV_TO_RGB:
+        arr = sd_filter.yuv444_to_rgb(bytes(bytearray(yuv)), 1, 1)
+        got = tuple(int(c) for c in arr[0][0])
+        check("yuv %-15s -> rgb %s" % (yuv, rgb), got == rgb, "got %r" % (got,))
 
 print()
 print("frames in equals frames out, at every stride:")
@@ -305,7 +417,7 @@ if not os.path.exists(shot):
     print("  (the in-process checks above still ran and are the same property)")
 else:
     with tempfile.TemporaryDirectory() as td:
-        wav = os.path.join(REPO, "spike", "clip.wav")
+        wav = synth_wav(os.path.join(td, "clip.wav"))
         args = [
             shot, "--preset-file",
             os.path.join(REPO, "presets", "attractor_leviathan.toml"),

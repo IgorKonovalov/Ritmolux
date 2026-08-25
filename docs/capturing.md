@@ -467,7 +467,7 @@ may ever enter `core/tests/golden/`**.
 python tools/sd-filter/test_sd_filter.py
 ```
 
-Standard library only, no GPU, no weights — 186 checks. It asserts the
+Standard library only, no GPU, no weights — 207 checks. It asserts the
 pass-through round-trip at four geometries and four colour spaces, that an
 unmodelled header or `FRAME` tag survives verbatim, that a malformed stream fails
 loudly rather than emitting garbage, that the pixel budget lands within 0.5 % at
@@ -477,7 +477,9 @@ accounting under test is the accounting that ships), that each profile
 round-trips through its own echoed expansion, and — when a built `shot` is
 present — the end-to-end byte-identity against real rendered bytes. It **skips**
 that last group with a printed notice when there is no built `shot`, rather than
-passing quietly.
+passing quietly, and skips the colour-table group the same way when `numpy` is
+absent - 207 is the count with both present, 188 without numpy, 183 without a
+built `shot`.
 
 The geometry is read off the stream and never assumed, which is the reason the
 header is self-describing: the same stage handles 320x180 and 1920x1080 with no

@@ -51,7 +51,7 @@ run_step() {
     "$@" || fail "$label"
 }
 
-echo "pre-push: running the fast subset (doc links, backlog claims, fmt, clippy, tests)"
+echo "pre-push: running the fast subset (doc links, backlog claims, sd-filter, fmt, clippy, tests)"
 
 # Cheapest check first, so the cheapest failure is the fastest one. ~50 ms, which
 # is why it fits a gate ADR-0033 Alternative F otherwise keeps to the fast subset:
@@ -90,6 +90,24 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-backlog-claims.mjs" node scripts/check-backlog-claims.mjs
 else
     echo "pre-push: skipping the doc-link, index-row and backlog-claim checks (no node on PATH)"
+fi
+
+# The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in
+# Python rather than Node and for the same reason: it is standard library only,
+# needs no GPU, no weights and no model, and it runs in about a second. It is the
+# one part of that feature that can be gated at all - everything downstream of
+# the pass-through is a model whose output is not reproducible across machines.
+#
+# An absent python3 SKIPS with a notice (ADR-0016), exactly as an absent node
+# does above, and the `links` job in CI is the backstop under both.
+#
+# Two groups inside it skip on their own terms and that is correct: the colour
+# table needs numpy (CI installs it), and the end-to-end group needs a release
+# `shot`, which this hook does not build.
+if command -v python3 >/dev/null 2>&1; then
+    run_step "python3 tools/sd-filter/test_sd_filter.py" python3 tools/sd-filter/test_sd_filter.py
+else
+    echo "pre-push: skipping the diffusion-filter suite (no python3 on PATH)"
 fi
 
 run_step "cargo fmt --all --check" cargo fmt --all --check
