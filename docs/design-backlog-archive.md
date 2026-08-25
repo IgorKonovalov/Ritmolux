@@ -5802,3 +5802,76 @@ of it — the same field under a realistic converted `decay` — is
 `Outcome`.
 
 ---
+
+## 0098 — `thickness` below 0.167 is a dead zone on every line scene: all values render identically and nothing says so
+
+> **PROMOTED 2026-08-16** — folded into [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)
+> as Phase 1b, placed before that plan's Phase 4 stop gate so it cannot be orphaned if the arc work
+> is abandoned. The doc half is already discharged.
+
+**Raised by:** `preset-author`, repairing `presets/fragment_vitrail.toml` (2026-08-16).
+**Owner if taken:** `dev` for the warning, `architect` for the doc line.
+
+- **Verified 2026-08-16** — the floor that creates the dead zone:
+  `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`
+
+### The finding
+
+`thickness` maps to an NDC-y half-width as `(thickness * 0.003).max(0.0005)`. The `.max` is a floor,
+so **every `thickness` below `0.167` produces the identical half-width** — 0.0005 NDC, about 0.27 px
+at 1080p, which rasterizes as a broken dotted line rather than a stroke.
+
+`fragment_vitrail` shipped with `thickness = 0.016` — two orders below the 1.5-3.2 every other line
+preset uses — so its Maurer rose rendered as scattered dots and read as gauze over the vault for
+its whole shipped life.
+
+**The dead zone is what made it expensive to find.** The content lane re-tuned `0.016` to `0.022`
+to `0.038` and the picture did not change *at all*, because all three clamp to the same floor — so
+the thickness hypothesis was discarded as disproved, and chord count and sample count were swept
+first. The value is in range, the preset loads clean, and nothing warns.
+
+### What a fix would be
+
+A load-time warning when a line scene's `thickness` binding rests below the floor's own threshold,
+in ADR-0020's shape (the unknown-param warning already exists and is the precedent). The floor
+itself should stay — it is what stops a zero thickness degenerating the quad.
+
+The doc half is already done: `presets/README.md` now states the working range and the dead zone.
+
+### Priority
+
+**Low for the engine, and the doc half is discharged.** One preset was affected and is repaired.
+It is filed because the *failure mode* — a parameter range where changing the value does nothing,
+with no warning — is the kind that costs a session every time someone meets it.
+
+### Closed 2026-08-25 by [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) Phase 1b — built as specified, and **this entry's own probe was what went red on delivery**
+
+The fix is exactly what "What a fix would be" asked for. `core/src/preset/schema.rs` warns when a
+`thickness` binding **rests** below the threshold, in ADR-0020's shape and on its surface; the floor
+stays, because the defect was the silence and not the clamp.
+
+**The threshold is derived rather than restated, and that is why the probe broke.** Phase 1b found
+`WIDTH_SCALE` and the `0.0005` clamp duplicated in four files — `lsystem.rs`, `parametric.rs`,
+`spectrum.rs` and `star.rs` — and moved them into `lines/mod.rs` as `WIDTH_SCALE`, `MIN_HALF_WIDTH`
+and `MIN_USEFUL_THICKNESS = MIN_HALF_WIDTH / WIDTH_SCALE`, with one `lines::half_width` applying
+both. So the warning cannot drift from the floor it describes — and this entry's probe, which named
+`parametric.rs` as the floor's home, stopped matching the moment the duplication went away. The
+claim never changed; the reduction did. Arithmetic unchanged, all eighteen `golden.rs` baselines at
+mean 0.0000.
+
+**What bounds the warning is new surface: `Expr::as_const`.** It reports the value a binding rests
+at and `None` for anything naming a variable, so an animated `thickness` is silent. That is the
+honest limit of a load-time check — warning on an expression because it *could* dip low would put a
+false positive on every preset that drives the stroke from the audio.
+
+**The dead zone itself is still there, deliberately**, and is asserted to be: `lines/tests.rs` proves
+`0.016` and `0.038` render **byte-identically** and that `1.8` does not, which is the property that
+makes the range dead. Without the second half the test would pass on a renderer ignoring `thickness`
+altogether.
+
+One correction the close review added: the plan's log says the animated-binding limit is "asserted as
+such", and `core/tests/preset.rs`'s third fixture is `"2.0 + clamp(bass * 0.9, 0, 0.8)"` — range
+`[2.0, 2.8]`, which never enters the dead zone. The mechanism (non-const bindings are skipped) is
+what the code does; the fixture does not exercise it. Filed as a minor at the close, not a reopening.
+
+---
