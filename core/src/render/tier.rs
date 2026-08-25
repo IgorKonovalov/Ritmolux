@@ -328,12 +328,59 @@ pub struct TierConfig {
     /// buffer is irrelevant at any value either tier would take: 64 bytes an
     /// element, so 128 elements is 8 KB.
     ///
-    /// **Both values are provisional.** `core/tests/collage_cost.rs` (Plan 0113
-    /// Phase 2) sweeps the count on hardware and prints the ladder; Phase 3 is
-    /// the human gate that reads it and sets these two numbers, and may instead
-    /// route the draw path to ADR-0123's Alternative A. Until then the floor
-    /// value is "large enough that the sweep reaches its own top rung", not a
-    /// measured budget — and it is deliberately not a number to quote.
+    /// # Where the floor value comes from
+    ///
+    /// **Measured, then decided by a human** — Plan 0113 Phases 2 and 3.
+    /// `core/tests/collage_cost.rs` sweeps the count on hardware and prints the
+    /// ladder on every run; its module docs carry the reading. Taken
+    /// **2026-08-25 on the development box**, 1920x1080, on that machine's
+    /// **integrated** GPU — which is much the closer model of the ~2015-iGPU
+    /// class `docs/nfr.md` §1 quotes the floor tier against than a discrete GPU
+    /// would be:
+    ///
+    /// ```text
+    ///  elements    per frame    share of 16.67 ms
+    ///     8         2.113 ms       12.7 %
+    ///    16         2.794 ms       16.8 %
+    ///    24         3.597 ms       21.6 %
+    ///    32         4.383 ms       26.3 %
+    ///    40  <- Floor 4.824 ms     28.9 %
+    /// ```
+    ///
+    /// The cost is **linear at roughly 0.09 ms an element**, over an intercept
+    /// of about 1.5 ms that is the frame's own fixed cost at this size and not
+    /// this scene's to be charged for.
+    ///
+    /// **Do not quote the pre-Phase-3 sweep's numbers**, which ran rungs to 128
+    /// against the provisional cap and read nearly 4 ms higher at every rung
+    /// including the sparse ones. That instrument's absolute readings move with
+    /// its own total load on a power-shared iGPU; `collage_cost.rs` carries the
+    /// finding.
+    ///
+    /// **40 is the reference set's own top, not a budget line.** The gate that
+    /// set it was a look judgement, and the numbers were not the binding
+    /// constraint: the user's working density is **8 to 14 elements** — where
+    /// the canvas costs 36-39 % — and denser canvases were rejected on sight
+    /// long before they were rejected on cost. The ceiling then went to the
+    /// densest thing the plan still has to build, Kandinsky's *On White II*,
+    /// which ADR-0123 counts at just above 40 once its lines and arcs are
+    /// included. So this value sits **exactly on** that canvas rather than over
+    /// it, and a `collage_onwhite` that needs a forty-first element moves this
+    /// number rather than being quietly truncated.
+    ///
+    /// `Rich` is provisional in the sense every [`RICH`](TierConfig::RICH) value
+    /// is — see that constant's own note.
+    ///
+    /// # It clamps, and it does not yet say so
+    ///
+    /// `shape_collage::applied_count` holds a bound `count` to this value
+    /// **silently**, unlike [`max_segments`](Self::max_segments), which
+    /// ADR-0007 requires surface an overflow. That was harmless while the cap
+    /// sat far above any authored canvas and is not harmless now that it sits on
+    /// one. Recorded as a followup on Plan 0113 rather than fixed there: the
+    /// surfaced channel is [`CapOverflow`](super::scenes::lines::CapOverflow),
+    /// whose context enum is shared with the line scenes, so widening it is an
+    /// architect call.
     pub collage_elements: usize,
 }
 
@@ -349,7 +396,7 @@ impl TierConfig {
         emitter_objects: 2_000,
         mesh_grid: (64, 48),
         max_segments: 20_000,
-        collage_elements: 128,
+        collage_elements: 40,
     };
 
     /// The midrange-discrete tier.
@@ -370,7 +417,7 @@ impl TierConfig {
         emitter_objects: 6_000,
         mesh_grid: (88, 66),
         max_segments: 60_000,
-        collage_elements: 256,
+        collage_elements: 96,
     };
 
     /// The config for `tier`.
