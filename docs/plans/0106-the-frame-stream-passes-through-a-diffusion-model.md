@@ -576,7 +576,7 @@ reproducible from what ran rather than from a name whose meaning may since have 
 | 7a—7c — the suite runs everywhere, the seam is pinned | dev | done | `d597594` |
 | 7e — one page, and a gate that keeps it there | dev | done | `1aa2f2a` |
 | 7d — the instrument | dev | done | `e1a0e98` |
-| 7d — the corrected figures | dev | in flight | — |
+| 7d — the corrected figures | dev | done | committed with this row |
 
 > **The per-phase sections below predate the implementation-log convention** (Plan 0112) and are
 > prose rather than observations. They are left as written because they carry the spike's, the
@@ -1133,18 +1133,32 @@ absorbed 32 335 s — the 8.98-hour suspend the same log describes. Its wall clo
 factor and its **0.650 s/frame, within 2.5 % of predicted** confirmation both rest on that reading.
 The process pair that log calls suspended was still running, and exited on completion at 11:05:06.
 
-**Measurement, 7d, `--profile fast`** — `attractor_leviathan`, 1920x1080 in and out, 1 350 frames
-from `spike/p7/seg45.wav`, RTX 3080 Laptop 8 GB, torch 2.6.0+cu124, GPU otherwise idle. Clip and log
+**Measurement, 7d.** `attractor_leviathan`, 1920x1080 in and out, cut from the Phase 6 track, on an
+otherwise idle GPU (RTX 3080 Laptop 8 GB, torch 2.6.0+cu124). Clips, source segments, script and log
 kept at `spike/p7/`:
 
-| | instrument | external stopwatch |
-|---|---|---|
-| elapsed | 936.1 s | 944 s |
-| per emitted frame | 0.693 s | 0.699 s |
+| profile | frames | instrument elapsed | stopwatch | instrument s/emitted | stopwatch s/emitted | delta |
+|---|---|---|---|---|---|---|
+| `fast` | 1 350 | 936.1 s | 944 s | 0.693 | 0.699 | 0.84 % |
+| `quality` | 270 | 2 100.8 s | 2 103 s | 7.781 | 7.789 | 0.10 % |
 
-0.84 % apart; the difference is `shot` startup, shader compilation and `ffmpeg` finalize, outside the
-stage. Diffusion call alone 1.291 s over 450 diffused; peak VRAM 3.81 GiB; model load 40.7 s of the
-elapsed. The shipped figures are 1.354 s and 0.451 s.
+The residual is `shot` startup, shader compilation and `ffmpeg` finalize, which sit outside the
+stage. Diffusion call alone: `fast` 1.291 s over 450 diffused at stride 3, peak VRAM 3.81 GiB;
+`quality` 7.499 s over 270 at stride 1, peak VRAM 4.88 GiB.
+
+**Finding, and it is larger than the scope error this phase was scoped to fix.** The two shipped
+figures were wrong in *different* ways. `fast`'s per-diffused number was sound — 1.354 s documented
+against 1.291 s measured — and only its derived per-emitted number was wrong about scope, by 1.54x.
+`quality`'s per-diffused number is wrong about the **machine**: 2.966 s documented against **7.499 s
+measured, 2.53x**. `768 x 768 = 589 824`, which is exactly the `quality` pixel budget, so the shipped
+figure is a **square** reading — the class this plan's own header already declares superseded —
+carried into a profile that has diffused natively at 1024x576 since Phase 2b. A 4-minute track at
+`quality` costs ~15.5 hours, not the ~5.9 documented.
+
+**Hypothesis, unverified, recorded so it is not re-derived.** `_control` passes
+`long_side = max(img.size)` as both `detect_resolution` and `image_resolution`, so at 1024x576 the
+annotator runs against 1024 rather than 576 while a 768x768 frame pays nothing extra. That would make
+the square arm structurally cheaper at equal pixel count. Nothing here measures it.
 
 **Finding, ADR number collision.** `main` carries
 `docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md` (commit `8b68cea`); this branch carries
@@ -1155,9 +1169,9 @@ filenames, so a merge takes both silently. 13 files on this branch cite the numb
 on `main`; 49 point at `docs/design-backlog.md#NNNN--...` bodies moved to the archive without their
 anchors re-pointed. None involve a file this phase changed. Not acted on.
 
-**Not done.** 7d's `quality` measurement, and the corrected figures in `docs/diffusion-filter.md`'s
-marked region and `README.md`'s orientation line. Both documents state the superseded numbers until
-that lands.
+**Not done, and not `dev`'s to do.** The `## Implementation log` close block (`### Notes`,
+`### Close triggers`) is unwritten, the branch has not taken `main`'s eight commits, and the ADR-0120
+collision above is unresolved. Phases 1—6's prose sections still predate the log convention.
 
 
 ## Followups (after this lands)

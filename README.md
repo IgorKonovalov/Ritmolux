@@ -333,7 +333,7 @@ It is **creator tooling you build yourself, and none of it ships** — no model,
 weights, no Python runtime in the release zip. It needs a CUDA GPU, a Python
 environment and a first-run download of several gigabytes of weights.
 
-<!-- figures:orientation --> A four-minute track takes about **54 minutes** at the `fast` profile, on the machine named beside that figure — the one thing worth knowing before you start.
+<!-- figures:orientation --> A four-minute track takes about **1.3 hours** at the `fast` profile, on the machine named beside that figure — the one thing worth knowing before you start.
 
 **[`docs/diffusion-filter.md`](docs/diffusion-filter.md) is the whole of it** —
 setup, the one canonical command, the flags, and what it costs everywhere else.

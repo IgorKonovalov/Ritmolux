@@ -119,19 +119,29 @@ multi-gigabyte weight download.
 <!-- figures:begin -->
 
 Measured on the dev box — **RTX 3080 Laptop 8 GB, torch 2.6.0+cu124, Python 3.12,
-Windows** — rendering `attractor_leviathan` at 1920x1080 in and out. These are
-measurements naming their configuration, **not portable figures**
+Windows** — rendering `attractor_leviathan` at 1920x1080 in and out, on an
+otherwise idle GPU. These are measurements naming their configuration, **not
+portable figures**
 ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
 
 | profile | diffusion geometry | per diffused frame | per emitted frame | peak VRAM | a 4-minute track at 30 fps (7,200 frames) |
 |---|---|---|---|---|---|
-| `quality` | 1024x576 | 2.966 s | 2.966 s | 4.88 GiB | **~5.9 hours** |
-| `fast` | 680x384 | 1.354 s | 0.451 s | 3.81 GiB | **~54 minutes** |
+| `quality` | 1024x576 | 7.499 s | 7.781 s | 4.88 GiB | **~15.5 hours** |
+| `fast` | 680x384 | 1.291 s | 0.693 s | 3.81 GiB | **~1.3 hours** |
+
+**The two columns measure different things, and the difference is the point.**
+*Per diffused frame* is the diffusion call alone. *Per emitted frame* is the wall
+clock across the whole stream divided by the frames that came out, so it also
+carries the colour decode, the downscale in, the upscale back to the stream's
+geometry, the colour encode out, and the gap crossfades. Those run per **emitted**
+frame, so at `fast`'s stride of 3 a single diffused frame pays three of them.
+Dividing the first column by the stride does **not** give the second, and a figure
+derived that way understates `fast` by 1.54x.
 
 `fast` is not a different model: it is the same cell at 44 % of the pixels with
 `--stride 3`, and the stride is where most of the saving comes from.
 
-Every run prints its own means when it finishes, so nobody has to trust this table
+Each run prints both figures when it finishes, so nobody has to trust this table
 for their own machine.
 
 <!-- figures:end -->
