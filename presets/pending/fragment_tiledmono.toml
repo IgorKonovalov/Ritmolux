@@ -1,0 +1,166 @@
+# Tiled Rosette Mono - the Tiled Rosette wallpaper mechanism cut down to a
+# LIMITED INK SET: black, white, and one red held to a thin accent. Sibling to
+# `fragment_tiled.toml`, which stays as it is; this one is the black-and-white
+# print of the same idea.
+#
+# WHAT "NO SHADES" COSTS, AND HOW IT IS PAID. Three things in the chain make
+# gradients, and all three are answered here rather than only the obvious one:
+#
+#   1. `palette_steps` is the only hard quantizer in the engine. It snaps the
+#      palette coordinate to a band centre BEFORE the LUT read, so the stops
+#      below are sampled at exactly twenty positions - 0.025, 0.075, ... 0.975 -
+#      and nothing between them can ever be drawn. The stops are therefore
+#      written as PLATEAUS spanning whole runs of bands, not as a gradient: a
+#      stop list that ramps would still read flat, but the colour landing in each
+#      band would be an accident of where the centre fell.
+#
+#   2. `glow` multiplies the field by a FIXED radial vignette - `glow * (1 -
+#      0.25 * r)` is baked into the scene shader with no param on the `0.25`.
+#      At 16:9 that is a 2:1 centre-to-corner falloff, which on flat colour
+#      reads as exactly the shading this look is trying not to have.
+#
+#      The fix is the tonemap, not the vignette. The curve is the IDENTITY below
+#      its 0.6 knee and a hard shoulder above it (`1 - 0.16/(x - 0.2)`), so a
+#      value driven well past the knee is compressed toward 1 and its neighbours
+#      compress with it. Measured on this curve: at `glow = 2.6` a white band
+#      reads 0.934 at the centre and 0.847 in the corner - the vignette survives
+#      as a barely-visible breath instead of a 2:1 ramp - while black is 0 times
+#      anything and does not move at all. Driving the whites INTO the shoulder is
+#      what buys the flatness. This is the one place in this repo where deliberate
+#      over-range is the correct answer rather than the additive-ceiling mistake,
+#      because the palette is quantized upstream of it and cannot smear.
+#
+#   3. Everything else that accumulates or blurs is OFF: `bloom_amount = 0`
+#      (a bright pass is a halo, and a halo is a shade), `trails = 0`,
+#      `flash = 0`, `palette_contour = 0` (its band edge is a SMOOTHSTEP, so the
+#      contour line is itself a gradient - and with black meeting white at every
+#      run boundary the edges are already maximum contrast, so it has nothing to
+#      add). `saturation = 1.0` is the exact identity in the shader; any other
+#      value would mix luma back in and lift black off black.
+#
+# HOW THE RED IS HELD TO AN ACCENT, AND THE MEASURED SHARE. Band widths are fixed
+# at 1/steps and cannot be varied individually, so the ONLY way to make one colour
+# scarce is to raise the step count and give that colour fewer of the bands. At
+# twenty steps the red takes three - 15 % of palette space - against the runs of
+# four to five the black and white sit in.
+#
+# PALETTE SHARE IS NOT PIXEL SHARE, and the ratio is worth recording because it
+# is not intuitive. The field is `0.5 + 0.5 * sin(...)`, whose distribution is
+# arcsine rather than uniform, so it dwells at the ends of the coordinate range
+# and hurries through the middle: measured on this look, a band takes about HALF
+# the screen area its palette width would suggest. Counted over the rendered
+# frames (every 4th pixel, 1280x720):
+#
+#     red 1 band  / 5 %  of palette  ->  2.4 % loud, 2.8 % quiet
+#     red 3 bands / 15 % of palette  ->  7.0 % loud, 8.2 % quiet   <- shipped
+#
+# The brief was 5-10 % and three bands is what lands inside it at BOTH
+# excitations. Anyone retuning the red should re-measure rather than reason from
+# the band count. The same count also confirms the flatness claim: the pixels
+# that are none of the three inks run 0.2-0.3 %, which is edge antialiasing and
+# nothing else - there is no gradient anywhere in the frame.
+#
+# The first draft ran five steps with red as one of them; at 20 % of palette space
+# it outlined every cell and read as a third equal colour rather than as an
+# accent, which is the note this revision answers. The bands the red gave up went
+# to WHITE rather than being split, because red sits between the white run and the
+# black run through the wrap, and that ordering - white, thin red, black - is what
+# makes the accent read against both.
+#
+# Its hex is written LINEAR - the palette bakes hex straight through with no sRGB
+# decode, and the surface encodes on write - so `#b00808` is what puts a
+# saturated red on the glass at this glow. A screen-space `#ff0000` written here
+# would come out pink.
+#
+# THE TILE COUNT IS FIXED AT 2 for the reason `fragment_tiled.toml` records: a
+# tile count is discrete but is NOT quantized CPU-side, so any eased or audio
+# driven binding sweeps it through fractional values and splits cells at the
+# frame edge. A constant is the only safe binding until that is fixed.
+system = "fragment_field"
+name = "Tiled Rosette Mono"
+
+[palette]
+# Twenty bands in five runs. Read as band counts: black 4, white 4, black 4,
+# white 5, RED 3 - and the red wraps straight back onto the opening black, which
+# is what gives the accent a white edge on one side and a black one on the other.
+# Each plateau is written wide of its run boundaries so every band centre inside
+# it lands on flat colour; the 0.02-wide transitions are never sampled.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.19, color = "#000000" },
+  { at = 0.21, color = "#ffffff" },
+  { at = 0.39, color = "#ffffff" },
+  { at = 0.41, color = "#000000" },
+  { at = 0.59, color = "#000000" },
+  { at = 0.61, color = "#ffffff" },
+  { at = 0.84, color = "#ffffff" },
+  { at = 0.86, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `warp` (how the motif deforms)
+#   treb  -> `zoom` (motif fineness)
+#   sum   -> `kaleido_order`, the rosette fold count
+#
+# NOTHING drives luminance, and that is structural rather than taste: every
+# band here is already pinned to black or into the tonemap shoulder, so a
+# reactive `glow` could only unpin it and put the grey back. All the music
+# energy goes into geometry - fold count, warp, fineness.
+
+# THE TILING. Radial repeat off (`kaleido_radial = 1` takes the unmapped path):
+# this look is flat and planar, closer to printed cloth than to depth.
+kaleido_tile   = "2"
+kaleido_radial = "1"
+kaleido_inner  = "0.06"
+kaleido_angle  = "time * 0.05"
+# A two-rung ladder, not a continuous term - the fold count is an integer and a
+# swept value is meaningless between rungs. Threshold placed so a normal passage
+# sits at 6 and real peaks reach 9, and eased hard in [smoothing] so the change
+# arrives as a settling rather than as a cut in every cell at once.
+kaleido_order  = "select(bass + mid + treb > 1.70, 9, 6)"
+
+# THE INK COUNT. Twenty bands in six runs, no contour - see the header.
+palette_steps   = "20"
+palette_contour = "0"
+
+# FIELD. Gains sized off their own caps: a clamped term reaches its ceiling at
+# C/G, so bass tops out at 0.27/0.318 = 0.85 and treb at 0.18/0.30 = 0.60 -
+# a typical passage sits near half, a real peak reaches the cap.
+warp  = "0.60 + sin(time * 0.037) * 0.12 + clamp(bass * 0.318, 0, 0.27)"
+zoom  = "1.20 + clamp(treb * 0.30, 0, 0.18)"
+pan_x = "sin(time * 0.013) * 0.06"
+pan_y = "cos(time * 0.017) * 0.05"
+
+# LUMINANCE, HELD FLAT AND HELD HIGH. See the header - 2.6 is the value that put
+# the white bands far enough into the tonemap shoulder to swallow the scene
+# shader built-in vignette. Constant on purpose.
+glow  = "2.6"
+flash = "0"
+
+# COLOUR WINDOW. `hue` and `color_center` slide WHICH field levels land in which
+# ink, so the slow drift reshuffles the black/white/red distribution without ever
+# producing a colour that is not one of the three. This is also what keeps the
+# red MOVING rather than pinned to one contour of the motif.
+hue          = "0.08 + time * 0.011"
+color_span   = "1.35"
+color_center = "sin(time * 0.029) * 0.10"
+saturation   = "1.0"
+
+# OFF - each of these is a gradient generator. See the header.
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+# The longest constant in the file. The gate reads a sum of three bands, which
+# hovers near its boundary for whole passages; and because `kaleido_order` is
+# quantized, an eased 6 -> 9 STEPS through 7 and 8 rather than gliding. A tiled
+# layout shows every one of those steps in every cell simultaneously, so the
+# constant is set to spread the three steps out into a settle.
+kaleido_order = 3.5
+
+# Raised the way the parent values were: the tiling multiplies motion, so
+# whatever one cell does, four do at once and the eye reads the sum.
+warp = 0.60
+zoom = 0.50
