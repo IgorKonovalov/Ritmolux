@@ -167,19 +167,40 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the tracker reports what it was handed | dev | done | committed with this row |
-| 2 — the log carries them, and the test reads them | dev | not started | |
+| 1 — the tracker reports what it was handed | dev | done | `fa5f040` |
+| 2 — the log carries them, and the test reads them | dev | done | committed with this row |
 
 ### Notes
 
+- `cargo nextest run --workspace`: 962 passed, 0 failed, 3 skipped (289 s).
+- The Phase 2 risk did not fire: `a_synthesized_4_4_favours_the_alignment_it_was_built_with`
+  passes on the repointed counter, with `bpm` reading 119.96 against a clip built at 120. This is
+  the first end-to-end reading of the fold through the grid, and the stimulus was not touched.
+- Two edits in Phase 2 beyond the plan's text, both in its listed files. In
+  `standalone/src/downbeatlog.rs`, `the_original_columns_are_unchanged_and_still_lead` asserted the
+  appended tail was exactly `bpm, time_since_beat, unix_ms`; its tail list now names five. The plan
+  named the frozen prefix as what must not move and listed this test's siblings at `:547`/`:581` as
+  passing unchanged, which they do — this third test is not one of them.
+- In `docs/capturing.md`, the sentence "where it does not, `beat_index % 4` spans less than a bar
+  and the four alignments are not the four beats of one" described the pre-0095 fold and
+  contradicted the two rows this plan adds two paragraphs above it. Rewritten in the same edit.
+- The plan's Decision and the doc row it prescribed both cite `spike/replay-old-fold.mjs` as a
+  reader that keeps `beat` pinned. That file is not in the repo — `git ls-files spike` is empty and
+  no commit touches the path — so the operator doc names pre-0095 captures instead of it. The
+  Decision's reasoning is unaffected; the pointer was.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none — the header has no `Closes:` line.
+- **What shipped:** feature (two appended `--downbeat-log` columns) plus the fix that returns
+  `main` to green.
+- **Operator docs touched:** `docs/capturing.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. It reports 0109 as
+  stamped 2026-08-17 against a `docs/capturing.md` last touched 2026-08-25 — this plan's own edit,
+  and the plan says amending ADR-0109's `Outcome` belongs to whichever plan runs the capture.
+  `check-doc-links.mjs` and `check-index-rows.mjs` also exit 0.
+- **Outstanding `human` phases:** none — both phases are `dev`.
 
 ## Followups (after this lands)
 
