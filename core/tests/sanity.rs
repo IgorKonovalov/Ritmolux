@@ -60,7 +60,7 @@ use lmv_core::{
     dsp::AnalysisFrame,
     preset::{Preset, SystemKind, default_presets},
     render::{
-        HeadlessOptions, RenderError, Renderer,
+        CaptureImage, HeadlessOptions, RenderError, Renderer,
         metrics::{
             RADIAL_SHELLS, TONE_BANDS, coverage, quadrant_spread, radial_shell_occupancy,
             tonal_flatness,
@@ -1326,5 +1326,389 @@ fn ratio_of(loud_cov: f32, mid_cov: f32) -> f32 {
         loud_cov / mid_cov
     } else {
         f32::INFINITY
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Plan 0116 Phase 1 — what each candidate ground would say
+// ---------------------------------------------------------------------------
+//
+// A measurement harness and nothing else. Every statistic above still measures
+// against [`BLACK`]; this section adds no production behaviour and changes no
+// verdict. It exists to put a table in front of Plan 0116 Phase 2, which is a
+// **stop gate** — the plan may legitimately end there, and ADR-0126 deliberately
+// declines to name an estimator because the obvious one is already falsified.
+
+/// How far in from each edge [`ground_modal_border`] samples, as a divisor of
+/// the frame's shorter side. At this file's 96×96 capture that is a 6-pixel
+/// margin holding 2160 of 9216 pixels — a population rather than a line, and
+/// narrow enough that a centred figure cannot reach it.
+const BORDER_DIVISOR: usize = 16;
+
+/// Levels per channel [`ground_modal_rgb`] quantizes to before counting cells.
+/// Sixteen makes a cell 16 wide on each axis, the same width [`TONE_BANDS`]
+/// gives a luminance band — so the three live candidates differ by **what** they
+/// cluster, not by how finely they cluster it.
+const RGB_LEVELS: usize = 16;
+
+/// `fragment_tiledmono` as it is held today, read from `presets/pending/`.
+///
+/// **It is not in the embedded set.** `core/build.rs` globs `presets/*.toml`
+/// non-recursively (ADR-0022), so a subdirectory is skipped by construction and
+/// [`sanity_roster`] cannot see this preset. It is tabled anyway because it is
+/// the false positive ADR-0126 was raised on: its black *ink* is excluded as
+/// unlit, leaving `tonal_flatness` to measure the white alone and read `0.9346`
+/// against a `0.90` ceiling. A table that picks the estimator without a row for
+/// the preset that motivated the estimator would be deciding on the wrong
+/// evidence.
+const HELD_OUT_TOML: &str = include_str!("../../presets/pending/fragment_tiledmono.toml");
+
+/// One candidate ground estimator. **The roster is the deliverable, not a
+/// choice** — Phase 2 chooses, from what these print.
+struct GroundCandidate {
+    /// Column name in the printed table.
+    name: &'static str,
+    /// One line on what it clusters, printed once above the table.
+    note: &'static str,
+    /// The reference tone this candidate would hand `is_lit`.
+    pick: fn(&CaptureImage) -> [u8; 4],
+}
+
+/// The four columns ADR-0126 asks Phase 1 to table, control first so every
+/// other column reads as a difference from it rather than as an absolute.
+const GROUND_CANDIDATES: &[GroundCandidate] = &[
+    GroundCandidate {
+        name: "black",
+        note: "the control - today's hardcoded reference (ADR-0067)",
+        pick: ground_black,
+    },
+    GroundCandidate {
+        name: "modal_luma",
+        note: "mean RGB of the frame's most populous luminance band",
+        pick: ground_modal_luma,
+    },
+    GroundCandidate {
+        name: "modal_border",
+        note: "the same, over border pixels only (see BORDER_DIVISOR)",
+        pick: ground_modal_border,
+    },
+    GroundCandidate {
+        name: "modal_rgb",
+        note: "mean RGB of the most populous coarse RGB cell (see RGB_LEVELS)",
+        pick: ground_modal_rgb,
+    },
+];
+
+/// The control: what the lens uses today, whatever the frame contains.
+fn ground_black(_img: &CaptureImage) -> [u8; 4] {
+    BLACK
+}
+
+/// The estimator ADR-0126 names and falsifies — the frame's modal luminance
+/// band. Tabled because "already falsified" is a claim this harness must be
+/// able to check rather than inherit.
+fn ground_modal_luma(img: &CaptureImage) -> [u8; 4] {
+    modal_luma_band(img, false)
+}
+
+/// The modal luminance band among **border** pixels only, on the argument that
+/// a composition's ground reaches the frame edge and its figure usually does
+/// not.
+fn ground_modal_border(img: &CaptureImage) -> [u8; 4] {
+    modal_luma_band(img, true)
+}
+
+/// The modal **RGB** cell rather than the modal luminance band. Luminance
+/// collapses hue, so a two-colour world at equal brightness has one modal band
+/// and two grounds; this separates them at the cost of a sparser histogram.
+fn ground_modal_rgb(img: &CaptureImage) -> [u8; 4] {
+    let cells = RGB_LEVELS * RGB_LEVELS * RGB_LEVELS;
+    let mut counts = vec![0u64; cells];
+    let mut sums = vec![[0u64; 3]; cells];
+    for px in img.rgba.chunks_exact(4) {
+        let q = |c: usize| (px[c] as usize * RGB_LEVELS / 256).min(RGB_LEVELS - 1);
+        let cell = (q(0) * RGB_LEVELS + q(1)) * RGB_LEVELS + q(2);
+        counts[cell] += 1;
+        for c in 0..3 {
+            sums[cell][c] += px[c] as u64;
+        }
+    }
+    modal_mean(&counts, &sums)
+}
+
+/// Mean RGB of the most populous luminance band, over the whole frame or over
+/// its border only.
+///
+/// The **mean of the band's members**, not the band's centre: an ink-on-paper
+/// world's paper is a specific off-white, and rounding it to the middle of a
+/// 16-level band would hand `is_lit` a reference the frame does not contain.
+fn modal_luma_band(img: &CaptureImage, border_only: bool) -> [u8; 4] {
+    let w = img.width as usize;
+    let h = img.height as usize;
+    if w == 0 || h == 0 {
+        return BLACK;
+    }
+    let margin = (w.min(h) / BORDER_DIVISOR).max(1);
+    let mut counts = [0u64; TONE_BANDS];
+    let mut sums = [[0u64; 3]; TONE_BANDS];
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let (x, y) = (i % w, i / w);
+        if border_only && x >= margin && y >= margin && x + margin < w && y + margin < h {
+            continue;
+        }
+        let band = (((sanity_luma(px) / 256.0) * TONE_BANDS as f32) as usize).min(TONE_BANDS - 1);
+        counts[band] += 1;
+        for c in 0..3 {
+            sums[band][c] += px[c] as u64;
+        }
+    }
+    modal_mean(&counts, &sums)
+}
+
+/// Mean RGB of the most populous cell in a parallel `counts` / `sums` pair, or
+/// [`BLACK`] when nothing was counted.
+///
+/// **On a tie `max_by_key` keeps the last maximum**, so a frame with no dominant
+/// tone gets a deterministic but arbitrary answer — which is the failure mode
+/// ADR-0126's Consequences names and Phase 3's done-when has to define rather
+/// than discover. It is left arbitrary here on purpose: defining it is a
+/// production decision, and this phase makes none.
+fn modal_mean(counts: &[u64], sums: &[[u64; 3]]) -> [u8; 4] {
+    let Some((best, &n)) = counts.iter().enumerate().max_by_key(|&(_, &n)| n) else {
+        return BLACK;
+    };
+    if n == 0 {
+        return BLACK;
+    }
+    let s = sums[best];
+    [(s[0] / n) as u8, (s[1] / n) as u8, (s[2] / n) as u8, 255]
+}
+
+/// Rec.601 luma — the same weights `metrics::tonal_flatness` buckets by. That
+/// helper is private to `core`, so it is restated here rather than widening a
+/// production surface for a harness Phase 2 may discard.
+fn sanity_luma(px: &[u8]) -> f32 {
+    0.299 * px[0] as f32 + 0.587 * px[1] as f32 + 0.114 * px[2] as f32
+}
+
+/// What one candidate ground said about one preset, kept only as far as the
+/// cross-column diff needs it.
+///
+/// The four statistics themselves are **printed** on the preset's own row and
+/// not retained: a reader compares them by eye down the four candidate lines,
+/// and the only thing the summary computes across columns is whether the
+/// reference moved and whether the verdict did.
+#[derive(Clone)]
+struct GroundRow {
+    /// The reference tone this candidate handed `is_lit`.
+    reference: [u8; 4],
+    /// Empty means this candidate would pass the preset.
+    failures: Vec<String>,
+}
+
+/// `every_preset_draws_a_real_shape`'s verdict, restated over a supplied
+/// reference rather than [`BLACK`] — the structural rescue included, since a
+/// candidate that moves `coverage` moves what the rescue is asked about.
+///
+/// [`KNOWN_FLAT`] is not consulted: it is empty, and an exemption roster would
+/// hide exactly the verdict changes this table exists to count.
+fn ground_verdict_loud(
+    system: SystemKind,
+    cov: f32,
+    spread: u8,
+    shells: usize,
+    flat: f32,
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    let floor = coverage_floor(system);
+    if cov < floor && shells < MIN_STRUCTURAL_SHELLS {
+        failures.push(format!(
+            "blank (cov {cov:.4} < {floor:.2}, shells {shells} < {MIN_STRUCTURAL_SHELLS})"
+        ));
+    }
+    if spread < MIN_QUADRANTS {
+        failures.push(format!("dot ({spread} quadrant(s) < {MIN_QUADRANTS})"));
+    }
+    if flat > MAX_TONAL_FLATNESS {
+        failures.push(format!("flat ({flat:.4} > {MAX_TONAL_FLATNESS:.2})"));
+    }
+    failures
+}
+
+/// The one gate the quieter capture buys today ([`MODERATE_MIN_COVERAGE`]),
+/// restated over a supplied reference.
+fn ground_verdict_moderate(cov: f32) -> Vec<String> {
+    if cov < MODERATE_MIN_COVERAGE {
+        vec![format!(
+            "not a picture at {MODERATE} (cov {cov:.4} < {MODERATE_MIN_COVERAGE:.2})"
+        )]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Name every preset whose verdict moves under each candidate, against the
+/// control column — **the number Phase 2 decides on**. ADR-0126's own
+/// falsification of naive modal tone is a count of exactly this shape (17 of
+/// 41), so a candidate is judged by how much of the library it re-bases and by
+/// how many verdicts that costs, not by how good its idea sounds.
+fn report_ground_verdict_changes(
+    label: &str,
+    meta: &[(String, SystemKind)],
+    rows: &[Vec<GroundRow>],
+) {
+    let Some(control) = rows.first() else {
+        return;
+    };
+    println!();
+    println!("verdict changes at {label}, against the `black` control:");
+    for (ci, cand) in GROUND_CANDIDATES.iter().enumerate().skip(1) {
+        let Some(column) = rows.get(ci) else {
+            continue;
+        };
+        let mut to_fail = Vec::new();
+        let mut to_pass = Vec::new();
+        let mut rebased = 0usize;
+        for (i, row) in column.iter().enumerate() {
+            let Some(base) = control.get(i) else {
+                continue;
+            };
+            let name = meta.get(i).map(|(n, _)| n.as_str()).unwrap_or("?");
+            // "Re-based" is `is_lit(reference, BLACK, EPS)`: this candidate
+            // picked a reference the old lens would have called lit, so every
+            // statistic downstream is answering a different question.
+            if row.reference.iter().take(3).any(|&c| c > EPS) {
+                rebased += 1;
+            }
+            match (base.failures.is_empty(), row.failures.is_empty()) {
+                (true, false) => to_fail.push(format!("{name} -> {}", row.failures.join("; "))),
+                (false, true) => {
+                    to_pass.push(format!("{name} (was: {})", base.failures.join("; ")))
+                }
+                _ => {}
+            }
+        }
+        println!(
+            "  {:<13} re-based {rebased}/{} preset(s);  pass->fail {};  fail->pass {}",
+            cand.name,
+            column.len(),
+            to_fail.len(),
+            to_pass.len(),
+        );
+        for entry in &to_fail {
+            println!("      pass->fail  {entry}");
+        }
+        for entry in &to_pass {
+            println!("      fail->pass  {entry}");
+        }
+    }
+}
+
+/// **Plan 0116 Phase 1.** Print, for every preset in the embedded set plus the
+/// held-out `Tiled Rosette Mono`, at both [`LOUD`] and [`MODERATE`], the
+/// reference tone each candidate ground estimator picks and the four statistics
+/// that follow from it — beside the [`BLACK`] control the lens uses today.
+///
+/// # This gates nothing, and cannot
+///
+/// It is `#[ignore]`d and contains no assertion. That is the phase's own
+/// done-when: a harness built to inform a **stop gate** must not be able to
+/// redden CI on its own, or the gate is decided by whichever candidate happens
+/// to be green. It is also 82 WARP captures, which is a second reason not to
+/// put it in the everyday loop.
+///
+/// Run it with:
+///
+/// ```text
+/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
+///     each_candidate_ground_is_tabled_against_the_library --no-capture
+/// ```
+///
+/// # What is missing from the table, said here rather than silently
+///
+/// **`shape_collage` contributes no row.** It is the family that motivates this
+/// work — Plan 0113 Phase 6 builds a canvas the music empties, and an emptied
+/// canvas is pixel-for-pixel a broken one — and it has not merged: it lives on
+/// `plan-0113-shape-collage` in its own worktree. So the estimator is being
+/// chosen from a library that contains no scene painting its own paper across
+/// every pixel *except* the attractor's ink duotone and the twelve presets that
+/// already read `coverage = 1.0000`. Those twelve are the nearest evidence
+/// available, and they are what the table can speak to.
+#[test]
+#[ignore = "measurement, not a gate: Plan 0116 Phase 1 informs a human stop gate, and it is 82 WARP captures"]
+fn each_candidate_ground_is_tabled_against_the_library() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    // The embedded roster measured exactly as the gate measures it (backdrops
+    // suppressed, ADR-0067), plus the held-out preset the estimator has to get
+    // right. Anything else would table a different measurement than the one
+    // Phase 3 changes.
+    let (mut presets, mut meta) = sanity_roster();
+    let held =
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+    meta.push((held.name.clone(), held.system));
+    presets.push(held);
+    renderer.set_presets(presets);
+
+    println!("{}", "=".repeat(78));
+    println!("Plan 0116 Phase 1 - candidate ground estimators against the shipped library");
+    println!("{}", "=".repeat(78));
+    println!(
+        "roster: {} preset(s) - the embedded set plus the held-out \
+         presets/pending/fragment_tiledmono.toml",
+        meta.len()
+    );
+    println!(
+        "NOT IN THIS TABLE: shape_collage. Plan 0113 has not merged (branch \
+         plan-0113-shape-collage), so"
+    );
+    println!("  the family this work exists for contributes no row - see this test's doc comment.");
+    println!("candidates:");
+    for cand in GROUND_CANDIDATES {
+        println!("  {:<13} {}", cand.name, cand.note);
+    }
+
+    for (label, level) in [("LOUD", LOUD), ("MODERATE", MODERATE)] {
+        let frame = excited(level);
+        let mut rows: Vec<Vec<GroundRow>> = vec![Vec::new(); GROUND_CANDIDATES.len()];
+        println!();
+        println!("-- excitation {label} ({level}) {}", "-".repeat(44));
+        for (name, system) in &meta {
+            let img = renderer
+                .capture_preset(name, &frame, FRAMES)
+                .expect("capture preset");
+            println!("[{}] {name}", system_name(*system));
+            for (ci, cand) in GROUND_CANDIDATES.iter().enumerate() {
+                let bg = (cand.pick)(&img);
+                let cov = coverage(&img, bg, EPS);
+                let spread = quadrant_spread(&img, bg, EPS);
+                let shells = radial_shell_occupancy(&img, bg, EPS);
+                let flat = tonal_flatness(&img, bg, EPS);
+                let failures = if label == "LOUD" {
+                    ground_verdict_loud(*system, cov, spread, shells, flat)
+                } else {
+                    ground_verdict_moderate(cov)
+                };
+                let verdict = if failures.is_empty() {
+                    "PASS".to_string()
+                } else {
+                    format!("FAIL: {}", failures.join("; "))
+                };
+                println!(
+                    "   {:<13} ref ({:>3},{:>3},{:>3})  cov {cov:.4}  quad {spread}  \
+                     shells {shells:>2}/{RADIAL_SHELLS}  flat {flat:.4}  {verdict}",
+                    cand.name, bg[0], bg[1], bg[2],
+                );
+                if let Some(column) = rows.get_mut(ci) {
+                    column.push(GroundRow {
+                        reference: bg,
+                        failures,
+                    });
+                }
+            }
+        }
+        report_ground_verdict_changes(label, &meta, &rows);
     }
 }
