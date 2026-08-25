@@ -177,12 +177,16 @@ impl TempoTracker {
     ///
     /// **This does not settle the octave, and it is not trying to** (Plan 0095
     /// Phase 1). The probe measured both directions of the ambiguity on
-    /// synthesized clips with known truth: a clean click train's correlation at
-    /// *twice* the winning lag reads 80.0-88.5 % of the peak — a plain property
-    /// of any periodic signal — against 77.7-94.5 % for material whose accent
-    /// period really is twice the click period, so the two are not separable by
-    /// magnitude, and a rule that preferred the slower reading dragged the 140,
-    /// 165 and 200 BPM rungs down an octave. What is separable is *stability*:
+    /// synthesized clips with known truth — the numbers below are what
+    /// `the_octave_ambiguity_is_one_sided` prints, in `core/tests/tempo_probe.rs`,
+    /// which is where to re-read them rather than trusting this comment: a clean
+    /// click train's correlation at *twice* the winning lag reads 80.0-88.5 % of
+    /// the peak — a plain property of any periodic signal — against 75.2-90.7 %
+    /// for material whose accent period really is twice the click period, so the
+    /// two overlap and no threshold separates them, and a rule that preferred the
+    /// slower reading dragged the 140, 165 and 200 BPM rungs down an octave. That
+    /// overlap is asserted there, not just printed. What is separable is
+    /// *stability*:
     /// the estimator recomputes an argmax from scratch every hop and has no
     /// memory, so two near-tied peaks make it flicker hop to hop (measured at
     /// 15 % of the window on the off-beat rung where the two peaks cross). A

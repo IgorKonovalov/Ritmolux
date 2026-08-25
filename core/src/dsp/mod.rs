@@ -148,20 +148,29 @@ pub struct AnalysisFrame {
     /// The name is a **documented misnomer** — this is beat phase, not bar phase.
     /// Too widely bound to rename (ADR-0050); `bar_phase` is the true quantity.
     pub bar: f32,
-    /// Monotone count of beats since the stream started, 0 on the first beat
-    /// (ADR-0050 Layer 1). Unconditional and deterministic — no confidence gate.
+    /// Monotone count of **onset detections** since the stream started, 0 before
+    /// the first (ADR-0050 Layer 1, corrected by
+    /// [ADR-0109](../../../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)).
+    /// Unconditional and deterministic — no confidence gate. **Not a musical
+    /// period:** the detector fires 1.2x-2.3x per musical beat depending on the
+    /// material and wanders inside a single track, so no fixed multiplier
+    /// converts this to beats.
     pub beat_index: u32,
-    /// Seconds since the last detected beat; exactly 0 on a beat hop.
+    /// Seconds since the last onset detection; exactly 0 on a detection hop.
     pub time_since_beat: f32,
     /// Which beat of the bar this is, `0..4` (ADR-0050 Layer 2). Estimated when
-    /// the downbeat tracker is confident, `beat_index % 4` otherwise.
+    /// the downbeat tracker is confident, and the fold's own counter modulo 4
+    /// otherwise — see [`bar_index`](Self::bar_index) for what that counter is.
     pub beat_in_bar: u32,
     /// Bar counter, on the same gated-or-counted basis. **Monotone except across
-    /// an alignment change** — it is `(beat_index - alignment) / 4`, so the beat
-    /// the estimator locks, drops back, or moves its alignment can repeat or skip
-    /// a bar. Hysteresis makes that rare (a challenger must lead for three bars),
-    /// and a repeated bar is a far softer failure than a wrong downbeat — but
-    /// `mod(bar_index, 8)` will see it.
+    /// an alignment change** — it is `(beat count - alignment) / 4`, where the
+    /// beat count is the [`grid`]'s tempo-driven one, and `beat_index` only
+    /// while the grid warms up. So the beat the estimator locks, drops back, or
+    /// moves its alignment can repeat or skip a bar. Hysteresis makes that rare
+    /// (a challenger must lead for three bars), and a repeated bar is a far
+    /// softer failure than a wrong downbeat — but `mod(bar_index, 8)` will see
+    /// it. The warmup handover is *not* a second source of it: the grid's count
+    /// carries a whole-bar offset that keeps this moving forward across it.
     pub bar_index: u32,
     /// Position across the bar in `[0, 1)` — the true bar phase, as against
     /// [`bar`](Self::bar), which is beat phase under a historical name.
@@ -223,6 +232,23 @@ pub struct Analyzer {
     /// reads it and it publishes no grammar variable — it exists so the downbeat
     /// fold has a unit that is a beat.
     grid: grid::BarGrid,
+    /// Offset added to the grid's beat count, latched on the first hop the grid
+    /// runs. `None` until then.
+    ///
+    /// The grid's counter starts at zero when the tempo tracker warms up,
+    /// several seconds into every stream, while the fold has been counting
+    /// `beat_index` until that moment — so without this the published
+    /// [`bar_index`](AnalysisFrame::bar_index) restarts there and walks
+    /// **backwards** once per stream. Measured before it existed: back one bar
+    /// on a 120 BPM click train, three on `dynamic_groove(124)` and on a 200 BPM
+    /// train, and further on material with a denser onset stream.
+    ///
+    /// Latched **rounded up to a whole bar**, which is what makes it free. A
+    /// whole-bar shift cannot change `beat_in_bar` or which of the fold's four
+    /// buckets an accent lands in — their phase is arbitrary and `alignment`
+    /// absorbs it — and rounding *up* rather than down is what guarantees the
+    /// published bar cannot step back at the handover.
+    grid_offset: Option<u32>,
     novelty: novelty::NoveltyDetector,
     /// ADR-0050 Layer 2. Reads the **normalized** bass and flux, unlike the
     /// detectors above: its accent blend weighs the two against each other, which
@@ -269,6 +295,7 @@ impl Analyzer {
             bands: bands::BandSplitter::new(format.sample_rate),
             tempo: tempo::TempoTracker::new(format.sample_rate),
             grid: grid::BarGrid::new(format.sample_rate),
+            grid_offset: None,
             novelty: novelty::NoveltyDetector::new(format.sample_rate),
             downbeat: downbeat::DownbeatTracker::new(),
             band_gain: gain::BandNormalizer::new(format.sample_rate),
@@ -349,9 +376,29 @@ impl Analyzer {
                     // tracker needs its envelope history filled first — the old
                     // pair is passed, which is the counter fallback ADR-0050
                     // specifies rather than a second code path.
+                    //
+                    // The grid's count carries a whole-bar offset latched at the
+                    // handover, so the published bar continues forward across it
+                    // rather than restarting — see `grid_offset`.
                     let (fold_count, fold_phase) = if grid.running {
+                        let offset = *self.grid_offset.get_or_insert_with(|| {
+                            let rem = clock.beat_index % downbeat::BEATS_PER_BAR;
+                            if rem == 0 {
+                                clock.beat_index
+                            } else {
+                                // Saturating rather than `next_multiple_of`,
+                                // which panics on overflow: this module denies
+                                // panics on the hot path and does not argue
+                                // reachability with itself.
+                                clock
+                                    .beat_index
+                                    .saturating_add(downbeat::BEATS_PER_BAR - rem)
+                            }
+                        });
                         (
-                            grid.bar_index * downbeat::BEATS_PER_BAR + grid.beat_in_bar,
+                            offset
+                                .saturating_add(grid.bar_index * downbeat::BEATS_PER_BAR)
+                                .saturating_add(grid.beat_in_bar),
                             grid.beat_phase,
                         )
                     } else {
