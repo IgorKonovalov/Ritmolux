@@ -15,7 +15,7 @@ were superseded orderings of the active roster.
 
 - [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)
   — closed 2026-08-25, eleven commits on `plan-0106-diffusion-filter` from `3c15e79` to
-  `b1647a6`, merged at `a5c4407`. Review: **no blockers, no majors, four minors** (all repaired at
+  `b1647a6`, merged at `a5c4407`. Review: **no blockers, no majors, five minors** (all repaired at
   the close). Version: **minor**, a feature plan — though it moves **no release artifact**:
   `core/`, `core-cabi/`, `plugin-foobar/`, `lmv-ring/` and `packaging/` are untouched and the only
   Rust is 85 lines of test.
@@ -63,7 +63,10 @@ were superseded orderings of the active roster.
   `1.406 x 1.188 = 1.670` decomposition and the *"within 2.5 % of predicted"* confirmation both
   fall, and the section now carries a dated correction. And `docs/diffusion-filter.md` shipped two
   arithmetic slips of its own (7,200 × 0.693 s is 1.4 hours, not 1.3; the in-table scope factor is
-  1.61x, not the 1.54x carried over from an earlier run), repaired at the close.
+  1.61x, not the 1.54x carried over from an earlier run), and **all three of its check counts were
+  wrong in every configuration the suite can be run in** — 215/196/210 measured against 207/188/183
+  stated. All repaired at the close; the last is the same defect Phase 7 fixed one level up, in a
+  sentence the figure gate does not cover because a check count is not a cost figure.
 
   **The ADR number collided.** Two lanes took **0120** on 2026-08-25 in different worktrees with
   different filenames, so the merge took both silently rather than conflicting. `main`'s was

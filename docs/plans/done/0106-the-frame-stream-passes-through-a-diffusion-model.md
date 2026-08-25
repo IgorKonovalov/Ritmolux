@@ -4,10 +4,10 @@
 > the Phase 2 stop condition did not fire and Phase 6 returned a qualified yes. **Phase 2b chose
 > `native`**, so the filter diffuses at the stream's own aspect and every square s/frame reading in
 > the phase bodies below is superseded by Phase 7d's idle-GPU measurement. Mode 4 review at close:
-> **no blockers, no majors**, four minors — two arithmetic slips repaired in
-> `docs/diffusion-filter.md` at the close, the falsified `attractor_leviathan` figures in the Phase
-> 6 log annotated, and this lane's ADR renumbered 0120 → **0122** to settle a same-day collision
-> with `main`. Verified at close on the merged tree: 949 tests, `fmt`, `clippy`, all four Node
+> **no blockers, no majors**, five minors — two arithmetic slips and all three check counts
+> repaired in `docs/diffusion-filter.md` at the close, the falsified `attractor_leviathan` figures
+> in the Phase 6 log annotated, and this lane's ADR renumbered 0120 → **0122** to settle a same-day
+> collision with `main`. Verified at close on the merged tree: 949 tests, `fmt`, `clippy`, all four Node
 > gates, and the Python suite — with the colour pin and the figure gate each bitten and seen red.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human

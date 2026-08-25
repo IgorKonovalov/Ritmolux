@@ -743,7 +743,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md) — closed 2026-08-25. Review: **no blockers, no majors, four minors** (repaired at close). ADR renumbered 0120 → **0122**: two lanes took the number the same day.
+- [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md) — closed 2026-08-25. Review: **no blockers, no majors, five minors** (repaired at close). ADR renumbered 0120 → **0122**: two lanes took the number the same day.
 
 - [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md) — closed 2026-08-25. Review: **no blockers, no majors, two minors.** Version: **none** (docs/chore-only). Log: 43 lines vs a 146-line phase section.
 - [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md) — closed 2026-08-20. Review: **no blockers, one major, two minors.** The bisect stopped: the wash is at the **field**. Phase 6 void.
