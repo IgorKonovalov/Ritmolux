@@ -1022,6 +1022,67 @@ as the 20-step UniPC cell, and the Negative about the interpolator being a new d
 than written, since the crossfade that shipped is `PIL.Image.blend`. Neither is a `dev` edit.
 
 
+### Phase 6 — a real track, 2026-08-24/25
+
+**The render.** Caribou — *Odessa* (Swim, 2010), 5:15, the track the Phase 1 spike judged; rendering
+on a different track would have confounded *does the look hold over five minutes* with *does it hold
+on unfamiliar material*. 48 kHz WAV, `--fps 30 --size 1920x1080 --tier rich`, `--profile fast`,
+9 466 frames. Two variants: `star_rosewindow` → *"a stained glass cathedral rose window"*, and
+`attractor_leviathan` → *"a vast canyon of luminous glowing rock strata"*, run sequentially because
+two diffusion jobs on one 8 GB card contend rather than parallelize.
+
+**The verdict, which is the done-when.** On `p6_rosewindow.mp4`:
+
+> *"rose window is interesting, it would obviously be great if resolution would be higher, and with
+> more variety. but as a way to make clip for music its fine"*
+
+So **Phase 6 passes** — it is usable for its stated purpose — and **Phase 2's third question, which
+[ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+recorded as never asked in those terms, is now answered**: a qualified yes. It carries two named
+wants, **higher resolution** and **more variety**, both filed rather than absorbed — the second is
+squarely inside this plan's *What this plan does NOT do* (*"No timeline, cuts, or prompt automation
+across a track"*) and maps onto its own recorded followup.
+
+**One qualifier the verdict did not have when it was given**: the clip watched was `fast`, which
+diffuses at 680x384. `quality` is 1024x576 — 2.25x the pixels, the budget Phase 2b measured and
+chose — and was never rendered on a real track. How much of the resolution complaint that answers is
+an open question, and a still comparison is the cheap way to settle it.
+
+**The frame-count contract held over a real render**: 9 466 in, 9 466 out, asserted by `run()`. The
+container reports 9 465 because `ffmpeg -shortest` trims one frame to the audio's exact length —
+the encoder's doing, not the filter's, and worth recording so it is not read as a contract break.
+
+**The cost model, corrected by measurement, and this is the phase's substantive finding.**
+Wall clock 21:38:54 → 23:37:46 = **7 132 s for 9 466 frames = 0.753 s per emitted frame**, against
+the **0.536 s** the filter's own instrument reported. The gap decomposes exactly:
+
+| factor | measured | what it is |
+|---|---|---|
+| instrument scope | **1.406x** | `_read`/`_emit` resamples and colour conversion, all outside the timer |
+| preset | **1.188x** | 1.608 s/diffused here against the documented 1.354, *same instrument both sides* |
+| **total against the docs** | **1.670x** | 0.753 measured against 0.451 documented |
+
+1.406 x 1.188 = 1.670, and the decomposition closes. Confirmed from the other side by the second
+variant: `attractor_leviathan` — the preset the documented 1.354 was measured on — runs at **0.650
+s/frame** wall-clock against 0.634 predicted (0.451 x 1.406), within 2.5 %. So the shipped figure is
+a **sound diffusion-only number for its own preset**, and the two errors are independent: a scope
+mislabel that affects everything, and a genuine per-preset difference. Phase 7d fixes the
+instrument; ADR-0120 fixes where the numbers live.
+
+**Two hypotheses died on the way, both worth recording so they are not re-run.** Thermal throttling:
+the rate was **flat** across every interval (0.6365, 0.642) and `nvidia-smi` showed no throttle
+reason active at 78 °C — so the short-run measurements were not living in a boost window. And GPU
+starvation: utilization sat at **48 %** with the card un-throttled, which is not a GPU limit at all
+but a CPU stage serialized with it — the same fact as the 1.406x, seen from the other side.
+
+**An operational trap, recorded because it cost nine hours and looked like a crash.** The laptop
+slept at ~23:47 mid-render. The pipeline **survived and resumed on wake** — `shot`, `sd_filter.py`
+and `ffmpeg` were all still alive nine hours later, having simply been suspended — but the
+supervising shell was killed, and an in-progress `ffmpeg` output has no `moov` atom, so `ffprobe`
+reports *"Invalid data found"* on a file that is merely unfinished. Neither is a defect. A long
+render wants sleep disabled; a partial output wants `ffprobe` read as "still writing", not "corrupt".
+
+
 ## Followups (after this lands)
 
 - **The diffused frame re-enters the renderer** as a texture the scene samples — the attractor

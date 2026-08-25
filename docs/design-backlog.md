@@ -2685,3 +2685,77 @@ answerable rather than leaving 2026-08-16's silence to stand for it.
 translation strategy is worth it.
 
 ---
+
+## 0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution
+
+**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a full-track render of
+`star_rosewindow` — *"it would obviously be great if resolution would be higher"*. **Owner if
+taken:** `architect` — it reopens a clause ADR-0121 recorded as deliberately rejected, so it is an
+ADR question before it is a code one.
+
+- **Verified 2026-08-25** — the shipping `quality` profile diffuses at a 589,824 px budget, which is
+  28 % of a 1920x1080 frame, so every output pixel is resampled up:
+  `present: "size": "589824" in: tools/sd-filter/sd_filter.py`
+
+### The finding
+
+The clip that drew the verdict was rendered at **`fast`** — a 262,144 px budget, **680x384** at
+16:9 — and resampled to 1920x1080. `quality` is 1024x576, **2.25x the pixels**, and *has never been
+rendered on a real track*. So an unknown and possibly large share of this complaint is a profile
+choice rather than a wall, and **the cheap first move is a side-by-side still at both budgets**, not
+a design.
+
+What is genuinely walled, and why this is not simply "raise the budget":
+
+- **SD1.5 duplicates or mirrors content above roughly 768²** — its native-resolution artifact, named
+  in Plan 0106 Phase 1's traps. Raising the budget does not scale smoothly into it.
+- **SDXL plus ControlNet is ~7.5 GB against an 8 GB card**, and the spike already peaks at 5.68 GB
+  with two ControlNets loaded. Offloading fixes the memory and ruins the throughput over thousands
+  of frames, which Phase 1 also measured.
+- **Cost scales with pixels.** Phase 2b measured 2.721 s/frame at 589,824 px against roughly a third
+  of that at 262,144. A 4-minute track at `quality` already measures ~5.9 h *before* the 1.406x
+  scope correction Plan 0106 Phase 7d applies to that figure.
+
+**The tension worth surfacing before anyone designs.**
+[ADR-0121](adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
+Alternative C is *diffuse at a smaller budget and upscale*, measured as the cheaper route and
+**rejected by this same user in the design interview**, on the ground that generated detail is worth
+its price against inferred detail. This verdict does not obviously overturn that — the ask is for
+*more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
+made before anyone had watched five minutes of output. A tiled or multi-pass approach that
+*generates* at higher resolution is the option neither the ADR nor the plan has costed.
+
+## 0126 — a render is one prompt, one seed and one preset from first frame to last, so nothing varies across a track
+
+**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a 5:15 render —
+*"...and with more variety"*. **Owner if taken:** `architect` — it is squarely inside Plan 0106's
+stated non-scope, so taking it is a scope decision, not an implementation one.
+
+- **Verified 2026-08-25** — one seed is fixed for the entire render, by construction and on purpose:
+  `present: manual_seed\(cfg in: tools/sd-filter/sd_filter.py`
+
+### The finding
+
+This is **not a defect** — it is Plan 0106's *What this plan does NOT do*, in as many words:
+*"No timeline, cuts, or prompt automation across a track. One prompt per render, matching 0101's one
+preset per render."* The fixed seed is load-bearing for the thing the gate approved: Phase 1 records
+that a per-frame seed *"guarantees boiling whatever else is tuned"*. So variety cannot be bought by
+simply unfixing it, and that is the first thing a designer would reach for.
+
+The plan already carries the shape of the answer in its own Followups — **audio-conditioned
+diffusion**, *"denoise from the onset envelope, prompt blend on bar boundaries"* — which was filed as
+a nice-to-have and is now a user ask with a watched render behind it. Levers worth costing, roughly
+in increasing order of what they disturb:
+
+- **Prompt interpolation on bar or section boundaries**, which the analyzer can already supply. The
+  smallest change that produces real variation, and it keeps one seed and one preset.
+- **Preset changes across a track** — 0101 renders one preset per render, so this is a `shot`
+  question before it is a filter question.
+- **Denoise strength driven by the onset envelope**, which is the one lever that **reopens Plan
+  0106's no-audio-conditioning decision**: it carries real audio data across a seam the plan
+  deliberately kept image-only. Phase 2 named exactly this as the repair if the music stopped
+  reading — it did not, so this would be taken for variety rather than for reactivity, which is a
+  different justification and wants its own ADR.
+
+**Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
+one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
