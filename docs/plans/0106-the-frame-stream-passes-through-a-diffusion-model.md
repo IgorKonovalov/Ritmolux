@@ -10,7 +10,9 @@
 > the ADR takes them as a dated `Outcome` at the close rather than as body edits.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+> **Related ADRs:** [0120](../adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md) — written
+> 2026-08-25, the documentation design pass; and
+> [0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
 > — the deferred ADR, written 2026-08-20 between Phases 2 and 3 against the spike's evidence exactly
 > as Phase 2 said it would be
 > **Hard dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) Phases 1–2, for every
@@ -354,13 +356,17 @@ the core, the C ABI, or `lmv.exe`.
 ### Phase 7 — the gateable part actually gates, added 2026-08-24 by `architect`
 
 - **Owner skill:** dev
-- **What:** Four defects from the Mode 4 close review and the Phase 6 render, all in the test,
-  gate and measurement surface. None changes what the filter draws; together they are the
-  difference between a suite that passes *here* and a suite that means something *anywhere*, and
-  between a cost table that describes a render and one that describes a subroutine.
+- **What:** Five items from the Mode 4 close review, the Phase 6 render and the documentation
+  design pass that followed — the test, gate, measurement and documentation surface. None changes what the filter draws; together they are the
+  difference between a suite that passes *here* and a suite that means something *anywhere*,
+  between a cost table that describes a render and one that describes a subroutine, and between
+  a fact written once and the same fact written three times in three sets of words.
+  **Order matters in one place: 7e before 7d**, so the figures are corrected in their new single
+  home rather than three times in the old one.
 - **Files touched:** `tools/sd-filter/test_sd_filter.py`, `tools/sd-filter/sd_filter.py`,
   `standalone/src/shot/render.rs` (one test), `.github/workflows/ci.yml`, `.githooks/pre-push`,
-  `docs/capturing.md`, `README.md`, `tools/sd-filter/README.md`.
+  `docs/capturing.md`, `README.md`, `tools/sd-filter/README.md`, `docs/diffusion-filter.md` (new),
+  and one new `scripts/` gate.
 - **Why this is a phase and not a followup:** Phase 3 called the pass-through *"the one part of
   this feature that can be a real CI gate"* and `docs/capturing.md` repeats it as shipped fact.
   Neither is true today — nothing runs the suite, and on any checkout but this one it would go
@@ -403,6 +409,34 @@ not the home for this**: the end-to-end group's property is the same byte identi
 group already asserts at four geometries against hostile payloads, and paying for it on three
 build matrices buys the word "real" and nothing else.
 
+**7e — the feature's documentation collapses to one page, and a gate keeps it there. Do this
+BEFORE 7d.** Carries [ADR-0120](../adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md).
+The filter is documented in three files, and profiles, `--size`, `--stride` and the check are each
+written out **in full, in different words**, in both `docs/capturing.md` and
+`tools/sd-filter/README.md` — so the copies cannot be diffed and disagree silently by construction.
+The cost table exists in three places, which is how 7d's own file list missed one. Create
+**`docs/diffusion-filter.md`** as the single canonical page and reduce the rest to pointers that
+carry no facts: `docs/capturing.md` to ~12 lines keeping only the pipe-level fact (the encoder line
+is invariant because `--stride` preserves the frame count), `tools/sd-filter/README.md` to install
+plus a pointer, `README.md` to a paragraph, a link and **one** orientation figure. Then add the
+gate — the canonical page wraps its figures in `<!-- figures:begin -->` / `<!-- figures:end -->` in
+[ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)'s idiom, and a new
+`scripts/` check asserts **no other markdown naming `sd-filter` or `sd_filter.py` carries a cost
+figure**, with `README.md`'s one line whitelisted and required to match inside the region. **Scope
+the scan to files that name the filter**: `0.451` is also a curve value in ADR-0040, and a
+units-only regex over `docs/` would convict it.
+- **Done when (7e):**
+  - `docs/diffusion-filter.md` exists and is the only place profiles, `--size`, `--stride`, the
+    check and the cost table are stated. The other three files state none of them.
+  - The new gate is wired exactly where the other three are — `.githooks/pre-push` and the CI
+    `links` job — and **fails on a seeded violation**: add a cost figure to
+    `tools/sd-filter/README.md`, watch it go red, remove it. A gate never seen to fail is a comment.
+  - `node scripts/check-doc-links.mjs` passes. **Then check the fragment anchors by hand** — that
+    checker does not validate them, and `README.md` links
+    `capturing.md#a-filter-stage-between-shot-and-the-encoder`, which this phase deletes.
+  - `docs/capturing.md` is materially shorter than the 2 119 lines it starts at, and what remains of
+    the filter in it is about the *pipe*, not about the filter.
+
 **7d — the cost every document quotes is the diffusion call, not the render.** `DiffusionStage`
 times `self.pipe(...)` alone; `_read`'s colour decode and downscale, `_emit`'s LANCZOS upscale back
 to the stream's geometry and its RGB→YUV encode, and the gap crossfades all sit outside the timer.
@@ -422,11 +456,10 @@ measures.
     frames. **No threshold is stated here on purpose**: the factor is whatever the instrument and
     the clock agree on, and a number written into this plan before either ran would be the same
     error one level up.
-  - **All three copies** of the cost table are corrected from the fixed instrument and still name
-    their configuration: `docs/capturing.md` and `tools/sd-filter/README.md` each carry the full
-    table plus its two derived track-length figures, and `README.md` carries the prose form
-    ("roughly an hour at the `fast` profile"). Grep the figures rather than trusting a list — the
-    third copy was missed on a first pass over exactly this question ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  - The cost table in **`docs/diffusion-filter.md`** and `README.md`'s single orientation figure are
+    corrected from the fixed instrument and still name their configuration. **If 7e ran first there
+    are exactly two places**; if for any reason it did not, grep the figures rather than trusting a
+    list — a first pass over exactly this question enumerated two copies of three ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
   - Each corrected figure says **which cost it is**. The old numbers were not wrong about the
     machine; they were wrong about the scope, and a reader could not tell because nothing disagreed
     with anything.
