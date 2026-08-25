@@ -1,7 +1,8 @@
 # 0116 — The sanity lens finds the ground
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-25
+> **Approved:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) (proposed)
 > **Closes:** design-backlog 0128
