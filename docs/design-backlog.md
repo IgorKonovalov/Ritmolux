@@ -2759,3 +2759,35 @@ in increasing order of what they disturb:
 
 **Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
 one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
+
+## 0127 — the figure gate walks the working tree, so a gitignored local note can redden a push
+
+**Raised by:** `architect`, at Plan 0106's close (2026-08-25), when the gate the same plan shipped
+convicted a **gitignored** provenance file under `renders/` that had never been and could never be
+committed. **Owner if taken:** `dev` — it is a scan-set question in one script, not a design one.
+
+- **Verified 2026-08-25** — the walk is filesystem-based and consults no ignore rules:
+  `present: readdirSync in: scripts/check-filter-figures.mjs`
+
+### The finding
+
+`scripts/check-filter-figures.mjs` enumerates candidate markdown by walking directories, skipping a
+hardcoded set (`node_modules`, `target`, `.git`, and the seeded-fixture tree). It never asks git what
+is tracked, so **any local file naming `sd-filter` and carrying a figure fails the pre-push hook** —
+scratch notes, a pasted measurement, a downloaded README. The author's fix is to edit or delete a
+file the repository will never see.
+
+**CI is unaffected and that is why this is small.** The `links` job checks out the tracked tree, so
+gitignored files do not exist there; only the local hook can fire on this. That also means the gate's
+*enforcement* is sound — nothing wrong can reach `main` through this hole — and what is wrong is the
+**local ergonomics**, which is a weaker complaint than it first looks.
+
+**The counter-argument is real and should be costed before this is taken.** A gitignored copy of a
+cost figure still misleads whoever reads it, and this repository's whole reason for the gate is that
+*the copy that broke it was the one outside the list anyone was checking*
+([ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)). Restricting the scan to
+`git ls-files` buys ergonomics and gives up exactly that reach. A middle option — scan the working
+tree, but report an untracked hit as a **warning that does not set the exit code**, in the shape
+`check-backlog-claims.mjs`'s advisory block already uses — keeps both and is probably the answer.
+
+**Not urgent.** One close hit it, once, and editing the offending file took a minute.
