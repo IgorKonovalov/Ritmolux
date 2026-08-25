@@ -286,6 +286,14 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
 | 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
 
+**Closed 2026-08-25** at [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)'s **mid-plan**
+review — the plan itself is still open (phases 5-7 unbuilt), but Phase 1b was placed before its stop
+gate precisely so this entry could not be orphaned by that outcome, and it discharges independently.
+
+| # | Entry | Went to |
+|---|-------|---------|
+| 0098 | `thickness` below 0.167 is a dead zone on every line scene, and nothing says so | [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) Phase 1b. The warning landed, the floor stays. Its own probe went red on delivery: the constant moved. **Closed 2026-08-25** |
+
 <!-- roster:end -->
 
 ## Open entries
@@ -1412,49 +1420,6 @@ particle path is the constraint that shaped the current arithmetic, and a naive 
 **Medium.** It is invisible until a preset puts a shaped star on the field scene, and the content
 lane already hit it on its first attempt — four probe presets carry a `color_center` offset whose
 only purpose is to dodge it.
-
----
-
-## 0098 — `thickness` below 0.167 is a dead zone on every line scene: all values render identically and nothing says so
-
-> **PROMOTED 2026-08-16** — folded into [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)
-> as Phase 1b, placed before that plan's Phase 4 stop gate so it cannot be orphaned if the arc work
-> is abandoned. The doc half is already discharged.
-
-**Raised by:** `preset-author`, repairing `presets/fragment_vitrail.toml` (2026-08-16).
-**Owner if taken:** `dev` for the warning, `architect` for the doc line.
-
-- **Verified 2026-08-16** — the floor that creates the dead zone:
-  `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`
-
-### The finding
-
-`thickness` maps to an NDC-y half-width as `(thickness * 0.003).max(0.0005)`. The `.max` is a floor,
-so **every `thickness` below `0.167` produces the identical half-width** — 0.0005 NDC, about 0.27 px
-at 1080p, which rasterizes as a broken dotted line rather than a stroke.
-
-`fragment_vitrail` shipped with `thickness = 0.016` — two orders below the 1.5-3.2 every other line
-preset uses — so its Maurer rose rendered as scattered dots and read as gauze over the vault for
-its whole shipped life.
-
-**The dead zone is what made it expensive to find.** The content lane re-tuned `0.016` to `0.022`
-to `0.038` and the picture did not change *at all*, because all three clamp to the same floor — so
-the thickness hypothesis was discarded as disproved, and chord count and sample count were swept
-first. The value is in range, the preset loads clean, and nothing warns.
-
-### What a fix would be
-
-A load-time warning when a line scene's `thickness` binding rests below the floor's own threshold,
-in ADR-0020's shape (the unknown-param warning already exists and is the precedent). The floor
-itself should stay — it is what stops a zero thickness degenerating the quad.
-
-The doc half is already done: `presets/README.md` now states the working range and the dead zone.
-
-### Priority
-
-**Low for the engine, and the doc half is discharged.** One preset was affected and is repaired.
-It is filed because the *failure mode* — a parameter range where changing the value does nothing,
-with no warning — is the kind that costs a session every time someone meets it.
 
 ---
 
