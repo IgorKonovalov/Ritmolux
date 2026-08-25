@@ -18,7 +18,6 @@ someone who picked it up is reading.
 |------|-------|--------|-------|-----------------|
 | [0116](0116-the-sanity-lens-finds-the-ground.md) | The sanity lens finds the ground | approved | dev, human | **Must land before [0113](0113-the-engine-paints-a-canvas.md) Phase 6**, where the emptying canvas arrives; 0113 Phases 3-5 are unaffected and the lanes run in parallel until then. Carries [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) (proposed), which re-bases `is_lit` on a ground **derived from the frame** rather than a hardcoded `BLACK`. **Phase 2 is a stop gate** — the obvious estimator is already falsified (naive modal tone re-bases **17 of 41** shipped presets), so Phase 1 measures candidates against the whole library and Phase 2 may legitimately end the plan. Closes [design-backlog 0128](../design-backlog.md). Twelve presets already read `coverage = 1.0000` exactly, so three of the four statistics are constants for them today. |
 | [0114](0114-the-line-stroke-reads-as-a-drawn-line.md) | The line stroke reads as a drawn line | approved | dev, human | **Takes priority over [0087](0087-the-line-renderer-draws-a-curve.md), which is parked at its Phase 4 by user decision 2026-08-25.** 0087's look gate returned *“circles looks fine but blurred”* — the first half closed that plan's question, the second half is this one. The stroke is a quadratic falloff across the **whole** half-width, so a 14 px line is a 4 px spine in a 10 px gradient; measured with bloom, trails and `glow` all unbound, so it is the stroke and not a post stage. **Nothing regressed** — it is [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) working as specified, and `glow`/`thickness`/bloom provably cannot reach it. Carries [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) (proposed): a `softness` param plus an `fwidth`-derived one-pixel edge, where `1.0` is today's fragment byte-for-byte. **Phase 4 is a human look gate that picks the default** — deliberately, on the 0087 precedent. Reaches **all five shipped line presets** and moves every line baseline once. Contends with 0087 on `core/src/render/scenes/lines/`, which is why that one is parked rather than run beside it. |
-| [0095](0095-the-downbeat-fold-gets-a-musical-beat.md) | The downbeat fold gets a musical beat | in-progress | dev, human | **Succeeds [0086], which measured the defect and shipped the instrument.** The fold is indexed by onset events, not beats (1.7-2.1x, wandering 1x-4x within a track, against a control that reads 1.00). Phase 2 puts **tempo octave stability on the critical path by choice** — if Phase 1's ladder says the octave choice is a coin flip, the plan stops there with a diagnosis rather than gridding on sand. `beat`/`beat_index` are bit-identical by Phase 3's own assertion, so no preset timing moves. Reviewed 2026-08-25: **Phase 7** repairs four majors. |
 | [0087](0087-the-line-renderer-draws-a-curve.md) | The line renderer draws a curve | approved | dev, human | The largest, and the only one with a **stop condition**: Phase 3 measures per-pixel cost against the NFR §1 floor tier, and Phase 4 is a `human` look gate placed *before* the biarc work — either can send the plan to ADR-0098's Alternative C. Owes a re-bless (28 baselines) and an ADR-0058 enumeration entry. Watch [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md): this family has shipped that bug three times. |
 | [0098](0098-the-figure-nests-properly.md) | The figure nests properly | approved | dev, human | **Carries [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (proposed) and closes two backlog entries from Plan 0091's content pass.** `shape_field`'s level sets are offsets, and an inward offset *erodes* — which rounds a reflex corner, so a nested heart loses its top notch. That is not tunable: a sharp notch needs `palette_steps * color_span ~ 1`, which leaves ONE band inside the figure, and the user rejected that end of the trade in the running app. Phase 1 is an independent defect fix (a curved or jittered `star` returns a **negative** distance at its own centre — provably, always). **Contends with [0092](0092-the-engine-draws-an-authored-path.md) on `shape_field.rs`**, so run them in sequence or in a lane. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Its hard dependency is discharged — [0091](done/0091-the-figure-fills-the-frame.md) closed 2026-08-16 and `shape_field` is the scene this draws into.** Soft-depends on [0087](0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
@@ -184,14 +183,6 @@ would revert most quietly.
    where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
    demo material, a 1080p render still reading as an upscale
    ([backlog 0110](../design-backlog.md)).
-
-### Gap fillers — either lane, any time
-
-- **[0095]** — `core/src/dsp/` only, contends with nothing, and by its own Phase 3 assertion
-  `beat`/`beat_index` stay bit-identical, so **it moves no golden baseline**. That is what makes it
-  the one plan safe to run beside a lane that is blessing. **Read
-  [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) first** — `beat_index` counts
-  onsets, not beats, and two authoring docs still say otherwise.
 
 ### What this sequence assumes
 
@@ -542,7 +533,7 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
 [0085]: done/0085-the-show-length-horizon-gets-an-instrument.md
 [0086]: done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
-[0095]: 0095-the-downbeat-fold-gets-a-musical-beat.md
+[0095]: done/0095-the-downbeat-fold-gets-a-musical-beat.md
 [ADR-0109]: ../adrs/0109-the-beat-clock-counts-onsets-not-beats.md
 [0087]: 0087-the-line-renderer-draws-a-curve.md
 [0088]: done/0088-the-docs-get-pictures.md
@@ -755,6 +746,8 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0095 — The downbeat fold gets a musical beat](done/0095-the-downbeat-fold-gets-a-musical-beat.md) — closed 2026-08-25. Review: **no blockers, one major, three minors.** Version: **0.77.0** (minor). [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) accepted with an `Outcome`.
+
 - [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md) — closed 2026-08-25. Review: **no blockers, no majors, five minors** (repaired at close). ADR renumbered 0120 → **0122**: two lanes took the number the same day.
 
 - [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md) — closed 2026-08-25. Review: **no blockers, no majors, two minors.** Version: **none** (docs/chore-only). Log: 43 lines vs a 146-line phase section.

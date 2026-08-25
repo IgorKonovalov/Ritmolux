@@ -1,17 +1,27 @@
 # 0095 — the downbeat fold gets a musical beat
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-25. Phases 1-7 landed in `5bdce91`, `09abdee`, `cae98a5`,
+> `d4e7cec`, Phase 5's `human` capture, `80f346f`, and `cd00aa1` + `4caac3c`. Second Mode 4
+> review (2026-08-25, fresh session, over Phase 7 as unreviewed work): **no blockers, one
+> major, three minors, one nit.** Verified: the whole-bar handover offset is real and its test drives
+> PCM through the analyzer; `grid.running` is a one-way latch, so the offset cannot be
+> stranded; the octave overlap is asserted as a property from one run, not frozen; the
+> `presets/*.toml` diff across the whole plan contains no non-comment line;
+> `beat`/`beat_index`/`time_since_beat` bit-identity holds structurally.
+> [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) accepted **with an
+> `Outcome`**: the Decision's "settle the octave or stop" was neither met nor taken.
 > **Created:** 2026-08-15
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md),
-> supplementing [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md),
-> [ADR-0082](../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) and
-> [ADR-0097](../adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md)
-> **Succeeds:** [0086](done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md), which measured the
+> **Related ADRs:** [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md),
+> supplementing [ADR-0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md),
+> [ADR-0082](../../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) and
+> [ADR-0097](../../adrs/0097-the-downbeat-cue-is-chosen-against-per-beat-evidence.md)
+> **Succeeds:** [0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md), which measured the
 > defect this plan repairs and shipped the instrument it is measured with
-> **Reviewed:** 2026-08-25 (Mode 4) - no blockers, four majors, all one shape. **Phase 7 below
-> is the repair pass**; the fourth major (an `Outcome` on ADR-0109, which claims the tempo estimate
-> was settled when only its *stability* was) is architect-owned and lands at the close.
+> **Reviewed twice.** 2026-08-25 (Mode 4, phases 1-6) - no blockers, four majors, all one shape;
+> **Phase 7 below is that repair pass**. 2026-08-25 again (Mode 4, close), in a fresh session,
+> reading Phase 7 as work no one had reviewed - it was authored in the session that produced the
+> first review. The fourth major, an `Outcome` on ADR-0109, landed at the close.
 
 ## TL;DR
 
@@ -19,7 +29,7 @@ The downbeat fold is indexed by onset-detector events, not musical beats — mea
 **1.73x / 1.35-2.10x / 1.76x** detections per beat on three genres, wandering across 1x, 2x and
 4x *inside* a single track, against a synthesized control that reads exactly 1.00. So
 `beat_index % 4` spans well under a bar and a bar-locked accent precesses across all four
-alignments. Per [ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) this plan
+alignments. Per [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) this plan
 gives Layer 2 its **own** bar grid, built from the autocorrelated tempo, and leaves `beat` /
 `beat_index` / `time_since_beat` bit-for-bit unchanged. The tempo estimate is octave-unstable
 and settling it is **on the critical path**, not a follow-on. The authoring docs, which
@@ -27,10 +37,10 @@ currently teach the false idiom, are corrected here.
 
 ## Context & problem
 
-[Plan 0086](done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) Phase 1 shipped
+[Plan 0086](0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md) Phase 1 shipped
 `--downbeat-log`, and its Phase 2 captured three matched 240 s runs on real material. The
 table, and the reason it is the whole argument, is in
-[ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md); the shape of it:
+[ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md); the shape of it:
 
 | | techno | hip-hop | rock/pop | synthesized control |
 |---|---|---|---|---|
@@ -206,7 +216,7 @@ absorbs it), and it leaves the published `bar_index` continuing forward across t
 `the_downbeat_estimator_locks_onto_a_kick_pattern_in_real_audio` drive **one transient per beat**
 — the single configuration where the grid, the tempo estimate and `beat_index` all agree, so no
 test at it can say which of the three the grid actually followed. That is the coincidence
-[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) is about, one subsystem
+[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) is about, one subsystem
 over. The uncovered case is not hypothetical: Phase 2 proved the halving direction undiscriminable,
 `offbeat_click_track(90, ., 0.5)` and `(., 0.8)` read `bpm` 180, and the live hip-hop capture read
 a 165.4 median on a track that counts at ~90.

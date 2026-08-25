@@ -129,7 +129,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0106](0106-two-tone-graphics-come-from-a-multiply-layer.md) | Two-tone graphics come from a multiply layer, not a composite redesign | accepted 2026-08-13 (Outcome) |
 | [0107](0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) | An authored path is inline SVG data, and it morphs by resampling | accepted 2026-08-13 |
 | [0108](0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) | a backlog claim about the repo carries an executable probe | accepted 2026-08-15 |
-| [0109](0109-the-beat-clock-counts-onsets-not-beats.md) | the beat clock counts onsets, not beats, and Layer 2 gets its own grid | proposed 2026-08-15 |
+| [0109](0109-the-beat-clock-counts-onsets-not-beats.md) | the beat clock counts onsets, not beats, and Layer 2 gets its own grid | accepted 2026-08-25 (Plan 0095), Outcome |
 | [0110](0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md) | Now-playing metadata is a shell-supplied string, and the core owns the banner | accepted 2026-08-16 (Outcome) |
 | [0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) | The shape field gains a scaled-copy coordinate beside its distance one | proposed |
 | [0112](0112-a-blender-model-enters-as-inline-mesh-data-and-the-gpu-scatters-its-points.md) | A Blender model enters as inline mesh data, and the GPU scatters its points | proposed |

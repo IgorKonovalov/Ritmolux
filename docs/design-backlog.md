@@ -488,8 +488,25 @@ correction.
 
 ## 0042 — the downbeat estimator locks on ~3 % of audible time, so the gated bar variables are almost always fallback
 
+- **HALF-DISCHARGED 2026-08-25, and the entry stays live** — [Plan 0095](plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+  closed, and it built the repair the 2026-08-15 bullet said was still unbuilt: the fold now buckets
+  over a tempo-driven bar grid (`core/src/dsp/grid.rs`) instead of over `beat_index`. **The cause
+  that bullet corrected is fixed; this entry's headline number is not.** Measured against a
+  reconstruction of the pre-0095 fold on the same captures, the share of hops over the gate moved
+  `0.00 → 2.36 %` on rock/pop, `0.79 → 3.67 %` on hip-hop and `4.16 → 0.42 %` on techno — so the
+  trio is still counter-derived the overwhelming majority of the time, which is exactly what this
+  entry's title says. What changed is *why*: it is no longer a fold indexed by a unit that is not a
+  beat. Two things now bound the remaining shortfall, and either could be the successor. **The
+  accent feature** is still 70 % bass band (ADR-0082's `Outcome`), and **the gate is now binding
+  where it never was** — rock/pop's corrected effect size reached a p90 of 0.2060 against
+  `CONFIDENCE_THRESHOLD = 0.25`, i.e. the distribution moved up *under* the gate rather than through
+  it, and ADR-0082's reason for that threshold was argued when the estimator had no signal at all.
+  That is not licence to lower it; it is the first evidence a decision about it could be made
+  against. **Nothing in this repo can separate the two**, because no log column carries the grid —
+  `--downbeat-log` predates it. An instrument that logs `beat_in_bar` / `bar_index` beside the
+  existing accent decomposition is the cheapest next step and is not yet filed.
 - **PROMOTED A THIRD TIME 2026-08-15 → [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md) +
-  [Plan 0095](plans/0095-the-downbeat-fold-gets-a-musical-beat.md)**, and **this entry's stated cause
+  [Plan 0095](plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md)**, and **this entry's stated cause
   is corrected here rather than left standing.** Plan 0086 ran its measurement and closed at Phase 2:
   the cue was never changed, so the repair this entry has now been promoted for three times is still
   unbuilt and the entry stays **live**. What the measurement found is upstream of the cue. `beat_index`
