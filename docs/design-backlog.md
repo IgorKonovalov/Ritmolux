@@ -2832,6 +2832,12 @@ threshold to retune.
   `present: pub fn modal_ground in: core/src/render/metrics.rs`
 - **Verified 2026-08-26** — the residue: `fragment_tiledmono` is still held and still not embedded:
   `present: fragment_tiledmono in: presets/pending/README.md`
+- **Verified 2026-08-26** — **the motivating family landed.** `shape_collage` merged with Plan 0113,
+  so "all eleven current systems" in The finding below is now twelve, and the light-ground case that
+  section calls *"about to stop holding"* has stopped holding. Its `coverage_floor` is derived from
+  the family's own distribution (0.13, half `On White`'s 0.2677) rather than resting on the
+  `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
+  instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
 
 ### Half-discharged 2026-08-26 by [Plan 0116](plans/done/0116-the-sanity-lens-finds-the-ground.md), and one causal claim below is falsified
 

@@ -235,6 +235,101 @@ fn a_thousand_recompositions_never_reallocate() {
     }
 }
 
+/// Global allocator that counts allocation calls **per thread**, so the test
+/// below can assert that a region on this thread performs no heap allocation
+/// while the rest of the binary allocates freely in parallel. Lifted verbatim
+/// in shape from `core/tests/preset.rs`, which needs the same thing for the
+/// expression evaluator; the reasoning for the thread-local counter is there.
+///
+/// It is a `System` pass-through, so nothing about how this crate's tests
+/// allocate changes — only that an increment is charged to the calling thread.
+struct CountingAlloc;
+
+thread_local! {
+    /// Allocations charged to the current thread. `const`-initialized so the
+    /// first touch neither allocates nor registers a destructor — the allocator
+    /// can read it without re-entering itself.
+    static ALLOCS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Allocations counted on the current thread so far.
+fn alloc_count() -> usize {
+    ALLOCS.with(std::cell::Cell::get)
+}
+
+unsafe impl std::alloc::GlobalAlloc for CountingAlloc {
+    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
+        // `try_with`: a no-op if TLS is unavailable (thread teardown), never a
+        // panic or an allocation on the alloc path.
+        let _ = ALLOCS.try_with(|c| c.set(c.get() + 1));
+        unsafe { std::alloc::System.alloc(layout) }
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
+        unsafe { std::alloc::System.dealloc(ptr, layout) }
+    }
+    unsafe fn alloc_zeroed(&self, layout: std::alloc::Layout) -> *mut u8 {
+        let _ = ALLOCS.try_with(|c| c.set(c.get() + 1));
+        unsafe { std::alloc::System.alloc_zeroed(layout) }
+    }
+    unsafe fn realloc(&self, ptr: *mut u8, layout: std::alloc::Layout, new_size: usize) -> *mut u8 {
+        let _ = ALLOCS.try_with(|c| c.set(c.get() + 1));
+        unsafe { std::alloc::System.realloc(ptr, layout, new_size) }
+    }
+}
+
+#[global_allocator]
+static GLOBAL: CountingAlloc = CountingAlloc;
+
+/// **The element builder allocates nothing**, for every kind and at every angle.
+///
+/// `compose` calls [`Element::build`] for **every live element on every frame**
+/// (`advance` -> `step` -> `compose`, unconditionally), so an allocation in any
+/// arm is one per element per frame on the render thread — against this plan's
+/// own "no allocation in the render path". The `segment`/`arc` arm held a
+/// `Vec::with_capacity(9)` for its hull candidates until Plan 0113 Phase 9, so
+/// `collage_onwhite` paid roughly five heap allocations a frame; it is a fixed
+/// `[[f32; 2]; 9]` plus a length now.
+///
+/// **[`a_thousand_recompositions_never_reallocate`] cannot see this**, which is
+/// why this test exists rather than an extension of that one: it measures the
+/// capacity of the `Vec<Placed>` the generator fills, and the hull buffer was
+/// inside the element built *into* that vector. Only the allocator can tell the
+/// two apart, so this reaches it.
+#[test]
+fn the_element_builder_allocates_nothing() {
+    // Warm anything lazily-initialized on this thread before the count starts,
+    // so what the window measures is `build` and not first-touch bookkeeping.
+    let _ = Element::build(Spec::new(KIND_QUAD, [0.0, 0.0], [0.2, 0.1], 0.0, 0.1, 1.0));
+
+    let before = alloc_count();
+    let mut sink = 0.0f32;
+    for kind in ALL_KINDS {
+        // Angles chosen to exercise the sector arm's cardinal-touch branch on
+        // both sides of its span, which is where the candidate count peaks.
+        for angle_deg in [0.0f32, 31.0, -67.0, 118.0, 179.0] {
+            for aperture in [0.05f32, 0.9, 2.4, std::f32::consts::PI] {
+                let spec = Spec {
+                    p0: aperture,
+                    ..Spec::new(kind, [0.1, -0.2], [0.62, 0.30], angle_deg, 0.15, 1.0)
+                };
+                let element = Element::build(spec);
+                // Consume the result so nothing above can be optimized away.
+                sink += element.aabb[2] - element.aabb[0];
+            }
+        }
+    }
+    let allocs = alloc_count() - before;
+
+    assert!(
+        sink.is_finite() && sink > 0.0,
+        "the builder produced degenerate boxes, so this test built nothing: {sink}"
+    );
+    assert_eq!(
+        allocs, 0,
+        "Element::build allocated {allocs} time(s), and compose() runs it for every live element every frame"
+    );
+}
+
 /// The three grammars compose **different** canvases from the same seed. Without
 /// this the sample sheet Phase 5 judges could be three renders of one strategy.
 #[test]

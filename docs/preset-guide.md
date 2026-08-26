@@ -74,9 +74,11 @@ the params then animate it.
 ## 2. The systems
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
-comparable. Each is a real shipped preset — the file name is under the picture. **One system is
-missing from this section and it is not an omission:** `shape_field` shipped with no world of its
-own, so there is nothing to photograph yet — see the note at the end.
+comparable. Each is a real shipped preset — the file name is under the picture. **Three of the
+twelve have no picture yet and that is not an omission:** the gallery was captured when the engine
+had nine systems, and `shape_field`, `warp_mesh` and `shape_collage` are described at the end
+instead. Every system is listed here either way; the roster and the full parameter tables live in
+[`../presets/README.md`](../presets/README.md).
 
 ### `fragment_field`
 
@@ -204,7 +206,8 @@ that should be triggered by a beat rather than modulated by a band.
 
 ### `shape_field` — no picture yet
 
-The newest system, and the only one with **no shipped preset**, so it has no image here. It draws one
+Two worlds ship on it (`presets/shape_facet.toml`, `presets/shape_pulse.toml`); the gallery predates
+them, so there is no image here. It draws one
 of five silhouettes — `disc`, `ring`, `polygon`, `star`, `heart` — as a **fullscreen distance
 field**, which makes the palette coordinate a *distance*: turn `palette_steps` up and you get
 concentric **offset contours of that shape**, not concentric circles. `palette_contour` then draws a
@@ -212,8 +215,35 @@ hairline at each band edge.
 
 **Reach for this when** the subject is a **figure and its echoes**: nested outlines, a breathing
 heart, rings travelling outward from a shape. The full parameter roster and three worked reactivity
-recipes are in [`../presets/README.md`](../presets/README.md); this page gains a picture when the
-first `shape_field` world ships.
+recipes are in [`../presets/README.md`](../presets/README.md).
+
+### `warp_mesh` — no picture yet
+
+The only system with **no shipped preset**, so there is nothing to photograph. It covers the frame
+with a grid of cells and resamples the **previous** frame through it, giving every grid vertex its
+own zoom, rotation, stretch and drift — so the past can spiral in one corner and drift in another,
+which no single whole-frame `fb_*` transform can express. It is also the only scene with nothing of
+its own to draw: turn the deposit off and the frame goes black in about a second.
+
+**Reach for this when** the subject is the **history of the image** rather than a figure in it:
+tunnels, vortices, anything where what you are looking at is where the last frame went. A converted
+MilkDrop preset brings its own draw layer and is the exception; see the `[milk]` table in
+[`../presets/README.md`](../presets/README.md).
+
+### `shape_collage` — no picture yet
+
+The newest system, shipping `presets/collage_suprematist.toml` and `presets/collage_onwhite.toml`;
+the gallery predates both. It is the engine's only **graphic** world rather than a luminous one.
+Every other system emits additive light, which has no notion of one object being in front of
+another — a black bar over a red one simply adds. This one *paints*: each pixel starts at the
+**paper** colour and walks an array of flat elements in array order, compositing each with `over`,
+so the array index **is** the depth. There is no glow, no bloom and no soft edge, and that is the
+vocabulary rather than an omission.
+
+**Reach for this when** the look is **flat colour and hard edges** on a light ground: suprematist
+and constructivist canvases, poster shapes, anything where solid opaque forms overlap. The one
+authoring fact is that the palette stays under linear `0.6` — see
+[`preset-palettes.md`](preset-palettes.md#flat-colour-on-shape_collage--stay-under-the-knee-adr-0123-plan-0113).
 
 ---
 

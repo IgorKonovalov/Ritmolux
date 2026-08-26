@@ -832,13 +832,24 @@ tonemap rather than off any parameter.
 **Keep every element colour's brightest channel at or under linear `0.6`.**
 
 That is [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
-`KNEE`, and below it the tonemap curve is **exactly the identity** — so the colour
-you author is the colour that reaches the display, flat and unshaded, to within
-the 8-bit write's own rounding. Bloom's threshold sits *above* that same knee, so
-a canvas living under it also gets no halo and its edges stay hard. **One
-constraint, both properties, and neither is a parameter you can reach for
-instead.** Author a brighter palette and you lose the flat fill and the hard edge
-together, with nothing to tell you why.
+`KNEE`, and below it the tonemap curve is **exactly the identity** — so the fill
+survives the whole post chain **unshaded**: the value the element wrote is the
+value that leaves the tonemap, to within the 8-bit write's own rounding. Bloom's
+threshold sits *above* that same knee, so a canvas living under it also gets no
+halo and its edges stay hard. **One constraint, both properties, and neither is a
+parameter you can reach for instead.** Author a brighter palette and you lose the
+flat fill and the hard edge together, with nothing to tell you why.
+
+> [!IMPORTANT]
+> **This does not mean the hex you typed is the hex on screen**, and reading it
+> that way will send you hunting for a bug that is not there. A stop is a
+> **linear coefficient with no sRGB decode** — the same mapping stated at the top
+> of this file — so the byte the display receives is that coefficient's sRGB
+> *encoding*, which is brighter. Measured on `collage_suprematist`: `#111111`
+> renders `#494949`, `#8a1420` renders `#BF5164`, and the paper `#d9d5c8` renders
+> `#E2E0DA`. What the knee buys is that every element is shifted by the *same*
+> curve and nothing is shaded, tinted or haloed on the way — which is the whole
+> of the flat-graphic look. Author by the rendered result, not by the hex.
 
 **The paper is the deliberate exception.** The curve's own table records
 `f(1.0) = 0.800` and 1.0 is asymptotically unreachable, so pure white paper does

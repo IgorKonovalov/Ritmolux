@@ -445,9 +445,10 @@ directly.
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
 | 6 — The music moves the canvas | dev | done | 47ef35d |
-| 6b — The canvas is measured against its own paper | dev | done | committed with this row |
+| 6b — The canvas is measured against its own paper | dev | done | df6ed6e |
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
+| 9 — The Mode 4 repairs | dev | done | committed with this row |
 
 ### Notes
 
@@ -546,6 +547,22 @@ required re-measure after the roster landed came in cheaper again (0.058 ms an
 element against 0.09): the branch is not what the loop costs, coverage is.
 `collage_cost.rs` carries all three tables and says the two are not a controlled
 before/after.
+
+**Phase 9's repairs, and two places it went past its own list.**
+
+- **The `shape_field` entry in `docs/preset-guide.md` section 2 was repaired
+  alongside the two additions.** The done-when asks only for `warp_mesh` and
+  `shape_collage`, but the section's preamble names the systems that have no
+  picture, and it could not be made true without also saying that `shape_field`
+  now ships `Facet` and `Pulse`. Same sentence, so it is disclosed rather than
+  split out.
+- **`tier.rs`'s replacement figures are the comment's own table, not a re-run.**
+  The done-when says "a figure the comment's own table supports", so the
+  sentence now quotes 12.7 % at eight and 16.8 % at sixteen. The plan also
+  records a 2026-08-26 re-run reading 7.3 % at eight and 18.2 % at forty, which
+  **disagrees with the committed table** at both ends; nothing here re-blesses
+  it, and the log's earlier note on this box's power-shared iGPU is the standing
+  explanation.
 
 **Observations for the review.**
 
