@@ -281,10 +281,58 @@ const MIN_STRUCTURAL_SHELLS: usize = 4;
 /// the *lowest* preset in a system rises well clear of the floor — retuning or
 /// retiring the sparsest member of a family — and the fix is to re-measure that
 /// floor from the distribution the gate prints, never to leave the slack in.
+///
+/// **Re-checked against the derived ground on 2026-08-26 (Plan 0116 Phase 4) and
+/// held.** Deriving the reference per capture lowers many measured coverages —
+/// fourteen presets came off `1.0000` — which moves this factor *down*, the
+/// direction that tightens floors rather than loosening them. The five floors
+/// re-derived below sit at `1.95x`-`2.06x`; the six left alone sit at
+/// `0.28x`-`1.78x`. Nothing approaches the cap, so the constant is unchanged.
+///
+/// **What that re-check exposed, which this constant cannot see.** It is
+/// one-sided: it fires when a floor sits too far *below* its family, and says
+/// nothing when a floor sits *above* it. Six families are in that state today —
+/// `parametric_curve`, `emitter`, `star_pattern`, `spectrum`,
+/// `reaction_diffusion` and `shape_field` — and their thinnest members clear the
+/// gate through the structural rescue rather than the floor. That predates Plan
+/// 0116 (their coverages are byte-identical under both lenses) and is not this
+/// file's to decide unilaterally, because the rescue carrying a thin figure is
+/// the design of Plan 0075, not a defect. It is raised in Plan 0116's log.
 const MAX_FLOOR_SLACK: f32 = 2.2;
 
 /// Per-system minimum lit fraction, **measured from the shipped library** under
-/// the ADR-0067 measurement (backdrop suppressed, compared against [`BLACK`]).
+/// the ADR-0067 capture (backdrop suppressed) against the frame's own derived
+/// ground ([ADR-0126], Plan 0116 Phase 3) — not against [`BLACK`], which is what
+/// every number below the 2026-08-26 block was measured against.
+///
+/// **Five floors were re-derived on 2026-08-26 (Plan 0116 Phase 4) and six were
+/// not, and the split is measured rather than chosen.** The derived ground only
+/// moves a preset that paints its own; for a scene drawing light onto darkness
+/// the modal band *is* the black it was already compared to, and the coverage
+/// comes back identical to the digit. So the families whose minimum moved are
+/// re-derived here, and the families whose minimum did not are left exactly as
+/// they were — there is nothing in them for this plan to re-measure.
+///
+/// ```text
+/// system              floor          family minimum              why
+/// fragment_field      0.50 -> 0.08   1.0000 -> 0.1645 Tiled Rosette   all eight came off 1.0000
+/// lsystem             0.50 -> 0.19   1.0000 -> 0.3704 Vellum          the only member
+/// swarm               0.42 -> 0.28   0.5701 -> 0.5553 Shatter         marginal
+/// attractor           0.18 -> 0.11   0.2214 -> 0.2156 De Jong Gallery marginal
+/// shape_field         0.50 -> 0.22   0.4312 Pulse (unmoved)           the arm's text was false
+/// parametric_curve    0.33           0.2273 Ion Wake (unmoved)        lit-on-dark
+/// emitter             0.25           0.0696 Ember Jet (unmoved)       lit-on-dark
+/// star_pattern        0.34           0.1484 Rose Window (unmoved)     lit-on-dark
+/// spectrum            0.28           0.2604 Halo (unmoved)            lit-on-dark
+/// reaction_diffusion  0.09           0.1603 Mitosis (unmoved)         lit-on-dark
+/// ```
+///
+/// `shape_field` is in that first group for a different reason: its minimum did
+/// not move, but the arm claimed the family "has zero shipped members", and
+/// `Facet` and `Pulse` both ship. The claim was false before this plan and the
+/// floor is derived from the distribution for the first time here.
+///
+/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 ///
 /// Each floor is set at half its system's lowest shipped preset, so the gap is a
 /// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
@@ -405,22 +453,36 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// moved the minimum — not to nudge a constant back until the run goes green.
 fn coverage_floor(system: SystemKind) -> f32 {
     match system {
-        // Full-screen field: every shipped member is above 0.99, so the spread
-        // is 0.0074 wide and anything near this floor is a broken field.
-        SystemKind::FragmentField => 0.50,
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.50. The old number
+        // came from a family where all eight members read 1.0000 and the spread
+        // was 0.0074 wide — which was the degeneracy ADR-0126 was raised on,
+        // not a measurement: `coverage` was reading the paper these scenes
+        // paint. Against their own ground the family spreads 0.1645-0.9969 and
+        // `Tiled Rosette` sets the minimum, so this is half of that. It is a
+        // large drop and it costs nothing the shells do not already catch: a
+        // broken field scores near zero at zero shells and is convicted, while
+        // `Tiled Rosette` was already riding the structural rescue at 9/10.
+        SystemKind::FragmentField => 0.08,
         // A dense point cloud that fills the frame far more than "sparse points"
         // suggested — the old 0.01 was 84x below the thinnest of the three.
-        SystemKind::Swarm => 0.42,
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.42: the derived
+        // ground moved `Shatter` 0.5701 -> 0.5553, marginally, and this is half
+        // of the new minimum.
+        SystemKind::Swarm => 0.28,
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
         // Raised from 0.32 on 2026-08-13 when `Wildwood` was retired on sight in
         // the running app: it was the family minimum, and its removal left
         // `Vellum` at 1.0000 as the only shipped member, putting the old floor
-        // 3.12x below it — over this file's 2.2x slack. Re-derived at half the
-        // new minimum like every floor here. A one-member family means the next
-        // lsystem preset will very likely move this number again.
-        SystemKind::LSystem => 0.50,
+        // 3.12x below it — over this file's 2.2x slack.
+        //
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.50. `Vellum`'s
+        // 1.0000 was the same paper artifact as the `fragment_field` eight —
+        // against its own ground it draws 0.3704 — so this is half of that. A
+        // one-member family means the next lsystem preset will very likely move
+        // this number again.
+        SystemKind::LSystem => 0.19,
         // Went to 0.12 and back on 2026-08-06 — see the doc comment. Star
         // Lantern's 0.6908 sets it again now that the three ring mandalas are
         // retired.
@@ -435,7 +497,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // 0.3785 against two members that fill the frame. Raised from 0.12 at
         // Plan 0057 Phase 6 — see the table above for why the minimum moved
         // off De Jong.
-        SystemKind::Attractor => 0.18,
+        //
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.18. The minimum
+        // barely moved (`De Jong Gallery` 0.2214 -> 0.2156), but the family's
+        // *ink duotones* did: `Ink on Paper`, `Thomas` and `Valentine` came off
+        // 1.0000 to 0.2167 / 0.2917 / 0.4389, which is the artifact the note
+        // below this table describes and no longer a live one. Half the new
+        // minimum.
+        SystemKind::Attractor => 0.11,
         // The sparsest system in the library, and the one this plan exists
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
         // version that shipped broken scores 0.0000 here.
@@ -451,16 +520,18 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // preset lands this is the number to re-derive from the distribution
         // this test prints.
         SystemKind::Emitter => 0.25,
-        // **Not derived from a distribution, because there is no distribution
-        // yet**: Plan 0091 ships the `shape_field` engine and deliberately no
-        // preset content (ADR-0081 puts worlds in the author's lane), so this
-        // family has zero shipped members and this floor has never gated
-        // anything. It is inherited from `FragmentField` on the structural
-        // argument alone — both are fullscreen scenes that cover every pixel
-        // with `occlude`, so a shape field that is not broken cannot score low.
-        // **Re-derive it from this test's printed distribution when the first
-        // one ships**, at half the family minimum like every floor above.
-        SystemKind::ShapeField => 0.50,
+        // **Derived from the distribution for the first time on 2026-08-26**
+        // (Plan 0116 Phase 4), from 0.50. Until then this arm said the family
+        // "has zero shipped members and this floor has never gated anything",
+        // inheriting `FragmentField`'s number on the structural argument that a
+        // fullscreen `occlude` scene cannot score low. That was true when Plan
+        // 0091 shipped the engine with no content; `Facet` and `Pulse` ship now,
+        // and `Pulse` has been under the old floor at 0.4312 — riding the
+        // structural rescue — under both lenses. Half of that minimum. (The
+        // structural argument is separately dead: `Facet` read 1.0000 only
+        // because `coverage` was measuring the ground it paints, and reads
+        // 0.5940 against that ground.)
+        SystemKind::ShapeField => 0.22,
         // **Not derived from a distribution either**: Plan 0100 ships the
         // `warp_mesh` engine and no preset content, exactly as Plan 0091 shipped
         // `shape_field`. Inherited from `FragmentField` on the same structural
@@ -468,6 +539,15 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // so one that is not broken cannot score low. **Re-derive it from this
         // test's printed distribution when the first one ships**, at half the
         // family minimum like every floor above.
+        //
+        // **Left at 0.50 on 2026-08-26 while `FragmentField` went to 0.08, so it
+        // no longer inherits anything** (Plan 0116 Phase 4). Two reasons, both
+        // recorded rather than resolved: the structural argument it rests on is
+        // the one Phase 3 falsified — a fullscreen field scores 1.0 because
+        // `coverage` was reading the ground it paints — and the number is
+        // duplicated in `core/tests/warp_mesh.rs`, which that phase is not
+        // scoped to touch and which asserts the two match. The first `warp_mesh`
+        // preset re-derives both together.
         SystemKind::WarpMesh => 0.50,
     }
 }
@@ -788,25 +868,55 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
         .capture_preset("Blown Out", &loud(), FRAMES)
         .expect("capture the flat fixture");
 
+    let floor = coverage_floor(SystemKind::ParametricCurve);
+
+    // (1) The lens as it stood before Plan 0116 Phase 3, on the same frozen
+    // fixture. This is the demonstration `MAX_TONAL_FLATNESS` was added for and
+    // it is kept rather than described: against a constant black reference the
+    // blot passes every areal check — full coverage, four quadrants, every
+    // radial shell — and only the tonal question convicts it.
+    let old_cov = coverage(&img, BLACK, EPS);
+    let old_spread = quadrant_spread(&img, BLACK, EPS);
+    let old_shells = radial_shell_occupancy(&img, BLACK, EPS);
+    let old_flat = tonal_flatness(&img, BLACK, EPS);
+    println!(
+        "[blown out] against BLACK: coverage={old_cov:.4} (floor {floor:.2}) \
+         quadrants={old_spread} shells={old_shells}/{RADIAL_SHELLS} flatness={old_flat:.4}"
+    );
+    assert!(
+        old_cov >= floor && old_spread >= MIN_QUADRANTS && old_shells >= MIN_STRUCTURAL_SHELLS,
+        "the fixture must clear every areal check against black, or it proves nothing about \
+         why the tonal question was added: coverage {old_cov:.4} (floor {floor:.2}), \
+         {old_spread} quadrant(s), {old_shells}/{RADIAL_SHELLS} shells"
+    );
+    assert!(
+        old_flat > MAX_TONAL_FLATNESS,
+        "a figure stacked past the additive ceiling must read flat, got {old_flat:.4}"
+    );
+
+    // (2) The lens as it stands now. A blot that fills the frame with one tone
+    // **is its own modal band**, so the derived ground lands on the blot itself
+    // and the lit mask is what is left over — the figure's fringe. The fixture
+    // is therefore convicted twice rather than once, which is a stronger
+    // verdict and a weaker demonstration: coverage no longer scores it healthy.
     let bg = ground(&img);
     let cov = coverage(&img, bg, EPS);
     let spread = quadrant_spread(&img, bg, EPS);
+    let shells = radial_shell_occupancy(&img, bg, EPS);
     let flat = tonal_flatness(&img, bg, EPS);
-    println!("[blown out] ground={bg:?} coverage={cov:.4} quadrants={spread} flatness={flat:.4}");
-
-    // The fixture has to pass the two existing checks, or it demonstrates
-    // nothing: the whole claim is that a blot satisfies both of them.
-    assert!(
-        cov >= coverage_floor(SystemKind::ParametricCurve),
-        "the fixture must pass the coverage floor, or it proves nothing: {cov:.4}"
-    );
-    assert!(
-        spread >= MIN_QUADRANTS,
-        "the fixture must pass the spread floor, or it proves nothing: {spread}"
+    println!(
+        "[blown out] against its own ground {bg:?}: coverage={cov:.4} (floor {floor:.2}) \
+         quadrants={spread} shells={shells}/{RADIAL_SHELLS} flatness={flat:.4}"
     );
     assert!(
         flat > MAX_TONAL_FLATNESS,
-        "a figure stacked past the additive ceiling must read flat, got {flat:.4}"
+        "the tonal question must still convict the blot once the reference is derived \
+         from the frame, got {flat:.4}"
+    );
+    assert!(
+        bg.iter().take(3).any(|&c| c > EPS),
+        "the fixture must be dense enough that its own tone is the modal band, or the two \
+         lenses agree and (2) tests nothing: ground {bg:?}"
     );
 }
 
