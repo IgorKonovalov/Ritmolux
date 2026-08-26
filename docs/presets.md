@@ -157,6 +157,17 @@ read 11 against 6 actual, `swarm` 5 against 3, `attractor` 5 against 6), because
 re-drifts every time a preset is added and nothing fails when it does. `presets/` is the
 list; `ls presets/*.toml` is the count.
 
+**The four line systems share one stroke.** `parametric_curve`, `lsystem`,
+`star_pattern` and `spectrum` all draw through the same line renderer, so
+`thickness`, `brightness`, `glow` and `softness` mean the same thing on all four
+and a value that reads well on one transfers. `softness` is the shape of the
+stroke *across* its width (ADR-0124): `0` is solid with a one-pixel antialiased
+edge, `1` is the pure quadratic falloff these scenes drew until Plan 0114, and
+the default is `0.25`. It is **coverage** where `glow` is **light** — reach for
+`softness` when a figure reads blurred and `glow` when it reads too bright. The
+working ranges, the sub-pixel limit and the `thickness` dead zone that sits
+beside it are in
+[`presets/README.md`](../presets/README.md#line-art-parameter-notes--strokes-joins-and-per-scene-shape).
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
 background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
@@ -651,7 +662,7 @@ Things worth knowing before you reach for it:
 - **Not every parameter is per-element.** On `spectrum` the ones describing a
   single element vary per element — `base`, `scale`, `curve`, `thickness`,
   `brightness` and `hue`. The whole-figure ones — `span`, `baseline`, `radius`,
-  `rotation`, `glow`, `hue_spread`, `palette_mix`, `saturation`, and the view
+  `rotation`, `glow`, `softness`, `hue_spread`, `palette_mix`, `saturation`, and the view
   transform / mirror — take the `index = 0` value of the series instead of
   silently dropping the binding.
 - **`[smoothing]` cannot ease a per-element binding**, because the smoother holds

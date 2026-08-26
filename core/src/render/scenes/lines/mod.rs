@@ -78,19 +78,27 @@ pub fn half_width(thickness: f32) -> f32 {
 /// The across-the-stroke profile the **four line families** draw at unless a
 /// preset binds `softness` itself ([ADR-0124]).
 ///
-/// `1.0` is the pre-Plan-0114 fragment exactly — `g = u²`, brightness falling
-/// from the centreline with no plateau — so the parameter ships byte-identical
-/// and the register stays reachable for a preset that wants the luminous smear.
+/// **`0.25` — a solid stroke with a short shoulder — set by Plan 0114 Phase
+/// 4's look gate**, which judged the shipped presets side by side at 1920x1080
+/// and 1280x800 and then in the running app on real audio. It replaced `1.0`,
+/// the pure quadratic falloff every line scene drew from Plan 0010 until then,
+/// whose 4 px spine inside a 10 px gradient is the *blurred* verdict that
+/// opened the plan.
 ///
-/// **This is the constant Plan 0114's look gate moves.** It is deliberately
-/// *not* the value
+/// **`1.0` remains reachable and is not dead surface.** The same gate returned
+/// `1.0` for the Maurer roses, `0` for `curve_ionwake` and `0.25` for
+/// `lsystem_vellum` — which is why this is an authorable parameter with a
+/// default rather than a constant. A preset that wants the luminous smear
+/// binds one number and gets the pre-Plan-0114 fragment back, term for term.
+///
+/// It is deliberately *not* the value
 /// [`warp_mesh`](crate::render::scenes::warp_mesh::MILKDROP_SOFTNESS) passes:
 /// that surface is judged against `foo_vis_milk2` rather than against this
-/// plan's gate and is pinned, so a reader of either call site can see which
-/// judge it serves without leaving the file.
+/// plan's gate and is pinned at `1.0`, so a reader of either call site can see
+/// which judge it serves without leaving the file.
 ///
 /// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
-pub const DEFAULT_SOFTNESS: f32 = 1.0;
+pub const DEFAULT_SOFTNESS: f32 = 0.25;
 
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset

@@ -1402,6 +1402,12 @@ about a half-width. The bead is most distinct in the middle of the range, where
 the two strokes leave the vertex far enough apart to overlap in a compact spot
 instead of along the whole point.
 
+**Four parameters shape a stroke and they do not substitute for each other.**
+`thickness` is how wide it is, `softness` is how the light is distributed across
+that width, `brightness` is the colour it carries, and `glow` scales that colour
+again per segment. A figure that reads *blurred* wants `softness`; *too heavy*
+wants `thickness`; *too bright* wants `brightness` or `glow`. Reaching for the
+wrong one is the trap the `glow` entry below records.
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
   Pick it for the weight you want: it no longer trades against a joint artifact.
 
@@ -1419,29 +1425,40 @@ instead of along the whole point.
   > before suspecting sample count or geometry density. Nothing warns
   > ([backlog 0098](../docs/design-backlog.md)).
 - `softness` — the **shape of the stroke across its width**, `0` to `1`, default
-  `1.0`. At `1.0` brightness starts falling at the centreline and reaches zero
-  only at the stroke edge, which is what these scenes have always drawn: a 14 px
-  line is a 4 px spine inside a 10 px gradient. Lowering it adds a **solid
-  plateau** — `0.5` makes the inner half of the stroke solid and ramps across the
-  outer half; `0` is a solid stroke with a **one-pixel** antialiased edge. That
-  edge is one pixel of the render target at any resolution and any aspect, so a
-  low `softness` reads the same on a laptop panel and on a 4K screen.
+  **`0.25`**: a solid stroke with a short shoulder. `0` is solid with a
+  **one-pixel** antialiased edge; `0.5` makes the inner half solid and ramps
+  across the outer half; `1.0` is the pure quadratic falloff these scenes drew
+  until Plan 0114, where brightness starts falling at the centreline and a 14 px
+  line is a 4 px spine inside a 10 px gradient. The edge is one pixel of the
+  **render target** at any resolution and any aspect, so a low `softness` reads
+  the same on a laptop panel and on a 4K screen.
 
-  > **It is coverage, where `glow` is light.** `softness` changes how much of the
-  > stroke's footprint is lit; `glow` changes how bright the lit part is. Reach
-  > for `softness` when the figure reads *blurred*, for `glow` when it reads *too
-  > bright*, and for `thickness` when it is the wrong weight.
+  > **`1.0` is a legitimate value, not a leftover.** The look gate that set the
+  > default returned `1.0` for the Maurer roses, `0` for `curve_ionwake` and
+  > `0.25` for `lsystem_vellum` — the right stroke is a property of the figure.
+  > A preset keeping `1.0` wants a header line saying why, or the next reader
+  > will "fix" it.
+  >
+  > **A crisper stroke reads brighter at the same `brightness`**, because more
+  > of the footprint sits at full coverage. Lowering `softness` on an existing
+  > preset usually means trimming `brightness`, and often `bloom_amount` too —
+  > the bloom threshold is a brightness cut, so a solid core is more fuel for it.
   >
   > **Below about two pixels of stroke there is no room for an edge**, so
   > `softness` stops doing anything there and the stroke is drawn at the `1.0`
   > profile whatever it asks for. That is the same regime as the `thickness` dead
   > zone above, one derivative up.
 
-- `glow` — the line renderer's **per-segment falloff** multiplier, default `1.0`
+- `glow` — the line renderer's **per-segment light** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
-  four. It scales the shader's core-to-edge term straight into the stroke colour:
-  below `1` the stroke thins toward a dim hairline, above `1` it saturates the core
-  and only widens the visible skirt. **There is more range downward than upward** —
+  four. **It multiplies the stroke's colour and never its coverage**: a dimmed
+  stroke still covers its whole footprint, which is ADR-0056's rule. This entry
+  called it a *falloff* multiplier for four years and it is not one — that
+  confusion is precisely what let the blurred stroke sit unfixed, because the
+  parameter that looked like it should sharpen a line could only dim it.
+  Below `1` the stroke recedes toward a dim hairline, above `1` it saturates the
+  core and only widens the visible skirt. **There is more range downward than
+  upward** —
   measured per lit pixel, `1.0 → 0.3` moves a rose about 0.25 while `1.0 → 2.5`
   moves it 0.17 — so reach for `glow < 1` when you want the figure to recede.
   **It is not the same quantity as `glow` on `fragment_field` or

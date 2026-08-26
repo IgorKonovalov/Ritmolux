@@ -1456,6 +1456,25 @@ fn polar_profile(px: &[f32], max_radius_px: f32) -> Vec<(f32, f32)> {
 /// around the ring. So the assertion that discriminates is on *brightness
 /// around the ring*, and the roundness arm is asserted of the arc alone, at
 /// both scales, as the resolution claim.
+/// The per-ray light spread that separates a **bead** from the ordinary
+/// quantization of a stroke against a pixel grid.
+///
+/// Measured at 768 px, a 0.012 NDC half-width and the shipped `softness`
+/// default: the arc spreads **7.9 %** at ornament scale and 7.4 % at full
+/// frame; the 24-gon control spreads **34.3 %** and carries about twice the
+/// light per ray. Both arms below use this one number, so they stay back to
+/// back and neither can drift alone.
+///
+/// **It was 5 % while the stroke was a pure quadratic falloff, and a crisper
+/// stroke legitimately quantizes harder** (Plan 0114 Phase 5). A solid core
+/// contributes whole pixels to a ray's sum where a gradient contributes
+/// fractions, so the sum steps as the stroke's sub-pixel position varies
+/// around the ring. That is smooth, everywhere, and nothing like the 24
+/// localized spots ADR-0041's joins sum at the control's vertices — which is
+/// why the gap between the two arms is what carries the property, not the
+/// absolute figure.
+const BEAD_SPREAD: f32 = 0.12;
+
 #[test]
 fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
     // `scale` 0.13 is the retired `star_mandala`'s outermost ring; 1.8 fills the
@@ -1516,7 +1535,7 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
         );
         // Unbeaded: it has no interior vertex, so nothing sums anywhere.
         assert!(
-            vhi - vlo <= 0.05 * vhi,
+            vhi - vlo <= BEAD_SPREAD * vhi,
             "the arc-drawn circle carries between {vlo:.3} and {vhi:.3} light \
              per ray around the ring at motif scale {motif_scale}, and an arc \
              has no joint for a bead to form at"
@@ -1561,7 +1580,7 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
         (vhi - vlo) / vhi * 100.0
     );
     assert!(
-        vhi - vlo > 0.05 * vhi,
+        vhi - vlo > BEAD_SPREAD * vhi,
         "the {n}-gon control varies by only {:.3} in light around the ring, so \
          the arc's uniformity above is not distinguishing it from anything — \
          check that the control is still joined (ADR-0041), which is what sums \
