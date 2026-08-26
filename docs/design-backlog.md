@@ -2819,14 +2819,47 @@ threshold to retune.
   `present: fn is_lit in: core/src/render/metrics.rs`
 - **Verified 2026-08-26** — the derived ground that half-discharged this entry:
   `present: pub fn modal_ground in: core/src/render/metrics.rs`
-- **Verified 2026-08-26** — the residue: `fragment_tiledmono` is still held and still not embedded:
-  `present: fragment_tiledmono in: presets/pending/README.md`
+- **Verified 2026-08-26** — **the titular claim is discharged.** A structural statistic does repair
+  it, and the preset ships: `present: pub fn boundary_density in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the conjunction it asked for is live and per system kind:
+  `present: fn boundary_floor in: core/tests/sanity.rs`
+- **Verified 2026-08-26** — the surviving half, which is the absence of an instrument rather than a
+  fact about the tree: `unprobeable: whether Sumi, Whorl, Supernova and Neon Tunnel are compositions
+  or fills is a question no statistic in this repo asks, so there is nothing to match on`
 - **Verified 2026-08-26** — **the motivating family landed.** `shape_collage` merged with Plan 0113,
   so "all eleven current systems" in The finding below is now twelve, and the light-ground case that
   section calls *"about to stop holding"* has stopped holding. Its `coverage_floor` is derived from
   the family's own distribution (0.13, half `On White`'s 0.2677) rather than resting on the
   `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
   instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
+
+### Half-discharged again 2026-08-26 by [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md) — the title is discharged, the residue is not
+
+**Read this before the section below it, which this one narrows.** The heading of this entry —
+*"no reference tone and no structural statistic repairs it"* — is now **false**, and it was false in
+its second half from the day it was written.
+[ADR-0130](adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+ships `metrics::boundary_density` as the flatness gate's second term, `fragment_tiledmono` is in the
+embedded set, and nothing in the preset moved to get there.
+
+**Discharged — the flat-graphic conviction.** `every_preset_draws_a_real_shape` convicts only a frame
+that is over `MAX_TONAL_FLATNESS` **and** under `boundary_floor(system)`. What made a "failed"
+candidate work was ADR-0129's conditioning correction, not a new statistic: a conjunction's second
+term is judged only over the frames the first term admits to it, and conditioned that way the
+population has two members. `boundary` was in the section below marked **no**; its reading never
+moved.
+
+**Not discharged — the full-coverage residue.** `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` still
+read honest `coverage` near 1.0 with nothing asking whether they are compositions or fills. That is
+this entry's last live half. The `#[ignore]`d `tile@N` columns in `core/tests/sanity.rs` are the
+instrument ADR-0129 argued that question needs, and losing the flatness contest does not disturb that
+argument. **Owner if taken:** `architect`.
+
+**And a live hazard the discharge created**, recorded here because it lands on the same content:
+22 of the 43 shipped presets read under their family's boundary floor and pass on term one alone, so
+converting one to a two-ink print flips it from passing to convicted. See ADR-0130's landmine
+Negative and [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s mono-cohort
+table for the per-preset numbers.
 
 ### Half-discharged 2026-08-26 by [Plan 0116](plans/done/0116-the-sanity-lens-finds-the-ground.md), and one causal claim below is falsified
 
@@ -3047,6 +3080,104 @@ form. What it buys is that the close ceremony's most-missed step stops having a 
 cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
 are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
 links are repaired or deleted — several may have been decorative from the start.
+
+## 0130 — `boundary_density` scales with the capture resolution, and neither it nor its two floors names the 96x96 they were measured at
+
+**Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
+Mode 4 review, 2026-08-26. **Owner if taken:** `dev` — it is two doc comments, unless someone wires
+the statistic into `shot --report`, at which point it is a design question first.
+
+- **Verified 2026-08-26** — the statistic is a perimeter count over an area count:
+  `present: pub fn boundary_density in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the floors it is read against, both measured only at the sanity capture:
+  `present: fn boundary_floor in: core/tests/sanity.rs`
+- **Verified 2026-08-26** — the capture the numbers were taken at, which the two doc comments above
+  do not name: `present: const SIZE: u32 = 96 in: core/tests/sanity.rs`
+- **Verified 2026-08-26** — the convention it departs from, in the same file, three functions away:
+  `present: the sanity suite's 96 in: core/src/render/metrics.rs`
+
+### The finding
+
+`boundary_density` counts lit pixels having an unlit 4-neighbour and divides by lit pixels. The
+numerator scales with the figure's **perimeter** and the denominator with its **area**, so the ratio
+goes as ~1/L in the capture's linear resolution: the same scene captured at 192x192 reads roughly
+half what it reads at 96x96. A solid disc of radius `r` px reads about `2/r`.
+
+Both shipped floors — `0.31` on the default arm, `0.13` on `ShapeCollage` — are measurements taken
+**only** at `SIZE = 96`. `boundary_floor`'s docstring names the date (2026-08-26) and the revision
+(`8389f2a`) the two anchors were read at, which is [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
+ceremony done carefully — but not the capture size, which is the one part of the configuration the
+number is actually bound to. `metrics.rs`'s own convention is to say it: `radial_shell_occupancy`
+names "the sanity suite's 96x96 capture" three times in one doc comment, for a weaker coupling.
+
+The function's docstring points the other way. *"A solid mass carries only its rim on the boundary
+and reads near zero **however large it is**; a hatched, stroked or tiled figure is almost all rim and
+reads near one **however small**"* reads as scale-freeness, and size is exactly the direction where
+it is not free — a 4x4 solid block reads `1.0000`, not near zero. Inside the gate that is harmless,
+because `coverage` disposes of tiny figures on a separate term at a fixed capture. Outside it, the
+sentence is an invitation.
+
+### Why it is worth writing down rather than shrugging at
+
+**Nothing in the repo can catch it.** The gate runs at 96 and only at 96, so no test at the
+configuration this project develops and tests on can distinguish a resolution-bound constant from a
+resolution-free one — the generalized form of [ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
+habit, applied to a capture size rather than a grid.
+
+And there is a caller waiting. `metrics` is the module `shot --report` consumes, Plan 0119 made this
+function `pub` there rather than leaving it in the test file, and that plan's own Followups propose
+re-using the instrument on the four full-coverage luminous fields (see 0128). A `--report` column
+computed at 1280x720 against a floor derived at 96x96 is off by roughly an order of magnitude, and
+would read as a finding about the presets.
+
+### What a fix looks like
+
+One sentence in `boundary_density`'s docstring saying the reading scales with the capture's linear
+resolution and is comparable only at a fixed one, and "measured at the 96x96 sanity capture" added to
+`boundary_floor`'s derivation paragraph. If it ever reaches `shot --report`, the column needs either
+a fixed internal capture or a documented per-resolution floor — that is the design question, and it
+is not answered here.
+
+## 0131 — `shot --report` truncates preset names to 14 characters, and the library now has its first collision
+
+**Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
+Mode 4 review, 2026-08-26, while running the close ceremony's own curation sweep.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-08-26** — the truncating format, in all three of the report's per-preset tables:
+  `present: \{:<14\.14\} in: standalone/src/shot/report.rs`
+- **Verified 2026-08-26** — the pair that collides under it, one shipped by Plan 0119:
+  `present: name = "Tiled Rosette Mono" in: presets/fragment_tiledmono.toml`
+
+### The finding
+
+`report.rs` formats every per-preset row with `{:<14.14}`, which pads *and truncates* to fourteen
+characters. `Tiled Rosette` is thirteen; `Tiled Rosette Mono` truncates to `Tiled Rosette `. Since
+Plan 0119 shipped the second one, `cargo run -p standalone --example shot -- --presets presets
+--report family=fragment_field` prints two rows labelled `Tiled Rosette` in each of its three tables,
+with no way to tell which is which except row order:
+
+```text
+  Tiled Rosette    0.082   0.100   0.021   0.019   0.048   0.337   20+   43+
+  Tiled Rosette    0.347   0.000   0.119   0.000   0.523   0.576   15+   43+
+```
+
+It is the library's first collision at that width, so nothing has ever exercised it.
+
+### Why it matters more than a formatting nit
+
+This report **is** the instrument the architect close ceremony's preset-curation step reads — *"does
+the new content earn its place against what already ships, or did a family just converge?"* — and the
+two rows it cannot distinguish are precisely a base preset and its variant, which is the shape a
+convergence takes. The near-duplicate flag is computed on real names and is unaffected; the human
+reading of the table is what breaks.
+
+### What a fix looks like
+
+Widen the column to the longest name in the family being printed, or drop the `.14` precision and let
+the numeric columns align on their own `{:>7}` widths. Either is a one-line change; the second is
+closer to what the surrounding tables already do. A `shot_cli` assertion that no two rows in one
+family table carry the same label is the thing that would keep it from coming back.
 
 ## 0132 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
 

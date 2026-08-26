@@ -1,0 +1,126 @@
+# Nebula - a supernova remnant as a two-layer world: cold gas and hot filaments,
+# which is the one thing a single scene could not give.
+#
+# Neither substrate works alone. A fragment field fills every pixel by
+# construction, so on its own it renders marble and a nebula is defined by the
+# void it hangs in. An attractor deposits filaments onto black, which is the
+# right figure/ground - but its hue is a per-particle random band, so widening it
+# does not paint a cold rim and a hot core, it just averages the whole cloud to
+# one colour (measured: spread 0.28 and 1.25 render the same flat violet).
+#
+# So the field is the GAS, held far down in luminance and pinned to the dark half
+# of the ramp, and the attractor rides `under` - the sparse-over-dense join, which
+# puts both in one target so they share trails, bloom and tonemap and fuse into
+# one substance rather than reading as two images. The colour split is done by
+# WHERE EACH SITS ON THE SHARED RAMP, not by two palettes: the gas lives in
+# void-to-violet, the filaments in magenta-to-white.
+#
+# fb_zoom drifts the accumulated past outward every second, so the trail is the
+# expanding shell. No fold anywhere - a rosette reads as architecture.
+system = "fragment_field"
+name = "Nebula"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#000208" },
+  { at = 0.20, color = "#10093e" },
+  { at = 0.42, color = "#4a1382" },
+  { at = 0.62, color = "#b02a6b" },
+  { at = 0.80, color = "#ff7a2a" },
+  { at = 0.93, color = "#ffd9a0" },
+  { at = 1.00, color = "#fffaf0" },
+]
+
+[params]
+# THE GAS. Luminance is the whole discipline here - the filaments above need
+# somewhere to land, and a field at its usual 0.5-0.7 glow erases them.
+warp  = "1.15 + noise(time * 0.045) * 0.35 + clamp(bass * 0.55, 0, 0.46)"
+zoom  = "2.40 + sin(time * 0.037) * 0.15"
+pan_x = "time * 0.009 + sin(time * 0.029) * 0.08"
+pan_y = "cos(time * 0.023) * 0.07"
+# Glow is the field's level param, but it is NOT the lever that darkens this
+# preset: with `trails` at 0.56 and `fb_zoom` above 1 the gas is accumulation-
+# dominated, and dropping glow 0.16 -> 0.045 barely moved the ground. Reach for
+# the trail pair before reaching for glow again.
+glow  = "0.045 + clamp(mid * 0.055, 0, 0.048)"
+flash = "clamp(onset * 0.26, 0, 0.16)"
+
+# Pinned to the ramp's dark half: span 0.34 about centre 0.10 keeps the gas
+# between void and violet and never lets it reach the shock colours.
+#
+# `color_center` IS CYCLIC AND WRAPS - a negative centre reaches the palette's
+# BRIGHT end, not its dark one. Pushing it to -0.05 to darken the gas is what
+# made an early draft render as bright marble, and nothing warns.
+color_span   = "0.34 + clamp(treb * 0.10, 0, 0.07)"
+color_center = "0.10 + sin(time * 0.041) * 0.05 + clamp(bass * 0.12, 0, 0.10)"
+saturation   = "1.25 + clamp(treb * 0.24, 0, 0.16)"
+palette_mix  = "0"
+
+# THE SHELL. No fold - order < 2 is passthrough.
+kaleido_order = "1"
+trails  = "0.56 + clamp(onset * 0.24, 0, 0.16)"
+fb_zoom = "1.045 + clamp(bass * 0.030, 0, 0.026) + beat * 0.015"
+
+bg_hue      = "0.14"
+bg_bright   = "0.004 + clamp(mid * 0.010, 0, 0.008)"
+bg_vignette = "0.95"
+
+# Only the densest filament crossings cross the threshold, which is what makes
+# the hot cores read as stars in gas rather than as an even glow.
+bloom_amount    = "1.5"
+bloom_threshold = "0.86"
+bloom_radius    = "1.6"
+
+# THE FILAMENTS - De Jong, riding `under` so it shares the post chain with the
+# gas. Sparse-over-dense is exactly this join's idiom.
+[layer]
+system = "attractor"
+join   = "under"
+
+[layer.particles]
+family = "de_jong"
+
+[layer.params]
+# Leviathan's four-axis coefficient wander, kept: the remnant is always
+# mid-transformation rather than a static shape. No spin.
+spin = "0"
+a = "-2.10 + sin(time * 0.0170) * 0.38 + clamp(bass * 0.4, 0, 0.34)"
+b = "-2.34 + cos(time * 0.0130) * 0.34 + clamp(mid * 0.353, 0, 0.30)"
+c = "1.28 + sin(time * 0.0091) * 0.42 + clamp(treb * 0.433, 0, 0.26)"
+d = "1.96 + cos(time * 0.0110) * 0.36 + clamp(bass * 0.282, 0, 0.24)"
+# Longer exposure and a wider nib than Leviathan's - that preset is tuned to stay
+# creature-like, and this one has to read as cloud.
+fade   = "0.78 - clamp(bass * 0.070, 0, 0.060) - beat * 0.018"
+size   = "0.58 - clamp((bass + treb) * 0.090, 0, 0.130) + beat * 0.10"
+reseed = "onset > 0.40"
+# The ramp's HOT half - magenta through the shock rim to the white core. Kept
+# narrow on purpose: a wide band on this scene averages, it does not gradate.
+hue_center  = "0.66 + sin(time * 0.021) * 0.05 + clamp(bass * 0.13, 0, 0.11)"
+hue_spread  = "0.26 + clamp(treb * 0.20, 0, 0.13)"
+saturation  = "1.15 + clamp(mid * 0.26, 0, 0.22)"
+zoom  = "1.10 + bar * 0.03 + clamp(bass * 0.10, 0, 0.09)"
+pan_x = "sin(time * 0.023) * 0.05"
+pan_y = "cos(time * 0.031) * 0.04"
+
+[layer.smoothing]
+a          = 0.55
+b          = 0.55
+c          = 0.55
+d          = 0.55
+fade       = 0.20
+size       = { attack = 0.02, release = 0.26 }
+zoom       = 0.16
+hue_center = 0.40
+hue_spread = 0.50
+
+[smoothing]
+warp         = { attack = 0.03, release = 0.40 }
+zoom         = { attack = 0.03, release = 0.45 }
+glow         = 0.25
+flash        = { attack = 0.02, release = 0.22 }
+color_center = 0.45
+color_span   = 0.35
+saturation   = 0.35
+trails       = { attack = 0.04, release = 0.55 }
+fb_zoom      = { attack = 0.05, release = 0.40 }
+bg_bright    = 0.40
