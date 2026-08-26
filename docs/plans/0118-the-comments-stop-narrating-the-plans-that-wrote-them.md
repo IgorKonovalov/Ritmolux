@@ -13,14 +13,14 @@
 
 28,064 comment lines against 53,489 of code. 89 relative links in Rust comments that no gate can see
 and eleven of which are already broken. 252 lines of narration written from inside a plan session
-(`this plan`, `used to`, `no longer`). 44 comment blocks over 40 lines, five of them module headers
-over 100.
+(`this plan`, `used to`, `no longer`). 61 comment blocks over 40 lines, eight of them over 100.
 
 ADR-0127 splits a comment into what it must carry — mechanism, invariant, trap, un-derivable
 formula — and what belongs in an ADR and is merely being copied. This plan builds the gate for the
 two mechanical rot classes, deletes all 89 links in favour of bare-number citations, removes the
-narration, and trims the 44 long blocks. **It leaves the ~2,900 short comments alone** and does not
-gate length, which ADR-0127 argues would fire on the wrong thing and be gameable by a blank line.
+narration, and trims the 61 long blocks. **It leaves the 7,913 blocks of 40 lines or fewer alone**
+and does not gate length, which ADR-0127 argues would fire on the wrong thing and be gameable by a
+blank line.
 
 ## Context & problem
 
@@ -48,14 +48,21 @@ own new link had to be repointed by hand.
 
 | | total | outside contended trees | inside them |
 |---|---|---|---|
-| files in scope | 106 | 75 | 31 |
-| relative links in comments | 89 | 56 | 33 |
-| lines inside blocks of 40+ | 3,850 | 3,124 | 726 |
-| plan-relative narration lines | 252 | 182 | 70 |
+| files in scope | 106 | 72 | 34 |
+| relative links in comments | 89 | 51 | 38 |
+| blocks of 40+ lines | 61 | 42 | 19 |
+| lines inside those blocks | 3,850 | 2,718 | 1,132 |
+| plan-relative narration lines | 252 | 164 | 88 |
 
-"Contended" is `core/src/render/scenes/` and `core/src/render/scenes/lines/`, where the live
-`plan-0113-shape-collage` and `plan-0087-arc-primitive` worktrees are working. That split is why
-Phases 6 and 7 are separate.
+**"Contended" is wherever a lane is live**, which is three lanes and not two:
+`core/src/render/scenes/` (including `lines/`) for `plan-0113-shape-collage` and
+`plan-0087-arc-primitive`, plus the three files `plan-0116-sanity-ground` reaches —
+`core/tests/sanity.rs`, `core/src/render/metrics.rs` and `core/src/render/post/tests.rs`, the
+callers of `is_lit` that Plan 0116 re-bases. That split is why Phases 6 and 7 are separate.
+
+**`core/tests/sanity.rs` is the single heaviest file in the sweep** — 365 lines inside five blocks
+of 40+, a third of everything Phase 7 now holds — and Plan 0116's own Phase 5 touches its module
+docs directly. It sits in Phase 7 for that reason, not because of where it lives.
 
 ## Decision
 
@@ -170,13 +177,13 @@ flowchart TB
 ### Phase 6 — the long blocks come down, outside the contended trees
 
 - **Owner skill:** dev
-- **What:** the 44 blocks of 40+ lines, in the **75 files outside** `core/src/render/scenes/`, held
+- **What:** the 42 blocks of 40+ lines — 2,718 lines — in the **72 uncontended files**, held
   to ADR-0127's rule — mechanism, invariant, trap, un-derivable formula stay; the restated decision
   record goes, cited by number. The tonemap header in ADR-0127's Context is the worked example of
   the target shape. **The Decision's deletion rule is the governing constraint of this phase.**
-- **Files touched:** ~75 `.rs` files, the heaviest being `core/tests/sanity.rs`,
-  `core/src/render/background.rs`, `kaleidoscope.rs`, `tier.rs`, `bloom.rs`,
-  `standalone/src/shot/render.rs`.
+- **Files touched:** ~72 `.rs` files, the heaviest being `core/src/render/background.rs` (192),
+  `kaleidoscope.rs` (191), `tier.rs` (171), `core/tests/composite.rs` (125), `bloom.rs` (118) and
+  `standalone/src/shot/render.rs` (106). **Not `core/tests/sanity.rs`** — see Phase 7.
 - **Done when:** no block over 40 lines survives in these files **unless** the log names it and says
   in one line what invariant needs the length — `kaleidoscope.rs`'s 191 lines may well be such a
   case, and ADR-0127 explicitly declines to gate this, so the log is the only record. No numeric
@@ -187,10 +194,11 @@ flowchart TB
 ### Phase 7 — the long blocks come down, inside the contended trees
 
 - **Owner skill:** dev
-- **What:** the same work for the **31 files** under `core/src/render/scenes/` and
-  `core/src/render/scenes/lines/` — 726 lines in 40+ blocks, 33 of the links, 70 narration lines.
-  (Phases 3 and 4 already took the links and narration here; this phase is the trimming only.)
-- **Files touched:** ~31 `.rs` files under `core/src/render/scenes/`.
+- **What:** the same work for the **34 contended files** — 1,132 lines in 19 blocks of 40+.
+  (Phases 3 and 4 already took this scope's 38 links and 88 narration lines; this phase is the
+  trimming only.) The weight is concentrated: `core/tests/sanity.rs` alone is 365 of those lines.
+- **Files touched:** ~31 `.rs` files under `core/src/render/scenes/`, plus `core/tests/sanity.rs`,
+  `core/src/render/metrics.rs` and `core/src/render/post/tests.rs`.
 - **Done when:** same bar as Phase 6. **This phase is separable and may be deferred** — the
   `plan-0113-shape-collage` and `plan-0087-arc-primitive` worktrees are live in exactly these
   directories, and a comment-only diff that collides with them buys a merge conflict for a cosmetic
@@ -221,7 +229,7 @@ flowchart TB
 
 - **It does not gate comment length**, in any file, by any threshold — ADR-0127 Alternative B, with
   its reasons. Length stays a Mode 4 judgement.
-- **It does not touch the ~2,900 comment blocks under 40 lines** that carry no link and no
+- **It does not touch the 7,913 comment blocks of 40 lines or fewer** that carry no link and no
   narration. Most of them are the load-bearing layer and are the reason this codebase reads well.
 - **It does not extend `check-doc-links.mjs`**, and it retires design-backlog 0129, which proposed
   exactly that before this question was asked.
