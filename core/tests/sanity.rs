@@ -2042,3 +2042,405 @@ fn each_candidate_ground_is_tabled_against_the_library() {
         report_ground_verdict_changes(label, &meta, &rows);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Plan 0116 Phase 8 — what separates a composition from a blot
+// ---------------------------------------------------------------------------
+//
+// A measurement harness and nothing else, the same shape as Phase 1 and for the
+// same reason: ADR-0126 named a mechanism without measuring it and Phase 1
+// falsified it one plan later. ADR-0127 now names a second one — that a picture
+// is a blot only if it is tonally flat *and* structureless — and this section
+// exists to find out whether any statistic actually says that, before Phase 9
+// weakens a live gate on the strength of it.
+//
+// The candidates live here rather than in `core/src/render/metrics.rs`, exactly
+// as Phase 1's ground estimators did. Two of the three will be discarded, and a
+// discarded candidate that shipped as a `pub` production statistic is worse than
+// no measurement.
+
+/// Whether a pixel departs from `bg` on any RGB channel by more than [`EPS`] —
+/// `metrics::is_lit`, which is private to `core`, restated for the same reason
+/// [`sanity_luma`] is.
+fn sanity_is_lit(px: &[u8], bg: [u8; 4]) -> bool {
+    px.iter()
+        .zip(bg.iter())
+        .take(3)
+        .any(|(&c, &b)| c.abs_diff(b) > EPS)
+}
+
+/// The lit mask of a frame against its own ground, as one bool per pixel.
+fn lit_mask(img: &CaptureImage) -> Vec<bool> {
+    let bg = ground(img);
+    img.rgba
+        .chunks_exact(4)
+        .map(|px| sanity_is_lit(px, bg))
+        .collect()
+}
+
+/// One candidate structural statistic. **The roster is the deliverable, not a
+/// choice** — Phase 8's stop condition decides, from what these print, and it
+/// can end the plan.
+struct StructureCandidate {
+    /// Column name in the printed table.
+    name: &'static str,
+    /// One line on what it counts, printed once above the table.
+    note: &'static str,
+    /// Read over the frame's lit mask. Higher must mean *more* structured, so
+    /// every column is read in one direction.
+    measure: fn(&CaptureImage) -> f32,
+}
+
+/// The four columns ADR-0127 asks Phase 8 to table, control first so every other
+/// column reads as a difference from it rather than as an absolute.
+const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
+    StructureCandidate {
+        name: "flatness^-1",
+        note: "the control - 1 - tonal_flatness, so high means structured like the rest",
+        measure: inverse_flatness,
+    },
+    StructureCandidate {
+        name: "boundary",
+        note: "share of lit pixels with an unlit 4-neighbour (perimeter over lit area)",
+        measure: boundary_density,
+    },
+    StructureCandidate {
+        name: "components",
+        note: "4-connected components in the lit mask, per thousand lit pixels",
+        measure: component_density,
+    },
+    StructureCandidate {
+        name: "sobel",
+        note: "mean |Sobel| over the binary lit mask at capture resolution",
+        measure: mask_sobel_density,
+    },
+];
+
+/// The control, inverted so it reads in the same direction as the other three:
+/// `1 - tonal_flatness`, high for a picture with tonal structure.
+fn inverse_flatness(img: &CaptureImage) -> f32 {
+    1.0 - tonal_flatness(img, ground(img), EPS)
+}
+
+/// Perimeter of the lit mask over its area: the share of lit pixels that have at
+/// least one unlit 4-neighbour.
+///
+/// Dimensionless and scale-free in the direction that matters — a solid mass has
+/// only its rim on the boundary and reads near zero, while a hatched figure is
+/// almost all rim and reads near one. Frame edges are treated as **unlit**, so a
+/// figure running off the frame counts that as boundary; the alternative (edges
+/// as lit) would let a fullscreen fill read as having no perimeter at all, which
+/// is the one answer this statistic must not give.
+fn boundary_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let at = |x: isize, y: isize| -> bool {
+        if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+            return false;
+        }
+        mask.get(y as usize * w + x as usize)
+            .copied()
+            .unwrap_or(false)
+    };
+    let (mut lit, mut edge) = (0u64, 0u64);
+    for y in 0..h as isize {
+        for x in 0..w as isize {
+            if !at(x, y) {
+                continue;
+            }
+            lit += 1;
+            if !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) {
+                edge += 1;
+            }
+        }
+    }
+    if lit == 0 {
+        return 0.0;
+    }
+    edge as f32 / lit as f32
+}
+
+/// 4-connected components of the lit mask, per thousand lit pixels.
+///
+/// Normalized by lit area rather than reported raw, so a dense figure and a
+/// sparse one are comparable: one solid mass reads near zero however large it
+/// is, and a field of separate marks reads high however many there are.
+fn component_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let lit = mask.iter().filter(|&&b| b).count();
+    if lit == 0 {
+        return 0.0;
+    }
+    let mut seen = vec![false; mask.len()];
+    let mut components = 0u64;
+    let mut stack: Vec<usize> = Vec::new();
+    for start in 0..mask.len() {
+        if !mask[start] || seen[start] {
+            continue;
+        }
+        components += 1;
+        seen[start] = true;
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            let (x, y) = (i % w, i / w);
+            let mut visit = |nx: usize, ny: usize| {
+                let j = ny * w + nx;
+                if mask[j] && !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(x - 1, y);
+            }
+            if x + 1 < w {
+                visit(x + 1, y);
+            }
+            if y > 0 {
+                visit(x, y - 1);
+            }
+            if y + 1 < h {
+                visit(x, y + 1);
+            }
+        }
+    }
+    components as f32 * 1000.0 / lit as f32
+}
+
+/// Mean Sobel gradient magnitude over the **binary** lit mask, at capture
+/// resolution.
+///
+/// The binary mask rather than the grayscale frame on purpose: a smooth luminous
+/// field has gradients everywhere and would read as structured, and the question
+/// ADR-0127 asks is about the *shape* of what is lit, not its shading. Border
+/// pixels stay zero (no wrap), matching `metrics::sobel`.
+fn mask_sobel_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w < 3 || h < 3 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let at = |x: usize, y: usize| -> f32 { f32::from(u8::from(mask[y * w + x])) };
+    let mut sum = 0.0f64;
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let gx = at(x + 1, y - 1) + 2.0 * at(x + 1, y) + at(x + 1, y + 1)
+                - at(x - 1, y - 1)
+                - 2.0 * at(x - 1, y)
+                - at(x - 1, y + 1);
+            let gy = at(x - 1, y + 1) + 2.0 * at(x, y + 1) + at(x + 1, y + 1)
+                - at(x - 1, y - 1)
+                - 2.0 * at(x, y - 1)
+                - at(x + 1, y - 1);
+            sum += f64::from((gx * gx + gy * gy).sqrt());
+        }
+    }
+    (sum / ((w - 2) * (h - 2)) as f64) as f32
+}
+
+/// One frame in Phase 8's table, with the role it plays in the stop condition.
+struct StructureRow {
+    name: String,
+    /// One value per [`STRUCTURE_CANDIDATES`] column.
+    values: Vec<f32>,
+    /// `Some(true)` = must read structureless, `Some(false)` = must read
+    /// structured, `None` = shipped content, which must land outside the gap
+    /// between those two.
+    is_blot: Option<bool>,
+}
+
+/// **Plan 0116 Phase 8.** Print, for the frozen blot fixture, the held-out
+/// `Tiled Rosette Mono`, the three frozen thin-stroke mandalas and the whole
+/// shipped library, what each candidate structural statistic says — beside
+/// `tonal_flatness`, the statistic ADR-0127 proposes to add a second term to.
+///
+/// # This gates nothing, and cannot
+///
+/// It is `#[ignore]`d and contains no assertion, for the reason Phase 1's
+/// harness carries: a report built to inform a **stop gate** must not be able to
+/// redden CI on its own, or the gate is decided by whichever candidate happens
+/// to be green.
+///
+/// # The stop condition, which is mechanical
+///
+/// A candidate passes only if it puts `Blown Out` **below** `Tiled Rosette Mono`
+/// and no shipped preset **between** them. If none does, Phase 9 does not run:
+/// the plan closes here, ADR-0127 gains a dated `Outcome`, and
+/// `fragment_tiledmono` stays held. The report prints that verdict per candidate
+/// rather than leaving it to be read off the rows.
+///
+/// # Thin-stroke content is in the table on purpose
+///
+/// Design-backlog 0072 measured that a hairline over a 46-fold ornament aliases
+/// to almost nothing at 96×96, which is what made `coverage` a halo-meter. A
+/// boundary-length measure is exactly the kind of statistic that could inherit
+/// that failure, so the three frozen [`retired_mandalas`] are rows here rather
+/// than assumed safe.
+///
+/// Run it with:
+///
+/// ```text
+/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
+///     each_structure_candidate_is_tabled_against_the_library --no-capture
+/// ```
+#[test]
+#[ignore = "measurement, not a gate: Plan 0116 Phase 8 informs a mechanical stop condition"]
+fn each_structure_candidate_is_tabled_against_the_library() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    let (mut presets, meta) = sanity_roster();
+    let mut roles: Vec<(String, Option<bool>)> =
+        meta.iter().map(|(n, _)| (n.clone(), None)).collect();
+
+    // The blot that must read structureless.
+    let blot = without_backdrop(blown_out());
+    roles.push((blot.name.clone(), Some(true)));
+    presets.push(blot);
+
+    // The composition that must read structured — the preset ADR-0127 exists
+    // for, held in presets/pending/ and so not reachable from `sanity_roster`.
+    let held =
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+    roles.push((held.name.clone(), Some(false)));
+    presets.push(held);
+
+    // Thin-stroke content, which a boundary measure must not mistake for a blot.
+    for mandala in retired_mandalas() {
+        let mandala = without_backdrop(mandala);
+        roles.push((mandala.name.clone(), None));
+        presets.push(mandala);
+    }
+
+    renderer.set_presets(presets);
+
+    println!("{}", "=".repeat(78));
+    println!("Plan 0116 Phase 8 - candidate structural statistics, at LOUD");
+    println!("{}", "=".repeat(78));
+    println!("candidates (higher = more structured, in every column):");
+    for cand in STRUCTURE_CANDIDATES {
+        println!("  {:<13} {}", cand.name, cand.note);
+    }
+    println!(
+        "roles: [blot] must read lowest, [comp] must read above it, the rest must not fall \
+         between them."
+    );
+    println!(
+        "NOTE: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are the four groundless luminous"
+    );
+    println!("  fields ADR-0127 records as the same open question - read their rows deliberately.");
+    println!();
+
+    let frame = loud();
+    let mut rows: Vec<StructureRow> = Vec::new();
+    for (name, is_blot) in &roles {
+        let img = renderer
+            .capture_preset(name, &frame, FRAMES)
+            .expect("capture preset");
+        let values: Vec<f32> = STRUCTURE_CANDIDATES
+            .iter()
+            .map(|c| (c.measure)(&img))
+            .collect();
+        let role = match is_blot {
+            Some(true) => "[blot]",
+            Some(false) => "[comp]",
+            None => "      ",
+        };
+        let printed: Vec<String> = STRUCTURE_CANDIDATES
+            .iter()
+            .zip(values.iter())
+            .map(|(c, v)| format!("{}={v:.4}", c.name))
+            .collect();
+        println!("{role} {name:<22} {}", printed.join("  "));
+        rows.push(StructureRow {
+            name: name.clone(),
+            values,
+            is_blot: *is_blot,
+        });
+    }
+
+    report_structure_separation(&rows);
+}
+
+/// Per candidate, the margin between the blot and the composition and whether
+/// any other frame falls in the gap — **the whole criterion**, printed rather
+/// than left to the reader.
+fn report_structure_separation(rows: &[StructureRow]) {
+    println!();
+    println!("separation at LOUD (the stop condition):");
+    let find = |want: bool| rows.iter().find(|r| r.is_blot == Some(want));
+    let (Some(blot), Some(comp)) = (find(true), find(false)) else {
+        println!("  the table is missing one of its two anchors — nothing to decide on");
+        return;
+    };
+    for (ci, cand) in STRUCTURE_CANDIDATES.iter().enumerate() {
+        let (Some(&lo), Some(&hi)) = (blot.values.get(ci), comp.values.get(ci)) else {
+            continue;
+        };
+        if lo >= hi {
+            println!(
+                "  {:<13} NOT SEPARATED: {} reads {lo:.4}, {} reads {hi:.4}",
+                cand.name, blot.name, comp.name,
+            );
+            continue;
+        }
+        let inside: Vec<String> = rows
+            .iter()
+            .filter(|r| r.is_blot.is_none())
+            .filter(|r| r.values.get(ci).is_some_and(|&v| v > lo && v < hi))
+            .map(|r| {
+                format!(
+                    "{} {:.4}",
+                    r.name,
+                    r.values.get(ci).copied().unwrap_or(f32::NAN)
+                )
+            })
+            .collect();
+        println!(
+            "  {:<13} separated by {:.4} ({lo:.4} -> {hi:.4});  {} frame(s) in the gap",
+            cand.name,
+            hi - lo,
+            inside.len(),
+        );
+        for entry in &inside {
+            println!("      in the gap  {entry}");
+        }
+
+        // The second, sharper reading of the same condition: run the threshold
+        // ceremony Phase 9 would have to use and see whether the constant it
+        // produces convicts the blot. `MIN_STRUCTURAL_SHELLS`, `MAX_FLOOR_SLACK`
+        // and every coverage floor in this file are derived as half the sparsest
+        // legitimate content (ADR-0071), so a candidate that cannot survive that
+        // derivation cannot be adopted without inventing a number instead — and
+        // this plan's Phase 9 forbids exactly that.
+        let sparsest = rows
+            .iter()
+            .filter(|r| r.is_blot.is_none())
+            .filter_map(|r| r.values.get(ci).copied())
+            .fold(f32::INFINITY, f32::min);
+        let threshold = sparsest / 2.0;
+        let convicts = lo < threshold;
+        println!(
+            "      threshold {threshold:.4} = half the sparsest legitimate content ({sparsest:.4}): {} reads {lo:.4}, {}",
+            blot.name,
+            if convicts {
+                "CONVICTED"
+            } else {
+                "NOT convicted - the flatness gate would go vacuous"
+            },
+        );
+        if inside.is_empty() && convicts {
+            println!("      PASSES the stop condition");
+        } else {
+            println!("      FAILS the stop condition");
+        }
+    }
+}
