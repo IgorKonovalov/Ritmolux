@@ -13,10 +13,18 @@
 #
 # THE PALETTE STAYS UNDER THE TONEMAP'S KNEE, AND THAT ONE CONSTRAINT IS WHAT
 # MAKES THE LOOK. ADR-0046's curve is exactly the identity below linear 0.6, so a
-# colour whose brightest channel sits at or under it reaches the display
-# byte-identical - flat, unshaded, the colour that was authored. Bloom's
-# threshold sits ABOVE that same knee, so a canvas living under it gets no halo
-# either, and the edges stay hard. Two properties, one constraint, no parameter.
+# colour whose brightest channel sits at or under it survives the post chain
+# UNSHADED - the value the element wrote is the value that leaves the tonemap.
+# Bloom's threshold sits ABOVE that same knee, so a canvas living under it gets
+# no halo either, and the edges stay hard. Two properties, one constraint, no
+# parameter.
+#
+# WHAT THAT DOES NOT MEAN IS THAT THE HEX BELOW IS THE HEX ON SCREEN. A stop is a
+# LINEAR COEFFICIENT with no sRGB decode, so the display byte is its sRGB
+# ENCODING and it is brighter: `#111111` renders `#494949`, `#8a1420` renders
+# `#BF5164`, and the paper renders `#E2E0DA`. Every plateau is shifted by the
+# same curve and none of them is shaded, tinted or haloed, which is the whole of
+# the flat-graphic look. Author by the rendered result, not by the hex.
 #
 # Seven of the eight plateaus below are under it. The eighth is the paper, and it
 # is deliberately over: `f(1.0) = 0.800`, so pure white is unreachable and
@@ -40,9 +48,10 @@
 #   saturation  the top end, on chroma rather than on luminance
 #
 # THE ONE THING TO KNOW BEFORE RETUNING THE BEAT: `beat_index` counts ONSETS,
-# about 1.7-2.1x per musical beat (ADR-0109), so anything hung off it fires
-# roughly twice as often as the music does. Plan 0095 is the fix in flight. Do
-# NOT compensate for it here - that would have to be unwound when 0095 lands.
+# and NO FIXED MULTIPLIER CONVERTS (ADR-0109). It runs at 1.2x to 2.3x detections
+# per musical beat depending on the material and wanders between 1x, 2x and 4x
+# inside a single track, so anything hung off it has no period at all. Do NOT
+# compensate for it here - there is nothing stable to compensate against.
 
 system = "shape_collage"
 name   = "Suprematist"
@@ -129,10 +138,11 @@ density = "0.72 + clamp(mid * 0.33, 0, 0.28)"
 # because a crossfade in flight is two canvases sharing one frame. A canvas needs
 # to be still long enough to be read as a composition.
 #
-# `beat_index` counts ONSETS at about 1.7-2.1x the musical beat (ADR-0109), so
-# one in eight of these is nearer one in four real beats. That is deliberate and
-# NOT compensated for here - Plan 0095 is the fix in flight, and a preset that
-# corrected for it would have to be unwound when it lands.
+# `beat_index` counts ONSET DETECTIONS, not beats, and no fixed multiplier
+# converts (ADR-0109) - so one in eight of these is somewhere between one in four
+# and one in seven real beats, and the ratio moves inside a track. That is fine
+# for what this clause IS: `hash(beat_index)` is activity-gating, a re-roll on a
+# hit, and it claims no period. Do not read the 0.88 as a beat count.
 recompose       = "select(hash(beat_index) > 0.88, 1, 0)"
 # Short and non-zero: at 0 the cut is violent, and a canvas is a slower thing
 # than a strobe.

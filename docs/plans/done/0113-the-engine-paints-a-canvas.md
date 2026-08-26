@@ -1,12 +1,22 @@
 # 0113 — The engine paints a canvas
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`, all on
+> `main` (Phases 1-8 on the `plan-0113-shape-collage` lane, merged `b20ba21`; 6b, 9
+> and 10 directly). Two Mode 4 reviews: the first found three `major`s (a false
+> colour promise at five sites, a forbidden sweep quoted, a per-frame heap
+> allocation in the render path) which became Phase 9; the second found **no
+> blockers and one `major`** — ADR-0123 carried the sixth copy of that colour
+> promise and is the document the five repaired sites cite — which is discharged
+> by this close as a dated `Outcome` on that ADR. Phase 10 took the remaining four
+> `minor`s and two `nit`s. Verified at the tip: `cargo nextest run --workspace` 994
+> passed / 5 skipped, `fmt --check` and `clippy --all-targets --workspace -D
+> warnings` clean, all three doc gates green, both golden baselines unmoved.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
-> **Relates to:** [design-backlog 0069](../design-backlog.md) — partially advanced, not closed.
+> **Related ADRs:** [0123](../../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
+> **Relates to:** [design-backlog 0069](../../design-backlog.md) — partially advanced, not closed.
 > **Amended 2026-08-25:** **Phase 6b added**, and Phase 6 is now blocked on
-> [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
+> [Plan 0116](0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
 > Phase 1's `coverage_floor` arm correctly found that this family's lit fraction is `1.0` by
 > construction and leaned on `MAX_TONAL_FLATNESS` as the rescue; that rescue is read only at `LOUD`,
 > where Phase 6's `density` holds the canvas at its fullest, so the emptying canvas Phase 6 builds is
@@ -128,7 +138,7 @@ flowchart LR
 - **Done when:**
   - The test sweeps element count across at least 8, 16, 32, 64 and 128 at 1080p, renders each, and
     **prints per-frame cost with the adapter, driver, profile and window size named**.
-  - **It asserts no threshold.** Per [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+  - **It asserts no threshold.** Per [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
     a frame time is a fact about a GPU and a driver, not about the code. Model this file on
     `core/tests/mark_cost.rs`, which is the in-tree precedent: it prints, it names its machine, and
     the only thing it asserts is that it genuinely measured different configurations.
@@ -243,7 +253,7 @@ flowchart LR
     through the analyzer; the other four synthesize their frames and would not notice a canvas that
     ignored the music.
 
-> **Blocked on [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
+> **Blocked on [Plan 0116](0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
 > builds a canvas the music empties, and **no gate in this repo can currently see that state.**
 > `sanity` reads `tonal_flatness` only at `LOUD`, where `density` holds the canvas at its fullest;
 > the quiet capture buys only `MODERATE_MIN_COVERAGE`, which is degenerate for this family because
@@ -256,7 +266,7 @@ flowchart LR
 ### Phase 6b — The canvas is measured against its own paper
 
 - **Owner skill:** dev
-- **What:** Adopt [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
+- **What:** Adopt [Plan 0116](0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
   family, and retire the placeholder reasoning this branch shipped in Phase 1.
 - **Depends on:** Plan 0116 Phase 3 having landed. If it has not, **stop and say so** rather than
   proceeding — Phase 7 does not depend on this and can be taken first.
@@ -312,7 +322,7 @@ flowchart LR
 
 ### Phase 9 — The Mode 4 repairs
 
-> **Added 2026-08-26 by the close review**, on the [Plan 0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+> **Added 2026-08-26 by the close review**, on the [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md)
 > precedent: findings that need code become a phase rather than a paragraph, so the session that
 > fixes them reads them in the plan it is already holding. Phases 1-8 landed cleanly and the
 > workspace is green (993 tests) on the merged lane; nothing below reverses a decision.
@@ -366,6 +376,80 @@ flowchart LR
   - `cargo nextest run --workspace` is green, and the two golden baselines are unmoved — none of the
     above is a pixel change.
 
+### Phase 10 — The second-pass repairs
+
+> **Added 2026-08-26 by the second close review**, on the same [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md)
+> precedent Phase 9 used. That pass found no blockers and one `major`; the `major`
+> is architect-owned — ADR-0123 carries its own copy of the colour promise Phase 9
+> repaired at five sites, and is the document those five cite — so it is repaired
+> at the close, not here. What is below is the four `minor`s and two `nit`s that
+> need `dev`. **Nothing here is a pixel change**, and none of it reverses a decision.
+
+- **Owner skill:** dev
+- **What:** Two stale measurements, one collision hazard, one defensive assert, one
+  unrecorded answer, and two lines of the plan's own log that the plan itself
+  falsified.
+- **Files touched:** `core/src/render/tier.rs`, `core/tests/sanity.rs`,
+  `core/src/render/scenes/shape_collage.rs`,
+  `core/src/render/scenes/shape_collage/tests.rs`, `docs/presets.md`,
+  `docs/plans/0113-the-engine-paints-a-canvas.md` (the `## Implementation log` only).
+- **Done when:**
+  - **`tier.rs` quotes the ladder that describes what ships.** Phase 9 replaced
+    *"36-39 %"* with *"12.7 % at eight and 16.8 % at sixteen"*, which satisfies its
+    own done-when literally but takes those from the **pre-roster** 2026-08-25
+    table. `collage_cost.rs`'s Phase 7 table - the same file this comment already
+    cites, the same box, the same day - measures the **shipped** configuration at
+    **8.2 % at eight and 10.7 % at sixteen**. The sentence is about the user's
+    working density on the system as shipped, so it takes the post-roster figures
+    and names which of the two tables it is quoting. This is the third pass over one
+    sentence; end it by naming the table inline rather than leaving the next reader
+    to pick.
+  - **`sanity.rs`'s `Ink on Paper` / `Thomas` note stops asserting a falsified
+    number.** The passage at `sanity.rs:449-457` states both *"read exactly
+    `1.0000`"*. ADR-0126's derived ground falsified that inside this same tree - the
+    `Attractor` arm forty lines above records `0.2167` / `0.2917`. Re-point it the
+    way those arms were re-pointed: the `1.0000` becomes what it **was** under the
+    `BLACK` predicate, dated, with the current reading beside it. **Keep the
+    mechanism sentence verbatim** - *"the ink remap is a terminal engine stage, not
+    a `bg_*` binding, so ADR-0067's backdrop suppression does not reach it"*. It is
+    the only record of that fact in the tree.
+  - **The `#[global_allocator]` says what it costs the crate.**
+    `shape_collage/tests.rs:280` installs `CountingAlloc` for the **entire
+    `lmv-core` lib unit-test binary**, from a leaf scene's test module. It is
+    `#[cfg(test)]`-gated and a `System` pass-through, so nothing production-facing -
+    but the slot is now taken, and the next in-lib test wanting an allocator counter
+    gets *"cannot define multiple global allocators"* from a file it has no reason to
+    be reading. Either hoist it to shared test support or state the collision where
+    it stands. A sentence is an acceptable fix; silence is not.
+  - **`Element::build`'s candidate buffer convicts an overflow instead of absorbing
+    one.** The `push` closure drops silently past index 8 (`points.get_mut(n)`).
+    Nine is exhaustive for today's kinds and the comment proves it, so this is not a
+    live defect - but a future kind that adds a candidate would shrink its own hull,
+    and a shrunk hull is a bounding box that is **too small**, which
+    `every_kind_is_contained_by_its_own_bounding_box` catches only if that kind
+    happens to be rendered at an angle that exposes it. A `debug_assert!` on the
+    bound is the whole change.
+  - **`docs/presets.md` records that this plan introduced no grammar surface.**
+    Phase 8's done-when offered two ways to satisfy it and the tree satisfies neither
+    in writing: the diff adds the system-roster row and no expression grammar, which
+    is the right answer, unstated. One line.
+  - **The `## Implementation log` stops carrying two claims this plan falsified.**
+    Both sit in **Observations for the review**, both were written before Phase 6b
+    landed, and `dev` owns that section:
+    - *"Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000 …
+      `On White`: coverage 1.0000"* - Phase 6b measured `0.3028` and `0.2677`
+      against the derived ground and re-derived the floor **from those numbers**.
+      Report the post-6b readings; keep the pre-6b ones only if labelled as the
+      `BLACK`-predicate reading they were.
+    - *"That fixture was also the only place in the tree recording that `ink_*` is a
+      terminal engine stage … Nothing records it now."* - it is recorded, at
+      `core/tests/sanity.rs:452-456`, in the same file the fixture moved within.
+      Correct the observation rather than deleting it: a close brief that reported a
+      loss which did not happen is worth one line saying so.
+  - `cargo nextest run --workspace` is green, `cargo clippy --all-targets --workspace
+    -- -D warnings` and `cargo fmt --all --check` are clean, and both golden
+    baselines are unmoved.
+
 ## Data shapes
 
 ```rust
@@ -402,7 +486,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 - **Recomposition may read as a glitch rather than a cut.** Hard-cutting a whole canvas on a beat is
   visually violent. `recompose_blend` exists as the lever; if neither extreme works, the finding is
   content-lane feedback, not an engine defect.
-- **The beat clock counts onsets, not beats** ([ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
+- **The beat clock counts onsets, not beats** ([ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
   at 1.7–2.1x. A `recompose` bound to `beat_index` will fire roughly twice as often as the music's
   beat, and Plan 0095 is the fix in flight. Author the shipped presets knowing this, and do not
   compensate for it inside the scene — that would have to be unwound when 0095 lands.
@@ -422,7 +506,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
   the render graph twice and both rejections stand.
 - **It does not deliver Malevich's figurative constructivism** (reference image 1). Figures
   assembled from colour blocks are authored bespoke geometry, which is
-  [Plan 0092](0092-the-engine-draws-an-authored-path.md)'s territory.
+  [Plan 0092](../0092-the-engine-draws-an-authored-path.md)'s territory.
 - **It does not deliver the Severini collage** (reference image 5). A dense fragmented-facet field
   is a subdivision mechanism, not a shape roster, and would be its own ADR.
 - **It does not add `paper_alpha`**, so `shape_collage` composes as the lower ADR-0090 layer only.
@@ -445,9 +529,11 @@ directly.
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
 | 6 — The music moves the canvas | dev | done | 47ef35d |
-| 6b — The canvas is measured against its own paper | dev | done | committed with this row |
+| 6b — The canvas is measured against its own paper | dev | done | df6ed6e |
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
+| 9 — The Mode 4 repairs | dev | done | 015f8a3 |
+| 10 — The second-pass repairs | dev | done | 02b6de9 |
 
 ### Notes
 
@@ -547,6 +633,36 @@ element against 0.09): the branch is not what the loop costs, coverage is.
 `collage_cost.rs` carries all three tables and says the two are not a controlled
 before/after.
 
+**Phase 9's repairs, and two places it went past its own list.**
+
+- **The `shape_field` entry in `docs/preset-guide.md` section 2 was repaired
+  alongside the two additions.** The done-when asks only for `warp_mesh` and
+  `shape_collage`, but the section's preamble names the systems that have no
+  picture, and it could not be made true without also saying that `shape_field`
+  now ships `Facet` and `Pulse`. Same sentence, so it is disclosed rather than
+  split out.
+- **`tier.rs`'s replacement figures are the comment's own table, not a re-run.**
+  The done-when says "a figure the comment's own table supports", so the
+  sentence now quotes 12.7 % at eight and 16.8 % at sixteen. The plan also
+  records a 2026-08-26 re-run reading 7.3 % at eight and 18.2 % at forty, which
+  **disagrees with the committed table** at both ends; nothing here re-blesses
+  it, and the log's earlier note on this box's power-shared iGPU is the standing
+  explanation.
+
+**Phase 10's repairs.** All six landed inside the phase's file list, and
+none is a pixel change. Two things worth naming:
+
+- **The allocator finding took the sentence, not the hoist.** Its done-when
+  allowed either; the note now says the slot is taken, points the next caller at
+  `alloc_count` rather than at a second declaration, and names three callers as
+  the threshold for hoisting to shared test support. Two is not yet worth the
+  move.
+- **`tier.rs` now cites *which* of the two ladders it is quoting**, because
+  naming the figures alone is what let this sentence go wrong twice. The
+  pre-roster ladder above the sentence stays exactly as Phase 3 read it — it is
+  the record of the gate's own reasoning, and correcting it would be rewriting
+  what the human saw.
+
 **Observations for the review.**
 
 - **The `animation` gate's `footprint_diff` statistic (ADR-0091) does not fit a
@@ -568,33 +684,31 @@ before/after.
 - **The root README said "Ten built-in rendering systems" and had been wrong since
   `warp_mesh` made eleven.** Now twelve.
 - **Phase 6b re-pointed Plan 0116 Phase 6's fixture rather than adding a second
-  one**, which is what its amendment asks for — but the attractor `ink_*`
-  stand-in is *gone*, not kept alongside. That fixture was also the only place in
-  the tree recording that `ink_*` is a terminal engine stage ADR-0067's backdrop
-  suppression does not reach, which is why `Ink on Paper` read `1.0000` for
-  months. Nothing records it now.
-- Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000,
-  flatness 0.7094, animation 0.0263, reactivity `bass=0.0511`. `On White`:
-  coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
-  against a 0.02 floor.
+  one**, which is what its amendment asks for — the attractor `ink_*` stand-in is
+  *gone*, not kept alongside. **The second half of this observation was wrong and
+  Phase 10 corrects it**: it said that fixture was the only place in the tree
+  recording that `ink_*` is a terminal engine stage ADR-0067's backdrop
+  suppression does not reach, and that nothing records it now. It is recorded, at
+  `core/tests/sanity.rs`, in the coverage-distribution note in the same file the
+  fixture moved within — Phase 10 marks that sentence as the load-bearing one so
+  the next re-point does not actually lose it.
+- Both shipped presets clear all five gates. Against the derived ground
+  (ADR-0126, adopted in Phase 6b): `Suprematist` coverage **0.3028**, `On White`
+  coverage **0.2677**, which are the two numbers the `0.13` floor is half of.
+  Flatness 0.7094 / 0.7152, animation 0.0263 / 0.0201, reactivity `bass=0.0511` /
+  `bass=0.0384` against a 0.02 floor. **The `1.0000` this bullet reported until
+  Phase 10** was the pre-merge reading under the `BLACK` predicate, which is
+  exactly the degeneracy Phase 6b exists to retire — it is kept here only as what
+  the old lens said.
 
-**Not merged, and `main` moved 27 commits under this lane.** The two lanes' code
-has never met — ADR-0053's step 2/3 is outstanding. Three files overlap
-textually (`docs/presets.md`, `presets/README.md`, this plan). Two commits
-collide with what this plan *wrote*, and neither is a conflict git will show:
-
-- **Plan 0095 closed without fixing the beat clock.** It closed by documenting
-  that `beat_index` counts onsets, and `docs/presets.md` on `main` now states
-  that **no fixed multiplier converts** and that `mod(beat_index, N)` never means
-  N beats. **Both shipped presets and the `presets/README.md` section written
-  here say "1.7-2.1x" and "Plan 0095 is the fix in flight".** Stale, and the
-  multiplier is now contradicted by main's own docs. Content repair, not a
-  merge resolution.
-- **ADR-0126 / Plan 0116 rebuilt the sanity lens**, and a backlog entry on `main`
-  is titled *the sanity lens cannot measure a scene that paints its own ground* —
-  which is this scene. The `coverage_floor` arm added here and the `animation`
-  footprint observation above may duplicate or contradict it. Worth reading
-  before the review rather than after.
+**Merged, and both semantic collisions the lane recorded are discharged.** The
+branch merged into `main` on 2026-08-26 (`b20ba21`); neither collision was a
+conflict git would have shown. Plan 0095's retracted beat multiplier is repaired
+in Phase 9 — both shipped presets and `presets/README.md` now match
+`docs/presets.md`. ADR-0126 / Plan 0116's rebuilt sanity lens is adopted in
+Phase 6b — the `coverage_floor` arm is re-derived rather than duplicated, and the
+backlog entry raised on this scene takes a dated bullet. The `animation`
+footprint observation below is untouched by either and is still open.
 
 ### Close triggers
 
@@ -607,15 +721,23 @@ collide with what this plan *wrote*, and neither is a conflict git will show:
   reactivity levers, an eight-kind element roster, two shipped presets, two golden
   fixtures and a cost instrument.
 - **Operator docs touched:** `presets/README.md`, `docs/presets.md`,
-  `docs/preset-palettes.md`, `README.md`.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. Four
-  unprobeable claims, unchanged — `0038`, `0069`, `0079`, `0110`. **`0069` is
-  this plan's own entry** and its probe still reads as unprobeable because the
-  entry is the absence of a mechanism; it needs the dated update the plan's
-  Followups name, which is architect's at close.
+  `docs/preset-palettes.md`, `README.md`, and — in Phase 9 —
+  `docs/preset-guide.md` and `docs/design-backlog.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 72
+  reductions across 41 live entries. Four unprobeable claims, unchanged —
+  `0038`, `0069`, `0079`, `0110`. **`0069` is this plan's own entry** and its
+  probe still reads as unprobeable because the entry is the absence of a
+  mechanism; it needs the dated update the plan's Followups name, which is
+  architect's at close. `0128` gained a probed bullet in Phase 9.
 - **Outstanding `human` phases:** none. Phase 3 decided *continue*, Floor 40 /
   Rich 96; Phase 5 decided *diagonal-axis with size-hierarchy's spread*. Both
   verdicts and their reasons are in their own phase blocks.
+- **Workspace at the tip:** `cargo nextest run --workspace` 994 passed, 5
+  skipped; `cargo fmt --all --check` and `cargo clippy --all-targets --workspace
+  -- -D warnings` clean; both golden baselines unmoved. Re-run at the Phase 10
+  tip with the same result — that phase adds one `debug_assert!` and otherwise
+  edits only comments and prose, so the suite is confirming the assert does not
+  fire for any shipped kind rather than confirming a behaviour change.
 
 ## Followups (after this lands)
 
