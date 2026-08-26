@@ -547,6 +547,37 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   with evenly spaced cusps, no overlap and no seam. Not a done-when — Phase 7 is where a look is
   judged — but a gross construction error would have shown here and did not.
 
+- **Phase 7 opened, and it landed a preset this plan said it would not.** The user judged the four
+  presets in the running app — the three retired mandalas recovered untouched from `654304a^` plus a
+  scratch fifth carrying the new boundary — and the verdict was *"looks much better"*, with the
+  instruction to **keep the bordered one**. So `presets/star_mandala_bordered.toml` ships: the
+  retired `star_mandala` roster and tuning exactly as they were rejected, on the new primitive, plus
+  a 32-lobe `scallop` boundary. **This plan's own scope note says it does not author or re-land any
+  preset**, and that content lands through the [Plan 0067](done/0067-the-curation-route.md) curation
+  route in the `preset-author` lane; the user asked for it here instead, so it is one commit of its
+  own rather than folded into a phase. All 67 preset-gate tests (`sanity`, `reactivity`,
+  `animation`, `distinctness`, `preset`) pass with it embedded. **The other three were not
+  re-landed and Phase 7 still owes a verdict on each of them.**
+- **Phase 7 also returned an engine finding, and it is [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s
+  own revisit condition firing.** The user's one complaint was the **straight-line** motifs:
+  *"how straight lines are connected, its clearly visible and doesn't look solid"*. Measured on a
+  single `diamond` filling a 1000x1000 frame at `thickness = 9` (half-width 13.5 px), both halves of
+  the defect are the same constant: `renderer.rs` extends a joined end by exactly `width` along its
+  own direction, where a corner of interior angle `theta` needs `width / sin(theta / 2)`.
+  - The diamond's acute vertex is `theta = 61.9 deg`, so it needs **26.3 px** and gets **15**. The
+    corner is truncated to a blunt bevel — the profile through it is 26 px of flat 185 and then
+    zero, with no taper at all.
+  - The two quads overlap on the inner side and sum: the corner patch reads **1.38x** the stroke's
+    own value.
+  **ADR-0041 rejected both the miter and the disc join, and its stated reason no longer holds.** It
+  argued "the falloff is quadratic to the quad edge, so a mitred corner and a rounded one differ by
+  less than the blur that is already there" — and [Plan 0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
+  removed that blur, taking `DEFAULT_SOFTNESS` from `1.0` to `0.25`. There is no longer any softness
+  hiding the bevel, which is why this became visible now and not at Plan 0039. The ADR's disc-join
+  alternative closes with *"worth revisiting only if the blunt corners above turn out to matter"*.
+  They matter. **Architect's call, and not this plan's** — it revises ADR-0041, reaches all four line
+  families and moves every line golden.
+
 ### Close triggers
 
 - **`presets/` touched:** **no `.toml`.** `presets/README.md` only — the motif table's cost column
