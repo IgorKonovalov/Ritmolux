@@ -50,11 +50,10 @@ use lmv_core::dsp::AnalysisFrame;
 /// [`BEATS_PER_BAR`](lmv_core::dsp::downbeat::BEATS_PER_BAR) — a test pins that
 /// rather than leaving it to whoever changes the meter assumption.
 ///
-/// **The last three columns are appended, never interleaved** — the frozen-prefix
-/// rule `diagnostics.log` follows — so the first captures taken with this mode
-/// stay parseable by column name. They were added the same day, from reading the
-/// first two runs, because the reading needed all three and the file carried none
-/// of them:
+/// **Columns are appended, never interleaved** — the frozen-prefix rule
+/// `diagnostics.log` follows — so a capture taken before a column existed stays
+/// parseable by name. Three were added the same day as the first two runs,
+/// because the reading needed all three and the file carried none of them:
 ///
 /// - **`bpm`** is the tempo tracker's own estimate, and it is here to be compared
 ///   against the rate these very rows arrive at. The beat flag this log is paced
@@ -69,9 +68,23 @@ use lmv_core::dsp::AnalysisFrame;
 ///   here come from the latest analysis hop, not necessarily the hop the beat
 ///   fired on, and this column is the size of that gap rather than an assurance
 ///   there isn't one.
+///
+/// Two more were appended by [Plan 0117], and they are the reason the `beat`
+/// column alone is not enough to read the alignment block against:
+///
+/// - **`fold_beat`** is the counter the fold actually buckets by. Since
+///   [Plan 0095] that is the grid's tempo-driven beat count, not `beat_index` —
+///   so `s0..s3`, `best` and `held` are indexed in `fold_beat % 4`, and were
+///   read against `beat % 4` for as long as nothing published the difference.
+/// - **`grid_bar_phase`** is where that counter sits across the bar, ungated.
+///   It is a *grid* reading only where `bpm > 0`; before the grid starts the
+///   fold is handed the tempo tracker's onset-reset phase instead.
+///
+/// [Plan 0095]: ../../docs/plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md
+/// [Plan 0117]: ../../docs/plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md
 const HEADER: &str = "beat\ts0\ts1\ts2\ts3\tbest\theld\teffect_raw\tnull_share\t\
                       effect_corrected\tbeats_seen\tlocked\tbass\tmid\ttreb\tonset\t\
-                      bpm\ttime_since_beat\tunix_ms\n";
+                      bpm\ttime_since_beat\tunix_ms\tfold_beat\tgrid_bar_phase\n";
 
 /// Appends one row per detected beat. Constructed only when `--downbeat-log` is
 /// requested, so its mere existence signals the mode is on.
@@ -171,7 +184,8 @@ impl fmt::Display for Row<'_> {
         }
         write!(
             f,
-            "\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.2}\t{:.4}\t{}",
+            "\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.2}\t{:.4}\t{}\
+             \t{}\t{:.4}",
             t.best,
             t.held,
             t.effect_raw,
@@ -186,6 +200,8 @@ impl fmt::Display for Row<'_> {
             self.frame.bpm,
             self.frame.time_since_beat,
             self.unix_ms,
+            t.fold_beat,
+            t.grid_bar_phase,
         )
     }
 }
@@ -353,6 +369,13 @@ mod tests {
     /// pattern's. What has to hold is that the fold picks out the phase the loud
     /// beats actually landed on — which is a claim about the wiring, and is false
     /// for a log wired to a default, to a stale snapshot, or to the wrong tracker.
+    ///
+    /// **Which phase means which counter.** The bass is bucketed by `fold_beat`,
+    /// because that is the counter `s0..s3`, `best` and `held` are indexed in
+    /// (Plan 0095, ADR-0109). Bucketed by `beat` instead — as this test did until
+    /// Plan 0117 gave it somewhere else to read — the accent is unambiguously on
+    /// phase 0 and the fold reports 3, and the two readings are simply not
+    /// commensurable rather than one of them being wrong.
     #[test]
     fn a_synthesized_4_4_favours_the_alignment_it_was_built_with() {
         let path = scratch("accented");
@@ -372,10 +395,27 @@ mod tests {
             );
         }
 
-        // Which phase the kick landed on, measured from the rows themselves.
+        // Rows past the grid handover only. The fold count is `beat_index`
+        // until the grid starts and the grid's count plus a whole-bar offset
+        // after, and the two advance at different rates, so rows spanning the
+        // handover mix two bucketings; `bpm > 0` marks it and they are skipped,
+        // not deleted.
+        let settled: Vec<&Vec<String>> = rows.iter().filter(|r| field(r, "bpm") > 0.0).collect();
+        assert!(
+            settled.len() > BEATS / 4,
+            "only {} of {} rows are past the grid handover, which is too few to \
+             read a fold that buckets in grid space",
+            settled.len(),
+            rows.len()
+        );
+
+        // Which phase the kick landed on, measured from the rows themselves —
+        // bucketed by `fold_beat`, which is what the fold buckets by, and not by
+        // `beat`, which counts transients and has not been the same number since
+        // Plan 0095.
         let mut bass_by_phase = [(0.0f32, 0u32); BEATS_PER_BAR as usize];
-        for row in &rows {
-            let phase = (field(row, "beat") as u32 % BEATS_PER_BAR) as usize;
+        for row in &settled {
+            let phase = (field(row, "fold_beat") as u32 % BEATS_PER_BAR) as usize;
             bass_by_phase[phase].0 += field(row, "bass");
             bass_by_phase[phase].1 += 1;
         }
@@ -404,7 +444,7 @@ mod tests {
         );
 
         // The fold, read at the end of the run, agrees with it.
-        let last = rows.last().expect("at least one row");
+        let last = *settled.last().expect("at least one settled row");
         let best = field(last, "best") as usize;
         assert_eq!(
             best, accent_phase,
@@ -494,8 +534,17 @@ mod tests {
         );
         assert_eq!(
             cols.get(ORIGINAL.len()..),
-            Some(&["bpm", "time_since_beat", "unix_ms"][..]),
-            "the added columns are not the appended tail: {cols:?}"
+            Some(
+                &[
+                    "bpm",
+                    "time_since_beat",
+                    "unix_ms",
+                    "fold_beat",
+                    "grid_bar_phase"
+                ][..]
+            ),
+            "the added columns are not the appended tail, in the order they were \
+             added: {cols:?}"
         );
     }
 
@@ -593,6 +642,8 @@ mod tests {
             effect_corrected: 0.4582,
             beats_seen: 32,
             locked: true,
+            fold_beat: 337,
+            grid_bar_phase: 0.3125,
         };
         let line = Row {
             frame: &frame,
@@ -614,5 +665,9 @@ mod tests {
         assert_eq!(field(&row, "bass"), 0.812);
         // 0/1, so the publish RATE over a run is the mean of this column.
         assert_eq!(field(&row, "locked"), 1.0);
+        // The two fold-space columns come off `terms`, not off the frame: 337
+        // against the frame's `beat_index` of 412 is the whole point of them.
+        assert_eq!(field(&row, "fold_beat"), 337.0);
+        assert_eq!(field(&row, "grid_bar_phase"), 0.3125);
     }
 }

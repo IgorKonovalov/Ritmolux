@@ -59,6 +59,12 @@ pub enum SystemKind {
     /// single shared feedback transform to one transform *per vertex*, driven by
     /// a `[per_vertex]` table.
     WarpMesh,
+    /// Flat opaque elements painted on their own paper, composited in painter
+    /// order in one fullscreen distance-field pass
+    /// ([ADR-0123](../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+    /// The engine's first **graphic** world rather than a luminous one: the only
+    /// system in which one object is genuinely in front of another.
+    ShapeCollage,
 }
 
 impl SystemKind {
@@ -66,7 +72,7 @@ impl SystemKind {
     /// `variant_roster_reminder` below: a new variant fails the build there until
     /// this is bumped, and the length of [`ALL`](SystemKind::ALL) is typed from
     /// it, so bumping it without rostering the variant does not compile either.
-    pub const VARIANT_COUNT: usize = 11;
+    pub const VARIANT_COUNT: usize = 12;
 
     /// **The** roster of built-in systems — every [`SystemKind`], in the order the
     /// engine builds their scenes. The single place the variant list lives: the
@@ -87,6 +93,7 @@ impl SystemKind {
         SystemKind::Emitter,
         SystemKind::ShapeField,
         SystemKind::WarpMesh,
+        SystemKind::ShapeCollage,
     ];
 
     /// Parse a canonical system name (as written in a preset's `system = "..."`
@@ -107,6 +114,7 @@ impl SystemKind {
             "emitter" => SystemKind::Emitter,
             "shape_field" => SystemKind::ShapeField,
             "warp_mesh" => SystemKind::WarpMesh,
+            "shape_collage" => SystemKind::ShapeCollage,
             _ => return None,
         })
     }
@@ -127,6 +135,7 @@ impl SystemKind {
             SystemKind::Emitter => "emitter",
             SystemKind::ShapeField => "shape_field",
             SystemKind::WarpMesh => "warp_mesh",
+            SystemKind::ShapeCollage => "shape_collage",
         }
     }
 
@@ -151,6 +160,7 @@ impl SystemKind {
             SystemKind::Emitter => scenes::emitter::PARAMS,
             SystemKind::ShapeField => scenes::shape_field::PARAMS,
             SystemKind::WarpMesh => scenes::warp_mesh::PARAMS,
+            SystemKind::ShapeCollage => scenes::shape_collage::PARAMS,
         }
     }
 }
@@ -173,7 +183,8 @@ fn variant_roster_reminder(system: SystemKind) {
         | SystemKind::Spectrum
         | SystemKind::Emitter
         | SystemKind::ShapeField
-        | SystemKind::WarpMesh => {}
+        | SystemKind::WarpMesh
+        | SystemKind::ShapeCollage => {}
     }
 }
 
@@ -1069,11 +1080,16 @@ fn build_config(
         // sharper reason: its structure is the `marks` roster, which is a closed
         // list selected by a numeric `shape` param (ADR-0084/ADR-0105), so there
         // is nothing declarative for a table to carry.
+        // `shape_collage` joins them at Plan 0113 Phase 1 with the same answer
+        // and a different reason: its structure is an authored element list
+        // compiled into the scene. Phase 4's seeded layout grammar is selected by
+        // named params too, so this arm is expected to stay where it is.
         SystemKind::FragmentField
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
         | SystemKind::Emitter
-        | SystemKind::ShapeField => Ok(None),
+        | SystemKind::ShapeField
+        | SystemKind::ShapeCollage => Ok(None),
     }
 }
 

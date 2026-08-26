@@ -73,20 +73,108 @@ pub fn click_track(bpm: f32, secs: f32, format: AudioFormat) -> Vec<f32> {
     let mut mono = vec![0.0f32; n];
     let mut start = 0usize;
     while start < n {
-        for i in 0..click_len {
-            let idx = start + i;
-            if idx >= n {
-                break;
-            }
-            let env = (-(i as f32) / click_len as f32 * 6.0).exp();
-            let sample = (rng.next_f32() * 2.0 - 1.0) * env * 0.95;
-            if let Some(slot) = mono.get_mut(idx) {
-                *slot = sample;
-            }
-        }
+        stamp_click(&mut mono, start, click_len, 0.95, &mut rng);
         start += period.max(1);
     }
     interleave(&mono, format.channels)
+}
+
+/// A click track at `bpm` carrying an extra click on every **off-beat**, at
+/// `offbeat` times the on-beat amplitude — the double-time trap (Plan 0095
+/// Phase 1).
+///
+/// At `offbeat = 0` this is [`click_track`]'s pattern; at `offbeat = 1` it is
+/// literally a click train at twice `bpm` and there is no ground truth left to
+/// find. In between, the notated tempo is `bpm` while the onset envelope's
+/// strongest short-lag periodicity sits at half the beat period, which is the
+/// arrangement that invites a tempo estimator to read the octave above.
+pub fn offbeat_click_track(bpm: f32, secs: f32, offbeat: f32, format: AudioFormat) -> Vec<f32> {
+    alternating_clicks(
+        30.0 / bpm.max(1.0),
+        offbeat,
+        0x0095_0FFB_EA70_C11C,
+        secs,
+        format,
+    )
+}
+
+/// A sparse half-time feel at `bpm`: full clicks on beats 1 and 3, `weak` times
+/// that on beats 2 and 4 — the half-time trap (Plan 0095 Phase 1).
+///
+/// The beat grid is still fully populated, so the notated tempo is `bpm`; what
+/// changes is that the accent pattern repeats every *two* beats, so the
+/// envelope's strongest periodicity is at twice the beat period. At `weak = 1`
+/// this is [`click_track`]; at `weak = 0` it stops being half-time material and
+/// simply becomes a click train at `bpm / 2`, which is why the probe sweeps the
+/// middle rather than the ends.
+pub fn halftime_click_track(bpm: f32, secs: f32, weak: f32, format: AudioFormat) -> Vec<f32> {
+    alternating_clicks(
+        60.0 / bpm.max(1.0),
+        weak,
+        0x0095_4A1F_7146_B3D2,
+        secs,
+        format,
+    )
+}
+
+/// Clicks every `interval` seconds, alternating full amplitude with `weak`
+/// times it. Click positions are computed from the index rather than
+/// accumulated, so a non-integer interval cannot drift the grid across a long
+/// clip.
+fn alternating_clicks(
+    interval: f32,
+    weak: f32,
+    seed: u64,
+    secs: f32,
+    format: AudioFormat,
+) -> Vec<f32> {
+    let sr = format.sample_rate as f32;
+    let n = frame_count(secs, format.sample_rate);
+    let click_len = ((0.012 * sr).round() as usize).max(1); // ~12 ms
+    let weak = weak.clamp(0.0, 1.0);
+    let mut rng = SplitMix::new(seed);
+    let mut mono = vec![0.0f32; n];
+    let mut k = 0usize;
+    loop {
+        let start = (k as f32 * interval.max(1e-4) * sr).round() as usize;
+        if start >= n {
+            break;
+        }
+        let amp = if k.is_multiple_of(2) {
+            0.95
+        } else {
+            0.95 * weak
+        };
+        stamp_click(&mut mono, start, click_len, amp, &mut rng);
+        k += 1;
+    }
+    interleave(&mono, format.channels)
+}
+
+/// Stamp one exponentially decaying broadband click of `amplitude` into `mono`
+/// at `start`, truncated at the end of the buffer.
+///
+/// Draws from `rng` once per **written** sample, so a caller's noise sequence
+/// depends only on how many click samples it has stamped so far — which is what
+/// keeps [`click_track`] bit-identical across this extraction.
+fn stamp_click(
+    mono: &mut [f32],
+    start: usize,
+    click_len: usize,
+    amplitude: f32,
+    rng: &mut SplitMix,
+) {
+    for i in 0..click_len {
+        let idx = start + i;
+        if idx >= mono.len() {
+            break;
+        }
+        let env = (-(i as f32) / click_len as f32 * 6.0).exp();
+        let sample = (rng.next_f32() * 2.0 - 1.0) * env * amplitude;
+        if let Some(slot) = mono.get_mut(idx) {
+            *slot = sample;
+        }
+    }
 }
 
 /// An envelope-shaped, beat-gridded signal with **dynamics** at `bpm` for

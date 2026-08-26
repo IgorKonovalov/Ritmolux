@@ -23,6 +23,7 @@ pub mod lines;
 pub(crate) mod marks;
 pub mod particles;
 pub mod reaction_diffusion;
+pub mod shape_collage;
 pub mod shape_field;
 pub mod swarm;
 pub mod warp_mesh;
@@ -589,7 +590,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::Attractor
         | SystemKind::Emitter
         | SystemKind::ShapeField
-        | SystemKind::WarpMesh => false,
+        | SystemKind::WarpMesh
+        | SystemKind::ShapeCollage => false,
     }
 }
 
@@ -659,6 +661,11 @@ fn create(
             tier.mesh_grid,
             tier.max_segments,
         )),
+        SystemKind::ShapeCollage => Box::new(shape_collage::ShapeCollageScene::new(
+            device,
+            surface_format,
+            tier.collage_elements,
+        )),
     }
 }
 
@@ -717,6 +724,7 @@ mod tests {
             SystemKind::Spectrum => "spectrum",
             SystemKind::Emitter => "emitter",
             SystemKind::WarpMesh => "warp mesh",
+            SystemKind::ShapeCollage => "shape collage",
         }
     }
 
@@ -809,6 +817,7 @@ mod tests {
             SystemKind::Emitter,
             SystemKind::ShapeField,
             SystemKind::WarpMesh,
+            SystemKind::ShapeCollage,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

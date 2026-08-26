@@ -3,7 +3,7 @@
 > **Status:** done (2026-08-15) — **closed at Phase 2, by its own gate.** Phase 1 landed
 > (`52dac85`, plus instrument follow-up `50ab2a1`); Phase 2 ran on three genres and its verdict
 > named a defect **upstream** of every cue on the shortlist, so Phases 3-5 are superseded by
-> [Plan 0095](../0095-the-downbeat-fold-gets-a-musical-beat.md) and
+> [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md) and
 > [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) rather than executed here.
 > See `Outcome` at the foot of this file. This is the outcome ADR-0097 was written to make
 > possible, not a failed plan.
@@ -272,7 +272,7 @@ fact predicts the flat ladder, the modest `effect_raw`, the zero median correcte
 1.6-2.9 % publish rate on all three genres, and it is **upstream of the accent feature**, so the
 shortlist's leading entry could not have repaired it. Recorded as
 [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md); repaired by
-[Plan 0095](../0095-the-downbeat-fold-gets-a-musical-beat.md).
+[Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md).
 
 **Three things the measurement did not settle, kept because they bound the claim:**
 

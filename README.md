@@ -20,7 +20,7 @@ codebase serve both frontends.
 | [![A luminous sea-green rosette of fine particle filaments on black](docs/images/gallery/attractor.png)](docs/preset-guide.md) | [![A radial spectrum readout: coloured spokes radiating from a dark centre](docs/images/gallery/spectrum.png)](docs/preset-guide.md) | [![A bold gold rose window of nested twelve-pointed stars](docs/images/gallery/star_pattern.png)](docs/preset-guide.md) |
 | `attractor` | `spectrum` | `star_pattern` |
 
-Ten built-in rendering systems, all driven by editable text presets —
+Twelve built-in rendering systems, all driven by editable text presets —
 **[see them, and how to write one](docs/preset-guide.md)**.
 
 > Every picture in this repository is a **headless render of the engine**, captured by the `shot`

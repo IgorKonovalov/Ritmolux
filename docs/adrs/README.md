@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0125.** *(0120 was reserved for
+**Next free number: 0129.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -129,14 +129,14 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0106](0106-two-tone-graphics-come-from-a-multiply-layer.md) | Two-tone graphics come from a multiply layer, not a composite redesign | accepted 2026-08-13 (Outcome) |
 | [0107](0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) | An authored path is inline SVG data, and it morphs by resampling | accepted 2026-08-13 |
 | [0108](0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) | a backlog claim about the repo carries an executable probe | accepted 2026-08-15 |
-| [0109](0109-the-beat-clock-counts-onsets-not-beats.md) | the beat clock counts onsets, not beats, and Layer 2 gets its own grid | proposed 2026-08-15 |
+| [0109](0109-the-beat-clock-counts-onsets-not-beats.md) | the beat clock counts onsets, not beats, and Layer 2 gets its own grid | accepted 2026-08-25 (Plan 0095), Outcome |
 | [0110](0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md) | Now-playing metadata is a shell-supplied string, and the core owns the banner | accepted 2026-08-16 (Outcome) |
 | [0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) | The shape field gains a scaled-copy coordinate beside its distance one | proposed |
 | [0112](0112-a-blender-model-enters-as-inline-mesh-data-and-the-gpu-scatters-its-points.md) | A Blender model enters as inline mesh data, and the GPU scatters its points | proposed |
 | [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) | MilkDrop presets are translated ahead of time onto a warp-mesh idiom | accepted 2026-08-16 (Outcome) |
 | [0114](0114-the-engine-renders-video-offline-and-delegates-encoding.md) | The engine renders video offline and delegates encoding to a pipe | accepted 2026-08-16 (Outcome) |
 | [0115](0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) | The foobar2000 component is a released artifact, and the SDK is a build parameter | accepted 2026-08-16 (Plan 0102; Outcome) |
-| [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome) |
+| [0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) | An index row is a pointer, and a gate holds it to one | accepted 2026-08-16 (Plan 0105; Outcome), supplemented by 0127 |
 | [0117](0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) | C ABI v6: the host reads the roster and selects a preset | accepted 2026-08-18 (Plan 0107; Outcome) |
 | [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), three Outcome |
 
@@ -146,4 +146,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0122](0122-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | accepted 2026-08-25 (Plan 0106) |
 | [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | proposed 2026-08-25 (Plan 0113) |
 | [0124](0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) | The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable | proposed 2026-08-25 (Plan 0114) |
+| [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | proposed 2026-08-25 (Plan 0115) |
+| [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
+| [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | proposed 2026-08-25 (Plan 0118) |
+| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | proposed 2026-08-26 (Plan 0116), Outcome - decision NOT implemented, no candidate statistic survived |
 <!-- roster:end -->

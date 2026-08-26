@@ -20,13 +20,35 @@
 //! drawn 3.3 world units off the top of a frame of half-height 1.0 and passing.
 //!
 //! So the roster this gate renders has its `bg_*` bindings **removed**
-//! ([`without_backdrop`]) and `is_lit` compares against [`BLACK`]. The
-//! background stage already defaults `bright` and `vignette` to `0.0`
-//! (`core/src/render/background.rs`), so this is *not applying three bindings*
-//! rather than a new render path: the pass renders the plain black clear it
-//! renders for any preset that never mentions `bg_*`. Nothing outside this file
-//! changes — `golden`, `distinctness`, `reactivity` and `shot` all keep the
-//! shipped composite, backdrop included.
+//! ([`without_backdrop`]). The background stage already defaults `bright` and
+//! `vignette` to `0.0` (`core/src/render/background.rs`), so this is *not
+//! applying three bindings* rather than a new render path: the pass renders the
+//! plain black clear it renders for any preset that never mentions `bg_*`.
+//! Nothing outside this file changes — `golden`, `distinctness`, `reactivity`
+//! and `shot` all keep the shipped composite, backdrop included.
+//!
+//! **Plan 0116 / [ADR-0126]: the reference is derived from the frame, not fixed
+//! at black.** Suppressing the backdrop answered *whose light is this* and left
+//! a second question standing: what a scene that paints **its own** ground is
+//! measured against. Against a constant black it is measured against nothing —
+//! the paper is not black, so every pixel counts as lit and the frame scores as
+//! completely full whatever was drawn on it. That is not a corner case: the
+//! attractor's ink duotones and every fullscreen field read exactly `1.0000`,
+//! which made `coverage`, `quadrant_spread` and `radial_shell_occupancy`
+//! constants rather than measurements for a third of the library, and left an
+//! **emptied** canvas and a **broken** one as the same picture
+//! ([`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`]).
+//!
+//! So [`ground`] estimates the reference per capture — the mean tone of the
+//! frame's most populous luminance band — and every statistic below asks the
+//! same question in both worlds: *how far does this picture depart from the
+//! ground it is drawn on?* A scene drawing light onto darkness is unaffected,
+//! because its modal band **is** the black it was already compared to; the
+//! estimator was measured against the whole library before it was threaded and
+//! moved no verdict. [`BLACK`] survives here as the historical reference the
+//! two-lens fixtures assert against, not as anything the gate reads.
+//!
+//! [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 //!
 //! Coverage floors stay per-system, because the systems still differ by an order
 //! of magnitude in how much they paint — `fragment_field` fills the frame while
@@ -54,32 +76,64 @@
 //! blot. That is how four attractor presets shipped flat behind this gate, and
 //! `tonal_flatness` is the statistic that names it. It is general, not
 //! attractor-specific: any drive that stacks past the additive ceiling produces
-//! it.
+//! it. It is also the one statistic the derived ground could **not** repair: a
+//! duotone has two large populations, and removing whichever is the ground
+//! leaves the other holding nearly all of what remains either way
+//! ([ADR-0128](../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)).
 
 use lmv_core::{
     dsp::AnalysisFrame,
     preset::{Preset, SystemKind, default_presets},
     render::{
-        HeadlessOptions, RenderError, Renderer,
+        CaptureImage, HeadlessOptions, RenderError, Renderer,
         metrics::{
-            RADIAL_SHELLS, TONE_BANDS, coverage, quadrant_spread, radial_shell_occupancy,
-            tonal_flatness,
+            RADIAL_SHELLS, TONE_BANDS, coverage, modal_ground, quadrant_spread,
+            radial_shell_occupancy, tonal_flatness,
         },
     },
 };
 
 const SIZE: u32 = 96;
 const FRAMES: u32 = 30;
-/// A pixel counts as lit if any RGB channel differs from [`BLACK`] by more than
-/// this (shrugs off dark near-black dithering).
+/// A pixel counts as lit if any RGB channel differs from the frame's [`ground`]
+/// by more than this (shrugs off dithering at the ground's own tone).
 const EPS: u8 = 10;
-/// What the scene is measured against (ADR-0067). Not a sampled pixel: the
-/// backdrop is suppressed for this capture, so every lit pixel is light the
-/// **scene** put there. Alpha is never compared — [`is_lit`] takes the first
-/// three channels — but the frames come back opaque, so 255 is the honest value.
+/// What the scene was measured against between ADR-0067 and Plan 0116 Phase 3 —
+/// **the historical reference, not what the gate reads.** [`ground`] is what it
+/// reads now.
 ///
-/// [`is_lit`]: lmv_core::render::metrics
+/// It is kept because two fixtures here assert against *both* lenses, which is
+/// the only way a test can show that the change repaired something rather than
+/// merely moved a number: `a_frame_with_no_tonal_structure_is_reported_flat`
+/// freezes the demonstration that a blot clears every areal check against black,
+/// and `a_canvas_the_music_empties_is_convicted_and_black_calls_it_full` pins
+/// that a painted ground reads as a completely full frame against it. Alpha is
+/// never compared — `metrics::is_lit` takes the first three channels — but the
+/// frames come back opaque, so 255 is the honest value.
 const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+/// The reference tone this gate hands `is_lit`, derived from the frame
+/// (**Plan 0116 Phase 3**, [ADR-0126]) rather than fixed at [`BLACK`].
+///
+/// Every statistic below asks *how far does this pixel depart from the ground*,
+/// and a constant reference answers that question only in a world where the
+/// scene draws light onto a ground it does not own. Twelve shipped presets
+/// paint their own — the attractor's ink duotones, every `fragment_field`
+/// preset — and read `coverage` exactly `1.0000` whatever they drew, which
+/// makes three of the four statistics constants rather than measurements for
+/// that content.
+///
+/// **It is the same lens in the world it was built for.** Plan 0116 Phase 1
+/// tabled this estimator against the whole library at both excitations: it
+/// re-bases 17 of 41 presets and moves **no verdict**, at either excitation.
+/// A dark-ground scene's modal band *is* the black it was already measured
+/// against, so the substitution is a no-op there and a repair everywhere else.
+///
+/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
+fn ground(img: &CaptureImage) -> [u8; 4] {
+    modal_ground(img)
+}
+
 /// The prefix every background-stage parameter carries (`bg_hue`, `bg_bright`,
 /// `bg_vignette` — `core/src/render/background.rs`'s `PARAMS`, which is
 /// `pub(crate)` and so not nameable from an integration test).
@@ -258,10 +312,58 @@ const MIN_STRUCTURAL_SHELLS: usize = 4;
 /// the *lowest* preset in a system rises well clear of the floor — retuning or
 /// retiring the sparsest member of a family — and the fix is to re-measure that
 /// floor from the distribution the gate prints, never to leave the slack in.
+///
+/// **Re-checked against the derived ground on 2026-08-26 (Plan 0116 Phase 4) and
+/// held.** Deriving the reference per capture lowers many measured coverages —
+/// fourteen presets came off `1.0000` — which moves this factor *down*, the
+/// direction that tightens floors rather than loosening them. The five floors
+/// re-derived below sit at `1.95x`-`2.06x`; the six left alone sit at
+/// `0.28x`-`1.78x`. Nothing approaches the cap, so the constant is unchanged.
+///
+/// **What that re-check exposed, which this constant cannot see.** It is
+/// one-sided: it fires when a floor sits too far *below* its family, and says
+/// nothing when a floor sits *above* it. Six families are in that state today —
+/// `parametric_curve`, `emitter`, `star_pattern`, `spectrum`,
+/// `reaction_diffusion` and `shape_field` — and their thinnest members clear the
+/// gate through the structural rescue rather than the floor. That predates Plan
+/// 0116 (their coverages are byte-identical under both lenses) and is not this
+/// file's to decide unilaterally, because the rescue carrying a thin figure is
+/// the design of Plan 0075, not a defect. It is raised in Plan 0116's log.
 const MAX_FLOOR_SLACK: f32 = 2.2;
 
 /// Per-system minimum lit fraction, **measured from the shipped library** under
-/// the ADR-0067 measurement (backdrop suppressed, compared against [`BLACK`]).
+/// the ADR-0067 capture (backdrop suppressed) against the frame's own derived
+/// ground ([ADR-0126], Plan 0116 Phase 3) — not against [`BLACK`], which is what
+/// every number below the 2026-08-26 block was measured against.
+///
+/// **Five floors were re-derived on 2026-08-26 (Plan 0116 Phase 4) and six were
+/// not, and the split is measured rather than chosen.** The derived ground only
+/// moves a preset that paints its own; for a scene drawing light onto darkness
+/// the modal band *is* the black it was already compared to, and the coverage
+/// comes back identical to the digit. So the families whose minimum moved are
+/// re-derived here, and the families whose minimum did not are left exactly as
+/// they were — there is nothing in them for this plan to re-measure.
+///
+/// ```text
+/// system              floor          family minimum              why
+/// fragment_field      0.50 -> 0.08   1.0000 -> 0.1645 Tiled Rosette   all eight came off 1.0000
+/// lsystem             0.50 -> 0.19   1.0000 -> 0.3704 Vellum          the only member
+/// swarm               0.42 -> 0.28   0.5701 -> 0.5553 Shatter         marginal
+/// attractor           0.18 -> 0.11   0.2214 -> 0.2156 De Jong Gallery marginal
+/// shape_field         0.50 -> 0.22   0.4312 Pulse (unmoved)           the arm's text was false
+/// parametric_curve    0.33           0.2273 Ion Wake (unmoved)        lit-on-dark
+/// emitter             0.25           0.0696 Ember Jet (unmoved)       lit-on-dark
+/// star_pattern        0.34           0.1484 Rose Window (unmoved)     lit-on-dark
+/// spectrum            0.28           0.2604 Halo (unmoved)            lit-on-dark
+/// reaction_diffusion  0.09           0.1603 Mitosis (unmoved)         lit-on-dark
+/// ```
+///
+/// `shape_field` is in that first group for a different reason: its minimum did
+/// not move, but the arm claimed the family "has zero shipped members", and
+/// `Facet` and `Pulse` both ship. The claim was false before this plan and the
+/// floor is derived from the distribution for the first time here.
+///
+/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 ///
 /// Each floor is set at half its system's lowest shipped preset, so the gap is a
 /// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
@@ -382,22 +484,36 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// moved the minimum — not to nudge a constant back until the run goes green.
 fn coverage_floor(system: SystemKind) -> f32 {
     match system {
-        // Full-screen field: every shipped member is above 0.99, so the spread
-        // is 0.0074 wide and anything near this floor is a broken field.
-        SystemKind::FragmentField => 0.50,
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.50. The old number
+        // came from a family where all eight members read 1.0000 and the spread
+        // was 0.0074 wide — which was the degeneracy ADR-0126 was raised on,
+        // not a measurement: `coverage` was reading the paper these scenes
+        // paint. Against their own ground the family spreads 0.1645-0.9969 and
+        // `Tiled Rosette` sets the minimum, so this is half of that. It is a
+        // large drop and it costs nothing the shells do not already catch: a
+        // broken field scores near zero at zero shells and is convicted, while
+        // `Tiled Rosette` was already riding the structural rescue at 9/10.
+        SystemKind::FragmentField => 0.08,
         // A dense point cloud that fills the frame far more than "sparse points"
         // suggested — the old 0.01 was 84x below the thinnest of the three.
-        SystemKind::Swarm => 0.42,
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.42: the derived
+        // ground moved `Shatter` 0.5701 -> 0.5553, marginally, and this is half
+        // of the new minimum.
+        SystemKind::Swarm => 0.28,
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,
         // Raised from 0.32 on 2026-08-13 when `Wildwood` was retired on sight in
         // the running app: it was the family minimum, and its removal left
         // `Vellum` at 1.0000 as the only shipped member, putting the old floor
-        // 3.12x below it — over this file's 2.2x slack. Re-derived at half the
-        // new minimum like every floor here. A one-member family means the next
-        // lsystem preset will very likely move this number again.
-        SystemKind::LSystem => 0.50,
+        // 3.12x below it — over this file's 2.2x slack.
+        //
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.50. `Vellum`'s
+        // 1.0000 was the same paper artifact as the `fragment_field` eight —
+        // against its own ground it draws 0.3704 — so this is half of that. A
+        // one-member family means the next lsystem preset will very likely move
+        // this number again.
+        SystemKind::LSystem => 0.19,
         // Went to 0.12 and back on 2026-08-06 — see the doc comment. Star
         // Lantern's 0.6908 sets it again now that the three ring mandalas are
         // retired.
@@ -412,7 +528,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // 0.3785 against two members that fill the frame. Raised from 0.12 at
         // Plan 0057 Phase 6 — see the table above for why the minimum moved
         // off De Jong.
-        SystemKind::Attractor => 0.18,
+        //
+        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.18. The minimum
+        // barely moved (`De Jong Gallery` 0.2214 -> 0.2156), but the family's
+        // *ink duotones* did: `Ink on Paper`, `Thomas` and `Valentine` came off
+        // 1.0000 to 0.2167 / 0.2917 / 0.4389, which is the artifact the note
+        // below this table describes and no longer a live one. Half the new
+        // minimum.
+        SystemKind::Attractor => 0.11,
         // The sparsest system in the library, and the one this plan exists
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
         // version that shipped broken scores 0.0000 here.
@@ -428,16 +551,18 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // preset lands this is the number to re-derive from the distribution
         // this test prints.
         SystemKind::Emitter => 0.25,
-        // **Not derived from a distribution, because there is no distribution
-        // yet**: Plan 0091 ships the `shape_field` engine and deliberately no
-        // preset content (ADR-0081 puts worlds in the author's lane), so this
-        // family has zero shipped members and this floor has never gated
-        // anything. It is inherited from `FragmentField` on the structural
-        // argument alone — both are fullscreen scenes that cover every pixel
-        // with `occlude`, so a shape field that is not broken cannot score low.
-        // **Re-derive it from this test's printed distribution when the first
-        // one ships**, at half the family minimum like every floor above.
-        SystemKind::ShapeField => 0.50,
+        // **Derived from the distribution for the first time on 2026-08-26**
+        // (Plan 0116 Phase 4), from 0.50. Until then this arm said the family
+        // "has zero shipped members and this floor has never gated anything",
+        // inheriting `FragmentField`'s number on the structural argument that a
+        // fullscreen `occlude` scene cannot score low. That was true when Plan
+        // 0091 shipped the engine with no content; `Facet` and `Pulse` ship now,
+        // and `Pulse` has been under the old floor at 0.4312 — riding the
+        // structural rescue — under both lenses. Half of that minimum. (The
+        // structural argument is separately dead: `Facet` read 1.0000 only
+        // because `coverage` was measuring the ground it paints, and reads
+        // 0.5940 against that ground.)
+        SystemKind::ShapeField => 0.22,
         // **Not derived from a distribution either**: Plan 0100 ships the
         // `warp_mesh` engine and no preset content, exactly as Plan 0091 shipped
         // `shape_field`. Inherited from `FragmentField` on the same structural
@@ -445,7 +570,30 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // so one that is not broken cannot score low. **Re-derive it from this
         // test's printed distribution when the first one ships**, at half the
         // family minimum like every floor above.
+        //
+        // **Left at 0.50 on 2026-08-26 while `FragmentField` went to 0.08, so it
+        // no longer inherits anything** (Plan 0116 Phase 4). Two reasons, both
+        // recorded rather than resolved: the structural argument it rests on is
+        // the one Phase 3 falsified — a fullscreen field scores 1.0 because
+        // `coverage` was reading the ground it paints — and the number is
+        // duplicated in `core/tests/warp_mesh.rs`, which that phase is not
+        // scoped to touch and which asserts the two match. The first `warp_mesh`
+        // preset re-derives both together.
         SystemKind::WarpMesh => 0.50,
+        // **Derived from the distribution on 2026-08-26** (Plan 0113 Phase 6b),
+        // from an inherited `0.50`. Until then this arm read that a
+        // `shape_collage` canvas paints its own paper across every pixel
+        // (ADR-0123) so "its lit fraction is 1.0 by construction whatever the
+        // elements do", and leaned on `MAX_TONAL_FLATNESS` as the rescue. Plan
+        // 0116 falsified the premise: `1.0000` was `coverage` measuring the
+        // paper against black, and against the ground the frame is actually
+        // drawn on the two shipped canvases read `On White` 0.2677 and
+        // `Suprematist` 0.3028 — both *under* the inherited floor, clearing the
+        // gate only on the structural rescue. Half the new minimum, like every
+        // floor above. The areal question is now the one that convicts an
+        // emptied canvas, at the quiet excitation where emptying happens —
+        // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
+        SystemKind::ShapeCollage => 0.13,
     }
 }
 
@@ -462,6 +610,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Emitter => "emitter",
         SystemKind::ShapeField => "shape_field",
         SystemKind::WarpMesh => "warp_mesh",
+        SystemKind::ShapeCollage => "shape_collage",
     }
 }
 
@@ -591,10 +740,11 @@ fn every_preset_draws_a_real_shape() {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture preset");
-        let cov = coverage(&img, BLACK, EPS);
-        let spread = quadrant_spread(&img, BLACK, EPS);
-        let flat = tonal_flatness(&img, BLACK, EPS);
-        let shells = radial_shell_occupancy(&img, BLACK, EPS);
+        let bg = ground(&img);
+        let cov = coverage(&img, bg, EPS);
+        let spread = quadrant_spread(&img, bg, EPS);
+        let flat = tonal_flatness(&img, bg, EPS);
+        let shells = radial_shell_occupancy(&img, bg, EPS);
         let floor = coverage_floor(system);
         println!(
             "[{}] {name:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
@@ -764,24 +914,55 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
         .capture_preset("Blown Out", &loud(), FRAMES)
         .expect("capture the flat fixture");
 
-    let cov = coverage(&img, BLACK, EPS);
-    let spread = quadrant_spread(&img, BLACK, EPS);
-    let flat = tonal_flatness(&img, BLACK, EPS);
-    println!("[blown out] coverage={cov:.4} quadrants={spread} flatness={flat:.4}");
+    let floor = coverage_floor(SystemKind::ParametricCurve);
 
-    // The fixture has to pass the two existing checks, or it demonstrates
-    // nothing: the whole claim is that a blot satisfies both of them.
-    assert!(
-        cov >= coverage_floor(SystemKind::ParametricCurve),
-        "the fixture must pass the coverage floor, or it proves nothing: {cov:.4}"
+    // (1) The lens as it stood before Plan 0116 Phase 3, on the same frozen
+    // fixture. This is the demonstration `MAX_TONAL_FLATNESS` was added for and
+    // it is kept rather than described: against a constant black reference the
+    // blot passes every areal check — full coverage, four quadrants, every
+    // radial shell — and only the tonal question convicts it.
+    let old_cov = coverage(&img, BLACK, EPS);
+    let old_spread = quadrant_spread(&img, BLACK, EPS);
+    let old_shells = radial_shell_occupancy(&img, BLACK, EPS);
+    let old_flat = tonal_flatness(&img, BLACK, EPS);
+    println!(
+        "[blown out] against BLACK: coverage={old_cov:.4} (floor {floor:.2}) \
+         quadrants={old_spread} shells={old_shells}/{RADIAL_SHELLS} flatness={old_flat:.4}"
     );
     assert!(
-        spread >= MIN_QUADRANTS,
-        "the fixture must pass the spread floor, or it proves nothing: {spread}"
+        old_cov >= floor && old_spread >= MIN_QUADRANTS && old_shells >= MIN_STRUCTURAL_SHELLS,
+        "the fixture must clear every areal check against black, or it proves nothing about \
+         why the tonal question was added: coverage {old_cov:.4} (floor {floor:.2}), \
+         {old_spread} quadrant(s), {old_shells}/{RADIAL_SHELLS} shells"
+    );
+    assert!(
+        old_flat > MAX_TONAL_FLATNESS,
+        "a figure stacked past the additive ceiling must read flat, got {old_flat:.4}"
+    );
+
+    // (2) The lens as it stands now. A blot that fills the frame with one tone
+    // **is its own modal band**, so the derived ground lands on the blot itself
+    // and the lit mask is what is left over — the figure's fringe. The fixture
+    // is therefore convicted twice rather than once, which is a stronger
+    // verdict and a weaker demonstration: coverage no longer scores it healthy.
+    let bg = ground(&img);
+    let cov = coverage(&img, bg, EPS);
+    let spread = quadrant_spread(&img, bg, EPS);
+    let shells = radial_shell_occupancy(&img, bg, EPS);
+    let flat = tonal_flatness(&img, bg, EPS);
+    println!(
+        "[blown out] against its own ground {bg:?}: coverage={cov:.4} (floor {floor:.2}) \
+         quadrants={spread} shells={shells}/{RADIAL_SHELLS} flatness={flat:.4}"
     );
     assert!(
         flat > MAX_TONAL_FLATNESS,
-        "a figure stacked past the additive ceiling must read flat, got {flat:.4}"
+        "the tonal question must still convict the blot once the reference is derived \
+         from the frame, got {flat:.4}"
+    );
+    assert!(
+        bg.iter().take(3).any(|&c| c > EPS),
+        "the fixture must be dense enough that its own tone is the modal band, or the two \
+         lenses agree and (2) tests nothing: ground {bg:?}"
     );
 }
 
@@ -908,12 +1089,13 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     let scene = renderer
         .capture_preset(name, &frame, FRAMES)
         .expect("capture the pre-repair ridge without its backdrop");
-    let cov = coverage(&scene, BLACK, EPS);
-    let spread = quadrant_spread(&scene, BLACK, EPS);
-    let shells = radial_shell_occupancy(&scene, BLACK, EPS);
+    let scene_bg = ground(&scene);
+    let cov = coverage(&scene, scene_bg, EPS);
+    let spread = quadrant_spread(&scene, scene_bg, EPS);
+    let shells = radial_shell_occupancy(&scene, scene_bg, EPS);
     println!(
-        "[pre-repair ridge] new gate: coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
-         shells={shells}/{RADIAL_SHELLS}"
+        "[pre-repair ridge] new gate: ground={scene_bg:?} coverage={cov:.4} (floor {floor:.2}) \
+         quadrants={spread} shells={shells}/{RADIAL_SHELLS}"
     );
     assert!(
         cov < floor,
@@ -943,7 +1125,7 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     let quiet = renderer
         .capture_preset(name, &excited(MODERATE), FRAMES)
         .expect("capture the pre-repair ridge at moderate excitation");
-    let mid_cov = coverage(&quiet, BLACK, EPS);
+    let mid_cov = coverage(&quiet, ground(&quiet), EPS);
     println!(
         "[pre-repair ridge] at excitation {MODERATE}: coverage={mid_cov:.4} \
          (min {MODERATE_MIN_COVERAGE:.2}), ratio {:.4}",
@@ -956,6 +1138,177 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The emptying canvas (Plan 0116 Phase 6, ADR-0126; the real family, Plan 0113
+// Phase 6b)
+// ---------------------------------------------------------------------------
+
+/// **A canvas the music empties**, frozen the way [`blown_out`] and
+/// [`pre_repair_spectrum_ridge`] are frozen — an inline fixture, not a shipped
+/// preset — because what it stands for is a *defect*, and no shipped preset may
+/// hold one.
+///
+/// [Plan 0113](../../docs/plans/0113-the-engine-paints-a-canvas.md) builds
+/// `shape_collage`, a scene whose element `density` falls with the level, so a
+/// quiet passage leaves bare paper. **An emptied canvas and a broken one are the
+/// same picture**, and against [`BLACK`] both read `coverage = 1.0000`: the
+/// paper is not black, so every pixel counts as lit and the frame scores as
+/// completely full. That is the false negative ADR-0126 was raised on, and it is
+/// designed-in rather than hypothetical.
+///
+/// **Plan 0116 Phase 6 wrote this fixture on the attractor's `ink_*` remap**,
+/// which reaches a paper-white frame the same way and was reachable while
+/// `shape_collage` sat on an unmerged branch. Plan 0113 Phase 6b re-points it at
+/// the family it was always about: everything below is the scene's own default
+/// canvas — the authored suprematist arrangement, still, at `count` — and the
+/// one binding is the lever the defect lives on.
+///
+/// Deliberately free of `time` terms: a fixture that is a pure function of its
+/// excitation is one the reader can reason about, and the determinism rule in
+/// `CLAUDE.md` applies to test content as much as to analysis.
+fn emptying_canvas() -> Preset {
+    Preset::from_toml_str(
+        r##"
+system = "shape_collage"
+name   = "Emptying Canvas"
+
+# The shipped palette's plateau shape, so the fixture is a flat graphic canvas
+# and not a gradient with edges: each element's coordinate lands in the interior
+# of one band, and the last band is the paper `paper` selects below.
+[palette]
+stops = [
+  { at = 0.0000, color = "#111111" },
+  { at = 0.1249, color = "#111111" },
+  { at = 0.1251, color = "#8a1420" },
+  { at = 0.2499, color = "#8a1420" },
+  { at = 0.2501, color = "#96751e" },
+  { at = 0.3749, color = "#96751e" },
+  { at = 0.3751, color = "#1e3a8a" },
+  { at = 0.4999, color = "#1e3a8a" },
+  { at = 0.5001, color = "#1d5c34" },
+  { at = 0.6249, color = "#1d5c34" },
+  { at = 0.6251, color = "#4a4a4a" },
+  { at = 0.7499, color = "#4a4a4a" },
+  { at = 0.7501, color = "#5a1f4a" },
+  { at = 0.8749, color = "#5a1f4a" },
+  { at = 0.8751, color = "#d9d5c8" },
+  { at = 1.0000, color = "#d9d5c8" },
+]
+
+[params]
+paper = "0.9375"
+
+# The whole fixture. `density` gates what fraction of the canvas is live, and
+# the gate rounds *up* — so any positive value keeps at least one element and
+# only an exact zero empties the canvas. At full drive this is 1.0 and the
+# authored arrangement is entirely on the page; at a realistic level the clamp
+# floors it and what is left is the paper it was drawn on.
+density = "clamp(bass - 0.5, 0, 0.5) * 2"
+"##,
+    )
+    .expect("the emptying-canvas fixture parses")
+}
+
+/// **Plan 0116 Phase 6, on the real family since Plan 0113 Phase 6b.** A canvas
+/// with nothing left on it is convicted, and the predicate this gate used until
+/// Plan 0116 Phase 3 calls the same frame completely full.
+///
+/// # Why both excitations are here
+///
+/// The gate reads `tonal_flatness` only at [`LOUD`], and at `LOUD` this canvas
+/// is at its fullest — the statistic looks exactly where the defect cannot be.
+/// The quiet capture buys one gate, [`MODERATE_MIN_COVERAGE`], and against
+/// [`BLACK`] that gate reads `1.0000` on a bare page and passes it. So the
+/// conviction has to come from the areal statistic at the *quiet* excitation,
+/// which is the one place an emptied canvas actually occurs.
+///
+/// # The separation is a property, not a threshold
+///
+/// A bare ground has **no lit pixels at all** — not few, none — because every
+/// pixel *is* the ground. A composition has some. Both frames below come from
+/// the same preset at two levels, so the comparison is not between two authors'
+/// taste, and **no number is invented for how sparse a legitimate composition
+/// may be**. That is a content judgement and this file does not make it.
+#[test]
+fn a_canvas_the_music_empties_is_convicted_and_black_calls_it_full() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let name = "Emptying Canvas";
+    renderer.set_presets(vec![without_backdrop(emptying_canvas())]);
+    let floor = coverage_floor(SystemKind::ShapeCollage);
+
+    let composed = renderer
+        .capture_preset(name, &loud(), FRAMES)
+        .expect("capture the emptying canvas at full drive");
+    let bare = renderer
+        .capture_preset(name, &excited(MODERATE), FRAMES)
+        .expect("capture the emptying canvas at a realistic level");
+
+    let (composed_bg, bare_bg) = (ground(&composed), ground(&bare));
+    let composed_cov = coverage(&composed, composed_bg, EPS);
+    let bare_cov = coverage(&bare, bare_bg, EPS);
+    println!(
+        "[emptying canvas] at {LOUD}: ground={composed_bg:?} coverage={composed_cov:.4} \
+         (floor {floor:.2}) quadrants={} shells={}/{RADIAL_SHELLS} flatness={:.4}",
+        quadrant_spread(&composed, composed_bg, EPS),
+        radial_shell_occupancy(&composed, composed_bg, EPS),
+        tonal_flatness(&composed, composed_bg, EPS),
+    );
+    println!(
+        "[emptying canvas] at {MODERATE}: ground={bare_bg:?} coverage={bare_cov:.4} \
+         (min {MODERATE_MIN_COVERAGE:.2}) quadrants={} shells={}/{RADIAL_SHELLS}",
+        quadrant_spread(&bare, bare_bg, EPS),
+        radial_shell_occupancy(&bare, bare_bg, EPS),
+    );
+
+    // (1) The driven frame is a real composition, or the fixture is just a
+    // broken preset and convicting it demonstrates nothing about emptying.
+    assert!(
+        composed_cov >= floor && quadrant_spread(&composed, composed_bg, EPS) >= MIN_QUADRANTS,
+        "the driven frame must pass the gate, or this fixture is a broken preset rather than \
+         a canvas the music empties: coverage {composed_cov:.4} (floor {floor:.2}), {} quadrant(s)",
+        quadrant_spread(&composed, composed_bg, EPS),
+    );
+
+    // (2) The emptied frame is convicted, at the excitation where emptying
+    // actually happens.
+    assert!(
+        bare_cov < MODERATE_MIN_COVERAGE,
+        "a canvas with nothing left on it must fail the quiet-excitation sentinel: \
+         coverage {bare_cov:.4} >= {MODERATE_MIN_COVERAGE:.2}"
+    );
+
+    // (3) **The demonstration that this needed Phase 3.** Reverted onto the old
+    // predicate the same frame reads completely full and clears the same gate,
+    // so this test would pass while measuring nothing. `assert_eq` rather than a
+    // bound: the paper is uniformly not-black, so the old lens does not merely
+    // overestimate it, it saturates.
+    let bare_under_black = coverage(&bare, BLACK, EPS);
+    assert_eq!(
+        bare_under_black, 1.0,
+        "the whole premise is that a painted ground reads as a full frame against black; \
+         if this is no longer 1.0 the fixture has stopped standing for the defect"
+    );
+    assert!(
+        bare_under_black >= MODERATE_MIN_COVERAGE,
+        "against black the emptied canvas must PASS the gate that convicts it above, or \
+         Phase 3 repaired nothing: coverage {bare_under_black:.4}"
+    );
+
+    // (4) The property, stated without a threshold: the bare frame departs from
+    // its own ground nowhere, the composed one somewhere. Everything between the
+    // two is content and this file does not adjudicate it.
+    assert_eq!(
+        bare_cov, 0.0,
+        "a bare ground is not sparsely covered, it is uncovered: every pixel is the ground \
+         it would be measured against, got {bare_cov:.4}"
+    );
+    assert!(
+        composed_cov > 0.0,
+        "the composed frame must depart from its ground somewhere, got {composed_cov:.4}"
+    );
+}
 /// **The three retired ring mandalas at their honest tunings**, recovered from
 /// `git show 654304a^:presets/star_mandala.toml` (and siblings) — every
 /// `[generator]` table and every binding byte-for-byte, comments stripped and
@@ -1143,10 +1496,11 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture a retired mandala fixture");
-        let cov = coverage(&img, BLACK, EPS);
-        let spread = quadrant_spread(&img, BLACK, EPS);
-        let flat = tonal_flatness(&img, BLACK, EPS);
-        let shells = radial_shell_occupancy(&img, BLACK, EPS);
+        let bg = ground(&img);
+        let cov = coverage(&img, bg, EPS);
+        let spread = quadrant_spread(&img, bg, EPS);
+        let flat = tonal_flatness(&img, bg, EPS);
+        let shells = radial_shell_occupancy(&img, bg, EPS);
         println!(
             "[honest mandala] {name}: coverage={cov:.4} (floor {floor:.2}) \
              shells={shells}/{RADIAL_SHELLS} (min {MIN_STRUCTURAL_SHELLS}) \
@@ -1275,20 +1629,14 @@ fn a_louder_frame_is_reported_against_a_quieter_one() {
     let mut rows: Vec<(f32, f32, f32, String)> = Vec::new();
     let mut failures = Vec::new();
     for (name, _system) in &meta {
-        let mid_cov = coverage(
-            &renderer
-                .capture_preset(name, &mid_frame, FRAMES)
-                .expect("capture at moderate excitation"),
-            BLACK,
-            EPS,
-        );
-        let loud_cov = coverage(
-            &renderer
-                .capture_preset(name, &loud_frame, FRAMES)
-                .expect("capture at loud excitation"),
-            BLACK,
-            EPS,
-        );
+        let mid = renderer
+            .capture_preset(name, &mid_frame, FRAMES)
+            .expect("capture at moderate excitation");
+        let mid_cov = coverage(&mid, ground(&mid), EPS);
+        let loud = renderer
+            .capture_preset(name, &loud_frame, FRAMES)
+            .expect("capture at loud excitation");
+        let loud_cov = coverage(&loud, ground(&loud), EPS);
         rows.push((ratio_of(loud_cov, mid_cov), mid_cov, loud_cov, name.clone()));
 
         if mid_cov < MODERATE_MIN_COVERAGE {
@@ -1326,5 +1674,800 @@ fn ratio_of(loud_cov: f32, mid_cov: f32) -> f32 {
         loud_cov / mid_cov
     } else {
         f32::INFINITY
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Plan 0116 Phase 1 — what each candidate ground would say
+// ---------------------------------------------------------------------------
+//
+// A measurement harness and nothing else. Every statistic above still measures
+// against [`BLACK`]; this section adds no production behaviour and changes no
+// verdict. It exists to put a table in front of Plan 0116 Phase 2, which is a
+// **stop gate** — the plan may legitimately end there, and ADR-0126 deliberately
+// declines to name an estimator because the obvious one is already falsified.
+
+/// How far in from each edge [`ground_modal_border`] samples, as a divisor of
+/// the frame's shorter side. At this file's 96×96 capture that is a 6-pixel
+/// margin holding 2160 of 9216 pixels — a population rather than a line, and
+/// narrow enough that a centred figure cannot reach it.
+const BORDER_DIVISOR: usize = 16;
+
+/// Levels per channel [`ground_modal_rgb`] quantizes to before counting cells.
+/// Sixteen makes a cell 16 wide on each axis, the same width [`TONE_BANDS`]
+/// gives a luminance band — so the three live candidates differ by **what** they
+/// cluster, not by how finely they cluster it.
+const RGB_LEVELS: usize = 16;
+
+/// `fragment_tiledmono` as it is held today, read from `presets/pending/`.
+///
+/// **It is not in the embedded set.** `core/build.rs` globs `presets/*.toml`
+/// non-recursively (ADR-0022), so a subdirectory is skipped by construction and
+/// [`sanity_roster`] cannot see this preset. It is tabled anyway because it is
+/// the false positive ADR-0126 was raised on: its black *ink* is excluded as
+/// unlit, leaving `tonal_flatness` to measure the white alone and read `0.9346`
+/// against a `0.90` ceiling. A table that picks the estimator without a row for
+/// the preset that motivated the estimator would be deciding on the wrong
+/// evidence.
+const HELD_OUT_TOML: &str = include_str!("../../presets/pending/fragment_tiledmono.toml");
+
+/// One candidate ground estimator. **The roster is the deliverable, not a
+/// choice** — Phase 2 chooses, from what these print.
+struct GroundCandidate {
+    /// Column name in the printed table.
+    name: &'static str,
+    /// One line on what it clusters, printed once above the table.
+    note: &'static str,
+    /// The reference tone this candidate would hand `is_lit`.
+    pick: fn(&CaptureImage) -> [u8; 4],
+}
+
+/// The four columns ADR-0126 asks Phase 1 to table, control first so every
+/// other column reads as a difference from it rather than as an absolute.
+const GROUND_CANDIDATES: &[GroundCandidate] = &[
+    GroundCandidate {
+        name: "black",
+        note: "the control - today's hardcoded reference (ADR-0067)",
+        pick: ground_black,
+    },
+    GroundCandidate {
+        name: "modal_luma",
+        note: "mean RGB of the frame's most populous luminance band",
+        pick: ground_modal_luma,
+    },
+    GroundCandidate {
+        name: "modal_border",
+        note: "the same, over border pixels only (see BORDER_DIVISOR)",
+        pick: ground_modal_border,
+    },
+    GroundCandidate {
+        name: "modal_rgb",
+        note: "mean RGB of the most populous coarse RGB cell (see RGB_LEVELS)",
+        pick: ground_modal_rgb,
+    },
+];
+
+/// The control: what the lens uses today, whatever the frame contains.
+fn ground_black(_img: &CaptureImage) -> [u8; 4] {
+    BLACK
+}
+
+/// The estimator ADR-0126 names and falsifies — the frame's modal luminance
+/// band. Tabled because "already falsified" is a claim this harness must be
+/// able to check rather than inherit.
+///
+/// **Since Phase 3 it delegates to the production one**, so this column tables
+/// what the gate actually does rather than a reproduction of it that can drift
+/// from it. The only behaviour that adds is [`NO_GROUND`] on a frame with no
+/// dominant band, and no shipped preset reaches it (see [`MIN_GROUND_SHARE`]),
+/// so the table is unchanged from the one Phase 2 read.
+///
+/// [`NO_GROUND`]: lmv_core::render::metrics::NO_GROUND
+/// [`MIN_GROUND_SHARE`]: lmv_core::render::metrics::MIN_GROUND_SHARE
+fn ground_modal_luma(img: &CaptureImage) -> [u8; 4] {
+    modal_ground(img)
+}
+
+/// The modal luminance band among **border** pixels only, on the argument that
+/// a composition's ground reaches the frame edge and its figure usually does
+/// not.
+fn ground_modal_border(img: &CaptureImage) -> [u8; 4] {
+    modal_border_band(img)
+}
+
+/// The modal **RGB** cell rather than the modal luminance band. Luminance
+/// collapses hue, so a two-colour world at equal brightness has one modal band
+/// and two grounds; this separates them at the cost of a sparser histogram.
+fn ground_modal_rgb(img: &CaptureImage) -> [u8; 4] {
+    let cells = RGB_LEVELS * RGB_LEVELS * RGB_LEVELS;
+    let mut counts = vec![0u64; cells];
+    let mut sums = vec![[0u64; 3]; cells];
+    for px in img.rgba.chunks_exact(4) {
+        let q = |c: usize| (px[c] as usize * RGB_LEVELS / 256).min(RGB_LEVELS - 1);
+        let cell = (q(0) * RGB_LEVELS + q(1)) * RGB_LEVELS + q(2);
+        counts[cell] += 1;
+        for c in 0..3 {
+            sums[cell][c] += px[c] as u64;
+        }
+    }
+    modal_mean(&counts, &sums)
+}
+
+/// Mean RGB of the most populous luminance band among the frame's border
+/// pixels — the whole-frame form is `metrics::modal_ground`.
+///
+/// The **mean of the band's members**, not the band's centre: an ink-on-paper
+/// world's paper is a specific off-white, and rounding it to the middle of a
+/// 16-level band would hand `is_lit` a reference the frame does not contain.
+fn modal_border_band(img: &CaptureImage) -> [u8; 4] {
+    let w = img.width as usize;
+    let h = img.height as usize;
+    if w == 0 || h == 0 {
+        return BLACK;
+    }
+    let margin = (w.min(h) / BORDER_DIVISOR).max(1);
+    let mut counts = [0u64; TONE_BANDS];
+    let mut sums = [[0u64; 3]; TONE_BANDS];
+    for (i, px) in img.rgba.chunks_exact(4).enumerate() {
+        let (x, y) = (i % w, i / w);
+        if x >= margin && y >= margin && x + margin < w && y + margin < h {
+            continue;
+        }
+        let band = (((sanity_luma(px) / 256.0) * TONE_BANDS as f32) as usize).min(TONE_BANDS - 1);
+        counts[band] += 1;
+        for c in 0..3 {
+            sums[band][c] += px[c] as u64;
+        }
+    }
+    modal_mean(&counts, &sums)
+}
+
+/// Mean RGB of the most populous cell in a parallel `counts` / `sums` pair, or
+/// [`BLACK`] when nothing was counted.
+///
+/// **On a tie `max_by_key` keeps the last maximum**, so a frame with no dominant
+/// tone gets a deterministic but arbitrary answer — which is the failure mode
+/// ADR-0126's Consequences names and Phase 3's done-when has to define rather
+/// than discover. It is left arbitrary here on purpose: defining it is a
+/// production decision, and this phase makes none.
+fn modal_mean(counts: &[u64], sums: &[[u64; 3]]) -> [u8; 4] {
+    let Some((best, &n)) = counts.iter().enumerate().max_by_key(|&(_, &n)| n) else {
+        return BLACK;
+    };
+    if n == 0 {
+        return BLACK;
+    }
+    let s = sums[best];
+    [(s[0] / n) as u8, (s[1] / n) as u8, (s[2] / n) as u8, 255]
+}
+
+/// Rec.601 luma — the same weights `metrics::tonal_flatness` buckets by. That
+/// helper is private to `core`, so it is restated here rather than widening a
+/// production surface for a harness Phase 2 may discard.
+fn sanity_luma(px: &[u8]) -> f32 {
+    0.299 * px[0] as f32 + 0.587 * px[1] as f32 + 0.114 * px[2] as f32
+}
+
+/// What one candidate ground said about one preset, kept only as far as the
+/// cross-column diff needs it.
+///
+/// The four statistics themselves are **printed** on the preset's own row and
+/// not retained: a reader compares them by eye down the four candidate lines,
+/// and the only thing the summary computes across columns is whether the
+/// reference moved and whether the verdict did.
+#[derive(Clone)]
+struct GroundRow {
+    /// The reference tone this candidate handed `is_lit`.
+    reference: [u8; 4],
+    /// Empty means this candidate would pass the preset.
+    failures: Vec<String>,
+}
+
+/// `every_preset_draws_a_real_shape`'s verdict, restated over a supplied
+/// reference rather than [`BLACK`] — the structural rescue included, since a
+/// candidate that moves `coverage` moves what the rescue is asked about.
+///
+/// [`KNOWN_FLAT`] is not consulted: it is empty, and an exemption roster would
+/// hide exactly the verdict changes this table exists to count.
+fn ground_verdict_loud(
+    system: SystemKind,
+    cov: f32,
+    spread: u8,
+    shells: usize,
+    flat: f32,
+) -> Vec<String> {
+    let mut failures = Vec::new();
+    let floor = coverage_floor(system);
+    if cov < floor && shells < MIN_STRUCTURAL_SHELLS {
+        failures.push(format!(
+            "blank (cov {cov:.4} < {floor:.2}, shells {shells} < {MIN_STRUCTURAL_SHELLS})"
+        ));
+    }
+    if spread < MIN_QUADRANTS {
+        failures.push(format!("dot ({spread} quadrant(s) < {MIN_QUADRANTS})"));
+    }
+    if flat > MAX_TONAL_FLATNESS {
+        failures.push(format!("flat ({flat:.4} > {MAX_TONAL_FLATNESS:.2})"));
+    }
+    failures
+}
+
+/// The one gate the quieter capture buys today ([`MODERATE_MIN_COVERAGE`]),
+/// restated over a supplied reference.
+fn ground_verdict_moderate(cov: f32) -> Vec<String> {
+    if cov < MODERATE_MIN_COVERAGE {
+        vec![format!(
+            "not a picture at {MODERATE} (cov {cov:.4} < {MODERATE_MIN_COVERAGE:.2})"
+        )]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Name every preset whose verdict moves under each candidate, against the
+/// control column — **the number Phase 2 decides on**. ADR-0126's own
+/// falsification of naive modal tone is a count of exactly this shape (17 of
+/// 41), so a candidate is judged by how much of the library it re-bases and by
+/// how many verdicts that costs, not by how good its idea sounds.
+fn report_ground_verdict_changes(
+    label: &str,
+    meta: &[(String, SystemKind)],
+    rows: &[Vec<GroundRow>],
+) {
+    let Some(control) = rows.first() else {
+        return;
+    };
+    println!();
+    println!("verdict changes at {label}, against the `black` control:");
+    for (ci, cand) in GROUND_CANDIDATES.iter().enumerate().skip(1) {
+        let Some(column) = rows.get(ci) else {
+            continue;
+        };
+        let mut to_fail = Vec::new();
+        let mut to_pass = Vec::new();
+        let mut rebased = 0usize;
+        for (i, row) in column.iter().enumerate() {
+            let Some(base) = control.get(i) else {
+                continue;
+            };
+            let name = meta.get(i).map(|(n, _)| n.as_str()).unwrap_or("?");
+            // "Re-based" is `is_lit(reference, BLACK, EPS)`: this candidate
+            // picked a reference the old lens would have called lit, so every
+            // statistic downstream is answering a different question.
+            if row.reference.iter().take(3).any(|&c| c > EPS) {
+                rebased += 1;
+            }
+            match (base.failures.is_empty(), row.failures.is_empty()) {
+                (true, false) => to_fail.push(format!("{name} -> {}", row.failures.join("; "))),
+                (false, true) => {
+                    to_pass.push(format!("{name} (was: {})", base.failures.join("; ")))
+                }
+                _ => {}
+            }
+        }
+        println!(
+            "  {:<13} re-based {rebased}/{} preset(s);  pass->fail {};  fail->pass {}",
+            cand.name,
+            column.len(),
+            to_fail.len(),
+            to_pass.len(),
+        );
+        for entry in &to_fail {
+            println!("      pass->fail  {entry}");
+        }
+        for entry in &to_pass {
+            println!("      fail->pass  {entry}");
+        }
+    }
+}
+
+/// **Plan 0116 Phase 1.** Print, for every preset in the embedded set plus the
+/// held-out `Tiled Rosette Mono`, at both [`LOUD`] and [`MODERATE`], the
+/// reference tone each candidate ground estimator picks and the four statistics
+/// that follow from it — beside the [`BLACK`] control the lens uses today.
+///
+/// # This gates nothing, and cannot
+///
+/// It is `#[ignore]`d and contains no assertion. That is the phase's own
+/// done-when: a harness built to inform a **stop gate** must not be able to
+/// redden CI on its own, or the gate is decided by whichever candidate happens
+/// to be green. It is also 82 WARP captures, which is a second reason not to
+/// put it in the everyday loop.
+///
+/// Run it with:
+///
+/// ```text
+/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
+///     each_candidate_ground_is_tabled_against_the_library --no-capture
+/// ```
+///
+/// # What is missing from the table, said here rather than silently
+///
+/// **`shape_collage` contributes no row.** It is the family that motivates this
+/// work — Plan 0113 Phase 6 builds a canvas the music empties, and an emptied
+/// canvas is pixel-for-pixel a broken one — and it has not merged: it lives on
+/// `plan-0113-shape-collage` in its own worktree. So the estimator is being
+/// chosen from a library that contains no scene painting its own paper across
+/// every pixel *except* the attractor's ink duotone and the twelve presets that
+/// already read `coverage = 1.0000`. Those twelve are the nearest evidence
+/// available, and they are what the table can speak to.
+#[test]
+#[ignore = "measurement, not a gate: Plan 0116 Phase 1 informs a human stop gate, and it is 82 WARP captures"]
+fn each_candidate_ground_is_tabled_against_the_library() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    // The embedded roster measured exactly as the gate measures it (backdrops
+    // suppressed, ADR-0067), plus the held-out preset the estimator has to get
+    // right. Anything else would table a different measurement than the one
+    // Phase 3 changes.
+    let (mut presets, mut meta) = sanity_roster();
+    let held =
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+    meta.push((held.name.clone(), held.system));
+    presets.push(held);
+    renderer.set_presets(presets);
+
+    println!("{}", "=".repeat(78));
+    println!("Plan 0116 Phase 1 - candidate ground estimators against the shipped library");
+    println!("{}", "=".repeat(78));
+    println!(
+        "roster: {} preset(s) - the embedded set plus the held-out \
+         presets/pending/fragment_tiledmono.toml",
+        meta.len()
+    );
+    println!(
+        "NOT IN THIS TABLE: shape_collage. Plan 0113 has not merged (branch \
+         plan-0113-shape-collage), so"
+    );
+    println!("  the family this work exists for contributes no row - see this test's doc comment.");
+    println!("candidates:");
+    for cand in GROUND_CANDIDATES {
+        println!("  {:<13} {}", cand.name, cand.note);
+    }
+
+    for (label, level) in [("LOUD", LOUD), ("MODERATE", MODERATE)] {
+        let frame = excited(level);
+        let mut rows: Vec<Vec<GroundRow>> = vec![Vec::new(); GROUND_CANDIDATES.len()];
+        println!();
+        println!("-- excitation {label} ({level}) {}", "-".repeat(44));
+        for (name, system) in &meta {
+            let img = renderer
+                .capture_preset(name, &frame, FRAMES)
+                .expect("capture preset");
+            println!("[{}] {name}", system_name(*system));
+            for (ci, cand) in GROUND_CANDIDATES.iter().enumerate() {
+                let bg = (cand.pick)(&img);
+                let cov = coverage(&img, bg, EPS);
+                let spread = quadrant_spread(&img, bg, EPS);
+                let shells = radial_shell_occupancy(&img, bg, EPS);
+                let flat = tonal_flatness(&img, bg, EPS);
+                let failures = if label == "LOUD" {
+                    ground_verdict_loud(*system, cov, spread, shells, flat)
+                } else {
+                    ground_verdict_moderate(cov)
+                };
+                let verdict = if failures.is_empty() {
+                    "PASS".to_string()
+                } else {
+                    format!("FAIL: {}", failures.join("; "))
+                };
+                println!(
+                    "   {:<13} ref ({:>3},{:>3},{:>3})  cov {cov:.4}  quad {spread}  \
+                     shells {shells:>2}/{RADIAL_SHELLS}  flat {flat:.4}  {verdict}",
+                    cand.name, bg[0], bg[1], bg[2],
+                );
+                if let Some(column) = rows.get_mut(ci) {
+                    column.push(GroundRow {
+                        reference: bg,
+                        failures,
+                    });
+                }
+            }
+        }
+        report_ground_verdict_changes(label, &meta, &rows);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Plan 0116 Phase 8 — what separates a composition from a blot
+// ---------------------------------------------------------------------------
+//
+// A measurement harness and nothing else, the same shape as Phase 1 and for the
+// same reason: ADR-0126 named a mechanism without measuring it and Phase 1
+// falsified it one plan later. ADR-0128 now names a second one — that a picture
+// is a blot only if it is tonally flat *and* structureless — and this section
+// exists to find out whether any statistic actually says that, before Phase 9
+// weakens a live gate on the strength of it.
+//
+// The candidates live here rather than in `core/src/render/metrics.rs`, exactly
+// as Phase 1's ground estimators did. Two of the three will be discarded, and a
+// discarded candidate that shipped as a `pub` production statistic is worse than
+// no measurement.
+
+/// Whether a pixel departs from `bg` on any RGB channel by more than [`EPS`] —
+/// `metrics::is_lit`, which is private to `core`, restated for the same reason
+/// [`sanity_luma`] is.
+fn sanity_is_lit(px: &[u8], bg: [u8; 4]) -> bool {
+    px.iter()
+        .zip(bg.iter())
+        .take(3)
+        .any(|(&c, &b)| c.abs_diff(b) > EPS)
+}
+
+/// The lit mask of a frame against its own ground, as one bool per pixel.
+fn lit_mask(img: &CaptureImage) -> Vec<bool> {
+    let bg = ground(img);
+    img.rgba
+        .chunks_exact(4)
+        .map(|px| sanity_is_lit(px, bg))
+        .collect()
+}
+
+/// One candidate structural statistic. **The roster is the deliverable, not a
+/// choice** — Phase 8's stop condition decides, from what these print, and it
+/// can end the plan.
+struct StructureCandidate {
+    /// Column name in the printed table.
+    name: &'static str,
+    /// One line on what it counts, printed once above the table.
+    note: &'static str,
+    /// Read over the frame's lit mask. Higher must mean *more* structured, so
+    /// every column is read in one direction.
+    measure: fn(&CaptureImage) -> f32,
+}
+
+/// The four columns ADR-0128 asks Phase 8 to table, control first so every other
+/// column reads as a difference from it rather than as an absolute.
+const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
+    StructureCandidate {
+        name: "flatness^-1",
+        note: "the control - 1 - tonal_flatness, so high means structured like the rest",
+        measure: inverse_flatness,
+    },
+    StructureCandidate {
+        name: "boundary",
+        note: "share of lit pixels with an unlit 4-neighbour (perimeter over lit area)",
+        measure: boundary_density,
+    },
+    StructureCandidate {
+        name: "components",
+        note: "4-connected components in the lit mask, per thousand lit pixels",
+        measure: component_density,
+    },
+    StructureCandidate {
+        name: "sobel",
+        note: "mean |Sobel| over the binary lit mask at capture resolution",
+        measure: mask_sobel_density,
+    },
+];
+
+/// The control, inverted so it reads in the same direction as the other three:
+/// `1 - tonal_flatness`, high for a picture with tonal structure.
+fn inverse_flatness(img: &CaptureImage) -> f32 {
+    1.0 - tonal_flatness(img, ground(img), EPS)
+}
+
+/// Perimeter of the lit mask over its area: the share of lit pixels that have at
+/// least one unlit 4-neighbour.
+///
+/// Dimensionless and scale-free in the direction that matters — a solid mass has
+/// only its rim on the boundary and reads near zero, while a hatched figure is
+/// almost all rim and reads near one. Frame edges are treated as **unlit**, so a
+/// figure running off the frame counts that as boundary; the alternative (edges
+/// as lit) would let a fullscreen fill read as having no perimeter at all, which
+/// is the one answer this statistic must not give.
+fn boundary_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let at = |x: isize, y: isize| -> bool {
+        if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+            return false;
+        }
+        mask.get(y as usize * w + x as usize)
+            .copied()
+            .unwrap_or(false)
+    };
+    let (mut lit, mut edge) = (0u64, 0u64);
+    for y in 0..h as isize {
+        for x in 0..w as isize {
+            if !at(x, y) {
+                continue;
+            }
+            lit += 1;
+            if !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) {
+                edge += 1;
+            }
+        }
+    }
+    if lit == 0 {
+        return 0.0;
+    }
+    edge as f32 / lit as f32
+}
+
+/// 4-connected components of the lit mask, per thousand lit pixels.
+///
+/// Normalized by lit area rather than reported raw, so a dense figure and a
+/// sparse one are comparable: one solid mass reads near zero however large it
+/// is, and a field of separate marks reads high however many there are.
+fn component_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let lit = mask.iter().filter(|&&b| b).count();
+    if lit == 0 {
+        return 0.0;
+    }
+    let mut seen = vec![false; mask.len()];
+    let mut components = 0u64;
+    let mut stack: Vec<usize> = Vec::new();
+    for start in 0..mask.len() {
+        if !mask[start] || seen[start] {
+            continue;
+        }
+        components += 1;
+        seen[start] = true;
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            let (x, y) = (i % w, i / w);
+            let mut visit = |nx: usize, ny: usize| {
+                let j = ny * w + nx;
+                if mask[j] && !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(x - 1, y);
+            }
+            if x + 1 < w {
+                visit(x + 1, y);
+            }
+            if y > 0 {
+                visit(x, y - 1);
+            }
+            if y + 1 < h {
+                visit(x, y + 1);
+            }
+        }
+    }
+    components as f32 * 1000.0 / lit as f32
+}
+
+/// Mean Sobel gradient magnitude over the **binary** lit mask, at capture
+/// resolution.
+///
+/// The binary mask rather than the grayscale frame on purpose: a smooth luminous
+/// field has gradients everywhere and would read as structured, and the question
+/// ADR-0128 asks is about the *shape* of what is lit, not its shading. Border
+/// pixels stay zero (no wrap), matching `metrics::sobel`.
+fn mask_sobel_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w < 3 || h < 3 {
+        return 0.0;
+    }
+    let mask = lit_mask(img);
+    let at = |x: usize, y: usize| -> f32 { f32::from(u8::from(mask[y * w + x])) };
+    let mut sum = 0.0f64;
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let gx = at(x + 1, y - 1) + 2.0 * at(x + 1, y) + at(x + 1, y + 1)
+                - at(x - 1, y - 1)
+                - 2.0 * at(x - 1, y)
+                - at(x - 1, y + 1);
+            let gy = at(x - 1, y + 1) + 2.0 * at(x, y + 1) + at(x + 1, y + 1)
+                - at(x - 1, y - 1)
+                - 2.0 * at(x, y - 1)
+                - at(x + 1, y - 1);
+            sum += f64::from((gx * gx + gy * gy).sqrt());
+        }
+    }
+    (sum / ((w - 2) * (h - 2)) as f64) as f32
+}
+
+/// One frame in Phase 8's table, with the role it plays in the stop condition.
+struct StructureRow {
+    name: String,
+    /// One value per [`STRUCTURE_CANDIDATES`] column.
+    values: Vec<f32>,
+    /// `Some(true)` = must read structureless, `Some(false)` = must read
+    /// structured, `None` = shipped content, which must land outside the gap
+    /// between those two.
+    is_blot: Option<bool>,
+}
+
+/// **Plan 0116 Phase 8.** Print, for the frozen blot fixture, the held-out
+/// `Tiled Rosette Mono`, the three frozen thin-stroke mandalas and the whole
+/// shipped library, what each candidate structural statistic says — beside
+/// `tonal_flatness`, the statistic ADR-0128 proposes to add a second term to.
+///
+/// # This gates nothing, and cannot
+///
+/// It is `#[ignore]`d and contains no assertion, for the reason Phase 1's
+/// harness carries: a report built to inform a **stop gate** must not be able to
+/// redden CI on its own, or the gate is decided by whichever candidate happens
+/// to be green.
+///
+/// # The stop condition, which is mechanical
+///
+/// A candidate passes only if it puts `Blown Out` **below** `Tiled Rosette Mono`
+/// and no shipped preset **between** them. If none does, Phase 9 does not run:
+/// the plan closes here, ADR-0128 gains a dated `Outcome`, and
+/// `fragment_tiledmono` stays held. The report prints that verdict per candidate
+/// rather than leaving it to be read off the rows.
+///
+/// # Thin-stroke content is in the table on purpose
+///
+/// Design-backlog 0072 measured that a hairline over a 46-fold ornament aliases
+/// to almost nothing at 96×96, which is what made `coverage` a halo-meter. A
+/// boundary-length measure is exactly the kind of statistic that could inherit
+/// that failure, so the three frozen [`retired_mandalas`] are rows here rather
+/// than assumed safe.
+///
+/// Run it with:
+///
+/// ```text
+/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
+///     each_structure_candidate_is_tabled_against_the_library --no-capture
+/// ```
+#[test]
+#[ignore = "measurement, not a gate: Plan 0116 Phase 8 informs a mechanical stop condition"]
+fn each_structure_candidate_is_tabled_against_the_library() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+
+    let (mut presets, meta) = sanity_roster();
+    let mut roles: Vec<(String, Option<bool>)> =
+        meta.iter().map(|(n, _)| (n.clone(), None)).collect();
+
+    // The blot that must read structureless.
+    let blot = without_backdrop(blown_out());
+    roles.push((blot.name.clone(), Some(true)));
+    presets.push(blot);
+
+    // The composition that must read structured — the preset ADR-0128 exists
+    // for, held in presets/pending/ and so not reachable from `sanity_roster`.
+    let held =
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+    roles.push((held.name.clone(), Some(false)));
+    presets.push(held);
+
+    // Thin-stroke content, which a boundary measure must not mistake for a blot.
+    for mandala in retired_mandalas() {
+        let mandala = without_backdrop(mandala);
+        roles.push((mandala.name.clone(), None));
+        presets.push(mandala);
+    }
+
+    renderer.set_presets(presets);
+
+    println!("{}", "=".repeat(78));
+    println!("Plan 0116 Phase 8 - candidate structural statistics, at LOUD");
+    println!("{}", "=".repeat(78));
+    println!("candidates (higher = more structured, in every column):");
+    for cand in STRUCTURE_CANDIDATES {
+        println!("  {:<13} {}", cand.name, cand.note);
+    }
+    println!(
+        "roles: [blot] must read lowest, [comp] must read above it, the rest must not fall \
+         between them."
+    );
+    println!(
+        "NOTE: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are the four groundless luminous"
+    );
+    println!("  fields ADR-0128 records as the same open question - read their rows deliberately.");
+    println!();
+
+    let frame = loud();
+    let mut rows: Vec<StructureRow> = Vec::new();
+    for (name, is_blot) in &roles {
+        let img = renderer
+            .capture_preset(name, &frame, FRAMES)
+            .expect("capture preset");
+        let values: Vec<f32> = STRUCTURE_CANDIDATES
+            .iter()
+            .map(|c| (c.measure)(&img))
+            .collect();
+        let role = match is_blot {
+            Some(true) => "[blot]",
+            Some(false) => "[comp]",
+            None => "      ",
+        };
+        let printed: Vec<String> = STRUCTURE_CANDIDATES
+            .iter()
+            .zip(values.iter())
+            .map(|(c, v)| format!("{}={v:.4}", c.name))
+            .collect();
+        println!("{role} {name:<22} {}", printed.join("  "));
+        rows.push(StructureRow {
+            name: name.clone(),
+            values,
+            is_blot: *is_blot,
+        });
+    }
+
+    report_structure_separation(&rows);
+}
+
+/// Per candidate, the margin between the blot and the composition and whether
+/// any other frame falls in the gap — **the whole criterion**, printed rather
+/// than left to the reader.
+fn report_structure_separation(rows: &[StructureRow]) {
+    println!();
+    println!("separation at LOUD (the stop condition):");
+    let find = |want: bool| rows.iter().find(|r| r.is_blot == Some(want));
+    let (Some(blot), Some(comp)) = (find(true), find(false)) else {
+        println!("  the table is missing one of its two anchors — nothing to decide on");
+        return;
+    };
+    for (ci, cand) in STRUCTURE_CANDIDATES.iter().enumerate() {
+        let (Some(&lo), Some(&hi)) = (blot.values.get(ci), comp.values.get(ci)) else {
+            continue;
+        };
+        if lo >= hi {
+            println!(
+                "  {:<13} NOT SEPARATED: {} reads {lo:.4}, {} reads {hi:.4}",
+                cand.name, blot.name, comp.name,
+            );
+            continue;
+        }
+        let inside: Vec<String> = rows
+            .iter()
+            .filter(|r| r.is_blot.is_none())
+            .filter(|r| r.values.get(ci).is_some_and(|&v| v > lo && v < hi))
+            .map(|r| {
+                format!(
+                    "{} {:.4}",
+                    r.name,
+                    r.values.get(ci).copied().unwrap_or(f32::NAN)
+                )
+            })
+            .collect();
+        println!(
+            "  {:<13} separated by {:.4} ({lo:.4} -> {hi:.4});  {} frame(s) in the gap",
+            cand.name,
+            hi - lo,
+            inside.len(),
+        );
+        for entry in &inside {
+            println!("      in the gap  {entry}");
+        }
+
+        // The second, sharper reading of the same condition: run the threshold
+        // ceremony Phase 9 would have to use and see whether the constant it
+        // produces convicts the blot. `MIN_STRUCTURAL_SHELLS`, `MAX_FLOOR_SLACK`
+        // and every coverage floor in this file are derived as half the sparsest
+        // legitimate content (ADR-0071), so a candidate that cannot survive that
+        // derivation cannot be adopted without inventing a number instead — and
+        // this plan's Phase 9 forbids exactly that.
+        let sparsest = rows
+            .iter()
+            .filter(|r| r.is_blot.is_none())
+            .filter_map(|r| r.values.get(ci).copied())
+            .fold(f32::INFINITY, f32::min);
+        let threshold = sparsest / 2.0;
+        let convicts = lo < threshold;
+        println!(
+            "      threshold {threshold:.4} = half the sparsest legitimate content ({sparsest:.4}): {} reads {lo:.4}, {}",
+            blot.name,
+            if convicts {
+                "CONVICTED"
+            } else {
+                "NOT convicted - the flatness gate would go vacuous"
+            },
+        );
+        if inside.is_empty() && convicts {
+            println!("      PASSES the stop condition");
+        } else {
+            println!("      FAILS the stop condition");
+        }
     }
 }
