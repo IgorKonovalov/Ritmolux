@@ -2920,9 +2920,12 @@ cargo run -p standalone --example shot -- --preset-file presets/yours.toml --sig
 ```
 
 `core/tests/sanity.rs` catches the **total** case — a figure so far out that the
-frame comes back empty — and since Plan 0058 it measures the scene against black
-with the backdrop suppressed, so a `bg_vignette` can no longer stand in for a
-figure that is not there. It also prints a per-preset **excitation ratio**
+frame comes back empty — with the backdrop suppressed since Plan 0058, so a
+`bg_vignette` can no longer stand in for a figure that is not there, and since
+Plan 0116 against **the frame's own ground** rather than against black: the mean
+tone of its most populous luminance band (ADR-0126), so a scene that paints its
+own paper is measured on what it drew instead of reading as a completely full
+frame. It also prints a per-preset **excitation ratio**
 (coverage when fully driven over coverage at a moderate level) on every run. That
 ratio is a report rather than a gate, and the reason is worth knowing: a partial
 over-scale that clips only the tips costs almost no pixels, so the number comes
