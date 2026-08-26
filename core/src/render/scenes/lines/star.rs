@@ -138,8 +138,10 @@
 use std::cell::RefCell;
 use std::f32::consts::TAU;
 use std::rc::Rc;
+use std::sync::OnceLock;
 
 use super::super::Scene;
+use super::biarc::{self, Piece};
 use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, hankin,
@@ -803,25 +805,76 @@ impl Motif {
         }
     }
 
+    /// This motif as a **G1 chain of circular arcs**, when its outline is a
+    /// curve that no single arc carries ([ADR-0098], Plan 0087 Phase 5).
+    ///
+    /// `None` for the two circular members, which are exact single arcs already
+    /// ([`arc_shape`](Self::arc_shape)), and for the two polygonal ones, whose
+    /// outlines are nothing but straight lines and corners — a distance field
+    /// is strictly more expensive for a line, and there is no faceting to
+    /// remove from a shape whose facets are the figure.
+    ///
+    /// **Fitted once for the life of the process, not per rebuild.** A chain is
+    /// a pure function of its motif: the fit's budget is stated in the motif's
+    /// own local frame, so neither a ring's `scale` nor its `phase` nor the
+    /// frame can change one. `build_rings` runs on most frames of an animated
+    /// mandala, and re-deriving a constant there would put a build-time
+    /// algorithm on the hot path.
+    ///
+    /// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
+    fn chain(self) -> Option<&'static [Piece]> {
+        let index = self.fitted_index()?;
+        CHAINS
+            .get_or_init(build_chains)
+            .get(index)
+            .map(Vec::as_slice)
+    }
+
+    /// This motif's slot in [`CHAINS`], and the roster's answer to *is this one
+    /// fitted?* — kept as one function so the two cannot disagree.
+    fn fitted_index(self) -> Option<usize> {
+        match self {
+            Motif::Petal => Some(0),
+            Motif::Teardrop => Some(1),
+            Motif::Trefoil => Some(2),
+            _ => None,
+        }
+    }
+
     /// **Segments** one copy of this motif contributes.
     ///
     /// **Zero for the two circular members since Plan 0087**: they are drawn as
     /// one [`ArcInstance`] each and contribute no segments at all, which is
     /// where ADR-0098's order of magnitude of tier headroom comes from — a
     /// `circle` cost `SMOOTH_SAMPLES` of this budget and now costs one of
-    /// [`arcs`](Self::arcs).
+    /// [`arcs`](Self::arcs). **A fitted member contributes whatever straight
+    /// runs its chain contains**, which for all three of them is none.
     pub fn segments(self) -> usize {
         if self.arc_shape().is_some() {
             return 0;
+        }
+        if let Some(chain) = self.chain() {
+            return chain
+                .iter()
+                .filter(|piece| matches!(piece, Piece::Line { .. }))
+                .count();
         }
         let n = self.vertex_count();
         if self.is_closed() { n } else { n - 1 }
     }
 
-    /// **Arcs** one copy contributes — one for each circular member, zero for
-    /// the rest.
+    /// **Arcs** one copy contributes — one for each circular member, its whole
+    /// chain for each fitted one, zero for the rest.
     pub fn arcs(self) -> usize {
-        usize::from(self.arc_shape().is_some())
+        if self.arc_shape().is_some() {
+            return 1;
+        }
+        self.chain().map_or(0, |chain| {
+            chain
+                .iter()
+                .filter(|piece| matches!(piece, Piece::Arc { .. }))
+                .count()
+        })
     }
 
     /// Instances of **either kind** one copy costs: the number the budget
@@ -842,19 +895,31 @@ impl Motif {
     /// rule), so a mandala is the same figure on every device and in every
     /// capture.
     fn outline(self, out: &mut Vec<[f32; 2]>) {
+        self.outline_at(self.vertex_count(), out);
+    }
+
+    /// [`outline`](Self::outline) at an arbitrary sample count.
+    ///
+    /// The count exists for the **fit**, not for the draw: a chain is fitted to
+    /// samples and can only put a piece boundary on one, so
+    /// [`vertex_count`](Self::vertex_count)'s 24 would quantize every boundary
+    /// to a 15-degree grid. The three polygonal members ignore it — a diamond
+    /// has four vertices at any sample count anyone asks for.
+    fn outline_at(self, samples: usize, out: &mut Vec<[f32; 2]>) {
         out.clear();
+        let smooth = samples.max(3);
         match self {
             Motif::Circle => {
-                for k in 0..SMOOTH_SAMPLES {
-                    let t = TAU * k as f32 / SMOOTH_SAMPLES as f32;
+                for k in 0..smooth {
+                    let t = TAU * k as f32 / smooth as f32;
                     out.push([0.5 * t.cos(), 0.5 * t.sin()]);
                 }
             }
             // A pointed oval: the `1.6` exponent is what makes the two ends cusp
             // instead of round, and it is the whole difference from `Circle`.
             Motif::Petal => {
-                for k in 0..SMOOTH_SAMPLES {
-                    let t = TAU * k as f32 / SMOOTH_SAMPLES as f32;
+                for k in 0..smooth {
+                    let t = TAU * k as f32 / smooth as f32;
                     let s = t.sin();
                     out.push([0.5 * t.cos(), 0.30 * s.signum() * s.abs().powf(1.6)]);
                 }
@@ -862,8 +927,8 @@ impl Motif {
             // The `(1 + cos t) / 2` taper collapses the width at `t = pi`, i.e.
             // at the *inner* end, so the cusp points at the frame centre.
             Motif::Teardrop => {
-                for k in 0..SMOOTH_SAMPLES {
-                    let t = TAU * k as f32 / SMOOTH_SAMPLES as f32;
+                for k in 0..smooth {
+                    let t = TAU * k as f32 / smooth as f32;
                     let c = t.cos();
                     out.push([0.5 * c, 0.32 * t.sin() * 0.5 * (1.0 + c)]);
                 }
@@ -892,8 +957,13 @@ impl Motif {
             // count is a multiple of six so every cusp lands exactly on a vertex
             // rather than being rounded off by the sampling.
             Motif::Trefoil => {
-                for k in 0..TREFOIL_SAMPLES {
-                    let t = TAU * k as f32 / TREFOIL_SAMPLES as f32;
+                // A multiple of six so every cusp lands exactly on a sample —
+                // the fit reads a cusp as a corner and breaks its chain there,
+                // and a cusp rounded off by the sampling would be smoothed
+                // into the figure instead.
+                for k in 0..(smooth / 6).max(1) * 6 {
+                    let n = (smooth / 6).max(1) * 6;
+                    let t = TAU * k as f32 / n as f32;
                     let r = 0.5 * (1.5 * t).cos().abs();
                     out.push([r * t.cos(), r * t.sin()]);
                 }
@@ -942,6 +1012,45 @@ struct ArcShape {
     radius: f32,
     start: f32,
     sweep: f32,
+}
+
+/// The lateral budget [`build_chains`] fits the roster's curved motifs to,
+/// in the **motif's own local frame**.
+///
+/// **One pixel at 1080p, at the largest scale the roster is drawn at.** A motif
+/// is authored spanning roughly one unit and placed at a ring `scale`; the three
+/// retired mandalas this plan exists for used `0.13` to `0.46`, so a copy at the
+/// top of that range covers `0.46` of the renderer's world y — 248 px at 1080p —
+/// and one of those pixels is `1 / 248 = 4.0e-3` of the local frame. Everything
+/// smaller is drawn better than the budget promises; a preset reaching past
+/// `0.46` (the ceiling is [`MAX_RING_SCALE`]) trades this off linearly and is
+/// still bounded by a chain that is G1 whatever its scale.
+const MOTIF_FIT_BUDGET: f32 = 4.0e-3;
+
+/// Every fitted motif's chain, in [`Motif::fitted_index`] order — see
+/// [`Motif::chain`] for why it is built once.
+static CHAINS: OnceLock<[Vec<Piece>; 3]> = OnceLock::new();
+
+/// Fit the three curved motifs. Runs at most once per process, on the first
+/// `[generator] rings` roster that names one.
+fn build_chains() -> [Vec<Piece>; 3] {
+    let mut points = Vec::with_capacity(biarc::FIT_SAMPLES);
+    let mut walk = Vec::new();
+    [Motif::Petal, Motif::Teardrop, Motif::Trefoil].map(|motif| {
+        motif.outline_at(biarc::FIT_SAMPLES, &mut points);
+        let mut chain = Vec::new();
+        // `walk` is the colour axis a fitted chain would be read along; the
+        // roster has none — `normalized_radii` colours a placed motif by where
+        // its copy sits on its ring, not by where a piece sits on its outline.
+        biarc::fit(
+            &points,
+            motif.is_closed(),
+            MOTIF_FIT_BUDGET,
+            &mut chain,
+            &mut walk,
+        );
+        chain
+    })
 }
 
 /// The largest `count` one ring may declare, enforced at load.
@@ -1184,6 +1293,71 @@ pub(crate) fn build_rings(
                     color: [1.0, 1.0, 1.0],
                     width: 0.01,
                 });
+            }
+            continue;
+        }
+
+        // A fitted motif is a G1 chain of arcs (ADR-0098): the same placement,
+        // piece by piece rather than copy by copy, and the two kinds land in
+        // the two buffers they belong to.
+        if let Some(chain) = ring.motif.chain() {
+            let closed = ring.motif.is_closed();
+            let last = chain.len().saturating_sub(1);
+            for i in 0..count {
+                let theta = TAU * i as f32 / count as f32 + base_phase;
+                let (sin, cos) = theta.sin_cos();
+                let place = |p: [f32; 2]| -> [f32; 2] {
+                    let x = p[0] * scale + radius;
+                    let y = p[1] * scale;
+                    [x * cos - y * sin, x * sin + y * cos]
+                };
+                for (k, piece) in chain.iter().enumerate() {
+                    if out.len() + arcs.len() >= cap {
+                        break 'rings;
+                    }
+                    match *piece {
+                        Piece::Arc {
+                            centre,
+                            radius: curvature,
+                            start,
+                            sweep,
+                        } => arcs.push(ArcInstance {
+                            centre: place(centre),
+                            // `abs` for the reason `LineInstance::rotate_scale`
+                            // gives: a negative `scale` reflects the piece, and
+                            // the reflected arc has the same positive radius
+                            // about the centre `place` already reflected.
+                            radius: (curvature * scale).abs(),
+                            angle_start: start + theta,
+                            angle_sweep: sweep,
+                            color: [1.0, 1.0, 1.0],
+                            width: 0.01,
+                        }),
+                        Piece::Line { a, b } => {
+                            // A chain is a chain (ADR-0041): every piece
+                            // continues its neighbour, and a closed one
+                            // continues it at both ends. That is true across a
+                            // corner too — the join is what covers the wedge
+                            // between two strokes, and a corner is exactly
+                            // where there is one.
+                            let mut joined = 0;
+                            if closed || k > 0 {
+                                joined |= JOINED_A;
+                            }
+                            if closed || k < last {
+                                joined |= JOINED_B;
+                            }
+                            out.push(SegmentInstance {
+                                a: place(a),
+                                b: place(b),
+                                color: [1.0, 1.0, 1.0],
+                                width: 0.01,
+                                alpha: 1.0,
+                                joined,
+                            });
+                        }
+                    }
+                }
             }
             continue;
         }

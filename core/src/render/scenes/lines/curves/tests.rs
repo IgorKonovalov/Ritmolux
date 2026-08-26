@@ -253,3 +253,54 @@ fn rotation_preserves_radii_where_phase_does_not() {
         "phase must change at least one point's radius"
     );
 }
+
+/// **The gate, on the two families a Maurer walk actually holds.**
+///
+/// A chord web declines the fit outright, which is what leaves every shipped
+/// `d` — and the ~20 golden baselines that capture one — drawing exactly the
+/// chords it always drew. A smooth rose takes it and comes back as arcs.
+#[test]
+fn a_chord_web_declines_the_fit_and_a_rose_takes_it() {
+    let walk = |n: f32, d: f32, samples: usize| {
+        let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
+        let fitted = maurer_rose_pieces(
+            RoseParams {
+                n,
+                d,
+                phase: 0.0,
+                radial_offset: 0.0,
+                samples,
+                scale: 0.9,
+                rotation: 0.0,
+                draw_progress: 1.0,
+                color: [0.0; 3],
+                width: 0.01,
+            },
+            &mut points,
+            &mut pieces,
+            &mut at,
+        );
+        (fitted, pieces)
+    };
+
+    // The shipped webs: `curve_nightbloom` binds 29 / 37 / 43, the golden
+    // fixture and `parametric_curve`'s own default bind 71.
+    for d in [29.0, 37.0, 43.0, 71.0] {
+        let (fitted, pieces) = walk(7.0, d, 240);
+        assert!(!fitted, "d = {d} is a chord web and must decline the fit");
+        assert!(pieces.is_empty(), "d = {d} left pieces behind");
+    }
+
+    // `curve_ionwake`'s rose, which is the figure this phase exists for.
+    let (fitted, pieces) = walk(5.0, 2.0, 240);
+    assert!(fitted, "a d = 2 rose is a curve and must be fitted");
+    assert!(
+        pieces.iter().any(|p| matches!(p, Piece::Arc { .. })),
+        "a fitted rose must come back as arcs"
+    );
+    assert!(
+        pieces.len() < 239,
+        "a fit that costs more than the chords it replaces is not a fit: {}",
+        pieces.len()
+    );
+}

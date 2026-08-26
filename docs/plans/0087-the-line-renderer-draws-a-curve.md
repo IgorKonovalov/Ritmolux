@@ -319,7 +319,9 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `WORK/lmv-plan-0087` on `plan-0087-arc-primitive`, branched from `main` at `aa4bc5f`.
+**Lane:** phases 1-4 ran in `WORK/lmv-plan-0087` on `plan-0087-arc-primitive`, branched from `main`
+at `aa4bc5f`; that branch is gone and its commits reached `main` inside Plan 0114's close merge.
+Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from `main` at `e205f8e`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -328,7 +330,7 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 | 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
 | 3 — the circular motifs become arcs | dev | done | `82c031f` |
 | 4 — does it read as a curve? | human | done | verdict in the notes |
-| 5 — the general curve: a biarc chain | dev | not started | |
+| 5 — the general curve: a biarc chain | dev | done | committed with this row |
 | 6 — the scalloped boundary | dev | not started | |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
@@ -458,6 +460,59 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   after the aspect divide" overstates what the shader does. **The arc reproduces it deliberately** —
   Phase 1's done-when is to match a densely-sampled polyline of the same arc, not to draw a better
   one — so changing it is a separate decision about every line scene, and an architect call.
+
+- **Phase 5 — the fit needs a second budget, and the first one alone cannot bound it.** The
+  done-when asks for a stated tangent-error budget with a written derivation, and there is one
+  (`biarc::TANGENT_BUDGET`, 0.05 rad, derived so its own positional consequence lands on the same
+  order as the lateral one). **A tangent budget alone does not terminate.** `petal` and `teardrop`
+  carry a point of *unbounded* curvature at each tip — the outline's `1.6` exponent makes
+  `y ~ |x|^0.8`, so the tangent turns arbitrarily fast through vertical and no circular arc tracks
+  it. A tangent-only criterion subdivides without limit over a feature `7.6e-6` units wide, five
+  hundred times narrower than a pixel. The fit therefore enforces a **lateral** budget as well, in
+  the caller's own frame, and that is the criterion that actually bounds the piece count. Measured
+  at the tangent budget alone: 28 arcs for a `petal` against the 24 segments it replaces.
+- **Phase 5 — the fit runs per frame on `parametric_curve`, and the plan says it never does.** "Runs
+  where `hankin::star_rosette` and `turtle::normalize_fit` already run, never per frame" holds for
+  the motif roster, where a chain is fitted once per process (`star::CHAINS`) because it is a pure
+  function of its motif. It **cannot** hold for `parametric_curve`, whose build model is a resample
+  every frame (ADR-0007) with no load moment to run anything at. It runs there per frame,
+  allocation-free into scene-owned buffers, and the span search is doubling-plus-bisection
+  (`O(n log n)`) rather than the `O(n^2)` a linear walk with a full recheck would cost.
+- **Phase 5 — piece counts against the segments they replace**, printed by
+  `a_fitted_motif_is_a_g1_chain_rather_than_a_polygon`: `petal` 24 -> **22 arcs**, `teardrop` 24 ->
+  **16 arcs**, `trefoil` 36 -> **24 arcs**, no straight runs in any of the three. The four-ring
+  mandala fixture falls from 1 092 instances before this plan to 492. The tangent breaks left in a
+  placed chain are the figure's own corners: 0, 1 and 3 against 24, 24 and 36 vertices.
+- **Phase 5 — a corner rule alone does not preserve a Maurer chord web, which is a measurement and
+  it moved the design.** The obvious construction — break the chain wherever the walk turns past
+  `CORNER_TURN`, and let a web fall out as its own polyline — **fails**: a `d = 29` walk is ~90 %
+  corners, and the fit turns the remaining tenth into arcs spanning two and three chords, redrawing
+  a figure whose chords *are* the figure. So the smooth/web decision is the **caller's**, taken
+  whole-figure from `biarc::corner_fraction` before the fit is called, with a threshold at 25 %
+  against measured 15 % / 85 % for the two families. A web declines the fit outright and reaches
+  `maurer_rose` unchanged; the two samplers were folded onto one `rose_point` so they cannot draw
+  two different roses from one set of parameters. **No golden baseline moved** — all 792 `lmv-core`
+  tests pass, including the ~20 `parametric_curve` captures, every one of which binds `d = 43` or
+  `d = 71`.
+- **Phase 5 — the single-arc collapse was a G1 defect before it was an optimization.** A span that
+  one arc already fits is emitted as one instance rather than as a biarc. Written against
+  `TANGENT_BUDGET`, that left the next piece starting up to 2.9 degrees off where this one ended — a
+  tangent discontinuity at every collapsed joint, which is the defect ADR-0098 exists to remove. It
+  is an equality test at `1e-4` rad now. Caught by asserting the G1 property directly rather than
+  taking it from the construction; the assertion is `chain_is_g1_at_every_joint_that_is_not_a_corner`
+  and its first run failed on an ellipse at five joints.
+- **Phase 5 — six `star` tests were written against `petal`/`teardrop`/`trefoil` being polylines**
+  and were repaired rather than relaxed: the roster's test helpers now split three families instead
+  of two, placement assertions read points **on the drawn figure** through one `drawn_points` helper
+  that is blind to which primitive carries them, and two instance-count literals became expressions
+  over `Motif::instances()` so the arithmetic is no longer asserted against itself. The
+  counter-rotation test named `Motif::Petal` while its own comment said "a **polyline** motif"; it
+  names `Motif::Diamond` now.
+- **Phase 5 — one scope step outside the phase's file list, disclosed rather than absorbed.**
+  `presets/README.md` (Phase 6's file, and Phase 3's precedent): its motif table quoted 24 / 24 / 36
+  segments for the three fitted members and a standing note said they "still facet where the retired
+  mandalas did", both of which this phase falsified. Left stale it would have been wrong for exactly
+  one commit.
 
 ### Close triggers
 

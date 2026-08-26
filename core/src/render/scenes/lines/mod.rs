@@ -21,6 +21,7 @@
     clippy::unreachable
 )]
 
+pub mod biarc;
 pub mod curves;
 pub mod grammar;
 pub mod hankin;
