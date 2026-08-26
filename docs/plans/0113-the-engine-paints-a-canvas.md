@@ -433,7 +433,9 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 
 > Written by `dev` — one row per phase as that phase's commit lands.
 
-**Lane:** branch `plan-0113-shape-collage`, worktree `WORK/lmv-plan-0113`.
+**Lane:** branch `plan-0113-shape-collage`, worktree `WORK/lmv-plan-0113`, for
+Phases 1-8. Merged to `main` on 2026-08-26; Phases 6b and 9 land on `main`
+directly.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -443,6 +445,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 | 4 — The layout generator and a sample sheet | dev | done | a008327 |
 | 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
 | 6 — The music moves the canvas | dev | done | 47ef35d |
+| 6b — The canvas is measured against its own paper | dev | done | committed with this row |
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
 
@@ -524,7 +527,8 @@ a gate's verdict is not a `dev` opinion. Flagged rather than left to be noticed.
 geometry_extent,golden}.rs` — exhaustive `SystemKind` matches, which the Phase 1
 done-when describes. `sanity.rs` also needed a `coverage_floor`; it is inherited
 from `FragmentField` and the arm records that coverage cannot judge this family at
-all, since the canvas lights every pixel. `core/src/render/{context,mod}.rs` — a
+all, since the canvas lights every pixel (**Phase 6b retires that arm and its
+reasoning** — see its row). `core/src/render/{context,mod}.rs` — a
 `Renderer::adapter_description()`, because Phase 2 requires the report name its
 adapter and driver and nothing could. `core/src/render/tier.rs`'s cap landed in
 Phase 1 rather than Phase 2, because the constructor sizes its buffer from it.
@@ -563,6 +567,12 @@ before/after.
   difference against a tolerance of 48. Restored from git and re-checked clean.
 - **The root README said "Ten built-in rendering systems" and had been wrong since
   `warp_mesh` made eleven.** Now twelve.
+- **Phase 6b re-pointed Plan 0116 Phase 6's fixture rather than adding a second
+  one**, which is what its amendment asks for — but the attractor `ink_*`
+  stand-in is *gone*, not kept alongside. That fixture was also the only place in
+  the tree recording that `ink_*` is a terminal engine stage ADR-0067's backdrop
+  suppression does not reach, which is why `Ink on Paper` read `1.0000` for
+  months. Nothing records it now.
 - Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000,
   flatness 0.7094, animation 0.0263, reactivity `bass=0.0511`. `On White`:
   coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
