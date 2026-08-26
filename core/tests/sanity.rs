@@ -580,16 +580,20 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // scoped to touch and which asserts the two match. The first `warp_mesh`
         // preset re-derives both together.
         SystemKind::WarpMesh => 0.50,
-        // **Not derived from a distribution either**, and for this family it may
-        // never need to be: a `shape_collage` canvas paints its own paper across
-        // every pixel (ADR-0123), so its lit fraction is 1.0 by construction
-        // whatever the elements do, and the statistic this floor is made of
-        // cannot distinguish a good canvas from an empty one. Inherited from
-        // `FragmentField` on the same structural argument as the two above.
-        // **The question this family actually needs asked is tonal, not areal**
-        // — a canvas that drew no elements is a flat sheet of paper, which
-        // `MAX_TONAL_FLATNESS` sees and coverage does not.
-        SystemKind::ShapeCollage => 0.50,
+        // **Derived from the distribution on 2026-08-26** (Plan 0113 Phase 6b),
+        // from an inherited `0.50`. Until then this arm read that a
+        // `shape_collage` canvas paints its own paper across every pixel
+        // (ADR-0123) so "its lit fraction is 1.0 by construction whatever the
+        // elements do", and leaned on `MAX_TONAL_FLATNESS` as the rescue. Plan
+        // 0116 falsified the premise: `1.0000` was `coverage` measuring the
+        // paper against black, and against the ground the frame is actually
+        // drawn on the two shipped canvases read `On White` 0.2677 and
+        // `Suprematist` 0.3028 — both *under* the inherited floor, clearing the
+        // gate only on the structural rescue. Half the new minimum, like every
+        // floor above. The areal question is now the one that convicts an
+        // emptied canvas, at the quiet excitation where emptying happens —
+        // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
+        SystemKind::ShapeCollage => 0.13,
     }
 }
 
@@ -1135,67 +1139,79 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
 }
 
 // ---------------------------------------------------------------------------
-// The emptying canvas (Plan 0116 Phase 6, ADR-0126)
+// The emptying canvas (Plan 0116 Phase 6, ADR-0126; the real family, Plan 0113
+// Phase 6b)
 // ---------------------------------------------------------------------------
 
 /// **A canvas the music empties**, frozen the way [`blown_out`] and
 /// [`pre_repair_spectrum_ridge`] are frozen — an inline fixture, not a shipped
-/// preset — because the family it stands for has not merged yet.
+/// preset — because what it stands for is a *defect*, and no shipped preset may
+/// hold one.
 ///
-/// [Plan 0113](../../docs/plans/0113-the-engine-paints-a-canvas.md) Phase 6
-/// builds a `shape_collage` scene whose element density falls with the level, so
-/// a quiet passage leaves bare paper. **An emptied canvas and a broken one are
-/// the same picture**, and against [`BLACK`] both read `coverage = 1.0000`: the
+/// [Plan 0113](../../docs/plans/0113-the-engine-paints-a-canvas.md) builds
+/// `shape_collage`, a scene whose element `density` falls with the level, so a
+/// quiet passage leaves bare paper. **An emptied canvas and a broken one are the
+/// same picture**, and against [`BLACK`] both read `coverage = 1.0000`: the
 /// paper is not black, so every pixel counts as lit and the frame scores as
 /// completely full. That is the false negative ADR-0126 was raised on, and it is
 /// designed-in rather than hypothetical.
 ///
-/// This reaches the same state without `shape_collage`. The attractor's `ink_*`
-/// remap is a **terminal engine stage**, not a `bg_*` binding, so ADR-0067's
-/// backdrop suppression does not reach it and a paper-white frame is reachable
-/// here today — which is why `Ink on Paper` shipped reading `1.0000` for months.
-/// `pan_x` carries the drawing off frame as the level falls, so the same preset
-/// renders a composed page when driven and a bare one when not.
+/// **Plan 0116 Phase 6 wrote this fixture on the attractor's `ink_*` remap**,
+/// which reaches a paper-white frame the same way and was reachable while
+/// `shape_collage` sat on an unmerged branch. Plan 0113 Phase 6b re-points it at
+/// the family it was always about: everything below is the scene's own default
+/// canvas — the authored suprematist arrangement, still, at `count` — and the
+/// one binding is the lever the defect lives on.
 ///
 /// Deliberately free of `time` terms: a fixture that is a pure function of its
 /// excitation is one the reader can reason about, and the determinism rule in
 /// `CLAUDE.md` applies to test content as much as to analysis.
 fn emptying_canvas() -> Preset {
     Preset::from_toml_str(
-        r#"
-system = "attractor"
+        r##"
+system = "shape_collage"
 name   = "Emptying Canvas"
 
-[particles]
-family = "de_jong"
+# The shipped palette's plateau shape, so the fixture is a flat graphic canvas
+# and not a gradient with edges: each element's coordinate lands in the interior
+# of one band, and the last band is the paper `paper` selects below.
+[palette]
+stops = [
+  { at = 0.0000, color = "#111111" },
+  { at = 0.1249, color = "#111111" },
+  { at = 0.1251, color = "#8a1420" },
+  { at = 0.2499, color = "#8a1420" },
+  { at = 0.2501, color = "#96751e" },
+  { at = 0.3749, color = "#96751e" },
+  { at = 0.3751, color = "#1e3a8a" },
+  { at = 0.4999, color = "#1e3a8a" },
+  { at = 0.5001, color = "#1d5c34" },
+  { at = 0.6249, color = "#1d5c34" },
+  { at = 0.6251, color = "#4a4a4a" },
+  { at = 0.7499, color = "#4a4a4a" },
+  { at = 0.7501, color = "#5a1f4a" },
+  { at = 0.8749, color = "#5a1f4a" },
+  { at = 0.8751, color = "#d9d5c8" },
+  { at = 1.0000, color = "#d9d5c8" },
+]
 
 [params]
-a = "1.641"
-b = "1.902"
-c = "0.316"
-d = "1.525"
-size = "0.60"
-fade = "0.885"
-saturation = "0.35"
+paper = "0.9375"
 
-# The whole fixture. At full drive the drawing is centred; as the level falls it
-# translates off frame, and what is left is the page it was drawn on.
-pan_x = "(1 - bass) * 40"
-
-ink_amount   = "1"
-paper_hue    = "0.11"
-paper_sat    = "0.055"
-paper_bright = "0.985"
-ink_hue      = "0.62"
-ink_sat      = "0.35"
-ink_bright   = "0.055"
-"#,
+# The whole fixture. `density` gates what fraction of the canvas is live, and
+# the gate rounds *up* — so any positive value keeps at least one element and
+# only an exact zero empties the canvas. At full drive this is 1.0 and the
+# authored arrangement is entirely on the page; at a realistic level the clamp
+# floors it and what is left is the paper it was drawn on.
+density = "clamp(bass - 0.5, 0, 0.5) * 2"
+"##,
     )
     .expect("the emptying-canvas fixture parses")
 }
 
-/// **Plan 0116 Phase 6.** A canvas with nothing left on it is convicted, and the
-/// predicate this gate used until Phase 3 calls the same frame completely full.
+/// **Plan 0116 Phase 6, on the real family since Plan 0113 Phase 6b.** A canvas
+/// with nothing left on it is convicted, and the predicate this gate used until
+/// Plan 0116 Phase 3 calls the same frame completely full.
 ///
 /// # Why both excitations are here
 ///
@@ -1220,7 +1236,7 @@ fn a_canvas_the_music_empties_is_convicted_and_black_calls_it_full() {
     };
     let name = "Emptying Canvas";
     renderer.set_presets(vec![without_backdrop(emptying_canvas())]);
-    let floor = coverage_floor(SystemKind::Attractor);
+    let floor = coverage_floor(SystemKind::ShapeCollage);
 
     let composed = renderer
         .capture_preset(name, &loud(), FRAMES)
