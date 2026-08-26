@@ -1,10 +1,10 @@
 # 0130 — The structural term is boundary density, and conditioning the population is what made it work
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-26 (Plan 0119)
 > **Date:** 2026-08-26, **revised the same day** — the threshold became
 > `boundary_floor(system)` rather than one global constant, on the straddle finding in Context.
 > Revised rather than superseded because it is still `proposed` and this is one design conversation.
-> **Related plan(s):** [0119](../plans/0119-the-flatness-gate-gets-its-second-term.md)
+> **Related plan(s):** [0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md)
 > **Supersedes the Decision of:** [ADR-0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
 > — its composition-scale statistic was measured and is not what ships. **Its criterion 2 survives
 > intact and is the reason this ADR exists**; see that ADR's dated `Outcome`.
@@ -14,7 +14,7 @@
 > (the ground the first term reads against),
 > [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > (why the constant below is a measurement and must say so)
-> **Raised from:** [Plan 0119](../plans/0119-the-flatness-gate-gets-its-second-term.md) Phase 1,
+> **Raised from:** [Plan 0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md) Phase 1,
 > measured 2026-08-26 at `8389f2a`
 
 ## Context
@@ -239,8 +239,8 @@ gate like any other preset.
   defeats this term, which is the mechanism 0129 was written to escape. We now believe that
   escape route was never open, but the hazard it was reacting to is real and unaddressed.
 - **`Blown Out` is one frozen frame doing even more work than before.** It is the sole anchor on the
-  defect side of `MAX_TONAL_FLATNESS`, of ADR-0128's conjunction, and now of `MIN_BOUNDARY_DENSITY`.
-  A re-bless moves three thresholds.
+  defect side of `MAX_TONAL_FLATNESS`, of ADR-0128's conjunction, and now of
+  `boundary_floor`'s default arm. A re-bless moves three thresholds.
 - **The gate is strictly weaker**, inherited from ADR-0128 and unchanged: a conviction now needs both
   terms, and the failure message has to tell an author which of the two to fix.
 

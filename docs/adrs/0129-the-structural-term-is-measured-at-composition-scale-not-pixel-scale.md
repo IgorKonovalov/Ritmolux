@@ -1,9 +1,9 @@
 # 0129 — The structural term is measured at composition scale, not at pixel scale
 
-> **Status:** proposed — **Decision superseded by [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)**;
+> **Status:** accepted 2026-08-26 (Plan 0119) — **Decision superseded by [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)**;
 > its corrected stop condition survives. See the dated `Outcome` below.
 > **Date:** 2026-08-26
-> **Related plan(s):** [0119](../plans/0119-the-flatness-gate-gets-its-second-term.md)
+> **Related plan(s):** [0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md)
 > **Completes:** [ADR-0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 > — that ADR decided flatness becomes a conjunction and left the second term's *mechanism* to a
 > measurement phase, which fired its stop condition. This one names why it fired and what to measure
@@ -254,7 +254,7 @@ usable second calibration point rather than a preset with several problems.
 
 ## Outcome (2026-08-26) — the correction was the finding; the axis claim was not
 
-[Plan 0119](../plans/0119-the-flatness-gate-gets-its-second-term.md) Phase 1 added this ADR's
+[Plan 0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md) Phase 1 added this ADR's
 composition-scale candidate to the Plan 0116 Phase 8 instrument, swept its tile count over
 `[4, 6, 8, 12, 16]`, and re-judged all four columns under the corrected stop condition. **The tiled
 statistic is not what ships.**
