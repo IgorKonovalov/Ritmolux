@@ -447,13 +447,30 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// what moved it.
 ///
 /// Two of that six deserve a note, because a reader checking the arithmetic
-/// will trip on them. `Ink on Paper` and `Thomas` both read exactly `1.0000`,
-/// and for `Ink` that is a **measurement artifact rather than a saturated
-/// figure**: it sets `ink_amount = 1`, and the ink remap is a terminal engine
+/// will trip on them. **Under the [`BLACK`] predicate this table was taken
+/// against**, `Ink on Paper` and `Thomas` both read exactly `1.0000`, and for
+/// `Ink` that was a **measurement artifact rather than a saturated figure**: it
+/// sets `ink_amount = 1`, and the ink remap is a terminal engine
 /// stage, not a `bg_*` binding, so ADR-0067's backdrop suppression does not
 /// reach it - the whole frame is paper-white and every pixel differs from
 /// [`BLACK`]. Its tonal flatness (`0.6756`) is the statistic that actually
-/// describes it. `Lorenz` was deliberately left un-retuned pending Plan 0057
+/// described it.
+///
+/// **That artifact is gone as of 2026-08-26** (ADR-0126, Plan 0116 Phase 3):
+/// against the frame's own derived ground the same two presets read `0.2167`
+/// and `0.2917`, which is what the `SystemKind::Attractor` arm below is now
+/// half of. The `1.0000` above is kept rather than overwritten because it is
+/// what the floors in the table around it were derived from — but it is a
+/// **historical** reading, and quoting it as a current one is the mistake this
+/// paragraph exists to prevent.
+///
+/// **The mechanism sentence outlives the number**, and this is the only place
+/// in the tree that records it: `ink_*` is a terminal engine stage rather than
+/// a `bg_*` binding, so no backdrop suppression reaches it, and any future lens
+/// that assumes a suppressed frame is dark will be wrong here for the same
+/// reason this one was.
+///
+/// `Lorenz` was deliberately left un-retuned pending Plan 0057
 /// Phase 5, so its `0.5381` is a pre-retune number and will move again.
 ///
 /// **These numbers replace floors that could not be failed.** Under the old

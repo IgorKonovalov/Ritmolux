@@ -243,6 +243,24 @@ fn a_thousand_recompositions_never_reallocate() {
 ///
 /// It is a `System` pass-through, so nothing about how this crate's tests
 /// allocate changes — only that an increment is charged to the calling thread.
+///
+/// # This takes the whole lib test binary's one allocator slot
+///
+/// A crate may install exactly one `#[global_allocator]`, and `#[cfg(test)]`
+/// modules all compile into a **single** `lmv-core` unit-test binary — so this
+/// declaration, written for one scene's element builder, is now the allocator
+/// for every unit test in `core/src/**`. It costs those tests nothing (a
+/// thread-local increment on a pass-through), but the slot is taken: a second
+/// in-lib test that wants an allocation counter fails to build with *"cannot
+/// define multiple global allocators"*, pointing at a file its author has no
+/// reason to be reading.
+///
+/// **So reuse this one rather than adding another** — [`alloc_count`] is the
+/// whole interface, and a test in another module reaches it through
+/// `crate::render::scenes::shape_collage::tests`. If a third caller appears,
+/// that is the signal to hoist both into a shared test-support module; two is
+/// not yet worth the move. `core/tests/preset.rs` has its own copy and does not
+/// collide, because an integration test is its own binary.
 struct CountingAlloc;
 
 thread_local! {
