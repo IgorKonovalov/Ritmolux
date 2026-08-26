@@ -13,8 +13,12 @@
 #    plateaus; a smooth ramp here would blur every element's fill and the
 #    baseline would stop being about flatness.
 #  - Seven of the eight plateaus sit AT OR UNDER the tonemap's KNEE = 0.6
-#    (ADR-0046), where the curve is exactly the identity, so those colours reach
-#    the display byte-identical. The eighth is the paper at linear 0.851, which
+#    (ADR-0046), where the curve is exactly the identity, so those fills survive
+#    the post chain UNSHADED - the value the element wrote is the value that
+#    leaves the tonemap. NOT byte-identical to the hex: a stop is a linear
+#    coefficient with no sRGB decode, so the display byte is its sRGB encoding
+#    and `#111111` pins as `#494949`. The eighth is the paper at linear 0.851,
+#    which
 #    is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
 #    unreachable, off-white is the affordable ground, and this fixture is what
 #    would notice if that ever stopped being true.

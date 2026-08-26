@@ -1,6 +1,6 @@
 # 0124 — The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-26 (Plan 0114) — carries an `Outcome`
 > **Date:** 2026-08-25
 > **Related plan(s):** [0114](../plans/0114-the-line-stroke-reads-as-a-drawn-line.md)
 > **Supplements:** [ADR-0056](0056-additive-scenes-emit-premultiplied-alpha.md) (the alpha model this
@@ -228,6 +228,50 @@ the deliverable.
 Rejected on the Plan 0087 precedent. The profile is a look, the look gate is the instrument that
 found the problem, and a number written here would be a guess dressed as a decision. The gate picks
 it; this ADR fixes the *mechanism* and the fact that a default exists.
+
+## Outcome — 2026-08-26, at Plan 0114's `dev`-arm close
+
+Recorded rather than edited into the body above, per this project's rule that an accepted ADR is
+append-only. **The decision stands in full and was built as written**; one supporting *reason* in the
+Negative section is false, and one number the Decision reasons from is confirmed exactly.
+
+**Falsified: why no golden baseline shaded a `warp_mesh` stroke.** The Negative section gives the
+reason as the three fixtures "setting no wave and no border". They set no *border*; they all set a
+wave, because `wave_a` defaults to `1.0` (`core/src/milk/outputs.rs:166`) and nothing in those
+fixtures turns it off. Every `warp_mesh` fixture in the repo has always stroked a waveform.
+
+**The real cause is the golden suite's 128 px capture, and the conclusion is unaffected — it is
+stronger.** At that size `draw.rs`'s `THIN` is **0.16 px** of half-width and `THICK` is **0.38 px**,
+both far under the one-pixel floor the profile's edge term is capped at, so the ramp is the whole
+half-width and *every* value of `MILKDROP_SOFTNESS` draws the identical frame. Measured at the close
+by driving the pin `1.0 -> 0.0` and reading the whole corpus: `warp_mesh.png`, `warp_mesh_milk.png`
+and `warp_mesh_shader.png` move by **mean 0.0000 / outlier 0**, and so do `parametric_curve.png`,
+`lsystem.png` and `star_pattern.png`. So the blindness is not a property of those three fixtures at
+all — it is a property of the **capture size**, and it reaches the line families too.
+
+Two things follow, and both are why this matters more than a corrected sentence:
+
+- **A fixture that merely "sets a wave" would have added a fourth blind baseline.** Plan 0114 Phase
+  9's `warp_mesh_stroke.toml` therefore strokes a **fat border** (`ob_size = 0.12`, 7.7 px of
+  half-width at 128 px) as well as a wave, and `the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke`
+  guards the border's width in pixels so it cannot quietly degrade back. That baseline is verified
+  to convict: the same `1.0 -> 0.0` sweep moves it to **mean 0.0336 / outlier 162** against
+  tolerances of 0.02 / 48.
+- **The line families' own coverage gap is now stated but not closed.** Only `spectrum.png` and
+  `line_joint_zigzag.png` moved when the default flipped; the other line baselines cannot see this
+  fragment. The pin is guarded; the *default* is guarded only incidentally.
+
+**Confirmed exactly: the cap is what makes the pin byte-identical rather than approximate.** The
+Negative section's `THIN` arithmetic — 1.35 px at 1080p, 1.0 px at 1280x800, `fwidth` reaching the cap
+at the small target — is what
+`the_edge_term_never_exceeds_the_softness_term` fixtures directly, on that real shipped geometry
+rather than on a synthetic width alone.
+
+**Alternative D0 was tested by the instrument it named, and held.** Plan 0114 Phase 8 put a spread of
+`softness` beside `foo_vis_milk2` and returned **`1.0`** — keep the pin as it stands — which the plan
+names as a legitimate outcome that closes the question rather than a null result. `MILKDROP_SOFTNESS`
+is unchanged, and it is now a *judged* constant rather than a held-over default.
+
 
 ## Notes
 

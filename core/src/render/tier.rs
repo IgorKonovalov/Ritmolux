@@ -359,9 +359,25 @@ pub struct TierConfig {
     ///
     /// **40 is the reference set's own top, not a budget line.** The gate that
     /// set it was a look judgement, and the numbers were not the binding
-    /// constraint: the user's working density is **8 to 14 elements** — where
-    /// the canvas costs 36-39 % — and denser canvases were rejected on sight
-    /// long before they were rejected on cost. The ceiling then went to the
+    /// constraint: the user's working density is **8 to 14 elements**, which on
+    /// the system **as shipped** costs **8.2 % at eight and 10.7 % at sixteen** —
+    /// and denser canvases were rejected on sight long before they were rejected
+    /// on cost.
+    ///
+    /// **Those two figures are from `collage_cost.rs`'s post-roster table, not
+    /// from the ladder above**, and the distinction is the whole reason this
+    /// sentence is on its third revision. The ladder above is what Phase 3 read,
+    /// and it is correctly frozen at what Phase 3 saw — *before* the eight-kind
+    /// roster landed, when a canvas was quads, circles and triangles. The roster
+    /// made the loop **cheaper**, because rings, sectors and checker patches
+    /// shade far less of their own bounding box than a quad does, so the
+    /// pre-roster ladder overstates the shipped cost by about half again
+    /// (12.7 % against 8.2 % at eight elements). Quote it for the gate's
+    /// reasoning; quote the post-roster table for what a canvas costs today.
+    /// (This sentence quoted 36-39 % until Plan 0113 Phase 9 — the pre-Phase-3
+    /// sweep's figures, taken from the instrument the paragraph five lines up
+    /// forbids quoting — and then the pre-roster ladder's 12.7 % / 16.8 % until
+    /// Phase 10.) The ceiling then went to the
     /// densest thing the plan still has to build, Kandinsky's *On White II*,
     /// which ADR-0123 counts at just above 40 once its lines and arcs are
     /// included. So this value sits **exactly on** that canvas rather than over

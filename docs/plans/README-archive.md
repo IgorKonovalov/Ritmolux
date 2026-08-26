@@ -13,6 +13,93 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0113 — The engine paints a canvas](done/0113-the-engine-paints-a-canvas.md)
+  — closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`. Phases 1-8 ran in the
+  `lmv-plan-0113` worktree on `plan-0113-shape-collage` and merged at `b20ba21`; 6b, 9 and
+  10 landed on `main` directly. Two `human` gates, both decided in their own phase blocks.
+  **Two Mode 4 reviews, which is the shape worth remembering about this close.** The first
+  found three `major`s and became **Phase 9**; the second found **no blockers and one
+  `major`** and became **Phase 10** plus one architect repair. Version: **minor**,
+  `0.78.1` → `0.79.0`.
+
+  **What shipped.** A twelfth system, `shape_collage` — the engine's first *graphic* world
+  rather than a luminous one. Flat opaque elements on their own off-white paper, walked in
+  array order by one fullscreen distance-field pass, so **the array index is the depth** and
+  a black bar genuinely sits in front of a red one. With it: a seeded CPU layout grammar
+  (`diagonal-axis`, with `size-hierarchy`'s across-axis spread folded in), all four
+  reactivity levers, an eight-kind element roster, two shipped presets
+  (`collage_suprematist`, `collage_onwhite`), two golden fixtures, and `collage_cost.rs` —
+  a cost instrument that asserts no threshold and skips on a software rasterizer.
+
+  **ADR-0123's central finding held: the composite took no change at all.** A fullscreen
+  scene emitting `alpha = 1` already holds the backdrop out (measured, Plan 0091 Phase 1),
+  the tonemap is exactly the identity below `KNEE = 0.6`, and bloom's threshold sits above
+  that knee — so flat fills and hard edges both came free from one palette constraint.
+  `design-backlog 0069` had priced this capability as a composite redesign since 2026-08-05
+  and sat at **Low** on that price; the price was wrong for the in-scene case.
+
+  **The stop gate did not bind on cost, and that is the durable finding.** Phase 3 read
+  Phase 2's ladder and continued at Floor 40 / Rich 96 — but the user rejected canvases
+  denser than about 14 elements **on sight, not on budget**: at 64 the forms stop reading as
+  objects in space and become a fragmented facet field. The cap was then set from the
+  densest thing still to build (Kandinsky's *On White II*, just above 40), so it sits
+  **exactly on** that count. A forty-first element moves the number rather than being
+  truncated — and the cap currently clamps **silently**, which ADR-0007 forbids for
+  `max_segments`; that is the plan's headline followup.
+
+  **Three defects that only a rendered frame could find**, all recorded in the plan's log:
+  the diagonal band ran at −15° while `angle_bias` asked for −22° (the axis was rotated in
+  unit space then scaled anisotropically, the elements were not); the canvas washed pale
+  under real audio because the crossfade composited two canvases *sequentially* with `over`
+  instead of mixing, leaving a quarter bare paper at the midpoint; and every grammar sized
+  elements as though a half extent were a full one. Every gate stayed green through all
+  three.
+
+  **What the two reviews caught, and why the second one mattered.** The first review's three
+  `major`s: a colour promise that was simply false at five sites (*"reaches the display
+  byte-identical"* — a palette stop is a **linear coefficient with no sRGB decode**, so
+  `#111111` presents as `#494949`), `tier.rs` quoting the very sweep its own paragraph
+  forbids quoting, and `Element::build` doing a `Vec::with_capacity(9)` per sector **per
+  frame** on the render thread. The second review found the sixth copy of the colour claim
+  in **ADR-0123 itself** — the document the five repaired sites cite — so the tree had been
+  left contradicting its own authority. Recorded as a dated `Outcome` on that ADR rather
+  than edited into its body. What the knee actually buys, and what the look rests on, is
+  that below it the **tonemap** is the identity, so every fill leaves the post chain
+  **unshaded and halo-free**; `an_element_under_the_knee_arrives_at_the_value_it_was_authored_at`
+  asserted `encoded(hex/255)` correctly from Phase 1, so no test was ever wrong — only the
+  prose around it.
+
+  **`coverage` read `1.0000` for this family and it was not a property.** Phase 1 took it as
+  structural (*"its lit fraction is 1.0 by construction"*); it was the old lens measuring
+  painted paper against black — the degeneracy ADR-0126 was raised on. Plan 0116 merged
+  mid-flight and unblocked **Phase 6b**, which re-derived the floor to `0.13` from the
+  family's own distribution (`On White` 0.2677, `Suprematist` 0.3028; slack 2.06 against the
+  2.2 cap) and re-pointed Plan 0116's emptying-canvas fixture onto the real family. That
+  test convicts a bare canvas **and asserts that the old `BLACK` predicate calls the same
+  frame completely full**, which is the only form of that claim worth anything.
+
+  **Two properties that outlive the plan.** `a_circle_element_is_round_at_sixteen_by_ten`
+  renders at 1280x800 and 500x800 because 1920x1080 and this box's 2048x1152 are both
+  exactly 16:9, where every wrong aspect source is right by accident (ADR-0037, which has
+  shipped three times here); its doc records that substituting a literal `1.0` renders the
+  circle 319x199 and fails the test. And `the_element_builder_allocates_nothing` reaches the
+  allocator through a thread-local counting global allocator, because the existing capacity
+  test measures the `Vec<Placed>` the generator fills and structurally cannot see a buffer
+  *inside* an element built into it.
+
+  **Curation verdict (step 3b).** Both shipped presets earn their place: `--report
+  family=shape_collage` flags **no near-duplicate geometry** (nothing below shape 0.08), and
+  the two are structurally different canvases rather than one grammar twice. Nothing the plan
+  fixed left a workaround stale — the system is new, so no pre-existing preset was dodging
+  anything it repaired. **One note for the content lane:** both worlds are bass-monotone
+  (`On White` bass 0.037 / mid 0.002 / treb 0.003; `Suprematist` 0.048 / 0.007 / 0.002, onset
+  0.000 for both). A third collage preset should take a different band, not a third layout.
+
+  **One caveat carried forward.** That allocator now occupies the `lmv-core` lib test
+  binary's single `#[global_allocator]` slot, from a leaf scene's test module; Phase 10
+  documents the collision and sets three callers as the threshold for hoisting it to shared
+  test support.
+
 - [0116 — The sanity lens finds the ground](done/0116-the-sanity-lens-finds-the-ground.md)
   — closed 2026-08-26, in the `lmv-plan-0116` worktree on `plan-0116-sanity-ground`, branched from
   `e022a5d`. Six `dev` phase commits (`8d4a9a9`, `debd803`, `5d97abd`, `86106af`, `022e4c5`,

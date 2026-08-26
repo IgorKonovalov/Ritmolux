@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0129.** *(0120 was reserved for
+**Next free number: 0131.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -144,10 +144,12 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0120](0120-the-close-brief-is-a-section-of-the-plan.md) | The close brief is a section of the plan, written as the phases land | accepted 2026-08-25 (0112) |
 | [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | accepted 2026-08-25 (Plan 0106), one Outcome |
 | [0122](0122-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | accepted 2026-08-25 (Plan 0106) |
-| [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | proposed 2026-08-25 (Plan 0113) |
-| [0124](0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) | The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable | proposed 2026-08-25 (Plan 0114) |
+| [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | accepted 2026-08-26 (Plan 0113), Outcome |
+| [0124](0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) | The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable | accepted 2026-08-26 (Plan 0114), Outcome |
 | [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | proposed 2026-08-25 (Plan 0115) |
 | [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
 | [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | proposed 2026-08-25 (Plan 0118) |
-| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | proposed 2026-08-26 (Plan 0116), Outcome - decision NOT implemented, no candidate statistic survived |
+| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | proposed 2026-08-26 (Plan 0116), Outcome - decision NOT implemented, no candidate statistic survived; completed by 0129 |
+| [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | proposed 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
+| [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | proposed 2026-08-26 (Plan 0119) |
 <!-- roster:end -->

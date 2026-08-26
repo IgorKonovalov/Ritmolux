@@ -1341,22 +1341,35 @@ preset that binds none of them draws a still canvas.
 | `drift`, `spin` | multipliers on each element's own velocity and angular velocity, drawn from the seed at generation. `1` is a slow travel — an element crosses the canvas in about a minute — and higher is legal. Integrated against real elapsed time, so the canvas moves identically at any refresh rate. An element reaching the canvas edge **wraps** to the other side. |
 | `pump_size`, `pump_alpha` | depths of a per-element swell in size and in opacity. **Phase-offset per element**, so the canvas does not breathe in unison — a field of oscillators sharing a phase reads as one sheet flashing. The *rate* is the engine's and is not a parameter; drive the depth from the music. |
 
-> **`beat_index` counts onsets, not beats** ([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
-> at about 1.7-2.1x. A `recompose` hung off it fires roughly twice as often as
-> the music's beat. Author knowing that, and **do not compensate for it inside a
-> preset** — Plan 0095 is the fix in flight and a compensated preset would have
-> to be unwound when it lands.
+> **`beat_index` counts onsets, not beats, and no fixed multiplier converts**
+> ([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)). It
+> runs at 1.2x-2.3x detections per musical beat depending on the material and
+> wanders between 1x, 2x and 4x *inside one track*, so a `recompose` hung off it
+> has no period at all — see the trap in
+> [`docs/presets.md`](../docs/presets.md#musical-time). **Do not compensate for
+> it inside a preset**, because there is nothing stable to compensate against.
+> What `beat_index` is good for here is exactly what the shipped canvas uses it
+> for: `hash(beat_index)` re-rolls the arrangement on activity without claiming
+> a beat count.
 
 > **Keep the palette under linear 0.6 and the look is free.** This is the one
 > authoring fact this system has, and it comes off the tonemap rather than off
 > any parameter — see
 > [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
 > paragraph on the knee in [`docs/preset-palettes.md`](../docs/preset-palettes.md).
-> Below the knee ADR-0046's curve is exactly the identity, so a colour arrives at
-> the display *as authored* — flat, unshaded — and bloom's threshold sits above
-> that same knee, so the edges stay hard with no halo. One constraint, both
-> properties, no parameter. Reach for a brighter palette and you lose the flat
-> fill and the hard edge together, and nothing will tell you why.
+> Below the knee ADR-0046's curve is exactly the identity, so the fill survives
+> the post chain **unshaded** — the value the element wrote is the value that
+> leaves the tonemap — and bloom's threshold sits above that same knee, so the
+> edges stay hard with no halo. One constraint, both properties, no parameter.
+> Reach for a brighter palette and you lose the flat fill and the hard edge
+> together, and nothing will tell you why.
+>
+> **Unshaded is not "the hex you typed".** A stop is a linear coefficient with
+> **no sRGB decode**, so the display byte is that coefficient's sRGB *encoding*
+> and it is brighter than the hex: in `collage_suprematist`, `#111111` renders
+> `#494949` and `#8a1420` renders `#BF5164`. Every element is shifted by the same
+> curve and none of them is shaded or haloed, which is the property the look
+> rests on. Author by the rendered result.
 >
 > The **paper** is the deliberate exception: `f(1.0) = 0.800` makes pure white
 > unreachable, so an off-white ground is the affordable one. Both of the

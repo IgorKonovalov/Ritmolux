@@ -1,6 +1,9 @@
 # 0114 — the line stroke reads as a drawn line
 
-> **Status:** in-progress
+> **Status:** in-progress — **the `dev` arm is done, reviewed and merged (2026-08-26): phases 1-5
+> and 7-9.** Two phases remain and neither gates the other: **Phase 6**, the `preset-author` retune,
+> and **Phase 10**, the Mode 4 review's findings. [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
+> is accepted with a dated `Outcome`.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
@@ -22,6 +25,15 @@
 > geometry in them — so Phase 5's re-bless stays lines-only as originally written. The real finding
 > is the other side of the same fact: **nothing in the golden corpus shades a `warp_mesh` stroke at
 > all**, which is why Phase 9 adds a baseline rather than re-blessing one.
+> **Correction, 2026-08-26 at the close — the conclusion above is right and the reason is not.**
+> The three `warp_mesh` goldens **do** carry line geometry: `wave_a` defaults to `1.0`
+> (`core/src/milk/outputs.rs:166`), so all three stroke a waveform and always have. What makes them
+> blind is the golden suite's **128 px capture**, where `THIN` is 0.16 px of half-width and the edge
+> cap makes the profile inert — which also makes `parametric_curve`, `lsystem` and `star_pattern`
+> blind, so this is a property of the capture size rather than of those fixtures. Phase 5's
+> lines-only re-bless and Phase 9's new baseline are both still correct; the same wording recurs in
+> Phase 5's first done-when below and is wrong there too. See the `Implementation log` and
+> [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s `Outcome`.
 
 ## TL;DR
 
@@ -301,6 +313,50 @@ instruments, and neither one's verdict is evidence for the other's constant.
   - The new baseline is blessed on hardware with adapters compared first, per the standing rule —
     this repo has blessed rasterizer garbage before.
 
+### Phase 10 — the guard that this plan made retirable says so, out loud
+
+- **Owner skill:** dev
+- **Why:** the Mode 4 review (2026-08-26) found one major and two minors, all in test surface, all
+  created by phases that are otherwise green. They are one commit.
+- **Files touched:** `core/tests/fixtures/lines_lit_backdrop.toml`,
+  `core/src/render/scenes/lines/renderer/tests.rs`, `core/src/render/scenes/lines/star/tests.rs`,
+  `docs/capturing.md`, `scripts/softness-sheets.mjs`.
+- **Done when:**
+  - **`lines_lit_backdrop.toml`'s `softness = "1.0"` is guarded the way its `thickness` is.**
+    Phase 5 added that line because at the new default a plateau legitimately extinguishes a
+    *region*, so the wide arm of `a_lit_backdrop_survives_where_the_strokes_drew_nothing` can no
+    longer separate coverage-is-1 from the constant-alpha defect it exists to catch. Right now the
+    line carries **no comment**, and the test reads back `bg_bright`, `draw_progress`, `thickness`
+    and `trails` as preconditions but **not** `softness`. That is precisely the trap the fixture's
+    own header is written about — *"'simplifying' it back to a shipped width retires this test
+    silently while leaving it green"* — and the pin is now the easiest thing in the file to
+    normalise away. So: a `fixture_value("softness")` arm asserting it is still `1.0`, worded like
+    the `thickness >= 6.0` one and pointing at the header, plus a header paragraph saying why.
+  - **`docs/capturing.md` says it too.** That file documents this fixture at length, including the
+    *"do not 'simplify' it away"* section, and still describes the line falloff as unconditionally
+    *"one-dimensional and quadratic"* — which is now true only at `softness = 1.0`. One sentence in
+    each place; the numbers in its table were measured at that profile and stay valid because the
+    fixture pins it.
+  - **`star/tests.rs`'s `BEAD_SPREAD` stops eating its test's doc comment.** The const was inserted
+    *inside* the header for `a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame`,
+    so the whole "what this test proves" block now documents the constant and the test has no doc
+    comment at all. Split them; neither text changes.
+  - **`BEAD_SPREAD` is asserted as the gap it claims to be, or it names its machine** ([ADR-0071]).
+    `0.12` is a frozen number chosen to sit between two adapter-dependent readings (the arc's 7.9 %,
+    the 24-gon control's 34.3 %), asserted universally, naming no configuration — and its own doc
+    already says *"the gap between the two arms is what carries the property, not the absolute
+    figure"*. Both readings are taken in the **same test**, so assert the ratio and let the absolute
+    figures be printed. If a ratio will not carry it, the fallback is the honest one: keep the
+    constant and name the machine and adapter it was measured on.
+  - **`scripts/softness-sheets.mjs` stops calling `1.00` the shipped default.** Its index prose says
+    *"`1.00` is the stroke the library ships today, byte for byte"* and it labels that panel
+    *"(ships today)"*. Phase 5 moved the default to `0.25`; a Phase 6 sitting re-running this script
+    would be told the wrong thing about its own control panel.
+  - No golden baseline moves. Nothing here touches a fragment, a default or a fixture's geometry —
+    if a baseline moves, something in this phase reached further than it was asked to.
+
+[ADR-0071]: ../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+
 ## Risks & open questions
 
 - **`fwidth` is a derivative, and it is quantized to the 2x2 rasterization quad.** Below about two
@@ -356,6 +412,7 @@ at `b2fb13b`.
 | 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
 | 8 — judge against the reference | human | done | verdict below |
 | 9 — set the constant, add a baseline | dev | done | `60cf15e` |
+| 10 — the guard says so out loud | dev | **outstanding — from the Mode 4 review, does not gate 6** | |
 
 ### Notes
 
