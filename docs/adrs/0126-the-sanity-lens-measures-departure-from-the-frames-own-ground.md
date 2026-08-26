@@ -157,7 +157,7 @@ the ink is included and the *paper* is excluded — and the preset reads `0.9413
 All three estimators found the paper at `(245,245,245)` and all three still convicted it. A duotone
 has two large populations and `is_lit` removes whichever one is the ground, so the other holds ~94 %
 of what remains either way. That residue is a property of `tonal_flatness`, and
-[ADR-0127](0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) takes it.
+[ADR-0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) takes it.
 
 **"The four statistics become meaningful for every world the engine can draw" is true for eight of
 the twelve, not all of them.** The estimator clears the `coverage = 1.0000` degeneracy where a ground

@@ -484,7 +484,7 @@ fn modal_ground_finds_the_paper_an_ink_figure_sits_on() {
     // And the residue Plan 0116 Phase 1 measured, asserted rather than
     // remembered: the ground does **not** repair `tonal_flatness` on a duotone.
     // Whichever of the two populations `is_lit` removes, the other one holds
-    // all of what remains and reads 1.0 either way. That is ADR-0127's job.
+    // all of what remains and reads 1.0 either way. That is ADR-0128's job.
     assert_eq!(tonal_flatness(&ink, BLACK, 8), 1.0);
     assert_eq!(tonal_flatness(&ink, modal_ground(&ink), 8), 1.0);
 }

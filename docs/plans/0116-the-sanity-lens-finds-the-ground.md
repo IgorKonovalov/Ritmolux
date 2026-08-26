@@ -5,10 +5,10 @@
 > **Approved:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) (proposed),
-> [0127](../adrs/0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) (proposed)
+> [0127](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) (proposed)
 > **Closes:** design-backlog 0128
 > **Amended:** 2026-08-26, at Phase 2's stop gate. `modal_luma` chosen; Phases 3-7 corrected against
-> Phase 1's measurement; **Phases 8-9 added** carrying ADR-0127, because the measurement showed the
+> Phase 1's measurement; **Phases 8-9 added** carrying ADR-0128, because the measurement showed the
 > ground fixes two of ADR-0126's three motivations and structurally cannot fix the third.
 > **Sequencing constraint:** must land **before [Plan 0113](0113-the-engine-paints-a-canvas.md)
 > Phase 6**, which is where the emptying canvas arrives. Plan 0113 Phases 3-5 are unaffected and the
@@ -27,7 +27,7 @@ from argument, because the obvious candidate is already falsified.
 and changes **no** verdict at either excitation — and it clears the degeneracy for the eight presets
 that have a ground. It cannot clear it for the four that do not, and it cannot repair the
 flat-graphic false positive at all: that one is a property of `tonal_flatness` itself, not of the
-reference it measures from. Phases 8-9 carry [ADR-0127](../adrs/0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+reference it measures from. Phases 8-9 carry [ADR-0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 for that residue.
 
 ## Context & problem
@@ -104,7 +104,7 @@ the permissive direction: the library's verdicts are insensitive to it. `modal_l
 simplest of three that measured equivalent; `modal_border` adds a structural assumption (the ground
 reaches the frame edge) and `modal_rgb` a sparser histogram, neither for any measured return.
 
-Two findings from the same table redirect the rest of the plan, and both are recorded in ADR-0127:
+Two findings from the same table redirect the rest of the plan, and both are recorded in ADR-0128:
 
 1. **The estimator clears the degeneracy for 8 of the twelve, and structurally cannot for 4.**
    `Tiled Rosette` `1.0000 -> 0.1645`, `Ink on Paper` `-> 0.2167`, `Thomas` `-> 0.2917`, `Vellum`
@@ -114,7 +114,7 @@ Two findings from the same table redirect the rest of the plan, and both are rec
    uniform distribution puts in one of sixteen bands. They have no ground, and their `coverage` of
    1.0 is honest.
 2. **No estimator repairs `Tiled Rosette Mono`.** All three find the paper at `(245,245,245)` and all
-   three still convict it: `0.9413` / `0.9419` / `0.9413` against `0.9346` under the control. ADR-0127
+   three still convict it: `0.9413` / `0.9419` / `0.9413` against `0.9346` under the control. ADR-0128
    carries the arithmetic; the short form is that a duotone has two large populations and `is_lit`
    removes whichever one is the ground, so the other holds ~94 % of what remains either way.
 
@@ -142,7 +142,7 @@ Two findings from the same table redirect the rest of the plan, and both are rec
     **byte-identical**, or the phase explains per image why not.
   - **`fragment_tiledmono` is NOT expected to pass here.** Phase 1 measured that no ground estimator
     repairs it; the preset stays in `presets/pending/` until Phase 9. Moved out of this phase's
-    done-when on 2026-08-26 — see Phase 2's Outcome and ADR-0127.
+    done-when on 2026-08-26 — see Phase 2's Outcome and ADR-0128.
 
 ### Phase 4 — The floors are re-derived, not re-used
 
@@ -229,7 +229,7 @@ Two findings from the same table redirect the rest of the plan, and both are rec
   `presets/pending/`: the `blown_out()` fixture (a saturated additive mass — **must** read
   structureless), `Tiled Rosette Mono` (**must** read structured), and the whole shipped library
   (**must** move no verdict). Include the four groundless luminous fields — `Sumi`, `Whorl`,
-  `Supernova`, `Neon Tunnel` — as rows, since ADR-0127 records them as the same open question.
+  `Supernova`, `Neon Tunnel` — as rows, since ADR-0128 records them as the same open question.
 - **Files touched:** `core/src/render/metrics.rs` (a new pure statistic may land here if a candidate
   needs one; it is unused by any gate in this phase), `core/tests/sanity.rs`.
 - **Done when:**
@@ -244,13 +244,13 @@ Two findings from the same table redirect the rest of the plan, and both are rec
   - The harness is a report and gates nothing — it must not be able to redden CI on its own.
   - **The stop condition is mechanical, stated here so no phase invents a threshold to clear.** If no
     candidate separates the two fixtures with the library outside the gap, **Phase 9 does not run**:
-    the plan closes at Phase 8, ADR-0127 gains a dated `Outcome`, and `fragment_tiledmono` stays held
+    the plan closes at Phase 8, ADR-0128 gains a dated `Outcome`, and `fragment_tiledmono` stays held
     with its blocker re-pointed at that Outcome.
 
 ### Phase 9 — The flatness ceiling gains a second condition
 
 - **Owner skill:** dev
-- **What:** Implement ADR-0127 — a picture is convicted as a blot only when it is tonally flat
+- **What:** Implement ADR-0128 — a picture is convicted as a blot only when it is tonally flat
   **and** structureless. Runs only if Phase 8's stop condition passed.
 - **Files touched:** `core/src/render/metrics.rs`, `core/tests/sanity.rs`,
   `presets/pending/fragment_tiledmono.toml` -> `presets/fragment_tiledmono.toml` (a `git mv`),
@@ -299,7 +299,7 @@ Today the pink diamond is the constant `BLACK`; Phases 3-4 make it `modal_luma`,
 between it and the four statistics is unchanged in shape — which is why the ground is one change at
 the root rather than four.
 
-The blue diamond is [ADR-0127](../adrs/0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
+The blue diamond is [ADR-0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
 added at the Phase 2 gate. It is a **separate** change and deliberately downstream of the first: the
 ground decides *which pixels are the figure*, and this decides *what the figure having one tone is
 allowed to mean*. Phase 1 measured that the first cannot do the second's job.
@@ -315,11 +315,11 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   **Phase 1 sharpened this:** 0113 has not merged, so Phases 6 and 8 both work against synthetic
   fixtures, and 0113 inherits the obligation to re-point its own `coverage_floor` arm at its merge.
 - **The plan grew a second decision at its own stop gate**, which is the risk the Phase 2 gate was
-  built to expose and not the one it was expected to find. Phases 8-9 carry ADR-0127 and have their
+  built to expose and not the one it was expected to find. Phases 8-9 carry ADR-0128 and have their
   own mechanical stop condition (Phase 8's last bullet) for exactly that reason: if the structural
   statistic does not survive measurement either, the plan closes at Phase 8 with the ground landed
   and the residue routed, rather than growing a third attempt.
-- **Two terms make the flatness gate strictly weaker.** ADR-0127's Negative section states the cost:
+- **Two terms make the flatness gate strictly weaker.** ADR-0128's Negative section states the cost:
   a picture that is tonally flat and structurally busy now passes, and a defect with that signature
   would ship. Phase 9's non-vacuity assertion on `blown_out()` is what holds the line.
 - **Resolved:** whether the quiet excitation should also read `tonal_flatness` once the ground is
@@ -337,7 +337,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 - **It does not decide how sparse a composition may legitimately be.** No such threshold is invented.
 - **It does not answer the composition-or-fill question for the four groundless luminous fields.**
   `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` keep `coverage` near 1.0 after Phase 3 and that
-  reading is honest. Phase 8 tables them so the instrument is known; ADR-0127 records the question as
+  reading is honest. Phase 8 tables them so the instrument is known; ADR-0128 records the question as
   instrumented, not answered.
 
 ## Implementation log
@@ -564,7 +564,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 - `BLACK` is kept in `core/tests/sanity.rs` rather than deleted, and its doc comment now says why:
   two fixtures assert against **both** lenses, which is the only way a test shows that the change
   repaired something rather than moved a number.
-- `presets/pending/README.md`'s held row is re-pointed to ADR-0127 with the measured arithmetic
+- `presets/pending/README.md`'s held row is re-pointed to ADR-0128 with the measured arithmetic
   (`0.9346` under black, `0.9413` under the derived ground) and its exit moved from Phase 3 to
   Phase 9, noting that Phase 8 is a stop gate which can leave the row blocked on its outcome.
 - All three doc gates pass, including `node scripts/check-backlog-claims.mjs`: **OK, 69 stated
@@ -579,7 +579,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 - **The control column is the sharpest result in the table.** `1 - tonal_flatness` scores the frozen
   `Blown Out` blot at `0.0846` and `Tiled Rosette Mono` at `0.0587` — **the blot reads as more
   structured than the drawing**. Today's statistic does not merely fail to separate them, it orders
-  them backwards, which is ADR-0127's premise stated as a measurement.
+  them backwards, which is ADR-0128's premise stated as a measurement.
 - **Measured at `LOUD`, over the shipped library plus `Blown Out`, `Tiled Rosette Mono` and the
   three frozen `retired_mandalas()`:**
 
@@ -600,7 +600,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 - **Why all three fail is one fact.** Under the derived ground a saturated blot is **its own modal
   band**, so its lit mask is not the mass but the mass's *fringe* — `Blown Out` reads `coverage
   0.1963` at one occupied radial shell (the Phase 3 finding). A fringe is a thin ring, and every one
-  of these statistics is built to score a thin ring as structured. The ground change and ADR-0127's
+  of these statistics is built to score a thin ring as structured. The ground change and ADR-0128's
   mechanism work against each other on exactly this fixture, which no reading of either document
   predicted.
 - **Thin-stroke content was in the table and is not the reason it failed.** The three frozen

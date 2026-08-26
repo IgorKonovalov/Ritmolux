@@ -79,7 +79,7 @@
 //! it. It is also the one statistic the derived ground could **not** repair: a
 //! duotone has two large populations, and removing whichever is the ground
 //! leaves the other holding nearly all of what remains either way
-//! ([ADR-0127](../../docs/adrs/0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)).
+//! ([ADR-0128](../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)).
 
 use lmv_core::{
     dsp::AnalysisFrame,
@@ -2049,7 +2049,7 @@ fn each_candidate_ground_is_tabled_against_the_library() {
 //
 // A measurement harness and nothing else, the same shape as Phase 1 and for the
 // same reason: ADR-0126 named a mechanism without measuring it and Phase 1
-// falsified it one plan later. ADR-0127 now names a second one — that a picture
+// falsified it one plan later. ADR-0128 now names a second one — that a picture
 // is a blot only if it is tonally flat *and* structureless — and this section
 // exists to find out whether any statistic actually says that, before Phase 9
 // weakens a live gate on the strength of it.
@@ -2091,7 +2091,7 @@ struct StructureCandidate {
     measure: fn(&CaptureImage) -> f32,
 }
 
-/// The four columns ADR-0127 asks Phase 8 to table, control first so every other
+/// The four columns ADR-0128 asks Phase 8 to table, control first so every other
 /// column reads as a difference from it rather than as an absolute.
 const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
     StructureCandidate {
@@ -2219,7 +2219,7 @@ fn component_density(img: &CaptureImage) -> f32 {
 ///
 /// The binary mask rather than the grayscale frame on purpose: a smooth luminous
 /// field has gradients everywhere and would read as structured, and the question
-/// ADR-0127 asks is about the *shape* of what is lit, not its shading. Border
+/// ADR-0128 asks is about the *shape* of what is lit, not its shading. Border
 /// pixels stay zero (no wrap), matching `metrics::sobel`.
 fn mask_sobel_density(img: &CaptureImage) -> f32 {
     let (w, h) = (img.width as usize, img.height as usize);
@@ -2259,7 +2259,7 @@ struct StructureRow {
 /// **Plan 0116 Phase 8.** Print, for the frozen blot fixture, the held-out
 /// `Tiled Rosette Mono`, the three frozen thin-stroke mandalas and the whole
 /// shipped library, what each candidate structural statistic says — beside
-/// `tonal_flatness`, the statistic ADR-0127 proposes to add a second term to.
+/// `tonal_flatness`, the statistic ADR-0128 proposes to add a second term to.
 ///
 /// # This gates nothing, and cannot
 ///
@@ -2272,7 +2272,7 @@ struct StructureRow {
 ///
 /// A candidate passes only if it puts `Blown Out` **below** `Tiled Rosette Mono`
 /// and no shipped preset **between** them. If none does, Phase 9 does not run:
-/// the plan closes here, ADR-0127 gains a dated `Outcome`, and
+/// the plan closes here, ADR-0128 gains a dated `Outcome`, and
 /// `fragment_tiledmono` stays held. The report prints that verdict per candidate
 /// rather than leaving it to be read off the rows.
 ///
@@ -2306,7 +2306,7 @@ fn each_structure_candidate_is_tabled_against_the_library() {
     roles.push((blot.name.clone(), Some(true)));
     presets.push(blot);
 
-    // The composition that must read structured — the preset ADR-0127 exists
+    // The composition that must read structured — the preset ADR-0128 exists
     // for, held in presets/pending/ and so not reachable from `sanity_roster`.
     let held =
         without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
@@ -2336,7 +2336,7 @@ fn each_structure_candidate_is_tabled_against_the_library() {
     println!(
         "NOTE: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are the four groundless luminous"
     );
-    println!("  fields ADR-0127 records as the same open question - read their rows deliberately.");
+    println!("  fields ADR-0128 records as the same open question - read their rows deliberately.");
     println!();
 
     let frame = loud();
