@@ -123,7 +123,7 @@ superseded by this ADR rather than wrong.
 ### Alternative B — gate contiguous comment-block length, in ADR-0116's shape
 
 A hard ceiling on a comment block, enforced the way the 320-byte roster row is. Today `N = 40` would
-fail 44 blocks, `N = 30` would fail 70, `N = 20` would fail 155.
+fail 61 blocks, `N = 30` would fail 91, `N = 20` would fail 193.
 
 **It lost on what it would actually catch.** Length is a symptom that correlates weakly with the
 defect: the rule fires on `kaleidoscope.rs`'s 191-line header, which is mostly genuine mechanism, and
@@ -149,15 +149,17 @@ Thorough, and it would settle the question in a single pass.
 **It lost on collision.** It touches all 125 `.rs` files, and nine plan lanes are live (0087, 0092,
 0098, 0103, 0104, 0113, 0114, 0115, 0116). A diff of that shape would have to run with every other
 lane parked, and the merge cost would exceed the benefit. Plan 0118 takes the bounded subset — the 89
-links, the 44 blocks over 40 lines, the 252 narration lines, across 106 files — and leaves the ~2,900
-short comments to the convention.
+links, the 61 blocks over 40 lines, the 252 narration lines, across 106 files — and leaves the 7,913
+blocks of 40 lines or fewer to the convention.
 
 ## Notes
 
 Measured 2026-08-25 over `core/src`, `standalone/src`, `lmv-ring/src`, `core-cabi/src`, `core/tests`
 and `standalone/tests`, at commit `e022a5d`. The 28,064 / 53,489 figures cover the four `src` roots;
-the sweep totals (89 links, 3,850 lines inside blocks of 40+, 252 narration lines, 106 files) include
-the two test roots, which is why they exceed the numbers quoted in Context.
+the sweep totals (89 links, 3,850 lines inside 61 blocks of 40+, 252 narration lines, 106 files)
+include the two test roots, which is why they exceed the numbers quoted in Context. **Every block
+count in this ADR is over the sweep scope**; the 191/140/125/118/106-line headers named in Context
+are `src`-root figures and are a subset of it.
 
 The eleven broken links that prompted this were found at
 [Plan 0117](../plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)'s close, in the
