@@ -15,7 +15,7 @@ were superseded orderings of the active roster.
 
 - [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
   — closed 2026-08-26. Ten phases, `e2eb8fc`..`1d0185a`, in the `lmv-plan-0114` worktree on
-  `plan-0114-line-stroke`. Review: **no blockers, no majors, three minors.** Version **0.81.0**
+  `plan-0114-line-stroke`. Review: **no blockers, one major, three minors** — no code finding; the major is the plan header's own false merge/version claim, repaired at the close. Version **0.81.0**
   (minor: a new authorable scene parameter, a moved default, a new golden baseline and a
   six-preset retune).
 

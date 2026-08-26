@@ -779,7 +779,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md) — closed 2026-08-26. Review: **no blockers, no majors, three minors.** Version: **0.81.0** (minor). Filed [design-backlog 0133](../design-backlog.md). [Write-up](README-archive.md).
+- [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md) — closed 2026-08-26. Review: **no blockers, one major, three minors** (none in code). Version: **0.81.0** (minor). Filed [design-backlog 0133](../design-backlog.md). [Write-up](README-archive.md).
 - [0113 — The engine paints a canvas](done/0113-the-engine-paints-a-canvas.md) — closed 2026-08-26. Two reviews: the first **three majors** (became Phase 9), the second **no blockers, one major** (became Phase 10). [Write-up](README-archive.md).
 - [0119 — The flatness gate gets its second term](done/0119-the-flatness-gate-gets-its-second-term.md) — closed 2026-08-26. Review: **no blockers, one major, four minors.** Version: **0.80.0** (minor). Filed [design-backlog 0130 + 0131](../design-backlog.md).
 

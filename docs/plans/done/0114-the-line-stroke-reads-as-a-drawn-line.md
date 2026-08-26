@@ -2,10 +2,16 @@
 
 > **Status:** done — closed 2026-08-26. All ten phases landed; the whole lane merged to `main` in
 > one go, so nothing of this plan reached `main` before this close. Mode 4 verdict: **no blockers,
-> no majors, three minors** (an inverted `softness` description in the segment fragment, a stale
-> future tense on `MILKDROP_SOFTNESS`'s Phase 8 note, and the gallery renders that still show the
-> old stroke — the last blocked on a pre-existing break in `scripts/docs-shots.mjs`, filed as
-> [design-backlog 0133](../../design-backlog.md)). Verified at the close: the full workspace gate on
+> one major, three minors.** The major is in this header itself and is repaired above — it claimed a
+> merge and a version bump that had not happened, and instructed the closing session to take *"a
+> `patch` or nothing, never another `minor`"*, which would have shipped a feature plan unbumped. The
+> minors: an inverted `softness` description in the segment fragment
+> (`core/src/render/scenes/lines/renderer.rs:263` — `softness` is the *ramp's* width, so the solid
+> core is `1 - softness`), a stale future tense on `MILKDROP_SOFTNESS`'s Phase 8 note
+> (`core/src/render/scenes/warp_mesh/mod.rs:214` still reads *"Until it runs"*), and the four gallery
+> renders that still show the old stroke — the last blocked on a pre-existing break in
+> `scripts/docs-shots.mjs`, filed as [design-backlog 0133](../../design-backlog.md). **No code
+> finding.** Verified at the close: the full workspace gate on
 > the merged tree (fmt, `clippy --workspace --all-targets`, `nextest --workspace` — 1014 passed),
 > all three doc gates, and the assertion bodies behind every numeric done-when.
 > [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) is
