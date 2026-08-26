@@ -289,7 +289,7 @@ flowchart TB
 | 2 — The stop gate | human | decided: continue on the control | `53d3e8b` |
 | 3 — The gate takes two terms | dev | done | `26b20b3` |
 | 4 — The preset ships | dev | done | `7b552f7` |
-| 5 — Documentation | dev | done | committed with this row |
+| 5 — Documentation | dev | done | `40398d4` |
 
 ### Notes
 
