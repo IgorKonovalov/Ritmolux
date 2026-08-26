@@ -351,8 +351,8 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 | 3 — The lens takes a ground | dev | done | `debd803` |
 | 4 — The floors are re-derived, not re-used | dev | done | `5d97abd` |
 | 5 — Adjudicate what changed | human | done | confirmed empty, 2026-08-26 |
-| 6 — The emptying canvas is actually caught | dev | done | `committed with this row` |
-| 7 — Documentation | dev | not started | — |
+| 6 — The emptying canvas is actually caught | dev | done | `86106af` |
+| 7 — Documentation | dev | done | `committed with this row` |
 | 8 — What separates a composition from a blot | dev | not started | — |
 | 9 — The flatness ceiling gains a second condition | dev | not started | — |
 
@@ -546,3 +546,26 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   merged, so no scene on this branch paints a bare canvas. It reaches a paper-white frame through
   the attractor's `ink_*` remap, a terminal engine stage ADR-0067's backdrop suppression does not
   reach. It carries no `time` terms, so it is a pure function of its excitation.
+
+#### Phase 7
+
+- Swept `docs/capturing.md`'s gate table, `core/tests/sanity.rs`'s module docs, the `EPS` and
+  `BLACK` doc comments beside them, and `presets/pending/README.md`'s held row.
+- **Both pre-existing errors in the gate-table row are corrected, and the second was worse than the
+  plan recorded.** "against its own background" is gone; the row now says what each statistic
+  answers and names both moves — ADR-0067 stripping `bg_*`, ADR-0126 deriving the reference. The
+  `KNOWN_FLAT` sentence claimed `Spectrum Ridge` is listed there and measures `1.000`; the roster is
+  empty, and **`Spectrum Ridge` is not a shipped preset at all** — the `spectrum` family is
+  `Halo` alone, so the plan's "it reads `0.1916`" is itself out of date. The row now states the
+  roster is empty and that nothing is excused.
+- A second stale mention was found outside the row and fixed in the same pass:
+  `docs/capturing.md`'s geometry-extent aside called `sanity.rs`'s question "coverage against
+  black".
+- `BLACK` is kept in `core/tests/sanity.rs` rather than deleted, and its doc comment now says why:
+  two fixtures assert against **both** lenses, which is the only way a test shows that the change
+  repaired something rather than moved a number.
+- `presets/pending/README.md`'s held row is re-pointed to ADR-0127 with the measured arithmetic
+  (`0.9346` under black, `0.9413` under the derived ground) and its exit moved from Phase 3 to
+  Phase 9, noting that Phase 8 is a stop gate which can leave the row blocked on its outcome.
+- All three doc gates pass, including `node scripts/check-backlog-claims.mjs`: **OK, 69 stated
+  reductions across 41 live entries.**
