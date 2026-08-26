@@ -107,23 +107,47 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
   (see below). The five musical-time variables are ADR-0050's, and they are **not
   equals** — see the two layers immediately below.
 
-**The two musical-time layers, and why only one of them is load-bearing.**
-`beat_index` and `time_since_beat` are unconditional: always tracked, always
-meaning what they say. `beat_in_bar`, `bar_index` and `bar_phase` come from a
-**gated** downbeat estimator and are counter-derived whenever it is not confident
-— which, measured over 98 minutes of unambiguous 4/4 through the live app, is
-**94 % of audible time** (Plan 0068 Phase 3: **6.8 %** lock on four-on-the-floor
-techno, **0.14 %** on backbeat rock/pop). That is diagnosed rather than
-mysterious: the accent feature is 70 % bass band, and the kick marks every beat
-in four-on-the-floor and the half-bar in a backbeat, so it rarely marks the bar.
-[ADR-0082](../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
-`Outcome` carries the measurement and the cause.
+**The two musical-time layers, and why neither is a musical period on its own.**
+`beat_index` and `time_since_beat` are unconditional — always tracked — but
+**`beat_index` does not count musical beats.** It counts onset-detector events
+([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)):
+1.35x-2.10x detections per musical beat across Plan 0086's three genres,
+1.20x / 1.22x / 2.28x across Plan 0095's, and it wanders between 1x, 2x and 4x
+*inside* one track. The ratio is material-dependent and not a stable integer, so
+`beat_index` is a monotone activity counter and **not a musical period**:
+`mod(beat_index, 16)` is not four bars and `mod(beat_index, 4)` is not "every
+4th beat". Neither idiom is safe to write, and both used to be taught here.
 
-So **build an arc on `beat_index`, and treat the bar trio as decorative.** They
-are safe to bind — they stay periodic and never claim a wrong beat 1, which is
-the trade ADR-0050 made deliberately — but an eight-bar structure written on
-`bar_index` is, on most material, an eight-*beat* structure wearing a bar's name.
-Write `mod(beat_index, 16)` when you mean four bars of four.
+`beat_in_bar`, `bar_index` and `bar_phase` come from a **gated** downbeat
+estimator and are counter-derived whenever it is not confident. Since Plan 0095
+that estimator folds over a **tempo-driven** bar grid rather than over
+`beat_index`, so its unit is a stable multiple of the beat instead of a
+wandering one — a real bar when the tempo estimate is on the right octave, and
+half or double one when it is not. That caveat is not theoretical: on the
+hip-hop capture below the estimate read a 165 BPM median on a track that counts
+at ~90, so its "bar" there spanned two musical beats. Re-measured through the
+live app on three genres — paired against a reconstruction of the pre-0095 fold
+on the same captures — the share of hops over the `0.25` confidence gate moved
+**0.00 -> 2.36 %** on rock/pop, **0.79 -> 3.67 %** on hip-hop (at that wrong
+octave) and **4.16 -> 0.42 %** on techno.
+
+Read that as **roughly 2-4 % on material with bar-scale accents, near zero on
+material without.** Four-on-the-floor puts a kick on every beat, so there is no
+bar-scale accent to find and the honest outcome is a shut gate; the old fold's
+4.16 % came from a counter running at 2.28 detections per beat aliasing its four
+buckets onto the kick/hat alternation — a real 4-periodicity that is not a bar.
+The accent feature is still 70 % bass band, which is why it finds so little
+([ADR-0082](../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
+`Outcome` carries that diagnosis).
+
+So the trio is **still counter-derived most of the time**, and the old advice
+here — "build an arc on `beat_index` and treat the bar trio as decorative" — is
+**retracted in both halves**: `beat_index` is not the safer unit. Bind the trio
+freely, since it stays periodic and never claims a wrong beat 1 (ADR-0050's
+deliberate trade), but do not write a look whose whole point is landing on the
+real bar line. For a structural pulse, `bar_index` / `beat_in_bar` are the
+closest unit there is; for a *timed* one, `time` in seconds against `tempo` in
+BPM is the only reading that is neither gated nor onset-driven.
 - **Functions:** `sin cos abs floor sqrt log min max pow mod clamp lerp
   smoothstep select bin hash noise` (17). `log` is the **natural** log; `bin(x)`
   reads the spectrum at a normalized position; `hash`/`noise` are the seeded
@@ -298,6 +322,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
@@ -821,9 +846,9 @@ between a ring and a polygon.
 
 Two consequences worth planning around:
 
-- **`hash(beat_index)` on `points` is the trick.** The count flipping per beat is
-  what already worked on `parametric_curve`'s `radial_offset` lobes, and it
-  carries over: `points = "7 + floor(hash(beat_index) * 2.999)"` gives a field
+- **`hash(beat_index)` on `points` is the trick.** The count flipping on each
+  onset detection is what already worked on `parametric_curve`'s `radial_offset`
+  lobes, and it carries over: `points = "7 + floor(hash(beat_index) * 2.999)"` gives a field
   that re-cuts itself every beat, and the stepping is a feature there rather than
   a cost.
 - **Small marks are where a silhouette earns its keep and also where it
@@ -909,7 +934,7 @@ it holds; these are recipes, not features.
 [params]
 color_center = "time * 0.15"            # RINGS TRAVEL OUTWARD
 scale        = "0.5 + 0.12 * bass"      # THE FIGURE BREATHES
-palette_steps = "6 + floor(hash(beat_index) * 4)"   # RING COUNT ON THE BEAT
+palette_steps = "6 + floor(hash(beat_index) * 4)"   # RING COUNT PER DETECTION
 ```
 
 - **Rings travel outward** because `color_center` slides the palette coordinate,
@@ -1274,6 +1299,81 @@ MilkDrop had two channels. Where the reference tells two of its wave modes apart
 by drawing the left channel against the right, this draws the one trace at the
 separation the reference's own parameters name. It is the same figure with the
 channel difference removed.
+
+### `shape_collage` — flat opaque elements on their own paper (Plan 0113)
+
+**This is the one system in the engine where one object is in front of another.**
+Every other scene emits additive light, and additive light has no ordering: a
+black bar over a red one simply adds. `shape_collage` paints instead. Each pixel
+starts at the **paper** colour and walks an array of flat elements *in array
+order*, compositing each with `over`, so the array index is the depth
+([ADR-0123](../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+There is no glow param, no bloom, and no soft edge — that is the vocabulary, not
+an omission.
+
+Where the elements come from is `layout`'s answer: either the scene's own
+authored suprematist canvas of fourteen elements, or one of three **seeded
+layout grammars**. What the music then does to them is the second table below.
+
+| param | what it does |
+|---|---|
+| `count` | how many elements of the canvas are live, in painter order. **Quantized to a whole element CPU-side** — an eased binding does not half-draw one — and bounded by the tier's element cap. A non-finite value falls back to the whole authored canvas rather than to a blank frame. |
+| `layout` | which composition builds the element list. `0` the **authored canvas** (a fixed fourteen-element composition; ignores `seed`), `1` **anchor-and-satellites** (one or two dominant planes with the rest clustered around them — the picture has a subject), `2` **diagonal-axis** (a dominant angle with elements along it and narrowly across it — the picture has a direction), `3` **size-hierarchy** (power-law sizes with position independent of size — a range but no centre). Quantized; anything off the roster falls back to `0`. |
+| `seed` | which canvas a grammar composes. Whole numbers, `0` to `16777216` — the ceiling is where an `f32` stops telling two seeds apart, not an arbitrary limit. Inert on `layout = 0`. |
+| `roster` | which element kinds the canvas draws from. `0` **suprematist** — `quad`, `circle`, `triangle`, and the default. `1` **Kandinsky** — those three plus `bar` (a rounded-cap stroke), `ring` (an annulus), `segment` (a circular sector), `arc` (an annular sector) and `checker` (a checkerboard patch), and about one element in four drawn translucent so crossings show both forms. Quantized; anything else falls back to `0`. Inert on `layout = 0`. |
+| `size_hierarchy` | `0..1`, how steeply generated sizes fall from the largest element to the smallest. `0` is a nearly uniform canvas; `1` is a few dominant forms over many small ones. Inert on `layout = 0`. |
+| `angle_bias` | the canvas's dominant angle, in **degrees**. Each grammar scatters around it differently — tightly on `1` and `2`, loosely on `3`. Wraps rather than clamping, so a drifting binding keeps turning. Inert on `layout = 0`. |
+| `scale` | the canvas's size in the frame. `1.0` is the composition as composed. |
+| `paper` | the ground's palette coordinate. **A raw coordinate**: `color_span` and `palette_shift` move the *elements* and deliberately do not drag the ground with them, so a colour drift does not take the paper along. |
+| `opacity` | a global multiplier on every element's own alpha. `1.0` — fully opaque — is the look; below it the whole canvas turns translucent over the paper. |
+| `edge_softness` | extra pixels of coverage ramp past the one-pixel analytic edge. **`0` is the hard edge and is the default.** This is an escape from the look, not a quality knob — antialiasing is already exact at `0`. |
+| `color_span`, `palette_shift` | scale and offset applied to every element's stored palette coordinate, so a whole canvas can be recoloured or drifted through the gradient at once. Both are the identity by default. |
+| `saturation`, `palette_mix` | the shared palette controls, unchanged. |
+
+**The four reactivity levers.** Every one of them defaults to the identity, so a
+preset that binds none of them draws a still canvas.
+
+| param | what it does |
+|---|---|
+| `recompose` | **rising past `0.5` recomposes the canvas once.** Edge-triggered, like `reseed` on the particle scenes and for the same reason: a sustained gate must not re-run the generator every frame. Each recomposition advances the generator's recomposition index, so successive canvases differ without the preset changing `seed`. |
+| `recompose_blend` | seconds the recomposition crossfades over. **`0` — the default — is a hard cut.** Above it, both canvases are on screen for that long and the outgoing one dissolves through the paper as the new one arrives. Note the cost: a blend has two whole canvases in the per-pixel loop, so it is the one moment a preset pays double. |
+| `density` | what fraction of `count` is live, `0..1`. Elements fade in and out over about half a second rather than popping. **Birth order is stable**: raising `density` only ever *adds* — an element already on the canvas never moves, changes colour, or loses its place in the painter's order. |
+| `drift`, `spin` | multipliers on each element's own velocity and angular velocity, drawn from the seed at generation. `1` is a slow travel — an element crosses the canvas in about a minute — and higher is legal. Integrated against real elapsed time, so the canvas moves identically at any refresh rate. An element reaching the canvas edge **wraps** to the other side. |
+| `pump_size`, `pump_alpha` | depths of a per-element swell in size and in opacity. **Phase-offset per element**, so the canvas does not breathe in unison — a field of oscillators sharing a phase reads as one sheet flashing. The *rate* is the engine's and is not a parameter; drive the depth from the music. |
+
+> **`beat_index` counts onsets, not beats** ([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
+> at about 1.7-2.1x. A `recompose` hung off it fires roughly twice as often as
+> the music's beat. Author knowing that, and **do not compensate for it inside a
+> preset** — Plan 0095 is the fix in flight and a compensated preset would have
+> to be unwound when it lands.
+
+> **Keep the palette under linear 0.6 and the look is free.** This is the one
+> authoring fact this system has, and it comes off the tonemap rather than off
+> any parameter — see
+> [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
+> paragraph on the knee in [`docs/preset-palettes.md`](../docs/preset-palettes.md).
+> Below the knee ADR-0046's curve is exactly the identity, so a colour arrives at
+> the display *as authored* — flat, unshaded — and bloom's threshold sits above
+> that same knee, so the edges stay hard with no halo. One constraint, both
+> properties, no parameter. Reach for a brighter palette and you lose the flat
+> fill and the hard edge together, and nothing will tell you why.
+>
+> The **paper** is the deliberate exception: `f(1.0) = 0.800` makes pure white
+> unreachable, so an off-white ground is the affordable one. Both of the
+> reference canvases this system was built from are off-white anyway.
+
+**Author the palette as plateaus, not as a gradient.** An element takes one
+colour off the LUT at its coordinate, so a smooth ramp shades every element by
+where it happens to sit. A pair of stops a ten-thousandth apart is a hard
+transition; `presets/collage_suprematist.toml` is eight flat bands built that
+way, and its header carries the arithmetic.
+
+**Eight is not a coincidence.** A layout grammar draws each element's colour
+from **eight evenly spaced coordinates at band centres** (`k/8 + 1/16`), and
+reserves the last for the paper so a generated element never draws the ground's
+own colour and vanishes. An eight-plateau palette therefore resolves every
+generated element exactly; a palette with a different number of bands still
+works, but its elements land wherever those eight coordinates happen to fall.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
@@ -2828,9 +2928,12 @@ cargo run -p standalone --example shot -- --preset-file presets/yours.toml --sig
 ```
 
 `core/tests/sanity.rs` catches the **total** case — a figure so far out that the
-frame comes back empty — and since Plan 0058 it measures the scene against black
-with the backdrop suppressed, so a `bg_vignette` can no longer stand in for a
-figure that is not there. It also prints a per-preset **excitation ratio**
+frame comes back empty — with the backdrop suppressed since Plan 0058, so a
+`bg_vignette` can no longer stand in for a figure that is not there, and since
+Plan 0116 against **the frame's own ground** rather than against black: the mean
+tone of its most populous luminance band (ADR-0126), so a scene that paints its
+own paper is measured on what it drew instead of reading as a completely full
+frame. It also prints a per-preset **excitation ratio**
 (coverage when fully driven over coverage at a moderate level) on every run. That
 ratio is a report rather than a gate, and the reason is worth knowing: a partial
 over-scale that clips only the tips costs almost no pixels, so the number comes
@@ -3667,7 +3770,7 @@ Presets worth reading as **worked examples** of one control each:
 | Preset | Shows |
 |--------|-------|
 | `swarm_drift` | the shared view **zoom** breathing with the music |
-| `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and a beat-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
+| `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and an onset-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
 | `fragment_tiled` | the screen-space **kaleidoscope** folding a field into a figure |
 | `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |
 | `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |

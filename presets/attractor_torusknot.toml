@@ -32,6 +32,13 @@ tuple = "1"
 brightness = "1.6"
 fade = "0.80 - clamp(bass * 0.05, 0, 0.05)"
 size = "0.18 + clamp(treb * 0.08, 0, 0.06) + beat * 0.05"
+# THE FLOOR IS NOT FOUR BARS. `beat_index` counts ONSET DETECTIONS, not musical
+# beats (ADR-0109) - 1.2x to 2.3x per beat depending on the material, and unstable
+# within one track, so `mod(beat_index, 16)` is every 16 DETECTIONS: roughly 7 to
+# 13 musical beats. On this marginally-stable orbit the clause is there so the
+# knot is periodically kicked and watched recovering, which does not need a
+# musical period - but do not read the 16 as one. Re-tuning is a preset-author
+# followup (Plan 0095).
 reseed = "max(onset > 0.55, min(beat, mod(beat_index, 16) == 0))"
 
 # BLOOM - the halo that makes a thin curve read as light rather than as line

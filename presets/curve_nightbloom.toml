@@ -2,13 +2,13 @@
 # cohort 1). One flower, midnight-violet into coral and gold, that MORPHS ITS
 # SHAPE on the music instead of only its brightness: phase reshapes the petals
 # continuously, radial_offset opens the bloom off-origin on the bass, and every
-# fourth beat the Maurer step angle re-cuts to a new chord pattern - a latched
-# structural change, softened by the trail, so the flower is never the same
-# figure two phrases running.
+# fourth onset detection the Maurer step angle re-cuts to a new chord pattern - a
+# latched structural change, softened by the trail, so the flower is rarely the
+# same figure for long.
 #
 # WHAT DRIVES WHAT. phase = slow morph + bass lean (petals twist toward the
 # low end); radial_offset = breath + bass opening; d = hash-latched per 4
-# beats across {27,29,31,33,35} - five genuinely different chord figures;
+# detections across {27,29,31,33,35} - five genuinely different chord figures;
 # treb tips the stroke; beat ticks it. spin stays a small CONSTANT: on this
 # scene rotation = spin * time, so an audio-driven spin multiplies absolute
 # time and jerks - the morph carries the motion instead.
@@ -29,7 +29,13 @@ stops = [
 
 [params]
 n = "7"
-# The re-cut: a new Maurer step angle every four beats, from the seeded hash.
+# The re-cut: a new Maurer step angle every four ONSET DETECTIONS, from the
+# seeded hash. NOT four musical beats: `beat_index` counts detections rather than
+# beats (ADR-0109), at 1.2x to 2.3x per beat depending on the material and
+# unstable inside one track, so four of them is roughly two to three musical
+# beats - under a bar, and irregular against it. The look wants an unpredictable
+# structural cut and gets one; it is the naming that was wrong, not the value.
+# Re-tuning to a musical period is a preset-author followup (Plan 0095).
 # The three angles are chosen COPRIME TO 360 on purpose - a step angle sharing
 # a factor with 360 closes the path after 360/gcd steps (d = 27 closes in 40
 # chords and renders as a string-art star, measured on this file's own first

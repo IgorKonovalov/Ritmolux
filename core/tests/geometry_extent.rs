@@ -205,7 +205,11 @@ fn draws_segments(system: SystemKind) -> bool {
         // The warp mesh draws a grid of triangles through its own pipeline, not
         // a CPU segment list through `LineRenderer`, so this instrument does not
         // reach it either.
-        | SystemKind::WarpMesh => false,
+        | SystemKind::WarpMesh
+        // `shape_collage` is `shape_field`'s case exactly: its elements are
+        // signed distances evaluated per pixel against a CPU-side element array,
+        // and there is no segment list for this instrument to measure.
+        | SystemKind::ShapeCollage => false,
     }
 }
 

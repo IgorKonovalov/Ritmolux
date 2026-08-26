@@ -1,0 +1,130 @@
+# On White - Kandinsky's vocabulary on the same paper: rings, arcs, sectors,
+# strokes and checker patches crossing each other, some of them translucent.
+# The second shipped world on `shape_collage` (ADR-0123, Plan 0113 Phase 7).
+#
+# THIS IS THE DENSE HALF OF THE REFERENCE SET. `collage_suprematist` is fourteen
+# opaque planes with room around them; this is forty elements of eight kinds
+# overlapping. Same engine, same paper, same knee constraint - the difference is
+# entirely `roster`, `count` and the palette.
+#
+# -- WHY THE COUNT IS EXACTLY 40 -------------------------------------------------
+#
+# ADR-0123 counts just above forty elements in `On White II` once its lines and
+# arcs are included, and Plan 0113 Phase 3 set the floor tier's element cap to
+# exactly 40 FROM that count. So this preset sits ON the cap, not under it: it is
+# the densest canvas the engine will draw at the floor tier, and a forty-first
+# element would be silently dropped rather than drawn.
+#
+# IF YOU WANT MORE, MOVE THE CAP - do not raise `count` here and assume it landed.
+# `TierConfig::collage_elements` is the number, `core/tests/collage_cost.rs` is
+# what prices moving it, and that file's own header says what a canvas costs per
+# element on an integrated GPU.
+#
+# -- THE PALETTE IS STILL UNDER THE KNEE -----------------------------------------
+#
+# Every element colour below has its brightest channel at or under linear 0.6,
+# where ADR-0046's tonemap is exactly the identity - so the fills are flat and
+# bloom's threshold is never reached. That is the one authoring fact this system
+# has and it does not change because the vocabulary got richer. The paper is the
+# single plateau above the knee, deliberately: `f(1.0) = 0.800` makes pure white
+# unreachable, and both reference canvases are off-white anyway.
+#
+# The colours are muddier than the suprematist file's on purpose. Kandinsky's
+# canvas is chalkier than Malevich's, and forty saturated elements overlapping
+# reads as noise where forty muted ones read as a painting.
+#
+# WHAT DRIVES WHAT
+#   recompose   the canvas recomposes on roughly one beat in eight
+#   density     elements arrive and leave with the mid range
+#   drift/spin  every element carries its own slow travel and turn
+#   pump_alpha  the low end swells the translucent crossings, phase-offset
+#   scale       a slow breath, plus the low end
+#   saturation  the top end, on chroma rather than on luminance
+
+system = "shape_collage"
+name   = "On White"
+
+[palette]
+stops = [
+  # near-black
+  { at = 0.0000, color = "#1a1a1a" },
+  { at = 0.1249, color = "#1a1a1a" },
+  # oxide red
+  { at = 0.1251, color = "#8c1c24" },
+  { at = 0.2499, color = "#8c1c24" },
+  # ochre
+  { at = 0.2501, color = "#8f7a1c" },
+  { at = 0.3749, color = "#8f7a1c" },
+  # ink blue
+  { at = 0.3751, color = "#22407e" },
+  { at = 0.4999, color = "#22407e" },
+  # verdigris
+  { at = 0.5001, color = "#2f6b46" },
+  { at = 0.6249, color = "#2f6b46" },
+  # slate
+  { at = 0.6251, color = "#5c5f66" },
+  { at = 0.7499, color = "#5c5f66" },
+  # plum
+  { at = 0.7501, color = "#6b3352" },
+  { at = 0.8749, color = "#6b3352" },
+  # THE PAPER. Linear 0.902 - the one plateau over the knee, see the header.
+  { at = 0.8751, color = "#e6e3d8" },
+  { at = 1.0000, color = "#e6e3d8" },
+]
+
+[params]
+# A RAW palette coordinate, and pinned - `color_span` and `palette_shift` move
+# the elements, never the ground.
+paper = "0.9375"
+
+# THE WHOLE VOCABULARY. `roster = 1` opens the five Kandinsky kinds - bar, ring,
+# segment, arc, checker - on top of the suprematist three. The generator still
+# weights the quad heavily: a canvas drawn flat across eight kinds reads as a
+# shape sampler rather than as a painting.
+roster = "1"
+
+# The diagonal-axis grammar, which Plan 0113 Phase 5 chose. `size_hierarchy` is
+# higher here than in the suprematist file - forty elements need a wider spread
+# between the dominant forms and the small ones, or the canvas reads as gravel.
+layout         = "2"
+seed           = "29"
+size_hierarchy = "0.62"
+angle_bias     = "-24"
+
+# ON the cap, not under it. See the header before changing this.
+count = "40"
+
+# The canvas is denser than the suprematist one, so `density` starts higher and
+# travels less: at forty elements, dropping to half is a visibly different
+# painting rather than a thinning of one.
+density = "0.78 + clamp(mid * 0.26, 0, 0.22)"
+
+scale = "1.00 + 0.04 * sin(time * 0.115) + clamp(bass * 0.0941, 0, 0.08)"
+pan_x = "0.12 * sin(time * 0.58)"
+pan_y = "0.08 * sin(time * 0.77 + 0.7)"
+
+# Slower than the suprematist file's. Forty elements travelling at that rate is
+# a swarm; at this rate it is a canvas whose forms are not quite still.
+drift = "0.55 + clamp(bass * 0.47, 0, 0.4)"
+spin  = "0.35 + clamp(mid * 0.41, 0, 0.35)"
+
+# Same seeded, irregular gate as the suprematist file, and slower still: a denser
+# canvas takes longer to read, so it should be left alone for longer.
+recompose       = "select(hash(beat_index) > 0.93, 1, 0)"
+recompose_blend = "0.45"
+
+# THE SWELL GOES ON OPACITY HERE, NOT ON SIZE. About a quarter of this roster's
+# elements are already translucent, so modulating their alpha makes the crossings
+# breathe - which is the thing this canvas has that the suprematist one does not.
+# Phase-offset per element, so they do not pulse together.
+pump_alpha = "clamp(bass * 0.235, 0, 0.20)"
+
+saturation = "0.90 + clamp(treb * 0.1176, 0, 0.10)"
+
+[smoothing]
+scale      = 0.5
+density    = 0.35
+drift      = 0.6
+spin       = 0.6
+pump_alpha = 0.15
+saturation = 0.2

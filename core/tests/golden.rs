@@ -64,6 +64,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
         SystemKind::Emitter => ("emitter", include_str!("fixtures/emitter.toml")),
         SystemKind::ShapeField => ("shape_field", include_str!("fixtures/shape_field.toml")),
         SystemKind::WarpMesh => ("warp_mesh", include_str!("fixtures/warp_mesh.toml")),
+        SystemKind::ShapeCollage => ("shape_collage", include_str!("fixtures/shape_collage.toml")),
     }
 }
 
@@ -133,12 +134,24 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// lines that no other entry here can reach, and which this suite pinned to
 /// nothing at all until it existed.
 ///
+/// `shape_collage_roster` is the eighth (Plan 0113 Phase 7), and the
+/// impossibility is that the rostered fixture runs the scene's **defaults** —
+/// which is what a drift baseline should pin, and which is also exactly the
+/// problem. At `layout = 0` the element list is a compiled-in array, so the whole
+/// seeded layout grammar is unreached; at `roster = 0` the vocabulary is quad,
+/// circle and triangle, so not one line of `sd_bar`, `sd_ring`, `sd_segment`,
+/// `sd_arc` or `sd_checker` executes. The generator also draws about one element
+/// in four below alpha 1 on that roster, making this the only baseline in the
+/// suite where two elements composite `over` each other rather than one hiding
+/// the other. No edit to `shape_collage.toml` that kept its picture could reach
+/// any of it.
+///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 7] = [
+const EXTRA_FIXTURES: [(&str, &str); 8] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -154,6 +167,10 @@ const EXTRA_FIXTURES: [(&str, &str); 7] = [
     (
         "warp_mesh_shader",
         include_str!("fixtures/warp_mesh_shader.toml"),
+    ),
+    (
+        "shape_collage_roster",
+        include_str!("fixtures/shape_collage_roster.toml"),
     ),
 ];
 

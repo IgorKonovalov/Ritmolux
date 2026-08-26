@@ -1165,7 +1165,7 @@ One tab-separated row per **beat**, header on a fresh file:
 
 | column | what it is |
 |---|---|
-| `beat` | the beat clock's `beat_index` — gaps mean beats the render loop coalesced |
+| `beat` | the beat clock's `beat_index` — gaps mean beats the render loop coalesced. **Not the counter the fold buckets by**; that is `fold_beat`, below |
 | `s0`..`s3` | mean accent per candidate beat-1 alignment: the 4/4 fold's own output |
 | `best` | the alignment the fold favours right now |
 | `held` | the alignment actually held, which lags `best` by the hysteresis |
@@ -1178,10 +1178,21 @@ One tab-separated row per **beat**, header on a fresh file:
 | `bpm` | the tempo tracker's estimate — read the **row rate** against it (see below) |
 | `time_since_beat` | how stale this row's band levels are: they come from the latest analysis hop, not necessarily the hop the beat fired on |
 | `unix_ms` | the time axis. Deltas between rows are the inter-detection interval, and it lines a capture up against a `diagnostics.log` from the same session |
+| `fold_beat` | **the counter `s0..s3`, `best` and `held` are indexed in** — the grid's tempo-driven beat count once the grid runs, `beat_index` before that. Bucket the accent by `fold_beat % 4`, never by `beat % 4` |
+| `grid_bar_phase` | where `fold_beat` sits across the bar, `[0, 1)`, **ungated** — no alignment subtracted, so it says where the *grid* is rather than where the estimator thinks beat 1 is. **Only a grid reading where `bpm > 0`**; on a warmup row it is the tempo tracker's onset-reset phase, so do not average the column down the whole file |
 
-> The last three are **appended, never interleaved** — the frozen-prefix rule
+> The last five are **appended, never interleaved** — the frozen-prefix rule
 > `diagnostics.log` follows — so a capture taken before they existed stays
 > parseable by column name.
+
+**`beat` and `fold_beat` are two different counters, and only the second one
+indexes the alignment block.** They were one number until Plan 0095 moved the fold
+onto the bar grid ([ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md));
+`beat` still means `beat_index`, unchanged, so that every capture taken before
+that keeps parsing and stays comparable. Reading `s0..s3` against `beat % 4`
+produces a plausible, wrong answer — on the synthesized 4/4 in
+`standalone/src/downbeatlog.rs` it puts the accent on phase 0 while the fold
+reports 3 — which is what these two columns exist to stop.
 
 **Read the row rate against `bpm` before reading anything else.** The beat flag
 that paces these rows comes from the onset detector — an adaptive threshold on
@@ -1190,8 +1201,9 @@ spectral flux with a 96 ms refractory — and it is **not tempo-gated**
 (`core/src/dsp/tempo.rs`). So `rows / seconds` against `bpm / 60` is the number of
 detections per musical beat, and it is **not** guaranteed to be 1. On a synthesized
 clip with one transient per beat it measures exactly 1.00; on real material with
-hats it does not, and where it does not, `beat_index % 4` spans less than a bar and
-the four alignments are not the four beats of one.
+hats it does not — which is why the fold stopped bucketing by `beat_index` in
+Plan 0095, and why the ratio is still worth reading: it is the size of the gap
+between the `beat` column and `fold_beat`.
 
 **Reading it is what tells the three stories apart** — the reason the plan spends
 a phase capturing before choosing a repair:
@@ -1502,7 +1514,7 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 |------|------|---------|
 | `reactivity` | HARD | every preset moves for at least one band (bass/mid/treb/onset), driven by **PCM through the real analyzer** (Plan 0067 Phase 1 — see [what the gates can and cannot see](#what-the-five-preset-gates-can-and-cannot-see) below); prints the per-band vector so a dead single binding — e.g. treble — is visible |
 | `animation` | HARD | every preset changes between frame N and N+k at fixed audio (not frozen). **Scores `metrics::footprint_diff` since Plan 0077 Phase 1** ([ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)) — motion over the **union of lit pixels**, with `bg_*` stripped, so a sparse figure is measured against its own footprint rather than diluted by the frame. The rejected fifth-density `emitter_squall` draft passes at 0.1049 where the whole-frame statistic priced it out at 0.0057; a static control still fails on a zero numerator, and both are pinned as a standing non-vacuity test. Two things it still cannot do, both by construction rather than by tuning: **a passing `anim` is not evidence of a *watchable* preset on a still family** — an IFS figure is a photograph, so a slow view pan clears the floor while nothing in the figure moves (design-backlog 0066); and **a rotationally symmetric figure cannot score its own spin** — a figure invariant under rotation by `2*pi/k` produces an *identical* image under that rotation, so its frame difference is zero at **every** resolution and no image-domain statistic lifts it (design-backlog 0009; the `#[ignore]`d resolution ladder from Plan 0067 Phase 1d is the recorded negative result, and it is why `SIZE` never moved). Such a figure must move radially, and that is an authoring constraint, not a gate defect |
-| `sanity` | HARD | every preset lights a minimum coverage, spans ≥2 quadrants **against its own background** (not blank, not a dot), and has some **tonal structure** — no more than 90 % of its lit pixels inside one of 16 luminance bands (not a blot). The third check is Plan 0056 Phase 5: a saturated single-tone mass satisfies the first two completely, which is how four attractor presets shipped flat. Threshold measured from the library's own distribution, printed on every run. `Spectrum Ridge` is listed in `KNOWN_FLAT` — it measures `1.000` today, and the test says so rather than gating on it |
+| `sanity` | HARD | every preset lights a minimum coverage and spans ≥2 quadrants (not blank, not a dot), and has some **tonal structure** — no more than `MAX_TONAL_FLATNESS` of its lit pixels inside one narrow luminance band (not a blot). The tonal check is Plan 0056 Phase 5: a saturated single-tone mass satisfies the first two completely, which is how a run of attractor presets shipped flat. **What "lit" means moved twice, and neither reading is the preset's own backdrop.** [ADR-0067](adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) strips every `bg_*` binding for this capture, because a `bg_vignette` made the frame's corner its darkest pixel and the backdrop read as a large, well-spread figure. [ADR-0126](adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) then made the reference **the frame's own ground** — the mean tone of its most populous luminance band — rather than a hardcoded black, because a scene that paints its own paper reads full coverage whatever it drew, which made three of the four statistics constants for that content and left an emptying canvas indistinguishable from a broken one. So each statistic now answers *how far does this picture depart from the ground it is drawn on*: `coverage` how much of it does, `quadrant_spread` and `radial_shell_occupancy` where, and `tonal_flatness` whether what departs has any interior. Every floor is measured from the library's own distribution and printed on every run. `KNOWN_FLAT` is the exemption roster and it is **empty** — no shipped preset is excused from the tonal check |
 | `beat` | HARD | a 120 BPM click track through the **real** DSP makes a beat-accent preset render differently on-beat vs off-beat; a zeroed beat binding does not |
 | `distinctness` | ADVISORY | prints per-family pixel + shape pairwise matrices and flags near-duplicate geometry; never asserts. Covers every family that ships **two or more** presets — the report’s unit is a pairwise matrix, so a family below that says nothing. The list is still a plain array and a new `SystemKind` does not appear in it on its own: `shape_field` is absent today, correctly and only because it ships no content yet |
 | `golden` | HARD (tolerance) | one **frozen fixture per system**, plus the `EXTRA_FIXTURES` escape hatch below, matches its committed baseline PNG within a mean + max-outlier tolerance ([ADR-0023](adrs/0023-golden-drift-guard-uses-frozen-fixtures.md)) |
@@ -1972,8 +1984,8 @@ Four things it does not see, each of which has its own answer:
 - **A figure collapsed to a point scores a perfect `1.0`.** Zero-length segments
   contribute to neither sum, and a curve that has degenerated to a dot is
   entirely in frame, which is all this instrument is asked. *Is anything actually
-  drawn* is `sanity.rs`'s question — coverage against black — and the two are
-  complements rather than a progression. A figure drawing **nothing** reports no
+  drawn* is `sanity.rs`'s question — coverage against the frame's own ground
+  (ADR-0126) — and the two are complements rather than a progression. A figure drawing **nothing** reports no
   fraction at all (`None`) rather than a zero, for the same reason.
 - **It cannot tell a deliberately zoomed-in figure from an over-scaled one**,
   because they are the same picture. `Rose Zoom` (`zoom` bound to `2.15..3.09`)

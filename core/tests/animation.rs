@@ -75,6 +75,18 @@ const EPS: u8 = 10;
 /// What the footprint is measured against. Not a sampled pixel: the backdrop is
 /// suppressed for this capture ([`without_backdrop`]), so every lit pixel is
 /// light the **scene** put there.
+///
+/// **Audited at Plan 0116 Phase 3 and deliberately left constant.** `sanity.rs`
+/// now derives its reference per capture ([ADR-0126]) because a scene that
+/// paints its own ground reads `coverage` exactly `1.0` against black. This
+/// measure has no single frame to derive from — `footprint_diff` masks over the
+/// **union** of two captures, so a per-frame ground would give the mask two
+/// references and make the union ill-defined. It is also a *difference*: a
+/// scene whose ground is a constant off-white contributes nothing to the
+/// numerator whatever the reference calls it, which is the property
+/// [`ANIM_FLOOR`] is derived against.
+///
+/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 /// Lower bound on `footprint_diff`'s denominator, as a fraction of the frame —
 /// the guard ADR-0091 requires against a tiny mask amplifying noise. `0.015` of
@@ -147,6 +159,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::Emitter => "emitter",
         SystemKind::ShapeField => "shape_field",
         SystemKind::WarpMesh => "warp_mesh",
+        SystemKind::ShapeCollage => "shape_collage",
     }
 }
 

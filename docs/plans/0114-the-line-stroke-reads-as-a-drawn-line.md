@@ -1,6 +1,6 @@
 # 0114 — the line stroke reads as a drawn line
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),

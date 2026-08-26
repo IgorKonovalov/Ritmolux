@@ -1,0 +1,173 @@
+# Suprematist - flat opaque planes on off-white paper, in painter order.
+# The first shipped world on `shape_collage` (ADR-0123, Plan 0113).
+#
+# THE MECHANISM: every other system in this engine draws LIGHT, and additive
+# light has no notion of one object being in front of another. This one draws a
+# GRAPHIC. A pixel starts at the paper colour and walks the element array in
+# array order, compositing each with `over` - so the black bar genuinely sits in
+# front of the blue plane, and the array index IS the depth. There is no glow,
+# no bloom and no halo anywhere in this file, and that is not restraint: it is
+# what the palette below buys.
+#
+# -- THE ONE AUTHORING FACT THIS FILE EXISTS TO RECORD ---------------------------
+#
+# THE PALETTE STAYS UNDER THE TONEMAP'S KNEE, AND THAT ONE CONSTRAINT IS WHAT
+# MAKES THE LOOK. ADR-0046's curve is exactly the identity below linear 0.6, so a
+# colour whose brightest channel sits at or under it reaches the display
+# byte-identical - flat, unshaded, the colour that was authored. Bloom's
+# threshold sits ABOVE that same knee, so a canvas living under it gets no halo
+# either, and the edges stay hard. Two properties, one constraint, no parameter.
+#
+# Seven of the eight plateaus below are under it. The eighth is the paper, and it
+# is deliberately over: `f(1.0) = 0.800`, so pure white is unreachable and
+# near-white costs a linear emission above 1 - which re-enters bloom's threshold
+# and forfeits the free hard edge. Off-white is the affordable ground, and both
+# of the reference canvases this world comes from are off-white anyway. Reach for
+# a brighter palette here and the look goes, without anything telling you why.
+#
+# THE STOPS ARE PLATEAUS, NOT A GRADIENT. Each element's coordinate lands in the
+# interior of one band, so its fill is one exact colour rather than a sample off
+# a ramp. The pairs 0.0002 apart are the hard transitions. If you retune this,
+# keep that shape - a smooth ramp would shade every element and there would be
+# nothing flat left to be flat.
+#
+# WHAT DRIVES WHAT
+#   recompose   the canvas RECOMPOSES on a strong onset - a new arrangement
+#   density     elements arrive and leave with the mid range
+#   drift/spin  every element carries its own slow travel and turn
+#   pump_size   the low end swells individual elements, phase-offset
+#   scale       a slow breath, plus the low end - the whole canvas leans in
+#   saturation  the top end, on chroma rather than on luminance
+#
+# THE ONE THING TO KNOW BEFORE RETUNING THE BEAT: `beat_index` counts ONSETS,
+# about 1.7-2.1x per musical beat (ADR-0109), so anything hung off it fires
+# roughly twice as often as the music does. Plan 0095 is the fix in flight. Do
+# NOT compensate for it here - that would have to be unwound when 0095 lands.
+
+system = "shape_collage"
+name   = "Suprematist"
+
+[palette]
+stops = [
+  # black
+  { at = 0.0000, color = "#111111" },
+  { at = 0.1249, color = "#111111" },
+  # red
+  { at = 0.1251, color = "#8a1420" },
+  { at = 0.2499, color = "#8a1420" },
+  # ochre
+  { at = 0.2501, color = "#96751e" },
+  { at = 0.3749, color = "#96751e" },
+  # blue
+  { at = 0.3751, color = "#1e3a8a" },
+  { at = 0.4999, color = "#1e3a8a" },
+  # green
+  { at = 0.5001, color = "#1d5c34" },
+  { at = 0.6249, color = "#1d5c34" },
+  # grey
+  { at = 0.6251, color = "#4a4a4a" },
+  { at = 0.7499, color = "#4a4a4a" },
+  # plum
+  { at = 0.7501, color = "#5a1f4a" },
+  { at = 0.8749, color = "#5a1f4a" },
+  # THE PAPER. Linear 0.851, the one plateau over the knee - see the header.
+  { at = 0.8751, color = "#d9d5c8" },
+  { at = 1.0000, color = "#d9d5c8" },
+]
+
+[params]
+# A RAW palette coordinate, and pinned. `color_span` and `palette_shift` move the
+# elements' colours; the ground must not travel with them, so this number is not
+# reachable through either and is written here directly.
+paper = "0.9375"
+
+# THE CANVAS LEANS, IT DOES NOT PUMP. A ~47 s sine so the picture is alive in
+# silence, plus the low end gained from the cap by the house rule (C / 0.85 for
+# bass) so a typical passage sits near half of it and a peak reaches it. The
+# smoothing constant below is long to match: at a short tau the elements
+# visibly jumped size on every hit, which reads as a zoom and not as a canvas.
+scale = "1.00 + 0.045 * sin(time * 0.135) + clamp(bass * 0.1176, 0, 0.10)"
+
+# THE WHOLE CANVAS FLOATS, AND EVERY ELEMENT ALSO CARRIES ITS OWN TRAVEL.
+# The two are deliberately different motions: `pan_*` slides the composition as
+# one rigid thing, `drift` and `spin` let the elements move RELATIVE to each
+# other, which is what stops the canvas reading as a photograph being panned
+# across. Each element's direction and turn are drawn from the seed at
+# generation, so this is reproducible rather than random.
+#
+# The pan rates are not taste. A `shape_collage` canvas covers EVERY pixel - the
+# paper is the ground - so the whole frame is its footprint, and the motion gate
+# measures a mean over all of it rather than over a sparse figure's own lit
+# pixels. Motion here therefore has to come from element EDGES sweeping, which is
+# a small share of the frame, and a 46 s breath alone moved 0.0006 against the
+# gate's 0.01 floor.
+pan_x = "0.15 * sin(time * 0.62)"
+pan_y = "0.10 * sin(time * 0.81 + 1.1)"
+
+drift = "0.85 + clamp(bass * 0.71, 0, 0.6)"
+spin  = "0.5 + clamp(mid * 0.59, 0, 0.5)"
+
+# THE COMPOSITION FILLS AND EMPTIES, AND NOW IT FADES RATHER THAN STEPS.
+# `count` is the canvas's full size and is fixed; `density` is what gates how
+# many of those are live, and an element crossing the gate fades in or out over
+# about half a second instead of appearing. Birth order is stable, so a rising
+# density only ever ADDS - nothing already on the canvas moves or changes colour
+# when the mid range swells.
+count   = "14"
+density = "0.72 + clamp(mid * 0.33, 0, 0.28)"
+
+# THE CANVAS RECOMPOSES ON ROUGHLY ONE BEAT IN EIGHT, AND THE RATE IS THE WHOLE
+# OF THE TUNING HERE. The scene is edge-triggered, so this is a level that goes
+# high for one beat and low again; `hash` is seeded and pure, so the sequence is
+# reproducible run to run rather than random, and irregular rather than periodic
+# - the canvas does not recompose on a metronome.
+#
+# THE FIRST DRAFT GATED ON `onset > 0.82` AND THAT WAS THE DEFECT. Under a click
+# track `onset` normalizes against its own recent peak (ADR-0049) and reaches
+# 1.0 on every click, so the canvas recomposed several times a second and spent
+# almost all of its time mid-blend. A filmstrip showed it: every frame pale,
+# because a crossfade in flight is two canvases sharing one frame. A canvas needs
+# to be still long enough to be read as a composition.
+#
+# `beat_index` counts ONSETS at about 1.7-2.1x the musical beat (ADR-0109), so
+# one in eight of these is nearer one in four real beats. That is deliberate and
+# NOT compensated for here - Plan 0095 is the fix in flight, and a preset that
+# corrected for it would have to be unwound when it lands.
+recompose       = "select(hash(beat_index) > 0.88, 1, 0)"
+# Short and non-zero: at 0 the cut is violent, and a canvas is a slower thing
+# than a strobe.
+recompose_blend = "0.35"
+
+# INDIVIDUAL ELEMENTS SWELL, THE CANVAS DOES NOT. Each element carries its own
+# phase, drawn at generation, so they breathe past each other rather than
+# together - a field of oscillators sharing a phase reads as one sheet flashing,
+# which is the swarm's twinkle finding. Depth only; the rate is the engine's.
+pump_size = "clamp(bass * 0.176, 0, 0.15)"
+
+# THE TOP END GOES ON COLOUR, NOT ON LIGHT. There is no brightness param in this
+# scene and there is deliberately nothing to blow out - the colours are already
+# at the palette's own levels, and pushing them would take the canvas over the
+# knee and lose the flat fill and the hard edge together. So the treble drives
+# `saturation` instead: the planes come up in chroma rather than in luminance,
+# which is a graphic move rather than a luminous one. The base sits slightly
+# under 1 so there is somewhere to come up FROM.
+saturation = "0.93 + clamp(treb * 0.0824, 0, 0.07)"
+
+[smoothing]
+# Long, deliberately. At 0.15 the bass term punched and the whole canvas read as
+# a zoom; half a second is the picture leaning into the low end.
+scale = 0.5
+# Shorter than the breath and different from it, so the two never resolve
+# together - but not zero: an element appearing is a hard event either way, and a
+# quarter second keeps a single mid-range transient from flickering one in and
+# out again.
+density = 0.3
+# The two motion multipliers settle rather than snap - a drift that answers each
+# hit reads as a stutter, not as travel.
+drift = 0.6
+spin  = 0.6
+# Short: the swell is the one thing here that should land ON the beat.
+pump_size = 0.12
+# Short: the chroma lift is the one thing here that should arrive with the beat
+# rather than behind it.
+saturation = 0.2
