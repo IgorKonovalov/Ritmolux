@@ -134,3 +134,42 @@ What this ADR fixes is the **principle** and the three alternatives it rules out
   `radial_shell_occupancy` stay degenerate for every full-coverage preset, and the flat-graphic false
   positive is untouched. It survives as a candidate **inside** Plan 0116 — a second excitation may
   still be wanted once the ground is right.
+
+## Outcome (2026-08-26)
+
+[Plan 0116](../plans/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measured the candidate
+estimators against the whole library, and Phase 2 chose **`modal_luma`** — the frame's modal
+luminance band. Three things this ADR asserted did not survive that measurement, recorded here rather
+than edited into the body above.
+
+**The 17-of-41 count was right and its reading was wrong.** This ADR treated naive modal tone as
+already falsified because it "would change the reference for 17 of the 41 shipped presets", and
+concluded that "an estimator that silently re-bases half the library is not a refinement of this
+lens, it is a different lens". The count reproduces exactly. The consequence does not: re-basing
+those 17 changes **no preset's verdict**, at either excitation, for any of the three candidates
+tabled. The library's verdicts are insensitive to the reference, which is the opposite of what the
+count was taken to imply — and the estimator was adopted on that measurement.
+
+**The false positive is not a ground problem, and this ADR's diagnosis of it is falsified.** The
+Context above attributes `fragment_tiledmono`'s `flatness = 0.9346` to its black ink "being excluded
+as unlit, leaving the statistic to measure the white alone". With the ground correctly at the paper,
+the ink is included and the *paper* is excluded — and the preset reads `0.9413`, marginally worse.
+All three estimators found the paper at `(245,245,245)` and all three still convicted it. A duotone
+has two large populations and `is_lit` removes whichever one is the ground, so the other holds ~94 %
+of what remains either way. That residue is a property of `tonal_flatness`, and
+[ADR-0127](0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) takes it.
+
+**"The four statistics become meaningful for every world the engine can draw" is true for eight of
+the twelve, not all of them.** The estimator clears the `coverage = 1.0000` degeneracy where a ground
+exists — `Tiled Rosette` to `0.1645`, `Ink on Paper` to `0.2167`, `Thomas` to `0.2917`, `Vellum` to
+`0.3704`, `Valentine` to `0.4389`, `Facet` to `0.5940`, `Vitrail` to `0.7071`, `Banded Mandala` to
+`0.7574`. It cannot where none does: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are smooth
+luminous fields whose modal band holds `7.4 %` / `5.0 %` / `0.7 %` / `0.3 %` of the frame, at or under
+the `6.25 %` a uniform distribution puts in one of sixteen bands. Their coverage of 1.0 is honest and
+no reference tone changes it. This is the "frame with no dominant tone" the Negative section
+anticipated, found in four shipped presets rather than in a hypothetical — Plan 0116 Phase 3 defines
+the estimator's behaviour there rather than discovering it.
+
+What stands unchanged is the Decision itself and all four Alternatives. The lens does measure
+departure from the frame's own ground; the ground is derived per capture; and none of the four
+rejected options became viable.
