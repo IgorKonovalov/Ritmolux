@@ -3048,7 +3048,7 @@ cannot see. Two things to decide rather than assume: whether `cargo doc` intra-d
 are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
 links are repaired or deleted — several may have been decorative from the start.
 
-## 0130 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
+## 0132 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
 
 **Raised by:** `preset-author`, at [Plan 0114](plans/0114-the-line-stroke-reads-as-a-drawn-line.md)
 Phase 6, where the retune brief's own question — *does a crisper stroke read brighter, and roughly
