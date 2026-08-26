@@ -75,6 +75,23 @@ pub fn half_width(thickness: f32) -> f32 {
     (thickness * WIDTH_SCALE).max(MIN_HALF_WIDTH)
 }
 
+/// The across-the-stroke profile the **four line families** draw at unless a
+/// preset binds `softness` itself ([ADR-0124]).
+///
+/// `1.0` is the pre-Plan-0114 fragment exactly — `g = u²`, brightness falling
+/// from the centreline with no plateau — so the parameter ships byte-identical
+/// and the register stays reachable for a preset that wants the luminous smear.
+///
+/// **This is the constant Plan 0114's look gate moves.** It is deliberately
+/// *not* the value
+/// [`warp_mesh`](crate::render::scenes::warp_mesh::MILKDROP_SOFTNESS) passes:
+/// that surface is judged against `foo_vis_milk2` rather than against this
+/// plan's gate and is pinned, so a reader of either call site can see which
+/// judge it serves without leaving the file.
+///
+/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
+pub const DEFAULT_SOFTNESS: f32 = 1.0;
+
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset
 /// switch and blow the segment cap (ADR-0007 Risks). Curated presets stay well

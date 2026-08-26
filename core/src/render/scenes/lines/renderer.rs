@@ -131,14 +131,56 @@ pub struct ArcInstance {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
-    // x: aspect, y: glow multiplier, zw: unused
+    // x: aspect, y: glow multiplier, z: softness (ADR-0124), w: unused
     v: [f32; 4],
     // x: zoom, yz: pan, w: unused — the shared ViewTransform (ADR-0018)
     view: [f32; 4],
 }
 
-/// The WGSL body, minus the join-bit constants — [`shader_source`] prepends
-/// those, generated from [`JOINED_A`] / [`JOINED_B`] themselves.
+/// The across-the-stroke profile, **one definition prepended to both fragment
+/// modules** ([ADR-0124]).
+///
+/// `u` runs 0 at the stroke edge to 1 at the centreline; `du` is that
+/// coordinate's change per pixel of the render target, from `fwidth` — so the
+/// ramp derived from it is a width in **pixels of the render target** rather
+/// than a fraction of the stroke, and no uniform has to carry a resolution.
+/// `softness` is the ramp's width as a fraction of the half-width:
+///
+/// - **`1.0` reduces the whole expression to `g = u²` term for term** — the
+///   profile every line scene drew before this parameter existed. That equality
+///   is what the golden corpus rests on, and it holds **only because `edge` is
+///   capped at 1.0**: a sub-pixel stroke drives `fwidth` above 1, where an
+///   uncapped `max(softness, edge)` would divide `u` down and *dim* the stroke
+///   instead of sharpening it. `warp_mesh`'s pin
+///   ([`MILKDROP_SOFTNESS`](crate::render::scenes::warp_mesh::MILKDROP_SOFTNESS))
+///   is byte-identical for the same reason — its `THIN` stroke is 1.0–1.35 px of
+///   half-width, exactly that regime.
+/// - `0.5` makes the inner half of the stroke solid and ramps across the outer.
+/// - `0` is a solid stroke whose coverage falls to zero across **one pixel**,
+///   whatever the stroke width, the resolution or the aspect.
+///
+/// Shared rather than written twice for the reason [`shader_source`] emits the
+/// join bits from the Rust constants: two copies of a profile is a divergence
+/// that compiles, and here it would mean a mandala whose circles and interlace
+/// no longer match.
+///
+/// **`fwidth` exists only in a fragment shader**, so each caller evaluates it at
+/// the fragment's top level and passes the result in — which also keeps the call
+/// out of the arc fragment's non-uniform endpoint branch.
+///
+/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
+const PROFILE_WGSL: &str = r#"
+fn stroke_coverage(u: f32, du: f32, softness: f32) -> f32 {
+    let edge = clamp(du, 1e-6, 1.0);
+    let ramp = max(clamp(softness, 0.0, 1.0), edge);
+    let core = clamp(u / ramp, 0.0, 1.0);
+    return core * core;
+}
+"#;
+
+/// The WGSL body, minus the join-bit constants and the shared profile —
+/// [`shader_source`] prepends those, the join bits generated from [`JOINED_A`] /
+/// [`JOINED_B`] themselves.
 const SHADER_BODY: &str = r#"
 struct Uniforms {
     v: vec4<f32>,
@@ -218,10 +260,16 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    // Bright core, quadratic falloff to the quad edge: a soft glowing stroke.
-    let d = abs(in.side);
-    let falloff = max(0.0, 1.0 - d);
-    let g = falloff * falloff;
+    // The shared profile (ADR-0124): a solid core of width `softness`, then a
+    // quadratic ramp to the quad edge, floored at one pixel of the render
+    // target. `side` spans -1..1 across the half-width, so `1 - |side|` is the
+    // coordinate the profile takes.
+    //
+    // The derivative is read off `side` and NOT off `|side|`, whose kink at the
+    // centreline would make `fwidth` meaningless on the 2x2 quad that straddles
+    // it. Away from that quad the two are equal in magnitude.
+    let inward = max(0.0, 1.0 - abs(in.side));
+    let g = stroke_coverage(inward, fwidth(in.side), u.v.z);
     // Premultiplied: colour AND alpha carry the same coverage `g * alpha`, so
     // the two long edges of the quad - where the across-the-stroke falloff
     // reaches zero - write nothing at all rather than opaque black (ADR-0056).
@@ -251,7 +299,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 ///
 /// Runs once per [`LineRenderer::new`] (pipeline build, not the hot path).
 fn shader_source() -> String {
-    format!("const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = {JOINED_B}u;\n{SHADER_BODY}")
+    format!(
+        "const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = \
+         {JOINED_B}u;\n{PROFILE_WGSL}\n{SHADER_BODY}"
+    )
 }
 
 /// The arc pipeline's WGSL, **a separate shader module** from [`SHADER_BODY`]
@@ -947,11 +998,19 @@ impl LineRenderer {
     /// **loading** over the engine backdrop rather than clearing (Plan 0018 Phase
     /// 3 — the background pass owns the clear). Segments beyond `capacity` are
     /// dropped defensively (the scene is responsible for capping at load).
+    ///
+    /// `softness` is the across-the-stroke profile ([`PROFILE_WGSL`], ADR-0124):
+    /// `1.0` is the pre-Plan-0114 quadratic falloff, `0` a solid stroke with a
+    /// one-pixel edge. **There is no default here** — one uniform serves every
+    /// entry point, so each caller names the constant it answers to:
+    /// [`lines::DEFAULT_SOFTNESS`](super::DEFAULT_SOFTNESS) for the four line
+    /// families, [`warp_mesh::MILKDROP_SOFTNESS`](crate::render::scenes::warp_mesh::MILKDROP_SOFTNESS)
+    /// for the MilkDrop surface.
     #[allow(
         clippy::too_many_arguments,
         reason = "distinct GPU handles plus the per-frame draw parameters (aspect, glow, \
-                  view transform); bundling them would only shuffle the same values behind a \
-                  one-use struct"
+                  softness, view transform); bundling them would only shuffle the same values \
+                  behind a one-use struct"
     )]
     pub fn draw(
         &mut self,
@@ -960,6 +1019,7 @@ impl LineRenderer {
         view: &wgpu::TextureView,
         aspect: f32,
         glow: f32,
+        softness: f32,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
     ) {
@@ -969,6 +1029,7 @@ impl LineRenderer {
             view,
             aspect,
             glow,
+            softness,
             xform,
             segments,
             segments.len(),
@@ -1002,6 +1063,7 @@ impl LineRenderer {
         view: &wgpu::TextureView,
         aspect: f32,
         glow: f32,
+        softness: f32,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         n_additive: usize,
@@ -1012,6 +1074,7 @@ impl LineRenderer {
             view,
             aspect,
             glow,
+            softness,
             xform,
             segments,
             n_additive,
@@ -1043,6 +1106,7 @@ impl LineRenderer {
         view: &wgpu::TextureView,
         aspect: f32,
         glow: f32,
+        softness: f32,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         arcs: &[ArcInstance],
@@ -1053,6 +1117,7 @@ impl LineRenderer {
             view,
             aspect,
             glow,
+            softness,
             xform,
             segments,
             segments.len(),
@@ -1075,6 +1140,7 @@ impl LineRenderer {
         view: &wgpu::TextureView,
         aspect: f32,
         glow: f32,
+        softness: f32,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         n_additive: usize,
@@ -1107,7 +1173,7 @@ impl LineRenderer {
             &self.uniforms,
             0,
             bytemuck::bytes_of(&Uniforms {
-                v: [aspect.max(0.1), glow, 0.0, 0.0],
+                v: [aspect.max(0.1), glow, softness, 0.0],
                 view: [xform.zoom, xform.pan[0], xform.pan[1], 0.0],
             }),
         );

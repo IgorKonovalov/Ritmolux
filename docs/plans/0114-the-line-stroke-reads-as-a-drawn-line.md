@@ -1,6 +1,6 @@
 # 0114 — the line stroke reads as a drawn line
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
@@ -336,6 +336,45 @@ instruments, and neither one's verdict is evidence for the other's constant.
 - **It does not resume Plan 0087.** Phase 5 of that plan stays green-lit and unbuilt until this
   closes.
 - **It does not choose the default.** That is Phase 4's whole job.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0114` on `plan-0114-line-stroke`, branched off `main` and merged forward
+at `b2fb13b`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the profile lands | dev | done | committed with this row |
+| 2 — the arc fragment shares it | dev | not started | |
+| 3 — the sample sheet | dev | not started | |
+| 4 — pick the default | human | not started | |
+| 5 — flip, re-bless, repair the docs | dev | not started | |
+| 6 — the library is retuned | human | not started | |
+| 7 — the MilkDrop comparison set | dev | not started | |
+| 8 — judge against the reference | human | not started | |
+| 9 — set the constant, add a baseline | dev | not started | |
+
+### Notes
+
+- **Phase 1 touched two files outside its list.** `presets/README.md`, because
+  `core/tests/preset.rs`'s `every_declared_param_is_documented_in_the_presets_readme` fails the
+  moment a name enters a `PARAMS` roster — so `softness` is documented in the same commit that
+  declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
+  `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
+  argument to compile.
+- Byte-identity at Phase 1 was read bless-to-bless, not off a `git diff`:
+  `LMV_BLESS=1 cargo nextest run -p lmv-core --test golden` moves `core/tests/golden/shape_collage.png`
+  and nothing else. A control bless with the phase stashed moves the same one file, and so does a
+  bless in the `main` checkout at `0b9a486` with none of this branch's code — so that baseline
+  drifts locally on this machine independently of this plan. The other 34, the three `warp_mesh`
+  ones included, are byte-identical.
+
+### Close triggers
+
+_(filled at the close, after the last phase.)_
 
 ## Followups (after this lands)
 
