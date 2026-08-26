@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind};
+use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
 use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
 
 const SIZE: u32 = 128;
@@ -151,7 +152,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 8] = [
+const EXTRA_FIXTURES: [(&str, &str); 9] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -172,8 +173,12 @@ const EXTRA_FIXTURES: [(&str, &str); 8] = [
         "shape_collage_roster",
         include_str!("fixtures/shape_collage_roster.toml"),
     ),
+    ("warp_mesh_stroke", FIXTURES_WARP_MESH_STROKE),
 ];
 
+/// The stroke fixture's text, named once so the roster entry above and the guard
+/// below cannot come to mean different files.
+const FIXTURES_WARP_MESH_STROKE: &str = include_str!("fixtures/warp_mesh_stroke.toml");
 fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -319,6 +324,107 @@ fn scenes_match_golden_baselines() {
     );
 }
 
+/// **The one baseline that can see the `warp_mesh` stroke profile still can**
+/// (Plan 0114 Phase 9).
+///
+/// [ADR-0124](../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
+/// pins `warp_mesh` to the pre-0114 stroke profile because it answers to
+/// `foo_vis_milk2` rather than to the line families' look gate. Nothing in the
+/// repo held that pin: a change to the shared line fragment could alter every
+/// MilkDrop stroke and no baseline would move. `warp_mesh_stroke.toml` is the
+/// baseline that closes it, and this is what stops it degrading back into a
+/// picture that cannot.
+///
+/// # Why a stroke being *present* is not enough
+///
+/// The other three `warp_mesh` fixtures already stroke a waveform — `wave_a`
+/// defaults to 1.0, so they cannot help it — and they are still blind, because
+/// at [`SIZE`] a `THIN` stroke is 0.16 px of half-width and `THICK` is 0.38 px.
+/// The profile's edge is floored at one pixel of the render target, so below
+/// about two the floor *is* the whole ramp and every `MILKDROP_SOFTNESS` draws
+/// the identical frame. Measured with the pin driven `1.0 -> 0.0`: all three move
+/// by mean 0.0000 / outlier 0.
+///
+/// So both arms are needed. The stroke has to reach the fragment **and** be wide
+/// enough for the profile to have room in it — and `ob_size` is the only stroke
+/// width on this surface a preset controls, reaching `SegmentInstance::width` as
+/// an NDC-y half-width.
+#[test]
+fn the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke() {
+    /// The half-width, in pixels of the golden capture, below which the edge
+    /// term is capped and the profile stops being expressible. Two is where it
+    /// begins to bite; three is the margin this fixture is asked to keep.
+    const MIN_RESOLVABLE_PX: f32 = 3.0;
+
+    let toml = FIXTURES_WARP_MESH_STROKE;
+
+    // The EEL2 the bundle compiled from is reproduced in the file as comments,
+    // emitted by `milkconv` from the same source it compiled — so reading them
+    // is reading what the bytecode does, not a second copy of it.
+    let value = |key: &str| -> f32 {
+        toml.lines()
+            .find_map(|line| {
+                let rest = line.trim_start().strip_prefix('#')?.trim_start();
+                let rest = rest.strip_prefix(key)?.trim_start();
+                let rest = rest.strip_prefix('=')?.trim();
+                rest.trim_end_matches(';').trim().parse::<f32>().ok()
+            })
+            .unwrap_or(f32::NAN)
+    };
+
+    let ob_size = value("ob_size");
+    let ob_a = value("ob_a");
+    let wave_a = value("wave_a");
+    let half_px = ob_size * SIZE as f32 / 2.0;
+    println!(
+        "warp_mesh_stroke: ob_size {ob_size} ({half_px:.2} px of half-width at \
+         {SIZE}), ob_a {ob_a}, wave_a {wave_a}"
+    );
+
+    assert!(
+        ob_a > 0.0,
+        "warp_mesh_stroke.toml no longer draws its border (ob_a = {ob_a}), which \
+         is the only stroke on this surface wide enough for the profile to show \
+         in — without it this baseline is as blind as the other three"
+    );
+    assert!(
+        half_px >= MIN_RESOLVABLE_PX,
+        "warp_mesh_stroke.toml strokes its border at {half_px:.2} px of \
+         half-width at {SIZE} (ob_size = {ob_size}), under the \
+         {MIN_RESOLVABLE_PX} px this fixture exists to keep. Below about two \
+         pixels the profile's edge term is capped and every MILKDROP_SOFTNESS \
+         draws the same frame, so the baseline would still exist and still \
+         guard nothing"
+    );
+    assert!(
+        wave_a > 0.0,
+        "warp_mesh_stroke.toml no longer sets a wave (wave_a = {wave_a}), so it \
+         has stopped being representative of the surface it stands for"
+    );
+
+    // And it actually reaches the line renderer, which no amount of reading the
+    // file can establish: the Plan 0069 extent diagnostic is read off the draw
+    // itself and yields nothing when no segment was stroked.
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let preset = Preset::from_toml_str(toml).expect("warp_mesh_stroke.toml is valid");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    set_extent_diagnostic(true);
+    renderer
+        .capture_preset(&name, &fixed_frame(), FRAMES)
+        .expect("capture warp_mesh_stroke");
+    let extent = take_draw_extent();
+    set_extent_diagnostic(false);
+    let fraction = extent.and_then(|e| e.fraction());
+    println!("warp_mesh_stroke in-frame geometry: {fraction:?}");
+    assert!(
+        fraction.is_some(),
+        "warp_mesh_stroke drew no segments at all — the baseline is a picture of \
+         a warp field, and the gap ADR-0124 records is still open"
+    );
+}
 /// Structural coverage guard (Plan 0016 Phase 5, closing the Plan 0022 followup;
 /// repointed onto [`SystemKind::ALL`] by Plan 0030 Phase 3, which retired this
 /// file's duplicate `SYSTEMS` list so the variant roster lives in exactly one

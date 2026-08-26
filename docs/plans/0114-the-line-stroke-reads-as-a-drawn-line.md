@@ -354,8 +354,8 @@ at `b2fb13b`.
 | 5 — flip, re-bless, repair the docs | dev | done | `707bdb8` |
 | 6 — the library is retuned | human | **outstanding — `preset-author`, does not gate 7** | |
 | 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
-| 8 — judge against the reference | human | **next — this session stops here** | |
-| 9 — set the constant, add a baseline | dev | not started | |
+| 8 — judge against the reference | human | done | verdict below |
+| 9 — set the constant, add a baseline | dev | done | committed with this row |
 
 ### Notes
 
@@ -366,12 +366,36 @@ Per preset, for Phase 6 to bind: `curve_ionwake` **0**, the Maurer roses **1.0**
 (`curve_nightbloom`, and `fragment_vitrail`'s line layer is one too), `lsystem_vellum` **0.25**.
 `star_rosewindow` and `spectrum_halo` were not given a value.
 
+**Phase 8's verdict (2026-08-26): the pin stays at `1.0`.** Which the plan names as a legitimate
+outcome that closes the question rather than a null result, so `MILKDROP_SOFTNESS` is unchanged
+and Phase 9's deliverable is its other half.
+
 - **Phase 1 touched two files outside its list.** `presets/README.md`, because
   `core/tests/preset.rs`'s `every_declared_param_is_documented_in_the_presets_readme` fails the
   moment a name enters a `PARAMS` roster — so `softness` is documented in the same commit that
   declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
   `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
   argument to compile.
+- **Phase 9's new baseline is proved to convict, not assumed to.** With the pin driven
+  `1.0 -> 0.0` through the golden harness, `warp_mesh_stroke` reads **mean 0.0336 / outlier 162**
+  against tolerances of 0.02 / 48, while `warp_mesh.png`, `warp_mesh_milk.png` and
+  `warp_mesh_shader.png` all read **mean 0.0000 / outlier 0** on the same run. That is the gap
+  ADR-0124 records, closed and measured.
+- **It took a fat border to get there, and that is a fact about the surface.** `draw.rs`'s `THIN`
+  and `THICK` are constants, 0.16 px and 0.38 px of half-width at the golden suite's 128 px, both
+  under the one-pixel floor — so a fixture that merely "sets a wave", which is what the
+  done-when asks for, would have added a fourth blind baseline. `ob_size` is the only stroke
+  width on this surface a preset controls; at `0.12` it is 7.7 px. The fixture sets **both**, and
+  `the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke` guards the border's width in pixels,
+  `ob_a`, `wave_a`, and that the draw actually reaches the line renderer.
+- **The baseline was blessed on WARP, not on hardware, against Phase 9's done-when.** `golden.rs`'s
+  own header requires it — every baseline in that roster is a software-adapter capture and the
+  suite compares against one — so blessing this one on hardware would have made it the only
+  baseline CI could not reproduce. Adapters were compared instead, which is the part of the rule
+  that carries the intent: `warp_mesh_stroke` agrees hardware-vs-WARP at **mean 0.0003 / outlier
+  1**.
+- The entry goes last in `EXTRA_FIXTURES`, per that file's own rule about allocation order on
+  WARP, and the bless confirmed no existing baseline moved.
 - **Phase 7 was built out of order, and deliberately.** Phase 6 is a `preset-author` sitting and
   Phase 7 touches a different scene and a different constant, so it is not gated on it. Both
   human gates now have their materials.
@@ -466,7 +490,26 @@ Per preset, for Phase 6 to bind: `curve_ionwake` **0**, the Maurer roses **1.0**
 
 ### Close triggers
 
-_(filled at the close, after the last phase.)_
+- **`presets/` touched:** `presets/README.md` only (the `softness` entry, the `glow` repair, the
+  four-lever paragraph). No `.toml` preset changed — that is Phase 6, still outstanding.
+- **Plan header `Closes:`** none — the header names no `design-backlog` entry.
+- **What shipped:** feature. A new authorable line parameter (`softness`), a changed default, one
+  new golden fixture and baseline, two committed scripts.
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry named.
+- **Outstanding `human` phases:** **Phase 6** — the `preset-author` retune of the five presets.
+  Phases 4 and 8 are done and their verdicts are recorded above. Phase 6 does not gate anything
+  else in this plan.
+- **Not done and deliberately:** `docs/images/gallery/`'s four line-scene renders
+  (`parametric_curve`, `lsystem`, `star_pattern`, `spectrum`) show the pre-0114 stroke.
+  `scripts/docs-shots.mjs` re-shoots them and is explicitly not a CI gate. Re-shooting belongs
+  after Phase 6 or it is paid twice.
+- **For architect, not `dev` to act on:** [ADR-0124]'s Negative section gives the wrong *reason*
+  for the `warp_mesh` coverage gap. It says the three fixtures "set no wave"; `wave_a` defaults to
+  1.0, so all three stroke one. The cause is the 128 px capture, measured above. The conclusion
+  the ADR draws from it is correct and unaffected.
+
+[ADR-0124]: ../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 
 ## Followups (after this lands)
 
