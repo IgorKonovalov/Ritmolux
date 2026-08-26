@@ -353,7 +353,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 | 5 — Adjudicate what changed | human | done | confirmed empty, 2026-08-26 |
 | 6 — The emptying canvas is actually caught | dev | done | `86106af` |
 | 7 — Documentation | dev | done | `022e4c5` |
-| 8 — What separates a composition from a blot | dev | done | `committed with this row` |
+| 8 — What separates a composition from a blot | dev | done | `c2dc0dc` |
 | 9 — The flatness ceiling gains a second condition | dev | **did not run** | Phase 8's stop condition fired |
 
 ### Notes
