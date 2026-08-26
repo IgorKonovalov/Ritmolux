@@ -355,7 +355,7 @@ at `b2fb13b`.
 | 6 — the library is retuned | human | **outstanding — `preset-author`, does not gate 7** | |
 | 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
 | 8 — judge against the reference | human | done | verdict below |
-| 9 — set the constant, add a baseline | dev | done | committed with this row |
+| 9 — set the constant, add a baseline | dev | done | `60cf15e` |
 
 ### Notes
 
