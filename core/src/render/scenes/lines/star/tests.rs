@@ -1438,6 +1438,48 @@ fn polar_profile(px: &[f32], max_radius_px: f32) -> Vec<(f32, f32)> {
         .collect()
 }
 
+/// How many times wider the beaded control's per-ray light spread must be than
+/// the arc's.
+///
+/// **A ratio, not a frozen threshold** (ADR-0071). Both readings are the same
+/// statistic — `(max - min) / max` of the light each ray integrates — taken in
+/// this one test, at one capture size, through one profile, so the absolute
+/// figures may move with the rasterizer while their *separation* is the
+/// property. The previous form was a bare `0.12` asserted universally against
+/// both arms and naming no configuration, while its own comment already said
+/// the gap between the arms was what carried the property rather than the
+/// absolute figure.
+///
+/// Measured at 768 px and a 0.012 NDC half-width: the arc spreads **7.9 %** at
+/// ornament scale and **7.4 %** at full frame; the 24-gon control spreads
+/// **34.3 %** and carries about twice the light per ray — a separation of
+/// **4.36x**. It reads the same on both adapters, 34.3 / 7.9 on the software
+/// rasterizer and 34.3 / 7.9 on this machine's hardware one, and that agreement
+/// is what earns the ratio: ADR-0074 records one that moved 7.3x between two
+/// builds of a single rasterizer, because its two terms answered to the machine
+/// differently. These two are one statistic over two geometries.
+///
+/// **The floor is 3.0 because the regression was measured, not guessed.**
+/// Dropping the control's `joined` flags — the exact edit the assertion's
+/// message names, and what stops a bead summing at every vertex — leaves it
+/// spreading **15.8 %**, a separation of **2.01x**. That is well above the
+/// spread a bare threshold would have compared against (the retired form's
+/// `0.12`, which this regression also passed), because a min/max spread is
+/// sign-blind: an unjoined 24-gon has a *gap* at every vertex, so it varies
+/// around the ring in the other direction and reads almost as uneven as a
+/// beaded one. 3.0 sits between the two with 1.45x of margin above the
+/// regression and 1.45x below the passing value.
+///
+/// **The arc's own figure was 5 % while the stroke was a pure quadratic
+/// falloff, and a crisper stroke legitimately quantizes harder** (Plan 0114
+/// Phase 5). A solid core contributes whole pixels to a ray's sum where a
+/// gradient contributes fractions, so the sum steps as the stroke's sub-pixel
+/// position varies around the ring. That is smooth and everywhere, nothing like
+/// the 24 localized spots ADR-0041's joins sum at the control's vertices — and
+/// it is the reason the absolutes are printed rather than asserted: the arc's
+/// figure answers to the stroke profile, and the separation does not.
+const BEAD_RATIO: f32 = 3.0;
+
 /// **A `circle` motif is round, and evenly bright, at ornament scale and at
 /// full frame** — the resolution-independence claim ADR-0098 makes, checked at
 /// the small scale where the polygon was visible rather than at the large one
@@ -1456,29 +1498,12 @@ fn polar_profile(px: &[f32], max_radius_px: f32) -> Vec<(f32, f32)> {
 /// around the ring. So the assertion that discriminates is on *brightness
 /// around the ring*, and the roundness arm is asserted of the arc alone, at
 /// both scales, as the resolution claim.
-/// The per-ray light spread that separates a **bead** from the ordinary
-/// quantization of a stroke against a pixel grid.
-///
-/// Measured at 768 px, a 0.012 NDC half-width and the shipped `softness`
-/// default: the arc spreads **7.9 %** at ornament scale and 7.4 % at full
-/// frame; the 24-gon control spreads **34.3 %** and carries about twice the
-/// light per ray. Both arms below use this one number, so they stay back to
-/// back and neither can drift alone.
-///
-/// **It was 5 % while the stroke was a pure quadratic falloff, and a crisper
-/// stroke legitimately quantizes harder** (Plan 0114 Phase 5). A solid core
-/// contributes whole pixels to a ray's sum where a gradient contributes
-/// fractions, so the sum steps as the stroke's sub-pixel position varies
-/// around the ring. That is smooth, everywhere, and nothing like the 24
-/// localized spots ADR-0041's joins sum at the control's vertices — which is
-/// why the gap between the two arms is what carries the property, not the
-/// absolute figure.
-const BEAD_SPREAD: f32 = 0.12;
-
 #[test]
 fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
     // `scale` 0.13 is the retired `star_mandala`'s outermost ring; 1.8 fills the
     // frame. A motif spans roughly one unit, so the drawn radius is half of it.
+    // Each scale's per-ray light spread, asserted against the control below.
+    let mut arc_spread: Vec<(f32, f32)> = Vec::new();
     for motif_scale in [0.13f32, 1.8] {
         let radius_world = 0.5 * motif_scale;
         let radius_px = radius_world * ROUND_SIZE as f32 / 2.0;
@@ -1533,13 +1558,11 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
              it at {radius_px:.2}",
             0.5 * (lo + hi)
         );
-        // Unbeaded: it has no interior vertex, so nothing sums anywhere.
-        assert!(
-            vhi - vlo <= BEAD_SPREAD * vhi,
-            "the arc-drawn circle carries between {vlo:.3} and {vhi:.3} light \
-             per ray around the ring at motif scale {motif_scale}, and an arc \
-             has no joint for a bead to form at"
-        );
+        // Unbeaded: it has no interior vertex, so nothing sums anywhere. The
+        // reading is carried out of the loop and asserted against the control's
+        // below, because the separation is the property and the absolute figure
+        // answers to the stroke profile (see `BEAD_RATIO`).
+        arc_spread.push((motif_scale, (vhi - vlo) / vhi));
     }
 
     // --- The control: the same circle as the polyline that shipped. ---
@@ -1579,12 +1602,28 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
          {vlo:.3}..{vhi:.3} ({:.1} % spread)",
         (vhi - vlo) / vhi * 100.0
     );
+    let control_spread = (vhi - vlo) / vhi;
+    let (worst_scale, worst_arc) =
+        arc_spread.iter().copied().fold(
+            (f32::NAN, 0.0f32),
+            |acc, s| if s.1 > acc.1 { s } else { acc },
+        );
+    eprintln!(
+        "bead separation: control {:.1} % against the arc's worst {:.1} % (at \
+         motif scale {worst_scale}) = {:.2}x, floor {BEAD_RATIO:.1}x",
+        control_spread * 100.0,
+        worst_arc * 100.0,
+        control_spread / worst_arc
+    );
     assert!(
-        vhi - vlo > BEAD_SPREAD * vhi,
-        "the {n}-gon control varies by only {:.3} in light around the ring, so \
-         the arc's uniformity above is not distinguishing it from anything — \
-         check that the control is still joined (ADR-0041), which is what sums \
-         a bead at every vertex",
-        vhi - vlo
+        control_spread > BEAD_RATIO * worst_arc,
+        "the {n}-gon control's per-ray light spreads {:.1} % around the ring \
+         against the arc's worst {:.1} %, a separation of only {:.2}x. The \
+         property is that a joined polyline BEADS and an arc does not, so \
+         either the control has stopped being joined (ADR-0041, which is what \
+         sums a bead at every vertex) or the arc has started beading",
+        control_spread * 100.0,
+        worst_arc * 100.0,
+        control_spread / worst_arc
     );
 }

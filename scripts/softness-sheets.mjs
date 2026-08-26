@@ -51,9 +51,18 @@ const SUBJECTS = [
   { file: "fragment_vitrail", table: "[layer.params]", note: "a line layer over a fragment field" },
 ];
 
-/// Both ends of the range and two values between. `1.0` is the stroke the
-/// library ships today, byte for byte.
+/// Both ends of the range and two values between. `1.0` is the profile every
+/// line scene drew from Plan 0010 until Plan 0114, byte for byte — the control,
+/// not the default. The shipped default is `0.25` (ADR-0124), which is why it
+/// is in this list rather than merely bracketed by it.
 const SOFTNESS = [1.0, 0.5, 0.25, 0.0];
+
+/// The value a preset that binds nothing renders at, so the sheet can mark
+/// which panel that is. Mirrors `DEFAULT_SOFTNESS` in
+/// `core/src/render/scenes/lines/mod.rs`. It only labels a panel — every
+/// panel's `softness` is written into its own scratch preset — so a drift
+/// here mislabels the sheet and cannot mis-render it.
+const DEFAULT_SOFTNESS = 0.25;
 
 /// The size the app is judged at, and one non-16:9 target. The edge is specified
 /// in pixels of the render target, so its **share** of the stroke differs
@@ -122,8 +131,9 @@ const index = [
   "",
   "The artifacts Phase 4 judges. Every panel in a sheet is the same preset, the",
   "same held stimulus and the same frame — only `softness` differs. `1.00` is the",
-  "stroke the library ships today, byte for byte; `0.00` is a solid stroke with a",
-  "one-pixel antialiased edge.",
+  "profile every line scene drew from Plan 0010 until Plan 0114, byte for byte;",
+  "`0.00` is a solid stroke with a one-pixel antialiased edge. **The shipped",
+  "default is `0.25`** — `1.00` is the control here, not what the library draws.",
   "",
   "**The contact sheet ranks, the full-size panels decide.** `shot --all` resizes",
   "every capture to a 320 px thumbnail, so at 1080p a sheet is a 6:1 downsample:",
@@ -185,7 +195,7 @@ for (const subject of SUBJECTS) {
             twin.softness === softness
               ? "distinct"
               : `**identical to \`${twin.softness.toFixed(2)}\`**`;
-          const ships = softness === 1 ? " (ships today)" : "";
+          const ships = softness === DEFAULT_SOFTNESS ? " (the default)" : "";
           return `| \`${softness.toFixed(2)}\`${ships} | [\`${name}\`](${name}) | ${weight(panel)} | ${reads} |`;
         }),
         "",

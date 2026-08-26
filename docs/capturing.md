@@ -1836,6 +1836,13 @@ surface** rather than re-parameterized existing files, for the reason above:
   one-dimensional, so its dark region is a rim whose width scales with
   `thickness`, and at shipped widths (2–3) that rim is close to a hairline a
   capture cannot discriminate. Narrowing it leaves the test green and blind.
+  **Its `softness = "1.0"` is pinned for the same reason and is deliberately
+  *not* the shipped default** (Plan 0114): since
+  [ADR-0124](adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
+  the profile is authorable and the library default is `0.25`, where a plateau
+  reaches coverage `1` over a *region* — which is exactly what the fourth
+  capture below reads as the defect. Normalising that line to the default
+  retires the wide arm while leaving it green. The test asserts the pin.
 
 All three bind a post stage (`trails`), and that is not decoration either: with an
 empty chain the scene draws straight onto the backdrop and its additive colour
@@ -1861,7 +1868,11 @@ lit capture can only reach indirectly.
 
 It exists because the line guard's exact arm was nearly vacuous
 ([design-backlog 0041](design-backlog.md)). The line falloff is one-dimensional
-and quadratic, so the region where it is *identically* zero is the outermost
+and — **at the `softness = 1.0` this fixture pins** — quadratic. Since Plan 0114
+that is a property of the fixture rather than of the renderer: the shipped
+default is `0.25`, a solid core with a one-pixel edge, and every number in this
+section was measured at `1.0` and stays valid because the fixture holds it
+there. So the region where the falloff is *identically* zero is the outermost
 sub-pixel sliver of the quad: reverting the shader moved that arm on **15
 channels**, about five pixels, and no choice of `samples` / `scale` / `thickness`
 widens it. The fourth capture changes the property instead of the fixture. A

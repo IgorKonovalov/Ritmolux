@@ -489,6 +489,7 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
     let backdrop = fixture_value("bg_bright");
     let progress = fixture_value("draw_progress");
     let thickness = fixture_value("thickness");
+    let softness = fixture_value("softness");
     let trails = fixture_value("trails");
     assert!(
         backdrop > 0.0,
@@ -507,6 +508,18 @@ fn a_lit_backdrop_survives_where_the_strokes_drew_nothing() {
          at shipped widths (2 to 3) it is close to a hairline that a capture \
          cannot discriminate — a thin fixture leaves this test green and \
          blind. See the file's header"
+    );
+    assert!(
+        softness == 1.0,
+        "lines_lit_backdrop.toml is at softness = {softness}, not the pinned \
+         1.0. The wide arm below reads alpha off the FULLY EXTINGUISHED set, \
+         and only the pure quadratic profile makes that set a curve: coverage \
+         reaches 1 on the centreline alone (2.77 % of the footprint) against \
+         the defect's whole quad (100 %). At the shipped 0.25 default a \
+         plateau reaches coverage 1 over a REGION legitimately, so the same \
+         reading no longer tells that from the constant alpha the arm exists \
+         to catch. Being the shipped default is what makes this the easiest \
+         line in the file to normalise away. See the file's header"
     );
     assert!(
         trails > 0.0,

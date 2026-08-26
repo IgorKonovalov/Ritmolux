@@ -408,11 +408,11 @@ at `b2fb13b`.
 | 3 — the sample sheet | dev | done | `5592e40` |
 | 4 — pick the default | human | done | verdict below |
 | 5 — flip, re-bless, repair the docs | dev | done | `707bdb8` |
-| 6 — the library is retuned | human | **outstanding — `preset-author`, does not gate 7** | |
+| 6 — the library is retuned | human | done | `619fd68` |
 | 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
 | 8 — judge against the reference | human | done | verdict below |
 | 9 — set the constant, add a baseline | dev | done | `60cf15e` |
-| 10 — the guard says so out loud | dev | **outstanding — from the Mode 4 review, does not gate 6** | |
+| 10 — the guard says so out loud | dev | done | committed with this row |
 
 ### Notes
 
@@ -427,6 +427,25 @@ Per preset, for Phase 6 to bind: `curve_ionwake` **0**, the Maurer roses **1.0**
 outcome that closes the question rather than a null result, so `MILKDROP_SOFTNESS` is unchanged
 and Phase 9's deliverable is its other half.
 
+- **Phase 10's `BEAD_SPREAD` replacement is a strictly stronger test, and the negative control is
+  what set its constant.** The done-when asked for a ratio; `BEAD_RATIO = 3.0` asserts the beaded
+  control's per-ray spread against the arc's worst, both readings printed. The floor is measured
+  rather than picked: dropping the control's `joined` flags — the regression the assertion's own
+  message names — leaves it spreading **15.8 %** against the arc's 7.9 %, a separation of
+  **2.01x**, and the passing configuration is **4.36x**. 3.0 sits between them with 1.45x either
+  way. **The retired `0.12` form passed that same regression** (15.8 % > 12 %), because a min/max
+  spread is sign-blind: an unjoined 24-gon has a gap at every vertex and reads almost as uneven as
+  a beaded one. So this is not a reformulation of an equivalent check.
+- **The ratio was confirmed adapter-stable before it was relied on**, which is what ADR-0074 asks
+  of one: 34.3 / 7.9 on the software rasterizer and 34.3 / 7.9 on this machine's hardware adapter,
+  measured by flipping `RenderContext::new_headless`'s `prefer_software` and restoring it.
+- **Phase 6's row was filled in here, by `dev`, and the phase was not `dev`'s.** It landed at
+  `619fd68` from the `preset-author` lane earlier the same day; leaving it reading `outstanding`
+  in the commit that writes this log would have recorded something known to be false.
+- **The plan doc carried an uncommitted edit from another session while this phase ran** — a
+  header note on the version bump — and it is **not** in this commit. Only the two table rows and
+  this section were staged, by patching the index rather than the file. That note is also wrong on
+  both halves, which is architect's to act on and is recorded in the close block below.
 - **Phase 1 touched two files outside its list.** `presets/README.md`, because
   `core/tests/preset.rs`'s `every_declared_param_is_documented_in_the_presets_readme` fails the
   moment a name enters a `PARAMS` roster — so `softness` is documented in the same commit that
@@ -547,24 +566,34 @@ and Phase 9's deliverable is its other half.
 
 ### Close triggers
 
-- **`presets/` touched:** `presets/README.md` only (the `softness` entry, the `glow` repair, the
-  four-lever paragraph). No `.toml` preset changed — that is Phase 6, still outstanding.
+- **`presets/` touched:** `presets/README.md` (the `softness` entry, the `glow` repair, the
+  four-lever paragraph), and at Phase 6 **six `.toml` presets** — `curve_ionwake`,
+  `curve_nightbloom`, `fragment_vitrail`, `lsystem_vellum`, `spectrum_halo`, `star_rosewindow`
+  (`619fd68`). Every one now binds `softness`; four also took a level or width trim.
 - **Plan header `Closes:`** none — the header names no `design-backlog` entry.
 - **What shipped:** feature. A new authorable line parameter (`softness`), a changed default, one
-  new golden fixture and baseline, two committed scripts.
-- **Operator docs touched:** `presets/README.md`, `docs/presets.md`.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry named.
-- **Outstanding `human` phases:** **Phase 6** — the `preset-author` retune of the five presets.
-  Phases 4 and 8 are done and their verdicts are recorded above. Phase 6 does not gate anything
-  else in this plan.
+  new golden fixture and baseline, two committed scripts, and the six-preset retune.
+- **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/capturing.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. One entry was **raised**
+  by this plan rather than convicted: **0132**, the level-statistic gap, filed from the Phase 6
+  sitting (`aedaabb`, renumbered `c6760f8`).
+- **Outstanding `human` phases:** none. Phases 4 and 8 returned verdicts, recorded above; Phase 6
+  landed at `619fd68`.
+- **Version, as facts rather than a recommendation:** this lane's `Cargo.toml` reads **`0.79.0`**
+  and no `chore: Release` commit is on the branch. **`v0.80.0` is not this plan's** — the tag sits
+  on `601293d`, directly after `e1bd171 docs(plan-0119): close`, and is an ancestor of `main` but
+  not of this branch. **No part of Plan 0114 is on `main`**: `softness` appears zero times in
+  `main`'s `renderer.rs` and `main`'s roster row still reads `approved`. The header note above
+  saying the bump was taken here states otherwise; it is not this section's to edit.
 - **Not done and deliberately:** `docs/images/gallery/`'s four line-scene renders
   (`parametric_curve`, `lsystem`, `star_pattern`, `spectrum`) show the pre-0114 stroke.
-  `scripts/docs-shots.mjs` re-shoots them and is explicitly not a CI gate. Re-shooting belongs
-  after Phase 6 or it is paid twice.
+  `scripts/docs-shots.mjs` re-shoots them and is explicitly not a CI gate. Phase 6 has now landed,
+  so the reason to defer it is discharged.
 - **For architect, not `dev` to act on:** [ADR-0124]'s Negative section gives the wrong *reason*
   for the `warp_mesh` coverage gap. It says the three fixtures "set no wave"; `wave_a` defaults to
   1.0, so all three stroke one. The cause is the 128 px capture, measured above. The conclusion
-  the ADR draws from it is correct and unaffected.
+  the ADR draws from it is correct and unaffected. **This is already carried in the ADR's dated
+  `Outcome`** — recorded here because the bullet predates it.
 
 [ADR-0124]: ../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 
