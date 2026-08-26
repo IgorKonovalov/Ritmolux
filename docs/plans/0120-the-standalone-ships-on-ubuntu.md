@@ -1,7 +1,8 @@
 # 0120 — The standalone ships on Ubuntu
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-26
+> **Approved:** 2026-08-26
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) (proposed),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
@@ -101,33 +102,65 @@ crosses into `core/`, which is what ADR-0001's split is for.
 - **Owner skill:** human
 
 This phase runs **before `dev` starts**, on the real Ubuntu 24.04 machine, and it exists because
-ADR-0131 rests on a premise this repo cannot test from Windows. It writes no code. The user runs
-these and reports the output:
+ADR-0131 rests on a premise this repo cannot test from Windows. It writes no code.
+
+**Run it with music playing at a normal volume**, from a graphical session on the target box — not
+over SSH, where there is no user sound server to talk to. Prerequisites, if absent:
+`sudo apt-get install -y pulseaudio-utils vulkan-tools`.
 
 ```sh
-echo "$XDG_SESSION_TYPE"                       # wayland or x11 — decides what Phase 6 can check
-pactl info                                     # server flavour and the default sink name
-pactl list short sources | grep -i monitor     # the monitor sources that exist
-timeout 3 parec -d @DEFAULT_MONITOR@ --raw > /tmp/mon.raw   # WITH MUSIC PLAYING
-ls -l /tmp/mon.raw && xxd /tmp/mon.raw | head  # non-zero size, and not all zero bytes
-apt-cache policy libpulse-dev libpulse0        # is the dev package installable
-vulkaninfo --summary 2>/dev/null | head -20    # which Vulkan device, if any
+# 1. Session and server identity.
+echo "session: ${XDG_SESSION_TYPE:-unknown}"
+pactl info | grep -E 'Server Name|Server Version|Default Sink'
+
+# 2. What monitor sources exist at all.
+pactl list short sources | grep -i monitor
+
+# 3. THE PREMISE: does the special name resolve, and does it carry audio?
+timeout 5 parec -d @DEFAULT_MONITOR@ --raw --format=s16le --rate=48000 --channels=2 \
+    > /tmp/mon-special.raw
+echo "special:  $(stat -c%s /tmp/mon-special.raw) bytes, \
+$(tr -d '\000' < /tmp/mon-special.raw | wc -c) non-zero"
+
+# 4. THE DISCRIMINATOR: the explicit name, same conditions.
+timeout 5 parec -d "$(pactl get-default-sink).monitor" --raw --format=s16le --rate=48000 \
+    --channels=2 > /tmp/mon-explicit.raw
+echo "explicit: $(stat -c%s /tmp/mon-explicit.raw) bytes, \
+$(tr -d '\000' < /tmp/mon-explicit.raw | wc -c) non-zero"
+
+# 5. Build and runtime prerequisites.
+apt-cache policy libpulse-dev libpulse0
+vulkaninfo --summary 2>/dev/null | head -20 || echo "vulkaninfo absent"
 ```
 
-**Done when** three questions have answers, written into this plan's `## Implementation log`:
+Steps 3 and 4 both write silence-detecting counts rather than a file size, because **a monitor
+source that resolves and delivers nothing is the failure mode this probe exists to catch** — and it
+produces a perfectly healthy-looking non-empty file. In `s16le`, silence is zero bytes; music is
+overwhelmingly not. A `special: 960000 bytes, 0 non-zero` line is a **failure**.
 
-1. **Does `@DEFAULT_MONITOR@` resolve, and does it carry audio?** `/tmp/mon.raw` is non-empty **and
-   its bytes are not all zero while music is playing.** A non-empty file of silence is a failure
-   here, not a pass — a monitor source that resolves and delivers nothing is the exact failure mode
-   this probe exists to catch.
-2. **What is the session type and the GPU?** Recorded, not acted on — Phase 6 needs to know whether
-   `D` (move to next monitor) is expected to work.
-3. **Is `libpulse-dev` installable?**
+Step 4 is what makes a failure actionable. `@DEFAULT_MONITOR@` is a PulseAudio special name and
+`<sink>.monitor` is an ordinary source, so the two probes fail for different reasons and separate
+three outcomes that a single probe would blur into one "no":
 
-**If question 1 answers no**, stop and route back to the architect. The fallback is the asynchronous
-context API reading the server's default sink name and appending `.monitor`, which is a scope change
-to ADR-0131 and a re-plan — not something `dev` improvises. This is a stop gate on purpose, on the
-Plan 0115 Phase 1 precedent.
+| Step 3 | Step 4 | What it means | What happens next |
+|--------|--------|---------------|-------------------|
+| audio | (either) | The premise holds | ADR-0131 stands as written; `dev` starts at Phase 2 |
+| silent/error | audio | The special name is unsupported here; monitor capture is fine | ADR-0131's Decision is amended to resolve the sink name at startup — the async API's `pa_context_get_server_info`. Bounded, but an ADR amendment and a re-plan of Phase 3 |
+| silent/error | silent/error | Monitor capture is not working on this box at all | Stop. The cause is likelier configuration than design, and nothing in this plan is buildable against it until that is understood |
+
+**Done when** four questions have answers, written into this plan's `## Implementation log`:
+
+1. **Does `@DEFAULT_MONITOR@` resolve and carry audio?** Step 3's non-zero count is a large fraction
+   of its byte count.
+2. **If not, does the explicit `<sink>.monitor` name?** Step 4, read against the table above.
+3. **What is the session type and the GPU?** Recorded, not acted on — Phase 6 needs to know whether
+   `D` (move to next monitor) is expected to work, and Phase 2 wants to know what a real Vulkan
+   device on this box looks like next to whatever CI resolves.
+4. **Is `libpulse-dev` installable?**
+
+**A row other than the first stops the plan and routes back to the architect.** This is a stop gate
+on purpose, on the Plan 0115 Phase 1 precedent: the repair is an ADR amendment, not something `dev`
+improvises mid-phase.
 
 ### Phase 2 — The tree compiles, lints and tests on Ubuntu
 
