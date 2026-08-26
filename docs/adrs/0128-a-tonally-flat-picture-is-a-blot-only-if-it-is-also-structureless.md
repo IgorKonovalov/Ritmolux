@@ -1,4 +1,4 @@
-# 0127 — A tonally flat picture is a blot only if it is also structureless
+# 0128 — A tonally flat picture is a blot only if it is also structureless
 
 > **Status:** proposed
 > **Date:** 2026-08-26
