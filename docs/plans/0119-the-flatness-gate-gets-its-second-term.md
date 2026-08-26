@@ -146,14 +146,26 @@ flowchart TB
   - **The conviction is a conjunction.** `every_preset_draws_a_real_shape` fails a preset only when
     `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < MIN_BOUNDARY_DENSITY`; the
     printed line carries both numbers for every preset, not only for failures.
-  - **`MIN_BOUNDARY_DENSITY = 0.31`**, and its docstring says it is a **measurement**: the midpoint
-    of `0.2631` (the frozen `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono`, measured
-    2026-08-26 at `8389f2a`), `1.18x` above the defect and `1.16x` below the composition. It names
-    its corpus and both fixtures (ADR-0071), and it states in plain words that **the conditional
-    population had two members** and that half-the-sparsest-legitimate-content was unavailable
-    because the one legitimate member is the preset being admitted. A claim of a derived floor here
-    is the exact error ADR-0129 was written to stop, and ADR-0130's first Negative names this
-    docstring as the mitigation.
+  - **The floor is `boundary_floor(system)`, not one constant** — the mechanism `coverage_floor`
+    already uses in this file. `SystemKind::ShapeCollage => 0.13`, everything else `0.31`. **A single
+    global number is provably impossible**: `Suprematist` reads `0.2565`, *below* the blot's own
+    `0.2631`, so no threshold both convicts the blot and admits a mono flat-graphic composition. See
+    ADR-0130's Context.
+  - **Each arm's docstring states its own derivation, and they are different kinds of number**
+    (ADR-0071). The `0.31` default is a **measurement**: the midpoint of `0.2631` (the frozen
+    `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono`, measured 2026-08-26 at `8389f2a`),
+    `1.18x` above the defect and `1.16x` below the composition — and it says in plain words that the
+    conditional population had two members and that half-the-sparsest-legitimate-content was
+    unavailable, because the one legitimate member is the preset being admitted. The `0.13`
+    `ShapeCollage` arm **is** half the sparsest legitimate member (`Suprematist`, `0.2565`), the
+    ordinary ceremony, and says so. A claim of a derived floor on the default arm is the exact error
+    ADR-0129 was written to stop.
+  - **The `ShapeCollage` arm's comment carries the structural reason, not a preference.** ADR-0123
+    holds that family's canvas under ADR-0046's tonemap knee and it therefore has no bloom, no glow
+    and no over-range path at all — so the additive stacking that produced `Blown Out`, and that put
+    four attractor presets into the library flat, cannot occur there. That is what distinguishes this
+    arm from the `palette_steps` exemption ADR-0129 Alternative B rejected as reachable by
+    declaration.
   - **`MAX_TONAL_FLATNESS`'s own doc comment says its meaning narrowed.** It currently argues a
     verdict from the library's distribution; after this phase it argues one of two terms, and
     ADR-0128's last Negative names that paragraph as the one that otherwise becomes the most
@@ -163,12 +175,13 @@ flowchart TB
     and the blot fixture's own test) still fail on the frames they were written for. A test asserts
     the conjunction is not vacuous: reverted to term one alone the held preset fails, and reverted to
     term two alone the blot passes — so each term is load-bearing.
-  - **The 24-of-45 exposure is printed, not left to be rediscovered.** Over half the library reads
-    below `0.31` on the structural term and is protected only by term one (ADR-0130's second
-    Negative). The per-preset line `every_preset_draws_a_real_shape` already prints carries
-    `boundary=` beside `flatness=`, and the run prints a one-line count of how many presets sit under
-    `MIN_BOUNDARY_DENSITY`, the way it already prints the flatness distribution. **It is a report,
-    not an assertion** — no threshold on that count, because there is no measured basis for one.
+  - **The exposure is printed, not left to be rediscovered.** 22 of the 42 shipped presets read below
+    their own family's floor and are protected only by term one (ADR-0130's landmine Negative). The
+    per-preset line `every_preset_draws_a_real_shape` already prints carries `boundary=` beside
+    `flatness=` **and the floor it was judged against**, and the run prints a one-line count of how
+    many presets sit under their floor. **It is a report, not an assertion** — no threshold on that
+    count, because there is no measured basis for one, and because that count is expected to move
+    as the mono cohort lands.
   - **The failure message names which term fired**, and tells an author what to do about that term
     rather than about flatness generally. For the structural term that advice is about *interior* —
     a convicted frame is a solid mass, and what it lacks is perimeter per unit lit area.
@@ -311,6 +324,35 @@ flowchart TB
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
 - **Outstanding `human` phases:**
 - **Workspace at the tip:**
+
+## The mono cohort, measured against this gate
+
+Raised 2026-08-26 while sizing the next content step, and recorded here because the numbers are this
+plan's own and a `preset-author` session should not have to re-derive them. **Converting a preset to
+a two-ink print raises `tonal_flatness` toward `1.0` and leaves `boundary` alone**, so a preset's
+`boundary` today is what decides whether its mono version passes.
+
+**These 20 survive a mono conversion** (`boundary` at or above their family's floor):
+
+| family | presets |
+|---|---|
+| `attractor` | `Thomas` 0.762, `Ink on Paper` 0.573, `Clifford` 0.463, `Leviathan` 0.406, `De Jong Gallery` 0.378 |
+| `emitter` | `Drift Field` 0.959, `Perseids` 0.619, `Ember Jet` 0.587 |
+| `fragment_field` | `Tiled Rosette` 0.637 (and the held `Tiled Rosette Mono` 0.360) |
+| `shape_collage` | `On White` 0.306, `Suprematist` 0.257 — against the `0.13` arm |
+| `reaction_diffusion` | `Etching` 0.362, `Verdigris` 0.349, `Mitosis` 0.341 |
+| others | `Vellum` 0.984, `Rose Window` 0.895, `Halo` 0.853, `Shatter` 0.847, `Pulse` 0.565, `Drift` 0.531 |
+
+**These 22 would be convicted**, and each needs its own floor arm with its own derivation before it
+can ship mono: all of `parametric_curve` (`Ion Wake` 0.150, `Nightbloom` 0.161), `shape_field`'s
+`Facet` 0.066, 12 of 17 `attractor` (`Torus Knot` 0.044 through `Barnsley Fern` 0.244), and 7 of 9
+`fragment_field` — including **`Sumi` at 0.101**, an ink wash and the most natural mono target in the
+library.
+
+**The `attractor` fork is the one to decide deliberately.** Its ceremony-derived floor is `0.0220`,
+`12x` below the blot and vacuous — and `attractor` is the family whose four flat presets
+`core/tests/sanity.rs`'s header records as the reason `tonal_flatness` was added. Mono attractors and
+blot-catching cannot both be had on this term.
 
 ## Followups (after this lands)
 
