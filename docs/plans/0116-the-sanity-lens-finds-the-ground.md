@@ -349,9 +349,9 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 | 1 — What each candidate ground would say | dev | done | `8d4a9a9` |
 | 2 — The stop gate | human | done | recorded in Phase 2's Outcome above |
 | 3 — The lens takes a ground | dev | done | `debd803` |
-| 4 — The floors are re-derived, not re-used | dev | done | `committed with this row` |
-| 5 — Adjudicate what changed | human | not started | — |
-| 6 — The emptying canvas is actually caught | dev | not started | — |
+| 4 — The floors are re-derived, not re-used | dev | done | `5d97abd` |
+| 5 — Adjudicate what changed | human | done | confirmed empty, 2026-08-26 |
+| 6 — The emptying canvas is actually caught | dev | done | `committed with this row` |
 | 7 — Documentation | dev | not started | — |
 | 8 — What separates a composition from a blot | dev | not started | — |
 | 9 — The flatness ceiling gains a second condition | dev | not started | — |
@@ -507,3 +507,42 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   the derived ground it asserts flatness still convicts and that the fixture is dense enough for the
   two lenses to actually differ. It no longer asserts the blank arm's conviction, which would pin an
   incidental consequence of a floor this phase deliberately did not move.
+
+#### Phase 5
+
+- Confirmed empty by the user on 2026-08-26. No preset changed verdict at any point in Phases 3-4;
+  `cargo nextest run --workspace` was 968 of 968 at the Phase 4 tip. One route change end to end:
+  `Pulse` (`0.4312`) stopped riding the structural rescue and now clears `shape_field`'s derived
+  floor of `0.22`. Seven presets still ride the rescue — `Ion Wake`, `Nightbloom`, `Drift Field`,
+  `Ember Jet`, `Perseids`, `Halo`, `Rose Window` — and all seven did before this plan, at identical
+  coverages.
+
+#### Phase 6
+
+- **The first fixture built was wrong and it is worth recording why, because the plan's Phase 6
+  bullet is what caught it.** A page that is bare at *both* excitations is convicted at `LOUD` by
+  `tonal_flatness` — a uniform sheet is one tone — so it would have demonstrated nothing about the
+  statistic being read at the wrong excitation. The defect ADR-0126 names needs a canvas that is
+  **composed when driven and bare when not**, which is what `pan_x = "(1 - bass) * 40"` builds: at
+  `LOUD` the drawing is centred, and as the level falls it translates off frame leaving the page.
+- **Measured, both excitations, one fixture:**
+
+  | excitation | ground | coverage | quadrants | shells | flatness |
+  |---|---|---|---|---|---|
+  | `LOUD` | `(252,250,246)` | 0.1177 | 4 | 9/10 | 0.4590 |
+  | `MODERATE` | `(253,251,247)` | **0.0000** | 0 | 0/10 | — |
+
+  Against `BLACK` the quiet frame reads `1.0000` and clears `MODERATE_MIN_COVERAGE`, which is the
+  false negative stated as a fact rather than an argument.
+- **The revert demonstration is asserted in the test rather than performed by hand.** It asserts
+  `coverage(bare, BLACK) == 1.0` and that this value passes the same sentinel the derived ground
+  fails, so substituting `BLACK` back into the predicate makes assertion (2) fail on a value the
+  test has already pinned. That is stronger than a one-time manual revert, which nothing preserves.
+- **No sparsity number was invented.** The separation asserted is `coverage == 0.0` against
+  `coverage > 0.0`: a bare ground is not sparsely covered but uncovered, because every pixel *is*
+  the ground it would be measured against. Both frames come from the same preset at two levels, so
+  the comparison is not between two authors' taste either.
+- The fixture is synthetic and inline, as the plan's 2026-08-26 note requires — Plan 0113 has not
+  merged, so no scene on this branch paints a bare canvas. It reaches a paper-white frame through
+  the attractor's `ink_*` remap, a terminal engine stage ADR-0067's backdrop suppression does not
+  reach. It carries no `time` terms, so it is a pure function of its excitation.

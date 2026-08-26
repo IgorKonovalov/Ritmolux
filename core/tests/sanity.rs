@@ -1092,6 +1092,165 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The emptying canvas (Plan 0116 Phase 6, ADR-0126)
+// ---------------------------------------------------------------------------
+
+/// **A canvas the music empties**, frozen the way [`blown_out`] and
+/// [`pre_repair_spectrum_ridge`] are frozen — an inline fixture, not a shipped
+/// preset — because the family it stands for has not merged yet.
+///
+/// [Plan 0113](../../docs/plans/0113-the-engine-paints-a-canvas.md) Phase 6
+/// builds a `shape_collage` scene whose element density falls with the level, so
+/// a quiet passage leaves bare paper. **An emptied canvas and a broken one are
+/// the same picture**, and against [`BLACK`] both read `coverage = 1.0000`: the
+/// paper is not black, so every pixel counts as lit and the frame scores as
+/// completely full. That is the false negative ADR-0126 was raised on, and it is
+/// designed-in rather than hypothetical.
+///
+/// This reaches the same state without `shape_collage`. The attractor's `ink_*`
+/// remap is a **terminal engine stage**, not a `bg_*` binding, so ADR-0067's
+/// backdrop suppression does not reach it and a paper-white frame is reachable
+/// here today — which is why `Ink on Paper` shipped reading `1.0000` for months.
+/// `pan_x` carries the drawing off frame as the level falls, so the same preset
+/// renders a composed page when driven and a bare one when not.
+///
+/// Deliberately free of `time` terms: a fixture that is a pure function of its
+/// excitation is one the reader can reason about, and the determinism rule in
+/// `CLAUDE.md` applies to test content as much as to analysis.
+fn emptying_canvas() -> Preset {
+    Preset::from_toml_str(
+        r#"
+system = "attractor"
+name   = "Emptying Canvas"
+
+[particles]
+family = "de_jong"
+
+[params]
+a = "1.641"
+b = "1.902"
+c = "0.316"
+d = "1.525"
+size = "0.60"
+fade = "0.885"
+saturation = "0.35"
+
+# The whole fixture. At full drive the drawing is centred; as the level falls it
+# translates off frame, and what is left is the page it was drawn on.
+pan_x = "(1 - bass) * 40"
+
+ink_amount   = "1"
+paper_hue    = "0.11"
+paper_sat    = "0.055"
+paper_bright = "0.985"
+ink_hue      = "0.62"
+ink_sat      = "0.35"
+ink_bright   = "0.055"
+"#,
+    )
+    .expect("the emptying-canvas fixture parses")
+}
+
+/// **Plan 0116 Phase 6.** A canvas with nothing left on it is convicted, and the
+/// predicate this gate used until Phase 3 calls the same frame completely full.
+///
+/// # Why both excitations are here
+///
+/// The gate reads `tonal_flatness` only at [`LOUD`], and at `LOUD` this canvas
+/// is at its fullest — the statistic looks exactly where the defect cannot be.
+/// The quiet capture buys one gate, [`MODERATE_MIN_COVERAGE`], and against
+/// [`BLACK`] that gate reads `1.0000` on a bare page and passes it. So the
+/// conviction has to come from the areal statistic at the *quiet* excitation,
+/// which is the one place an emptied canvas actually occurs.
+///
+/// # The separation is a property, not a threshold
+///
+/// A bare ground has **no lit pixels at all** — not few, none — because every
+/// pixel *is* the ground. A composition has some. Both frames below come from
+/// the same preset at two levels, so the comparison is not between two authors'
+/// taste, and **no number is invented for how sparse a legitimate composition
+/// may be**. That is a content judgement and this file does not make it.
+#[test]
+fn a_canvas_the_music_empties_is_convicted_and_black_calls_it_full() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let name = "Emptying Canvas";
+    renderer.set_presets(vec![without_backdrop(emptying_canvas())]);
+    let floor = coverage_floor(SystemKind::Attractor);
+
+    let composed = renderer
+        .capture_preset(name, &loud(), FRAMES)
+        .expect("capture the emptying canvas at full drive");
+    let bare = renderer
+        .capture_preset(name, &excited(MODERATE), FRAMES)
+        .expect("capture the emptying canvas at a realistic level");
+
+    let (composed_bg, bare_bg) = (ground(&composed), ground(&bare));
+    let composed_cov = coverage(&composed, composed_bg, EPS);
+    let bare_cov = coverage(&bare, bare_bg, EPS);
+    println!(
+        "[emptying canvas] at {LOUD}: ground={composed_bg:?} coverage={composed_cov:.4} \
+         (floor {floor:.2}) quadrants={} shells={}/{RADIAL_SHELLS} flatness={:.4}",
+        quadrant_spread(&composed, composed_bg, EPS),
+        radial_shell_occupancy(&composed, composed_bg, EPS),
+        tonal_flatness(&composed, composed_bg, EPS),
+    );
+    println!(
+        "[emptying canvas] at {MODERATE}: ground={bare_bg:?} coverage={bare_cov:.4} \
+         (min {MODERATE_MIN_COVERAGE:.2}) quadrants={} shells={}/{RADIAL_SHELLS}",
+        quadrant_spread(&bare, bare_bg, EPS),
+        radial_shell_occupancy(&bare, bare_bg, EPS),
+    );
+
+    // (1) The driven frame is a real composition, or the fixture is just a
+    // broken preset and convicting it demonstrates nothing about emptying.
+    assert!(
+        composed_cov >= floor && quadrant_spread(&composed, composed_bg, EPS) >= MIN_QUADRANTS,
+        "the driven frame must pass the gate, or this fixture is a broken preset rather than \
+         a canvas the music empties: coverage {composed_cov:.4} (floor {floor:.2}), {} quadrant(s)",
+        quadrant_spread(&composed, composed_bg, EPS),
+    );
+
+    // (2) The emptied frame is convicted, at the excitation where emptying
+    // actually happens.
+    assert!(
+        bare_cov < MODERATE_MIN_COVERAGE,
+        "a canvas with nothing left on it must fail the quiet-excitation sentinel: \
+         coverage {bare_cov:.4} >= {MODERATE_MIN_COVERAGE:.2}"
+    );
+
+    // (3) **The demonstration that this needed Phase 3.** Reverted onto the old
+    // predicate the same frame reads completely full and clears the same gate,
+    // so this test would pass while measuring nothing. `assert_eq` rather than a
+    // bound: the paper is uniformly not-black, so the old lens does not merely
+    // overestimate it, it saturates.
+    let bare_under_black = coverage(&bare, BLACK, EPS);
+    assert_eq!(
+        bare_under_black, 1.0,
+        "the whole premise is that a painted ground reads as a full frame against black; \
+         if this is no longer 1.0 the fixture has stopped standing for the defect"
+    );
+    assert!(
+        bare_under_black >= MODERATE_MIN_COVERAGE,
+        "against black the emptied canvas must PASS the gate that convicts it above, or \
+         Phase 3 repaired nothing: coverage {bare_under_black:.4}"
+    );
+
+    // (4) The property, stated without a threshold: the bare frame departs from
+    // its own ground nowhere, the composed one somewhere. Everything between the
+    // two is content and this file does not adjudicate it.
+    assert_eq!(
+        bare_cov, 0.0,
+        "a bare ground is not sparsely covered, it is uncovered: every pixel is the ground \
+         it would be measured against, got {bare_cov:.4}"
+    );
+    assert!(
+        composed_cov > 0.0,
+        "the composed frame must depart from its ground somewhere, got {composed_cov:.4}"
+    );
+}
 /// **The three retired ring mandalas at their honest tunings**, recovered from
 /// `git show 654304a^:presets/star_mandala.toml` (and siblings) — every
 /// `[generator]` table and every binding byte-for-byte, comments stripped and
