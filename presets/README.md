@@ -3034,15 +3034,25 @@ the ones you already know.
 
 | Key      | Values                | Notes                                                                 |
 |----------|-----------------------|-----------------------------------------------------------------------|
-| `motif`  | one of the seven names below | Required. An unknown name is a **load error** listing the legal set — the roster is closed, not extensible. |
+| `motif`  | one of the eight names below | Required. An unknown name is a **load error** listing the legal set — the roster is closed, not extensible. |
 | `count`  | `1` .. `512`          | Required. Copies around the ring. `0`, a negative, or anything over the ceiling is a load error. |
 | `radius` | number                | Required. Distance from the frame centre, in the fit-normalized world the figure lands in: it spans `+/- 0.9`, so `0.9` is the rim and anything smaller is interior. `0.0` is a single centre boss. |
 | `scale`  | number                | Motif size multiplier — close to the copy's diameter, since every outline spans about one unit. Default `0.25`. |
 | `phase`  | number (radians)      | Angular offset of copy `0`. Default `0`. Use it to stagger a ring against its neighbours. |
 
-**The closed motif roster is seven names**, picked from rendered samples at Plan
-0065 Phase 3 and closed on purpose — a look outside it routes back through
-`architect` + `dev`, it is not a preset-side extension point:
+> **`scallop` reads three of those keys differently, and it is the only member
+> that does.** It is a *boundary*, not a bead repeated around a ring, so there
+> is no copy count: `count` is its **lobe count** (floored at 3 — below that
+> there is no boundary, and a smaller number is raised rather than refused),
+> `radius` is the base circle its lobes bulge from, and `scale` is the **depth**
+> of the bulge, which is the only size a lobe has once `count` has fixed its
+> width. `phase` turns the whole boundary, as it turns every other ring. Each
+> key keeps its spirit; none of them means a copy.
+
+**The closed motif roster is eight names** — seven picked from rendered samples
+at Plan 0065 Phase 3, plus `scallop` at Plan 0087 Phase 6 — and closed on
+purpose: a look outside it routes back through `architect` + `dev`, it is not a
+preset-side extension point:
 
 | `motif`    | what it is                                                | instances per copy |
 |------------|-----------------------------------------------------------|-------------------|
@@ -3053,6 +3063,7 @@ the ones you already know.
 | `arc`      | an **open** outward-bulging arc, chord tangential; the nearest this roster comes to a scalloped boundary | **1 arc** |
 | `trefoil`  | a three-lobed rose — the densest member, and the one that reads as ornament rather than as a bead | **24 arcs** |
 | `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
+| `scallop`  | the **scalloped boundary** — one closed chain of outward-bulging arcs meeting at cusps. Not a bead: see the key note above | **1 arc per lobe** |
 
 > **Five of the seven are drawn as real curves** (Plan 0087, [ADR-0098]), and
 > the two circular ones are the cheapest members of the roster. Every arc's
@@ -3068,6 +3079,11 @@ the ones you already know.
 >   is the figure's own corners, which is why a `trefoil` still cusps three times
 >   and a `teardrop` once. Three tangent breaks where there were 36 is the
 >   remaining bead count, and it does not depend on the scale you draw at.
+> - **`scallop` is exact and needs no fit at all** — a scallop *is* a chain of
+>   circular arcs, which is what makes it a scallop and not a sine wave. At
+>   `scale = 0` every lobe is an arc of the base circle, so the boundary is a
+>   plain ring: sweeping `ring_scale` through zero passes through that rather
+>   than through anything undefined.
 > - **`diamond` and `chevron` stay sampled polylines**, which is the right
 >   primitive for them: a distance field is strictly more expensive for a
 >   straight line, and these two are nothing but straight lines.
@@ -3111,8 +3127,16 @@ rings = [
   { motif = "diamond", count = 12, radius = 0.30, scale = 0.20 },
   { motif = "petal",   count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
   { motif = "circle",  count = 24, radius = 0.70, scale = 0.13 },
+  # count = lobes, radius = the circle they bulge from, scale = the depth.
+  { motif = "scallop", count = 40, radius = 0.86, scale = 0.05 },
 ]
 ```
+
+> **The scalloped boundary is the figure the roster was missing.** Shown a ring
+> of 40 overlapping `arc` motifs faking a continuous edge side by side with the
+> real thing at Plan 0065 Phase 2, the answer was the real thing — and until
+> Plan 0087 gave the renderer an arc instance there was no way to build one.
+> `arc` is now just an open arc; reach for `scallop` when you want a boundary.
 
 #### The ring levers — and why two of them are radial
 
@@ -3120,7 +3144,7 @@ rings = [
 |---------------|---------|-------------------------------------------------------------------------------|
 | `ring_phase`  | `0`     | Turns **alternate rings in opposite directions**, in radians: ring 0 by `+phase`, ring 1 by `−phase`, and so on down the roster. Counter-rotation is the strongest ornamental gesture this geometry has. Wraps at one turn. |
 | `ring_spread` | `1`     | Multiplies every ring's `radius` about the centre — the figure opening and closing. Clamped to `0 .. 4`. |
-| `ring_scale`  | `1`     | Multiplies every motif's `scale` — the copies growing in place, without moving the rings. Clamped to `0 .. 8`. |
+| `ring_scale`  | `1`     | Multiplies every motif's `scale` — the copies growing in place, without moving the rings. On a `scallop` ring that is its lobe **depth**, so the boundary breathes between a plain circle and a deep scallop. Clamped to `0 .. 8`. |
 
 All three default to the exact identity, so **a preset that binds none of them
 draws the roster it declared**, and one that declares no `rings` is untouched by

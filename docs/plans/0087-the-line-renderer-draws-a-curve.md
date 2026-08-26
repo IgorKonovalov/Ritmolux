@@ -330,8 +330,8 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
 | 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
 | 3 — the circular motifs become arcs | dev | done | `82c031f` |
 | 4 — does it read as a curve? | human | done | verdict in the notes |
-| 5 — the general curve: a biarc chain | dev | done | committed with this row |
-| 6 — the scalloped boundary | dev | not started | |
+| 5 — the general curve: a biarc chain | dev | done | `af4f118` |
+| 6 — the scalloped boundary | dev | done | committed with this row |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
 ### Notes
@@ -513,6 +513,38 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   segments for the three fitted members and a standing note said they "still facet where the retired
   mandalas did", both of which this phase falsified. Left stale it would have been wrong for exactly
   one commit.
+
+- **Phase 6 — the plan's open "a `[generator]` key **or** roster member" is a roster member,**
+  `scallop`, the eighth. It reaches presets with **no schema change at all**: `schema.rs` builds its
+  legal-name list from `Motif::ALL` and validates `count` against a range the new member already
+  satisfies, so the phase stayed inside its stated two files. A `[generator] boundary` block would
+  have needed `core/src/preset/schema.rs` and `core/src/render/scenes/mod.rs`, both outside it.
+- **Phase 6 — `scallop` reads three ring keys with its own meaning, and it is the only member that
+  does.** A boundary is a figure, not a bead repeated around a ring, so there is no copy count:
+  `count` is the **lobe count**, `radius` the base circle the lobes bulge from, `scale` the **depth**
+  of the bulge — the only size a lobe has once `count` has fixed its width. `Motif::arcs()` returns
+  **one arc per lobe**, so `count * instances()` is the whole chain and the cap arithmetic never
+  learns that this member is a chain rather than a ring.
+- **Phase 6 — the lobes are constructed exactly, not fitted.** A scallop *is* a chain of circular
+  arcs, which is what makes it a scallop and not a sine wave, so `biarc` has nothing to approximate
+  here; the circle through a lobe's two ends and its apex has its centre on the lobe's axis by
+  symmetry, and equating the two distances gives it in one line. At `depth = 0` that centre is the
+  origin and every lobe is an arc of the base circle, so a `ring_scale` swept through zero passes
+  through a plain ring rather than through anything undefined — asserted.
+- **Phase 6 — a count below three is raised rather than refused**, to `MIN_SCALLOP_LOBES`: at one
+  lobe the chain's only arc has coincident ends and a zero sweep. The `wanted` fold that reports the
+  cap drop is raised through the same `placed_count` helper, so a raised count cannot make the drop
+  count a fiction.
+- **Phase 6 — three more `star` tests were roster-wide and had to learn the new member**: the closed
+  roster is eight names, `polyline_motifs()` excludes the scallop as it already excluded the arc and
+  chain families, and `the_declared_cost_matches_what_a_ring_emits` now asserts its invariant per
+  **placed element** (`instances() * placed_count()`) rather than per copy, which is the same
+  statement for the other seven.
+- **Phase 6 — eyeballed, and it is the figure backlog 0071 asked for.** A 24-lobe boundary at
+  `radius = 0.80`, `scale = 0.06` over a `petal` ring and a `trefoil` boss, rendered at 900x900
+  through `shot --preset-file` from a scratch preset outside the repo: one continuous scalloped edge
+  with evenly spaced cusps, no overlap and no seam. Not a done-when — Phase 7 is where a look is
+  judged — but a gross construction error would have shown here and did not.
 
 ### Close triggers
 

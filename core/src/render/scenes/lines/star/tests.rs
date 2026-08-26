@@ -336,7 +336,7 @@ fn polyline_motifs() -> Vec<Motif> {
     Motif::ALL
         .iter()
         .copied()
-        .filter(|m| m.arc_shape().is_none() && m.chain().is_none())
+        .filter(|m| m.arc_shape().is_none() && m.chain().is_none() && !m.is_scallop())
         .collect()
 }
 
@@ -447,17 +447,18 @@ fn an_absent_roster_builds_no_ornament_at_all() {
 /// that makes an unknown `motif = "..."` a load error rather than a silent
 /// fallback to whichever variant happened to be first.
 ///
-/// **The count is seven and the two cut names are checked by name** (Plan
-/// 0065 Phase 3). `star` and `triangle` were in the provisional set, so they
-/// are the two strings most likely to be written by someone working from a
-/// pre-verdict draft — they must reach the *unknown motif* error with its
-/// roster list, not silently draw something else.
+/// **The count is eight and the two cut names are checked by name** (Plan
+/// 0065 Phase 3, plus `scallop` at Plan 0087 Phase 6). `star` and `triangle`
+/// were in the provisional set, so they are the two strings most likely to be
+/// written by someone working from a pre-verdict draft — they must reach the
+/// *unknown motif* error with its roster list, not silently draw something
+/// else.
 #[test]
 fn the_motif_roster_round_trips_and_rejects_everything_else() {
     for &m in Motif::ALL {
         assert_eq!(Motif::from_name(m.name()), Some(m), "{}", m.name());
     }
-    assert_eq!(Motif::ALL.len(), 7, "the closed roster is seven motifs");
+    assert_eq!(Motif::ALL.len(), 8, "the closed roster is eight motifs");
     for bad in [
         "", "hexagon", "Circle", "crescent", "petal2", "star", "triangle",
     ] {
@@ -478,23 +479,22 @@ fn the_declared_cost_matches_what_a_ring_emits() {
 
         let mut out = Vec::new();
         let mut arcs = Vec::new();
-        build_rings(
-            &[ring(m, 1, 0.5, 1.0)],
-            RingMotion::STATIC,
-            CAP,
-            &mut out,
-            &mut arcs,
-        );
+        let spec = ring(m, 1, 0.5, 1.0);
+        build_rings(&[spec], RingMotion::STATIC, CAP, &mut out, &mut arcs);
+        // Copies for every motif but `scallop`, whose `count` is a lobe count
+        // with a floor — so the roster-wide invariant is per *placed element*,
+        // and for the other seven that is exactly one.
+        let placed = placed_count(&spec) as usize;
         assert_eq!(
             out.len(),
-            m.segments(),
-            "{}: segments in one copy",
+            m.segments() * placed,
+            "{}: segments emitted",
             m.name()
         );
-        assert_eq!(arcs.len(), m.arcs(), "{}: arcs in one copy", m.name());
+        assert_eq!(arcs.len(), m.arcs() * placed, "{}: arcs emitted", m.name());
         assert_eq!(
             out.len() + arcs.len(),
-            m.instances(),
+            m.instances() * placed,
             "{}: the budget must charge what the ring emits",
             m.name()
         );
@@ -1827,4 +1827,125 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
         worst_arc * 100.0,
         control_spread / worst_arc
     );
+}
+
+/// **Phase 6's done-when: the boundary is one closed curve whose lobe count is
+/// a parameter** — the primitive the user chose at Plan 0065 Phase 2 over a
+/// ring of overlapping `arc` motifs faking continuity (design-backlog 0071).
+///
+/// The distinction that makes it the real thing rather than the approximation
+/// is asserted here directly: consecutive lobes **share the point where they
+/// meet**, so the chain is one curve. A ring of placed copies does not — it
+/// overlaps, which is what "faking one" meant.
+#[test]
+fn the_scalloped_boundary_is_one_closed_chain_of_lobes() {
+    const BASE: f32 = 0.7;
+    const DEPTH: f32 = 0.12;
+    for lobes in [3u32, 6, 12, 40] {
+        let mut arcs = Vec::new();
+        build_rings(
+            &[ring(Motif::Scallop, lobes, BASE, DEPTH)],
+            RingMotion::STATIC,
+            CAP,
+            &mut Vec::new(),
+            &mut arcs,
+        );
+        assert_eq!(
+            arcs.len(),
+            lobes as usize,
+            "the lobe count is the parameter, and it is `count`"
+        );
+
+        // One closed curve: every lobe ends exactly where the next begins, and
+        // the last hands back to the first.
+        for k in 0..arcs.len() {
+            let (Some(a), Some(b)) = (
+                arcs.get(k).copied(),
+                arcs.get((k + 1) % arcs.len()).copied(),
+            ) else {
+                panic!("{lobes} lobes: the chain is short");
+            };
+            let (_, end) = arc_ends(&a);
+            let (start, _) = arc_ends(&b);
+            let gap = ((end[0] - start[0]).powi(2) + (end[1] - start[1]).powi(2)).sqrt();
+            assert!(gap < 1e-4, "{lobes} lobes: cusp {k} is {gap} apart");
+        }
+
+        // The cusps sit on the base circle and the apexes reach `depth` past
+        // it — which is what makes it a scallop rather than a ring or a blob.
+        for arc in &arcs {
+            let (start, _) = arc_ends(arc);
+            let cusp = (start[0] * start[0] + start[1] * start[1]).sqrt();
+            assert!(
+                (cusp - BASE).abs() < 1e-3,
+                "{lobes} lobes: a cusp left the base circle at {cusp}"
+            );
+            let mid = arc.angle_start + 0.5 * arc.angle_sweep;
+            let apex = [
+                arc.centre[0] + arc.radius * mid.cos(),
+                arc.centre[1] + arc.radius * mid.sin(),
+            ];
+            let reach = (apex[0] * apex[0] + apex[1] * apex[1]).sqrt();
+            assert!(
+                (reach - (BASE + DEPTH)).abs() < 1e-3,
+                "{lobes} lobes: an apex reached {reach}, not {}",
+                BASE + DEPTH
+            );
+        }
+    }
+}
+
+/// The boundary's two degenerate ends, which a bound `ring_scale` reaches by
+/// sweeping rather than by being asked for.
+#[test]
+fn a_zero_depth_scallop_is_the_plain_ring_and_a_short_count_is_raised() {
+    const BASE: f32 = 0.5;
+    // Depth 0: every lobe is an arc of the base circle itself, so the chain is
+    // that circle. This is what makes `ring_scale` a continuous lever on this
+    // member — a preset sweeping it through zero passes through a plain ring
+    // rather than through something undefined.
+    let mut arcs = Vec::new();
+    build_rings(
+        &[ring(Motif::Scallop, 8, BASE, 0.0)],
+        RingMotion::STATIC,
+        CAP,
+        &mut Vec::new(),
+        &mut arcs,
+    );
+    for arc in &arcs {
+        assert!(
+            (arc.radius - BASE).abs() < 1e-4 && arc_radius(arc) < 1e-4,
+            "a zero-depth lobe must be an arc of the base circle, got r = {} at {}",
+            arc.radius,
+            arc_radius(arc)
+        );
+    }
+    let total: f32 = arcs.iter().map(|a| a.angle_sweep.abs()).sum();
+    assert!(
+        (total - std::f32::consts::TAU).abs() < 1e-3,
+        "eight lobes of the base circle must sum to one turn, got {total}"
+    );
+
+    // Below three lobes there is no boundary — one lobe's two ends coincide and
+    // its sweep degenerates. `build_rings` raises the count rather than drawing
+    // nothing, and the `wanted` fold is raised with it so the drop count stays
+    // honest.
+    for count in [1u32, 2] {
+        let mut arcs = Vec::new();
+        let dropped = build_rings(
+            &[ring(Motif::Scallop, count, BASE, 0.1)],
+            RingMotion::STATIC,
+            CAP,
+            &mut Vec::new(),
+            &mut arcs,
+        );
+        assert_eq!(arcs.len(), MIN_SCALLOP_LOBES as usize, "count {count}");
+        assert_eq!(dropped, 0, "count {count}: nothing was dropped");
+        for arc in &arcs {
+            assert!(
+                arc.angle_sweep.abs() > 1e-3,
+                "count {count}: a lobe degenerated to a zero sweep"
+            );
+        }
+    }
 }
