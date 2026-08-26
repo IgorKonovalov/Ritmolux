@@ -3047,3 +3047,78 @@ form. What it buys is that the close ceremony's most-missed step stops having a 
 cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
 are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
 links are repaired or deleted — several may have been decorative from the start.
+
+## 0130 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
+
+**Raised by:** `preset-author`, at [Plan 0114](plans/0114-the-line-stroke-reads-as-a-drawn-line.md)
+Phase 6, where the retune brief's own question — *does a crisper stroke read brighter, and roughly
+by how much* — had no instrument and the lane had to write one in a scratch directory.
+**Owner if taken:** `dev`; the decode table and the call sites already exist.
+
+- **Verified 2026-08-26** — the module's one definition of luminance is on 8-bit code values:
+  `present: fn luma\(px: &\[u8\]\) -> f32 in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — it *does* linearize, for exactly one question, behind a private table:
+  `present: fn srgb_decode_lut\(\) -> &'static \[f32; 256\] in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the report's column set carries no level column:
+  `present: "preset", "bass", "mid", "treb", "onset", "anim", "cover", "rise", "fall" in: standalone/src/shot/report.rs`
+
+### The finding
+
+`core/src/render/metrics.rs` is the shared instrument for judging a rendered frame, and it answers
+*shape* questions well: `coverage`, `peak_to_mean`, `tonal_flatness`, `boundary_density`,
+`quadrant_spread`, `radial_shell_occupancy`. It answers **no level question at all**. Nothing
+reports how much light a frame carries, so "this change made the library brighter" is not a
+statement anything in this repo can produce a number for, and `shot --report` has no column for it.
+
+The reachable substitute is a mean over `luma()`, and it is in the wrong space. `luma()` is Rec.601
+weights over the stored `u8`, so it measures **gamma-encoded code value**. Trimming a preset's
+`brightness` by 30 % moves the encoded mean by about 11 %, which is close enough to nothing that a
+level match read off it lands nowhere near. Measured on `star_rosewindow` during the Phase 6 retune:
+`brightness` `1.0 → 0.70` moved the frame's encoded mean by 5 % and its **linear** light by 13 %,
+and the honest size of the profile change it was meant to offset was **1.87x**, not the 33 % the
+encoded mean reported.
+
+**The module already contains the argument against itself.** `linear_diff` decodes to linear light
+before differencing, and its doc comment says why in as many words: sRGB's transfer curve is concave,
+so a parameter easing linearly toward its target *"crosses 90 % of its pixel change early on the way
+up and late on the way down, and a symmetric `[smoothing]` entry would measure asymmetric."* That
+reasoning is not specific to a step response — it is the same reasoning for any comparison of two
+levels — but the decode is confined to `frames_to_settle` / `segment_settled` / `step_response`,
+and `srgb_decode_lut` is private. The other statistics never see it.
+
+A third symptom, minor on its own and corroborating: the sRGB decode is re-derived by hand in
+`core/src/render/ink/tests.rs` and `core/tests/transition.rs` rather than shared, because the table
+that already exists cannot be reached.
+
+### Why it matters beyond one retune
+
+Two of this project's standing rules are level claims that nothing measures.
+
+The **additive ceiling** — the first thing `references/craft.md` teaches and the failure behind most
+broken presets — is a statement about light stacking past what the tonemap can hold. `cover` sees a
+frame that has *already* blown out to a wash; it cannot see one approaching. And ADR-0124's own
+Phase 4 asked whether a crisper stroke reads brighter *because no test in this repo settles it*,
+which was true and remains true: the look gate is the right instrument for the judgement, and it
+should not also have to be the instrument for the arithmetic.
+
+The gap is invisible in the usual way. Nothing is broken, every gate is green, and the encoded mean
+produces a plausible number for anyone who does not stop to ask what space it is in — which is the
+same shape as the `thickness` dead zone this plan's own ADR records: the obvious experiment returns
+a reading, and the reading is meaningless.
+
+### The shape of a repair, not a decision
+
+Roughly: make `srgb_decode_lut` reachable inside the module, add a level statistic beside the others
+in **linear light**, and give `shot --report` a column for it. Three things want deciding rather
+than assuming, and they are why this is a note and not a plan:
+
+- **What the statistic is.** Frame-mean linear light is the simple one and is background-dominated
+  — on `star_rosewindow` the background carried enough of the frame that a 30 % source trim read as
+  3 %. Restricting to the lit set (the `coverage` predicate already defines one) made the Phase 6
+  numbers legible, but "lit" is a threshold in code space and so inherits the problem one level up.
+- **Whether a `--report` column earns its width.** The table is already nine columns, and a level
+  number with no baseline to compare against is not obviously actionable per-preset.
+- **Whether the existing statistics should move too.** Probably not — `coverage` and
+  `peak_to_mean` are threshold and ratio measures where code space is defensible, and `peak_to_mean`
+  documents its 8-bit saturation deliberately. Changing them would move blessed baselines for no
+  gain. The claim here is that the *level* question is missing, not that the shape ones are wrong.
