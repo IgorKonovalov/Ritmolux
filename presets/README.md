@@ -1604,14 +1604,16 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > retired at Plan 0075 cohort 3) and now lives in `fragment_mandala` (Banded
 > Mandala), which has no geometry to facet.
 >
-> **Plan 0087 removed that ceiling for `circle` and `arc` and not for the other
-> five.** Those two are single per-pixel arcs now, so a ring of them is round at
-> any scale and carries no vertex beads; `petal`, `teardrop` and `trefoil` are
-> still sampled outlines and still facet where the retired mandalas did. **The
-> three retired presets have not been re-judged** — that is the plan's own
-> Phase 7 — so read Rose Window's header before authoring the next rings preset,
-> and treat "a curved motif reads at ornament scale" as true of the two circular
-> members only.
+> **Plan 0087 removed that ceiling for every curved member of the roster.**
+> `circle` and `arc` became single per-pixel arcs at its Phase 3; `petal`,
+> `teardrop` and `trefoil` became **G1 arc chains** at its Phase 5 — a handful of
+> arcs that share a tangent where they meet, so the chain has no tangent
+> discontinuity for the eye to read as a corner and no sampled vertex to bead at.
+> A ring of any of the five is round at `scale = 0.13` and at full frame. Only
+> `diamond` and `chevron` are still sampled polylines, and their vertices are the
+> figure. **The three retired presets have not been re-judged** — that is the
+> plan's own Phase 7 — so read Rose Window's header before authoring the next
+> rings preset.
 
 ### `spectrum` — the frequency-axis readout (Plan 0034)
 
@@ -3045,22 +3047,30 @@ the ones you already know.
 | `motif`    | what it is                                                | instances per copy |
 |------------|-----------------------------------------------------------|-------------------|
 | `circle`   | a plain bead; the ring that reads as a dotted orbit        | **1 arc** |
-| `petal`    | a pointed oval (vesica), cusped at both ends along the radius | 24 |
-| `teardrop` | round outward, cusped inward — the only motif with an unambiguous "which way is out" | 24 |
+| `petal`    | a pointed oval (vesica), cusped at both ends along the radius | **22 arcs** |
+| `teardrop` | round outward, cusped inward — the only motif with an unambiguous "which way is out" | **16 arcs** |
 | `diamond`  | a four-vertex rhombus, long along the radius               | 4  |
 | `arc`      | an **open** outward-bulging arc, chord tangential; the nearest this roster comes to a scalloped boundary | **1 arc** |
-| `trefoil`  | a three-lobed rose — the densest member, and the one that reads as ornament rather than as a bead | 36 |
+| `trefoil`  | a three-lobed rose — the densest member, and the one that reads as ornament rather than as a bead | **24 arcs** |
 | `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
 
-> **`circle` and `arc` are drawn as real curves, and they are now the two
-> cheapest members** (Plan 0087, [ADR-0098]). Each is a single instance whose
-> stroke is a distance evaluated per pixel, so it has **no vertices at any
-> scale**: it is round at `scale = 0.13` and at full frame, and there is no
-> interior joint for a bead to sum at. Where a `circle` cost 24 segments and 24
-> additively-overlapping joints, it now costs one instance and none. The other
-> five stay sampled polylines, which is the right primitive for them — a
-> distance field is strictly more expensive for a straight line, and a `diamond`
-> and a `chevron` are nothing but straight lines.
+> **Five of the seven are drawn as real curves** (Plan 0087, [ADR-0098]), and
+> the two circular ones are the cheapest members of the roster. Every arc's
+> stroke is a distance evaluated **per pixel**, so it has no vertices at any
+> scale.
+>
+> - **`circle` and `arc` are exact**, one instance each, with no interior joint
+>   at all. Where a `circle` cost 24 segments and 24 additively-overlapping
+>   joints, it costs one instance and none.
+> - **`petal`, `teardrop` and `trefoil` are fitted G1 chains** — 22, 16 and 24
+>   arcs, against the 24, 24 and 36 segments they were. Consecutive arcs share a
+>   tangent, so a chain has no corner where its pieces meet; what it *does* keep
+>   is the figure's own corners, which is why a `trefoil` still cusps three times
+>   and a `teardrop` once. Three tangent breaks where there were 36 is the
+>   remaining bead count, and it does not depend on the scale you draw at.
+> - **`diamond` and `chevron` stay sampled polylines**, which is the right
+>   primitive for them: a distance field is strictly more expensive for a
+>   straight line, and these two are nothing but straight lines.
 >
 > [ADR-0098]: ../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
 
@@ -3073,9 +3083,11 @@ the ones you already know.
 **The instance budget, and what happens when you exceed it.** A ring costs
 `count × instances-per-copy`, and the interlace adds `2n` on top. Segments and
 arcs share **one** ceiling — **20 000** at the floor tier, 60 000 at rich — so the
-four-ring mandala roster at `36 + 12×4 + 18×24 + 24×1 = 540` plus a 24-segment
-interlace uses under 3 % of it. (That roster cost 1 092 before Plan 0087; the
-24-copy `circle` ring fell from 576 segments to 24 arcs.) Two things to know:
+four-ring mandala roster at `24 + 12×4 + 18×22 + 24×1 = 492` plus a 24-segment
+interlace uses under 3 % of it. (That roster cost 1 092 before Plan 0087: its
+`circle` ring fell from 576 segments to 24 arcs at Phase 3, and its `trefoil` and
+`petal` rings from 36 and 432 segments to 24 and 396 arcs at Phase 5.) Two things
+to know:
 
 - **Truncation at the cap is silent.** The build stops emitting and nothing warns
   you — no load error, no `--report` column. The figure simply ends part-way

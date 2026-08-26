@@ -36,7 +36,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::super::Scene;
-use super::renderer::{LineRenderer, SegmentInstance};
+use super::biarc::Piece;
+use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
     ViewTransform, curves, replicate_mirror,
@@ -90,6 +91,19 @@ pub struct ParametricCurveScene {
     /// Reused buffer for the single (pre-mirror) sampled curve, replicated into
     /// [`segments`](Self::segments) by [`replicate_mirror`]. Preallocated.
     single_buf: Vec<SegmentInstance>,
+    /// [`segments`](Self::segments)' arc half, and its pre-mirror source — the
+    /// G1 chain a **smooth** walk is fitted to (ADR-0098, Plan 0087 Phase 5).
+    /// Both empty for a chord web, which is every shipped `d`, so that preset
+    /// draws exactly the segment batch it always did.
+    arcs: Vec<ArcInstance>,
+    single_arcs: Vec<ArcInstance>,
+    /// The fit's three scratch buffers: the sampled walk, the chain it fits,
+    /// and each piece's place along the walk. Fields rather than locals because
+    /// the fit runs every frame and must not allocate (ADR-0007's parametric
+    /// build model gives it no load moment to run at).
+    points: Vec<[f32; 2]>,
+    pieces: Vec<Piece>,
+    walk: Vec<f32>,
     /// The active tier's segment ceiling
     /// ([`TierConfig::max_segments`](crate::render::TierConfig::max_segments)),
     /// resolved once at construction (Plan 0044). A field rather than a constant
@@ -143,6 +157,11 @@ impl ParametricCurveScene {
             renderer,
             segments: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
+            arcs: Vec::with_capacity(max_segments),
+            single_arcs: Vec::with_capacity(max_segments),
+            points: Vec::with_capacity(max_segments),
+            pieces: Vec::with_capacity(max_segments),
+            walk: Vec::with_capacity(max_segments),
             max_segments,
             mirror_overflow: None,
             family: CurveFamily::MaurerRose,
@@ -173,6 +192,68 @@ impl ParametricCurveScene {
             pan_y: DEFAULT_PAN,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
+        }
+    }
+}
+
+impl ParametricCurveScene {
+    /// Split the fitted chain into the two instance buffers the renderer draws,
+    /// colouring each piece by **where it sits along the walk**.
+    ///
+    /// The walk position is what the fit reports, not the piece's index: a
+    /// piece spans as many samples as the budget allowed, so the `k`th piece is
+    /// not the `k`th chord and an index would run the palette at the wrong rate
+    /// — visibly, wherever the fit's pieces are uneven, which is everywhere a
+    /// rose's curvature changes. `samples` stays the divisor for the reason
+    /// [`color_along_path`] gives: a chord's place on the curve belongs to the
+    /// curve, so a `draw_progress` reveal draws the gradient on rather than
+    /// re-tinting it.
+    fn split_pieces(&mut self, samples: usize, ramp: ColorRamp, color: [f32; 3], width: f32) {
+        self.single_buf.clear();
+        self.single_arcs.clear();
+        let span = samples.saturating_sub(1).max(1) as f32;
+        let last = self.pieces.len().saturating_sub(1);
+        for (k, piece) in self.pieces.iter().enumerate() {
+            let color = self
+                .walk
+                .get(k)
+                .map_or(color, |at| ramp.at(&self.palette, at / span));
+            match *piece {
+                Piece::Arc {
+                    centre,
+                    radius,
+                    start,
+                    sweep,
+                } => self.single_arcs.push(ArcInstance {
+                    centre,
+                    radius,
+                    angle_start: start,
+                    angle_sweep: sweep,
+                    color,
+                    width,
+                }),
+                Piece::Line { a, b } => {
+                    // A chain is a chain (ADR-0041): every piece but the walk's
+                    // two ends continues a neighbour, across a corner as much
+                    // as along a curve — the join is what covers the wedge
+                    // between two strokes, and a corner is where there is one.
+                    let mut joined = 0;
+                    if k > 0 {
+                        joined |= JOINED_A;
+                    }
+                    if k < last {
+                        joined |= JOINED_B;
+                    }
+                    self.single_buf.push(SegmentInstance {
+                        a,
+                        b,
+                        color,
+                        width,
+                        alpha: 1.0,
+                        joined,
+                    });
+                }
+            }
         }
     }
 }
@@ -341,27 +422,46 @@ impl Scene for ParametricCurveScene {
         let color = ramp.at(&self.palette, 0.0);
         let width = super::half_width(self.thickness);
 
+        let params = curves::RoseParams {
+            n: self.n,
+            d: self.d,
+            phase: self.phase,
+            radial_offset: self.radial_offset,
+            samples,
+            scale: self.scale,
+            rotation,
+            draw_progress: self.draw_progress,
+            color,
+            width,
+        };
+
         // Sample the single curve, then replicate it under the geometry mirror
         // (Phase 4). At the default identity spec this is a 1:1 copy, so an
         // un-mirrored preset is unchanged.
-        match self.family {
-            CurveFamily::MaurerRose => curves::maurer_rose(
-                curves::RoseParams {
-                    n: self.n,
-                    d: self.d,
-                    phase: self.phase,
-                    radial_offset: self.radial_offset,
-                    samples,
-                    scale: self.scale,
-                    rotation,
-                    draw_progress: self.draw_progress,
-                    color,
-                    width,
-                },
-                &mut self.single_buf,
+        //
+        // **Two primitives, one walk** (Plan 0087 Phase 5). A *smooth* Maurer
+        // walk — a small angular step, where the successive points trace a rose
+        // rather than web it — is fitted to a G1 arc chain and drawn without a
+        // tangent break anywhere. A chord web declines the fit and takes the
+        // path below, which is untouched: the chords **are** that figure, and
+        // an arc through two of them would be drawing something else.
+        let fitted = match self.family {
+            CurveFamily::MaurerRose => curves::maurer_rose_pieces(
+                params,
+                &mut self.points,
+                &mut self.pieces,
+                &mut self.walk,
             ),
+        };
+        if fitted {
+            self.split_pieces(samples, ramp, color, width);
+        } else {
+            match self.family {
+                CurveFamily::MaurerRose => curves::maurer_rose(params, &mut self.single_buf),
+            }
+            self.single_arcs.clear();
+            color_along_path(&mut self.single_buf, &self.palette, ramp, samples);
         }
-        color_along_path(&mut self.single_buf, &self.palette, ramp, samples);
         let mirror = MirrorSpec::from_params(self.mirror_order, self.mirror_reflect);
         if mirror.is_identity() {
             // Identity spec: replication would copy the whole segment set into a
@@ -374,6 +474,7 @@ impl Scene for ParametricCurveScene {
                 "the sampler already clamps to the cap, so identity cannot truncate"
             );
             std::mem::swap(&mut self.single_buf, &mut self.segments);
+            std::mem::swap(&mut self.single_arcs, &mut self.arcs);
             self.mirror_overflow = None;
             return;
         }
@@ -383,6 +484,12 @@ impl Scene for ParametricCurveScene {
             self.max_segments,
             &mut self.segments,
         );
+        // The arcs replicate under the same spec and against their own share of
+        // the cap: whatever the segments left. One budget over both kinds, the
+        // way `star_pattern` charges them (ADR-0098).
+        let arc_cap = self.max_segments.saturating_sub(self.segments.len());
+        let arc_dropped = replicate_mirror(&self.single_arcs, mirror, arc_cap, &mut self.arcs);
+        let dropped = dropped + arc_dropped;
         self.mirror_overflow = (dropped > 0).then_some(CapOverflow {
             dropped,
             context: OverflowContext::Mirror(mirror.order),
@@ -404,7 +511,7 @@ impl Scene for ParametricCurveScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer.borrow_mut().draw(
+        self.renderer.borrow_mut().draw_arcs(
             queue,
             encoder,
             view,
@@ -413,6 +520,7 @@ impl Scene for ParametricCurveScene {
             self.softness,
             xform,
             &self.segments,
+            &self.arcs,
         );
     }
 }
