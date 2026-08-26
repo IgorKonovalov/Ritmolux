@@ -1,16 +1,25 @@
 # 0119 — The flatness gate gets its second term
 
-> **Status:** in-progress 2026-08-26
+> **Status:** done 2026-08-26 — five phases, five commits (`8389f2a`, `53d3e8b`, `26b20b3`,
+> `7b552f7`, `40398d4`). Mode 4 review: **no blockers, one major, four minor.** Verified against a
+> live run rather than the log — `cargo nextest run --workspace` 995 passed / 5 skipped, `fmt` and
+> `clippy --workspace --all-targets` clean, and every calibration number re-measured: the frozen
+> `HELD_OUT_TOML` is byte-identical to `26b20b3^:presets/pending/fragment_tiledmono.toml` and to
+> the shipped copy, `Tiled Rosette Mono` reads `flatness 0.9413 / boundary 0.3602 / coverage
+> 0.4952`, `Suprematist` `0.2565`, `On White` `0.3064`, and the gate prints exactly the 22-of-43
+> exposure the plan claims. The major: `boundary_density`'s reading scales with the capture
+> resolution and neither it nor `boundary_floor` names the 96x96 it was measured at — filed as
+> [design-backlog 0130](../../design-backlog.md).
 > **Created:** 2026-08-26
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+> **Related ADRs:** [0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
 > (**the term that ships**, written at Phase 2 on Phase 1's measurement),
-> [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
+> [0129](../../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
 > (the stop condition, which stands — its Decision is superseded and it carries a dated `Outcome`),
-> [0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+> [0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 > (the conjunction this implements — its Decision stands, its mechanism did not),
-> [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> [0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Ships:** `presets/pending/fragment_tiledmono.toml` into the curated set, or explains in a dated
 > `Outcome` why it stays held.
 
@@ -20,7 +29,7 @@
 **and** below the second term's threshold. Phase 1 measured four candidates against ADR-0129's
 three-part stop condition, and **Phase 2 chose `boundary`** — perimeter over lit area, the control
 ADR-0129 rejected — not the tiled statistic that ADR proposed. See
-[ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+[ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
 for why, and ADR-0129's dated `Outcome` for what its own measurement falsified. Phases 3-5 implement
 the conjunction, ship the held preset, and sweep the docs.
 
@@ -112,7 +121,7 @@ flowchart TB
     run.** This is a real outcome and it has now happened twice; it is not a failure of the plan.
 - **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at
   `MIN_BOUNDARY_DENSITY = 0.31`, not the tiled statistic. The reason, in full, is
-  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
+  [ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
   ADR-0129 keeps its corrected stop condition, takes a dated `Outcome`, and has its Decision
   superseded. In one paragraph: conditioned correctly the population is two members and criterion 2
   is inert, so **three** of the four candidates separate — the conditioning error was not hiding a
@@ -129,7 +138,7 @@ flowchart TB
 
 - **Owner skill:** dev
 - **Depends on:** Phase 2, which decided *continue on the control*. The term is
-  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s
+  [ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s
   `boundary`, **not** the tiled statistic — read that ADR before starting.
 - **Files touched:** `core/src/render/metrics.rs` (`boundary_density` moves next to
   `tonal_flatness`), `core/tests/sanity.rs`.
@@ -210,7 +219,7 @@ flowchart TB
   - **The preset's own header stops naming a blocker that no longer exists.** It records what held it
     and what released it, in the shape `presets/pending/README.md` requires of an entry — an entry
     leaves as soon as its blocker lifts, and a stale blocker in a shipped preset's header is the
-    class of comment [Plan 0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
+    class of comment [Plan 0118](../0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
     about. **It also carries the one line that makes it un-editable-by-accident**: this preset's
     frame is a calibration anchor for `MIN_BOUNDARY_DENSITY`, and re-tuning it re-opens that
     constant.

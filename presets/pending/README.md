@@ -33,7 +33,7 @@ the table below.
 
 ### What left, and why the record is worth keeping
 
-`fragment_tiledmono.toml` shipped on 2026-08-26 ([Plan 0119](../../docs/plans/0119-the-flatness-gate-gets-its-second-term.md)
+`fragment_tiledmono.toml` shipped on 2026-08-26 ([Plan 0119](../../docs/plans/done/0119-the-flatness-gate-gets-its-second-term.md)
 Phase 4) after being held from Plan 0113. It is the only entry this directory has ever had, and its
 history is the argument for the directory existing.
 

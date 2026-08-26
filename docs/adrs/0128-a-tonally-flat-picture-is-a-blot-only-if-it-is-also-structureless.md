@@ -1,8 +1,12 @@
 # 0128 — A tonally flat picture is a blot only if it is also structureless
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-26 (Plan 0119), two Outcomes — the first records that Plan 0116
+> could not implement it, the second that Plan 0119 did
 > **Date:** 2026-08-26
-> **Related plan(s):** [0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phases 8-9
+> **Related plan(s):** [0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phases 8-9,
+> [0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md) (which implemented it)
+> **Implemented by:** [ADR-0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+> — the statistic the conjunction needed
 > **Relates to:** [ADR-0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
 > (the decision this completes — 0126 re-bases *which pixels are the figure*, this one fixes *what
 > the figure's tonal spread is allowed to mean*), [ADR-0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
@@ -195,3 +199,28 @@ nothing measured here made A, B, C or D viable, and the duotone arithmetic in th
 reproduced exactly. What is falsified is the implicit premise that *some* structural statistic over
 the lit mask separates the two cases. A future attempt starts from the fringe mechanism above, not
 from this roster.
+
+## Outcome (2026-08-26, second) — the decision is implemented, on the axis this ADR's first Outcome ruled out
+
+[Plan 0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md) shipped the conjunction.
+`every_preset_draws_a_real_shape` convicts a preset only when `tonal_flatness > MAX_TONAL_FLATNESS`
+**and** `metrics::boundary_density < boundary_floor(system)`, and `fragment_tiledmono` is in the
+embedded set. **The Outcome above is superseded in its verdict and kept for its measurement** — the
+numbers in its table are correct and not one of them moved.
+
+What moved is the population they were judged against.
+[ADR-0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) found that
+the stop condition had been evaluated over the whole library, when a conjunction's second term is
+only ever asked about frames that already failed the first. Conditioned that way the calibration
+population has two members, and three of the four candidates separate — including `boundary`, the
+first row this ADR's own table marked **no**.
+
+The reading to carry forward is not about blots. **A candidate for the second term of a conjunction
+must be judged over the frames the first term admits to it, and judging it over the whole population
+is how a working candidate is discarded.** That rule is ADR-0129's, it is the whole of what survived
+that ADR, and it is why this one took two attempts and three ADRs to deliver a statistic that had
+been written and measured the entire time.
+
+The statistic, the two floors and the price — a 1.37x margin and 22 of 43 shipped presets held out
+of conviction by term one alone — are
+[ADR-0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s.

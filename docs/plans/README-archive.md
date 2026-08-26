@@ -13,6 +13,65 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0119 — The flatness gate gets its second term](done/0119-the-flatness-gate-gets-its-second-term.md)
+  — closed 2026-08-26. Five phases, `8389f2a`..`40398d4`, on `main` in the primary
+  worktree. Review: **no blockers, one major, four minors.** Version **0.80.0** (minor:
+  `metrics::boundary_density` is new production code and one preset joined the embedded
+  set, 42 → 43).
+
+  **What landed.** `tonal_flatness` stopped being a verdict and became one of two terms.
+  `every_preset_draws_a_real_shape` convicts only when a frame is over `MAX_TONAL_FLATNESS`
+  **and** under `boundary_floor(system)` on `metrics::boundary_density` — perimeter over lit
+  area. `fragment_tiledmono` shipped after two plans held, and its frame is frozen into
+  `sanity.rs` as the composition-side calibration anchor. ADR-0128 took a second dated
+  `Outcome` and was accepted; ADR-0129 was accepted with its Decision superseded; ADR-0130
+  carries the term that ships.
+
+  **The finding that unblocked three ADRs is not about blots.** ADR-0129's *secondary*
+  correction — that a conjunction's second term is judged only over the frames the first term
+  admits to it — was the whole of it. Conditioned that way, three of the four candidates
+  separate, including `boundary`, which Plan 0116 Phase 8 had recorded as failing. Not one
+  reading moved; only the population they were judged against did. ADR-0129's *primary* claim
+  (that the pixel-scale axis was wrong and a composition-scale statistic was needed) was
+  falsified by its own instrument, along with its thin-stroke Positive — the three frozen
+  `retired_mandalas` read `0.0000` at every grid in the sweep and `0.87`–`0.96` on `boundary`.
+
+  **Pre-registration earned its keep.** The plan's Risks section wrote *"a constant that only
+  works at one tile count is a fitted number"* before the numbers existed; the sweep then
+  flipped verdict between `tile@4` and `tile@6` with no plateau above it, and that is what
+  decided Phase 2 against the tiled statistic. Keep the habit.
+
+  **`dev` caught the plan's own arithmetic.** Phase 3's non-vacuity done-when asked for a test
+  showing that "reverted to term two alone **the blot passes**". False on the term that shipped
+  — `Blown Out` reads `boundary 0.2631` under a `0.31` floor, so term two alone convicts it.
+  `dev` substituted a shipped preset under its floor (`Sumi`, `flatness 0.2075` / `boundary
+  0.1008`) as the witness that a structure-only gate convicts legitimate content, which is what
+  the clause was reaching for. Deviation logged, and correct.
+
+  **The review re-measured rather than graded the log.** `cargo nextest run --workspace` 995
+  passed / 5 skipped; `fmt` and `clippy --workspace --all-targets` clean; the frozen
+  `HELD_OUT_TOML` verified byte-identical to `26b20b3^:presets/pending/fragment_tiledmono.toml`
+  *and* to the shipped copy; and every calibration number re-read off a live gate run —
+  `Tiled Rosette Mono` `0.9413 / 0.3602 / coverage 0.4952`, `Suprematist` `0.2565`, `On White`
+  `0.3064`, and the exposure printing exactly `22 of 43`.
+
+  **The major.** `boundary_density` is a perimeter count over an area count, so it scales as
+  ~1/L with capture resolution — the same figure at 192x192 reads about half. Both floors were
+  measured only at `SIZE = 96`, and neither the now-`pub` function nor `boundary_floor` names
+  that capture, where `radial_shell_occupancy` three doc-comments away names its 96x96 three
+  times. No test at the development configuration can see it, because the gate only ever runs
+  at 96. Filed as design-backlog 0130.
+
+  **What outlived the plan.** design-backlog 0128 stays live, half-discharged: its titular
+  claim is delivered, its full-coverage residue (`Sumi`, `Whorl`, `Supernova`, `Neon Tunnel`
+  reading honest `coverage` near 1.0) is not, and one of its own probes was reading green on a
+  dead claim — repaired at this close. The landmine ADR-0130 records is real and unaddressed:
+  22 of 43 shipped presets sit under their family's floor and pass on term one alone, so the
+  mono-conversion cohort the plan sizes needs a per-family floor arm each, and for `attractor`
+  the ceremony-derived number is `0.0220`, `12x` below the blot and vacuous. New:
+  design-backlog 0130 (the resolution coupling) and 0131 (`shot --report` truncates preset
+  names at 14 characters, and this plan shipped the library's first collision).
+
 - [0113 — The engine paints a canvas](done/0113-the-engine-paints-a-canvas.md)
   — closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`. Phases 1-8 ran in the
   `lmv-plan-0113` worktree on `plan-0113-shape-collage` and merged at `b20ba21`; 6b, 9 and
