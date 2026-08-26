@@ -353,7 +353,7 @@ at `b2fb13b`.
 | 4 — pick the default | human | done | verdict below |
 | 5 — flip, re-bless, repair the docs | dev | done | `707bdb8` |
 | 6 — the library is retuned | human | **outstanding — `preset-author`, does not gate 7** | |
-| 7 — the MilkDrop comparison set | dev | done | committed with this row |
+| 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
 | 8 — judge against the reference | human | **next — this session stops here** | |
 | 9 — set the constant, add a baseline | dev | not started | |
 
