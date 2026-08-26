@@ -287,8 +287,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — The fourth candidate joins the table | dev | done | `8389f2a` |
 | 2 — The stop gate | human | decided: continue on the control | `53d3e8b` |
-| 3 — The gate takes two terms | dev | done | committed with this row |
-| 4 — The preset ships | dev | | |
+| 3 — The gate takes two terms | dev | done | `26b20b3` |
+| 4 — The preset ships | dev | done | committed with this row |
 | 5 — Documentation | dev | | |
 
 ### Notes
@@ -305,7 +305,20 @@ flowchart TB
   `Blown Out` 0.9154 / 0.2631. The witness is named in a constant with a comment saying it is a
   witness and not a fixture, and how to replace it.
 - **The exposure count read 22 of 42**, matching ADR-0130's landmine Negative. The full list is
-  printed by `every_preset_draws_a_real_shape` on every run and is unasserted, per the phase.
+  printed by `every_preset_draws_a_real_shape` on every run and is unasserted, per the phase. It
+  reads 22 of 43 after Phase 4, the shipped preset being above its floor.
+- **Phase 4's "the header stops naming a blocker" was vacuous as written.** The preset's own header
+  never named one — the blocker lived only in `presets/pending/README.md`'s table, though that
+  README's own rule is that an entry "needs a named blocker, recorded in the preset's own header".
+  The rest of that done-when is what landed: the header now records what held it, what released it,
+  and the calibration-anchor warning.
+- **The frozen anchor and the shipped copy were checked to agree, not assumed to.** Both read
+  `tonal_flatness 0.9413` and `boundary_density 0.3602`; the shipped copy reads `coverage 0.4952`,
+  the number the plan's Context recorded. The frozen literal is comment-stripped and its `name` is
+  suffixed `(frozen)` — the suffix is load-bearing now that the preset ships, because
+  `each_structure_candidate_is_tabled_against_the_library` pushes the anchor alongside
+  `sanity_roster()`, and two presets of one name are not addressable by
+  `Renderer::capture_preset`.
 - **Phase 2 decided *continue on the control*, 2026-08-26.** `boundary` ships as the second term,
   not the tiled statistic. Per the phase's own routing that needs a superseding note on ADR-0129
   before Phase 3, so the plan is with `architect`; the reason belongs in that note and is not
