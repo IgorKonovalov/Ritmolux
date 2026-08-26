@@ -136,6 +136,24 @@ samples       = "500"
 # 1.0 is the thinnest CONTINUOUS line available, and it reads as lace that sits
 # back into the vault rather than as leading laid over it.
 thickness     = "1.0 + clamp(treb * 0.55, 0, 0.35)"
+# THE WINDOW KEEPS THE OLD PROFILE, DELIBERATELY - do not "fix" it to the 0.25
+# default. Plan 0114's look gate named 1.0 for the Maurer roses and this layer
+# is one, for the same reason `curve_nightbloom` is: crossing chords read as
+# lace only while each thread is a bright centre in a dim skirt.
+#
+# It carries an extra reason the solo rose does not. This figure hangs OVER a
+# processed vault, and the whole join depends on it sitting BACK into that
+# ground - the thickness comment above is a long record of getting exactly that
+# balance, landing on 1.0 as "lace that sits back into the vault rather than
+# leading laid over it". A solid core is precisely leading laid over it: same
+# geometry, same brightness, more of the footprint at full coverage, and the
+# window steps forward off the vault it is supposed to be set into.
+#
+# And as on the solo rose, the range below is not really there - a ~2 px stroke
+# is all edge floor, and Phase 3 measured this file drawing 0.00 and 0.25
+# byte-identically at BOTH sizes. Buying range means thickness, and the comment
+# above is why thickness is not available.
+softness      = "1.0"
 brightness    = "1.15 + clamp(treb * 0.41, 0, 0.35)"
 glow          = "0.25"
 scale         = "0.80"

@@ -43,8 +43,31 @@ kaleido_zoom   = "time * 0.07 + clamp(bass * 0.35, 0, 0.3)"
 kaleido_inner  = "0.1"
 
 thickness  = "3.2 + clamp(bass * 1.3, 0, 1.1) + beat * 0.5"
-glow       = "1.25"
-brightness = "1.0 + clamp(mid * 0.47, 0, 0.4)"
+# THE LEADING IS SOLID. Plan 0114's look gate left this world to the content
+# lane rather than naming a number, and the verdict is 0.25 - the library
+# default, bound explicitly because it is a judgement about this figure and
+# should not move silently if the default moves again. It is the opposite case
+# to the Maurer roses, which keep 1.0: those are 720 fine crossing chords where
+# a falloff is what stops a crossing reading as a mat. This is a dozen BOLD
+# chords at 3.2 - a 12 px stroke at 1080p - and there the old profile spent ten
+# of those pixels on a gradient, which is the case the plan was opened over.
+# Leading in a window is a drawn band, so it gets one.
+#
+# The bottom of the range was rejected on a render rather than skipped: at 0.00
+# the chords read as flat tape, and the shoulder 0.25 leaves is what keeps them
+# reading as glass with light behind it rather than as a sticker.
+softness   = "0.25"
+# TRIMMED FOR THAT STROKE. This world moved the most of the six - a solid core
+# more than doubles the light its figure carries at the same bindings (17.1 to
+# 35.2 per-mille linear over the lit set, at the sheet stimulus), because the
+# whole gradient became coverage. Nothing clips - checked at a held beat, peak
+# 163 either way, the tonemap absorbs it - so this is a level judgement and not
+# a ceiling repair, and it is deliberately a TRIM and not a restoration: paying
+# all of it back needs about a 60% cut, which drops the peak to 133 and draws a
+# window dimmer than the one that was judged. Glow off a quarter and the level
+# term off a tenth lands at 29.5, and the rings read as leaded glass again.
+glow       = "0.95"
+brightness = "0.88 + clamp(mid * 0.41, 0, 0.35)"
 
 # EVERY BEAT LANDS A NEW PANE OF GLASS: the hue latches to a seeded position
 # on each beat, the short trail holds the outgoing colour while the rings

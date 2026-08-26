@@ -72,8 +72,25 @@ trails = "0.93"
 # small continuous term keeps a dim spiral breathing under the rings so
 # silence is never a black frame.
 thickness  = "2.6"
-glow       = "1.15"
-brightness = "0.38 + (noise(time * 0.6) - 0.5) * 0.16 + beat * 1.0"
+# THE STROKE IS SOLID, and on this world that is a statement about the tunnel
+# rather than about the flower. Plan 0114's look gate named `0` here
+# specifically, against a library default of 0.25. The reason is the feedback:
+# every frame's figure becomes the next frame's echo, so a stroke whose light
+# falls off across its whole half-width deposits a smear that the outward rush
+# smears again, and the ring the beat is supposed to stamp arrives already soft.
+# A solid core stamps a crisp ring and the echoes stay countable as they travel.
+softness   = "0"
+# TRIMMED FOR THAT STROKE, and this is the retune half of Plan 0114 Phase 6.
+# A solid core carries more light at the same bindings because more of the
+# footprint sits at full coverage - measured on this file, the same frame goes
+# 10.8 to 16.8 per-mille of linear light between softness 1.0 and 0. Glow and
+# the level term come down about a third between them, which lands it at 13.4:
+# not the old number, because part of that light IS the crisper stroke and
+# spending it all back would draw a thinner figure than the one that was judged.
+# What the trim buys back is the header's dark water between echoes, which the
+# untrimmed solid deposit had begun to fill in.
+glow       = "0.95"
+brightness = "0.32 + (noise(time * 0.6) - 0.5) * 0.14 + beat * 0.85"
 
 # A two-tone band riding a cyan-to-magenta ramp - wider than the first draft
 # but still a BAND, not the whole wheel (the add-blend wash trade): the braid

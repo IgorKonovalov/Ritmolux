@@ -57,6 +57,22 @@ zoom    = "1.06"
 # palette only shows if the crossings stay under the ceiling - at brightness
 # 0.92 the lace rendered white-pink with every stop washed out (measured).
 thickness  = "1.5 + clamp(treb * 0.83, 0, 0.5) + beat * 0.25"
+# THIS WORLD KEEPS THE OLD PROFILE, DELIBERATELY - do not "fix" it to the 0.25
+# default. Plan 0114 made the stroke's cross-section authorable and its look
+# gate named 1.0 for the Maurer roses by name, this file among them. The
+# quadratic falloff across the whole half-width is what lets 720 crossing
+# chords read as a LACE: each thread is a bright centre inside a dim skirt, so
+# a crossing sums two skirts and stays legible, where 720 solid-core threads
+# sum to a mat. It is the same argument the thickness comment above makes, one
+# derivative up - and it is why this file is held DOWN at 1.5 rather than being
+# drawn bolder.
+#
+# There is a second, duller reason it could not go much lower anyway: at 1.5
+# the stroke is about two pixels, and the one-pixel edge floor is then the
+# whole ramp. Phase 3 measured it - at 1280x800 this preset draws softness 0.00
+# and 0.25 byte-identically. Wanting range here means spending thickness, and
+# thickness is exactly what the lace cannot afford.
+softness   = "1.0"
 glow       = "0.85"
 brightness = "0.32 + clamp(mid * 0.24, 0, 0.2)"
 
