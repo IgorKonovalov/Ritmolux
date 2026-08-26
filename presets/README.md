@@ -314,12 +314,12 @@ preset folder — so while you are editing a file it re-rolls on each save.
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` `star_valley` `star_curve` `star_jitter` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
@@ -1418,6 +1418,25 @@ instead of along the whole point.
   > stippled, check the magnitude against the 1.5–3.2 the shipped line presets use
   > before suspecting sample count or geometry density. Nothing warns
   > ([backlog 0098](../docs/design-backlog.md)).
+- `softness` — the **shape of the stroke across its width**, `0` to `1`, default
+  `1.0`. At `1.0` brightness starts falling at the centreline and reaches zero
+  only at the stroke edge, which is what these scenes have always drawn: a 14 px
+  line is a 4 px spine inside a 10 px gradient. Lowering it adds a **solid
+  plateau** — `0.5` makes the inner half of the stroke solid and ramps across the
+  outer half; `0` is a solid stroke with a **one-pixel** antialiased edge. That
+  edge is one pixel of the render target at any resolution and any aspect, so a
+  low `softness` reads the same on a laptop panel and on a 4K screen.
+
+  > **It is coverage, where `glow` is light.** `softness` changes how much of the
+  > stroke's footprint is lit; `glow` changes how bright the lit part is. Reach
+  > for `softness` when the figure reads *blurred*, for `glow` when it reads *too
+  > bright*, and for `thickness` when it is the wrong weight.
+  >
+  > **Below about two pixels of stroke there is no room for an edge**, so
+  > `softness` stops doing anything there and the stroke is drawn at the `1.0`
+  > profile whatever it asks for. That is the same regime as the `thickness` dead
+  > zone above, one derivative up.
+
 - `glow` — the line renderer's **per-segment falloff** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
   four. It scales the shader's core-to-edge term straight into the stroke colour:

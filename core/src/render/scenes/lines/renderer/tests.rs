@@ -941,6 +941,7 @@ fn arc_capture(
         &view,
         ARC_ASPECT,
         1.0,
+        super::super::DEFAULT_SOFTNESS,
         ViewTransform::default(),
         segments,
         arcs,
@@ -1295,5 +1296,385 @@ fn an_arcs_angular_span_is_what_it_draws() {
          {elsewhere} everywhere else — the span is not selecting the side it \
          names",
         counts[3]
+    );
+}
+
+// -----------------------------------------------------------------------
+// The across-the-stroke profile (Plan 0114 Phase 1, ADR-0124)
+// -----------------------------------------------------------------------
+
+/// Render `segments` at `softness` into a linear `Rgba16Float` target of the
+/// given size and read the light back, unclamped and untonemapped.
+///
+/// A sibling of [`arc_capture`] rather than a parameter on it: these fixtures
+/// are about **pixels of the render target**, so the size has to be theirs and
+/// the aspect has to be derived from it (ADR-0037). Colour is white and `glow`
+/// is 1 in every caller, so the red channel *is* the fragment's coverage `g`.
+///
+/// Builds and drops one context per call, for the reason `linear_composite`
+/// records: a second live device in a binary is what the software adapter falls
+/// over on.
+fn profile_capture(
+    width: u32,
+    height: u32,
+    softness: f32,
+    segments: &[SegmentInstance],
+) -> Option<Vec<f32>> {
+    use crate::render::capture;
+    use crate::render::context::RenderContext;
+
+    const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+    let ctx = match RenderContext::new_headless(width, height, true) {
+        Ok(ctx) => ctx,
+        Err(_) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+    };
+    let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("profile-target"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&Default::default());
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("profile-capture"),
+        });
+    // The line pass loads rather than clears (the background pass owns the clear
+    // in the shipped chain), so clear this target once here.
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("profile-clear"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: &view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+
+    let mut renderer =
+        super::LineRenderer::new(&ctx.device, FORMAT, segments.len().max(1), "profile");
+    renderer.draw(
+        &ctx.queue,
+        &mut encoder,
+        &view,
+        width as f32 / height as f32,
+        1.0,
+        softness,
+        ViewTransform::default(),
+        segments,
+    );
+
+    let (buffer, padded_bpr) = capture::create_linear_readback(&ctx.device, width, height);
+    capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+    Some(
+        capture::read_back_linear(&ctx.device, &buffer, width, height, padded_bpr)
+            .expect("read back the profile capture"),
+    )
+}
+
+/// Half-precision slack, the same figure
+/// `the_arc_stroke_falls_off_quadratically_like_a_segment` uses. It is slack,
+/// not a tolerance: every property below is an exact equality in real
+/// arithmetic.
+const PROFILE_SLACK: f32 = 0.02;
+
+/// A stroke spanning the whole frame horizontally at NDC y = 0. World x reaches
+/// well past the frame at either edge, so every column is interior and the
+/// column read below never lands on an end cap.
+fn flat_stroke(half_width: f32) -> [SegmentInstance; 1] {
+    [SegmentInstance {
+        a: [-4.0, 0.0],
+        b: [4.0, 0.0],
+        color: [1.0, 1.0, 1.0],
+        width: half_width,
+        joined: 0,
+        alpha: 1.0,
+    }]
+}
+
+/// A stroke crossing the frame at a **deliberately unremarkable slope**, so the
+/// perpendicular offsets of the pixel centres it covers equidistribute rather
+/// than repeating on the lattice. Every one of its pixels is interior at the
+/// sizes below, so the peak it reaches is the profile's and not an end cap's.
+fn slanted_stroke(half_width: f32) -> [SegmentInstance; 1] {
+    [SegmentInstance {
+        a: [-1.55, -0.71],
+        b: [1.55, 0.69],
+        color: [1.0, 1.0, 1.0],
+        width: half_width,
+        joined: 0,
+        alpha: 1.0,
+    }]
+}
+
+/// NDC y of the centre of `row`, at a target `height` rows tall. Row 0 is
+/// NDC y = +1 and pixel centres sit at +0.5.
+fn row_ndc_y(row: usize, height: u32) -> f32 {
+    1.0 - 2.0 * (row as f32 + 0.5) / height as f32
+}
+
+/// **The edge term can never exceed the softness term** — the cap in the shared
+/// profile, and the single fact `softness = 1.0` being byte-identical rests on.
+///
+/// `d` is normalized across the half-width, so `fwidth(d)` is roughly
+/// `1 / half-width-in-pixels`: about 0.41 at `thickness = 1.5` and 0.19 at
+/// `3.2`, the range the shipped line presets span. A **sub-pixel** stroke drives
+/// it the other way, above 1.0, and there an uncapped `max(softness, edge)`
+/// divides `u` down — dimming the line instead of sharpening it, and breaking
+/// byte-identity at the default.
+///
+/// # Why these three configurations
+///
+/// The deep arm is synthetic — `thickness = 0.1`, which is inside the dead zone
+/// [`MIN_USEFUL_THICKNESS`](super::super::MIN_USEFUL_THICKNESS) describes, so it
+/// floors to [`MIN_HALF_WIDTH`](super::super::MIN_HALF_WIDTH) and lands at about
+/// a quarter pixel. The other two are **real shipped geometry**:
+/// `warp_mesh::draw`'s `THIN = 0.0025` NDC-y, the width every MilkDrop waveform,
+/// motion vector and thin border is stroked at, at the two target sizes the plan
+/// reasons about. It is 1.35 px of half-width at 1080p and **1.0 px** at
+/// 1280x800, and byte-identity for `warp_mesh` — which is pinned at `1.0` and
+/// has no golden baseline shading a stroke — depends on the cap holding there.
+///
+/// At `softness = 1.0` the capped profile puts `g = u²`, so a pixel centre
+/// landing on the centreline reads **1.0** whatever the stroke's width. Uncapped
+/// it would read `min(1, 1/fwidth)²`, which at these three widths is about
+/// **0.51**, **0.037** and **0.93** respectively — so the 1280x800 arm and the
+/// deep arm each convict on their own, and the 1080p arm is the control just
+/// inside the cap, where the two expressions very nearly agree.
+#[test]
+fn the_edge_term_never_exceeds_the_softness_term() {
+    /// `warp_mesh::draw`'s `THIN`, the half-width every MilkDrop waveform,
+    /// motion vector and thin border is stroked at. Private there; restated
+    /// here because this fixture's whole point is that it is *that* geometry.
+    const MILKDROP_THIN: f32 = 0.0025;
+
+    let cases: [(&str, u32, u32, f32); 3] = [
+        ("warp_mesh THIN at 1280x800", 1280, 800, MILKDROP_THIN),
+        (
+            "thickness = 0.1 at 1080p",
+            1920,
+            1080,
+            super::super::half_width(0.1),
+        ),
+        ("warp_mesh THIN at 1080p", 1920, 1080, MILKDROP_THIN),
+    ];
+
+    for (label, width, height, half_width) in cases {
+        let Some(drawn) = profile_capture(
+            width,
+            height,
+            super::super::DEFAULT_SOFTNESS,
+            &slanted_stroke(half_width),
+        ) else {
+            return;
+        };
+        let half_px = half_width * height as f32 / 2.0;
+        let lit = drawn.chunks_exact(4).filter(|t| t[0] > 0.01).count();
+        let peak = drawn.chunks_exact(4).fold(0.0f32, |acc, t| acc.max(t[0]));
+        // The ramp an uncapped `max(softness, edge)` would divide by, and the
+        // peak it would leave. A diagonal stroke's `fwidth` is
+        // `(|sin| + |cos|) / half_px`, about `1.4 / half_px` at this slope.
+        let uncapped_ramp = 1.4 / half_px;
+        let uncapped_peak = (1.0f32 / uncapped_ramp.max(1.0)).powi(2);
+        eprintln!(
+            "{label}: half-width {half_px:.2} px, {lit} lit pixels, peak \
+             coverage {peak:.4}; uncapped this would peak at about \
+             {uncapped_peak:.3}"
+        );
+        assert!(
+            lit > 200,
+            "{label}: only {lit} pixels lit — the peak below would be read off \
+             almost nothing"
+        );
+        assert!(
+            peak >= 0.95,
+            "{label}: a stroke {half_px:.2} px of half-width peaks at \
+             {peak:.4} at softness = 1.0, where the profile is `g = u²` and a \
+             pixel centre on the centreline must read 1.0. The edge term has \
+             escaped its cap and is dimming the stroke instead of sharpening \
+             it (uncapped, this configuration peaks at about {uncapped_peak:.3})"
+        );
+    }
+}
+
+/// **The edge is a width in pixels of the render target, not a fraction of the
+/// stroke** ([ADR-0124], the other side of
+/// [ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+///
+/// At `softness = 0` the ramp is the edge term alone, so the coverage a pixel
+/// carries is a function of **how many pixels inside the stroke edge it sits**
+/// and of nothing else:
+///
+/// ```text
+/// g(p) = min(p, 1)²    p = pixels inward from the stroke edge
+/// ```
+///
+/// There is no resolution in that expression, which is the property. It is
+/// asserted at 1920x1080 and at 1280x800 against the *same* NDC half-width, so
+/// the stroke itself is 27 px across at one and 20 px at the other and the one
+/// pixel of ramp is a visibly different **share** of it — 3.7 % against 5 %.
+///
+/// Stated as the closed form rather than as a ramp-width count because a
+/// one-pixel ramp spans at most one row of pixel centres per side: counting rows
+/// would be a comparison of small integers that a broken implementation could
+/// pass, where matching `min(p, 1)²` across forty rows cannot be.
+///
+/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
+#[test]
+fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
+    /// Fat enough that a couple of dozen rows land across the half-width, so
+    /// the plateau the closed form describes is resolved rather than inferred.
+    const HALF_WIDTH: f32 = 0.05;
+
+    let mut half_px_seen: Vec<f32> = Vec::new();
+    for (width, height) in [(1920u32, 1080u32), (1280, 800)] {
+        let Some(drawn) = profile_capture(width, height, 0.0, &flat_stroke(HALF_WIDTH)) else {
+            return;
+        };
+        let half_px = HALF_WIDTH * height as f32 / 2.0;
+        half_px_seen.push(half_px);
+
+        let column = (width / 2) as usize;
+        let (mut worst, mut checked, mut peak) = (0.0f32, 0usize, 0.0f32);
+        for row in 0..height as usize {
+            let d = row_ndc_y(row, height).abs();
+            if d > HALF_WIDTH {
+                continue; // outside the stroke; the fragment writes nothing
+            }
+            // Pixels inward from the stroke edge — the coordinate the property
+            // is stated in, derived from the geometry and the target height.
+            let p = (HALF_WIDTH - d) * height as f32 / 2.0;
+            let want = p.min(1.0).powi(2);
+            let got = drawn[(row * width as usize + column) * 4];
+            worst = worst.max((got - want).abs());
+            peak = peak.max(got);
+            checked += 1;
+        }
+        eprintln!(
+            "{width}x{height}: half-width {half_px:.1} px, {checked} rows \
+             across the stroke, peak {peak:.4}, worst |measured - min(p,1)^2| \
+             {worst:.4}; the one-pixel ramp is {:.1} % of the half-width",
+            100.0 / half_px
+        );
+        assert!(
+            checked >= 32 && peak > 0.95,
+            "{width}x{height}: {checked} rows fell across the stroke and the \
+             brightest reached {peak:.4} — the profile is not resolved and the \
+             assertion below would be vacuous"
+        );
+        assert!(
+            worst <= PROFILE_SLACK,
+            "{width}x{height}: the coverage departs from `min(p, 1)^2` by \
+             {worst:.4} (slack {PROFILE_SLACK}), where `p` is pixels inward \
+             from the stroke edge. A ramp specified as a fraction of the \
+             stroke would fit this form at one resolution and miss it at the \
+             other"
+        );
+    }
+
+    // Non-vacuity for the *pair*: the two targets must actually differ in how
+    // many pixels the stroke spans, or the closed form above was checked twice
+    // against the same geometry.
+    let (hi, lo) = (half_px_seen[0], half_px_seen[1]);
+    assert!(
+        hi > lo * 1.2,
+        "the two targets stroke {hi:.1} px and {lo:.1} px of half-width — too \
+         close for the ramp's SHARE of the stroke to differ, which is the half \
+         of this property the pixel count cannot show"
+    );
+}
+
+/// **A low `softness` puts a plateau across the stroke** — the defect this plan
+/// exists for, read off the cross-section rather than off a total-brightness
+/// statistic, which moves for several reasons.
+///
+/// The statistic is the one Plan 0114's own measurement table uses: **how many
+/// rows sit within 10 % of the peak**. At `softness = 1.0` that is a handful —
+/// a 14 px stroke's 4 px spine, the reading that produced the *blurred* verdict.
+/// As `softness` falls the solid core grows toward the whole half-width, and it
+/// grows **inside a fixed footprint**: `softness` redistributes coverage across
+/// the stroke, it does not widen it, which is what keeps it a separate lever
+/// from `thickness`.
+#[test]
+fn a_low_softness_puts_a_plateau_across_the_stroke() {
+    const HALF_WIDTH: f32 = 0.05;
+    const W: u32 = 1280;
+    const H: u32 = 800;
+
+    let mut plateaus: Vec<(f32, usize, usize)> = Vec::new();
+    for softness in [1.0f32, 0.5, 0.25, 0.0] {
+        let Some(drawn) = profile_capture(W, H, softness, &flat_stroke(HALF_WIDTH)) else {
+            return;
+        };
+        let column = (W / 2) as usize;
+        let cut: Vec<f32> = (0..H as usize)
+            .filter(|row| row_ndc_y(*row, H).abs() <= HALF_WIDTH * 1.05)
+            .map(|row| drawn[(row * W as usize + column) * 4])
+            .collect();
+        let peak = cut.iter().copied().fold(0.0f32, f32::max);
+        let plateau = cut.iter().filter(|g| **g >= 0.9 * peak).count();
+        let footprint = cut.iter().filter(|g| **g > 1e-3).count();
+        let bytes: Vec<u8> = cut
+            .iter()
+            .map(|g| (g.clamp(0.0, 1.0) * 255.0).round() as u8)
+            .collect();
+        eprintln!(
+            "softness {softness}: peak {peak:.4}, {plateau} of {footprint} \
+             rows within 10 % of it; cross-section {bytes:?}"
+        );
+        assert!(
+            peak > 0.95,
+            "softness {softness}: the stroke peaked at {peak:.4}"
+        );
+        plateaus.push((softness, plateau, footprint));
+    }
+
+    // Monotone: every drop in `softness` widens the solid core.
+    for pair in plateaus.windows(2) {
+        let ((soft_hi, wide_lo, _), (soft_lo, wide_hi, _)) = (pair[0], pair[1]);
+        assert!(
+            wide_hi > wide_lo,
+            "softness {soft_lo} holds {wide_hi} rows within 10 % of peak \
+             against {soft_hi}'s {wide_lo} — lowering `softness` did not widen \
+             the plateau"
+        );
+    }
+
+    // The two ends, quantified. At `1.0` the profile is `u²`, so 10 % off peak
+    // is `u >= 0.949` — about a twentieth of the stroke. At `0` it is the whole
+    // stroke bar its one-pixel edge.
+    let (_, spine, footprint) = plateaus[0];
+    let (_, solid, footprint_solid) = plateaus[3];
+    assert!(
+        solid >= 8 * spine,
+        "the solid stroke holds {solid} rows within 10 % of peak against the \
+         soft one's {spine} — `softness = 0` is not producing a plateau"
+    );
+    assert!(
+        footprint.abs_diff(footprint_solid) <= 2,
+        "the stroke's footprint moved from {footprint} rows to \
+         {footprint_solid} across the `softness` range — the parameter is \
+         changing the stroke's WIDTH, which is `thickness`'s job"
     );
 }

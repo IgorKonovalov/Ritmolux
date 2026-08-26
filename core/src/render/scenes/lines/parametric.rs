@@ -126,6 +126,7 @@ pub struct ParametricCurveScene {
     scale: f32,
     brightness: f32,
     glow: f32,
+    softness: f32,
     draw_progress: f32,
     zoom: f32,
     pan_x: f32,
@@ -165,6 +166,7 @@ impl ParametricCurveScene {
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
+            softness: super::DEFAULT_SOFTNESS,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
@@ -216,6 +218,7 @@ pub const PARAMS: &[&str] = &[
     "scale",
     "brightness",
     "glow",
+    "softness",
     "draw_progress",
     "zoom",
     "pan_x",
@@ -250,6 +253,7 @@ impl Scene for ParametricCurveScene {
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
+        self.softness = super::DEFAULT_SOFTNESS;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
@@ -276,6 +280,7 @@ impl Scene for ParametricCurveScene {
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
+            "softness" => self.softness = value,
             "draw_progress" => self.draw_progress = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
@@ -405,6 +410,7 @@ impl Scene for ParametricCurveScene {
             view,
             aspect,
             self.glow,
+            self.softness,
             xform,
             &self.segments,
         );

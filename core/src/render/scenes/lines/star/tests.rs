@@ -1366,6 +1366,7 @@ fn round_capture(segments: &[SegmentInstance], arcs: &[ArcInstance]) -> Option<V
         &view,
         1.0,
         1.0,
+        crate::render::scenes::lines::DEFAULT_SOFTNESS,
         ViewTransform::default(),
         segments,
         arcs,

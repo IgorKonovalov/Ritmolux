@@ -44,6 +44,11 @@
 //!   per-element lever on an element's length, beside `base` and `scale`.
 //! - `glow` — the line renderer's per-segment falloff multiplier (Plan 0038),
 //!   whole-figure like on the other three line scenes. Not a post bloom.
+//! - `softness` — the across-the-stroke profile (ADR-0124), whole-figure and
+//!   shared with the other three line scenes. `1.0` is the quadratic falloff
+//!   these bars have always drawn; toward `0` the bar goes solid with a
+//!   one-pixel edge. A different quantity from `glow`, which scales the light
+//!   and never the coverage.
 //!
 //! Three parameters are **layout-specific**, and each is a no-op on the layouts
 //! it does not describe — stated in `presets/README.md` and `docs/presets.md`
@@ -168,6 +173,7 @@ pub const PARAMS: &[&str] = &[
     "palette_contour",
     "brightness",
     "glow",
+    "softness",
     "zoom",
     "pan_x",
     "pan_y",
@@ -486,6 +492,7 @@ pub struct SpectrumScene {
     palette_contour: f32,
     brightness: f32,
     glow: f32,
+    softness: f32,
     scale: f32,
     base: f32,
     curve: f32,
@@ -533,6 +540,7 @@ impl SpectrumScene {
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
+            softness: super::DEFAULT_SOFTNESS,
             scale: DEFAULT_SCALE,
             base: DEFAULT_BASE,
             curve: DEFAULT_CURVE,
@@ -605,6 +613,7 @@ impl Scene for SpectrumScene {
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
+        self.softness = super::DEFAULT_SOFTNESS;
         self.scale = DEFAULT_SCALE;
         self.base = DEFAULT_BASE;
         self.curve = DEFAULT_CURVE;
@@ -641,6 +650,7 @@ impl Scene for SpectrumScene {
             "palette_contour" => self.palette_contour = value,
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
+            "softness" => self.softness = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -837,6 +847,7 @@ impl Scene for SpectrumScene {
             view,
             aspect,
             self.glow,
+            self.softness,
             xform,
             &self.segments,
         );

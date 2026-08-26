@@ -191,6 +191,36 @@ const DEFAULT_DECAY: f32 = 0.72;
 /// `MAX_FADE` ceiling the trails accumulation takes for the same reason.
 const MAX_DECAY: f32 = 0.995;
 
+/// The `softness` every `warp_mesh` stroke is drawn at — the waveform, every
+/// custom wave, every shape outline, both borders and the motion grid, which all
+/// reach the line fragment through one [`LineRenderer::draw_split`](lines::LineRenderer::draw_split)
+/// call.
+///
+/// **Pinned at `1.0` — the pre-Plan-0114 profile — and it does NOT follow**
+/// [`lines::DEFAULT_SOFTNESS`], which Plan 0114 Phase 5 moves ([ADR-0124],
+/// Alternative D0). The two constants exist because there are two judges: the
+/// four line families answer to that plan's look gate, and this surface answers
+/// to **`foo_vis_milk2`**, [ADR-0113]'s fidelity reference, against which the
+/// conversion has already been judged side by side. `draw.rs`'s stroke widths
+/// were chosen *through* this profile — a thick MilkDrop line, drawn there as two
+/// or four offset passes, reproduced here as one stroke of twice the width — so
+/// a number picked by that gate answers a question nobody asked of this surface.
+///
+/// It is also the regime where the profile's `fwidth` term stops describing a
+/// real gradient: `draw.rs`'s `THIN` is a **1.35 px** half-width at 1080p and
+/// **1.0 px** at 1280x800. The pin stays byte-identical there only because the
+/// edge term is capped at 1.0 — see the shared profile in the line renderer.
+///
+/// **Plan 0114 Phase 8 is what sets this**: it puts the reference rig beside a
+/// spread of values and returns a number, and `1.0` — keeping the pin as it
+/// stands — is a legitimate outcome that closes the question rather than a null
+/// result. Until it runs, the pin holds the profile the conversion was judged
+/// under.
+///
+/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
+/// [ADR-0113]: ../../../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md
+pub const MILKDROP_SOFTNESS: f32 = 1.0;
+
 /// Procedural-warp defaults — the spatial scale of the four sinusoids and how
 /// fast they animate. `1.0` is MilkDrop's own unit scale.
 const DEFAULT_WARP_SCALE: f32 = 1.0;
@@ -2176,14 +2206,19 @@ impl Scene for WarpMeshScene {
         if !self.geometry.segments.is_empty() {
             // One batch for the whole layer — the waveform, every custom wave,
             // every shape outline, both borders and the motion grid — because
-            // colour and width are per segment and only `glow` is per draw. The
-            // split is the same partition the shapes above use.
+            // colour and width are per segment and only `glow` and `softness`
+            // are per draw. The split is the same partition the shapes above use.
+            //
+            // `softness` is MILKDROP_SOFTNESS and not the line default: this
+            // surface is judged against foo_vis_milk2, not against Plan 0114 -
+            // see the constant.
             res.lines.draw_split(
                 queue,
                 encoder,
                 res.field.write_view(),
                 aspect,
                 1.0,
+                MILKDROP_SOFTNESS,
                 lines::ViewTransform::default(),
                 &self.geometry.segments,
                 self.geometry.segments_additive,

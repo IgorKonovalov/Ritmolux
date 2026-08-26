@@ -290,6 +290,7 @@ pub struct StarPatternScene {
     scale: f32,
     brightness: f32,
     glow: f32,
+    softness: f32,
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
@@ -345,6 +346,7 @@ impl StarPatternScene {
             scale: DEFAULT_SCALE,
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
+            softness: super::DEFAULT_SOFTNESS,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -1251,6 +1253,7 @@ pub const PARAMS: &[&str] = &[
     "scale",
     "brightness",
     "glow",
+    "softness",
     "zoom",
     "pan_x",
     "pan_y",
@@ -1286,6 +1289,7 @@ impl Scene for StarPatternScene {
         self.scale = DEFAULT_SCALE;
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
+        self.softness = super::DEFAULT_SOFTNESS;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -1311,6 +1315,7 @@ impl Scene for StarPatternScene {
             "scale" => self.scale = value,
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
+            "softness" => self.softness = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -1524,6 +1529,7 @@ impl Scene for StarPatternScene {
             view,
             aspect,
             self.glow,
+            self.softness,
             xform,
             &self.draw_buf,
             &self.arc_draw_buf,
