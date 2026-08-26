@@ -215,13 +215,26 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The fourth candidate joins the table | dev | done | committed with this row |
-| 2 — The stop gate | human | | |
+| 1 — The fourth candidate joins the table | dev | done | `8389f2a` |
+| 2 — The stop gate | human | decided: continue on the control | committed with this row |
 | 3 — The gate takes two terms | dev | | |
 | 4 — The preset ships | dev | | |
 | 5 — Documentation | dev | | |
 
 ### Notes
+
+- **Phase 2 decided *continue on the control*, 2026-08-26.** `boundary` ships as the second term,
+  not the tiled statistic. Per the phase's own routing that needs a superseding note on ADR-0129
+  before Phase 3, so the plan is with `architect`; the reason belongs in that note and is not
+  recorded here by `dev`.
+- **What Phase 1 measured, as the gate read it.** The conditional population is two members, as
+  ADR-0129 predicted, so criterion 2 is inert on every column — nothing else in the corpus is above
+  the flatness ceiling to be in the gap. Conditioned, `boundary` (1.37x), `components` (2.33x) and
+  `sobel` (6.31x) all pass, having all failed unconditioned at Plan 0116 Phase 8. The tiled sweep:
+  `tile@4` does not separate (both anchors 0.3333), `tile@6` 6.00x, `tile@8` 2.50x, `tile@12` 5.14x,
+  `tile@16` 6.10x — a verdict flip between the first two adjacent grids, and the composition swings
+  2.24x between `tile@6` and `tile@8`. Frames reading exactly 0.0000 on the tiled term: 18 at
+  `tile@6`, 14 at `tile@8`, 10 at `tile@12`, 6 at `tile@16`, including all three retired mandalas.
 
 - **Criterion 3 is implemented as the midpoint between the two frozen fixtures**, so it is
   satisfied by construction whenever criterion 1 holds and never fails a candidate on its own.
