@@ -20,6 +20,36 @@ as that blocker lifts.
 
 ## Held today
 
+**Nothing.** The directory is empty of presets and that is the state to keep it in — an entry here
+is a preset the library cannot have yet, not a shelf.
+
+The mechanism above is live and the directory keeps its purpose with nothing in it: the next preset
+blocked by a named engine or harness gap lands here, with its blocker in its own header and a row in
+the table below.
+
 | Preset | Blocked by | Leaves when |
 |--------|-----------|-------------|
-| `fragment_tiledmono.toml` | [ADR-0128](../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) — `tonal_flatness` convicts it whatever it is measured against. A duotone has two large populations and `is_lit` removes whichever one is the ground, so the other holds ~94 % of what remains either way: `0.9346` under the old black reference, `0.9413` under the derived ground. **Not a ground problem** — [Plan 0116](../../docs/plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measured all three candidate estimators and none repairs it | **Nothing scheduled.** [Plan 0116](../../docs/plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 8 measured three candidate structural statistics — mask boundary density, connected components, Sobel over the binary mask — and **none survived its stop condition**, so the Phase 9 that would have shipped this preset did not run. Each one scores the frozen `Blown Out` blot as *more* structured than a hairline, so the threshold ceremony this repo derives constants by (half the sparsest legitimate content, ADR-0071) yields a number that stops convicting blots. The plan closed at Phase 8 and the residue is ADR-0128's to route. Re-read that ADR's `Outcome` before re-opening this row |
+| *(none)* | | |
+
+### What left, and why the record is worth keeping
+
+`fragment_tiledmono.toml` shipped on 2026-08-26 ([Plan 0119](../../docs/plans/done/0119-the-flatness-gate-gets-its-second-term.md)
+Phase 4) after being held from Plan 0113. It is the only entry this directory has ever had, and its
+history is the argument for the directory existing.
+
+It was blocked by exactly one number — `tonal_flatness = 0.9413` against a `0.90` ceiling — while
+clearing every other gate. Three attempts to treat that as a measurement error failed:
+[ADR-0126](../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
+read it as a ground problem and [Plan 0116](../../docs/plans/done/0116-the-sanity-lens-finds-the-ground.md)
+Phase 1 falsified that against all three candidate estimators; Phase 8 then measured three candidate
+structural statistics and killed all three;
+[ADR-0129](../../docs/adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
+proposed a fourth and Plan 0119 Phase 1 falsified *it*. What finally released the preset was ADR-0129's
+**secondary** finding — that a conjunction's second term is only ever judged over the frames that
+failed the first — which turned one of the three "failed" candidates into the one that ships. See
+[ADR-0130](../../docs/adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md).
+
+Two things that cost real time are worth carrying forward. **The preset never changed**; every
+attempt was aimed at the gate, which is what the blocker being *named* bought. And **the held frame
+became a calibration anchor** for the constant that released it, so it is frozen into
+`core/tests/sanity.rs` and its shipped header says not to retune it casually.

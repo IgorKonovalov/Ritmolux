@@ -47,3 +47,11 @@ renders/
 # untracked AND unignored until this close, which is how a test came to read
 # spike/clip.wav and pass on exactly one machine (Plan 0106 Phase 7a).
 spike/
+
+# The diffusion filter's Python environment (Plan 0106). `docs/diffusion-filter.md`
+# tells a creator to build it at the repo root with `python -m venv .venv`, so it
+# lands here by instruction rather than by accident - and it is gigabytes of
+# platform-specific torch wheels that must never be committed. The tool itself
+# (tools/sd-filter/) and its requirements.txt ARE tracked; the environment they
+# build is not.
+.venv/

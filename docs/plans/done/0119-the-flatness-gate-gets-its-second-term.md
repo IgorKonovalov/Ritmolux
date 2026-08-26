@@ -1,16 +1,25 @@
 # 0119 — The flatness gate gets its second term
 
-> **Status:** in-progress 2026-08-26
+> **Status:** done 2026-08-26 — five phases, five commits (`8389f2a`, `53d3e8b`, `26b20b3`,
+> `7b552f7`, `40398d4`). Mode 4 review: **no blockers, one major, four minor.** Verified against a
+> live run rather than the log — `cargo nextest run --workspace` 995 passed / 5 skipped, `fmt` and
+> `clippy --workspace --all-targets` clean, and every calibration number re-measured: the frozen
+> `HELD_OUT_TOML` is byte-identical to `26b20b3^:presets/pending/fragment_tiledmono.toml` and to
+> the shipped copy, `Tiled Rosette Mono` reads `flatness 0.9413 / boundary 0.3602 / coverage
+> 0.4952`, `Suprematist` `0.2565`, `On White` `0.3064`, and the gate prints exactly the 22-of-43
+> exposure the plan claims. The major: `boundary_density`'s reading scales with the capture
+> resolution and neither it nor `boundary_floor` names the 96x96 it was measured at — filed as
+> [design-backlog 0130](../../design-backlog.md).
 > **Created:** 2026-08-26
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+> **Related ADRs:** [0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
 > (**the term that ships**, written at Phase 2 on Phase 1's measurement),
-> [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
+> [0129](../../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
 > (the stop condition, which stands — its Decision is superseded and it carries a dated `Outcome`),
-> [0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+> [0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 > (the conjunction this implements — its Decision stands, its mechanism did not),
-> [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> [0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Ships:** `presets/pending/fragment_tiledmono.toml` into the curated set, or explains in a dated
 > `Outcome` why it stays held.
 
@@ -20,7 +29,7 @@
 **and** below the second term's threshold. Phase 1 measured four candidates against ADR-0129's
 three-part stop condition, and **Phase 2 chose `boundary`** — perimeter over lit area, the control
 ADR-0129 rejected — not the tiled statistic that ADR proposed. See
-[ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+[ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
 for why, and ADR-0129's dated `Outcome` for what its own measurement falsified. Phases 3-5 implement
 the conjunction, ship the held preset, and sweep the docs.
 
@@ -58,7 +67,7 @@ flowchart TB
     F --> T1["term 1: tonal_flatness<br/>share of LIT pixels in one of 16 bands<br/>(ADR-0126 ground)"]
     F --> T2["term 2: boundary density<br/>share of LIT pixels with an unlit 4-neighbour<br/>(perimeter over lit area, ADR-0130)"]
     T1 -->|"> MAX_TONAL_FLATNESS"| AND{"both?"}
-    T2 -->|"< MIN_BOUNDARY_DENSITY"| AND
+    T2 -->|"< boundary_floor(system)"| AND
     AND -->|yes| BLOT["convicted: a blot"]
     AND -->|no| OK["passes the flatness gate"]
 ```
@@ -110,9 +119,13 @@ flowchart TB
   - **Stop** — nothing passes. ADR-0129 takes a dated `Outcome`, `fragment_tiledmono` stays held, and
     the `presets/pending/README.md` row is updated with what this plan ruled out. **Phases 3-5 do not
     run.** This is a real outcome and it has now happened twice; it is not a failure of the plan.
-- **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at
-  `MIN_BOUNDARY_DENSITY = 0.31`, not the tiled statistic. The reason, in full, is
-  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
+- **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at `0.31`,
+  not the tiled statistic. (This Outcome first named that constant `MIN_BOUNDARY_DENSITY`. It shipped
+  as `boundary_floor(system)` instead, revised the same day on the straddle finding in ADR-0130's
+  Context — Phase 3 below carries the corrected form, and the name is repointed throughout this file
+  at the plan's close so nothing here cites an identifier the tree never had.) The reason, in full,
+  is
+  [ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
   ADR-0129 keeps its corrected stop condition, takes a dated `Outcome`, and has its Decision
   superseded. In one paragraph: conditioned correctly the population is two members and criterion 2
   is inert, so **three** of the four candidates separate — the conditioning error was not hiding a
@@ -129,7 +142,7 @@ flowchart TB
 
 - **Owner skill:** dev
 - **Depends on:** Phase 2, which decided *continue on the control*. The term is
-  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s
+  [ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s
   `boundary`, **not** the tiled statistic — read that ADR before starting.
 - **Files touched:** `core/src/render/metrics.rs` (`boundary_density` moves next to
   `tonal_flatness`), `core/tests/sanity.rs`.
@@ -144,7 +157,7 @@ flowchart TB
     discarded candidates; a discarded candidate that ships as a `pub` production statistic is the
     thing that section's own header warns against.
   - **The conviction is a conjunction.** `every_preset_draws_a_real_shape` fails a preset only when
-    `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < MIN_BOUNDARY_DENSITY`; the
+    `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < boundary_floor(system)`; the
     printed line carries both numbers for every preset, not only for failures.
   - **The floor is `boundary_floor(system)`, not one constant** — the mechanism `coverage_floor`
     already uses in this file. `SystemKind::ShapeCollage => 0.13`, everything else `0.31`. **A single
@@ -199,7 +212,8 @@ flowchart TB
   - **The calibration anchor is frozen into the test, and this is not optional.**
     `HELD_OUT_TOML` is `include_str!("../../presets/pending/fragment_tiledmono.toml")`, so the `git
     mv` breaks the build — and repointing it at the new path would be worse than the break: the
-    composition-side anchor of `MIN_BOUNDARY_DENSITY` would become ordinary editable content, and a
+    composition-side anchor of `boundary_floor`'s default arm would become ordinary editable
+    content, and a
     preset tweak could move a gate constant with nothing able to notice, because the constant would
     still read green. Freeze the measured TOML into `sanity.rs` as an inline literal the way
     `retired_mandalas()` already freezes three presets from a git revision, name the revision it was
@@ -210,10 +224,10 @@ flowchart TB
   - **The preset's own header stops naming a blocker that no longer exists.** It records what held it
     and what released it, in the shape `presets/pending/README.md` requires of an entry — an entry
     leaves as soon as its blocker lifts, and a stale blocker in a shipped preset's header is the
-    class of comment [Plan 0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
+    class of comment [Plan 0118](../0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
     about. **It also carries the one line that makes it un-editable-by-accident**: this preset's
-    frame is a calibration anchor for `MIN_BOUNDARY_DENSITY`, and re-tuning it re-opens that
-    constant.
+    frame is a calibration anchor for `boundary_floor`'s default arm, and re-tuning it re-opens
+    that constant.
   - **`presets/pending/README.md`'s `Held today` table loses the row.** If the table is then empty,
     the file says so explicitly rather than leaving an empty table — the directory keeps its purpose
     with nothing in it.
@@ -233,7 +247,8 @@ flowchart TB
     which is ADR-0130's, not ADR-0129's: **a blot with a raggeder mask than `Blown Out`'s passes the
     structural term**, because `boundary` reads pixel-scale perimeter and a noisier particle field
     has more of it. Say the second half too — over half the shipped library reads below
-    `MIN_BOUNDARY_DENSITY` and is held only by the tonal term — because a reader who knows only the
+    its family's `boundary_floor` and is held only by the tonal term — because a reader who knows
+    only the
     first half will mis-price the gate. A gate's documented limits are the reason that section
     exists.
   - `presets/README.md` gains whatever the shipped preset's arrival requires and nothing more; this
@@ -287,9 +302,9 @@ flowchart TB
 |---|---|---|---|
 | 1 — The fourth candidate joins the table | dev | done | `8389f2a` |
 | 2 — The stop gate | human | decided: continue on the control | `53d3e8b` |
-| 3 — The gate takes two terms | dev | done | committed with this row |
-| 4 — The preset ships | dev | | |
-| 5 — Documentation | dev | | |
+| 3 — The gate takes two terms | dev | done | `26b20b3` |
+| 4 — The preset ships | dev | done | `7b552f7` |
+| 5 — Documentation | dev | done | `40398d4` |
 
 ### Notes
 
@@ -305,7 +320,20 @@ flowchart TB
   `Blown Out` 0.9154 / 0.2631. The witness is named in a constant with a comment saying it is a
   witness and not a fixture, and how to replace it.
 - **The exposure count read 22 of 42**, matching ADR-0130's landmine Negative. The full list is
-  printed by `every_preset_draws_a_real_shape` on every run and is unasserted, per the phase.
+  printed by `every_preset_draws_a_real_shape` on every run and is unasserted, per the phase. It
+  reads 22 of 43 after Phase 4, the shipped preset being above its floor.
+- **Phase 4's "the header stops naming a blocker" was vacuous as written.** The preset's own header
+  never named one — the blocker lived only in `presets/pending/README.md`'s table, though that
+  README's own rule is that an entry "needs a named blocker, recorded in the preset's own header".
+  The rest of that done-when is what landed: the header now records what held it, what released it,
+  and the calibration-anchor warning.
+- **The frozen anchor and the shipped copy were checked to agree, not assumed to.** Both read
+  `tonal_flatness 0.9413` and `boundary_density 0.3602`; the shipped copy reads `coverage 0.4952`,
+  the number the plan's Context recorded. The frozen literal is comment-stripped and its `name` is
+  suffixed `(frozen)` — the suffix is load-bearing now that the preset ships, because
+  `each_structure_candidate_is_tabled_against_the_library` pushes the anchor alongside
+  `sanity_roster()`, and two presets of one name are not addressable by
+  `Renderer::capture_preset`.
 - **Phase 2 decided *continue on the control*, 2026-08-26.** `boundary` ships as the second term,
   not the tiled statistic. Per the phase's own routing that needs a superseding note on ADR-0129
   before Phase 3, so the plan is with `architect`; the reason belongs in that note and is not
@@ -330,13 +358,25 @@ flowchart TB
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
-- **Workspace at the tip:**
+- **`presets/` touched:** yes — `presets/fragment_tiledmono.toml` (renamed in from
+  `presets/pending/`, 79 % similarity, header block added), `presets/pending/README.md`,
+  `presets/README.md`. One preset joins the embedded set: 42 → 43.
+- **Plan header `Closes:`** the header carries no `Closes:` line. Its `Ships:` line is satisfied by
+  the first branch — the preset went into the curated set rather than taking a dated `Outcome`.
+- **What shipped:** feature. A gate behaviour change (`metrics::boundary_density` is new production
+  code, and `every_preset_draws_a_real_shape` convicts on a conjunction) plus one preset entering
+  the embedded set. No render behaviour, no C ABI, no `Scene` trait, no post chain.
+- **Operator docs touched:** `docs/capturing.md` (the five-gate table's `sanity` row, and the
+  "what the five gates can and cannot see" section, which gains a fifth caveat),
+  `presets/README.md` (one worked-example row), `presets/pending/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. 4 unprobeable claims, which
+  is the set nothing checks and is unchanged by this plan. `check-doc-links.mjs` and
+  `check-index-rows.mjs` also exit 0.
+- **Outstanding `human` phases:** none. Phase 2 was the only one and it is decided.
+- **Workspace at the tip:** `cargo nextest run --workspace` 995 passed / 5 skipped, exit 0, run at
+  Phase 4's tree (the Phase 5 commit is docs-only). `cargo fmt --all --check` and
+  `cargo clippy --all-targets -- -D warnings` clean. Version is `0.79.0`, unbumped — the bump is
+  architect's call at close (ADR-0005).
 
 ## The mono cohort, measured against this gate
 

@@ -3821,6 +3821,7 @@ Presets worth reading as **worked examples** of one control each:
 | `swarm_drift` | the shared view **zoom** breathing with the music |
 | `attractor_dragon` | a scene over a vignetted **background** gradient (`bg_*`), and an onset-latched structural re-cut (`hash(floor(beat_index * 0.25))`) |
 | `fragment_tiled` | the screen-space **kaleidoscope** folding a field into a figure |
+| `fragment_tiledmono` | a **limited ink set** — `palette_steps` as a hard quantizer with the stops written as plateaus, and the whites driven into the tonemap shoulder so the scene shader's built-in radial vignette stops reading as shading |
 | `attractor_clifford` | **feedback trails** stretching a figure into a long exposure |
 | `fragment_supernova` | beat-driven flash/glow **eased** through a `[smoothing]` table |
 | `attractor_ink` | the terminal **ink-on-paper** remap (`ink_*` / `paper_*`) |

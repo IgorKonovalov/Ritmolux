@@ -1199,7 +1199,7 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
 
     let blot = without_backdrop(blown_out());
     let held =
-        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
     let (blot_name, blot_system) = (blot.name.clone(), blot.system);
     let (held_name, held_system) = (held.name.clone(), held.system);
 
@@ -2006,17 +2006,84 @@ const BORDER_DIVISOR: usize = 16;
 /// cluster, not by how finely they cluster it.
 const RGB_LEVELS: usize = 16;
 
-/// `fragment_tiledmono` as it is held today, read from `presets/pending/`.
+/// **`fragment_tiledmono` frozen at the revision its calibration was measured
+/// at**, recovered from `git show 26b20b3^:presets/pending/fragment_tiledmono.toml`
+/// — every table and every binding byte-for-byte, comments stripped and the
+/// `name` suffixed so the output reads clearly and so it cannot collide with the
+/// shipped copy in a renderer that holds both. Nothing here is tunable.
 ///
-/// **It is not in the embedded set.** `core/build.rs` globs `presets/*.toml`
-/// non-recursively (ADR-0022), so a subdirectory is skipped by construction and
-/// [`sanity_roster`] cannot see this preset. It is tabled anyway because it is
-/// the false positive ADR-0126 was raised on: its black *ink* is excluded as
-/// unlit, leaving `tonal_flatness` to measure the white alone and read `0.9346`
-/// against a `0.90` ceiling. A table that picks the estimator without a row for
-/// the preset that motivated the estimator would be deciding on the wrong
-/// evidence.
-const HELD_OUT_TOML: &str = include_str!("../../presets/pending/fragment_tiledmono.toml");
+/// # Why it is frozen rather than read from the file
+///
+/// It used to be `include_str!("../../presets/pending/fragment_tiledmono.toml")`,
+/// which was correct while the preset was held: it was outside the embedded set
+/// (`core/build.rs` globs `presets/*.toml` non-recursively per ADR-0022, so a
+/// subdirectory is skipped by construction) and so unreachable from
+/// [`sanity_roster`], and it had to be in the table anyway as the false positive
+/// ADR-0126 was raised on and ADR-0128 was written about.
+///
+/// Plan 0119 Phase 4 ships it into `presets/`, and repointing the `include_str!`
+/// at the new path would be **worse than letting the move break the build**.
+/// This frame is the composition-side anchor of [`boundary_floor`]'s default
+/// arm: `0.31` is the midpoint of `0.2631` ([`blown_out`]) and this preset's
+/// `0.3602`. As ordinary editable content, a routine preset tweak could move a
+/// gate constant with nothing able to notice, because the constant would still
+/// read green. ADR-0130's Decision requires **both** anchors frozen, and this is
+/// the second one; `retired_mandalas` is the precedent for how.
+///
+/// The shipped copy goes on being judged by the gate like any other preset, and
+/// the two are meant to agree. If they ever stop agreeing, the shipped preset
+/// was retuned and [`boundary_floor`]'s default arm is re-opened with it — which
+/// is exactly the event this freeze exists to make visible.
+const HELD_OUT_TOML: &str = r##"
+system = "fragment_field"
+name = "Tiled Rosette Mono (frozen)"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.19, color = "#000000" },
+  { at = 0.21, color = "#ffffff" },
+  { at = 0.39, color = "#ffffff" },
+  { at = 0.41, color = "#000000" },
+  { at = 0.59, color = "#000000" },
+  { at = 0.61, color = "#ffffff" },
+  { at = 0.84, color = "#ffffff" },
+  { at = 0.86, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+kaleido_tile   = "2"
+kaleido_radial = "1"
+kaleido_inner  = "0.06"
+kaleido_angle  = "time * 0.05"
+kaleido_order  = "select(bass + mid + treb > 1.70, 9, 6)"
+
+palette_steps   = "20"
+palette_contour = "0"
+
+warp  = "0.60 + sin(time * 0.037) * 0.12 + clamp(bass * 0.318, 0, 0.27)"
+zoom  = "1.20 + clamp(treb * 0.30, 0, 0.18)"
+pan_x = "sin(time * 0.013) * 0.06"
+pan_y = "cos(time * 0.017) * 0.05"
+
+glow  = "2.6"
+flash = "0"
+
+hue          = "0.08 + time * 0.011"
+color_span   = "1.35"
+color_center = "sin(time * 0.029) * 0.10"
+saturation   = "1.0"
+
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+kaleido_order = 3.5
+
+warp = 0.60
+zoom = 0.50
+"##;
 
 /// One candidate ground estimator. **The roster is the deliverable, not a
 /// choice** — Phase 2 chooses, from what these print.
@@ -2306,12 +2373,14 @@ fn each_candidate_ground_is_tabled_against_the_library() {
     };
 
     // The embedded roster measured exactly as the gate measures it (backdrops
-    // suppressed, ADR-0067), plus the held-out preset the estimator has to get
-    // right. Anything else would table a different measurement than the one
-    // Phase 3 changes.
+    // suppressed, ADR-0067), plus the frozen `Tiled Rosette Mono` the estimator
+    // has to get right — held out of the set when this table was taken, shipped
+    // since (Plan 0119 Phase 4), and kept here as the frozen copy so the reading
+    // does not move with the file. Anything else would table a different
+    // measurement than the one Plan 0116 Phase 3 changed.
     let (mut presets, mut meta) = sanity_roster();
     let held =
-        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
     meta.push((held.name.clone(), held.system));
     presets.push(held);
     renderer.set_presets(presets);
@@ -2789,9 +2858,12 @@ fn each_structure_candidate_is_tabled_against_the_library() {
     presets.push(blot);
 
     // The composition that must read structured — the preset ADR-0128 exists
-    // for, held in presets/pending/ and so not reachable from `sanity_roster`.
+    // for, and the composition-side anchor of boundary_floor's default arm.
+    // It ships now (Plan 0119 Phase 4), so `sanity_roster` carries a copy of it
+    // too; this row is the FROZEN one, and the two appearing side by side in the
+    // table is the point rather than a duplicate.
     let held =
-        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the held-out preset parses"));
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
     roles.push((held.name.clone(), Some(false)));
     presets.push(held);
 
