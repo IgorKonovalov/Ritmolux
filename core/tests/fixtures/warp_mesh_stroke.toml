@@ -1,0 +1,322 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# **The only baseline in the repo that can see the `warp_mesh` stroke profile**
+# (Plan 0114 Phase 9). Converted by `milkconv` from `warp_mesh_stroke.milk`, which
+# sits beside it - regenerate with:
+#
+#   cargo run --release -p milkconv -- core/tests/fixtures/warp_mesh_stroke.milk \
+#     --out core/tests/fixtures/warp_mesh_stroke.toml
+#
+# WHY THE FAT BORDER, WHICH IS THE WHOLE POINT OF THIS FILE. ADR-0124 records that
+# no baseline shades a `warp_mesh` stroke, and gives the reason as the fixtures
+# setting no wave. That reason is wrong - `wave_a` defaults to 1.0, so every
+# `warp_mesh` fixture already strokes a waveform. The real cause is the golden
+# suite's 128 px capture: `draw.rs`'s THIN is 0.16 px of half-width there and THICK
+# is 0.38 px, both far under the one-pixel floor the profile's edge term is capped
+# at, so every value of MILKDROP_SOFTNESS draws the identical frame. Measured: with
+# the pin driven 1.0 -> 0.0, `warp_mesh.png`, `warp_mesh_milk.png` and
+# `warp_mesh_shader.png` all move by mean 0.0000 / outlier 0.
+#
+# So a fixture that merely sets a wave adds another blind baseline. `ob_size` is
+# the one stroke width on this surface a preset controls: it reaches
+# `SegmentInstance::width` as an NDC-y half-width, so 0.12 is 7.7 px at 128 and the
+# profile has room to differ. Verified the same way - the same pin change moves
+# THIS baseline. `the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke` in
+# `golden.rs` holds both halves so the file cannot quietly degrade back.
+#
+# It sets a wave as well (`wave_a = 1`, `wave_thick = 1`), per the phase's done-when
+# - that arm is guarded too, and it is what keeps the fixture representative of the
+# surface rather than being only a rectangle.
+
+# Converted from a MilkDrop preset by `milkconv` (Plan 0100 / ADR-0113).
+#
+# Everything below is machine-generated. The `[milk]` table is compiled
+# EEL2 bytecode, executed by the engine's stack VM; the EEL2 it came from
+# is reproduced under each section so this file can be read.
+#
+# Source format: MilkDrop 2
+# The converter had nothing to report.
+
+system = "warp_mesh"
+name   = "warp_mesh_stroke"
+
+[mesh]
+x = 32
+y = 24
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#000000" },
+  { at = 0.45, color = "#8c7e62" },
+  { at = 0.8,  color = "#ffe5b2" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+# A converted preset draws its own light - the waveform, its custom
+# waves and shapes, the borders - so the scene's own deposit stays off.
+brightness     = "1.0"
+warp_scale     = "1.0"
+warp_speed     = "1.0"
+
+[milk]
+# --- per_frame_init, from:
+per_frame_init = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a rad
+.code
+const 0.0
+"""
+
+# --- per_frame, from:
+#   zoom = 1.0;
+#   rot = 0.0;
+#   cx = 0.5;
+#   cy = 0.5;
+#   dx = 0.0;
+#   dy = 0.0;
+#   sx = 1.0;
+#   sy = 1.0;
+#   warp = 1.0;
+#   zoomexp = 1.0;
+#   decay = 0.85;
+#   gamma = 1.0;
+#   wrap = 0.0;
+#   darken_center = 0.0;
+#   brighten = 0.0;
+#   darken = 0.0;
+#   solarize = 0.0;
+#   invert = 0.0;
+#   echo_zoom = 1.0;
+#   echo_alpha = 0.0;
+#   echo_orient = 0.0;
+#   wave_mode = 2.0;
+#   wave_scale = 1.0;
+#   wave_smoothing = 0.0;
+#   wave_mystery = 0.0;
+#   wave_a = 1.0;
+#   wave_r = 1.0;
+#   wave_g = 0.9;
+#   wave_b = 0.7;
+#   wave_x = 0.5;
+#   wave_y = 0.5;
+#   wave_usedots = 0.0;
+#   wave_thick = 1.0;
+#   wave_additive = 1.0;
+#   wave_brighten = 1.0;
+#   ob_size = 0.12;
+#   ob_r = 1.0;
+#   ob_g = 0.82;
+#   ob_b = 0.4;
+#   ob_a = 1.0;
+#   ib_size = 0.01;
+#   ib_r = 0.25;
+#   ib_g = 0.25;
+#   ib_b = 0.25;
+#   ib_a = 0.0;
+#   mv_x = 0.0;
+#   mv_y = 0.0;
+#   mv_dx = 0.0;
+#   mv_dy = 0.0;
+#   mv_l = 0.9;
+#   mv_r = 1.0;
+#   mv_g = 1.0;
+#   mv_b = 1.0;
+#   mv_a = 0.0;
+#   
+per_frame = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a rad
+.code
+const 1.0
+store 0
+pop
+const 0.0
+store 1
+pop
+const 0.5
+store 2
+pop
+const 0.5
+store 3
+pop
+const 0.0
+store 4
+pop
+const 0.0
+store 5
+pop
+const 1.0
+store 6
+pop
+const 1.0
+store 7
+pop
+const 1.0
+store 8
+pop
+const 1.0
+store 9
+pop
+const 0.85
+store 10
+pop
+const 1.0
+store 11
+pop
+const 0.0
+store 12
+pop
+const 0.0
+store 13
+pop
+const 0.0
+store 14
+pop
+const 0.0
+store 15
+pop
+const 0.0
+store 16
+pop
+const 0.0
+store 17
+pop
+const 1.0
+store 18
+pop
+const 0.0
+store 19
+pop
+const 0.0
+store 20
+pop
+const 2.0
+store 21
+pop
+const 1.0
+store 22
+pop
+const 0.0
+store 23
+pop
+const 0.0
+store 24
+pop
+const 1.0
+store 25
+pop
+const 1.0
+store 26
+pop
+const 0.9
+store 27
+pop
+const 0.7
+store 28
+pop
+const 0.5
+store 29
+pop
+const 0.5
+store 30
+pop
+const 0.0
+store 31
+pop
+const 1.0
+store 32
+pop
+const 1.0
+store 33
+pop
+const 1.0
+store 34
+pop
+const 0.12
+store 35
+pop
+const 1.0
+store 36
+pop
+const 0.82
+store 37
+pop
+const 0.4
+store 38
+pop
+const 1.0
+store 39
+pop
+const 0.01
+store 40
+pop
+const 0.25
+store 41
+pop
+const 0.25
+store 42
+pop
+const 0.25
+store 43
+pop
+const 0.0
+store 44
+pop
+const 0.0
+store 45
+pop
+const 0.0
+store 46
+pop
+const 0.0
+store 47
+pop
+const 0.0
+store 48
+pop
+const 0.9
+store 49
+pop
+const 1.0
+store 50
+pop
+const 1.0
+store 51
+pop
+const 1.0
+store 52
+pop
+const 0.0
+store 53
+"""
+
+# --- per_vertex, from:
+#   ;
+#   zoom = if(above(abs(zoomexp - 1), 0.0001) * above(zoomexp, 0), pow(zoom, pow(zoomexp, rad*2 - 1)), zoom);
+per_vertex = """
+.regs zoom rot cx cy dx dy sx sy warp zoomexp decay gamma wrap darken_center brighten darken solarize invert echo_zoom echo_alpha echo_orient wave_mode wave_scale wave_smoothing wave_mystery wave_a wave_r wave_g wave_b wave_x wave_y wave_usedots wave_thick wave_additive wave_brighten ob_size ob_r ob_g ob_b ob_a ib_size ib_r ib_g ib_b ib_a mv_x mv_y mv_dx mv_dy mv_l mv_r mv_g mv_b mv_a rad
+.code
+load 9
+const 1.0
+sub
+fn1 abs
+const 0.0001
+fn2 above
+load 9
+const 0.0
+fn2 above
+mul
+jz 21
+load 0
+load 9
+load 54
+const 2.0
+mul
+const 1.0
+sub
+fn2 pow
+fn2 pow
+jump 22
+load 0
+store 0
+"""
+
