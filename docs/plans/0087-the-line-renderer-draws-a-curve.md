@@ -4,7 +4,9 @@
 > started.** Every `dev` phase has landed. Phase 4's look gate returned a green light and Phase 5
 > built on it; Phase 6 closed [design-backlog 0071](../design-backlog.md). One thing is owed before a
 > push: `check-backlog-claims.mjs` exits 1 on **0071**, whose probe Phase 6 falsified *by discharging
-> it*, and closing that entry is an architect call
+> it*, and closing that entry is an architect call. Phase 7 has begun and returned one engine
+> finding — a blunt joined corner on the straight-line motifs — **to be filed as a design-backlog
+> entry at the close**, drafted in the log
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
@@ -575,8 +577,26 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   removed that blur, taking `DEFAULT_SOFTNESS` from `1.0` to `0.25`. There is no longer any softness
   hiding the bevel, which is why this became visible now and not at Plan 0039. The ADR's disc-join
   alternative closes with *"worth revisiting only if the blunt corners above turn out to matter"*.
-  They matter. **Architect's call, and not this plan's** — it revises ADR-0041, reaches all four line
-  families and moves every line golden.
+  They matter.
+
+  **This is not for this plan to fix — file it at the close as a design-backlog entry**, at the
+  user's instruction. It revises ADR-0041, reaches all four line families and moves every line
+  golden, and the shader cannot compute `theta` on its own: a segment does not know its neighbour's
+  direction, which is the whole point of *per-endpoint on the segment instance*. Three designs are
+  open and they differ in instance-buffer cost — a per-endpoint miter length carried on the
+  instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex. Draft entry,
+  ready to lift:
+
+  > **A joined corner is blunt, and the stroke that hid it is gone.** `renderer.rs` extends a joined
+  > end by exactly `width` along its own direction; a corner of interior angle `theta` needs
+  > `width / sin(theta / 2)`. A `diamond`'s 61.9-degree vertex needs 26.3 px of a 13.5 px half-width
+  > and gets 15, so the point is truncated to a flat bevel, and the two quads sum on the inner side
+  > to 1.38x the stroke. ADR-0041 accepted this because the quadratic falloff blurred it; Plan 0114
+  > took `DEFAULT_SOFTNESS` to `0.25` and there is no blur left. Verdict in the running app, Plan
+  > 0087 Phase 7: *"how straight lines are connected, its clearly visible and doesn't look solid"*.
+  > Revises ADR-0041; reaches all four line families; moves every line golden.
+  >
+  > `present: let ext_a = select\(0\.0, width, in: core/src/render/scenes/lines/renderer.rs`
 
 ### Close triggers
 
@@ -606,12 +626,16 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   split. **It breaks `pre-push` and the CI `links` job until it is closed.** (The Phase 1b breakage
   this field recorded before — 0098's stale path — is gone: that entry was archived on `main` at
   `6eff54e`.)
-- **Outstanding `human` phases:** **Phase 7** (the retired mandalas, re-judged) — the regression
-  target the whole plan exists for, and the phase that decides whether any of `star_mandala`,
-  `star_mandala_six` or `star_weave` returns to the shipped set. Phase 4 ran; its verdict is above.
+- **Outstanding `human` phases:** **Phase 7, partly run.** All three retired presets were judged in
+  the running app and the verdict was *"looks much better"*; `star_mandala` returns as
+  `star_mandala_bordered` (commit below). **`star_mandala_six` and `star_weave` have no per-preset
+  verdict and were not re-landed**, so the phase is not discharged.
+- **Owed to `docs/design-backlog.md` at the close:** **one new entry**, the blunt joined corner —
+  drafted verbatim in the notes above, with its probe. Raised by Phase 7 in the running app, and it
+  revises [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
 - **Outstanding `dev` phases:** **none.** 5 and 6 landed here.
-- **Lane state:** `plan-0087-biarc` is branched from `main` at `e205f8e` and carries two commits,
-  `af4f118` and `8179f25`. **`main` has moved since** — a parallel session is committing to it — so
+- **Lane state:** `plan-0087-biarc` is branched from `main` at `e205f8e` and carries four commits —
+  `af4f118` (Phase 5), `8179f25` (Phase 6), `7631423` (the close block) and `a7d7cd0` (the preset). **`main` has moved since** — a parallel session is committing to it — so
   a merge of `main` into this branch is owed before the close. **No golden baseline moved**: all 794
   `lmv-core` tests pass on the tip, including every `parametric_curve` capture, which is the property
   the chord-web gate exists to hold. `cargo fmt --all --check` and
