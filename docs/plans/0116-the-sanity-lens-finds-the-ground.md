@@ -352,9 +352,9 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 | 4 — The floors are re-derived, not re-used | dev | done | `5d97abd` |
 | 5 — Adjudicate what changed | human | done | confirmed empty, 2026-08-26 |
 | 6 — The emptying canvas is actually caught | dev | done | `86106af` |
-| 7 — Documentation | dev | done | `committed with this row` |
-| 8 — What separates a composition from a blot | dev | not started | — |
-| 9 — The flatness ceiling gains a second condition | dev | not started | — |
+| 7 — Documentation | dev | done | `022e4c5` |
+| 8 — What separates a composition from a blot | dev | done | `committed with this row` |
+| 9 — The flatness ceiling gains a second condition | dev | **did not run** | Phase 8's stop condition fired |
 
 ### Notes
 
@@ -569,3 +569,70 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   Phase 9, noting that Phase 8 is a stop gate which can leave the row blocked on its outcome.
 - All three doc gates pass, including `node scripts/check-backlog-claims.mjs`: **OK, 69 stated
   reductions across 41 live entries.**
+
+#### Phase 8 — and the stop condition fired
+
+- **No candidate separates a blot from a composition. Phase 9 did not run**, per this phase's own
+  mechanical stop condition. The harness is
+  `each_structure_candidate_is_tabled_against_the_library`, `#[ignore]`d and assertion-free like
+  Phase 1's.
+- **The control column is the sharpest result in the table.** `1 - tonal_flatness` scores the frozen
+  `Blown Out` blot at `0.0846` and `Tiled Rosette Mono` at `0.0587` — **the blot reads as more
+  structured than the drawing**. Today's statistic does not merely fail to separate them, it orders
+  them backwards, which is ADR-0127's premise stated as a measurement.
+- **Measured at `LOUD`, over the shipped library plus `Blown Out`, `Tiled Rosette Mono` and the
+  three frozen `retired_mandalas()`:**
+
+  | candidate | blot -> composition | frames in the gap | derived threshold | convicts the blot? |
+  |---|---|---|---|---|
+  | `flatness^-1` (control) | `0.0846` -> `0.0587` | **not separated** | — | — |
+  | `boundary` | `0.2631` -> `0.3602` | 3 (`Banded Mandala`, `Mitosis`, `Verdigris`) | `0.0220` | **no** |
+  | `components` | `4.4223` -> `10.2980` | 5 (`De Jong Walk`, `Rho Walk`, `Banded Mandala`, `Pulse`, `Etching`) | `0.0544` | **no** |
+  | `sobel` | `0.2199` -> `1.3876` | **32** | `0.0215` | **no** |
+
+- **The report prints two readings of the stop condition and they agree.** The plan's own — separated
+  with the library outside the gap — fails for all three. The harness adds the sharper one: run the
+  threshold ceremony Phase 9 would have been required to use (half the sparsest legitimate content,
+  ADR-0071) and check whether the constant it produces still convicts the blot. It does not, for any
+  candidate, by an order of magnitude. That is the addition to the plan's stated report, made because
+  "no shipped preset in the gap" is a proxy for the thing that actually matters and this measures the
+  thing itself.
+- **Why all three fail is one fact.** Under the derived ground a saturated blot is **its own modal
+  band**, so its lit mask is not the mass but the mass's *fringe* — `Blown Out` reads `coverage
+  0.1963` at one occupied radial shell (the Phase 3 finding). A fringe is a thin ring, and every one
+  of these statistics is built to score a thin ring as structured. The ground change and ADR-0127's
+  mechanism work against each other on exactly this fixture, which no reading of either document
+  predicted.
+- **Thin-stroke content was in the table and is not the reason it failed.** The three frozen
+  mandalas read `boundary` `0.9480` / `0.9641` / `0.8653` — the top of the range, not the bottom — so
+  design-backlog 0072's aliasing failure did not reproduce on a boundary measure. That is a clean
+  negative result about the *worry*, inside a phase whose overall answer is negative for another
+  reason.
+- The candidates live in `core/tests/sanity.rs`, not `core/src/render/metrics.rs`, following Phase
+  1's precedent. The plan permits either; two discarded candidates shipped as `pub` production
+  statistics would have been the worse outcome, and this is the branch where that mattered.
+- `presets/pending/README.md`'s held row is re-pointed a second time, as this phase's stop condition
+  requires: `fragment_tiledmono` has **nothing scheduled**, and the row now carries why.
+
+### Close triggers
+
+- **`presets/` touched:** yes, but only `presets/pending/README.md` — no `.toml` added, removed or
+  edited, and the embedded set is byte-identical. `fragment_tiledmono.toml` was **not** `git mv`d
+  into `presets/`; Phase 9 did not run.
+- **The plan header's `Closes:` entries:** design-backlog 0128. **Not obviously closed** — the ground
+  landed and the emptying canvas is caught, but the entry was raised on `tonal_flatness` blocking
+  flat graphics and that half is measured-unsolved, with `fragment_tiledmono` still held. Whether
+  0128 closes, splits, or stays live on the residue is architect's call.
+- **What shipped:** fix + docs, no feature. The engine renders exactly what it rendered — every file
+  touched is a test, a metric, or a document. One new `pub` surface in `core/src/render/metrics.rs`
+  (`modal_ground`, `NO_GROUND`, `MIN_GROUND_SHARE`), read by the test suite only.
+- **Operator docs moved:** `docs/capturing.md` (the `sanity` gate-table row plus one stale mention in
+  the geometry-extent section) and `presets/pending/README.md` (the held row, twice).
+- **`node scripts/check-backlog-claims.mjs`:** exit 0 — "OK, 69 stated reductions still hold across
+  all 41 live entries (4 unprobeable)".
+- **`human` phases remaining:** none. Phase 2 and Phase 5 both ran and are recorded above.
+- **Two decisions were taken at stops the plan did not anticipate**, both offered as options and
+  chosen by the user, both recorded in full in the phase notes: Phase 3 committing red with Phase 4
+  restoring it, and Phase 4 re-deriving only the floors the ground change moved.
+- **Workspace at the tip:** `cargo nextest run --workspace` 969 of 969, `cargo fmt --all --check`
+  clean, `cargo clippy --workspace --all-targets -- -D warnings` clean, all three doc gates pass.
