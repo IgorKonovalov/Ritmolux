@@ -19,9 +19,14 @@
 //!   pixel owns its own ground, which is what lets this one paint paper.
 //! - The tonemap is **exactly the identity** below
 //!   [`KNEE`](crate::render::tonemap::KNEE)` = 0.6` (ADR-0046), so an element
-//!   whose brightest channel is at or under it reaches the display untouched.
+//!   whose brightest channel is at or under it survives the post chain
+//!   **unshaded** — the value it wrote is the value that leaves the tonemap.
 //!   Flatness is not argued for against this pipeline; below the knee the
-//!   pipeline is a no-op.
+//!   pipeline is a no-op. This is *not* the claim that the authored hex reaches
+//!   the display: a palette stop is a **linear coefficient with no sRGB decode**
+//!   (`docs/preset-palettes.md`), so the byte written is its sRGB encoding and
+//!   `#111111` presents as `#494949`. Same curve for every element, no shading
+//!   and no halo — which is the property the look actually rests on.
 //! - Bloom's threshold sits **above** that knee, so a canvas living under it
 //!   gets no halo and hard edges stay hard, at no cost and with no parameter.
 //!   One constraint buys both properties this look is made of.
@@ -474,29 +479,43 @@ impl Element {
             } else {
                 (hx - hy.min(hx)).max(0.0)
             };
-            let mut points: Vec<[f32; 2]> = Vec::with_capacity(9);
-            // A `segment`'s apex is its own centre; an `arc` has none.
-            if kind < 5.5 {
-                points.push([0.0, 0.0]);
-            }
-            for end in [-a, a] {
-                let (se, ce) = (angle + end).sin_cos();
-                for radius in [inner, hx] {
-                    points.push([radius * ce, radius * se]);
+            // **A fixed array, not a `Vec`.** `compose` calls this for every
+            // live element on every frame, so a heap allocation here is one per
+            // sector per frame on the render thread — see
+            // `the_element_builder_allocates_nothing`. Nine is exhaustive: one
+            // apex, two ends at two radii, and at most four cardinal touches.
+            let mut points = [[0.0f32; 2]; 9];
+            let mut n = 0usize;
+            {
+                let mut push = |p: [f32; 2]| {
+                    if let Some(slot) = points.get_mut(n) {
+                        *slot = p;
+                        n += 1;
+                    }
+                };
+                // A `segment`'s apex is its own centre; an `arc` has none.
+                if kind < 5.5 {
+                    push([0.0, 0.0]);
+                }
+                for end in [-a, a] {
+                    let (se, ce) = (angle + end).sin_cos();
+                    for radius in [inner, hx] {
+                        push([radius * ce, radius * se]);
+                    }
+                }
+                for k in 0..4 {
+                    let phi = k as f32 * std::f32::consts::FRAC_PI_2;
+                    // Angular distance from the sector's world-frame axis,
+                    // wrapped into [-PI, PI].
+                    let tau = std::f32::consts::TAU;
+                    let raw = phi - angle;
+                    let delta = raw - tau * ((raw + std::f32::consts::PI) / tau).floor();
+                    if delta.abs() <= a {
+                        push([hx * phi.cos(), hx * phi.sin()]);
+                    }
                 }
             }
-            for k in 0..4 {
-                let phi = k as f32 * std::f32::consts::FRAC_PI_2;
-                // Angular distance from the sector's world-frame axis, wrapped
-                // into [-PI, PI].
-                let tau = std::f32::consts::TAU;
-                let raw = phi - angle;
-                let delta = raw - tau * ((raw + std::f32::consts::PI) / tau).floor();
-                if delta.abs() <= a {
-                    points.push([hx * phi.cos(), hx * phi.sin()]);
-                }
-            }
-            hull(points.into_iter())
+            hull(points.iter().take(n).copied())
         };
 
         Element {

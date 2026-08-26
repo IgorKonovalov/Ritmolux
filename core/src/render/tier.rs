@@ -359,9 +359,12 @@ pub struct TierConfig {
     ///
     /// **40 is the reference set's own top, not a budget line.** The gate that
     /// set it was a look judgement, and the numbers were not the binding
-    /// constraint: the user's working density is **8 to 14 elements** — where
-    /// the canvas costs 36-39 % — and denser canvases were rejected on sight
-    /// long before they were rejected on cost. The ceiling then went to the
+    /// constraint: the user's working density is **8 to 14 elements**, where the
+    /// ladder above reads **12.7 % at eight and 16.8 % at sixteen** — and denser
+    /// canvases were rejected on sight long before they were rejected on cost.
+    /// (This sentence quoted 36-39 % until Plan 0113 Phase 9. Those were the
+    /// pre-Phase-3 sweep's figures, taken from the instrument the paragraph five
+    /// lines up forbids quoting.) The ceiling then went to the
     /// densest thing the plan still has to build, Kandinsky's *On White II*,
     /// which ADR-0123 counts at just above 40 once its lines and arcs are
     /// included. So this value sits **exactly on** that canvas rather than over
