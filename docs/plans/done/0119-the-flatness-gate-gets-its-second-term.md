@@ -67,7 +67,7 @@ flowchart TB
     F --> T1["term 1: tonal_flatness<br/>share of LIT pixels in one of 16 bands<br/>(ADR-0126 ground)"]
     F --> T2["term 2: boundary density<br/>share of LIT pixels with an unlit 4-neighbour<br/>(perimeter over lit area, ADR-0130)"]
     T1 -->|"> MAX_TONAL_FLATNESS"| AND{"both?"}
-    T2 -->|"< MIN_BOUNDARY_DENSITY"| AND
+    T2 -->|"< boundary_floor(system)"| AND
     AND -->|yes| BLOT["convicted: a blot"]
     AND -->|no| OK["passes the flatness gate"]
 ```
@@ -119,8 +119,12 @@ flowchart TB
   - **Stop** — nothing passes. ADR-0129 takes a dated `Outcome`, `fragment_tiledmono` stays held, and
     the `presets/pending/README.md` row is updated with what this plan ruled out. **Phases 3-5 do not
     run.** This is a real outcome and it has now happened twice; it is not a failure of the plan.
-- **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at
-  `MIN_BOUNDARY_DENSITY = 0.31`, not the tiled statistic. The reason, in full, is
+- **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at `0.31`,
+  not the tiled statistic. (This Outcome first named that constant `MIN_BOUNDARY_DENSITY`. It shipped
+  as `boundary_floor(system)` instead, revised the same day on the straddle finding in ADR-0130's
+  Context — Phase 3 below carries the corrected form, and the name is repointed throughout this file
+  at the plan's close so nothing here cites an identifier the tree never had.) The reason, in full,
+  is
   [ADR-0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
   ADR-0129 keeps its corrected stop condition, takes a dated `Outcome`, and has its Decision
   superseded. In one paragraph: conditioned correctly the population is two members and criterion 2
@@ -153,7 +157,7 @@ flowchart TB
     discarded candidates; a discarded candidate that ships as a `pub` production statistic is the
     thing that section's own header warns against.
   - **The conviction is a conjunction.** `every_preset_draws_a_real_shape` fails a preset only when
-    `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < MIN_BOUNDARY_DENSITY`; the
+    `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < boundary_floor(system)`; the
     printed line carries both numbers for every preset, not only for failures.
   - **The floor is `boundary_floor(system)`, not one constant** — the mechanism `coverage_floor`
     already uses in this file. `SystemKind::ShapeCollage => 0.13`, everything else `0.31`. **A single
@@ -208,7 +212,8 @@ flowchart TB
   - **The calibration anchor is frozen into the test, and this is not optional.**
     `HELD_OUT_TOML` is `include_str!("../../presets/pending/fragment_tiledmono.toml")`, so the `git
     mv` breaks the build — and repointing it at the new path would be worse than the break: the
-    composition-side anchor of `MIN_BOUNDARY_DENSITY` would become ordinary editable content, and a
+    composition-side anchor of `boundary_floor`'s default arm would become ordinary editable
+    content, and a
     preset tweak could move a gate constant with nothing able to notice, because the constant would
     still read green. Freeze the measured TOML into `sanity.rs` as an inline literal the way
     `retired_mandalas()` already freezes three presets from a git revision, name the revision it was
@@ -221,8 +226,8 @@ flowchart TB
     leaves as soon as its blocker lifts, and a stale blocker in a shipped preset's header is the
     class of comment [Plan 0118](../0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
     about. **It also carries the one line that makes it un-editable-by-accident**: this preset's
-    frame is a calibration anchor for `MIN_BOUNDARY_DENSITY`, and re-tuning it re-opens that
-    constant.
+    frame is a calibration anchor for `boundary_floor`'s default arm, and re-tuning it re-opens
+    that constant.
   - **`presets/pending/README.md`'s `Held today` table loses the row.** If the table is then empty,
     the file says so explicitly rather than leaving an empty table — the directory keeps its purpose
     with nothing in it.
@@ -242,7 +247,8 @@ flowchart TB
     which is ADR-0130's, not ADR-0129's: **a blot with a raggeder mask than `Blown Out`'s passes the
     structural term**, because `boundary` reads pixel-scale perimeter and a noisier particle field
     has more of it. Say the second half too — over half the shipped library reads below
-    `MIN_BOUNDARY_DENSITY` and is held only by the tonal term — because a reader who knows only the
+    its family's `boundary_floor` and is held only by the tonal term — because a reader who knows
+    only the
     first half will mis-price the gate. A gate's documented limits are the reason that section
     exists.
   - `presets/README.md` gains whatever the shipped preset's arrival requires and nothing more; this
