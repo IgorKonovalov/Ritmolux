@@ -1,6 +1,6 @@
 # 0119 — The flatness gate gets its second term
 
-> **Status:** draft
+> **Status:** approved 2026-08-26
 > **Created:** 2026-08-26
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
