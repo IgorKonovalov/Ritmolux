@@ -310,6 +310,62 @@ flowchart LR
   - Golden baselines exist for both shipped presets, blessed on **hardware**, and the bless is
     scoped — unrelated baselines are restored before committing.
 
+### Phase 9 — The Mode 4 repairs
+
+> **Added 2026-08-26 by the close review**, on the [Plan 0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+> precedent: findings that need code become a phase rather than a paragraph, so the session that
+> fixes them reads them in the plan it is already holding. Phases 1-8 landed cleanly and the
+> workspace is green (993 tests) on the merged lane; nothing below reverses a decision.
+
+- **Owner skill:** dev
+- **What:** The three `major` findings from the close review, plus the four documentation `minor`s.
+  Independent of Phase 6b and takeable in either order.
+- **Files touched:** `docs/preset-palettes.md`, `presets/README.md`,
+  `presets/collage_suprematist.toml`, `core/tests/fixtures/shape_collage.toml`,
+  `core/src/render/scenes/shape_collage.rs`, `core/src/render/tier.rs`, `docs/preset-guide.md`,
+  `docs/design-backlog.md`.
+- **Done when:**
+  - **The colour promise states what the knee actually buys.** Five sites say a colour under the
+    knee *"reaches the display byte-identical"* / *"as authored"* / *"untouched"*:
+    `docs/preset-palettes.md` (the `shape_collage` section), `presets/README.md`,
+    `presets/collage_suprematist.toml`, `core/tests/fixtures/shape_collage.toml`, and
+    `shape_collage.rs`'s module docs. It is false and the same file already says so 750 lines up:
+    a hex stop is a **linear coefficient with no sRGB decode**, so the display byte is its sRGB
+    *encoding*. Measured on the shipped preset: `#111111` renders `#494949`, `#8a1420` renders
+    `#BF5164`, `#d9d5c8` renders `#E2E0DA`. The true claim — and the one the look rests on — is that
+    below the knee the **tonemap** is the identity, so the fill survives the post chain **unshaded
+    and halo-free**. Fix all five together; half a repair leaves the tree contradicting itself.
+    `an_element_under_the_knee_arrives_at_the_value_it_was_authored_at` is already correct (it
+    asserts `encoded(hex/255)`) and must not be changed to match the prose.
+  - **`core/src/render/tier.rs` stops quoting the sweep it forbids quoting.** The paragraph reading
+    *"the user's working density is 8 to 14 elements — where the canvas costs 36-39 %"* takes those
+    figures from the pre-Phase-3 throttled sweep, five lines under the sentence that says **do not
+    quote it**. The shipped table in the same comment reads 12.7 % at 8 and 16.8 % at 16; a re-run
+    on 2026-08-26 read **7.3 % at 8 and 18.2 % at 40**. Replace with a figure the comment's own
+    table supports.
+  - **`Element::build` allocates nothing.** Its `segment`/`arc` arm builds a `Vec::with_capacity(9)`,
+    and `compose()` calls `Element::build` for every live element **every frame**
+    (`advance` -> `step` -> `compose`, unconditionally) — so `collage_onwhite` pays roughly five
+    heap allocations a frame on the render thread, against this plan's own *"No allocation in the
+    render path"*. A fixed `[[f32; 2]; 9]` plus a length, passed to `hull` as a slice, is the whole
+    change. **The existing capacity test cannot see this** — it measures `Vec<Placed>`, not the
+    hull — so the assertion needs to reach the allocator or the sector arm needs to hold no `Vec`
+    for one to be able to.
+  - **The retracted beat multiplier is gone.** `presets/collage_suprematist.toml` (twice) and
+    `presets/README.md` state *"1.7-2.1x"* and *"Plan 0095 is the fix in flight"*. Plan 0095 closed
+    by **retracting the multiplier** — `docs/presets.md` now says no fixed multiplier converts, and
+    that close swept seven other presets to *"a preset-author followup (Plan 0095)"*. Match them.
+    `collage_onwhite.toml` is already clean, and no binding changes: `hash(beat_index)` is
+    activity-gating, which is what `beat_index` is still good for.
+  - **`docs/preset-guide.md` section 2 lists every system.** It stops at ten while `README.md` now
+    says twelve and links to it. `warp_mesh` was already missing; add both rather than one.
+  - **`design-backlog 0128` records that its motivating family landed.** Its finding says the
+    black-ground precondition *"holds for all eleven current systems"*; there are twelve, and the
+    twelfth is the light-ground case the entry was raised on. A dated bullet, not a rewrite — the
+    entry closed with Plan 0116 and the archive is append-only.
+  - `cargo nextest run --workspace` is green, and the two golden baselines are unmoved — none of the
+    above is a pixel change.
+
 ## Data shapes
 
 ```rust
