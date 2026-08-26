@@ -136,7 +136,7 @@
 )]
 
 use std::cell::RefCell;
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 use std::rc::Rc;
 use std::sync::OnceLock;
 
@@ -696,14 +696,17 @@ pub enum Motif {
     Teardrop,
     /// A four-vertex rhombus, long along the radius.
     Diamond,
-    /// An **open** circular arc bulging outward, chord tangential. The nearest
-    /// the closed roster comes to a scalloped boundary: raise `scale` until
-    /// neighbouring members' chord ends touch and the ring closes into a scallop.
+    /// An **open** circular arc bulging outward, chord tangential. One bead
+    /// among the others, and no longer the roster's answer to a scalloped
+    /// boundary.
     ///
-    /// **It is an approximation and the user chose the real thing.** Shown side
-    /// by side with a dense overlapping arc ring at Phase 3, the user picked a
-    /// genuine boundary *curve primitive*, which the engine does not have —
-    /// design-backlog 0071, architect then dev. Nothing here fakes one.
+    /// **It was an approximation of one, and the user chose the real thing.**
+    /// Shown side by side with a dense overlapping arc ring at Plan 0065 Phase
+    /// 2, they picked a genuine boundary *curve primitive*, which the engine
+    /// did not then have (design-backlog 0071). It has one now:
+    /// [`Scallop`](Motif::Scallop), a single closed chain rather than a ring of
+    /// copies faking continuity. Reach for that when you want a boundary, and
+    /// for this when you want an open arc.
     Arc,
     /// A three-lobed rose, `r = |cos(3*theta/2)|` — the densest member, and the
     /// one that reads as ornament rather than as a bead.
@@ -711,6 +714,24 @@ pub enum Motif {
     /// An **open** two-segment chevron, apex outward. The cheapest motif in the
     /// roster at two segments a copy.
     Chevron,
+    /// The **scalloped boundary** — one closed chain of outward-bulging arcs
+    /// meeting at cusps, and the only roster member that is a *figure* rather
+    /// than a bead repeated around a ring.
+    ///
+    /// **This is the primitive the user chose over an approximation of it**
+    /// (Plan 0065 Phase 2, design-backlog 0071). Shown a ring of overlapping
+    /// [`Arc`](Motif::Arc) motifs faking a continuous boundary side by side with
+    /// the real thing, they picked the real thing, and until Plan 0087 gave the
+    /// renderer an arc instance there was no way to build one.
+    ///
+    /// **It reads the ring's own fields, and each keeps its spirit** — see
+    /// [`build_rings`]. `count` is the **lobe count** rather than a copy count,
+    /// because the lobes are one chain and there is nothing to repeat; `radius`
+    /// is the base circle they bulge from, which is exactly the ring a boundary
+    /// sits on; `scale` is the **depth** of the bulge, which is the only size a
+    /// lobe has once `count` has fixed its width; and `phase` turns the whole
+    /// boundary, as it turns every other ring.
+    Scallop,
 }
 
 impl Motif {
@@ -724,6 +745,7 @@ impl Motif {
         Motif::Arc,
         Motif::Trefoil,
         Motif::Chevron,
+        Motif::Scallop,
     ];
 
     /// The `motif = "..."` name a preset writes. `None` for anything outside the
@@ -737,6 +759,7 @@ impl Motif {
             "arc" => Motif::Arc,
             "trefoil" => Motif::Trefoil,
             "chevron" => Motif::Chevron,
+            "scallop" => Motif::Scallop,
             _ => return None,
         })
     }
@@ -751,6 +774,7 @@ impl Motif {
             Motif::Arc => "arc",
             Motif::Trefoil => "trefoil",
             Motif::Chevron => "chevron",
+            Motif::Scallop => "scallop",
         }
     }
 
@@ -761,6 +785,13 @@ impl Motif {
         !matches!(self, Motif::Arc | Motif::Chevron)
     }
 
+    /// Whether this motif is the closed [`Scallop`](Motif::Scallop) boundary,
+    /// whose ring is **one chain of `count` lobes** rather than `count` copies
+    /// of anything.
+    fn is_scallop(self) -> bool {
+        matches!(self, Motif::Scallop)
+    }
+
     /// Vertices in one copy of this motif.
     fn vertex_count(self) -> usize {
         match self {
@@ -769,6 +800,8 @@ impl Motif {
             Motif::Arc => ARC_SAMPLES + 1,
             Motif::Trefoil => TREFOIL_SAMPLES,
             Motif::Chevron => 3,
+            // The base circle its lobes bulge from — see `outline`.
+            Motif::Scallop => SMOOTH_SAMPLES,
         }
     }
 
@@ -850,7 +883,7 @@ impl Motif {
     /// [`arcs`](Self::arcs). **A fitted member contributes whatever straight
     /// runs its chain contains**, which for all three of them is none.
     pub fn segments(self) -> usize {
-        if self.arc_shape().is_some() {
+        if self.arc_shape().is_some() || self.is_scallop() {
             return 0;
         }
         if let Some(chain) = self.chain() {
@@ -866,7 +899,11 @@ impl Motif {
     /// **Arcs** one copy contributes — one for each circular member, its whole
     /// chain for each fitted one, zero for the rest.
     pub fn arcs(self) -> usize {
-        if self.arc_shape().is_some() {
+        // One arc per lobe for a scallop, and its ring's `count` is its lobe
+        // count — so `count * instances()` is the whole chain, exactly as it is
+        // the whole ring for every other member. The budget arithmetic never
+        // learns that this one is a chain.
+        if self.arc_shape().is_some() || self.is_scallop() {
             return 1;
         }
         self.chain().map_or(0, |chain| {
@@ -973,6 +1010,16 @@ impl Motif {
                 out.push([0.5, 0.0]);
                 out.push([-0.25, -0.42]);
             }
+            // The base circle the boundary's lobes bulge from. A scallop has no
+            // outline of its own in this frame: its shape needs a lobe count
+            // and a depth, and both live on the ring rather than on the motif.
+            // `build_rings` builds the chain directly and never asks for this.
+            Motif::Scallop => {
+                for k in 0..smooth {
+                    let t = TAU * k as f32 / smooth as f32;
+                    out.push([0.5 * t.cos(), 0.5 * t.sin()]);
+                }
+            }
         }
     }
 }
@@ -1012,6 +1059,58 @@ struct ArcShape {
     radius: f32,
     start: f32,
     sweep: f32,
+}
+
+/// The fewest lobes a [`Motif::Scallop`] boundary is built with.
+///
+/// Below three there is no boundary to speak of: at one lobe the two ends of
+/// the chain's only arc coincide and its sweep degenerates to zero, and at two
+/// the "scallop" is a lens. `build_rings` raises a smaller `count` to this
+/// rather than declining it, and charges the raised count against the cap, so
+/// the budget arithmetic and the geometry agree.
+pub const MIN_SCALLOP_LOBES: u32 = 3;
+
+/// One lobe of a scalloped boundary, in the ring's own frame: the arc that
+/// leaves the base circle at `-half_span`, bulges out to `depth` past it on the
+/// axis, and returns to the base circle at `+half_span`.
+///
+/// **Constructed exactly rather than fitted.** A scallop *is* a chain of
+/// circular arcs — that is what makes it a scallop and not a sine wave — so
+/// there is nothing here for [`biarc`] to approximate. The circle through the
+/// two ends and the apex has its centre on the axis by symmetry, and equating
+/// its distance to an end and to the apex gives the centre in one line:
+///
+/// ```text
+///   c = ((R + d)^2 - R^2) / (2 * ((R + d) - R * cos(half_span)))
+/// ```
+///
+/// At `d = 0` that is `c = 0` and the lobe is an arc of the base circle itself,
+/// so a zero depth draws the plain ring rather than anything degenerate — the
+/// property that makes `ring_scale` a continuous lever on this member as it is
+/// on every other.
+fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
+    let apex = base + depth;
+    let denom = 2.0 * (apex - base * half_span.cos());
+    // `apex - base * cos` is positive for every depth a preset can reach
+    // (`ring_scale` clamps at zero), so this only guards the exactly-flat case.
+    let centre = if denom.abs() > f32::EPSILON {
+        (apex * apex - base * base) / denom
+    } else {
+        0.0
+    };
+    let radius = (apex - centre).abs();
+    let (sin, cos) = half_span.sin_cos();
+    let start = (-base * sin).atan2(base * cos - centre);
+    let end = (base * sin).atan2(base * cos - centre);
+    ArcShape {
+        centre: [centre, 0.0],
+        radius,
+        start,
+        // The lobe runs the short way from one end to the other, which is
+        // outward past the apex: the two ends straddle the axis and the sweep
+        // between them is under half a turn for any depth.
+        sweep: (end - start).rem_euclid(TAU),
+    }
 }
 
 /// The lateral budget [`build_chains`] fits the roster's curved motifs to,
@@ -1215,6 +1314,21 @@ const RING_SPREAD_STEP: f32 = 0.001;
 /// sub-pixel step is a looser number: `0.002 * 0.46 * 540 = 0.50 px`.
 const RING_SCALE_STEP: f32 = 0.002;
 
+/// How many of a ring's repeated element actually get placed: copies for every
+/// motif but [`Motif::Scallop`], whose `count` is a **lobe count** and has a
+/// floor of [`MIN_SCALLOP_LOBES`].
+///
+/// One function, called by both the cap-free `wanted` fold and the placement
+/// loop, because a raised count that only one of them knew about would make the
+/// drop count a fiction.
+fn placed_count(ring: &RingSpec) -> u32 {
+    if ring.motif.is_scallop() {
+        ring.count.max(MIN_SCALLOP_LOBES)
+    } else {
+        ring.count.max(1)
+    }
+}
+
 /// Place every ring's motifs into `out` (cleared first) under `motion`, and
 /// return how many segments were dropped at `cap`.
 ///
@@ -1252,18 +1366,52 @@ pub(crate) fn build_rings(
         acc.saturating_add(
             ring.motif
                 .instances()
-                .saturating_mul(ring.count.max(1) as usize),
+                .saturating_mul(placed_count(ring) as usize),
         )
     });
 
     let mut pts: Vec<[f32; 2]> = Vec::new();
     'rings: for (index, ring) in rings.iter().enumerate() {
-        let count = ring.count.max(1);
+        let count = placed_count(ring);
         // The ring's own configuration, moved. Hoisted out of the copy loop
         // because it is constant across the ring.
         let base_phase = ring.phase + ring_direction(index) * motion.phase;
         let radius = ring.radius * motion.spread;
         let scale = ring.scale * motion.scale;
+
+        // The scalloped boundary: **one closed chain of `count` lobes**, not
+        // `count` copies of a motif (ADR-0079's open question, and the form the
+        // user chose at Plan 0065 Phase 2). Each lobe is an exact arc, and
+        // consecutive lobes share the point where they leave the base circle,
+        // so the chain closes on itself.
+        if ring.motif.is_scallop() {
+            let half_span = PI / count as f32;
+            // `scale` is the lobe's depth here, and `radius` the circle it
+            // bulges from — see `Motif::Scallop`. Both already carry the ring
+            // motion, so the boundary breathes under `ring_spread` and deepens
+            // under `ring_scale` like any other ring.
+            let lobe = scallop_lobe(radius.abs(), scale, half_span);
+            for i in 0..count {
+                if out.len() + arcs.len() >= cap {
+                    break 'rings;
+                }
+                // Lobe `i` is the same arc turned into its own sector; the
+                // sectors tile the circle exactly, which is what makes the
+                // chain closed and its cusps evenly spaced.
+                let theta = TAU * i as f32 / count as f32 + base_phase;
+                let (sin, cos) = theta.sin_cos();
+                let (x, y) = (lobe.centre[0], lobe.centre[1]);
+                arcs.push(ArcInstance {
+                    centre: [x * cos - y * sin, x * sin + y * cos],
+                    radius: lobe.radius,
+                    angle_start: lobe.start + theta,
+                    angle_sweep: lobe.sweep,
+                    color: [1.0, 1.0, 1.0],
+                    width: 0.01,
+                });
+            }
+            continue;
+        }
 
         // A circular motif is one arc per copy, with no interior joint at any
         // scale (ADR-0098) — where it used to be `SMOOTH_SAMPLES` segments and
