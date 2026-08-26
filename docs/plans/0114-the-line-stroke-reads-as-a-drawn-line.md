@@ -350,14 +350,21 @@ at `b2fb13b`.
 | 1 — the profile lands | dev | done | `e2eb8fc` |
 | 2 — the arc fragment shares it | dev | done | `348cc01` |
 | 3 — the sample sheet | dev | done | `5592e40` |
-| 4 — pick the default | human | **next — this session stops here** | |
-| 5 — flip, re-bless, repair the docs | dev | not started | |
-| 6 — the library is retuned | human | not started | |
+| 4 — pick the default | human | done | verdict below |
+| 5 — flip, re-bless, repair the docs | dev | done | committed with this row |
+| 6 — the library is retuned | human | **next — this session stops here** | |
 | 7 — the MilkDrop comparison set | dev | not started | |
 | 8 — judge against the reference | human | not started | |
 | 9 — set the constant, add a baseline | dev | not started | |
 
 ### Notes
+
+**Phase 4's verdict, given in the running app on real audio (2026-08-26).** Default **`0.25`**.
+A crisper stroke reads **noticeably brighter** at the same `brightness`, so Phase 6 should expect
+an exposure trim and not discover one — bloom included, since its threshold is a brightness cut.
+Per preset, for Phase 6 to bind: `curve_ionwake` **0**, the Maurer roses **1.0**
+(`curve_nightbloom`, and `fragment_vitrail`'s line layer is one too), `lsystem_vellum` **0.25**.
+`star_rosewindow` and `spectrum_halo` were not given a value.
 
 - **Phase 1 touched two files outside its list.** `presets/README.md`, because
   `core/tests/preset.rs`'s `every_declared_param_is_documented_in_the_presets_readme` fails the
@@ -365,6 +372,38 @@ at `b2fb13b`.
   declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
   `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
   argument to compile.
+- **The re-bless is two files, not "every line baseline".** `spectrum.png` and
+  `line_joint_zigzag.png`. `parametric_curve`, `lsystem` and `star_pattern` moved by **mean
+  0.0000 / outlier 0** — at the golden suite's 128 px a `thickness ≈ 2` stroke is 0.38 px of
+  half-width, so the edge cap makes `softness` inert and those baselines cannot see this
+  fragment at all. That is the same coverage gap ADR-0124 records for `warp_mesh`, now shown to
+  reach the line families; Phase 9 closes it only for `warp_mesh`.
+- **`line_joint_zigzag.png` lives in `tests/golden/` but is blessed by its own binary**, so
+  `LMV_BLESS=1 ... --test golden` does not reach it and it surfaced only on the full suite. Its
+  behavioural arms still pass — the joint is a local maximum (0.7015 against 0.5120 either side)
+  and neither end overshoots — so what moved is the pixels, not the notch.
+- **`warp_mesh`'s three baselines did not move**, per Phase 5's stop-and-diagnose check. The pin
+  and the cap both hold.
+- **Adapters compared before blessing.** Both re-blessed baselines were re-read on the hardware
+  adapter against the WARP-blessed file: `spectrum` and `line_joint_zigzag` each at **mean
+  0.0000 / outlier 1**. In the same hardware pass `attractor` reads outlier 107 and
+  `reaction_diffusion` 46 — neither scene was touched and neither baseline was re-blessed, so
+  that is pre-existing cross-adapter drift and not this plan's.
+- **Three tests encoded the old profile and were repointed rather than retuned away.**
+  `the_arc_stroke_falls_off_quadratically_like_a_segment` keyed its `(1 - d/w)²` closed form on
+  `DEFAULT_SOFTNESS`; it now names `SOFT_PROFILE = 1.0`, the value that expression is about.
+  `a_circle_motif_is_round_and_unbeaded_...` moved from a bare `0.05` per-ray spread to a named
+  `BEAD_SPREAD = 0.12` on **both** arms — measured, the arc spreads 7.9 % and the 24-gon control
+  34.3 %, so the gap that carries the property widened rather than narrowed; a solid core
+  contributes whole pixels to a ray's sum where a gradient contributes fractions.
+  `lines_lit_backdrop.toml` now pins `softness = "1.0"`, because that guard's wide arm reads
+  alpha off the *fully extinguished* set and a plateau legitimately extinguishes a region rather
+  than a thread — at the new default it cannot tell coverage-is-1-over-a-region from the
+  constant-alpha defect it exists to catch.
+- **Followup, deliberately not acted on:** `docs/images/gallery/`'s four line-scene renders
+  (`parametric_curve`, `lsystem`, `star_pattern`, `spectrum`) now show a stroke the engine no
+  longer draws. `scripts/docs-shots.mjs` re-shoots them and is explicitly not a CI gate, so
+  nothing fails. Re-shooting belongs **after** Phase 6, or it is paid twice.
 - **Phase 3 emits two artifacts per (preset, size), not one.** `shot --all` resizes every capture
   to a 320 px thumbnail, so a 1080p contact sheet is a 6:1 downsample and a 4 px stroke lands at
   0.7 px. The sheet ranks the four and shows whether the figure still reads; the four full-size

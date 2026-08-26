@@ -1011,6 +1011,17 @@ fn arc_diff(a: &[f32], b: &[f32]) -> (f32, u8) {
 /// The golden suite's tolerances, quoted rather than re-invented — Phase 1's
 /// done-when is "within the golden suite's own drift tolerance", and these are
 /// the two numbers `core/tests/golden.rs` holds every baseline to.
+/// The `softness` at which the profile is the **pre-Plan-0114 fragment, term
+/// for term** — `g = u²`, the shape every closed form in this file is written
+/// against.
+///
+/// Named rather than spelled `1.0` inline, and deliberately **not**
+/// [`DEFAULT_SOFTNESS`](super::super::DEFAULT_SOFTNESS): Plan 0114 Phase 5
+/// moved the default to 0.25 on a look gate, and it will move again. What
+/// these assertions are about is the profile, not the library's current
+/// taste.
+const SOFT_PROFILE: f32 = 1.0;
+
 const ARC_MEAN_TOL: f32 = 0.02;
 const ARC_OUTLIER_TOL: u8 = 48;
 
@@ -1087,7 +1098,7 @@ fn an_arc_draws_the_same_curve_as_a_dense_polyline() {
         width: ARC_WIDTH,
     };
 
-    for softness in [super::super::DEFAULT_SOFTNESS, 0.5, 0.0] {
+    for softness in [SOFT_PROFILE, 0.5, 0.0] {
         let Some(polyline) = arc_capture(&segments, &[], 0, softness) else {
             return;
         };
@@ -1193,7 +1204,7 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
         .collect();
 
     let mut cuts: Vec<(f32, Vec<f32>)> = Vec::new();
-    for softness in [super::super::DEFAULT_SOFTNESS, 0.5, 0.0] {
+    for softness in [SOFT_PROFILE, 0.5, 0.0] {
         let Some(drawn) = arc_capture(&[], &[arc], 4, softness) else {
             return;
         };
@@ -1227,16 +1238,19 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
              two primitives are not drawing the same stroke"
         );
 
-        if softness == super::super::DEFAULT_SOFTNESS {
-            // The default is still the pre-Plan-0114 fragment, term for term.
+        if softness == SOFT_PROFILE {
+            // `1.0` is still the pre-Plan-0114 fragment, term for term — that is
+            // what the golden corpus rests on, and it is a value a preset can
+            // still bind. It is NOT the default any more (Plan 0114 Phase 5
+            // moved that to 0.25), so this arm names the number it is about.
             let worst = rows.iter().fold(0.0f32, |acc, row| {
                 let d = (ndc_y(*row) - RADIUS).abs();
                 let falloff = 1.0 - d / WIDTH;
                 acc.max((at(&drawn, *row) - falloff * falloff).abs())
             });
             eprintln!(
-                "arc stroke profile at the default: worst |measured - \
-                 (1 - d/w)^2| {worst:.4}"
+                "arc stroke profile at softness {SOFT_PROFILE}: worst \
+                 |measured - (1 - d/w)^2| {worst:.4}"
             );
             assert!(
                 worst <= SLACK,

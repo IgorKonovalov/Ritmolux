@@ -67,6 +67,7 @@ spin          = "0"
 hue           = "0.25"
 brightness    = "1.2"
 thickness     = "9"
+softness      = "1.0"
 draw_progress = "1"
 
 trails = "0.25"
