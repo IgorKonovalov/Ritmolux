@@ -448,7 +448,7 @@ directly.
 | 6b — The canvas is measured against its own paper | dev | done | df6ed6e |
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
-| 9 — The Mode 4 repairs | dev | done | committed with this row |
+| 9 — The Mode 4 repairs | dev | done | 015f8a3 |
 
 ### Notes
 
@@ -595,23 +595,14 @@ before/after.
   coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
   against a 0.02 floor.
 
-**Not merged, and `main` moved 27 commits under this lane.** The two lanes' code
-has never met — ADR-0053's step 2/3 is outstanding. Three files overlap
-textually (`docs/presets.md`, `presets/README.md`, this plan). Two commits
-collide with what this plan *wrote*, and neither is a conflict git will show:
-
-- **Plan 0095 closed without fixing the beat clock.** It closed by documenting
-  that `beat_index` counts onsets, and `docs/presets.md` on `main` now states
-  that **no fixed multiplier converts** and that `mod(beat_index, N)` never means
-  N beats. **Both shipped presets and the `presets/README.md` section written
-  here say "1.7-2.1x" and "Plan 0095 is the fix in flight".** Stale, and the
-  multiplier is now contradicted by main's own docs. Content repair, not a
-  merge resolution.
-- **ADR-0126 / Plan 0116 rebuilt the sanity lens**, and a backlog entry on `main`
-  is titled *the sanity lens cannot measure a scene that paints its own ground* —
-  which is this scene. The `coverage_floor` arm added here and the `animation`
-  footprint observation above may duplicate or contradict it. Worth reading
-  before the review rather than after.
+**Merged, and both semantic collisions the lane recorded are discharged.** The
+branch merged into `main` on 2026-08-26 (`b20ba21`); neither collision was a
+conflict git would have shown. Plan 0095's retracted beat multiplier is repaired
+in Phase 9 — both shipped presets and `presets/README.md` now match
+`docs/presets.md`. ADR-0126 / Plan 0116's rebuilt sanity lens is adopted in
+Phase 6b — the `coverage_floor` arm is re-derived rather than duplicated, and the
+backlog entry raised on this scene takes a dated bullet. The `animation`
+footprint observation below is untouched by either and is still open.
 
 ### Close triggers
 
@@ -624,15 +615,20 @@ collide with what this plan *wrote*, and neither is a conflict git will show:
   reactivity levers, an eight-kind element roster, two shipped presets, two golden
   fixtures and a cost instrument.
 - **Operator docs touched:** `presets/README.md`, `docs/presets.md`,
-  `docs/preset-palettes.md`, `README.md`.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. Four
-  unprobeable claims, unchanged — `0038`, `0069`, `0079`, `0110`. **`0069` is
-  this plan's own entry** and its probe still reads as unprobeable because the
-  entry is the absence of a mechanism; it needs the dated update the plan's
-  Followups name, which is architect's at close.
+  `docs/preset-palettes.md`, `README.md`, and — in Phase 9 —
+  `docs/preset-guide.md` and `docs/design-backlog.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 72
+  reductions across 41 live entries. Four unprobeable claims, unchanged —
+  `0038`, `0069`, `0079`, `0110`. **`0069` is this plan's own entry** and its
+  probe still reads as unprobeable because the entry is the absence of a
+  mechanism; it needs the dated update the plan's Followups name, which is
+  architect's at close. `0128` gained a probed bullet in Phase 9.
 - **Outstanding `human` phases:** none. Phase 3 decided *continue*, Floor 40 /
   Rich 96; Phase 5 decided *diagonal-axis with size-hierarchy's spread*. Both
   verdicts and their reasons are in their own phase blocks.
+- **Workspace at the tip:** `cargo nextest run --workspace` 994 passed, 5
+  skipped; `cargo fmt --all --check` and `cargo clippy --all-targets --workspace
+  -- -D warnings` clean; both golden baselines unmoved.
 
 ## Followups (after this lands)
 
