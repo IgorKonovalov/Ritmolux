@@ -351,10 +351,10 @@ at `b2fb13b`.
 | 2 — the arc fragment shares it | dev | done | `348cc01` |
 | 3 — the sample sheet | dev | done | `5592e40` |
 | 4 — pick the default | human | done | verdict below |
-| 5 — flip, re-bless, repair the docs | dev | done | committed with this row |
-| 6 — the library is retuned | human | **next — this session stops here** | |
-| 7 — the MilkDrop comparison set | dev | not started | |
-| 8 — judge against the reference | human | not started | |
+| 5 — flip, re-bless, repair the docs | dev | done | `707bdb8` |
+| 6 — the library is retuned | human | **outstanding — `preset-author`, does not gate 7** | |
+| 7 — the MilkDrop comparison set | dev | done | committed with this row |
+| 8 — judge against the reference | human | **next — this session stops here** | |
 | 9 — set the constant, add a baseline | dev | not started | |
 
 ### Notes
@@ -372,6 +372,31 @@ Per preset, for Phase 6 to bind: `curve_ionwake` **0**, the Maurer roses **1.0**
   declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
   `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
   argument to compile.
+- **Phase 7 was built out of order, and deliberately.** Phase 6 is a `preset-author` sitting and
+  Phase 7 touches a different scene and a different constant, so it is not gated on it. Both
+  human gates now have their materials.
+- **`scripts/milk-softness.mjs` temporarily edits a tracked source file**, because
+  `MILKDROP_SOFTNESS` is a compile-time constant by ADR-0124's design and there is no runtime
+  lever to sweep — the surface is built four times. A first run was killed by a harness timeout
+  mid-build and left the constant at `0.00` in the working tree; the restore is now wired to
+  `SIGINT`/`SIGTERM`/`SIGHUP`/`exit` as well as to the `finally`, and the run refuses to write an
+  index unless the file came back byte-identical.
+- **The `warp_mesh` line surface is almost entirely inside the edge cap, which shrinks Phase 8's
+  question to nearly binary.** Across the full `1.00 → 0.00` range there are **two** distinct
+  pictures at `THIN` (both sizes) and **three** at `THICK`: everything at or below 0.50 (THIN) or
+  0.25 (THICK) is byte-identical. MilkDrop's own widths are 1.0–1.35 px of half-width, right at
+  the one-pixel floor, so most of the range has no room to differ. The index marks every twin.
+- **ADR-0124's *reason* for the `warp_mesh` coverage gap is wrong, though its conclusion holds.**
+  It says the three fixtures "set no wave"; `wave_a` defaults to **1.0**, so all three do stroke a
+  waveform. Measured: driving the pin from `1.0` to `0.0` — the largest change available — moves
+  `warp_mesh.png`, `warp_mesh_milk.png` and `warp_mesh_shader.png` by **mean 0.0000 / outlier 0**.
+  The cause is the golden suite's 128 px capture, where `THIN` is 0.16 px of half-width and the
+  cap makes the profile inert — the same mechanism that leaves the line baselines blind. **This
+  bears on Phase 9:** a fixture that merely "sets a wave" would add another blind baseline; it has
+  to be stroked wide enough at 128 px to resolve a profile, and asserting non-empty geometry is
+  not sufficient to prove it can.
+- The custom-wave subject is `THIN` only. `THIN`/`THICK` are both covered on the built-in
+  waveform at both sizes, which is what the done-when names.
 - **The re-bless is two files, not "every line baseline".** `spectrum.png` and
   `line_joint_zigzag.png`. `parametric_curve`, `lsystem` and `star_pattern` moved by **mean
   0.0000 / outlier 0** — at the golden suite's 128 px a `thickness ≈ 2` stroke is 0.38 px of
