@@ -39,7 +39,7 @@ construction. Their coverage floors — `0.50` for `fragment_field` — are pass
 `Ink on Paper` is the sharp case: an ink-on-paper duotone is a **light-ground world that already
 exists in the shipped library**, reading `coverage 1.0000, flatness 0.7833`.
 
-**A twelfth system universalises it.** [Plan 0113](../plans/0113-the-engine-paints-a-canvas.md) is in
+**A twelfth system universalises it.** [Plan 0113](../plans/done/0113-the-engine-paints-a-canvas.md) is in
 flight and adds `shape_collage`, which paints its own off-white paper across every pixel. Its own
 branch already records the consequence, in a `coverage_floor` arm written by `dev`: *"its lit
 fraction is 1.0 by construction whatever the elements do, and the statistic this floor is made of

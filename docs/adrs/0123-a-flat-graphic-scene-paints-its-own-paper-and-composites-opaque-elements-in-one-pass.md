@@ -1,8 +1,8 @@
 # 0123 — A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-26 (Plan 0113) — see `Outcome`
 > **Date:** 2026-08-25
-> **Related plan(s):** [0113](../plans/0113-the-engine-paints-a-canvas.md)
+> **Related plan(s):** [0113](../plans/done/0113-the-engine-paints-a-canvas.md)
 > **Builds on:** [ADR-0056](0056-additive-scenes-emit-premultiplied-alpha.md) (the alpha model),
 > [ADR-0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) (`occlude` as coverage),
 > [ADR-0046](0046-linear-light-hdr-composite-bloom-tonemap.md) (the tonemap this look lives under),
@@ -162,3 +162,46 @@ subdivision field and a different mechanism entirely.
 *Suprematism* (the black disc canvas), roughly 20 in *Dynamic Suprematism*, roughly 35 in
 *Suprematist Composition*, and above 40 in *On White II* once lines and arcs are included. That
 count is what Plan 0113's stop gate is measured against.
+
+
+## Outcome (added at Plan 0113's close, 2026-08-26)
+
+**Every load-bearing claim in Context held, and one sentence in it was false.** The
+decision itself is unchanged: the composite took no change at all, a fullscreen
+`alpha = 1` scene owns its own ground, bloom's threshold sits above the knee so hard
+edges came free, and the element cap landed as a `TierConfig` field. Phase 3's stop
+gate read the cost and continued at Floor 40 / Rich 96 — the count this ADR's Notes
+derive from *On White II*, arrived at from the reference paintings rather than from
+the budget, because the fidelity ceiling turned out to bind first.
+
+**The false sentence is in Context, and it propagated.** This ADR states that an
+element whose brightest channel is at or below `0.6` *"reaches the display
+byte-identical"*. It does not. A palette stop is a **linear coefficient with no sRGB
+decode**, so the byte the display receives is that coefficient's sRGB *encoding*:
+measured on the shipped preset, `#111111` presents as `#494949`, `#8a1420` as
+`#BF5164`, and the paper `#d9d5c8` as `#E2E0DA`. Five downstream sites had copied the
+claim — `docs/preset-palettes.md`, `presets/README.md`,
+`presets/collage_suprematist.toml`, `core/tests/fixtures/shape_collage.toml` and
+`shape_collage.rs`'s module docs — and Plan 0113 Phase 9 repaired all five; the second
+close review found this ADR still carrying the original, which is the document those
+five cite. Recorded here rather than edited into the body above, per this project's
+append-only rule.
+
+**What the knee actually buys is the property the look rests on**, and it is the
+reason the decision survives the correction untouched: below `KNEE` the **tonemap** is
+the identity, so every element's fill leaves the post chain **unshaded and halo-free**,
+shifted by the same transfer curve as every other element. Flatness and hard edges both
+follow from that; neither ever depended on the authored hex reaching the display.
+`an_element_under_the_knee_arrives_at_the_value_it_was_authored_at` asserted the
+correct thing from Phase 1 — `encoded(hex/255)`, not `hex` — so no test was ever wrong,
+only the prose around it. Author a `shape_collage` palette by the rendered result.
+
+**One consequence this ADR did not anticipate.** `coverage` in `core/tests/sanity.rs`
+read `1.0000` for this family, which Phase 1 took as a structural property (*"its lit
+fraction is 1.0 by construction"*). It was not: it was the old lens measuring painted
+paper against black — the degeneracy
+[ADR-0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) was
+raised on. Against the derived ground the two shipped canvases read `0.3028` and
+`0.2677`, and Phase 6b re-derived the floor to `0.13` from that distribution. A scene
+that paints its own paper is exactly the case a black-reference lens cannot see, and
+that is a property of **this ADR's fullscreen-paper decision**, not of the sanity gate.

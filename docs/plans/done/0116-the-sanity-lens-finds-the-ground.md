@@ -20,7 +20,7 @@
 > **Amended:** 2026-08-26, at Phase 2's stop gate. `modal_luma` chosen; Phases 3-7 corrected against
 > Phase 1's measurement; **Phases 8-9 added** carrying ADR-0128, because the measurement showed the
 > ground fixes two of ADR-0126's three motivations and structurally cannot fix the third.
-> **Sequencing constraint:** must land **before [Plan 0113](../0113-the-engine-paints-a-canvas.md)
+> **Sequencing constraint:** must land **before [Plan 0113](0113-the-engine-paints-a-canvas.md)
 > Phase 6**, which is where the emptying canvas arrives. Plan 0113 Phases 3-5 are unaffected and the
 > two lanes can run in parallel until then.
 

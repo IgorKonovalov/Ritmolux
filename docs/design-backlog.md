@@ -715,10 +715,34 @@ bundled decision (Alternative B) rather than on its merits. It also sits adjacen
 and its plan, which is the *other* place the additive model's occlusion behaviour is being
 questioned — anyone taking this should read that first.
 
+### Updated 2026-08-26 at [Plan 0113](plans/done/0113-the-engine-paints-a-canvas.md)'s close — half the ask now exists, and this entry stays live for the other half
+
+**Occlusion exists inside one scene.** `shape_collage` (twelfth system,
+[ADR-0123](adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md))
+paints flat opaque elements on its own paper in painter order, so a black bar genuinely sits in
+front of a red one and a fill with a contrasting outline is drawable today — two elements, the
+smaller later in the array. `the_later_element_wins_the_overlap` renders the pair in **both** array
+orders and asserts the overlap takes the later element's colour each time, which is the mechanism
+rather than an example of it: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
+
+**And it cost no composite change**, which is the half of this entry's own pricing that was wrong.
+This entry has sat at **Low** since 2026-08-05 because it was priced as a composite redesign.
+ADR-0123 found that price mistaken for the in-scene case: a fullscreen scene emitting `alpha = 1`
+already holds the backdrop out (measured, Plan 0091 Phase 1), and the tonemap is the identity below
+`KNEE`, so the capability landed as a **scene** with the composite untouched.
+
+**What is still missing is the cross-scene half, and it is the harder one.** A collage element and a
+`swarm` particle still have no ordering relationship, because nothing in the engine decides what is
+in front of what across scenes — which is this entry's title claim and remains true. ADR-0090's two
+layers compose by blend, not by depth, and ADR-0018 / ADR-0031 rejected a render graph twice. So the
+entry stays **live**: the ask survives, the in-scene route is now a shipped answer for anyone who
+only needs one world at a time, and the remaining work is engine-wide depth rather than a fill model.
+
 ### Priority
 
-**Low, and deliberately so.** The user has asked for it once, in a form Plan 0070 partially answered,
-and the cost is a composite redesign. It is here so the ask survives, not because it is next.
+**Low, and deliberately so.** The user has asked for it once, in a form Plan 0070 partially answered
+and Plan 0113 half-answered, and the cost of the remaining half is still a composite redesign. It is
+here so the ask survives, not because it is next.
 
 ---
 
@@ -2910,7 +2934,7 @@ the goal rather than the defect.
 
 ### Why it is time-critical
 
-[Plan 0113](plans/0113-the-engine-paints-a-canvas.md) is **approved** and adds `shape_collage`,
+[Plan 0113](plans/done/0113-the-engine-paints-a-canvas.md) is **approved** and adds `shape_collage`,
 described in its own TL;DR as "the engine's first **graphic** world rather than a luminous one: no
 glow, no bloom, hard edges, solid colour", on "its own off-white paper" (`f(1.0) = 0.800`). It
 reaches flat colour through the same tonemap property this preset uses — identity below `KNEE = 0.6`.
