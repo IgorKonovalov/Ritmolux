@@ -157,6 +157,13 @@ read 11 against 6 actual, `swarm` 5 against 3, `attractor` 5 against 6), because
 re-drifts every time a preset is added and nothing fails when it does. `presets/` is the
 list; `ls presets/*.toml` is the count.
 
+**The twelfth system added no expression grammar.** `shape_collage` (Plan 0113) is
+entirely new *parameters* — every variable, constant, function, operator and error
+message in [The expression language](#the-expression-language) is exactly what it
+was before, and a collage preset is written with the same vocabulary as every other
+preset. Recorded because the alternative to writing it down is a reader assuming a
+new system must have brought new grammar with it.
+
 Beyond a system's own parameters, **every** preset may also bind the engine-wide
 compositing controls — the shared view transform (`zoom`, `pan_x`, `pan_y`), the
 background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope

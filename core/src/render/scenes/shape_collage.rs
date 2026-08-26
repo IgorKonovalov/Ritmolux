@@ -488,6 +488,18 @@ impl Element {
             let mut n = 0usize;
             {
                 let mut push = |p: [f32; 2]| {
+                    // The `debug_assert` is the point of the branch, not the
+                    // fallback. Dropping a candidate would shrink the hull, and
+                    // a hull that is too SMALL is a bounding box the painter
+                    // rejects real pixels against — a silent clip, which
+                    // `every_kind_is_contained_by_its_own_bounding_box` only
+                    // catches at an angle that happens to expose it. A future
+                    // kind that adds a tenth candidate should fail loudly here.
+                    debug_assert!(
+                        n < points.len(),
+                        "the hull candidate buffer is full at {n}; a new element kind needs \
+                         the array widened, not its candidates dropped"
+                    );
                     if let Some(slot) = points.get_mut(n) {
                         *slot = p;
                         n += 1;

@@ -523,6 +523,7 @@ directly.
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
 | 9 — The Mode 4 repairs | dev | done | 015f8a3 |
+| 10 — The second-pass repairs | dev | done | committed with this row |
 
 ### Notes
 
@@ -638,6 +639,20 @@ before/after.
   it, and the log's earlier note on this box's power-shared iGPU is the standing
   explanation.
 
+**Phase 10's repairs.** All six landed inside the phase's file list, and
+none is a pixel change. Two things worth naming:
+
+- **The allocator finding took the sentence, not the hoist.** Its done-when
+  allowed either; the note now says the slot is taken, points the next caller at
+  `alloc_count` rather than at a second declaration, and names three callers as
+  the threshold for hoisting to shared test support. Two is not yet worth the
+  move.
+- **`tier.rs` now cites *which* of the two ladders it is quoting**, because
+  naming the figures alone is what let this sentence go wrong twice. The
+  pre-roster ladder above the sentence stays exactly as Phase 3 read it — it is
+  the record of the gate's own reasoning, and correcting it would be rewriting
+  what the human saw.
+
 **Observations for the review.**
 
 - **The `animation` gate's `footprint_diff` statistic (ADR-0091) does not fit a
@@ -659,15 +674,22 @@ before/after.
 - **The root README said "Ten built-in rendering systems" and had been wrong since
   `warp_mesh` made eleven.** Now twelve.
 - **Phase 6b re-pointed Plan 0116 Phase 6's fixture rather than adding a second
-  one**, which is what its amendment asks for — but the attractor `ink_*`
-  stand-in is *gone*, not kept alongside. That fixture was also the only place in
-  the tree recording that `ink_*` is a terminal engine stage ADR-0067's backdrop
-  suppression does not reach, which is why `Ink on Paper` read `1.0000` for
-  months. Nothing records it now.
-- Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000,
-  flatness 0.7094, animation 0.0263, reactivity `bass=0.0511`. `On White`:
-  coverage 1.0000, flatness 0.7152, animation 0.0201, reactivity `bass=0.0384`,
-  against a 0.02 floor.
+  one**, which is what its amendment asks for — the attractor `ink_*` stand-in is
+  *gone*, not kept alongside. **The second half of this observation was wrong and
+  Phase 10 corrects it**: it said that fixture was the only place in the tree
+  recording that `ink_*` is a terminal engine stage ADR-0067's backdrop
+  suppression does not reach, and that nothing records it now. It is recorded, at
+  `core/tests/sanity.rs`, in the coverage-distribution note in the same file the
+  fixture moved within — Phase 10 marks that sentence as the load-bearing one so
+  the next re-point does not actually lose it.
+- Both shipped presets clear all five gates. Against the derived ground
+  (ADR-0126, adopted in Phase 6b): `Suprematist` coverage **0.3028**, `On White`
+  coverage **0.2677**, which are the two numbers the `0.13` floor is half of.
+  Flatness 0.7094 / 0.7152, animation 0.0263 / 0.0201, reactivity `bass=0.0511` /
+  `bass=0.0384` against a 0.02 floor. **The `1.0000` this bullet reported until
+  Phase 10** was the pre-merge reading under the `BLACK` predicate, which is
+  exactly the degeneracy Phase 6b exists to retire — it is kept here only as what
+  the old lens said.
 
 **Merged, and both semantic collisions the lane recorded are discharged.** The
 branch merged into `main` on 2026-08-26 (`b20ba21`); neither collision was a
@@ -702,7 +724,10 @@ footprint observation below is untouched by either and is still open.
   verdicts and their reasons are in their own phase blocks.
 - **Workspace at the tip:** `cargo nextest run --workspace` 994 passed, 5
   skipped; `cargo fmt --all --check` and `cargo clippy --all-targets --workspace
-  -- -D warnings` clean; both golden baselines unmoved.
+  -- -D warnings` clean; both golden baselines unmoved. Re-run at the Phase 10
+  tip with the same result — that phase adds one `debug_assert!` and otherwise
+  edits only comments and prose, so the suite is confirming the assert does not
+  fire for any shipped kind rather than confirming a behaviour change.
 
 ## Followups (after this lands)
 
