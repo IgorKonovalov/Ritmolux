@@ -263,6 +263,99 @@ fn luma(px: &[u8]) -> f32 {
         + 0.114 * px.get(2).copied().unwrap_or(0) as f32
 }
 
+// ---------------------------------------------------------------------------
+// The frame's own ground (Plan 0116 Phase 3, ADR-0126)
+// ---------------------------------------------------------------------------
+
+/// The reference tone [`modal_ground`] returns for a frame that has no ground —
+/// black, which is what every caller passed before Plan 0116.
+///
+/// A groundless frame is therefore measured exactly as it always was, so the
+/// fallback is a no-op rather than a second behaviour to reason about.
+pub const NO_GROUND: [u8; 4] = [0, 0, 0, 255];
+
+/// Minimum share of a frame that its modal luminance band must hold before that
+/// band is called a ground.
+///
+/// **Derived, not tuned.** A uniform luminance distribution puts exactly
+/// `1 / TONE_BANDS` of the frame in each band, so a modal band holding no more
+/// than that share is the definition of *no band is dominant* — there is
+/// nothing to call a ground, and [`modal_ground`] returns [`NO_GROUND`].
+///
+/// **It is a floor on a maximum, so it is inert against real content, and that
+/// is the honest reading of it.** The largest of `TONE_BANDS` counts is at least
+/// their mean, with equality only for a perfectly flat histogram, so this fires
+/// only on a frame whose luminance is near-exactly uniform. Measured over the
+/// shipped library at `LOUD` (Plan 0116 Phase 3, 2026-08-26): the smallest modal
+/// band share is `Clifford`'s `0.1590`, two and a half times this line, and
+/// **no shipped preset falls back**. The rule defines the boundary case rather
+/// than reaching any content — which is what Phase 3 asked for, a behaviour
+/// defined in code rather than discovered later.
+pub const MIN_GROUND_SHARE: f32 = 1.0 / TONE_BANDS as f32;
+
+/// The frame's own ground: the mean RGB of its most populous luminance band, or
+/// [`NO_GROUND`] when no band holds more than [`MIN_GROUND_SHARE`] of it.
+///
+/// Everything built on `is_lit` — [`coverage`], [`quadrant_spread`],
+/// [`radial_shell_occupancy`], [`tonal_flatness`] — asks *how far does this
+/// pixel depart from the ground*, and passing a constant `BLACK` encodes an
+/// unstated precondition: that the scene draws light onto a ground it does not
+/// own. A scene that paints its own paper breaks it, and reads `coverage`
+/// exactly `1.0` whatever it drew (ADR-0126). This derives the reference from
+/// the frame instead, so the same question is asked correctly in both worlds.
+///
+/// **The mean of the band's members, not the band's centre.** An ink-on-paper
+/// world's paper is a specific off-white; rounding it to the middle of a
+/// 16-level band would hand `is_lit` a reference the frame does not contain,
+/// and at `EPS`-scale tolerances that is the difference between a ground and a
+/// second figure.
+///
+/// **Luminance, not RGB.** Plan 0116 Phase 1 tabled a coarse-RGB cluster and a
+/// border-only band beside this one over the whole shipped library: all three
+/// re-based the same presets, cost the same zero verdict changes, and repaired
+/// the same nothing. This is the simplest of the three that measured
+/// equivalent — the border variant assumes the ground reaches the frame edge,
+/// and the RGB variant buys a sparser histogram, neither for any measured
+/// return.
+///
+/// Ties resolve to the **brightest** tied band (the last maximum), which is
+/// arbitrary but deterministic — a duotone at equal populations has two grounds
+/// and no estimator over one histogram can pick between them.
+pub fn modal_ground(img: &CaptureImage) -> [u8; 4] {
+    let mut counts = [0u64; TONE_BANDS];
+    let mut sums = [[0u64; 3]; TONE_BANDS];
+    let mut total: u64 = 0;
+    for px in img.rgba.chunks_exact(4) {
+        total += 1;
+        let band = ((luma(px) / 256.0) * TONE_BANDS as f32) as usize;
+        let band = band.min(TONE_BANDS - 1);
+        if let (Some(count), Some(sum)) = (counts.get_mut(band), sums.get_mut(band)) {
+            *count += 1;
+            for c in 0..3 {
+                if let (Some(slot), Some(&v)) = (sum.get_mut(c), px.get(c)) {
+                    *slot += u64::from(v);
+                }
+            }
+        }
+    }
+    let Some((best, &n)) = counts.iter().enumerate().max_by_key(|&(_, &n)| n) else {
+        return NO_GROUND;
+    };
+    // `n * TONE_BANDS <= total` is `n / total <= MIN_GROUND_SHARE` without the
+    // division — exact in integers, where the f32 quotient is not.
+    if n == 0 || n * TONE_BANDS as u64 <= total {
+        return NO_GROUND;
+    }
+    match sums.get(best) {
+        Some(s) => [
+            (s.first().copied().unwrap_or(0) / n) as u8,
+            (s.get(1).copied().unwrap_or(0) / n) as u8,
+            (s.get(2).copied().unwrap_or(0) / n) as u8,
+            255,
+        ],
+        None => NO_GROUND,
+    }
+}
 /// Concentric annuli [`radial_shell_occupancy`] divides the frame's inscribed
 /// disc into. Ten equal-radius shells is the granularity the Plan 0065 lane's
 /// one-off prototype measured with when it separated the four-ring mandala from

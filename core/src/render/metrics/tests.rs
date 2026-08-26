@@ -445,3 +445,109 @@ fn struct_diff_is_recolor_robust_but_shape_sensitive() {
         "a genuine shape change is clearly nonzero ({reshape:.3})"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The frame's own ground (Plan 0116 Phase 3)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn modal_ground_finds_the_dark_ground_a_light_figure_sits_on() {
+    // The world the lens was built for: a figure on a ground it does not own.
+    // The estimator must land on that ground, so it gives the answer the
+    // hardcoded BLACK gave and the dark-world library does not move.
+    let lit = image(
+        32,
+        32,
+        |x, _| {
+            if x < 8 { [255, 255, 255, 255] } else { BLACK }
+        },
+    );
+    assert_eq!(modal_ground(&lit), BLACK);
+    assert_eq!(coverage(&lit, modal_ground(&lit), 8), 0.25);
+    assert_eq!(coverage(&lit, BLACK, 8), 0.25);
+}
+
+#[test]
+fn modal_ground_finds_the_paper_an_ink_figure_sits_on() {
+    // ADR-0126's motivating world, inverted: black ink on off-white paper.
+    //
+    // Under BLACK the *paper* is the figure — 75 % of the frame is "lit" and
+    // the 25 % that carries the drawing is excluded, which is the whole of the
+    // `fragment_tiledmono` false positive. Under the derived ground the ink is
+    // the figure and coverage reads the share it actually occupies.
+    let paper = [245, 245, 245, 255];
+    let ink = image(32, 32, |x, _| if x < 8 { BLACK } else { paper });
+    assert_eq!(modal_ground(&ink), paper);
+    assert_eq!(coverage(&ink, BLACK, 8), 0.75);
+    assert_eq!(coverage(&ink, modal_ground(&ink), 8), 0.25);
+
+    // And the residue Plan 0116 Phase 1 measured, asserted rather than
+    // remembered: the ground does **not** repair `tonal_flatness` on a duotone.
+    // Whichever of the two populations `is_lit` removes, the other one holds
+    // all of what remains and reads 1.0 either way. That is ADR-0127's job.
+    assert_eq!(tonal_flatness(&ink, BLACK, 8), 1.0);
+    assert_eq!(tonal_flatness(&ink, modal_ground(&ink), 8), 1.0);
+}
+
+#[test]
+fn modal_ground_returns_the_bands_own_mean_not_its_centre() {
+    // A specific off-white, not the middle of the 16-level band holding it: at
+    // EPS-scale tolerances the difference is a ground versus a second figure.
+    let paper = [250, 248, 246, 255];
+    assert_eq!(modal_ground(&solid(16, 16, paper)), paper);
+}
+
+#[test]
+fn a_frame_with_no_dominant_band_has_no_ground() {
+    // The boundary case, defined rather than discovered (Plan 0116 Phase 3).
+    // A perfectly flat luminance histogram puts exactly MIN_GROUND_SHARE in
+    // every band, so no band is dominant and the estimator declines: 256 gray
+    // levels, each on exactly one column of a 256-wide frame.
+    let flat = image(256, 8, |x, _| {
+        let v = x as u8;
+        [v, v, v, 255]
+    });
+    let mut counts = [0u64; TONE_BANDS];
+    for px in flat.rgba.chunks_exact(4) {
+        counts[(((luma(px) / 256.0) * TONE_BANDS as f32) as usize).min(TONE_BANDS - 1)] += 1;
+    }
+    let total: u64 = counts.iter().sum();
+    let modal = *counts.iter().max().unwrap();
+    assert_eq!(
+        modal as f32 / total as f32,
+        MIN_GROUND_SHARE,
+        "the fixture must be exactly flat, or it does not test the boundary"
+    );
+    assert_eq!(modal_ground(&flat), NO_GROUND);
+
+    // Uniform *noise* is not this case, and a reader who expects it to be
+    // should find out here. The largest of TONE_BANDS counts is at least their
+    // mean, so any sampled distribution lands above the line: the rule fires on
+    // exact flatness, and on nothing the renderer produces.
+    let noise = image(96, 96, |x, y| {
+        // splitmix64 over the pixel index — seeded, so the frame is the same
+        // every run (the determinism rule in CLAUDE.md applies to fixtures too).
+        let mut z = (u64::from(y) * 96 + u64::from(x)).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        let v = ((z ^ (z >> 31)) >> 33) as u8;
+        [v, v, v, 255]
+    });
+    assert_ne!(modal_ground(&noise), NO_GROUND);
+}
+
+#[test]
+fn an_empty_frame_has_no_ground() {
+    assert_eq!(modal_ground(&image(0, 0, |_, _| BLACK)), NO_GROUND);
+}
+
+#[test]
+fn a_frame_of_one_tone_is_all_ground_and_nothing_is_lit() {
+    // The property Plan 0116 Phase 6 rests on: a bare sheet of paper is its own
+    // ground, so nothing departs from it. Under BLACK the same frame reads
+    // fully lit, which is the false negative the plan exists to close.
+    let bare = solid(32, 32, [250, 249, 247, 255]);
+    assert_eq!(coverage(&bare, modal_ground(&bare), 8), 0.0);
+    assert_eq!(quadrant_spread(&bare, modal_ground(&bare), 8), 0);
+    assert_eq!(coverage(&bare, BLACK, 8), 1.0);
+}

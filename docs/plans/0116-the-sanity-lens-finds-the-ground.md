@@ -348,7 +348,7 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 |---|---|---|---|
 | 1 — What each candidate ground would say | dev | done | `8d4a9a9` |
 | 2 — The stop gate | human | done | recorded in Phase 2's Outcome above |
-| 3 — The lens takes a ground | dev | not started | — |
+| 3 — The lens takes a ground | dev | done | `committed with this row` |
 | 4 — The floors are re-derived, not re-used | dev | not started | — |
 | 5 — Adjudicate what changed | human | not started | — |
 | 6 — The emptying canvas is actually caught | dev | not started | — |
@@ -389,3 +389,70 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   it at Phase 3 would ship a preset that fails the gate. Not yet done.
 - Rows 8-9 and the Phase 2 row were written by `architect` at the Phase 2 gate, not by `dev`: the
   amendment added the phases they enumerate.
+
+#### Phase 3
+
+- **This commit is red on one test, by the user's decision at a stop the plan did not anticipate.**
+  `a_frame_with_no_tonal_structure_is_reported_flat` fails its own precondition — see the
+  `blown_out()` entry below — because the constant it is asserted against is a **coverage floor**,
+  and every floor in the file was measured under the old predicate. That is Phase 4's whole subject,
+  and Phase 4 restores this test. Offered as three options (two commits with a red one between,
+  one combined commit, or re-pointing the test twice); the user chose two commits. Nothing else in
+  the workspace is red: `cargo nextest run --workspace` is **967 of 968**, and the one failure is
+  this test.
+- **The verdict count Phase 1 promised is reproduced: zero.** `every_preset_draws_a_real_shape`
+  passes over all 40 shipped presets with the derived ground threaded through all four statistics,
+  and the printed coverages match Phase 1's `modal_luma` column exactly.
+- **The estimator landed in `core/src/render/metrics.rs` as `modal_ground`, and the change to that
+  file is purely additive** — 93 insertions, 0 deletions, no existing function's body touched. No
+  render path is reachable from it, so the golden baselines cannot move; the workspace run above
+  includes `golden` and it is green. `reactivity.rs` and `golden.rs` are confirmed non-callers, as
+  the 2026-08-26 correction to this phase said.
+- **The `1 / TONE_BANDS` fallback was implemented exactly as the done-when states it, and measured
+  against nothing.** No shipped preset falls back. The premise behind that bullet is falsified: the
+  modal band's share of the **whole frame** never drops below `0.1590` (`Clifford`), two and a half
+  times the `0.0625` line, and it cannot in principle — the largest of `TONE_BANDS` counts is at
+  least their mean. The `Supernova 0.7 %` / `Neon Tunnel 0.3 %` / `Whorl 5.0 %` / `Sumi 7.4 %`
+  figures in Phase 2's Outcome are the largest **lit** bucket's share under the `BLACK` control
+  (`flatness x coverage`), not the modal band's share; the same four presets measure `0.4263` /
+  `0.1723` / `0.2735` / `0.2346` on the axis the rule actually reads. The rule therefore defines the
+  boundary case and reaches no content, which is what `MIN_GROUND_SHARE`'s doc comment now says.
+  The `coverage ~ 1.0` those four keep is delivered by a different mechanism than the plan expected:
+  their modal band's *mean* is a tone the frame barely contains, so almost every pixel departs from
+  it. Asserted on a synthetic exactly-flat histogram and on seeded uniform noise, which is **not**
+  the same case and now says so in the test.
+- **`blown_out()` becomes its own ground, and this is the finding Phases 8 and 9 need.** The fixture
+  is `80.5 %` one luminance band, so `modal_ground` returns the blot at `(158,254,202)`:
+
+  | lens | reference | coverage | shells | flatness | convicted by |
+  |---|---|---|---|---|---|
+  | `BLACK` | `(0,0,0)` | 0.8203 | 10/10 | 0.9816 | flatness alone |
+  | derived | `(158,254,202)` | 0.1963 | 1/10 | 0.9154 | the blank arm **and** flatness |
+
+  It is convicted twice rather than once, so the gate did not weaken — but the test's stated claim,
+  that "a blot satisfies coverage and spread and only flatness catches it", is no longer true of
+  this fixture under this lens. Two consequences, neither acted on here: **Phase 9's non-vacuity
+  assertion** rests on `blown_out()` still being convicted, and it would now be satisfied by the
+  blank arm even if the flatness term went vacuous; and **Phase 8 rosters this fixture as the frame
+  that "must read structureless"**, but its lit mask under the derived ground is the blot's fringe —
+  one radial shell, a ring — which a boundary-length measure may well read as structured. Whether
+  Phase 4's re-derived floor puts the fixture back above its floor (it lands near `0.11` on the
+  half-the-family-minimum rule, against the fixture's `0.1963`) is Phase 4's to record.
+- **Route changes, which are not verdict changes.** Measured both lenses on the same tree (the old
+  one by stashing this phase's diff). Under `BLACK`, **eight** presets already cleared the gate
+  through the structural rescue rather than the coverage floor — `Ion Wake`, `Nightbloom`,
+  `Drift Field`, `Ember Jet`, `Perseids`, `Pulse`, `Halo`, `Rose Window` — and all eight measure
+  **the identical coverage** under the derived ground, because their ground *is* black. Two more
+  join them: `Tiled Rosette` (`1.0000` -> `0.1645`) and `Vellum` (`1.0000` -> `0.3704`). Fourteen
+  presets read `1.0000` under the control and none does now; the lowest `fragment_field` coverage
+  is `Tiled Rosette`'s `0.1645` against a floor of `0.50`. All of that is Phase 4's input.
+- **Caller audit, all six.** `animation.rs` and `warp_mesh.rs` keep `BLACK` and each now carries a
+  doc note saying why: `footprint_diff` masks over the **union of two captures**, so a per-frame
+  ground gives that mask two references; and `warp_mesh.rs`'s floors are its own constants measured
+  under the old predicate, which Phase 4 is scoped away from. The other four — `attractor.rs`,
+  `reaction_diffusion.rs`, `standalone/src/shot/report.rs`, `standalone/src/shot/horizon.rs` — do
+  **not** pass `BLACK`: they already derive a ground, from the frame's **top-left pixel**. That is a
+  fifth estimator, in production, that Phase 1 never tabled, and it is the one ADR-0067 discredited
+  for this gate on the measurement that `bg_vignette` makes the corner the darkest pixel in the
+  frame. Left alone — changing it is a behaviour change to a user-facing `--report` and to two
+  suites with their own thresholds — and raised here.
