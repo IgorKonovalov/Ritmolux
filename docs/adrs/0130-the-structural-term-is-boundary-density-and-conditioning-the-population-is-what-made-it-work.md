@@ -1,7 +1,9 @@
 # 0130 — The structural term is boundary density, and conditioning the population is what made it work
 
 > **Status:** proposed
-> **Date:** 2026-08-26
+> **Date:** 2026-08-26, **revised the same day** — the threshold became
+> `boundary_floor(system)` rather than one global constant, on the straddle finding in Context.
+> Revised rather than superseded because it is still `proposed` and this is one design conversation.
 > **Related plan(s):** [0119](../plans/0119-the-flatness-gate-gets-its-second-term.md)
 > **Supersedes the Decision of:** [ADR-0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
 > — its composition-scale statistic was measured and is not what ships. **Its criterion 2 survives
@@ -89,6 +91,29 @@ modal band and the frame reads as one flat field. Those three are safe only beca
 them, which is luck rather than design. The low-pass filter that was supposed to be the mechanism
 throws away the exact content the mechanism was meant to protect.
 
+### The blot and a legitimate flat graphic straddle each other, so one global constant cannot work
+
+Raised while sizing the mono-preset cohort that is this project's next content step. Two shipped
+`shape_collage` presets — [ADR-0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)'s
+flat-graphic family, and the obvious conversion targets — read:
+
+| frame | `boundary` | `tonal_flatness` today |
+|---|---|---|
+| `Suprematist` | **0.2565** | 0.2981 |
+| `On White` | **0.3064** | 0.2388 |
+| `Blown Out` (the blot) | 0.2631 | 0.9154 |
+
+**`Suprematist` scores below the purpose-built blot.** Both collages clear the gate today only
+because their flatness is low, and it is low *only because they are multi-colour*: `shape_collage`
+composites opaque elements with no gradients, so several flat colours means several luminance bands.
+Reduce that to a two-ink print and the luminance collapses to two populations, `is_lit` removes
+whichever is the ground, and the survivor is one tone — Plan 0116 Phase 1's measured finding, against
+every candidate ground. The conversion changes the tone and leaves the geometry alone.
+
+So a single global floor must sit above `0.2631` to convict the blot and below `0.2565` to admit a
+mono `Suprematist`. **No such number exists.** The per-family split below is forced by measurement,
+not chosen for convenience.
+
 ## Decision
 
 We will use **`boundary` — the share of lit pixels having at least one unlit 4-neighbour, perimeter
@@ -96,7 +121,30 @@ over lit area** — as the flatness gate's second term, and we will adopt ADR-01
 correction as the reason it is admissible.
 
 `every_preset_draws_a_real_shape` convicts a preset only when `tonal_flatness > MAX_TONAL_FLATNESS`
-**and** `boundary_density < MIN_BOUNDARY_DENSITY`, with `MIN_BOUNDARY_DENSITY = 0.31`.
+**and** `boundary_density < boundary_floor(system)` — a per-system-kind floor, the mechanism
+`coverage_floor(system)` in the same file already uses:
+
+```rust
+fn boundary_floor(system: SystemKind) -> f32 {
+    match system {
+        // Half the sparsest legitimate member of the family (`Suprematist`,
+        // 0.2565) - this file's own ceremony, on the two shipped members.
+        SystemKind::ShapeCollage => 0.13,
+        // The midpoint of the two frozen fixtures. A measurement, not a floor.
+        _ => 0.31,
+    }
+}
+```
+
+**Why `shape_collage` earns an arm, where `palette_steps` did not.** ADR-0129 Alternative B rejected
+idiom-scoping because `palette_steps > 0` is a one-line edit any preset can make, so the exemption
+would be reachable by declaration. A **system kind** is not a declaration — it selects a different
+renderer. And the specific reason this family is safe is structural rather than stylistic: ADR-0123
+holds the whole canvas under ADR-0046's tonemap knee, which *"gives up the engine's entire over-range
+vocabulary — no bloom, no glow, no highlight modelling."* The additive stacking past the knee that
+`Blown Out` embodies, and that put four attractor presets into the library flat, **cannot happen in
+`shape_collage`.** The family is exempt from the defect, so it is exempt from the term that catches
+the defect.
 
 **Why `boundary` and not the two other columns that also pass conditioned**, which is the question
 this ADR is actually deciding:
@@ -118,13 +166,18 @@ this ADR is actually deciding:
   the question a blot fails and a composition passes, and perimeter-over-area is that question
   written down. Neither of the others is interpretable without a paragraph.
 
-**The threshold is a measurement, and it is taken between two frozen frames.** `0.31` is the midpoint
-of `0.2631` (the frozen `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono` as measured
+**The default `0.31` is a measurement, and it is taken between two frozen frames.** It is the
+midpoint of `0.2631` (the frozen `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono` as measured
 2026-08-26), rounded to two places: `1.18x` above the defect, `1.16x` below the composition. It is
 **not** half the sparsest legitimate content, the ceremony every other constant in
 `core/tests/sanity.rs` follows — with one legitimate member in the conditional population, and that
 member being the preset the change exists to admit, that derivation is circular. ADR-0071 requires
 such a number to say what it is, and its docstring must say this in plain words.
+
+**The `shape_collage` arm is derived the ordinary way**, and is the better-founded of the two: half
+the sparsest legitimate member of the family (`Suprematist`, `0.2565`), which is exactly how every
+`coverage_floor` arm is set. It leaves `Suprematist` at `1.97x` and `On White` at `2.36x` above their
+own floor, so both survive a mono conversion with room.
 
 **Both anchors must be frozen fixtures, and one of them is about to stop being one.**
 `Tiled Rosette Mono` reaches the instrument today through
@@ -161,14 +214,27 @@ gate like any other preset.
   objection and it stands unrebutted: `boundary`'s legitimate range is `0.0440..0.9839` and the
   separation occupies about a tenth of it. It is accepted because the alternative on offer was a
   wider margin drawn from a statistic that moves 2.24x when you change a constant it invents.
-- **24 of 45 non-anchor frames read below `0.31`.** Over half the library is under the structural
-  term and is protected only by term one. The conjunction is doing real work — but it also means a
-  preset that ever drifts over the flatness ceiling has a better-than-even chance of being convicted
-  by a term that was never calibrated on it.
-- **The two-member calibration is unchanged, and no decision in this plan could change it.** One
-  frozen defect, one composition. A third tonally flat frame — legitimate and low-perimeter — is a
-  false positive nothing in the corpus predicts. Inherited from ADR-0129's first Negative and still
-  the real price.
+- **The gate is a landmine, and this is the price that matters.** It convicts nothing today, and
+  would convict roughly half the library the moment that content becomes flat — which is precisely
+  the mono-conversion roadmap. Under the floors above, **22 of the 42 shipped presets would be
+  convicted by a mono conversion**: the whole of `parametric_curve`, `shape_field`'s `Facet`, 12 of
+  17 `attractor` (`Torus Knot` `0.0440`, `Lorenz Gallery` `0.0511`, `Thomas Walk` `0.0527` …), and 7
+  of 9 `fragment_field` including `Sumi` at `0.1008`, which is an ink wash and the most natural mono
+  target in the library. The 20 that survive are listed in the plan. **Each conversion outside
+  `shape_collage` therefore needs its own floor arm with its own derivation**, and that is a
+  per-family decision rather than a constant to nudge.
+- **For `attractor` that trade is not obviously takeable.** The ceremony-derived floor there is
+  `0.0220` (half of `Torus Knot`'s `0.0440`), which sits `12x` below the blot and is vacuous — and
+  `attractor` is the family whose four flat presets `core/tests/sanity.rs`'s own header records as
+  the reason this statistic was added. Mono attractors and blot-catching cannot both be had on this
+  term; that is a real fork, and it is not decided here.
+- **The two-member calibration stands for the default arm.** One frozen defect, one composition. The
+  `shape_collage` arm is calibrated on two legitimate members instead, which is the ordinary ceremony
+  but still a two-member family. Inherited from ADR-0129's first Negative.
+- **A `shape_collage` blot would not be caught**, at a floor of `0.13`. Accepted on the structural
+  argument above — the family has no additive path — which is a claim about the renderer and would
+  have to be re-examined if `shape_collage` ever gained one (ADR-0123's own `paper_alpha` followup is
+  the shape such a change would take).
 - **The known decay mode is a noisier blot.** A defect whose mask is more ragged than `Blown Out`'s
   defeats this term, which is the mechanism 0129 was written to escape. We now believe that
   escape route was never open, but the hazard it was reacting to is real and unaddressed.
