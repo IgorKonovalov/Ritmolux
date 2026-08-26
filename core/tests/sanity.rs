@@ -20,13 +20,35 @@
 //! drawn 3.3 world units off the top of a frame of half-height 1.0 and passing.
 //!
 //! So the roster this gate renders has its `bg_*` bindings **removed**
-//! ([`without_backdrop`]) and `is_lit` compares against [`BLACK`]. The
-//! background stage already defaults `bright` and `vignette` to `0.0`
-//! (`core/src/render/background.rs`), so this is *not applying three bindings*
-//! rather than a new render path: the pass renders the plain black clear it
-//! renders for any preset that never mentions `bg_*`. Nothing outside this file
-//! changes — `golden`, `distinctness`, `reactivity` and `shot` all keep the
-//! shipped composite, backdrop included.
+//! ([`without_backdrop`]). The background stage already defaults `bright` and
+//! `vignette` to `0.0` (`core/src/render/background.rs`), so this is *not
+//! applying three bindings* rather than a new render path: the pass renders the
+//! plain black clear it renders for any preset that never mentions `bg_*`.
+//! Nothing outside this file changes — `golden`, `distinctness`, `reactivity`
+//! and `shot` all keep the shipped composite, backdrop included.
+//!
+//! **Plan 0116 / [ADR-0126]: the reference is derived from the frame, not fixed
+//! at black.** Suppressing the backdrop answered *whose light is this* and left
+//! a second question standing: what a scene that paints **its own** ground is
+//! measured against. Against a constant black it is measured against nothing —
+//! the paper is not black, so every pixel counts as lit and the frame scores as
+//! completely full whatever was drawn on it. That is not a corner case: the
+//! attractor's ink duotones and every fullscreen field read exactly `1.0000`,
+//! which made `coverage`, `quadrant_spread` and `radial_shell_occupancy`
+//! constants rather than measurements for a third of the library, and left an
+//! **emptied** canvas and a **broken** one as the same picture
+//! ([`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`]).
+//!
+//! So [`ground`] estimates the reference per capture — the mean tone of the
+//! frame's most populous luminance band — and every statistic below asks the
+//! same question in both worlds: *how far does this picture depart from the
+//! ground it is drawn on?* A scene drawing light onto darkness is unaffected,
+//! because its modal band **is** the black it was already compared to; the
+//! estimator was measured against the whole library before it was threaded and
+//! moved no verdict. [`BLACK`] survives here as the historical reference the
+//! two-lens fixtures assert against, not as anything the gate reads.
+//!
+//! [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 //!
 //! Coverage floors stay per-system, because the systems still differ by an order
 //! of magnitude in how much they paint — `fragment_field` fills the frame while
@@ -54,7 +76,10 @@
 //! blot. That is how four attractor presets shipped flat behind this gate, and
 //! `tonal_flatness` is the statistic that names it. It is general, not
 //! attractor-specific: any drive that stacks past the additive ceiling produces
-//! it.
+//! it. It is also the one statistic the derived ground could **not** repair: a
+//! duotone has two large populations, and removing whichever is the ground
+//! leaves the other holding nearly all of what remains either way
+//! ([ADR-0127](../../docs/adrs/0127-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)).
 
 use lmv_core::{
     dsp::AnalysisFrame,
@@ -70,15 +95,21 @@ use lmv_core::{
 
 const SIZE: u32 = 96;
 const FRAMES: u32 = 30;
-/// A pixel counts as lit if any RGB channel differs from [`BLACK`] by more than
-/// this (shrugs off dark near-black dithering).
+/// A pixel counts as lit if any RGB channel differs from the frame's [`ground`]
+/// by more than this (shrugs off dithering at the ground's own tone).
 const EPS: u8 = 10;
-/// What the scene is measured against (ADR-0067). Not a sampled pixel: the
-/// backdrop is suppressed for this capture, so every lit pixel is light the
-/// **scene** put there. Alpha is never compared — [`is_lit`] takes the first
-/// three channels — but the frames come back opaque, so 255 is the honest value.
+/// What the scene was measured against between ADR-0067 and Plan 0116 Phase 3 —
+/// **the historical reference, not what the gate reads.** [`ground`] is what it
+/// reads now.
 ///
-/// [`is_lit`]: lmv_core::render::metrics
+/// It is kept because two fixtures here assert against *both* lenses, which is
+/// the only way a test can show that the change repaired something rather than
+/// merely moved a number: `a_frame_with_no_tonal_structure_is_reported_flat`
+/// freezes the demonstration that a blot clears every areal check against black,
+/// and `a_canvas_the_music_empties_is_convicted_and_black_calls_it_full` pins
+/// that a painted ground reads as a completely full frame against it. Alpha is
+/// never compared — `metrics::is_lit` takes the first three channels — but the
+/// frames come back opaque, so 255 is the honest value.
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
 /// The reference tone this gate hands `is_lit`, derived from the frame
