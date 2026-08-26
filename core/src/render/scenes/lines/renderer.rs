@@ -305,6 +305,23 @@ fn shader_source() -> String {
     )
 }
 
+/// The arc pipeline's full WGSL: [`PROFILE_WGSL`] prepended to [`ARC_SHADER`].
+///
+/// The two fragments are separate modules, so **the profile is shared by
+/// construction rather than by convention** - the same reason [`shader_source`]
+/// emits the join bits from the Rust constants instead of restating them. Two
+/// hand-kept copies of the expression would compile, render, and give a mandala
+/// whose circles and interlace no longer match.
+///
+/// Runs once per [`LineRenderer::new_with_arcs`] (pipeline build, not the hot
+/// path).
+fn arc_shader_source() -> String {
+    format!(
+        "{PROFILE_WGSL}
+{ARC_SHADER}"
+    )
+}
+
 /// The arc pipeline's WGSL, **a separate shader module** from [`SHADER_BODY`]
 /// and built only when a scene asked for arcs.
 ///
@@ -444,7 +461,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let theta = atan2(q.y, q.x);
     let t = theta + TAU * ceil((in.span.x - theta) / TAU);
 
-    var d: f32;
+    // SIGNED across the stroke, and that is load-bearing: the profile below
+    // takes `fwidth` of this, and `fwidth` of an ABSOLUTE distance is garbage
+    // on the 2x2 quad that straddles the centreline - the kink makes the finite
+    // difference near zero exactly where the stroke is brightest. The segment
+    // fragment reads `side` and not `|side|` for the same reason.
+    var sd: f32;
     if (t <= in.span.y) {
         // The exact world radial distance, converted into the NDC metric by
         // the NDC length of its own gradient: moving one NDC unit along x
@@ -452,7 +474,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // less NDC where the arc runs vertically.
         let dir = select(vec2<f32>(1.0, 0.0), q / len, len > 1e-6);
         let grad = length(vec2<f32>(dir.x * aspect, dir.y));
-        d = abs(len - in.radius) / max(grad, 1e-6);
+        sd = (len - in.radius) / max(grad, 1e-6);
     } else {
         // Past an end: the distance to the nearer endpoint. A point has an
         // exact NDC distance, so this arm approximates nothing.
@@ -460,16 +482,29 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let e1 = in.centre + in.radius * vec2<f32>(cos(in.span.y), sin(in.span.y));
         let d0 = length(vec2<f32>((p.x - e0.x) / aspect, p.y - e0.y));
         let d1 = length(vec2<f32>((p.x - e1.x) / aspect, p.y - e1.y));
-        d = min(d0, d1);
+        sd = min(d0, d1);
     }
 
-    // The segment path's profile on the arc's own distance: bright core,
-    // quadratic falloff to the stroke edge. Premultiplied, so colour and alpha
-    // carry the same coverage and the quad outside the stroke writes nothing
-    // at all rather than opaque black (ADR-0056). The glow multiplier scales
-    // the LIGHT, not the coverage, exactly as it does for a segment.
-    let falloff = max(0.0, 1.0 - d / max(in.width, 1e-8));
-    let g = falloff * falloff;
+    // The segment path's profile on the arc's own distance - literally the
+    // same `stroke_coverage`, prepended to both modules (ADR-0124), so the two
+    // fragments cannot draw different strokes on the same figure.
+    //
+    // `sd` is an NDC distance and `width` is flat-interpolated, so the
+    // normalized coordinate is `sd / width` and its screen derivative is
+    // `fwidth(sd) / width`: the aspect divides out with the distance it was
+    // already applied to, and the edge stays one pixel of the render target on
+    // a non-16:9 frame. Taken on the signed distance, per its declaration.
+    //
+    // Premultiplied, so colour and alpha carry the same coverage and the quad
+    // outside the stroke writes nothing at all rather than opaque black
+    // (ADR-0056). The glow multiplier scales the LIGHT, not the coverage,
+    // exactly as it does for a segment.
+    //
+    // DIVIDED, not multiplied by a reciprocal: `x / w` and `x * (1 / w)` differ
+    // in the last ulp, and byte-identity at the default is what the golden
+    // corpus rests on.
+    let width = max(in.width, 1e-8);
+    let g = stroke_coverage(max(0.0, 1.0 - abs(sd) / width), fwidth(sd) / width, u.v.z);
     return vec4<f32>(in.color * g * u.v.y, g);
 }
 "#;
@@ -919,7 +954,7 @@ impl LineRenderer {
         let arc_pipeline = arcs.is_some().then(|| {
             let arc_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some(&format!("{label}-arc-shader")),
-                source: wgpu::ShaderSource::Wgsl(ARC_SHADER.into()),
+                source: wgpu::ShaderSource::Wgsl(arc_shader_source().into()),
             });
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(&format!("{label}-arc-pipeline")),

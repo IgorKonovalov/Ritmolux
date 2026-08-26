@@ -347,8 +347,8 @@ at `b2fb13b`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the profile lands | dev | done | committed with this row |
-| 2 — the arc fragment shares it | dev | not started | |
+| 1 — the profile lands | dev | done | `e2eb8fc` |
+| 2 — the arc fragment shares it | dev | done | committed with this row |
 | 3 — the sample sheet | dev | not started | |
 | 4 — pick the default | human | not started | |
 | 5 — flip, re-bless, repair the docs | dev | not started | |
@@ -365,6 +365,19 @@ at `b2fb13b`.
   declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
   `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
   argument to compile.
+- **Phase 2 changed the arc fragment beyond restating the profile.** It now differentiates the
+  SIGNED across-the-stroke distance: `fwidth` of the absolute one is near zero on the 2x2 quad
+  straddling the centreline, and at `softness = 0.5` that read as a brighter arc than the polyline
+  it is compared against — outlier 185 against a tolerance of 48. The default is unaffected either
+  way, so no baseline moves.
+- **`an_arc_draws_the_same_curve_as_a_dense_polyline` cannot resolve `softness` at its own width.**
+  `ARC_WIDTH` is 0.72 px of half-width at a 240-row target, where the edge term is capped and all
+  three values draw the identical picture — 632 lit pixels, mean 0.0000 at each. Fattening it is
+  not available: a 512-sample polyline at 0.04 NDC-y seams, and disagrees with the arc by a whole
+  pixel of bright core at the unchanged default. So the done-when's sweep runs there for the
+  *curve*, and the profile equality is asserted in
+  `the_arc_stroke_falls_off_quadratically_like_a_segment` against a single straight segment, at
+  both ends of the range and one value between.
 - Byte-identity at Phase 1 was read bless-to-bless, not off a `git diff`:
   `LMV_BLESS=1 cargo nextest run -p lmv-core --test golden` moves `core/tests/golden/shape_collage.png`
   and nothing else. A control bless with the phase stashed moves the same one file, and so does a

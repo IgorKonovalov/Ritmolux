@@ -867,11 +867,14 @@ const ARC_WIDTH: f32 = 0.006;
 ///
 /// `arc_capacity` is a parameter rather than derived from `arcs.len()` so a
 /// caller can build a renderer *without* the arc pipeline and confirm it draws
-/// no arcs.
+/// no arcs. `softness` is a parameter because the two fragments share one
+/// profile (ADR-0124) and the comparison below has to hold across its range,
+/// not only at the default.
 fn arc_capture(
     segments: &[SegmentInstance],
     arcs: &[super::ArcInstance],
     arc_capacity: usize,
+    softness: f32,
 ) -> Option<Vec<f32>> {
     use crate::render::capture;
     use crate::render::context::RenderContext;
@@ -941,7 +944,7 @@ fn arc_capture(
         &view,
         ARC_ASPECT,
         1.0,
-        super::super::DEFAULT_SOFTNESS,
+        softness,
         ViewTransform::default(),
         segments,
         arcs,
@@ -1039,6 +1042,36 @@ const ARC_OUTLIER_TOL: u8 = 48;
 /// right on the other seventy-six thousand — the mean lands at 0.0044 and
 /// stays comfortably *inside* the 0.02 the golden suite allows. Dropping the
 /// max-outlier arm would leave this test green on the bug it exists for.
+///
+/// # The `softness` sweep (Plan 0114 Phase 2)
+///
+/// Once the profile became a parameter, this comparison became the guard on
+/// **both fragments sharing it**: the arc's distance field and the segment's
+/// interpolated coordinate are different expressions, so the two pictures can
+/// only keep agreeing across the range if the profile they feed is one
+/// definition. That is why [`arc_shader_source`](super::arc_shader_source)
+/// prepends it rather than the fragment restating it.
+///
+/// It is run at three `softness` values, and **at this width all three draw the
+/// same picture** — deliberately. 0.006 NDC-y is 0.72 px of half-width at a
+/// 240-row target, inside the regime where the edge term reaches its cap and the
+/// ramp is the whole half-width whatever `softness` asks for. So what this
+/// asserts across the sweep is that the arc keeps drawing the *same curve* at
+/// every value, including the sub-pixel case where the parameter is inert; the
+/// proof that the two fragments share one **profile** is
+/// [`the_arc_stroke_falls_off_quadratically_like_a_segment`], which resolves it
+/// against a single straight segment at a width that has an interior.
+///
+/// A fatter stroke here would not do that job: at 512 samples the chords are
+/// shorter than a pixel, and a polyline of sub-pixel slivers seams — measured at
+/// 0.04 NDC-y the two disagree by a **whole pixel of the bright core** (outlier
+/// 243) at the unchanged default profile. The dense polyline is a reference for
+/// the *curve*, and only while the stroke is thin.
+///
+/// The aspect does not enter the new term. The arc's `d` is an NDC distance and
+/// its `width` is flat-interpolated, so `fwidth(d / width)` is
+/// `fwidth(d) / width` — the aspect divides out with the distance it was already
+/// applied to, and the edge stays one pixel of this 4:3 target.
 #[test]
 fn an_arc_draws_the_same_curve_as_a_dense_polyline() {
     const CENTRE: [f32; 2] = [0.1, -0.05];
@@ -1054,50 +1087,69 @@ fn an_arc_draws_the_same_curve_as_a_dense_polyline() {
         width: ARC_WIDTH,
     };
 
-    let Some(polyline) = arc_capture(&segments, &[], 0) else {
-        return;
-    };
-    let Some(drawn) = arc_capture(&[], &[arc], 4) else {
-        return;
-    };
+    for softness in [super::super::DEFAULT_SOFTNESS, 0.5, 0.0] {
+        let Some(polyline) = arc_capture(&segments, &[], 0, softness) else {
+            return;
+        };
+        let Some(drawn) = arc_capture(&[], &[arc], 4, softness) else {
+            return;
+        };
 
-    // Non-vacuity first: two black frames agree perfectly and prove nothing.
-    let lit = |px: &[f32]| px.chunks_exact(4).filter(|t| t[0] > 0.01).count();
-    let (lit_polyline, lit_arc) = (lit(&polyline), lit(&drawn));
-    let total = (ARC_W * ARC_H) as usize;
-    let (mean, outlier) = arc_diff(&polyline, &drawn);
-    eprintln!(
-        "arc vs {ARC_SAMPLES}-segment polyline at {ARC_W}x{ARC_H} (aspect \
-         {ARC_ASPECT:.4}): {lit_polyline} lit pixels vs {lit_arc} of {total}; \
-         mean {mean:.4} (tol {ARC_MEAN_TOL}) outlier {outlier} (tol \
-         {ARC_OUTLIER_TOL})"
-    );
-    assert!(
-        lit_polyline * 200 > total && lit_arc * 200 > total,
-        "one of the two captures is nearly empty ({lit_polyline} and {lit_arc} \
-         of {total} pixels lit) — the comparison below would pass on black \
-         against black"
-    );
+        // Non-vacuity first: two black frames agree perfectly and prove nothing.
+        let lit = |px: &[f32]| px.chunks_exact(4).filter(|t| t[0] > 0.01).count();
+        let (lit_polyline, lit_arc) = (lit(&polyline), lit(&drawn));
+        let total = (ARC_W * ARC_H) as usize;
+        let (mean, outlier) = arc_diff(&polyline, &drawn);
+        eprintln!(
+            "arc vs {ARC_SAMPLES}-segment polyline at {ARC_W}x{ARC_H} (aspect \
+             {ARC_ASPECT:.4}), softness {softness}: {lit_polyline} lit pixels \
+             vs {lit_arc} of {total}; mean {mean:.4} (tol {ARC_MEAN_TOL}) \
+             outlier {outlier} (tol {ARC_OUTLIER_TOL})"
+        );
+        assert!(
+            lit_polyline * 200 > total && lit_arc * 200 > total,
+            "at softness {softness} one of the two captures is nearly empty \
+             ({lit_polyline} and {lit_arc} of {total} pixels lit) — the \
+             comparison below would pass on black against black"
+        );
 
-    assert!(
-        mean <= ARC_MEAN_TOL && outlier <= ARC_OUTLIER_TOL,
-        "the arc and a {ARC_SAMPLES}-segment polyline of the same circle draw \
-         different pictures: mean {mean:.4} (tol {ARC_MEAN_TOL}), worst \
-         single-channel byte {outlier} (tol {ARC_OUTLIER_TOL})"
-    );
+        assert!(
+            mean <= ARC_MEAN_TOL && outlier <= ARC_OUTLIER_TOL,
+            "at softness {softness} the arc and a {ARC_SAMPLES}-segment \
+             polyline of the same circle draw different pictures: mean \
+             {mean:.4} (tol {ARC_MEAN_TOL}), worst single-channel byte \
+             {outlier} (tol {ARC_OUTLIER_TOL})"
+        );
+    }
 }
 
-/// **The stroke profile is the segment path's**: a bright core falling
-/// quadratically to zero at the stroke edge, not a flat bar and not a linear
-/// ramp.
+/// **The stroke profile is the segment path's**: at the default a bright core
+/// falling quadratically to zero at the stroke edge, not a flat bar and not a
+/// linear ramp — and **at every `softness`, whatever shape that is, the same
+/// shape on both primitives**.
 ///
 /// Read off the column through the circle's centre, where the arc runs
 /// horizontally and its distance is measured along y — so the profile is
 /// sampled in the very axis the half-width is quoted in and no aspect
 /// conversion enters. That makes the expected value a **closed form** rather
 /// than a shape to match: a pixel whose centre sits at NDC `y` is exactly
-/// `|y - radius|` from the circle there, so the fragment must emit
-/// `(1 - d / width)^2` and nothing else.
+/// `|y - radius|` from the circle there, so at `softness = 1` the fragment must
+/// emit `(1 - d / width)^2` and nothing else.
+///
+/// # This is where the two fragments are held to one profile (Plan 0114 Phase 2)
+///
+/// The arc's distance field and the segment's interpolated coordinate are
+/// different expressions reaching the same `stroke_coverage`, prepended to both
+/// modules by [`arc_shader_source`](super::arc_shader_source). Two hand-kept
+/// copies would compile and render, and the symptom would be a mandala whose
+/// circles and interlace no longer match. So the cross-sections are compared at
+/// **both ends of the `softness` range and one value between**, against a single
+/// straight segment rather than against a polyline — one quad has no seams and
+/// no unjoined corners, which is what makes the comparison survive a hard edge.
+///
+/// The last assertion is the one that keeps the rest from passing vacuously: the
+/// three cuts must actually differ from each other. Both fragments ignoring
+/// `softness` would satisfy every equality above.
 #[test]
 fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
     const CENTRE: [f32; 2] = [0.0, 0.0];
@@ -1105,6 +1157,11 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
     // Fat enough that a dozen rows land across the half-width; the property
     // does not depend on the width, only the resolution of the check does.
     const WIDTH: f32 = 0.08;
+    // The composite is `Rgba16Float`, so a value near 1 is stored to about
+    // 1/1024; the rest is the rasterizer agreeing with the pixel-centre
+    // convention this reconstructs `d` from. It is slack, not a tolerance: the
+    // properties below are exact equalities in real arithmetic.
+    const SLACK: f32 = 0.01;
 
     let arc = super::ArcInstance {
         centre: CENTRE,
@@ -1114,57 +1171,9 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
         color: [1.0, 1.0, 1.0],
         width: WIDTH,
     };
-    let Some(drawn) = arc_capture(&[], &[arc], 4) else {
-        return;
-    };
-
-    // `color` and the glow multiplier are both 1 and the target was cleared to
-    // black, so the red channel *is* the fragment's coverage `g`.
-    let column = (ARC_W / 2) as usize;
-    let at = |row: usize| drawn[(row * ARC_W as usize + column) * 4];
-    // Pixel centres sit at +0.5, and row 0 is NDC y = +1.
-    let ndc_y = |row: usize| 1.0 - 2.0 * (row as f32 + 0.5) / ARC_H as f32;
-
-    let (mut worst, mut checked, mut peak) = (0.0f32, 0usize, 0.0f32);
-    for row in 0..(ARC_H / 2) as usize {
-        let d = (ndc_y(row) - RADIUS).abs();
-        if d > WIDTH {
-            continue; // outside the stroke; the arc writes nothing there
-        }
-        let falloff = 1.0 - d / WIDTH;
-        let want = falloff * falloff;
-        let got = at(row);
-        worst = worst.max((got - want).abs());
-        peak = peak.max(got);
-        checked += 1;
-    }
-    eprintln!(
-        "arc stroke profile at {ARC_W}x{ARC_H}: {checked} rows across the \
-         stroke, peak {peak:.4}, worst |measured - (1 - d/w)^2| {worst:.4}"
-    );
-
-    assert!(
-        checked >= 16 && peak > 0.8,
-        "only {checked} rows fell across the stroke and the brightest reached \
-         {peak:.4} — the profile is not resolved and the assertion below \
-         would be vacuous"
-    );
-    // The composite is `Rgba16Float`, so a value near 1 is stored to about
-    // 1/1024; the rest is the rasterizer agreeing with the pixel-centre
-    // convention this reconstructs `d` from. It is slack, not a tolerance: the
-    // property is an exact equality in real arithmetic.
-    const PROFILE_SLACK: f32 = 0.01;
-    assert!(
-        worst <= PROFILE_SLACK,
-        "the arc's across-the-stroke profile departs from `(1 - d/w)^2` by \
-         {worst:.4} (slack {PROFILE_SLACK}) — a flat bar, a linear ramp or a \
-         stroke of the wrong width here would all be a different look drawn \
-         on the same curve"
-    );
-
     // The other half of "like a segment": the same cut through the segment
-    // path's own stroke must land on the same numbers. Without this the check
-    // above pins the arc to a formula rather than to its sibling.
+    // path's own stroke must land on the same numbers. Without it the closed
+    // form below pins the arc to a formula rather than to its sibling.
     let flat = [SegmentInstance {
         a: [-1.0, RADIUS],
         b: [1.0, RADIUS],
@@ -1173,23 +1182,90 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
         joined: 0,
         alpha: 1.0,
     }];
-    let Some(segment) = arc_capture(&flat, &[], 0) else {
-        return;
-    };
-    let mut worst_pair = 0.0f32;
-    for row in 0..(ARC_H / 2) as usize {
-        if (ndc_y(row) - RADIUS).abs() > WIDTH {
-            continue;
+
+    // `color` and the glow multiplier are both 1 and the target was cleared to
+    // black, so the red channel *is* the fragment's coverage `g`.
+    let column = (ARC_W / 2) as usize;
+    // Pixel centres sit at +0.5, and row 0 is NDC y = +1.
+    let ndc_y = |row: usize| 1.0 - 2.0 * (row as f32 + 0.5) / ARC_H as f32;
+    let rows: Vec<usize> = (0..(ARC_H / 2) as usize)
+        .filter(|row| (ndc_y(*row) - RADIUS).abs() <= WIDTH)
+        .collect();
+
+    let mut cuts: Vec<(f32, Vec<f32>)> = Vec::new();
+    for softness in [super::super::DEFAULT_SOFTNESS, 0.5, 0.0] {
+        let Some(drawn) = arc_capture(&[], &[arc], 4, softness) else {
+            return;
+        };
+        let Some(segment) = arc_capture(&flat, &[], 0, softness) else {
+            return;
+        };
+        let at = |px: &[f32], row: usize| px[(row * ARC_W as usize + column) * 4];
+
+        let cut: Vec<f32> = rows.iter().map(|row| at(&drawn, *row)).collect();
+        let peak = cut.iter().copied().fold(0.0f32, f32::max);
+        let worst_pair = rows.iter().fold(0.0f32, |acc, row| {
+            acc.max((at(&drawn, *row) - at(&segment, *row)).abs())
+        });
+        eprintln!(
+            "softness {softness} at {ARC_W}x{ARC_H}: {} rows across the \
+             stroke, peak {peak:.4}; worst arc-vs-segment per-row difference \
+             {worst_pair:.4}",
+            rows.len()
+        );
+        assert!(
+            rows.len() >= 16 && peak > 0.8,
+            "only {} rows fell across the stroke and the brightest reached \
+             {peak:.4} — the profile is not resolved and the assertions below \
+             would be vacuous",
+            rows.len()
+        );
+        assert!(
+            worst_pair <= SLACK,
+            "at softness {softness} the arc's stroke and a straight segment's \
+             differ by {worst_pair:.4} across their own cross-sections — the \
+             two primitives are not drawing the same stroke"
+        );
+
+        if softness == super::super::DEFAULT_SOFTNESS {
+            // The default is still the pre-Plan-0114 fragment, term for term.
+            let worst = rows.iter().fold(0.0f32, |acc, row| {
+                let d = (ndc_y(*row) - RADIUS).abs();
+                let falloff = 1.0 - d / WIDTH;
+                acc.max((at(&drawn, *row) - falloff * falloff).abs())
+            });
+            eprintln!(
+                "arc stroke profile at the default: worst |measured - \
+                 (1 - d/w)^2| {worst:.4}"
+            );
+            assert!(
+                worst <= SLACK,
+                "the arc's across-the-stroke profile departs from \
+                 `(1 - d/w)^2` by {worst:.4} (slack {SLACK}) — a flat bar, a \
+                 linear ramp or a stroke of the wrong width here would all be \
+                 a different look drawn on the same curve"
+            );
         }
-        worst_pair = worst_pair.max((at(row) - segment[(row * ARC_W as usize + column) * 4]).abs());
+        cuts.push((softness, cut));
     }
-    eprintln!("arc vs segment cross-section: worst per-row difference {worst_pair:.4}");
-    assert!(
-        worst_pair <= PROFILE_SLACK,
-        "the arc's stroke and a straight segment's differ by {worst_pair:.4} \
-         across their own cross-sections — the two primitives are not drawing \
-         the same stroke"
-    );
+
+    // **The sweep has to move something.** A `softness` both fragments ignored
+    // would satisfy every equality above, on three identical pictures.
+    for pair in cuts.windows(2) {
+        let ((soft_hi, hi), (soft_lo, lo)) = (&pair[0], &pair[1]);
+        let moved = hi
+            .iter()
+            .zip(lo)
+            .fold(0.0f32, |acc, (a, b)| acc.max((a - b).abs()));
+        eprintln!("softness {soft_hi} vs {soft_lo}: cross-sections differ by {moved:.4}");
+        assert!(
+            moved > 0.1,
+            "softness {soft_hi} and {soft_lo} draw the same cross-section \
+             (worst row difference {moved:.4}) — the parameter is reaching the \
+             fragments as a no-op, so the agreement asserted above proves \
+             nothing about the profile they share"
+        );
+    }
 }
 
 /// A renderer built **without** the arc pipeline draws no arcs, rather than
@@ -1209,7 +1285,7 @@ fn a_renderer_without_the_arc_pipeline_draws_no_arcs() {
         color: [1.0, 1.0, 1.0],
         width: 0.02,
     };
-    let Some(drawn) = arc_capture(&[], &[arc], 0) else {
+    let Some(drawn) = arc_capture(&[], &[arc], 0, super::super::DEFAULT_SOFTNESS) else {
         return;
     };
     let lit = drawn.chunks_exact(4).filter(|t| t[0] > 0.001).count();
@@ -1243,10 +1319,16 @@ fn an_arcs_angular_span_is_what_it_draws() {
     };
     let quarter = std::f32::consts::FRAC_PI_2;
 
-    let Some(full) = arc_capture(&[], &[arc(0.0, std::f32::consts::TAU)], 4) else {
+    let Some(full) = arc_capture(
+        &[],
+        &[arc(0.0, std::f32::consts::TAU)],
+        4,
+        super::super::DEFAULT_SOFTNESS,
+    ) else {
         return;
     };
-    let Some(first) = arc_capture(&[], &[arc(0.0, quarter)], 4) else {
+    let Some(first) = arc_capture(&[], &[arc(0.0, quarter)], 4, super::super::DEFAULT_SOFTNESS)
+    else {
         return;
     };
     let lit = |px: &[f32]| px.chunks_exact(4).filter(|t| t[0] > 0.01).count();
@@ -1393,11 +1475,10 @@ fn profile_capture(
     )
 }
 
-/// Half-precision slack, the same figure
-/// `the_arc_stroke_falls_off_quadratically_like_a_segment` uses. It is slack,
-/// not a tolerance: every property below is an exact equality in real
+/// Half-precision slack for the pixel-coordinate closed forms below. It is
+/// slack, not a tolerance: both properties are exact equalities in real
 /// arithmetic.
-const PROFILE_SLACK: f32 = 0.02;
+const PIXEL_PROFILE_SLACK: f32 = 0.02;
 
 /// A stroke spanning the whole frame horizontally at NDC y = 0. World x reaches
 /// well past the frame at either edge, so every column is interior and the
@@ -1584,9 +1665,9 @@ fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
              assertion below would be vacuous"
         );
         assert!(
-            worst <= PROFILE_SLACK,
+            worst <= PIXEL_PROFILE_SLACK,
             "{width}x{height}: the coverage departs from `min(p, 1)^2` by \
-             {worst:.4} (slack {PROFILE_SLACK}), where `p` is pixels inward \
+             {worst:.4} (slack {PIXEL_PROFILE_SLACK}), where `p` is pixels inward \
              from the stroke edge. A ramp specified as a fraction of the \
              stroke would fit this form at one resolution and miss it at the \
              other"
