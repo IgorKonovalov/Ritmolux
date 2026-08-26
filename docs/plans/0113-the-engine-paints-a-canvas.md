@@ -366,6 +366,80 @@ flowchart LR
   - `cargo nextest run --workspace` is green, and the two golden baselines are unmoved — none of the
     above is a pixel change.
 
+### Phase 10 — The second-pass repairs
+
+> **Added 2026-08-26 by the second close review**, on the same [Plan 0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+> precedent Phase 9 used. That pass found no blockers and one `major`; the `major`
+> is architect-owned — ADR-0123 carries its own copy of the colour promise Phase 9
+> repaired at five sites, and is the document those five cite — so it is repaired
+> at the close, not here. What is below is the four `minor`s and two `nit`s that
+> need `dev`. **Nothing here is a pixel change**, and none of it reverses a decision.
+
+- **Owner skill:** dev
+- **What:** Two stale measurements, one collision hazard, one defensive assert, one
+  unrecorded answer, and two lines of the plan's own log that the plan itself
+  falsified.
+- **Files touched:** `core/src/render/tier.rs`, `core/tests/sanity.rs`,
+  `core/src/render/scenes/shape_collage.rs`,
+  `core/src/render/scenes/shape_collage/tests.rs`, `docs/presets.md`,
+  `docs/plans/0113-the-engine-paints-a-canvas.md` (the `## Implementation log` only).
+- **Done when:**
+  - **`tier.rs` quotes the ladder that describes what ships.** Phase 9 replaced
+    *"36-39 %"* with *"12.7 % at eight and 16.8 % at sixteen"*, which satisfies its
+    own done-when literally but takes those from the **pre-roster** 2026-08-25
+    table. `collage_cost.rs`'s Phase 7 table - the same file this comment already
+    cites, the same box, the same day - measures the **shipped** configuration at
+    **8.2 % at eight and 10.7 % at sixteen**. The sentence is about the user's
+    working density on the system as shipped, so it takes the post-roster figures
+    and names which of the two tables it is quoting. This is the third pass over one
+    sentence; end it by naming the table inline rather than leaving the next reader
+    to pick.
+  - **`sanity.rs`'s `Ink on Paper` / `Thomas` note stops asserting a falsified
+    number.** The passage at `sanity.rs:449-457` states both *"read exactly
+    `1.0000`"*. ADR-0126's derived ground falsified that inside this same tree - the
+    `Attractor` arm forty lines above records `0.2167` / `0.2917`. Re-point it the
+    way those arms were re-pointed: the `1.0000` becomes what it **was** under the
+    `BLACK` predicate, dated, with the current reading beside it. **Keep the
+    mechanism sentence verbatim** - *"the ink remap is a terminal engine stage, not
+    a `bg_*` binding, so ADR-0067's backdrop suppression does not reach it"*. It is
+    the only record of that fact in the tree.
+  - **The `#[global_allocator]` says what it costs the crate.**
+    `shape_collage/tests.rs:280` installs `CountingAlloc` for the **entire
+    `lmv-core` lib unit-test binary**, from a leaf scene's test module. It is
+    `#[cfg(test)]`-gated and a `System` pass-through, so nothing production-facing -
+    but the slot is now taken, and the next in-lib test wanting an allocator counter
+    gets *"cannot define multiple global allocators"* from a file it has no reason to
+    be reading. Either hoist it to shared test support or state the collision where
+    it stands. A sentence is an acceptable fix; silence is not.
+  - **`Element::build`'s candidate buffer convicts an overflow instead of absorbing
+    one.** The `push` closure drops silently past index 8 (`points.get_mut(n)`).
+    Nine is exhaustive for today's kinds and the comment proves it, so this is not a
+    live defect - but a future kind that adds a candidate would shrink its own hull,
+    and a shrunk hull is a bounding box that is **too small**, which
+    `every_kind_is_contained_by_its_own_bounding_box` catches only if that kind
+    happens to be rendered at an angle that exposes it. A `debug_assert!` on the
+    bound is the whole change.
+  - **`docs/presets.md` records that this plan introduced no grammar surface.**
+    Phase 8's done-when offered two ways to satisfy it and the tree satisfies neither
+    in writing: the diff adds the system-roster row and no expression grammar, which
+    is the right answer, unstated. One line.
+  - **The `## Implementation log` stops carrying two claims this plan falsified.**
+    Both sit in **Observations for the review**, both were written before Phase 6b
+    landed, and `dev` owns that section:
+    - *"Both shipped presets clear all five gates. `Suprematist`: coverage 1.0000 …
+      `On White`: coverage 1.0000"* - Phase 6b measured `0.3028` and `0.2677`
+      against the derived ground and re-derived the floor **from those numbers**.
+      Report the post-6b readings; keep the pre-6b ones only if labelled as the
+      `BLACK`-predicate reading they were.
+    - *"That fixture was also the only place in the tree recording that `ink_*` is a
+      terminal engine stage … Nothing records it now."* - it is recorded, at
+      `core/tests/sanity.rs:452-456`, in the same file the fixture moved within.
+      Correct the observation rather than deleting it: a close brief that reported a
+      loss which did not happen is worth one line saying so.
+  - `cargo nextest run --workspace` is green, `cargo clippy --all-targets --workspace
+    -- -D warnings` and `cargo fmt --all --check` are clean, and both golden
+    baselines are unmoved.
+
 ## Data shapes
 
 ```rust
