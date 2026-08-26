@@ -13,6 +13,63 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
+  — closed 2026-08-26. Ten phases, `e2eb8fc`..`1d0185a`, in the `lmv-plan-0114` worktree on
+  `plan-0114-line-stroke`. Review: **no blockers, no majors, three minors.** Version **0.81.0**
+  (minor: a new authorable scene parameter, a moved default, a new golden baseline and a
+  six-preset retune).
+
+  **What landed.** The line fragment gained a plateau and a `fwidth`-derived one-pixel edge,
+  expressed once as `stroke_coverage(u, du, softness)` and prepended to **both** the segment and
+  arc modules, so the two cannot draw different profiles on one figure. `softness = 1.0` reduces
+  it to the pre-Plan-0010 `g = u²` term for term — verified bless-to-bless against a control, not
+  by `git diff`. Phase 4's look gate set `DEFAULT_SOFTNESS = 0.25`; `warp_mesh` took its own
+  `MILKDROP_SOFTNESS = 1.0` because it answers to `foo_vis_milk2` rather than to that gate, and
+  Phase 8's second gate kept it. Phase 6 retuned six presets — `curve_ionwake` to `0`,
+  `lsystem_vellum` / `spectrum_halo` / `star_rosewindow` to `0.25`, and `curve_nightbloom` /
+  `fragment_vitrail` deliberately to `1.0`, each with a header saying why.
+
+  **The coverage gap this plan found in itself is the durable part.** At the golden suite's 128 px
+  capture a `thickness ≈ 2` stroke is 0.38 px of half-width and `warp_mesh`'s `THIN` is 0.16 px —
+  all under the one-pixel floor the edge term is capped at, so *every* `softness` drew the
+  identical frame. Measured, not assumed: driving the pin `1.0 → 0.0` moved `warp_mesh.png`,
+  `warp_mesh_milk.png` and `warp_mesh_shader.png` by mean 0.0000 / outlier 0, and the whole line
+  family the same. **Thirty-three baselines could not see the fragment this plan rewrote.** Phase 9
+  closed it for one surface with `warp_mesh_stroke`, which needed a 7.7 px border to resolve a
+  profile at all and is *proved* to convict (mean 0.0336 / outlier 162 against 0.02 / 48 under the
+  same driven pin). The line families' half of the gap is still open.
+
+  **ADR-0124's stated reason for that gap was wrong and its conclusion was right.** It said the
+  three `warp_mesh` fixtures "set no wave"; `wave_a` defaults to `1.0`, so all three stroke one.
+  The cause is the capture size. The ADR carries a dated `Outcome` recording the correction.
+
+  **Three tests had encoded the old profile and were repointed rather than retuned away.** The arc
+  falloff test now names `SOFT_PROFILE = 1.0` — the value its closed form is *about* — instead of
+  keying on a default that moved. `lines_lit_backdrop.toml` pins `softness = "1.0"`, because at
+  `0.25` a plateau legitimately reaches coverage 1 over a *region* and the guard's wide arm can no
+  longer separate that from the constant-alpha defect it exists to catch; Phase 10 gave that pin a
+  `fixture_value` assertion and a header paragraph, the shape the fixture's own "do not simplify it
+  away" rule asks for. And `BEAD_SPREAD = 0.12` — a frozen number asserted universally, naming no
+  configuration — became `BEAD_RATIO = 3.0`, one statistic over two geometries in one test with
+  both absolutes printed. Its floor was **measured**: the regression the message names (dropping
+  the control's `joined` flags) separates at 2.01x where the passing configuration is 4.36x, and
+  the retired `0.12` form *passed* that regression because a min/max spread is sign-blind.
+
+  **Found at the close, pre-existing, not this plan's.** `node scripts/docs-shots.mjs` — the
+  committed instrument ADR-0100 makes the whole operator-doc image sweep depend on — aborts before
+  rendering anything, because its gallery manifest has no entry for `shape_field`, `warp_mesh` or
+  `shape_collage` and its own cross-check against `SystemKind::from_name` is a hard error.
+  Reproduced on `main`. So the four line-scene gallery renders that this plan made stale cannot be
+  refreshed. Filed as [design-backlog 0133](../design-backlog.md).
+
+  **Two bookkeeping facts worth keeping.** The lane was branched off `plan-0087-arc-primitive`, so
+  this close merged **Plan 0087 Phases 1-4** to `main` as well; 0087 stays open at Phase 5, now
+  resuming from `main` instead of from its own branch. And the plan's header had claimed the
+  `v0.80.0` bump was taken at a "`dev`-arm close" and that phases 1-5 and 7-9 were already merged
+  — both false: that tag sits on `601293d`, Plan 0119's release commit, and no part of 0114 was on
+  `main` until this close. `dev`'s close block caught the discrepancy, refused to edit the header,
+  and left it here, which is exactly the split the lanes are for.
+
 - [0119 — The flatness gate gets its second term](done/0119-the-flatness-gate-gets-its-second-term.md)
   — closed 2026-08-26. Five phases, `8389f2a`..`40398d4`, on `main` in the primary
   worktree. Review: **no blockers, one major, four minors.** Version **0.80.0** (minor:

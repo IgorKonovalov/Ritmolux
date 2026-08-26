@@ -1,27 +1,35 @@
 # 0114 — the line stroke reads as a drawn line
 
-> **Status:** in-progress — **the `dev` arm is done, reviewed and merged (2026-08-26): phases 1-5
-> and 7-9.** Two phases remain and neither gates the other: **Phase 6**, the `preset-author` retune,
-> and **Phase 10**, the Mode 4 review's findings. [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
-> is accepted with a dated `Outcome`.
-> **The version bump was taken here, at the `dev`-arm close: `v0.80.0`.** ADR-0005 says one bump
-> per shipped plan, *"the unit a human reads as a feature"* — and that unit, the authorable
-> stroke, is what lands on `main` now. Phase 6 is a content retune and Phase 10 is a test-guard
-> repair; neither is a second feature, so **the eventual close takes a `patch` or nothing, never
-> another `minor`**.
+> **Status:** done — closed 2026-08-26. All ten phases landed; the whole lane merged to `main` in
+> one go, so nothing of this plan reached `main` before this close. Mode 4 verdict: **no blockers,
+> no majors, three minors** (an inverted `softness` description in the segment fragment, a stale
+> future tense on `MILKDROP_SOFTNESS`'s Phase 8 note, and the gallery renders that still show the
+> old stroke — the last blocked on a pre-existing break in `scripts/docs-shots.mjs`, filed as
+> [design-backlog 0133](../../design-backlog.md)). Verified at the close: the full workspace gate on
+> the merged tree (fmt, `clippy --workspace --all-targets`, `nextest --workspace` — 1014 passed),
+> all three doc gates, and the assertion bodies behind every numeric done-when.
+> [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) is
+> accepted with a dated `Outcome`.
+> **Version: `0.81.0`** — one minor, taken here, for the whole plan. An earlier header note claimed
+> `v0.80.0` had been taken at a `dev`-arm close; it had not. That tag sits on `601293d`, Plan 0119's
+> release commit, and no part of this plan was on `main` until now. `dev`'s close block recorded the
+> discrepancy and correctly left it for this session.
+> **This merge also lands [Plan 0087](../0087-the-line-renderer-draws-a-curve.md) Phases 1-4** — the
+> arc primitive — because this lane was branched off that one (Phase 2 needs the arc fragment).
+> 0087 stays open and parked at Phase 5, now resuming from `main`.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
-> supplementing [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md),
-> [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)
-> **Blocks:** [Plan 0087](0087-the-line-renderer-draws-a-curve.md) Phase 5 — parked at Phase 4 by
+> **Related ADRs:** [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
+> supplementing [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md),
+> [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)
+> **Blocks:** [Plan 0087](../0087-the-line-renderer-draws-a-curve.md) Phase 5 — parked at Phase 4 by
 > user decision 2026-08-25, so the biarc chain is judged on the final stroke rather than through
 > this defect
 > **Amended 2026-08-26, before Phase 1 started.** `dev` found a **fifth consumer** of the fragment:
 > `warp_mesh` strokes through it via `LineRenderer::draw_split`, and since all three entry points
 > funnel into one `draw_all` writing one uniform, it cannot abstain. It is **pinned** to the
 > pre-0114 profile rather than following the new default, because it answers to `foo_vis_milk2` and
-> not to Phase 4 — see [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s
+> not to Phase 4 — see [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s
 > Decision and its Alternative D0. Phase 1 grows the pin and one file; **Phases 7-9 are new** and
 > are the arm that judges that surface properly. Phase 3's output path is settled. Phases 2, 4 and 6
 > are unchanged.
@@ -38,7 +46,7 @@
 > blind, so this is a property of the capture size rather than of those fixtures. Phase 5's
 > lines-only re-bless and Phase 9's new baseline are both still correct; the same wording recurs in
 > Phase 5's first done-when below and is wrong there too. See the `Implementation log` and
-> [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s `Outcome`.
+> [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s `Outcome`.
 
 ## TL;DR
 
@@ -74,14 +82,14 @@ the arc build's own frame, on a preset binding **no bloom, no trails and no `glo
 | above half peak | 13 px |
 | frame pixels reaching >= 200/255 | 13.0 % |
 
-**Nothing regressed and this is not a bug.** It is [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
+**Nothing regressed and this is not a bug.** It is [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
 working as specified — the profile that produces the blur is the same one that makes the
 premultiplied seam correct, so the quad's long edges write nothing instead of opaque black. Plan
 0087 Phase 1's done-when *required* the arc primitive to reproduce it exactly, and it does, at mean
 0.0000. The reading is identical either side of that plan.
 
 **Three levers were checked and none reaches it** — the detail is in
-[ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s Context.
+[ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)'s Context.
 `glow` multiplies the light and not the coverage, so it dims without narrowing. `thickness` scales
 the whole profile, so a thinner stroke is a smaller blur at the same spine-to-gradient ratio — which
 is why four years of tuning never found this. Bloom adds halo and cannot remove one, and the
@@ -95,7 +103,7 @@ judged through the same defect.
 
 ## Decision
 
-Per [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md): the
+Per [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md): the
 fragment gains a **plateau whose width is authorable** and an **edge specified in pixels of the
 render target**, taken from `fwidth` — the technique `palette.rs:744` already uses here for a
 screen-constant contour. `softness = 1.0` is today's fragment exactly; `softness → 0` is a solid
@@ -297,7 +305,7 @@ instruments, and neither one's verdict is evidence for the other's constant.
   is in fact *harder* than this engine's soft falloff. **`1.0` — keep the pin as it stands — is a
   legitimate outcome and closes the question**; it is not a null result. A verdict of "the profile
   is not what differs" is also a result, and routes to
-  [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
+  [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
   fidelity ledger rather than back here.
 
 ### Phase 9 — set the constant, and give the surface a baseline
@@ -360,7 +368,7 @@ instruments, and neither one's verdict is evidence for the other's constant.
   - No golden baseline moves. Nothing here touches a fragment, a default or a fixture's geometry —
     if a baseline moves, something in this phase reached further than it was asked to.
 
-[ADR-0071]: ../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+[ADR-0071]: ../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 
 ## Risks & open questions
 
@@ -370,7 +378,7 @@ instruments, and neither one's verdict is evidence for the other's constant.
   one. This is a limit to state, not to engineer around.
 - **The look may not be the profile.** The user said "blurred **and semi-transparent**". Coverage
   and brightness are separable here, and it is possible the complaint is partly about the additive
-  composite rather than the stroke shape — which is [backlog 0069](../design-backlog.md)'s
+  composite rather than the stroke shape — which is [backlog 0069](../../design-backlog.md)'s
   territory and a redesign. Phase 4 asks the brightness question directly for this reason. If the
   sheets come back "sharper but still washed out", that is the finding and it routes there.
 - **A crisper stroke is more fuel for bloom**, since more of the footprint sits at full coverage and
@@ -388,7 +396,7 @@ instruments, and neither one's verdict is evidence for the other's constant.
 
 - **It does not change the composite.** ADR-0056 and ADR-0018 stand; colour and alpha still carry
   the same coverage `g`, and only the shape of `g` moves. The two-tone fill-and-outline question
-  stays in [backlog 0069](../design-backlog.md).
+  stays in [backlog 0069](../../design-backlog.md).
 - **It does not touch the particle, field or attractor families.** Their strokes are not this
   fragment.
 - **It does not change how a MilkDrop preset looks.** `warp_mesh` is pinned to the pre-0114
@@ -600,12 +608,12 @@ and Phase 9's deliverable is its other half.
   the ADR draws from it is correct and unaffected. **This is already carried in the ADR's dated
   `Outcome`** — recorded here because the bullet predates it.
 
-[ADR-0124]: ../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
+[ADR-0124]: ../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 
 ## Followups (after this lands)
 
 - Plan 0087 Phase 5 (the biarc chain) resumes, now judged on the final stroke. It is gated on
   Phases 1-6 only — the `warp_mesh` arm (Phases 7-9) touches a different constant and a different
   scene, and does not block it.
-- If Phase 4 says "sharper but still washed out", that is [backlog 0069](../design-backlog.md)'s
+- If Phase 4 says "sharper but still washed out", that is [backlog 0069](../../design-backlog.md)'s
   evidence and its ADR's opening argument — the same routing Plan 0087 Phase 4 carried.
