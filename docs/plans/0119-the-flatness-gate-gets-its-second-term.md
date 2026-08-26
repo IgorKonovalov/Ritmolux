@@ -286,13 +286,26 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The fourth candidate joins the table | dev | done | `8389f2a` |
-| 2 — The stop gate | human | decided: continue on the control | committed with this row |
-| 3 — The gate takes two terms | dev | | |
+| 2 — The stop gate | human | decided: continue on the control | `53d3e8b` |
+| 3 — The gate takes two terms | dev | done | committed with this row |
 | 4 — The preset ships | dev | | |
 | 5 — Documentation | dev | | |
 
 ### Notes
 
+- **Phase 3 deviates from one clause of its own non-vacuity done-when, and the plan's number is
+  why.** The phase asks for a test asserting that "reverted to term one alone the held preset fails,
+  and reverted to term two alone **the blot passes**". The first clause holds. The second is false
+  on the term that shipped: `Blown Out` reads `boundary = 0.2631` against a `0.31` floor, so term
+  two alone convicts it — ADR-0130's own table says so, and the test re-measures it at `0.2631`.
+  `each_term_of_the_flatness_conjunction_is_load_bearing` therefore witnesses term one's necessity
+  on a **shipped preset under its floor** instead: `Sumi`, `flatness 0.2075` (clears) and
+  `boundary 0.1008` (under `0.31`), so a structure-only gate would convict legitimate content. The
+  three rows it asserts are `Tiled Rosette Mono` 0.9413 / 0.3602, `Sumi` 0.2075 / 0.1008, and
+  `Blown Out` 0.9154 / 0.2631. The witness is named in a constant with a comment saying it is a
+  witness and not a fixture, and how to replace it.
+- **The exposure count read 22 of 42**, matching ADR-0130's landmine Negative. The full list is
+  printed by `every_preset_draws_a_real_shape` on every run and is unasserted, per the phase.
 - **Phase 2 decided *continue on the control*, 2026-08-26.** `boundary` ships as the second term,
   not the tiled statistic. Per the phase's own routing that needs a superseding note on ADR-0129
   before Phase 3, so the plan is with `architect`; the reason belongs in that note and is not

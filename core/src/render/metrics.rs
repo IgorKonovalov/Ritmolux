@@ -206,6 +206,74 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
     buckets.iter().copied().max().unwrap_or(0) as f32 / lit as f32
 }
 
+/// Perimeter of the lit figure over its area: the share of lit pixels having at
+/// least one **unlit** 4-neighbour (`0.0..=1.0`) — "is the lit set a solid mass,
+/// or does it have interior?"
+///
+/// This is the second term of the flatness gate ([ADR-0128], settled by
+/// [ADR-0130]). [`tonal_flatness`] asks whether the figure has any *tonal*
+/// structure and convicts a two-ink print for having exactly two tones, which is
+/// what that idiom is; this asks the orthogonal question, and a picture is
+/// called a blot only when both say so.
+///
+/// A solid mass carries only its rim on the boundary and reads near zero however
+/// large it is; a hatched, stroked or tiled figure is almost all rim and reads
+/// near one however small. **The denominator is the lit area, not the frame's**,
+/// which is what keeps the statistic asking one question: normalizing by frame
+/// area would make a frame score higher merely for having more lit material,
+/// and *how much is lit* is [`coverage`], another term of the same gate.
+///
+/// Frame edges count as **unlit**, so a figure running off the frame counts that
+/// as boundary. The alternative — edges as lit — would let a fullscreen fill
+/// read as having no perimeter at all, which is the one answer this statistic
+/// must not give.
+///
+/// It reads pixel-scale perimeter, so a **ragged** mass defeats it: a particle
+/// blot noisier than the fixture the threshold was measured on has more
+/// perimeter per lit pixel than a composition does. That is the known decay mode
+/// and ADR-0130 records it as accepted rather than solved.
+///
+/// `0.0` for a frame with no lit pixels — the convention [`tonal_flatness`]
+/// uses, and [`coverage`] is the metric that already convicts an empty picture.
+///
+/// [ADR-0128]: ../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md
+/// [ADR-0130]: ../../docs/adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md
+pub fn boundary_density(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask: Vec<bool> = img
+        .rgba
+        .chunks_exact(4)
+        .map(|px| is_lit(px, bg, eps))
+        .collect();
+    let at = |x: isize, y: isize| -> bool {
+        if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+            return false;
+        }
+        mask.get(y as usize * w + x as usize)
+            .copied()
+            .unwrap_or(false)
+    };
+    let (mut lit, mut edge) = (0u64, 0u64);
+    for y in 0..h as isize {
+        for x in 0..w as isize {
+            if !at(x, y) {
+                continue;
+            }
+            lit += 1;
+            if !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) {
+                edge += 1;
+            }
+        }
+    }
+    if lit == 0 {
+        return 0.0;
+    }
+    edge as f32 / lit as f32
+}
+
 /// Ratio of the frame's **peak** departure from its background luminance to the
 /// **mean** departure over every pixel — the crest factor, and the direct
 /// reading of *has the population piled onto a few places?* (Plan 0085 Phase 1).
