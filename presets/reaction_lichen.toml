@@ -1,0 +1,49 @@
+# Lichen - Verdigris' Gray-Scott worm regime with the eight-fold screen fold
+# REMOVED. The fold is what makes the shipped preset read as a bronze rosette;
+# unfolded, the same simulation is what it physically is - a reaction-diffusion
+# pattern, the arithmetic behind coral, lichen crust and leopard skin. Palette
+# moved off copper onto damp forest: peat, moss, lichen green, a pale sporing
+# highlight.
+system = "reaction_diffusion"
+name = "Lichen"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#050a06" },  # wet peat
+  { at = 0.30, color = "#1b3a1c" },  # deep moss
+  { at = 0.55, color = "#4e7a2a" },  # leaf green
+  { at = 0.80, color = "#9fc84a" },  # lichen crust
+  { at = 1.00, color = "#eaf7cf" },  # pale spore bloom
+]
+
+[params]
+feed = "0.0505 + noise(time * 0.12) * 0.0025 + clamp(bass * 1.18, 0, 1) * 0.0018"
+kill = "0.0635 + noise(time * 0.09 + 80) * 0.0008 + clamp(mid * 1.18, 0, 1) * 0.0006"
+flow = "2.6 + max(0, 1.0 - time * 0.2) + clamp(treb * 1.0, 0, 0.6)"
+inject = "max(beat * (bar < 0.25), noise(time * 1.4 + 9) > 0.62)"
+glow = "0.90 + clamp(bass * 0.41, 0, 0.35)"
+contour = "5 + clamp(bass * 3.5, 0, 3)"
+hatch = "3"
+# NO FOLD - this is the whole edit. Order < 2 is passthrough.
+kaleido_order = "1"
+# Zoomed IN a little on the unfolded field: the fold used to supply eight copies
+# of the pattern, so without it the same zoom reads as a sparser frame.
+zoom = "0.88 + noise(time * 0.25) * 0.05"
+color_span = "2.2"
+color_center = "0.05"
+saturation = "1.10 + clamp(bass * 0.41, 0, 0.35)"
+trails = "0.45"
+fb_zoom = "1.04"
+bg_hue = "0.35"
+bg_bright = "0.05 + noise(time * 1.0) * 0.020 + clamp(bass * 0.12, 0, 0.10) + beat * 0.02"
+bg_vignette = "0.62"
+
+[feedback]
+blend = "add"
+
+[smoothing]
+flow = 0.3
+glow = 0.25
+contour = { attack = 0.03, release = 0.4 }
+saturation = { attack = 0.05, release = 0.5 }
+bg_bright = { attack = 0.02, release = 0.3 }
