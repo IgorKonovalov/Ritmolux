@@ -348,9 +348,9 @@ at `b2fb13b`.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the profile lands | dev | done | `e2eb8fc` |
-| 2 — the arc fragment shares it | dev | done | committed with this row |
-| 3 — the sample sheet | dev | not started | |
-| 4 — pick the default | human | not started | |
+| 2 — the arc fragment shares it | dev | done | `348cc01` |
+| 3 — the sample sheet | dev | done | committed with this row |
+| 4 — pick the default | human | **next — this session stops here** | |
 | 5 — flip, re-bless, repair the docs | dev | not started | |
 | 6 — the library is retuned | human | not started | |
 | 7 — the MilkDrop comparison set | dev | not started | |
@@ -365,6 +365,21 @@ at `b2fb13b`.
   declares it, and Phase 5 still owes the `glow` repair and the four-lever sentence.
   `core/src/render/scenes/lines/star/tests.rs`, which calls `draw_arcs` and had to pass the new
   argument to compile.
+- **Phase 3 emits two artifacts per (preset, size), not one.** `shot --all` resizes every capture
+  to a 320 px thumbnail, so a 1080p contact sheet is a 6:1 downsample and a 4 px stroke lands at
+  0.7 px. The sheet ranks the four and shows whether the figure still reads; the four full-size
+  panels beside it are what a one-pixel edge can be judged on. Both land in
+  `target/softness-sheets/` and `index.md` links them.
+- **The bottom of the `softness` range collapses on two of the six subjects, and the index says
+  so per panel.** `curve_nightbloom` at 1280x800 draws `0.00` and `0.25` byte-identically;
+  `fragment_vitrail` does at both sizes. That is the one-pixel edge floor working as ADR-0124's
+  Negative section states — those strokes are around two pixels wide, so the floor is the whole
+  ramp. It is a fact about those presets' `thickness` and it is Phase 4/6 material, not a defect.
+  The script hashes each panel and marks the twins, so the gate is not shown two identical
+  pictures under different labels.
+- The sheets are rendered against a held stimulus (`bass=0.55,mid=0.45,treb=0.4,tempo=120`, 240
+  frames), so they show the library at one operating point rather than across a track. Phase 4's
+  second half — the winner in the running app on real audio — is what covers the rest.
 - **Phase 2 changed the arc fragment beyond restating the profile.** It now differentiates the
   SIGNED across-the-stroke distance: `fwidth` of the absolute one is near zero on the 2x2 quad
   straddling the centreline, and at `softness = 0.5` that read as a brighter arc than the polyline
