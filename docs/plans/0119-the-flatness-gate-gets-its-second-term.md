@@ -3,8 +3,11 @@
 > **Status:** in-progress 2026-08-26
 > **Created:** 2026-08-26
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
-> (the axis and the stop condition), [0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+> **Related ADRs:** [0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+> (**the term that ships**, written at Phase 2 on Phase 1's measurement),
+> [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
+> (the stop condition, which stands — its Decision is superseded and it carries a dated `Outcome`),
+> [0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 > (the conjunction this implements — its Decision stands, its mechanism did not),
 > [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
 > [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -13,11 +16,13 @@
 
 ## TL;DR
 
-`tonal_flatness` becomes one of two terms. The second is **modal-band tile transition density** —
-tile the capture, give each tile its modal luminance band, count how often adjacent tiles disagree —
-and a preset is convicted only when it is tonally flat **and** below that term's threshold. Phase 1
-measures the candidate against ADR-0129's three-part stop condition; Phase 2 is a human gate that can
-end the plan; Phases 3-5 implement, ship the held preset, and sweep the docs.
+`tonal_flatness` becomes one of two terms, and a preset is convicted only when it is tonally flat
+**and** below the second term's threshold. Phase 1 measured four candidates against ADR-0129's
+three-part stop condition, and **Phase 2 chose `boundary`** — perimeter over lit area, the control
+ADR-0129 rejected — not the tiled statistic that ADR proposed. See
+[ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+for why, and ADR-0129's dated `Outcome` for what its own measurement falsified. Phases 3-5 implement
+the conjunction, ship the held preset, and sweep the docs.
 
 ## Context & problem
 
@@ -51,9 +56,9 @@ that followed — ADR-0126's diagnosis by Plan 0116 Phase 1, ADR-0128's mechanis
 flowchart TB
     F["capture (96x96)"]
     F --> T1["term 1: tonal_flatness<br/>share of LIT pixels in one of 16 bands<br/>(ADR-0126 ground)"]
-    F --> T2["term 2: modal-band tile transitions<br/>ALL pixels, tiled, modal band per tile<br/>(ADR-0129)"]
+    F --> T2["term 2: boundary density<br/>share of LIT pixels with an unlit 4-neighbour<br/>(perimeter over lit area, ADR-0130)"]
     T1 -->|"> MAX_TONAL_FLATNESS"| AND{"both?"}
-    T2 -->|"< MIN_TILE_TRANSITIONS"| AND
+    T2 -->|"< MIN_BOUNDARY_DENSITY"| AND
     AND -->|yes| BLOT["convicted: a blot"]
     AND -->|no| OK["passes the flatness gate"]
 ```
@@ -105,24 +110,50 @@ flowchart TB
   - **Stop** — nothing passes. ADR-0129 takes a dated `Outcome`, `fragment_tiledmono` stays held, and
     the `presets/pending/README.md` row is updated with what this plan ruled out. **Phases 3-5 do not
     run.** This is a real outcome and it has now happened twice; it is not a failure of the plan.
+- **Outcome (2026-08-26): continue on the control.** `boundary` ships as the second term at
+  `MIN_BOUNDARY_DENSITY = 0.31`, not the tiled statistic. The reason, in full, is
+  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md);
+  ADR-0129 keeps its corrected stop condition, takes a dated `Outcome`, and has its Decision
+  superseded. In one paragraph: conditioned correctly the population is two members and criterion 2
+  is inert, so **three** of the four candidates separate — the conditioning error was not hiding a
+  design error, it *was* the error. The tiled statistic's verdict then flips between `tile@4` (not
+  separated) and `tile@6` (6.00x) with no plateau above it, which this plan's Risks section
+  pre-registered as a stop; and the three frozen `retired_mandalas` ADR-0129 put in the table
+  precisely to test its thin-stroke Positive read `0.0000` at **every** grid against `0.87`-`0.96` on
+  `boundary`, falsifying it. Among the three that pass, `boundary` normalizes by lit area (so it asks
+  only about structure, where `sobel`'s frame-area denominator partly re-asks `coverage`) and does
+  not invert on particle fields (where `components` scores `Drift Field` highest of all). Its price
+  is a 1.37x margin inside the library's own spread, accepted knowingly.
 
 ### Phase 3 — The gate takes two terms
 
 - **Owner skill:** dev
-- **Depends on:** Phase 2 deciding *continue*. If it decided *stop*, this phase does not exist.
-- **Files touched:** `core/src/render/metrics.rs` (the statistic moves next to `tonal_flatness`),
-  `core/tests/sanity.rs`.
+- **Depends on:** Phase 2, which decided *continue on the control*. The term is
+  [ADR-0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)'s
+  `boundary`, **not** the tiled statistic — read that ADR before starting.
+- **Files touched:** `core/src/render/metrics.rs` (`boundary_density` moves next to
+  `tonal_flatness`), `core/tests/sanity.rs`.
 - **Done when:**
-  - The statistic lives in `metrics.rs` beside `tonal_flatness`, not in the test file — it is now
-    gate behaviour rather than an instrument, and `#[ignore]`d measurement helpers staying in
-    `sanity.rs` is what kept the first three honest.
+  - **`boundary_density` lives in `metrics.rs` beside `tonal_flatness`**, not in the test file — it
+    is now gate behaviour rather than an instrument, and `#[ignore]`d measurement helpers staying in
+    `sanity.rs` is what kept the candidates honest. It takes `(img, bg, eps)` like its neighbours and
+    uses the real private `metrics::is_lit`, so the test file's `sanity_is_lit` / `lit_mask`
+    restatements stop being the definition the gate runs on. **The instrument keeps its column** and
+    reads the production function, so the table Phase 2 decided on stays re-runnable.
+  - **The `#[ignore]`d instrument's other three candidates stay in the test file.** They are
+    discarded candidates; a discarded candidate that ships as a `pub` production statistic is the
+    thing that section's own header warns against.
   - **The conviction is a conjunction.** `every_preset_draws_a_real_shape` fails a preset only when
-    `tonal_flatness > MAX_TONAL_FLATNESS` **and** the structural term is under its threshold; the
+    `tonal_flatness > MAX_TONAL_FLATNESS` **and** `boundary_density < MIN_BOUNDARY_DENSITY`; the
     printed line carries both numbers for every preset, not only for failures.
-  - **The threshold's docstring says it is a measurement, names its corpus, and names both frozen
-    fixtures it was taken between** (ADR-0071, and ADR-0129's first Negative). It must state, in
-    plain words, that the conditional population had two members — a claim of a derived floor here
-    would be the exact error 0129 was written to stop.
+  - **`MIN_BOUNDARY_DENSITY = 0.31`**, and its docstring says it is a **measurement**: the midpoint
+    of `0.2631` (the frozen `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono`, measured
+    2026-08-26 at `8389f2a`), `1.18x` above the defect and `1.16x` below the composition. It names
+    its corpus and both fixtures (ADR-0071), and it states in plain words that **the conditional
+    population had two members** and that half-the-sparsest-legitimate-content was unavailable
+    because the one legitimate member is the preset being admitted. A claim of a derived floor here
+    is the exact error ADR-0129 was written to stop, and ADR-0130's first Negative names this
+    docstring as the mitigation.
   - **`MAX_TONAL_FLATNESS`'s own doc comment says its meaning narrowed.** It currently argues a
     verdict from the library's distribution; after this phase it argues one of two terms, and
     ADR-0128's last Negative names that paragraph as the one that otherwise becomes the most
@@ -132,25 +163,44 @@ flowchart TB
     and the blot fixture's own test) still fail on the frames they were written for. A test asserts
     the conjunction is not vacuous: reverted to term one alone the held preset fails, and reverted to
     term two alone the blot passes — so each term is load-bearing.
+  - **The 24-of-45 exposure is printed, not left to be rediscovered.** Over half the library reads
+    below `0.31` on the structural term and is protected only by term one (ADR-0130's second
+    Negative). The per-preset line `every_preset_draws_a_real_shape` already prints carries
+    `boundary=` beside `flatness=`, and the run prints a one-line count of how many presets sit under
+    `MIN_BOUNDARY_DENSITY`, the way it already prints the flatness distribution. **It is a report,
+    not an assertion** — no threshold on that count, because there is no measured basis for one.
   - **The failure message names which term fired**, and tells an author what to do about that term
-    rather than about flatness generally.
+    rather than about flatness generally. For the structural term that advice is about *interior* —
+    a convicted frame is a solid mass, and what it lacks is perimeter per unit lit area.
   - `cargo nextest run --workspace` is green.
 
 ### Phase 4 — The preset ships
 
 - **Owner skill:** dev
 - **Depends on:** Phase 3.
-- **Files touched:** `presets/fragment_tiledmono.toml` (moved), `presets/pending/README.md`.
+- **Files touched:** `presets/fragment_tiledmono.toml` (moved), `presets/pending/README.md`,
+  `core/tests/sanity.rs`.
 - **Done when:**
   - `git mv presets/pending/fragment_tiledmono.toml presets/` — the whole of shipping one, per that
     directory's own README.
+  - **The calibration anchor is frozen into the test, and this is not optional.**
+    `HELD_OUT_TOML` is `include_str!("../../presets/pending/fragment_tiledmono.toml")`, so the `git
+    mv` breaks the build — and repointing it at the new path would be worse than the break: the
+    composition-side anchor of `MIN_BOUNDARY_DENSITY` would become ordinary editable content, and a
+    preset tweak could move a gate constant with nothing able to notice, because the constant would
+    still read green. Freeze the measured TOML into `sanity.rs` as an inline literal the way
+    `retired_mandalas()` already freezes three presets from a git revision, name the revision it was
+    taken at, and let the shipped copy be judged by the gate like any other preset. ADR-0130's
+    Decision requires both anchors frozen.
   - **All five gates pass with it embedded**, run as `cargo nextest run --workspace` rather than a
     package-scoped subset.
   - **The preset's own header stops naming a blocker that no longer exists.** It records what held it
     and what released it, in the shape `presets/pending/README.md` requires of an entry — an entry
     leaves as soon as its blocker lifts, and a stale blocker in a shipped preset's header is the
     class of comment [Plan 0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
-    about.
+    about. **It also carries the one line that makes it un-editable-by-accident**: this preset's
+    frame is a calibration anchor for `MIN_BOUNDARY_DENSITY`, and re-tuning it re-opens that
+    constant.
   - **`presets/pending/README.md`'s `Held today` table loses the row.** If the table is then empty,
     the file says so explicitly rather than leaving an empty table — the directory keeps its purpose
     with nothing in it.
@@ -166,9 +216,13 @@ flowchart TB
   - **`docs/capturing.md`'s five-gate table says what `sanity` now measures.** Its `sanity` row
     currently describes the tonal check as a single condition; it becomes a conjunction, and the row
     says what each term asks and that a conviction needs both.
-  - **The same file's "what the five gates can and cannot see" section gains the new blind spot** —
-    a coarsely mottled blot passes the structural term (ADR-0129's third Negative). A gate's
-    documented limits are the reason that section exists.
+  - **The same file's "what the five gates can and cannot see" section gains the new blind spot**,
+    which is ADR-0130's, not ADR-0129's: **a blot with a raggeder mask than `Blown Out`'s passes the
+    structural term**, because `boundary` reads pixel-scale perimeter and a noisier particle field
+    has more of it. Say the second half too — over half the shipped library reads below
+    `MIN_BOUNDARY_DENSITY` and is held only by the tonal term — because a reader who knows only the
+    first half will mis-price the gate. A gate's documented limits are the reason that section
+    exists.
   - `presets/README.md` gains whatever the shipped preset's arrival requires and nothing more; this
     plan adds no scene param and no grammar.
 
@@ -177,11 +231,14 @@ flowchart TB
 - **The two-member calibration is this plan's real risk**, and no phase removes it. Phase 3's
   docstring requirement is mitigation by disclosure, not by measurement. The first genuinely flat
   preset from a third family is what tests it, and that preset does not exist yet.
-- **The tile sweep may show no plateau.** If the verdict flips between adjacent grids in
-  `[4, 6, 8, 12, 16]`, the statistic is resolution-coupled and Phase 2 should read that as a *stop*
-  even if one grid passes — a constant that only works at one tile count is a fitted number.
-  Recorded here rather than as a stop-condition clause because judging a curve is what the human gate
-  is for.
+- ~~**The tile sweep may show no plateau.**~~ **It showed none, and that is what decided Phase 2.**
+  The verdict flips between `tile@4` (not separated) and `tile@6` (6.00x), and the composition's own
+  reading swings 2.24x between `tile@6` and `tile@8`. Pre-registering this before the numbers existed
+  is the only reason the reading carries weight; keep the habit.
+- **The margin that shipped is 1.37x, inside the library's own spread** (`0.0440..0.9839`). This is
+  ADR-0129 Alternative A's objection, it was never rebutted, and ADR-0130 accepts it knowingly
+  against the alternative of a fitted tile count. The decay mode it names — a blot with a raggeder
+  mask — is real and unaddressed, and is what a fourth attempt would be about.
 - **A gate that convicts nothing is not obviously broken.** After this change only frames failing
   both terms are caught, and the library has no such frame; a regression in the conjunction's *wiring*
   would look exactly like a healthy library. Phase 3's non-vacuity test is the only thing standing
@@ -257,7 +314,11 @@ flowchart TB
 
 ## Followups (after this lands)
 
-- The composition-or-fill question for the four full-coverage luminous fields, using the same
-  statistic.
-- If Phase 2 stops the plan, `presets/pending/README.md`'s row should record all four ruled-out
-  candidates rather than three, so a fifth attempt starts from the whole negative result.
+- The composition-or-fill question for the four full-coverage luminous fields (`Sumi`, `Whorl`,
+  `Supernova`, `Neon Tunnel`). ADR-0129 argued its tiled statistic is the instrument that question
+  needs; that argument is untouched by the tiled statistic losing *this* one, and the instrument is
+  still in `sanity.rs` as an `#[ignore]`d column. Another plan.
+- **The margin is the thing a fourth attempt would be about**, not the axis. 1.37x inside a
+  `0.0440..0.9839` spread, with over half the library under the threshold and held only by term one.
+  The trigger is the first genuinely flat preset from a third family — it is what tests the
+  two-member calibration, and it does not exist yet.

@@ -1,6 +1,7 @@
 # 0129 — The structural term is measured at composition scale, not at pixel scale
 
-> **Status:** proposed
+> **Status:** proposed — **Decision superseded by [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)**;
+> its corrected stop condition survives. See the dated `Outcome` below.
 > **Date:** 2026-08-26
 > **Related plan(s):** [0119](../plans/0119-the-flatness-gate-gets-its-second-term.md)
 > **Completes:** [ADR-0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
@@ -250,3 +251,44 @@ prints on every run.
 `reactivity` `bass=0.3493`, `animation` footprint 0.7579, and no near-duplicate geometry against
 `Tiled Rosette` or any sibling. Flatness is the only thing holding it, which is what makes it a
 usable second calibration point rather than a preset with several problems.
+
+## Outcome (2026-08-26) — the correction was the finding; the axis claim was not
+
+[Plan 0119](../plans/0119-the-flatness-gate-gets-its-second-term.md) Phase 1 added this ADR's
+composition-scale candidate to the Plan 0116 Phase 8 instrument, swept its tile count over
+`[4, 6, 8, 12, 16]`, and re-judged all four columns under the corrected stop condition. **The tiled
+statistic is not what ships.**
+[ADR-0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
+takes `boundary` — this ADR's own Alternative A — and supersedes the Decision above.
+
+Three findings, in the order they matter.
+
+**1. The conditioning correction was the entire finding, and it holds.** Criterion 2 above is right,
+is general, and is what unblocked two plans: judged over the population a second term can actually
+reach, `boundary` (1.37x), `components` (2.33x) and `sobel` (6.31x) all separate the blot from the
+composition, having all "failed" Phase 8 unconditioned. Not one of their readings moved — only the
+population they were judged against did. The conditional population is **two members**, exactly as
+this ADR predicted.
+
+**2. The axis claim did not survive.** This ADR's Context argues the three candidates are one axis
+and *"the axis is wrong"*, and its Alternative A concludes that *"the conditioning error hid a design
+error rather than causing it."* The measurement says the opposite: there was no design error under
+the conditioning error. Correct the population and the pixel-scale axis works.
+
+**3. The thin-stroke Positive is falsified, and inverted.** This ADR claims tiling *structurally
+reduces* the hairline hazard, and asked for the three frozen `retired_mandalas` as a required row
+rather than an assumption — which is what makes this checkable. They read `0.0000` on **every** grid
+in the sweep, the absolute floor of the statistic, against `0.8653`–`0.9641` on `boundary`. A tile's
+majority vote does not care how thin a stroke is, but it also cannot see a period finer than itself,
+so dense ornament reads as one flat field. The claimed mitigation throws away the content it was
+meant to protect.
+
+**And the tile count is a fitted number.** The verdict flips between `tile@4` (not separated, both
+anchors `0.3333`) and `tile@6` (6.00x), with no plateau above it — the composition's own reading of
+one fixed frame swings 2.24x between `tile@6` and `tile@8`. Plan 0119's Risks section pre-registered
+that reading as a stop before the numbers existed.
+
+**What stands:** criterion 2, the instrument, and the insistence that an ADR name an axis and hand
+the numbers to a measurement phase. That insistence is the reason this ADR's own mechanism could be
+falsified in one phase rather than shipped. **What falls:** the composition-scale statistic, the
+"wrong axis" diagnosis, and the second Positive.
