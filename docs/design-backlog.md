@@ -2817,7 +2817,7 @@ tree, but report an untracked hit as a **warning that does not set the exit code
 
 **Not urgent.** One close hit it, once, and editing the offending file took a minute.
 
-## 0128 — every sanity statistic measures departure from black, so a scene that paints its own ground is unmeasurable
+## 0128 — `tonal_flatness` convicts a flat-graphic composition, and no reference tone and no structural statistic repairs it
 
 **Raised by:** `preset-author`, routed 2026-08-25, when a deliberately flat black-and-white preset
 (`presets/fragment_tiledmono.toml`, `fragment_field` + `palette_steps = 20`) was rejected by
@@ -2828,6 +2828,50 @@ threshold to retune.
 - **Verified 2026-08-25** — the ceiling that convicts: `present: MAX_TONAL_FLATNESS: f32 = 0\.90 in: core/tests/sanity.rs`
 - **Verified 2026-08-25** — every statistic keys off departure from the black reference:
   `present: fn is_lit in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the derived ground that half-discharged this entry:
+  `present: pub fn modal_ground in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the residue: `fragment_tiledmono` is still held and still not embedded:
+  `present: fragment_tiledmono in: presets/pending/README.md`
+
+### Half-discharged 2026-08-26 by [Plan 0116](plans/done/0116-the-sanity-lens-finds-the-ground.md), and one causal claim below is falsified
+
+**Read this before the body.** The entry stays live because only one of its two failure modes was
+repaired, and the diagnosis it gives for the other one is wrong.
+
+**Discharged — "a light ground is worse".** `sanity` no longer measures against a constant. `is_lit`
+takes a reference derived per capture ([ADR-0126](adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
+`metrics::modal_ground`: the mean RGB of the frame's most populous luminance band), so the three
+statistics this entry called degenerate carry information again for the eight presets that have a
+ground — `Tiled Rosette` `1.0000` → `0.1645`, `Ink on Paper` → `0.2167`, `Vellum` → `0.3704`. The
+re-basing reached 17 of 41 presets and moved **no verdict**, at either excitation. The emptying
+canvas this entry called time-critical for Plan 0113 is now convicted at the quiet excitation, on a
+synthetic fixture that also pins the old lens reading the same frame as `coverage 1.0000`.
+
+**Not discharged, and the entry's own explanation of it is falsified — "dark ink on black".** This
+body attributes `fragment_tiledmono`'s conviction to its black ink "not being counted", so that the
+look is "measured on its white alone". With the ground correctly at the paper the ink **is** counted
+and the paper is excluded, and the preset reads `0.9413` — marginally *worse* than the `0.9346` it
+read against black. All three candidate estimators found the paper at `(245,245,245)` and all three
+still convicted it. The mechanism is symmetric: a duotone has two large populations and `is_lit`
+removes whichever one is the ground, so the other holds ~94 % of what remains either way. **This is a
+property of `tonal_flatness`, not of the reference it measures from**, which is what
+[ADR-0128](adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) was raised
+to take.
+
+**And ADR-0128's mechanism did not survive measurement either.** Plan 0116 Phase 8 tabled boundary
+length, connected components and Sobel density over the lit mask against the frozen `Blown Out` blot
+and the held preset. None separates them with the library outside the gap, and every one produces —
+under this repo's own threshold ceremony — a constant that stops convicting the blot by an order of
+magnitude. The reason is a collision with the repair above: under a derived ground a saturated blot is
+its own modal band, so its lit mask is the mass's **fringe**, and a fringe is a thin ring that every
+structural statistic scores as structured. `fragment_tiledmono` stays in `presets/pending/` with
+**nothing scheduled**, and the four groundless luminous fields (`Sumi`, `Whorl`, `Supernova`,
+`Neon Tunnel`) stay composition-or-fill unanswered.
+
+**So what is still open** is narrower and harder than what this entry was raised as: a gate that can
+tell a deliberately flat graphic composition from a saturated blot, when the two are not separable by
+tone *or* by any structural statistic measured so far over the lit mask. Start from the fringe
+mechanism, not from ADR-0128's roster. **Owner if taken:** `architect`.
 
 ### The finding
 

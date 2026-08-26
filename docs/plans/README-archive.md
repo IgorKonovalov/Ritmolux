@@ -13,6 +13,79 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0116 — The sanity lens finds the ground](done/0116-the-sanity-lens-finds-the-ground.md)
+  — closed 2026-08-26, in the `lmv-plan-0116` worktree on `plan-0116-sanity-ground`, branched from
+  `e022a5d`. Six `dev` phase commits (`8d4a9a9`, `debd803`, `5d97abd`, `86106af`, `022e4c5`,
+  `c2dc0dc`), two `human` gates (Phases 2 and 5), and **one phase that deliberately did not run**.
+  Review: **one blocker, two majors, four minors.** Version: **patch**, `0.78.0` → `0.78.1` — the
+  engine renders exactly what it rendered; every file touched is a test, a metric or a document.
+
+  **What shipped.** `core/src/render/metrics.rs` gained `modal_ground` — the mean RGB of a frame's
+  most populous luminance band — plus `NO_GROUND` and `MIN_GROUND_SHARE`, and `core/tests/sanity.rs`
+  threads it through `is_lit` and therefore through all four of `coverage`, `quadrant_spread`,
+  `radial_shell_occupancy` and `tonal_flatness`. Five coverage floors were re-derived against the new
+  predicate (`fragment_field` `0.50` → `0.08`, `lsystem` `0.50` → `0.19`, `swarm` `0.42` → `0.28`,
+  `attractor` `0.18` → `0.11`, `shape_field` `0.50` → `0.22`) and six were provably left alone,
+  because a lit-on-dark scene's modal band **is** the black it was already compared to and its
+  coverage comes back identical to the digit. `MAX_FLOOR_SLACK` re-checked and unchanged at `2.2`.
+  ADR-0126 accepted.
+
+  **The estimator cost zero verdict changes, which is the fact the whole plan turns on.** Phase 1
+  built an `#[ignore]`d harness tabling three candidates (`modal_luma`, `modal_border`, `modal_rgb`)
+  against the whole library at both excitations. ADR-0126 had treated naive modal tone as *already*
+  falsified because it re-bases 17 of 41 shipped presets — "not a refinement of this lens, a
+  different lens". The count reproduced exactly and the reading did not: pass→fail 0, fail→pass 0,
+  for all three candidates at both excitations. `modal_luma` was chosen as the simplest of three that
+  measured equivalent. ADR-0126 carries that as a dated `Outcome` rather than an edit to its body.
+
+  **The false negative is closed and demonstrated rather than described.**
+  `a_canvas_the_music_empties_is_convicted_and_black_calls_it_full` builds an inline attractor
+  fixture whose `pan_x = "(1 - bass) * 40"` carries the drawing off frame as the level falls, so the
+  same preset renders a composed page at `LOUD` (`coverage 0.1177`, 4 quadrants, 9/10 shells) and a
+  bare one at `MODERATE` (`coverage 0.0000`). Against `BLACK` that bare frame reads exactly `1.0000`
+  and *passes* `MODERATE_MIN_COVERAGE` — the revert demonstration is asserted in the test rather than
+  performed once by hand. No sparsity threshold was invented: the separation asserted is `0.0` against
+  `> 0.0`, because a bare ground is not sparsely covered but uncovered.
+
+  **Phase 9 did not run, and that is the plan's most valuable result.** Phase 8's harness tabled three
+  structural statistics — boundary length per unit area, connected components, Sobel density over the
+  binary mask — against the frozen `Blown Out` blot, the held `Tiled Rosette Mono`, the library and the
+  three frozen thin-stroke mandalas. None separated a blot from a composition with the library outside
+  the gap, and by the sharper reading the harness added — run ADR-0071's threshold ceremony and check
+  whether the constant still convicts the blot — **all three failed by an order of magnitude**. The
+  control column was the sharpest row in the table: `1 - tonal_flatness` scores the blot `0.0846` and
+  the drawing `0.0587`, ordering them *backwards*. The mechanism is a collision between the plan's own
+  two halves: under the derived ground a saturated blot is its own modal band, so its lit mask is the
+  mass's **fringe** — one radial shell, a thin ring — and every candidate is built to score a thin ring
+  as structured. Re-run at the close; every number reproduced. ADR-0128 stays `proposed` with a dated
+  `Outcome` saying its decision is not implemented.
+
+  **Two negative results worth keeping.** Design-backlog 0072's aliasing worry did not reach a boundary
+  measure — the three frozen mandalas read `0.9480` / `0.9641` / `0.8653`, the *top* of the range. And
+  Phase 3's `1 / TONE_BANDS` no-ground rule was implemented exactly as specified and **reaches no
+  content**: the largest of sixteen band counts is at least their mean, so the smallest modal-band share
+  in the library is `Clifford`'s `0.1590`, two and a half times the line. The plan's premise for that
+  bullet — four presets "at or under `6.25 %`" — was reading the largest *lit* bucket's share, a
+  different axis. `MIN_GROUND_SHARE`'s doc comment now says so.
+
+  **The blocker was an ADR number collision.** This lane took `0127` for the tonal-flatness decision on
+  2026-08-26 while `main` had already published a different ADR-0127 (Plan 0118's "a comment carries the
+  mechanism", `577fceb`, 2026-08-25). It surfaced at the close's `git merge main`, and the lane's ADR was
+  renumbered to **0128** across 26 references. Root cause: **both** next-free-number lines were stale —
+  `docs/adrs/README.md` said 0128 with 0127 already consumed, and `docs/plans/README.md` said 0127 with
+  0127 already consumed. Both corrected to 0129.
+
+  **What outlived the plan.** `presets/pending/fragment_tiledmono.toml` stays held with **nothing
+  scheduled**. Design-backlog 0128 stays **live and half-discharged**: its ground half landed, its
+  flat-graphic half is measured-unsolved, and the causal claim in its own body — that the false positive
+  comes from black ink being excluded as unlit — is falsified (grounding the paper instead makes the
+  reading marginally *worse*, `0.9346` → `0.9413`). Raised and not acted on, twice by `dev` and once
+  here: `standalone/src/shot/{report,horizon}.rs`, `core/tests/attractor.rs` and
+  `core/tests/reaction_diffusion.rs` derive a ground from the frame's **top-left pixel** — a fifth
+  estimator, in production, that is the one ADR-0067 discredited for this gate; and `MAX_FLOOR_SLACK` is
+  one-sided, firing when a floor sits too far *below* its family and never when it sits above, which is
+  where six families now are.
+
 - [0117 — The downbeat log sees the counter it folds over](done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)
   — closed 2026-08-25, two phase commits on `main` directly (`fa5f040`, `28641ec`) plus the close
   block at `b02244d`. No worktree: the plan's whole subject was that `main` was red and unpushed at

@@ -1,8 +1,8 @@
 # 0126 — The sanity lens measures departure from the frame's own ground, not from black
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-26
 > **Date:** 2026-08-25
-> **Related plan(s):** [0116](../plans/0116-the-sanity-lens-finds-the-ground.md)
+> **Related plan(s):** [0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md)
 > **Relates to:** [ADR-0067](0067-coverage-measures-the-scene-not-the-backdrop.md) (the decision
 > this supersedes in its premise — the capture still suppresses the backdrop; what changes is what
 > "against black" is allowed to mean), [ADR-0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
@@ -76,7 +76,7 @@ shipped presets**, derived from the suite's own printed table by comparing black
 coverage`) against the largest lit bucket (`flatness × coverage`): `Clifford` alone reads 15.9 %
 against 6.8 %, and the twelve full-coverage presets have no black to be modal at all. An estimator
 that silently re-bases half the library is not a refinement of this lens, it is a different lens.
-[Plan 0116](../plans/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measures candidate estimators
+[Plan 0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measures candidate estimators
 against the whole library and Phase 2 is a stop gate on the result, in the shape Plan 0113 Phase 3
 and Plan 0075 Phase 1 both use.
 
@@ -137,7 +137,7 @@ What this ADR fixes is the **principle** and the three alternatives it rules out
 
 ## Outcome (2026-08-26)
 
-[Plan 0116](../plans/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measured the candidate
+[Plan 0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 1 measured the candidate
 estimators against the whole library, and Phase 2 chose **`modal_luma`** — the frame's modal
 luminance band. Three things this ADR asserted did not survive that measurement, recorded here rather
 than edited into the body above.
