@@ -1,6 +1,6 @@
 # 0119 — The flatness gate gets its second term
 
-> **Status:** approved 2026-08-26
+> **Status:** in-progress 2026-08-26
 > **Created:** 2026-08-26
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md)
@@ -209,17 +209,28 @@ flowchart TB
 
 > Written by `dev` — one row per phase as that phase's commit lands.
 
-**Lane:** _(fill on the first phase commit)_
+**Lane:** `main`, in the primary worktree — no branch. The two live worktrees
+(`plan-0087`, `plan-0114`) touch neither `core/tests/sanity.rs` nor
+`core/src/render/metrics.rs`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The fourth candidate joins the table | dev | | |
+| 1 — The fourth candidate joins the table | dev | done | committed with this row |
 | 2 — The stop gate | human | | |
 | 3 — The gate takes two terms | dev | | |
 | 4 — The preset ships | dev | | |
 | 5 — Documentation | dev | | |
 
 ### Notes
+
+- **Criterion 3 is implemented as the midpoint between the two frozen fixtures**, so it is
+  satisfied by construction whenever criterion 1 holds and never fails a candidate on its own.
+  The ADR asks for a threshold that convicts the blot *with margin*, and margin is not mechanical
+  with a two-member population — so the report prints the separation ratio and the column's
+  legitimate spread beside the threshold instead of ruling on it, and the ruling is Phase 2's.
+- **The report also prints the superseded ceremony** (half the sparsest legitimate content) per
+  candidate, labelled as superseded. Not asked for by the phase; it is what makes the re-judging
+  of the three existing candidates readable against Plan 0116 Phase 8's own printed result.
 
 ### Close triggers
 

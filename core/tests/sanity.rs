@@ -2088,20 +2088,35 @@ fn each_candidate_ground_is_tabled_against_the_library() {
 }
 
 // ---------------------------------------------------------------------------
-// Plan 0116 Phase 8 — what separates a composition from a blot
+// What separates a composition from a blot
 // ---------------------------------------------------------------------------
 //
-// A measurement harness and nothing else, the same shape as Phase 1 and for the
-// same reason: ADR-0126 named a mechanism without measuring it and Phase 1
-// falsified it one plan later. ADR-0128 now names a second one — that a picture
-// is a blot only if it is tonally flat *and* structureless — and this section
-// exists to find out whether any statistic actually says that, before Phase 9
-// weakens a live gate on the strength of it.
+// A measurement harness and nothing else, the same shape as the ground-estimator
+// harness above and for the same reason: ADR-0126 named a mechanism without
+// measuring it and it was falsified one plan later. ADR-0128 named a second —
+// that a picture is a blot only if it is tonally flat *and* structureless — and
+// this section exists to find out whether any statistic actually says that,
+// before a live gate is weakened on the strength of it.
+//
+// The three pixel-scale candidates were measured and all three failed. ADR-0129
+// read that failure as one axis chosen three times: they are computed on the
+// binary lit mask at 96x96, where a particle cloud's mask *is* noise, and noise
+// is jagged — so the blot outscores the library's own sparsest legitimate
+// content on every one of them. Its candidate is the fourth column family here,
+// `tile@N`, and it is deliberately orthogonal: tone rather than mask, all pixels
+// rather than lit ones, composition scale rather than pixel scale.
+//
+// ADR-0129 also corrects how the columns are judged. A conjunction's second term
+// is only ever asked about frames that already failed the first, so a frame
+// "in the gap" disqualifies a candidate only if its own `tonal_flatness` is
+// above the ceiling. Conditioned that way the calibration population has two
+// members, and [`report_structure_separation`] prints it so that is visible
+// rather than assumed.
 //
 // The candidates live here rather than in `core/src/render/metrics.rs`, exactly
-// as Phase 1's ground estimators did. Two of the three will be discarded, and a
-// discarded candidate that shipped as a `pub` production statistic is worse than
-// no measurement.
+// as the ground estimators did. All but one will be discarded, and a discarded
+// candidate that shipped as a `pub` production statistic is worse than no
+// measurement.
 
 /// Whether a pixel departs from `bg` on any RGB channel by more than [`EPS`] —
 /// `metrics::is_lit`, which is private to `core`, restated for the same reason
@@ -2123,40 +2138,98 @@ fn lit_mask(img: &CaptureImage) -> Vec<bool> {
 }
 
 /// One candidate structural statistic. **The roster is the deliverable, not a
-/// choice** — Phase 8's stop condition decides, from what these print, and it
-/// can end the plan.
+/// choice** — the stop condition decides, from what these print, and it can end
+/// the plan.
 struct StructureCandidate {
     /// Column name in the printed table.
     name: &'static str,
     /// One line on what it counts, printed once above the table.
     note: &'static str,
-    /// Read over the frame's lit mask. Higher must mean *more* structured, so
-    /// every column is read in one direction.
-    measure: fn(&CaptureImage) -> f32,
+    /// Higher must mean *more* structured, so every column is read in one
+    /// direction.
+    measure: Measure,
 }
 
-/// The four columns ADR-0128 asks Phase 8 to table, control first so every other
-/// column reads as a difference from it rather than as an absolute.
+/// How a column is read off a frame.
+///
+/// The pixel-scale candidates are plain functions of the whole frame. The
+/// ADR-0129 candidate carries a grid size instead, because **its tile count is
+/// swept rather than chosen** — each grid in [`TILE_SWEEP`] is its own column, so
+/// the gate reads a curve and can tell a plateau from a fitted number.
+enum Measure {
+    /// Read over the whole frame — the control and the three Plan 0116 Phase 8
+    /// candidates.
+    Whole(fn(&CaptureImage) -> f32),
+    /// [`modal_band_tile_transitions`] at this many tiles per side.
+    Tiled(usize),
+}
+
+impl StructureCandidate {
+    /// This column's reading of one frame.
+    fn read(&self, img: &CaptureImage) -> f32 {
+        match self.measure {
+            Measure::Whole(f) => f(img),
+            Measure::Tiled(tiles) => modal_band_tile_transitions(img, tiles),
+        }
+    }
+}
+
+/// Tiles per side [`modal_band_tile_transitions`] is swept over, every one of
+/// which divides the [`SIZE`] capture exactly.
+///
+/// Printed as five separate columns rather than reduced to one, because a
+/// verdict that flips between adjacent grids means the statistic is
+/// resolution-coupled — which is a *stop*, and only visible as a curve.
+const TILE_SWEEP: [usize; 5] = [4, 6, 8, 12, 16];
+
+/// The control and the three Plan 0116 Phase 8 candidates, control first so
+/// every other column reads as a difference from it rather than as an absolute,
+/// followed by the ADR-0129 candidate once per [`TILE_SWEEP`] grid.
 const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
     StructureCandidate {
         name: "flatness^-1",
         note: "the control - 1 - tonal_flatness, so high means structured like the rest",
-        measure: inverse_flatness,
+        measure: Measure::Whole(inverse_flatness),
     },
     StructureCandidate {
         name: "boundary",
         note: "share of lit pixels with an unlit 4-neighbour (perimeter over lit area)",
-        measure: boundary_density,
+        measure: Measure::Whole(boundary_density),
     },
     StructureCandidate {
         name: "components",
         note: "4-connected components in the lit mask, per thousand lit pixels",
-        measure: component_density,
+        measure: Measure::Whole(component_density),
     },
     StructureCandidate {
         name: "sobel",
         note: "mean |Sobel| over the binary lit mask at capture resolution",
-        measure: mask_sobel_density,
+        measure: Measure::Whole(mask_sobel_density),
+    },
+    StructureCandidate {
+        name: "tile@4",
+        note: "ADR-0129: differing adjacent modal-band tiles on a 4x4 grid (24px tiles)",
+        measure: Measure::Tiled(4),
+    },
+    StructureCandidate {
+        name: "tile@6",
+        note: "ADR-0129: differing adjacent modal-band tiles on a 6x6 grid (16px tiles)",
+        measure: Measure::Tiled(6),
+    },
+    StructureCandidate {
+        name: "tile@8",
+        note: "ADR-0129: differing adjacent modal-band tiles on an 8x8 grid (12px tiles)",
+        measure: Measure::Tiled(8),
+    },
+    StructureCandidate {
+        name: "tile@12",
+        note: "ADR-0129: differing adjacent modal-band tiles on a 12x12 grid (8px tiles)",
+        measure: Measure::Tiled(12),
+    },
+    StructureCandidate {
+        name: "tile@16",
+        note: "ADR-0129: differing adjacent modal-band tiles on a 16x16 grid (6px tiles)",
+        measure: Measure::Tiled(16),
     },
 ];
 
@@ -2289,21 +2362,104 @@ fn mask_sobel_density(img: &CaptureImage) -> f32 {
     (sum / ((w - 2) * (h - 2)) as f64) as f32
 }
 
-/// One frame in Phase 8's table, with the role it plays in the stop condition.
+/// Share of adjacent tile pairs whose **modal luminance band** differs, on a
+/// `tiles x tiles` grid over the whole frame — ADR-0129's composition-scale
+/// candidate.
+///
+/// Two departures from the three candidates above, and both are the point rather
+/// than a variation:
+///
+/// - **Tone, not the binary mask.** Those three throw tone away and keep shape;
+///   this keeps tone and throws away fine shape. The tiling is a low-pass
+///   filter, and the signal that defeated all three is high-frequency: a
+///   particle blot's raggedness lives *below* the tile and averages away, while
+///   a tiled ornament or a stroke lattice has a period *above* it and survives.
+/// - **All pixels, not lit ones.** In a duotone the ink and the paper are both
+///   the composition. Restricting to lit pixels is what makes `tonal_flatness`
+///   structurally unable to see a duotone, and inheriting that would inherit the
+///   defect.
+///
+/// Banding is [`TONE_BANDS`] over `0..255` by [`sanity_luma`] — the same binning
+/// `metrics::tonal_flatness` uses, so a change to `TONE_BANDS` moves both. A tile
+/// whose two most populous bands tie takes the **lower** band index, so the
+/// reading is deterministic rather than iteration-order dependent.
+///
+/// **Tile bounds are `i * w / tiles`, not `i * (w / tiles)`.** Every grid in
+/// [`TILE_SWEEP`] divides the [`SIZE`] capture exactly, so today no tile is
+/// ragged; if a future capture size does not divide, the remainder is spread one
+/// pixel at a time across the grid rather than piled onto a last, wider tile.
+/// No tile is ever empty while `tiles <= min(width, height)`.
+///
+/// Adjacency is 4-neighbour with no wrap, so the denominator is
+/// `2 * tiles * (tiles - 1)`. `0.0` for a frame with no adjacent pairs at all.
+fn modal_band_tile_transitions(img: &CaptureImage, tiles: usize) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 || tiles < 2 || tiles > w.min(h) {
+        return 0.0;
+    }
+    let bound = |i: usize, n: usize| i * n / tiles;
+    let mut bands = vec![0usize; tiles * tiles];
+    for ty in 0..tiles {
+        for tx in 0..tiles {
+            let mut counts = [0u64; TONE_BANDS];
+            for y in bound(ty, h)..bound(ty + 1, h) {
+                for x in bound(tx, w)..bound(tx + 1, w) {
+                    let Some(px) = img.rgba.get((y * w + x) * 4..(y * w + x) * 4 + 4) else {
+                        continue;
+                    };
+                    let band = ((sanity_luma(px) / 256.0) * TONE_BANDS as f32) as usize;
+                    counts[band.min(TONE_BANDS - 1)] += 1;
+                }
+            }
+            let (mut best, mut most) = (0usize, 0u64);
+            for (band, &n) in counts.iter().enumerate() {
+                if n > most {
+                    most = n;
+                    best = band;
+                }
+            }
+            bands[ty * tiles + tx] = best;
+        }
+    }
+    let mut differing = 0u64;
+    for ty in 0..tiles {
+        for tx in 0..tiles {
+            let here = bands[ty * tiles + tx];
+            if tx + 1 < tiles && bands[ty * tiles + tx + 1] != here {
+                differing += 1;
+            }
+            if ty + 1 < tiles && bands[(ty + 1) * tiles + tx] != here {
+                differing += 1;
+            }
+        }
+    }
+    let pairs = 2 * tiles * (tiles - 1);
+    if pairs == 0 {
+        return 0.0;
+    }
+    differing as f32 / pairs as f32
+}
+
+/// One frame in the table, with the role it plays in the stop condition.
 struct StructureRow {
     name: String,
     /// One value per [`STRUCTURE_CANDIDATES`] column.
     values: Vec<f32>,
+    /// The frame's own `tonal_flatness`, which is **not** a candidate column:
+    /// it is the first term, and criterion 2 of ADR-0129's stop condition cannot
+    /// be read without it — a frame in the gap only disqualifies a candidate if
+    /// the conjunction could ever reach it.
+    flatness: f32,
     /// `Some(true)` = must read structureless, `Some(false)` = must read
     /// structured, `None` = shipped content, which must land outside the gap
     /// between those two.
     is_blot: Option<bool>,
 }
 
-/// **Plan 0116 Phase 8.** Print, for the frozen blot fixture, the held-out
-/// `Tiled Rosette Mono`, the three frozen thin-stroke mandalas and the whole
-/// shipped library, what each candidate structural statistic says — beside
-/// `tonal_flatness`, the statistic ADR-0128 proposes to add a second term to.
+/// Print, for the frozen blot fixture, the held-out `Tiled Rosette Mono`, the
+/// three frozen thin-stroke mandalas and the whole shipped library, what each
+/// candidate structural statistic says — beside `tonal_flatness`, the statistic
+/// ADR-0128 proposes to add a second term to.
 ///
 /// # This gates nothing, and cannot
 ///
@@ -2314,11 +2470,26 @@ struct StructureRow {
 ///
 /// # The stop condition, which is mechanical
 ///
-/// A candidate passes only if it puts `Blown Out` **below** `Tiled Rosette Mono`
-/// and no shipped preset **between** them. If none does, Phase 9 does not run:
-/// the plan closes here, ADR-0128 gains a dated `Outcome`, and
-/// `fragment_tiledmono` stays held. The report prints that verdict per candidate
-/// rather than leaving it to be read off the rows.
+/// ADR-0129's three parts, all of which must hold for one candidate column:
+///
+/// 1. **Separation.** `Blown Out` reads below `Tiled Rosette Mono`.
+/// 2. **Nothing convictable in the gap.** No shipped frame lies between them
+///    *whose own `tonal_flatness` is above [`MAX_TONAL_FLATNESS`]* — no other
+///    frame can reach a second term. Frames in the gap below the ceiling are
+///    printed with their flatness, as reported and not disqualifying, so the
+///    reading is checkable rather than asserted. **This is the correction**: the
+///    same criterion was previously judged over the whole library.
+/// 3. **A threshold convicts the blot.** With two members in the conditional
+///    population, *half the sparsest legitimate content* is not available — the
+///    one legitimate member is the preset being admitted, so deriving from it
+///    would be circular. The number is therefore a measurement between the two
+///    frozen fixtures, and the report prints the margin and the column's
+///    legitimate spread beside it so "with margin" is judgeable rather than
+///    declared.
+///
+/// If no candidate passes all three, the plan stops: ADR-0129 gains a dated
+/// `Outcome` and `fragment_tiledmono` stays held. The report prints that verdict
+/// per candidate rather than leaving it to be read off the rows.
 ///
 /// # Thin-stroke content is in the table on purpose
 ///
@@ -2335,7 +2506,7 @@ struct StructureRow {
 ///     each_structure_candidate_is_tabled_against_the_library --no-capture
 /// ```
 #[test]
-#[ignore = "measurement, not a gate: Plan 0116 Phase 8 informs a mechanical stop condition"]
+#[ignore = "measurement, not a gate: this informs a mechanical stop condition"]
 fn each_structure_candidate_is_tabled_against_the_library() {
     let Some(mut renderer) = headless() else {
         return;
@@ -2367,21 +2538,33 @@ fn each_structure_candidate_is_tabled_against_the_library() {
     renderer.set_presets(presets);
 
     println!("{}", "=".repeat(78));
-    println!("Plan 0116 Phase 8 - candidate structural statistics, at LOUD");
+    println!("candidate structural statistics, at LOUD");
     println!("{}", "=".repeat(78));
     println!("candidates (higher = more structured, in every column):");
     for cand in STRUCTURE_CANDIDATES {
         println!("  {:<13} {}", cand.name, cand.note);
     }
+    println!("  tile sweep: {TILE_SWEEP:?} tiles per side at {SIZE}x{SIZE}, all exact divisors");
+    println!("`flat=` is the frame's own tonal_flatness, ceiling {MAX_TONAL_FLATNESS:.2}.");
+    println!("  It is term one and not a candidate: it decides whether a row reaches term");
+    println!("  two at all (ADR-0129 criterion 2).");
     println!(
         "roles: [blot] must read lowest, [comp] must read above it, the rest must not fall \
-         between them."
+         between them"
     );
+    println!("  while being flat enough for the conjunction to reach.");
     println!(
         "NOTE: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are the four groundless luminous"
     );
     println!("  fields ADR-0128 records as the same open question - read their rows deliberately.");
     println!();
+
+    // Where the tile sweep starts, so a row prints the whole-frame candidates on
+    // one line and the curve on the next instead of one 130-column line.
+    let tiled_from = STRUCTURE_CANDIDATES
+        .iter()
+        .position(|c| matches!(c.measure, Measure::Tiled(_)))
+        .unwrap_or(STRUCTURE_CANDIDATES.len());
 
     let frame = loud();
     let mut rows: Vec<StructureRow> = Vec::new();
@@ -2389,10 +2572,8 @@ fn each_structure_candidate_is_tabled_against_the_library() {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture preset");
-        let values: Vec<f32> = STRUCTURE_CANDIDATES
-            .iter()
-            .map(|c| (c.measure)(&img))
-            .collect();
+        let values: Vec<f32> = STRUCTURE_CANDIDATES.iter().map(|c| c.read(&img)).collect();
+        let flatness = tonal_flatness(&img, ground(&img), EPS);
         let role = match is_blot {
             Some(true) => "[blot]",
             Some(false) => "[comp]",
@@ -2403,10 +2584,15 @@ fn each_structure_candidate_is_tabled_against_the_library() {
             .zip(values.iter())
             .map(|(c, v)| format!("{}={v:.4}", c.name))
             .collect();
-        println!("{role} {name:<22} {}", printed.join("  "));
+        println!(
+            "{role} {name:<22} flat={flatness:.4}  {}",
+            printed[..tiled_from].join("  ")
+        );
+        println!("{:30}{}", "", printed[tiled_from..].join("  "));
         rows.push(StructureRow {
             name: name.clone(),
             values,
+            flatness,
             is_blot: *is_blot,
         });
     }
@@ -2414,74 +2600,129 @@ fn each_structure_candidate_is_tabled_against_the_library() {
     report_structure_separation(&rows);
 }
 
-/// Per candidate, the margin between the blot and the composition and whether
-/// any other frame falls in the gap — **the whole criterion**, printed rather
-/// than left to the reader.
+/// Per candidate, ADR-0129's three-part stop condition — **the whole criterion**,
+/// printed rather than left to the reader.
+///
+/// The correction over the criterion this instrument shipped with is criterion 2:
+/// a frame between the two anchors disqualifies a candidate only if the
+/// conjunction could ever reach it, which means only if its own
+/// `tonal_flatness` is above [`MAX_TONAL_FLATNESS`]. Everything else in the gap
+/// is printed with its flatness and marked as reported, because a reading that
+/// cannot be checked is a reading that gets believed.
 fn report_structure_separation(rows: &[StructureRow]) {
     println!();
-    println!("separation at LOUD (the stop condition):");
+    println!("separation at LOUD (ADR-0129's corrected stop condition):");
+
     let find = |want: bool| rows.iter().find(|r| r.is_blot == Some(want));
     let (Some(blot), Some(comp)) = (find(true), find(false)) else {
         println!("  the table is missing one of its two anchors — nothing to decide on");
         return;
     };
+
+    // Criterion 2's population, printed once: the frames a second term can
+    // reach at all. ADR-0129 records this as two members, one of which is the
+    // preset the change exists to admit — if it is ever larger, the calibration
+    // stopped being a two-point one and the threshold's docstring is stale.
+    let reachable: Vec<&StructureRow> = rows
+        .iter()
+        .filter(|r| r.flatness > MAX_TONAL_FLATNESS)
+        .collect();
+    println!("  the conditional population - every frame a second term can reach at all");
+    println!("  (its own flatness is over the {MAX_TONAL_FLATNESS:.2} ceiling):");
+    for r in &reachable {
+        let role = match r.is_blot {
+            Some(true) => "[blot]",
+            Some(false) => "[comp]",
+            None => "      ",
+        };
+        println!("      {role} {:<22} flat={:.4}", r.name, r.flatness);
+    }
+    println!(
+        "      {} member(s). Every other frame passes term one and is never",
+        reachable.len()
+    );
+    println!("      asked the second question.");
+    println!();
+
     for (ci, cand) in STRUCTURE_CANDIDATES.iter().enumerate() {
         let (Some(&lo), Some(&hi)) = (blot.values.get(ci), comp.values.get(ci)) else {
             continue;
         };
+
+        // (1) Separation.
         if lo >= hi {
             println!(
-                "  {:<13} NOT SEPARATED: {} reads {lo:.4}, {} reads {hi:.4}",
+                "  {:<13} (1) NOT SEPARATED: {} reads {lo:.4}, {} reads {hi:.4}   -> FAILS",
                 cand.name, blot.name, comp.name,
             );
             continue;
         }
-        let inside: Vec<String> = rows
+        println!(
+            "  {:<13} (1) separated by {:.4} ({lo:.4} -> {hi:.4}), a {:.2}x margin",
+            cand.name,
+            hi - lo,
+            if lo > 0.0 { hi / lo } else { f32::INFINITY },
+        );
+
+        // (2) Nothing convictable in the gap.
+        let in_gap: Vec<&StructureRow> = rows
             .iter()
             .filter(|r| r.is_blot.is_none())
             .filter(|r| r.values.get(ci).is_some_and(|&v| v > lo && v < hi))
-            .map(|r| {
-                format!(
-                    "{} {:.4}",
-                    r.name,
-                    r.values.get(ci).copied().unwrap_or(f32::NAN)
-                )
-            })
             .collect();
+        let convictable = in_gap
+            .iter()
+            .filter(|r| r.flatness > MAX_TONAL_FLATNESS)
+            .count();
         println!(
-            "  {:<13} separated by {:.4} ({lo:.4} -> {hi:.4});  {} frame(s) in the gap",
-            cand.name,
-            hi - lo,
-            inside.len(),
+            "      (2) {} frame(s) in the gap, {convictable} of them above the flatness ceiling",
+            in_gap.len(),
         );
-        for entry in &inside {
-            println!("      in the gap  {entry}");
+        for r in &in_gap {
+            let verdict = if r.flatness > MAX_TONAL_FLATNESS {
+                "DISQUALIFYING - the conjunction reaches this frame"
+            } else {
+                "reported, not disqualifying - term one clears it"
+            };
+            println!(
+                "          in the gap  {:<22} {}={:.4}  flat={:.4}  {verdict}",
+                r.name,
+                cand.name,
+                r.values.get(ci).copied().unwrap_or(f32::NAN),
+                r.flatness,
+            );
         }
 
-        // The second, sharper reading of the same condition: run the threshold
-        // ceremony Phase 9 would have to use and see whether the constant it
-        // produces convicts the blot. `MIN_STRUCTURAL_SHELLS`, `MAX_FLOOR_SLACK`
-        // and every coverage floor in this file are derived as half the sparsest
-        // legitimate content (ADR-0071), so a candidate that cannot survive that
-        // derivation cannot be adopted without inventing a number instead — and
-        // this plan's Phase 9 forbids exactly that.
-        let sparsest = rows
+        // (3) A threshold that convicts the blot, named for what it is.
+        //
+        // Half the sparsest legitimate content — the ceremony every other
+        // constant in this file follows (ADR-0071) — is not available here: the
+        // conditional population has one legitimate member and it is the preset
+        // being admitted, so deriving from it would be circular. The number is a
+        // measurement taken between the two frozen fixtures, and the spread
+        // beside it is what says whether the separation sits outside the
+        // library's own range or inside it.
+        let threshold = (lo + hi) / 2.0;
+        let legit: Vec<f32> = rows
             .iter()
             .filter(|r| r.is_blot.is_none())
             .filter_map(|r| r.values.get(ci).copied())
-            .fold(f32::INFINITY, f32::min);
-        let threshold = sparsest / 2.0;
-        let convicts = lo < threshold;
-        println!(
-            "      threshold {threshold:.4} = half the sparsest legitimate content ({sparsest:.4}): {} reads {lo:.4}, {}",
-            blot.name,
-            if convicts {
-                "CONVICTED"
-            } else {
-                "NOT convicted - the flatness gate would go vacuous"
-            },
-        );
-        if inside.is_empty() && convicts {
+            .collect();
+        let spread_lo = legit.iter().copied().fold(f32::INFINITY, f32::min);
+        let spread_hi = legit.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        println!("      (3) threshold {threshold:.4}, measured between the two frozen fixtures:");
+        println!("          {} reads {lo:.4} - CONVICTED", blot.name);
+        println!("          library spread on this column: {spread_lo:.4}..{spread_hi:.4}");
+        let superseded = spread_lo / 2.0;
+        let would = if lo < superseded {
+            "convict"
+        } else {
+            "NOT convict"
+        };
+        println!("          (superseded ceremony: half the sparsest legitimate = {superseded:.4},");
+        println!("          which would {would} the blot)");
+
+        if convictable == 0 {
             println!("      PASSES the stop condition");
         } else {
             println!("      FAILS the stop condition");
