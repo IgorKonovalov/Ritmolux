@@ -1,0 +1,112 @@
+# Star Mandala Bordered - concentric rings of motifs inside a real scalloped
+# boundary, and NO interlace: `tiling = "none"`, which is the composition the
+# reference image actually is.
+#
+# THIS IS THE RETIRED `star_mandala`, RE-JUDGED. The original was pulled on
+# sight in the running app - every motif was a parametric outline sampled to
+# straight segments, so at ornament scale the vertices showed and a circle read
+# as a polygon. Nothing in this file fixed that. What changed is underneath it:
+# `circle` is one exact arc, and `petal` and `trefoil` are G1 arc chains whose
+# pieces share a tangent where they meet, so there is no sampled vertex left to
+# facet or to bead. The roster and the tuning are the ones that were rejected;
+# the primitive drawing them is not.
+#
+# THE BOUNDARY IS THE NEW FIGURE. Shown a ring of overlapping `arc` motifs
+# faking a continuous edge beside a genuine boundary curve, the answer was the
+# genuine one - and the engine had no way to draw it until it had an arc
+# instance. `scallop` is that curve: one closed chain of arcs meeting at cusps,
+# not copies of anything, which is why it reads three ring keys differently
+# (see the roster below).
+#
+# THE RING ROSTER IS STRUCTURAL, not bindable: read once at load and fixed for
+# as long as the preset is loaded, exactly like `tiling`. What moves is the
+# three ring LEVERS below, which multiply and turn the roster without changing
+# what is in it.
+system = "star_pattern"
+name   = "Star Mandala Bordered"
+
+[generator]
+tiling = "none"
+
+# FIVE RINGS, read outward. Radii are in the fit-normalized world the figure
+# lands in - it spans +/- 0.9, so 0.9 is the rim and everything inside the
+# boundary is genuinely interior. `scale` is close to the copy's diameter,
+# because every motif in the closed roster is authored to span about one unit.
+#
+# THE COUNTS ARE DELIBERATELY NOT ALL TWELVE: 12 / 18 / 24 share no common
+# factor above 6, so the three inner rings beat against each other instead of
+# locking into one coarse rotational figure. Under a moving `ring_phase` that
+# beat is what you see. The boundary's 32 is outside that set on purpose - it
+# is a rim, not a ring, and it should not lock to what it encloses.
+#
+# INSTANCE BUDGET: 24 + 12*4 + 18*22 + 24*1 + 32 = 524 of the floor tier's
+# 20 000, against 1 092 for the four sampled-polyline rings this replaces. A
+# ring costs `count` copies of the motif's own instance count, and nothing warns
+# you at the cap - it truncates silently, outermost ring first.
+rings = [
+  { motif = "trefoil",  count = 1,  radius = 0.00, scale = 0.46 },
+  { motif = "diamond",  count = 12, radius = 0.30, scale = 0.20 },
+  { motif = "petal",    count = 18, radius = 0.52, scale = 0.26, phase = 0.09 },
+  { motif = "circle",   count = 24, radius = 0.70, scale = 0.13 },
+  # The boundary. `scallop` reads three keys with its own meaning: `count` is
+  # the LOBE count (there are no copies - it is one chain), `radius` the circle
+  # the lobes bulge from, `scale` the DEPTH of the bulge. At depth 0 it is a
+  # plain ring, which is what makes `ring_scale` continuous through zero here.
+  { motif = "scallop",  count = 32, radius = 0.86, scale = 0.055 },
+]
+
+[params]
+# THE COUNTER-ROTATION. `ring_phase` turns rings 0, 2 and 4 one way and rings 1
+# and 3 the other, which is the single strongest ornamental motion this geometry
+# has and costs one sign. It is the GESTURE, not the liveness: a 12-, 18- and
+# 24-fold figure turned by any angle lands nearly on top of itself, so a turn
+# moves very few pixels however fast it runs. What carries the motion is radial.
+ring_phase = "time * 0.085 + clamp(bass * 0.22, 0, 0.18)"
+
+# THE BREATH - the two RADIAL levers, at different rates so the figure never
+# repeats itself exactly. `ring_spread` walks the rings out and back about the
+# centre; `ring_scale` grows the motifs in place, and deepens the boundary's
+# lobes with them. Between them they change what the figure IS at each radius
+# rather than only where it points, which is why a mandala's animation sits
+# here.
+ring_spread = "1.00 + sin(time * 0.83) * 0.075 + clamp(bass * 0.13, 0, 0.11)"
+ring_scale  = "1.00 + sin(time * 0.61) * 0.115 + clamp(mid * 0.20, 0, 0.17)"
+
+# The frame's own slow drift, under the ring motion rather than instead of it.
+rotation = "0.09 * time"
+scale    = "1.06 + sin(time * 0.22) * 0.045"
+zoom     = "1.02 + sin(time * 0.15) * 0.035"
+
+# STROKE. `thickness` is the honest lever on this scene and the only one used
+# here: a thicker SOLID stroke reads as a line, where a raised `glow` or a long
+# `trails` reads as haze. An earlier tuning of this roster chased a 96x96
+# coverage floor with glow 1.55 and trails 0.40 and was rejected in the running
+# app - "all lines are half transparent". On this scene that floor measures the
+# halo and the tail, not the figure. So this file is tuned by eye at a size a
+# person looks at, and `glow` is left at the engine's 1.0.
+thickness  = "3.10 + clamp(bass * 1.60, 0, 1.30) + beat * 0.45"
+brightness = "0.95 + clamp(treb * 0.40, 0, 0.34)"
+
+# COLOUR ALONG THE RADIUS. The axis is IDENTICALLY FLAT on a bare rosette - 2n
+# congruent segments all at the same radius - so `hue_spread` is a no-op there.
+# Five rings at five radii give it a real range, and the boundary anchors the
+# far end of it.
+hue        = "0.58 + time * 0.011 + clamp(treb * 0.38, 0, 0.28)"
+hue_spread = "0.60 + clamp(mid * 0.22, 0, 0.18)"
+saturation = "0.94"
+
+bg_hue      = "0.68 + sin(time * 0.0085) * 0.05"
+bg_bright   = "0.016 + clamp(mid * 0.012, 0, 0.010)"
+bg_vignette = "0.80"
+
+[smoothing]
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+rotation    = 0.20
+scale       = 0.45
+zoom        = 0.22
+thickness   = { attack = 0.02, release = 0.32 }
+hue         = 0.40
+hue_spread  = 0.55
+bg_bright   = 0.40
