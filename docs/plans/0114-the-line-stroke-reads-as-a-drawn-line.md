@@ -4,6 +4,11 @@
 > and 7-9.** Two phases remain and neither gates the other: **Phase 6**, the `preset-author` retune,
 > and **Phase 10**, the Mode 4 review's findings. [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
 > is accepted with a dated `Outcome`.
+> **The version bump was taken here, at the `dev`-arm close: `v0.80.0`.** ADR-0005 says one bump
+> per shipped plan, *"the unit a human reads as a feature"* — and that unit, the authorable
+> stroke, is what lands on `main` now. Phase 6 is a content retune and Phase 10 is a test-guard
+> repair; neither is a second feature, so **the eventual close takes a `patch` or nothing, never
+> another `minor`**.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
@@ -412,7 +417,7 @@ at `b2fb13b`.
 | 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
 | 8 — judge against the reference | human | done | verdict below |
 | 9 — set the constant, add a baseline | dev | done | `60cf15e` |
-| 10 — the guard says so out loud | dev | done | committed with this row |
+| 10 — the guard says so out loud | dev | done | `1d0185a` |
 
 ### Notes
 
