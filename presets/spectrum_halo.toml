@@ -29,7 +29,17 @@ curve = "0.5"                      # dB-like: quiet elements stay legible
 scale = "1.8"                      # uniform; retuned down ~5.8x for the curve, per the doc's factor
 radius = "0.34 + noise(time * 0.5) * 0.05 + clamp(bass * 0.31, 0, 0.26)"   # the body: the crown swells on bass, and drifts at rest
 thickness = "5"                    # one clean width — the readout speaks through length and brightness (user verdict 2026-08-11: varying widths read as mess)
-brightness = "0.85 + clamp(bin(index) * 6, 0, 1.2)"   # loud spokes cross 1.0 — bloom fuel
+# THE SPOKES ARE BARS, NOT TAPERS. Plan 0114's look gate left this world to the
+# content lane rather than naming a number, and the verdict is 0.25 — the
+# library default, bound explicitly because it is a judgement about this figure
+# and should not move silently if the default moves again. This is a READOUT:
+# the plan flagged straight bars as the case where a plateau could read heavy
+# instead of crisp, and rendered at 1:1 it is the other way round. At 1.0 a
+# 16 px spoke is a faint tapered smear and the ring reads as a halo of light; at
+# 0.25 it reads as 48 discrete bars, which is what a frequency readout is for.
+# 0.00 is within a percent of 0.25 here and buys nothing over it.
+softness = "0.25"
+brightness = "0.78 + clamp(bin(index) * 5.5, 0, 1.1)"   # loud spokes still cross 1.0 — bloom fuel; base and gain trimmed ~8% for the solid core (Plan 0114 Phase 6)
 hue_spread = "1.0"
 hue = "time * 0.015"               # the palette walks slowly round the ring
 glow = "0.9"
@@ -37,6 +47,15 @@ saturation = "1.1"
 bg_hue = "0.05"                    # the palette's violet end — a deep violet atmosphere, not the mid-ramp mud
 bg_bright = "0.12 + noise(time * 1.1) * 0.06"
 bg_vignette = "0.55"
+# BLOOM IS DELIBERATELY UNCHANGED, and that is a measurement rather than an
+# oversight. The retune brief expected a solid core to be more fuel for it,
+# since the bloom threshold is a brightness cut — true in general, and not true
+# here. Driven through real PCM (`--signal chord:120`, at the hop where onset
+# peaks) a 20% cut to bloom_amount moved the frame's total light by 0.3%,
+# because what a solid core adds on this figure is coverage at the spoke's own
+# level rather than anything ABOVE the 0.9 threshold: only the few loudest
+# spokes cross it, and they crossed it before. The brightness trim above is
+# where the extra light is paid from.
 bloom_amount = "0.5 + clamp(onset * 1.0, 0, 0.6)"
 bloom_threshold = "0.9"
 bloom_radius = "1.2"

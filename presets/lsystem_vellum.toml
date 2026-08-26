@@ -47,7 +47,30 @@ draw_progress = "0.93 + sin(time * 0.4) * 0.07"
 # The pen: a gilder's nib. Not heavier - at 3.0 the meander's strokes touched
 # and the figure filled to a solid gold slab (rendered and rejected); the gold
 # reads as gold only while the parchment shows between the strokes.
-thickness  = "2.0 + clamp(bass * 0.94, 0, 0.8) + beat * 0.3"
+# THE STROKE IS DRAWN, NOT AIRBRUSHED, and on an ink world that is the whole
+# difference. Plan 0114's look gate named 0.25 for this file - the library
+# default, bound explicitly here because it is a judgement about this figure
+# and should not move silently if the default ever does again. In ink mode the
+# palette shapes LUMINANCE only, so the stroke's cross-section is literally how
+# much of the nib's width lands as ink: the old falloff put full ink on a
+# thread and construction-grey either side of it, which reads as an embossed or
+# airbrushed line. A solid core with a one-pixel edge reads as a pen.
+softness   = "0.25"
+# NARROWED FOR THAT STROKE, and thickness is the right lever rather than the
+# obvious one. A solid core inks its whole footprint, so the same 2.0 nib drew
+# a visibly FATTER line than the one this file was tuned to - measured, the
+# inked area went 8.59% of frame to 10.36%. That walks toward the failure the
+# comment above records, the meander filling to a solid gold slab, and the
+# parchment showing between the strokes is the whole look.
+#
+# `exposure` is the lever the retune brief expected to need here and it is the
+# wrong one, which is worth writing down: exposure sits UPSTREAM of the ink
+# remap, so trimming it slides the stroke's edge back down into construction-
+# grey - it un-crisps the line instead of narrowing it, and measured it barely
+# touched the inked area at all (10.31% for a 16% cut). 1.65 puts the drawn
+# line back at 8.49%, which is the width the figure was judged at, now drawn
+# solid. `exposure` further down the file is untouched.
+thickness  = "1.65 + clamp(bass * 0.78, 0, 0.66) + beat * 0.25"
 glow       = "1.1"
 brightness = "1.1 + clamp(mid * 0.47, 0, 0.4)"
 
