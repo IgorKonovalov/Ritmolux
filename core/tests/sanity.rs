@@ -62,8 +62,8 @@ use lmv_core::{
     render::{
         CaptureImage, HeadlessOptions, RenderError, Renderer,
         metrics::{
-            RADIAL_SHELLS, TONE_BANDS, coverage, quadrant_spread, radial_shell_occupancy,
-            tonal_flatness,
+            RADIAL_SHELLS, TONE_BANDS, coverage, modal_ground, quadrant_spread,
+            radial_shell_occupancy, tonal_flatness,
         },
     },
 };
@@ -80,6 +80,29 @@ const EPS: u8 = 10;
 ///
 /// [`is_lit`]: lmv_core::render::metrics
 const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+/// The reference tone this gate hands `is_lit`, derived from the frame
+/// (**Plan 0116 Phase 3**, [ADR-0126]) rather than fixed at [`BLACK`].
+///
+/// Every statistic below asks *how far does this pixel depart from the ground*,
+/// and a constant reference answers that question only in a world where the
+/// scene draws light onto a ground it does not own. Twelve shipped presets
+/// paint their own — the attractor's ink duotones, every `fragment_field`
+/// preset — and read `coverage` exactly `1.0000` whatever they drew, which
+/// makes three of the four statistics constants rather than measurements for
+/// that content.
+///
+/// **It is the same lens in the world it was built for.** Plan 0116 Phase 1
+/// tabled this estimator against the whole library at both excitations: it
+/// re-bases 17 of 41 presets and moves **no verdict**, at either excitation.
+/// A dark-ground scene's modal band *is* the black it was already measured
+/// against, so the substitution is a no-op there and a repair everywhere else.
+///
+/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
+fn ground(img: &CaptureImage) -> [u8; 4] {
+    modal_ground(img)
+}
+
 /// The prefix every background-stage parameter carries (`bg_hue`, `bg_bright`,
 /// `bg_vignette` — `core/src/render/background.rs`'s `PARAMS`, which is
 /// `pub(crate)` and so not nameable from an integration test).
@@ -591,10 +614,11 @@ fn every_preset_draws_a_real_shape() {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture preset");
-        let cov = coverage(&img, BLACK, EPS);
-        let spread = quadrant_spread(&img, BLACK, EPS);
-        let flat = tonal_flatness(&img, BLACK, EPS);
-        let shells = radial_shell_occupancy(&img, BLACK, EPS);
+        let bg = ground(&img);
+        let cov = coverage(&img, bg, EPS);
+        let spread = quadrant_spread(&img, bg, EPS);
+        let flat = tonal_flatness(&img, bg, EPS);
+        let shells = radial_shell_occupancy(&img, bg, EPS);
         let floor = coverage_floor(system);
         println!(
             "[{}] {name:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
@@ -764,10 +788,11 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
         .capture_preset("Blown Out", &loud(), FRAMES)
         .expect("capture the flat fixture");
 
-    let cov = coverage(&img, BLACK, EPS);
-    let spread = quadrant_spread(&img, BLACK, EPS);
-    let flat = tonal_flatness(&img, BLACK, EPS);
-    println!("[blown out] coverage={cov:.4} quadrants={spread} flatness={flat:.4}");
+    let bg = ground(&img);
+    let cov = coverage(&img, bg, EPS);
+    let spread = quadrant_spread(&img, bg, EPS);
+    let flat = tonal_flatness(&img, bg, EPS);
+    println!("[blown out] ground={bg:?} coverage={cov:.4} quadrants={spread} flatness={flat:.4}");
 
     // The fixture has to pass the two existing checks, or it demonstrates
     // nothing: the whole claim is that a blot satisfies both of them.
@@ -908,12 +933,13 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     let scene = renderer
         .capture_preset(name, &frame, FRAMES)
         .expect("capture the pre-repair ridge without its backdrop");
-    let cov = coverage(&scene, BLACK, EPS);
-    let spread = quadrant_spread(&scene, BLACK, EPS);
-    let shells = radial_shell_occupancy(&scene, BLACK, EPS);
+    let scene_bg = ground(&scene);
+    let cov = coverage(&scene, scene_bg, EPS);
+    let spread = quadrant_spread(&scene, scene_bg, EPS);
+    let shells = radial_shell_occupancy(&scene, scene_bg, EPS);
     println!(
-        "[pre-repair ridge] new gate: coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
-         shells={shells}/{RADIAL_SHELLS}"
+        "[pre-repair ridge] new gate: ground={scene_bg:?} coverage={cov:.4} (floor {floor:.2}) \
+         quadrants={spread} shells={shells}/{RADIAL_SHELLS}"
     );
     assert!(
         cov < floor,
@@ -943,7 +969,7 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
     let quiet = renderer
         .capture_preset(name, &excited(MODERATE), FRAMES)
         .expect("capture the pre-repair ridge at moderate excitation");
-    let mid_cov = coverage(&quiet, BLACK, EPS);
+    let mid_cov = coverage(&quiet, ground(&quiet), EPS);
     println!(
         "[pre-repair ridge] at excitation {MODERATE}: coverage={mid_cov:.4} \
          (min {MODERATE_MIN_COVERAGE:.2}), ratio {:.4}",
@@ -1143,10 +1169,11 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture a retired mandala fixture");
-        let cov = coverage(&img, BLACK, EPS);
-        let spread = quadrant_spread(&img, BLACK, EPS);
-        let flat = tonal_flatness(&img, BLACK, EPS);
-        let shells = radial_shell_occupancy(&img, BLACK, EPS);
+        let bg = ground(&img);
+        let cov = coverage(&img, bg, EPS);
+        let spread = quadrant_spread(&img, bg, EPS);
+        let flat = tonal_flatness(&img, bg, EPS);
+        let shells = radial_shell_occupancy(&img, bg, EPS);
         println!(
             "[honest mandala] {name}: coverage={cov:.4} (floor {floor:.2}) \
              shells={shells}/{RADIAL_SHELLS} (min {MIN_STRUCTURAL_SHELLS}) \
@@ -1275,20 +1302,14 @@ fn a_louder_frame_is_reported_against_a_quieter_one() {
     let mut rows: Vec<(f32, f32, f32, String)> = Vec::new();
     let mut failures = Vec::new();
     for (name, _system) in &meta {
-        let mid_cov = coverage(
-            &renderer
-                .capture_preset(name, &mid_frame, FRAMES)
-                .expect("capture at moderate excitation"),
-            BLACK,
-            EPS,
-        );
-        let loud_cov = coverage(
-            &renderer
-                .capture_preset(name, &loud_frame, FRAMES)
-                .expect("capture at loud excitation"),
-            BLACK,
-            EPS,
-        );
+        let mid = renderer
+            .capture_preset(name, &mid_frame, FRAMES)
+            .expect("capture at moderate excitation");
+        let mid_cov = coverage(&mid, ground(&mid), EPS);
+        let loud = renderer
+            .capture_preset(name, &loud_frame, FRAMES)
+            .expect("capture at loud excitation");
+        let loud_cov = coverage(&loud, ground(&loud), EPS);
         rows.push((ratio_of(loud_cov, mid_cov), mid_cov, loud_cov, name.clone()));
 
         if mid_cov < MODERATE_MIN_COVERAGE {
@@ -1407,15 +1428,24 @@ fn ground_black(_img: &CaptureImage) -> [u8; 4] {
 /// The estimator ADR-0126 names and falsifies — the frame's modal luminance
 /// band. Tabled because "already falsified" is a claim this harness must be
 /// able to check rather than inherit.
+///
+/// **Since Phase 3 it delegates to the production one**, so this column tables
+/// what the gate actually does rather than a reproduction of it that can drift
+/// from it. The only behaviour that adds is [`NO_GROUND`] on a frame with no
+/// dominant band, and no shipped preset reaches it (see [`MIN_GROUND_SHARE`]),
+/// so the table is unchanged from the one Phase 2 read.
+///
+/// [`NO_GROUND`]: lmv_core::render::metrics::NO_GROUND
+/// [`MIN_GROUND_SHARE`]: lmv_core::render::metrics::MIN_GROUND_SHARE
 fn ground_modal_luma(img: &CaptureImage) -> [u8; 4] {
-    modal_luma_band(img, false)
+    modal_ground(img)
 }
 
 /// The modal luminance band among **border** pixels only, on the argument that
 /// a composition's ground reaches the frame edge and its figure usually does
 /// not.
 fn ground_modal_border(img: &CaptureImage) -> [u8; 4] {
-    modal_luma_band(img, true)
+    modal_border_band(img)
 }
 
 /// The modal **RGB** cell rather than the modal luminance band. Luminance
@@ -1436,13 +1466,13 @@ fn ground_modal_rgb(img: &CaptureImage) -> [u8; 4] {
     modal_mean(&counts, &sums)
 }
 
-/// Mean RGB of the most populous luminance band, over the whole frame or over
-/// its border only.
+/// Mean RGB of the most populous luminance band among the frame's border
+/// pixels — the whole-frame form is `metrics::modal_ground`.
 ///
 /// The **mean of the band's members**, not the band's centre: an ink-on-paper
 /// world's paper is a specific off-white, and rounding it to the middle of a
 /// 16-level band would hand `is_lit` a reference the frame does not contain.
-fn modal_luma_band(img: &CaptureImage, border_only: bool) -> [u8; 4] {
+fn modal_border_band(img: &CaptureImage) -> [u8; 4] {
     let w = img.width as usize;
     let h = img.height as usize;
     if w == 0 || h == 0 {
@@ -1453,7 +1483,7 @@ fn modal_luma_band(img: &CaptureImage, border_only: bool) -> [u8; 4] {
     let mut sums = [[0u64; 3]; TONE_BANDS];
     for (i, px) in img.rgba.chunks_exact(4).enumerate() {
         let (x, y) = (i % w, i / w);
-        if border_only && x >= margin && y >= margin && x + margin < w && y + margin < h {
+        if x >= margin && y >= margin && x + margin < w && y + margin < h {
             continue;
         }
         let band = (((sanity_luma(px) / 256.0) * TONE_BANDS as f32) as usize).min(TONE_BANDS - 1);
