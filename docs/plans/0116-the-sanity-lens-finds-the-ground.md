@@ -348,8 +348,8 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 |---|---|---|---|
 | 1 — What each candidate ground would say | dev | done | `8d4a9a9` |
 | 2 — The stop gate | human | done | recorded in Phase 2's Outcome above |
-| 3 — The lens takes a ground | dev | done | `committed with this row` |
-| 4 — The floors are re-derived, not re-used | dev | not started | — |
+| 3 — The lens takes a ground | dev | done | `debd803` |
+| 4 — The floors are re-derived, not re-used | dev | done | `committed with this row` |
 | 5 — Adjudicate what changed | human | not started | — |
 | 6 — The emptying canvas is actually caught | dev | not started | — |
 | 7 — Documentation | dev | not started | — |
@@ -456,3 +456,54 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
   for this gate on the measurement that `bg_vignette` makes the corner the darkest pixel in the
   frame. Left alone — changing it is a behaviour change to a user-facing `--report` and to two
   suites with their own thresholds — and raised here.
+
+#### Phase 4
+
+- **The workspace is green again: `cargo nextest run --workspace` is 968 of 968.** Phase 3's red
+  test passes, and no other verdict moved.
+- **Five floors re-derived, six left alone, and the split is measured.** The derived ground only
+  moves a preset that paints its own; a lit-on-dark scene's modal band *is* the black it was already
+  compared to, and its coverage comes back identical to the digit. Moved:
+  `fragment_field` `0.50 -> 0.08` (family minimum `1.0000` -> `0.1645` `Tiled Rosette`, all eight
+  members came off `1.0000`), `lsystem` `0.50 -> 0.19` (`Vellum` `1.0000` -> `0.3704`),
+  `swarm` `0.42 -> 0.28` (`Shatter` `0.5701` -> `0.5553`), `attractor` `0.18 -> 0.11`
+  (`De Jong Gallery` `0.2214` -> `0.2156`, but the family's three ink duotones came off `1.0000`),
+  and `shape_field` `0.50 -> 0.22`, which the plan names: its arm claimed the family "has zero
+  shipped members" while `Facet` and `Pulse` ship. Unmoved, because their minimums are
+  byte-identical under both lenses: `parametric_curve` `0.33`, `emitter` `0.25`, `star_pattern`
+  `0.34`, `spectrum` `0.28`, `reaction_diffusion` `0.09`. Each moved arm carries the date and what
+  moved it; the table above `coverage_floor` carries the split.
+- **Deviation, authorized by the user before the phase: the plan says re-derive every floor and
+  five were left alone.** Applying "half the family minimum" to all eleven arms breaks
+  `the_honest_mandala_tunings_pass_the_structural_measure`. That test asserts the three frozen
+  retired-mandala fixtures (`0.2444` / `0.2509` / `0.2546`) sit **under** the `star_pattern` floor,
+  which is the whole premise that the structural rescue is what saves them; the rule gives
+  `0.1484 / 2 = 0.07` and they clear it outright. The families it would have broken are exactly the
+  ones the ground change never touched. Offered as three options (re-derive only what the ground
+  moved; re-derive all eleven and re-point the mandala test; stop and route to `architect`); the
+  user chose the first.
+- **`MAX_FLOOR_SLACK` re-checked and unchanged at `2.2`.** The five re-derived floors sit at
+  `1.95x`-`2.06x`, the six untouched ones at `0.28x`-`1.78x`. Nothing approaches the cap. Its doc
+  comment records the re-check.
+- **Finding: `MAX_FLOOR_SLACK` is one-sided, and six families are on the side it cannot see.** It
+  fires when a floor sits too far *below* its family and says nothing when a floor sits *above* it.
+  `parametric_curve`, `emitter`, `star_pattern`, `spectrum`, `reaction_diffusion` and `shape_field`
+  all have their thinnest member under their floor, clearing the gate through Plan 0075's structural
+  rescue rather than the floor — `emitter` most sharply, at `0.0696 Ember Jet` against `0.25`. That
+  predates this plan entirely and is not obviously a defect (the rescue carrying a thin figure is
+  its design), which is why it is raised rather than fixed. It is also what makes the plan's
+  "half the family minimum" rule ambiguous: it was never applied to a family whose minimum is itself
+  rescued, and the `star_pattern` history in `coverage_floor`'s doc comment is the precedent.
+- **`SystemKind::WarpMesh` kept `0.50` and therefore stopped inheriting from `FragmentField`.** Two
+  reasons, both in the arm: the structural argument the inheritance rests on ("a fullscreen
+  `occlude` scene cannot score low") is the one Phase 3 falsified, and the number is duplicated in
+  `core/tests/warp_mesh.rs`, which this phase is not scoped to touch and which asserts the two
+  match. The family has no shipped members, so it gates nothing either way.
+- **`a_frame_with_no_tonal_structure_is_reported_flat` was re-pointed, and this is not a floor
+  change.** The Phase 3 finding stands: the blot is its own modal band, so no floor movement makes
+  its coverage healthy again. The test now reads both lenses, the same idiom
+  `the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one` already uses — against `BLACK` it
+  freezes the original demonstration (every areal check passes, only flatness convicts), and against
+  the derived ground it asserts flatness still convicts and that the fixture is dense enough for the
+  two lenses to actually differ. It no longer asserts the blank arm's conviction, which would pin an
+  incidental consequence of a floor this phase deliberately did not move.
