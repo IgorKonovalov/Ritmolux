@@ -3179,9 +3179,68 @@ the numeric columns align on their own `{:>7}` widths. Either is a one-line chan
 closer to what the surrounding tables already do. A `shot_cli` assertion that no two rows in one
 family table carry the same label is the thing that would keep it from coming back.
 
+## 0133 — `docs-shots.mjs` cannot run at all, so the operator-doc image sweep has been dead since 2026-08-15
+
+**Raised by:** `architect`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s
+close, attempting the operator-doc image refresh that close ceremony owes.
+**Owner if taken:** `dev` — three manifest entries plus a re-run, unless someone first decides what
+`warp_mesh` should be a picture *of*, which is a content question.
+
+- **Verified 2026-08-26** — the guard that aborts the run, and its message:
+  `present: the gallery does not match SystemKind::from_name in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — the three systems the manifest has no gallery entry for; each of these
+  reds the moment its entry is added, which is the intended re-read trigger:
+  `absent: gallery/shape_field\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — `absent: gallery/warp_mesh\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — `absent: gallery/shape_collage\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — all three are real systems the cross-check reads out of:
+  `present: "shape_collage" => SystemKind:: in: core/src/preset/schema.rs`
+
+### The finding
+
+`scripts/docs-shots.mjs` is the committed instrument
+[ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md) makes every committed
+documentation image depend on, and its own header states the contract in as many words: *"an image
+set nobody can re-shoot without remembering a command line is an image set that goes stale"*, and
+*"freshness is a human duty at a named cadence (the close-ceremony operator-doc sweep), not a
+check."*
+
+**It throws before rendering anything.** Its manifest holds nine gallery entries; `SystemKind`
+now has twelve. The script cross-checks the two and turns a mismatch into a hard error, so
+`shape_field`, `warp_mesh` and `shape_collage` having no gallery image takes down the *whole*
+run — including the eight images that are nothing to do with them.
+
+**The guard is not the bug; the cadence is.** The cross-check is doing exactly what its comment
+says it is for — *"a hardcoded list of nine names would let a tenth system ship with no gallery
+picture"* — and it caught precisely that. What failed is that the only thing which executes it is a
+human running it at a close, and ADR-0100 deliberately keeps it out of CI (renders are not
+byte-reproducible; a CI diff would be permanently red). So the guard fired into an empty room:
+`shape_field` entered `SystemKind` on **2026-08-15** (`78d1671`, Plan 0091 Phase 3), `warp_mesh` on
+2026-08-16 and `shape_collage` on 2026-08-25, and no close in the eleven days since could have
+re-shot an image even if it had tried.
+
+**What it is currently hiding.** Plan 0114 moved the line stroke's default `softness` and retuned
+six line presets, so `parametric_curve.png`, `lsystem.png`, `star_pattern.png` and `spectrum.png`
+all show a stroke the engine no longer draws. That is four of the nine gallery images stale, with
+no way to refresh them and nothing that reports it.
+
+### What a fix looks like
+
+Three manifest entries and one run. The only real decision is what each new picture should be of —
+`shape_field` and `shape_collage` have obvious shipped worlds (`shape_pulse`, `collage_suprematist`),
+while `warp_mesh` ships none, so it needs a fixture bundle or a converted `.milk` named in the
+manifest's provenance line like every other entry.
+
+**The separable question worth deciding once**, because this will recur on the thirteenth system:
+whether "every system has a gallery image" should be asserted somewhere that runs *without*
+rendering. The cross-check is pure text — it reads the manifest and `schema.rs` and needs no GPU —
+so it could live in `core/tests/` or in the `links` CI job and fail on the commit that ships a
+scene, instead of silently disabling the sweep until someone tries to use it. That is a different
+claim from "the images are current", which is the one ADR-0100 correctly refuses to gate.
+
 ## 0132 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
 
-**Raised by:** `preset-author`, at [Plan 0114](plans/0114-the-line-stroke-reads-as-a-drawn-line.md)
+**Raised by:** `preset-author`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)
 Phase 6, where the retune brief's own question — *does a crisper stroke read brighter, and roughly
 by how much* — had no instrument and the lane had to write one in a scratch directory.
 **Owner if taken:** `dev`; the decode table and the call sites already exist.

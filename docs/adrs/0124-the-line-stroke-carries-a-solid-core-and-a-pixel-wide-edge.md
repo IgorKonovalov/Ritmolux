@@ -2,7 +2,7 @@
 
 > **Status:** accepted 2026-08-26 (Plan 0114) — carries an `Outcome`
 > **Date:** 2026-08-25
-> **Related plan(s):** [0114](../plans/0114-the-line-stroke-reads-as-a-drawn-line.md)
+> **Related plan(s):** [0114](../plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)
 > **Supplements:** [ADR-0056](0056-additive-scenes-emit-premultiplied-alpha.md) (the alpha model this
 > keeps), [ADR-0098](0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) (the arc
 > primitive, whose fragment carries the same profile by construction)
