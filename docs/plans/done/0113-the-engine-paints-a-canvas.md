@@ -1,12 +1,22 @@
 # 0113 — The engine paints a canvas
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`, all on
+> `main` (Phases 1-8 on the `plan-0113-shape-collage` lane, merged `b20ba21`; 6b, 9
+> and 10 directly). Two Mode 4 reviews: the first found three `major`s (a false
+> colour promise at five sites, a forbidden sweep quoted, a per-frame heap
+> allocation in the render path) which became Phase 9; the second found **no
+> blockers and one `major`** — ADR-0123 carried the sixth copy of that colour
+> promise and is the document the five repaired sites cite — which is discharged
+> by this close as a dated `Outcome` on that ADR. Phase 10 took the remaining four
+> `minor`s and two `nit`s. Verified at the tip: `cargo nextest run --workspace` 994
+> passed / 5 skipped, `fmt --check` and `clippy --all-targets --workspace -D
+> warnings` clean, all three doc gates green, both golden baselines unmoved.
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
-> **Relates to:** [design-backlog 0069](../design-backlog.md) — partially advanced, not closed.
+> **Related ADRs:** [0123](../../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
+> **Relates to:** [design-backlog 0069](../../design-backlog.md) — partially advanced, not closed.
 > **Amended 2026-08-25:** **Phase 6b added**, and Phase 6 is now blocked on
-> [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
+> [Plan 0116](0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
 > Phase 1's `coverage_floor` arm correctly found that this family's lit fraction is `1.0` by
 > construction and leaned on `MAX_TONAL_FLATNESS` as the rescue; that rescue is read only at `LOUD`,
 > where Phase 6's `density` holds the canvas at its fullest, so the emptying canvas Phase 6 builds is
@@ -128,7 +138,7 @@ flowchart LR
 - **Done when:**
   - The test sweeps element count across at least 8, 16, 32, 64 and 128 at 1080p, renders each, and
     **prints per-frame cost with the adapter, driver, profile and window size named**.
-  - **It asserts no threshold.** Per [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+  - **It asserts no threshold.** Per [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
     a frame time is a fact about a GPU and a driver, not about the code. Model this file on
     `core/tests/mark_cost.rs`, which is the in-tree precedent: it prints, it names its machine, and
     the only thing it asserts is that it genuinely measured different configurations.
@@ -243,7 +253,7 @@ flowchart LR
     through the analyzer; the other four synthesize their frames and would not notice a canvas that
     ignored the music.
 
-> **Blocked on [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
+> **Blocked on [Plan 0116](0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
 > builds a canvas the music empties, and **no gate in this repo can currently see that state.**
 > `sanity` reads `tonal_flatness` only at `LOUD`, where `density` holds the canvas at its fullest;
 > the quiet capture buys only `MODERATE_MIN_COVERAGE`, which is degenerate for this family because
@@ -256,7 +266,7 @@ flowchart LR
 ### Phase 6b — The canvas is measured against its own paper
 
 - **Owner skill:** dev
-- **What:** Adopt [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
+- **What:** Adopt [Plan 0116](0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
   family, and retire the placeholder reasoning this branch shipped in Phase 1.
 - **Depends on:** Plan 0116 Phase 3 having landed. If it has not, **stop and say so** rather than
   proceeding — Phase 7 does not depend on this and can be taken first.
@@ -312,7 +322,7 @@ flowchart LR
 
 ### Phase 9 — The Mode 4 repairs
 
-> **Added 2026-08-26 by the close review**, on the [Plan 0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+> **Added 2026-08-26 by the close review**, on the [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md)
 > precedent: findings that need code become a phase rather than a paragraph, so the session that
 > fixes them reads them in the plan it is already holding. Phases 1-8 landed cleanly and the
 > workspace is green (993 tests) on the merged lane; nothing below reverses a decision.
@@ -368,7 +378,7 @@ flowchart LR
 
 ### Phase 10 — The second-pass repairs
 
-> **Added 2026-08-26 by the second close review**, on the same [Plan 0095](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
+> **Added 2026-08-26 by the second close review**, on the same [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md)
 > precedent Phase 9 used. That pass found no blockers and one `major`; the `major`
 > is architect-owned — ADR-0123 carries its own copy of the colour promise Phase 9
 > repaired at five sites, and is the document those five cite — so it is repaired
@@ -476,7 +486,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
 - **Recomposition may read as a glitch rather than a cut.** Hard-cutting a whole canvas on a beat is
   visually violent. `recompose_blend` exists as the lever; if neither extreme works, the finding is
   content-lane feedback, not an engine defect.
-- **The beat clock counts onsets, not beats** ([ADR-0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
+- **The beat clock counts onsets, not beats** ([ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)),
   at 1.7–2.1x. A `recompose` bound to `beat_index` will fire roughly twice as often as the music's
   beat, and Plan 0095 is the fix in flight. Author the shipped presets knowing this, and do not
   compensate for it inside the scene — that would have to be unwound when 0095 lands.
@@ -496,7 +506,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
   the render graph twice and both rejections stand.
 - **It does not deliver Malevich's figurative constructivism** (reference image 1). Figures
   assembled from colour blocks are authored bespoke geometry, which is
-  [Plan 0092](0092-the-engine-draws-an-authored-path.md)'s territory.
+  [Plan 0092](../0092-the-engine-draws-an-authored-path.md)'s territory.
 - **It does not deliver the Severini collage** (reference image 5). A dense fragmented-facet field
   is a subdivision mechanism, not a shape roster, and would be its own ADR.
 - **It does not add `paper_alpha`**, so `shape_collage` composes as the lower ADR-0090 layer only.
@@ -523,7 +533,7 @@ directly.
 | 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
 | 8 — Documentation and the shipped set | dev | done | b31a4e7 |
 | 9 — The Mode 4 repairs | dev | done | 015f8a3 |
-| 10 — The second-pass repairs | dev | done | committed with this row |
+| 10 — The second-pass repairs | dev | done | 02b6de9 |
 
 ### Notes
 
