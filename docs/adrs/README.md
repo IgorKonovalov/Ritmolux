@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0131.** *(0120 was reserved for
+**Next free number: 0132.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -152,4 +152,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes - not implementable at Plan 0116, implemented at 0119; completed by 0129, implemented by 0130 |
 | [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | accepted 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
 | [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119) |
+| [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) | The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm | proposed 2026-08-26 (Plan 0120) |
 <!-- roster:end -->
