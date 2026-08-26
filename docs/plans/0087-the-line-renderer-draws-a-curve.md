@@ -1,9 +1,10 @@
 # 0087 — the line renderer draws a curve
 
-> **Status:** in-progress — **phases 1, 1b, 2, 3 and 4 are done and phases 5, 6 and 7 are not
-> started.** The stop condition did not fire and Phase 4's look gate returned a **green light**, so
-> Phase 5 is authorized and unbuilt. Handed to `architect` at the user's instruction before it,
-> with one thing owed that blocks a push: `check-backlog-claims.mjs` exits 1 on backlog 0098
+> **Status:** in-progress — **phases 1, 1b, 2, 3, 4, 5 and 6 are done; Phase 7 is `human` and not
+> started.** Every `dev` phase has landed. Phase 4's look gate returned a green light and Phase 5
+> built on it; Phase 6 closed [design-backlog 0071](../design-backlog.md). One thing is owed before a
+> push: `check-backlog-claims.mjs` exits 1 on **0071**, whose probe Phase 6 falsified *by discharging
+> it*, and closing that entry is an architect call
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
@@ -331,7 +332,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
 | 3 — the circular motifs become arcs | dev | done | `82c031f` |
 | 4 — does it read as a curve? | human | done | verdict in the notes |
 | 5 — the general curve: a biarc chain | dev | done | `af4f118` |
-| 6 — the scalloped boundary | dev | done | committed with this row |
+| 6 — the scalloped boundary | dev | done | `8179f25` |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
 ### Notes
@@ -549,28 +550,42 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
 ### Close triggers
 
 - **`presets/` touched:** **no `.toml`.** `presets/README.md` only — the motif table's cost column
-  (`circle` and `arc` are one instance each, not 24 and 12), the ring budget arithmetic, and the
-  standing note that a circle reads as a polygon at ornament scale, which Phase 3 falsified for
-  those two members and left true for the other five.
-- **Plan header `Closes:`** — three entries, **one of them actually closed**:
+  (five of the eight members are arcs now, not 24 / 24 / 36 segments), the ring budget arithmetic,
+  the standing note that a curved motif facets at ornament scale (Phase 3 falsified it for the two
+  circular members, Phase 5 for the three fitted ones, and it is now true of neither), and the
+  `scallop` row with the three ring keys it reads differently.
+- **Plan header `Closes:`** — three entries, **two of them closed**:
   - [design-backlog 0098](../design-backlog.md) — **closed** by Phase 1b.
-  - [design-backlog 0073](../design-backlog.md) — **not closed.** Phase 4 answers its question for
-    the two circular motifs, but the three retired presets are not re-landed; that is Phase 7.
-  - [design-backlog 0071](../design-backlog.md) — **not closed.** The boundary curve is Phase 6.
-- **What shipped:** **feature + fix.** The arc primitive and its instrument widening (feature); the
-  sub-floor `thickness` warning (fix). No preset content.
+  - [design-backlog 0071](../design-backlog.md) — **closed** by Phase 6. The boundary curve exists,
+    `star.rs`'s "Nothing here fakes one" note is replaced by a pointer to it, and
+    `presets/README.md` carries it.
+  - [design-backlog 0073](../design-backlog.md) — **not closed.** Phase 4 answered its question for
+    the circular motifs and Phase 5 removes the mechanism for the other three, but the three retired
+    presets are not re-landed; that is Phase 7, and it is `human`.
+- **What shipped:** **feature.** The arc primitive and its instrument widening (Phases 1-3), the
+  biarc fit and the three fitted motifs (Phase 5), the scalloped boundary (Phase 6); plus the
+  sub-floor `thickness` warning as a fix (Phase 1b). No preset content.
 - **Operator docs touched:** `presets/README.md`. None of `README.md`, `docs/presets.md`,
   `docs/preset-palettes.md`, `docs/capturing.md`, `docs/on-device-validation.md`, `docs/nfr.md`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, naming
-  **0098** — `present: max\(0\.0005\) in: core/src/render/scenes/lines/parametric.rs`, which Phase 1b
-  moved to `lines/mod.rs` as `MIN_HALF_WIDTH`. The claim is unchanged; the probe's path is stale.
-  **This breaks `pre-push` and the CI `links` job until it is repaired.**
-- **Outstanding `human` phases:** **Phase 7** (the retired mandalas, re-judged). Phase 4 ran and its
-  verdict is above.
-- **Outstanding `dev` phases:** **5 and 6**, neither started. Phase 5 is green-lit by Phase 4.
-- **Lane state:** `plan-0087-arc-primitive` is branched from `main` at `aa4bc5f` and `main` has since
-  moved to `1be71c8` (a parallel `lmv-plan-0095` worktree is live). A merge of `main` into this
-  branch is owed before any bless or close. Nothing here moved a golden baseline.
+  **0071** — `present: Nothing here fakes one in: core/src/render/scenes/lines/star.rs`. Phase 6
+  deleted that sentence **because it built the thing the entry asked for**, so the probe is falsified
+  by the entry being discharged rather than by drift. `docs/design-backlog.md` is outside every `dev`
+  phase's scope and the gate's own message says a falsified entry is architect's to correct, close or
+  split. **It breaks `pre-push` and the CI `links` job until it is closed.** (The Phase 1b breakage
+  this field recorded before — 0098's stale path — is gone: that entry was archived on `main` at
+  `6eff54e`.)
+- **Outstanding `human` phases:** **Phase 7** (the retired mandalas, re-judged) — the regression
+  target the whole plan exists for, and the phase that decides whether any of `star_mandala`,
+  `star_mandala_six` or `star_weave` returns to the shipped set. Phase 4 ran; its verdict is above.
+- **Outstanding `dev` phases:** **none.** 5 and 6 landed here.
+- **Lane state:** `plan-0087-biarc` is branched from `main` at `e205f8e` and carries two commits,
+  `af4f118` and `8179f25`. **`main` has moved since** — a parallel session is committing to it — so
+  a merge of `main` into this branch is owed before the close. **No golden baseline moved**: all 794
+  `lmv-core` tests pass on the tip, including every `parametric_curve` capture, which is the property
+  the chord-web gate exists to hold. `cargo fmt --all --check` and
+  `cargo clippy --all-targets -- -D warnings` are clean; `node scripts/check-doc-links.mjs` and
+  `node scripts/check-index-rows.mjs` pass.
 
 ## Followups (after this lands)
 
