@@ -349,7 +349,7 @@ at `b2fb13b`.
 |---|---|---|---|
 | 1 — the profile lands | dev | done | `e2eb8fc` |
 | 2 — the arc fragment shares it | dev | done | `348cc01` |
-| 3 — the sample sheet | dev | done | committed with this row |
+| 3 — the sample sheet | dev | done | `5592e40` |
 | 4 — pick the default | human | **next — this session stops here** | |
 | 5 — flip, re-bless, repair the docs | dev | not started | |
 | 6 — the library is retuned | human | not started | |
