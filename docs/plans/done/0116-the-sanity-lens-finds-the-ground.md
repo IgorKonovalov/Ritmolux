@@ -1,16 +1,26 @@
 # 0116 — The sanity lens finds the ground
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-26. Phases 1, 3, 4, 6, 7 and 8 landed as `8d4a9a9`, `debd803`,
+> `5d97abd`, `86106af`, `022e4c5` and `c2dc0dc`; Phases 2 and 5 are the `human` gates and both ran.
+> **Phase 9 did not run** — Phase 8's mechanical stop condition fired, verified independently at the
+> close by re-running its harness (every number reproduces). Mode 4 verdict: **one blocker, two
+> majors, four minors**; the blocker was an ADR number collision with `main`'s own ADR-0127
+> (Plan 0118), resolved at the merge by renumbering this plan's to **0128** and re-pointing every
+> reference. `cargo nextest run --workspace` 969/969 after merging `main`, `fmt` and
+> `clippy --workspace --all-targets` clean, all three doc gates pass.
 > **Created:** 2026-08-25
 > **Approved:** 2026-08-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) (proposed),
-> [0127](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) (proposed)
-> **Closes:** design-backlog 0128
+> **Related ADRs:** [0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) (accepted, Outcome),
+> [0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+> (**proposed, Outcome — decision NOT implemented**; Phase 8 measured that no candidate structural
+> statistic survives, so the flatness gate still has one term)
+> **Closes:** design-backlog 0128 — **only in half.** The ground landed and the emptying canvas is
+> caught; the flat-graphic false positive is measured-unsolved and the entry stays live.
 > **Amended:** 2026-08-26, at Phase 2's stop gate. `modal_luma` chosen; Phases 3-7 corrected against
 > Phase 1's measurement; **Phases 8-9 added** carrying ADR-0128, because the measurement showed the
 > ground fixes two of ADR-0126's three motivations and structurally cannot fix the third.
-> **Sequencing constraint:** must land **before [Plan 0113](0113-the-engine-paints-a-canvas.md)
+> **Sequencing constraint:** must land **before [Plan 0113](../0113-the-engine-paints-a-canvas.md)
 > Phase 6**, which is where the emptying canvas arrives. Plan 0113 Phases 3-5 are unaffected and the
 > two lanes can run in parallel until then.
 
@@ -27,7 +37,7 @@ from argument, because the obvious candidate is already falsified.
 and changes **no** verdict at either excitation — and it clears the degeneracy for the eight presets
 that have a ground. It cannot clear it for the four that do not, and it cannot repair the
 flat-graphic false positive at all: that one is a property of `tonal_flatness` itself, not of the
-reference it measures from. Phases 8-9 carry [ADR-0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
+reference it measures from. Phases 8-9 carry [ADR-0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 for that residue.
 
 ## Context & problem
@@ -299,7 +309,7 @@ Today the pink diamond is the constant `BLACK`; Phases 3-4 make it `modal_luma`,
 between it and the four statistics is unchanged in shape — which is why the ground is one change at
 the root rather than four.
 
-The blue diamond is [ADR-0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
+The blue diamond is [ADR-0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
 added at the Phase 2 gate. It is a **separate** change and deliberately downstream of the first: the
 ground decides *which pixels are the figure*, and this decides *what the figure having one tone is
 allowed to mean*. Phase 1 measured that the first cannot do the second's job.

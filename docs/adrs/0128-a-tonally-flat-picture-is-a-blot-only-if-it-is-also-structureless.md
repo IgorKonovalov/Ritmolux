@@ -2,12 +2,12 @@
 
 > **Status:** proposed
 > **Date:** 2026-08-26
-> **Related plan(s):** [0116](../plans/0116-the-sanity-lens-finds-the-ground.md) Phases 8-9
+> **Related plan(s):** [0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phases 8-9
 > **Relates to:** [ADR-0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
 > (the decision this completes — 0126 re-bases *which pixels are the figure*, this one fixes *what
 > the figure's tonal spread is allowed to mean*), [ADR-0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
 > (the scene family that forces it)
-> **Raised from:** [Plan 0116](../plans/0116-the-sanity-lens-finds-the-ground.md) Phase 1's measured
+> **Raised from:** [Plan 0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 1's measured
 > table
 
 ## Context
@@ -147,3 +147,51 @@ question about palette where the gate is asking one about composition.
 Plan 0116 Phase 1's harness (`each_candidate_ground_is_tabled_against_the_library`, `#[ignore]`d in
 `core/tests/sanity.rs`) prints every number cited above and is re-runnable; the shares in Context are
 derived from its `LOUD` block.
+
+## Outcome (2026-08-26) — the decision is not implemented, and the mechanism did not survive measurement
+
+[Plan 0116](../plans/done/0116-the-sanity-lens-finds-the-ground.md) Phase 8 tabled three candidate
+structural statistics against the library before implementing this ADR, and its mechanical stop
+condition fired: **Phase 9 did not run, and the flatness gate still has one term.** This ADR stays
+`proposed`. Anything reading it as shipped behaviour is reading it wrong.
+
+**No candidate separates a blot from a composition.** Measured at `LOUD` over the shipped library
+plus the frozen `Blown Out` fixture, the held `Tiled Rosette Mono`, and the three frozen
+`retired_mandalas()`, by `each_structure_candidate_is_tabled_against_the_library` (`#[ignore]`d in
+`core/tests/sanity.rs`):
+
+| candidate | blot -> composition | shipped frames in the gap | derived threshold | convicts the blot? |
+|---|---|---|---|---|
+| `1 - tonal_flatness` (control) | `0.0846` -> `0.0587` | **not separated** | — | — |
+| boundary length per unit area | `0.2631` -> `0.3602` | 3 | `0.0220` | **no** |
+| connected components | `4.4223` -> `10.2980` | 5 | `0.0544` | **no** |
+| Sobel density over the mask | `0.2199` -> `1.3876` | **32** | `0.0215` | **no** |
+
+Two readings, and they agree. The plan's own — separated with the library outside the gap — fails for
+all three. The sharper one is that the threshold ceremony this repo derives constants by (half the
+sparsest legitimate content, [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md))
+produces, for every candidate, a constant that **stops convicting `Blown Out` by an order of
+magnitude**. Implementing this ADR on any of them would have made the flatness gate vacuous — which
+is exactly what its own Negative section warned a second term risks, arriving on the first
+measurement rather than after it shipped.
+
+**Why all three fail is one fact, and it is a collision between this ADR and
+[ADR-0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).** Under the ground
+0126 derives, a saturated blot **is its own modal band**, so its lit mask is not the mass but the
+mass's *fringe* — `Blown Out` reads `coverage 0.1963` at one occupied radial shell. A fringe is a thin
+ring, and every statistic proposed here is built to score a thin ring as structured. The two decisions
+work against each other on precisely the fixture that had to anchor the gate's non-vacuity, and no
+reading of either document predicted it.
+
+**One worry was cleared, and it is a clean negative result.** The Negative section's resolution hazard
+did not reproduce: the three frozen thin-stroke mandalas read boundary `0.9480` / `0.9641` / `0.8653`
+— the **top** of the range, not the bottom. Design-backlog 0072's aliasing failure does not reach a
+boundary measure. The candidates failed for the reason above, not for that one.
+
+**What this leaves.** `presets/pending/fragment_tiledmono.toml` stays held with nothing scheduled, and
+the four groundless luminous fields (`Sumi`, `Whorl`, `Supernova`, `Neon Tunnel`) stay
+composition-or-fill unanswered. The Context, the Decision and all four Alternatives stand unchanged —
+nothing measured here made A, B, C or D viable, and the duotone arithmetic in the Context is
+reproduced exactly. What is falsified is the implicit premise that *some* structural statistic over
+the lit mask separates the two cases. A future attempt starts from the fringe mechanism above, not
+from this roster.

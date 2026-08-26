@@ -147,7 +147,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | proposed 2026-08-25 (Plan 0113) |
 | [0124](0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) | The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable | proposed 2026-08-25 (Plan 0114) |
 | [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | proposed 2026-08-25 (Plan 0115) |
-| [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | proposed 2026-08-25 (Plan 0116), Outcome, completed by 0128 |
+| [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
 | [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | proposed 2026-08-25 (Plan 0118) |
-| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | proposed 2026-08-26 (Plan 0116), Outcome |
+| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | proposed 2026-08-26 (Plan 0116), Outcome - decision NOT implemented, no candidate statistic survived |
 <!-- roster:end -->

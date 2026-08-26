@@ -6,11 +6,17 @@
 > **Related ADRs:** [0123](../adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)
 > **Relates to:** [design-backlog 0069](../design-backlog.md) — partially advanced, not closed.
 > **Amended 2026-08-25:** **Phase 6b added**, and Phase 6 is now blocked on
-> [Plan 0116](0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
+> [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md) / [ADR-0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md).
 > Phase 1's `coverage_floor` arm correctly found that this family's lit fraction is `1.0` by
 > construction and leaned on `MAX_TONAL_FLATNESS` as the rescue; that rescue is read only at `LOUD`,
 > where Phase 6's `density` holds the canvas at its fullest, so the emptying canvas Phase 6 builds is
 > measured by nothing. Phases 1-5 and 7-8 are unaffected.
+> **Unblocked 2026-08-26:** Plan 0116 closed, `sanity` now derives its reference per capture, and its
+> Phase 6 fixture demonstrates the emptied-canvas conviction on a synthetic stand-in. Two obligations
+> pass to this plan, both because `ShapeCollage` does not exist on that branch: `coverage_floor` needs
+> a `ShapeCollage` arm **derived from the printed distribution** at half the family minimum like every
+> other floor (never inherited from `FragmentField`, whose `0.50` is now `0.08`), and Phase 6b should
+> replace the synthetic fixture's role with the real family where it can.
 
 ## TL;DR
 
@@ -195,7 +201,7 @@ flowchart LR
     through the analyzer; the other four synthesize their frames and would not notice a canvas that
     ignored the music.
 
-> **Blocked on [Plan 0116](0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
+> **Blocked on [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md), added 2026-08-25.** This phase
 > builds a canvas the music empties, and **no gate in this repo can currently see that state.**
 > `sanity` reads `tonal_flatness` only at `LOUD`, where `density` holds the canvas at its fullest;
 > the quiet capture buys only `MODERATE_MIN_COVERAGE`, which is degenerate for this family because
@@ -208,7 +214,7 @@ flowchart LR
 ### Phase 6b — The canvas is measured against its own paper
 
 - **Owner skill:** dev
-- **What:** Adopt [Plan 0116](0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
+- **What:** Adopt [Plan 0116](done/0116-the-sanity-lens-finds-the-ground.md)'s derived ground for this
   family, and retire the placeholder reasoning this branch shipped in Phase 1.
 - **Depends on:** Plan 0116 Phase 3 having landed. If it has not, **stop and say so** rather than
   proceeding — Phase 7 does not depend on this and can be taken first.
