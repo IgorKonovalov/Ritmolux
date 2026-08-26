@@ -8,6 +8,10 @@
 > primitive, whose fragment carries the same profile by construction)
 > **Relates to:** [ADR-0037](0037-internal-grid-is-a-resolution-not-a-shape.md) — the edge is
 > specified in **pixels of the render target**, which is the same rule seen from the other side
+> **Amended 2026-08-26, before acceptance:** this ADR said the fragment reaches *four* line
+> families. It reaches **five consumers** — `warp_mesh` strokes through the identical fragment, and
+> because all three entry points funnel into one `draw_all` writing one uniform, it cannot abstain.
+> The amendment adds the second constant and its rationale; the mechanism above is unchanged.
 
 ## Context
 
@@ -91,6 +95,25 @@ the answer the gate exists to produce.
 carry the same coverage `g`; only the shape of `g` changes. The emission model, the blend state and
 the OVER range are exactly as they were.
 
+**Two constants, because there are two judges.** `LineRenderer::draw`, `draw_split` and `draw_arcs`
+all funnel into one private `draw_all` that writes **one** uniform, so every caller supplies a
+`softness` and none can abstain. `warp_mesh` is a caller: it strokes the MilkDrop waveform, every
+custom wave, every shape outline, both borders and the motion grid through this same fragment. It
+does **not** take the line default. It passes its own named constant, pinned at `1.0` — the
+pre-0114 profile — because it answers to a different instrument.
+
+The four line families are judged by "does this read as a drawn line", against an eye. `warp_mesh`
+is judged against **`foo_vis_milk2`**, which [ADR-0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+names as the fidelity reference and against which the conversion has already been judged
+side-by-side. Its stroke width was chosen *through* this profile — `draw.rs:171` records a thick
+MilkDrop line, drawn there as two or four offset passes, being reproduced here as one stroke of
+twice the width, "the same gesture through this engine's soft-falloff primitive". A number picked by
+Plan 0114's look gate is an answer to a question nobody asked of that surface.
+
+**What the reference actually wants is open, and this ADR does not guess it.** Plan 0114 carries a
+`human` phase that judges `warp_mesh`'s stroke against the reference rig and sets the constant from
+that verdict. Until it runs, the pin holds the profile the conversion was judged under.
+
 ## Consequences
 
 ### Positive
@@ -99,7 +122,8 @@ the OVER range are exactly as they were.
   this is the only place the profile lives.
 - **One fragment change reaches all four line families** — `parametric_curve`, `lsystem`,
   `star_pattern` and `spectrum` all stroke through `LineRenderer` — **and the arc primitive comes
-  along for free.** ADR-0098's arc fragment applies the same falloff to its own distance, so it
+  along for free.** (It reaches a fifth consumer, `warp_mesh`, which the Decision pins rather than
+  moves; that is the price recorded below, not a benefit.) ADR-0098's arc fragment applies the same falloff to its own distance, so it
   inherits the profile by construction and Plan 0087's arc-equals-polyline equivalence test keeps
   holding at every `softness`. That test becomes the guard on this change rather than a casualty of
   it.
@@ -127,12 +151,31 @@ the OVER range are exactly as they were.
   Plan 0087 Phase 1b just made warnable, and the floor there is now the right place to state it.
 - **It adds a parameter to a surface that already has `thickness`, `brightness` and `glow`**, and
   the four interact. The plan owes the authoring docs a sentence on which one to reach for.
+- **The engine carries two stroke profiles once the default moves**, and a reader of the fragment
+  cannot see why without following the constant. That is the cost of the pin, and it is paid in
+  naming: two named constants at the call sites, never a bare `1.0`.
+- **Nothing in the golden corpus shades a `warp_mesh` stroke, so the pin is the only thing holding
+  that surface.** All three `warp_mesh` baselines — `warp_mesh.png`, `warp_mesh_milk.png`,
+  `warp_mesh_shader.png` — are warp field, deposit and shader output with **no line geometry in
+  them**; the fixtures set no wave and no border. The line path is covered at the CPU-geometry level
+  only (`every_wave_mode_builds_a_different_figure`,
+  `borders_and_motion_vectors_each_draw_their_own_figure` assert which segments get *built*, not how
+  they are *shaded*). So a change to this fragment can alter every MilkDrop stroke and no baseline
+  in the repo moves. Plan 0114 closes the gap by adding one.
+- **MilkDrop's own widths sit below the range the plan's arithmetic reasons about.** `draw.rs`'s
+  `THIN = 0.0025` NDC-y is a **1.35 px** half-width at 1080p and **1.0 px** at 1280x800, against the
+  1.5–3.2 px shipped range the line families span. `fwidth(d) ~ 1 / half-width-in-pixels` is
+  therefore ~0.74 and ~1.0 there — at the small target it reaches the cap exactly. The cap is what
+  makes the pin *exact* rather than approximate: with `edge` capped at 1.0, `max(1.0, edge)` is
+  1.0, so `core = u` and `g = u²` term for term. Remove the cap and the pin silently stops being
+  byte-identical on small targets.
 
 ### Neutral
 
 - `spectrum`'s bars and `lsystem`'s straight stems get the same treatment. That is wanted — the
   complaint was never specific to curves — but it means the change is engine-wide across the line
-  families rather than scoped to the ornament work that surfaced it.
+  families rather than scoped to the ornament work that surfaced it. `warp_mesh` is the one
+  consumer held out, and for a stated reason rather than by oversight.
 - The name `softness` is chosen over `feather` and `hardness` because it reads correctly at both
   ends for an author (`0` sharp, `1` soft) and does not invert the sense of the existing default.
 
@@ -158,6 +201,20 @@ Rejected on layering. The composite at that point contains every scene and every
 filter there would sharpen the attractor's trails and the reaction-diffusion field along with the
 strokes, and it would have no way to know what was meant to be soft. The profile is a property of
 the stroke and belongs in the fragment that draws it.
+
+### Alternative D0 — Let `warp_mesh` follow the new default like every other consumer
+
+One profile engine-wide, nothing to explain, and no second constant. Rejected because it changes a
+**fidelity variable against an external reference** with nothing watching: no gate in this repo
+compares `warp_mesh` to `foo_vis_milk2`, and — see the Negative section — no golden baseline even
+shades a `warp_mesh` stroke, so the regression would be invisible until someone next sat down with
+the rig. It also lands MilkDrop's `THIN` stroke, at 1.0–1.35 px of half-width, in exactly the
+sub-two-pixel regime this ADR's own Negative section says the edge term stops describing.
+
+The asymmetry is the point: for the four line families, Plan 0114's look gate **is** the instrument
+and a human has already returned the verdict that motivated the change. For `warp_mesh` the
+instrument exists but has not been pointed at this question. Following the default would be
+answering it by default.
 
 ### Alternative D — Ship it opt-in, with today's profile as the permanent default
 
