@@ -10,15 +10,14 @@
 //! static (dark) backdrop is stable (its own max), so nothing blows up. `fade`
 //! comes from the `trails` named param (0 = off).
 //!
-//! **Off by default (passthrough).** When `trails <= 0` — every shipped preset
-//! until one opts in — the [`PostChain`](super::post::PostChain) skips this stage
-//! entirely: no offscreen
-//! target, no pipelines, so golden/determinism are unchanged, the NFR §1 iGPU
-//! floor pays nothing, and (like the background pass) the DX12 WARP software
-//! adapter never sees a coexisting feedback pipeline during the no-trails
-//! captures. When active, the pipelines build lazily and the accumulation is
-//! **reset on the capture scene-rebuild**, so a headless capture stays a pure
-//! function of its inputs (NFR §6).
+//! **Off by default (passthrough).** When `trails <= 0` the
+//! [`PostChain`](super::post::PostChain) skips this stage entirely: no
+//! offscreen target, no pipelines, so the NFR §1 iGPU floor pays nothing, and
+//! (like the background pass) the DX12 WARP software adapter never sees a
+//! coexisting feedback pipeline during the no-trails captures. When active,
+//! the pipelines build lazily and the accumulation is **reset on the capture
+//! scene-rebuild**, so a headless capture stays a pure function of its inputs
+//! (NFR §6).
 //!
 //! The `surface_format` this stage is built with is the **composite's** format
 //! (`Rgba16Float`, ADR-0046), not the surface's: the max-decay already ran in
@@ -48,10 +47,10 @@
 //! - **Every rate is per-second, on the injected real `dt`** (ADR-0019): `fb_zoom`
 //!   is a factor per second applied as `zoom^dt`, `fb_rotate` is rad/s, `fb_dx`/
 //!   `fb_dy` are units/s. The same edit normalizes `fade` to `fade^(dt / (1/60))`,
-//!   the form the attractor's trail has always used — this stage applied it once
-//!   per *frame*, so its trails were a third as long at 144 Hz as at 48 Hz. At the
-//!   capture `dt` the exponent is exactly `1.0` and the factor is exactly `fade`,
-//!   which is why no golden moved.
+//!   the form the attractor's trail uses. Applied once per *frame* instead, a
+//!   trail is a third as long at 144 Hz as at 48 Hz. At the capture `dt` the
+//!   exponent is exactly `1.0` and the factor is exactly `fade`, so no golden
+//!   depends on the rate.
 //! - **The transform is aspect-corrected from the RENDER TARGET** (ADR-0037). The
 //!   accumulation grid is quantized to a 256 px step, so its own aspect is not the
 //!   target's; a rotation computed in grid-uv space would shear. The centred

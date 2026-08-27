@@ -44,23 +44,20 @@
 //!
 //! # Why the disc guard lives here and not in `composite.rs`
 //!
-//! Plan 0045 Phase 1 lists `core/tests/composite.rs` for it. That file pins two
-//! **blessed baselines** at a load-bearing 160x100, and its own module docs are
-//! the record of why building GPU resources mid-run must not happen near them: a
-//! second `Renderer::new_headless` is documented to change what the trails stage
-//! resolves to on the WARP software adapter. This guard needs a *portrait* target
-//! and a border-filling fixture, so it cannot share that renderer — it would have
-//! to construct a second one in the same binary, beside the baselines, which is
-//! the one thing that file exists to avoid. It is the same fold, so it joins the
-//! fold's own binary instead. Nothing else about the assertion changes.
+//! This guard needs a *portrait* target and a border-filling fixture,
+//! so it cannot share `composite.rs`'s renderer — it would have to
+//! build a second one in that binary, beside two blessed baselines, and
+//! that file's own module docs record why building GPU resources
+//! mid-run must not happen near them. It is the same fold, so it joins
+//! the fold's own binary instead.
 //!
 //! The fold wraps `a = atan2(p.y, p.x) + angle` with `a - seg * floor(a / seg)`,
 //! `seg = 2*pi/order`, then mirrors within the wedge. `atan2`'s branch cut lies on
 //! the **-x ray**, where the angle jumps by exactly `2*pi`. The wrap-and-mirror is
 //! periodic in `seg`, so it absorbs that jump only when `2*pi` is a whole multiple
-//! of `seg` — only, that is, when `order` is an integer. Before Phase 1 the CPU
-//! side clamped the order and never rounded it, so a fractional order tore the
-//! frame along one horizontal ray from the centre to the left edge.
+//! of `seg` — only, that is, when `order` is an integer. A fractional order that
+//! reaches the shader unrounded tears the frame along one horizontal ray from the
+//! centre to the left edge, which is why the CPU side rounds it.
 //!
 //! # `kaleido_angle` must be non-zero or there is nothing to see
 //!

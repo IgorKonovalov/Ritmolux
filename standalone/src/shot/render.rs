@@ -45,7 +45,7 @@
 //! texture the app would have presented, so an exported file cannot be washed
 //! out relative to the app without the app being washed out too.
 //!
-//! That is a property, so it is asserted rather than asserted-by-comment:
+//! That is a property, so it is asserted rather than claimed here:
 //! `standalone/tests/shot_cli.rs`'s
 //! `a_rendered_frame_is_byte_identical_to_the_png_the_app_writes` renders the
 //! same instant twice — once through here, once through `shot --frame-at` — and
@@ -55,10 +55,6 @@
 //! instant" expressible: [`HOP_SIZE`] samples at 30,720 Hz is 60 hops a second,
 //! so at `--fps 60` frame *N* and hop *N* coincide. Nothing in this module
 //! assumes that alignment — the test arranges it.
-//!
-//! The assertion is on the RGB frame and never on the wire, for the reason the
-//! section above gives: the YUV conversion is not bijective, so a wire-level
-//! version of it could only be loosened until it passed.
 //!
 //! ## Surviving a whole track
 //!

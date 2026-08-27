@@ -5,12 +5,11 @@
 //! # The order, and the skip rule
 //!
 //! The chain is `trails -> kaleidoscope -> bloom -> destination`, built as a
-//! compile-time constant array in [`PostChain::new`]. That order is ADR-0018's
-//! product decision (feedback before the screen-space fold) extended by ADR-0046
-//! (bloom last, so its bright-pass reads the finished HDR frame). This is **not**
-//! a render graph and
-//! **not** a registration point: nothing reorders the array at runtime, and the
-//! only way to add a stage is to add an array element and a [`PostStage`] impl.
+//! compile-time constant array in [`PostChain::new`] — feedback before the
+//! screen-space fold (ADR-0018), bloom last so its bright-pass reads the
+//! finished HDR frame (ADR-0046). This is **not** a render graph and **not**
+//! a registration point: nothing reorders the array at runtime, and the only
+//! way to add a stage is to add an array element and a [`PostStage`] impl.
 //!
 //! Every stage is individually **skippable**: a stage whose amount param is off
 //! reports [`active`](PostStage::active) `false` and is dropped from the frame
@@ -41,10 +40,8 @@
 //! situations its `out` is in; both use one premultiplied-OVER pipeline, because
 //! over a transparent-cleared target that blend reduces exactly to `REPLACE`.
 //!
-//! This generalizes the convention ADR-0026 already established at the scene seam,
-//! where the fullscreen scenes present premultiplied over the backdrop and the
-//! emissive ones draw additive in colour with `OVER` alpha. Scene alpha is
-//! meaningful at both seams, and the chain carries it rather than discarding it.
+//! Scene alpha is meaningful at this seam and at the scene seam
+//! (ADR-0026), and the chain carries it rather than discarding it.
 //!
 //! # The chain runs in linear light (ADR-0046)
 //!
@@ -58,9 +55,9 @@
 //!
 //! # What is *not* in the chain
 //!
-//! ADR-0032's rule: **a pass a preset composes belongs in the chain; a pass that
-//! applies to the finished frame belongs outside it.** So the renderer drives three
-//! passes directly, around this chain:
+//! A pass a preset composes belongs in the chain; a pass that applies
+//! to the finished frame belongs outside it (ADR-0032). So the renderer
+//! drives these directly, around this chain:
 //!
 //! - [`Background`](super::background::Background) — the pre-pass that owns the
 //!   frame clear and never folds a rendered frame down;

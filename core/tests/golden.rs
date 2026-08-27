@@ -78,74 +78,39 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// the roster, for when the rostered one structurally cannot reach the code
 /// under test.
 ///
-/// `attractor_depth` is the case that opened it, and the impossibility is by
-/// design rather than by accident: the roster's `attractor.toml` is **De Jong**,
-/// and ADR-0076 gives every 2-D family an inverse depth extent of exactly `0.0`
-/// — which is precisely what makes the perspective divide, the distance haze and
-/// the depth tint the identity there. No edit to that fixture could exercise a
-/// line of them. A 3-D family with all four levers off their defaults is the
-/// only thing in this suite that would catch a regression in them.
+/// Each entry names what the rostered fixture **structurally cannot
+/// reach**, and an entry without such a claim does not belong here:
 ///
-/// `attractor_ifs` is the same shape of argument for the same scene (Plan 0062).
-/// De Jong takes a different arm of the step shader, its `a`..`d` coefficients
-/// *are* its shape, and `morph`/`curl`/`vigor`/`lean`/`bias` are inert on it —
-/// so nothing that could be done to `attractor.toml` would exercise the SVD
-/// decomposition, the morph, the framing fit or the levers.
-///
-/// `swarm_shaped` is the third (Plan 0070, ADR-0084). The mark silhouette's
-/// default is `disc`, and `disc` is **exactly** `length(local)` — the arithmetic
-/// the sprite drew before the roster existed — so the rostered `swarm.toml`
-/// takes that arm, and no edit to it that kept its baseline could execute a line
-/// of the ring, polygon, star or heart arms.
-///
-/// `backdrop_ramp` is the fourth (Plan 0080, ADR-0094), and its impossibility is
-/// the starkest of the four: every rostered fixture runs `bg_bright = 0`, where
-/// the backdrop's gradient pipeline is **not even built** (`background.rs`'s
-/// module docs), so no baseline in this suite executes a line of that pass. The
-/// ramp's five params each default to an arithmetic identity with the pre-ramp
-/// expression, so a fixture leaving any of them alone would pin the old picture
-/// through the new code — `bg_ramp_gamma` off `1.0` in particular is the only
-/// thing anywhere in the crate's baselines that takes the shader's `pow` arm
-/// rather than its identity `select` arm.
-///
-/// `backdrop_band` is the fifth (Plan 0081, ADR-0095), and it takes the ramp's
-/// argument one layer further out: the band is an untaken `select` branch at
-/// `bg_band_amount = 0`, so even `backdrop_ramp` — the suite's one lit backdrop —
-/// executes none of it. Its `bg_band_curve` off `0` is the only thing in the
-/// crate's baselines that reads the **along-band** axis at all; with the default
-/// there the shader never touches `t`.
-///
-/// `warp_mesh_milk` is the sixth (Plan 0100 Phase 2, ADR-0113), and its
-/// impossibility is structural in the strongest sense the list has: the rostered
-/// `warp_mesh.toml` carries **no `[milk]` table at all**, so no bundle is
-/// constructed, no `MilkRuntime` exists, and not one instruction of the EEL2 VM
-/// executes under it. The two presets drive the same nine outputs of the same
-/// scene through two entirely separate paths — one through `[per_vertex]`
-/// expression bindings evaluated by the renderer, the other through bytecode
-/// executed by the VM — and only this fixture pins the second one to pixels.
-///
-/// `warp_mesh_shader` is the seventh (Plan 0110), and what puts it out of reach
-/// of the other six is a **file**, not a param: every fixture in the crate drives
-/// the warp mesh from EEL2 bytecode, and not one of them carries WGSL.
-/// `warp_mesh_milk` gets closest and still stops short — its `[milk]` table
-/// declares no `warp_shader`, no `comp_shader` and no `blur_level`, and
-/// `warp_mesh/shader.rs` is built *only* for a bundle that declares them. So this
-/// is the one baseline anywhere in the crate that executes a translated shader
-/// module, a procedural noise texture, or a single level of the blur chain — 719
-/// lines that no other entry here can reach, and which this suite pinned to
-/// nothing at all until it existed.
-///
-/// `shape_collage_roster` is the eighth (Plan 0113 Phase 7), and the
-/// impossibility is that the rostered fixture runs the scene's **defaults** —
-/// which is what a drift baseline should pin, and which is also exactly the
-/// problem. At `layout = 0` the element list is a compiled-in array, so the whole
-/// seeded layout grammar is unreached; at `roster = 0` the vocabulary is quad,
-/// circle and triangle, so not one line of `sd_bar`, `sd_ring`, `sd_segment`,
-/// `sd_arc` or `sd_checker` executes. The generator also draws about one element
-/// in four below alpha 1 on that roster, making this the only baseline in the
-/// suite where two elements composite `over` each other rather than one hiding
-/// the other. No edit to `shape_collage.toml` that kept its picture could reach
-/// any of it.
+/// - `attractor_depth` — the roster's `attractor.toml` is De Jong, and ADR-0076
+///   gives every 2-D family an inverse depth extent of exactly `0.0`, which is
+///   what makes the perspective divide, the distance haze and the depth tint the
+///   identity there.
+/// - `attractor_ifs` — De Jong takes a different arm of the step shader and its
+///   `a`..`d` coefficients *are* its shape, so the SVD decomposition, the morph,
+///   the framing fit and the levers are inert on it.
+/// - `swarm_shaped` — the silhouette default `disc` is **exactly**
+///   `length(local)`, so the rostered `swarm.toml` takes that arm and none of the
+///   ring, polygon, star or heart arms.
+/// - `backdrop_ramp` — every rostered fixture runs `bg_bright = 0`, where the
+///   gradient pipeline is not even built (`background.rs`'s module docs). Its
+///   `bg_ramp_gamma` off `1.0` is the only thing in the crate's baselines that
+///   takes the shader's `pow` arm rather than its identity `select` arm.
+/// - `backdrop_band` — the band is an untaken `select` branch at
+///   `bg_band_amount = 0`, so even `backdrop_ramp` executes none of it, and its
+///   `bg_band_curve` off `0` is the only baseline that reads the along-band axis.
+/// - `warp_mesh_milk` — the rostered `warp_mesh.toml` carries no `[milk]` table,
+///   so no bundle is constructed and not one EEL2 instruction executes. The two
+///   presets drive the same nine scene outputs through separate paths.
+/// - `warp_mesh_shader` — what puts it out of reach is a **file**, not a param:
+///   `warp_mesh_milk`'s `[milk]` table declares no `warp_shader`, `comp_shader`
+///   or `blur_level`, and `warp_mesh/shader.rs` is built only for a bundle that
+///   declares them. The one baseline executing a translated shader module, a
+///   procedural noise texture, or a level of the blur chain.
+/// - `shape_collage_roster` — the rostered fixture runs the scene's defaults, so
+///   at `layout = 0` the seeded layout grammar is unreached and at `roster = 0`
+///   no line of `sd_bar`, `sd_ring`, `sd_segment`, `sd_arc` or `sd_checker`
+///   executes. Also the only baseline where two elements composite `over` each
+///   other rather than one hiding the other.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always

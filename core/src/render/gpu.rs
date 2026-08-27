@@ -2,11 +2,10 @@
 //! scene-seam blend state, the fullscreen-pass pipeline, the
 //! fullscreen-triangle vertex preludes, and the fixed-timestep accumulator.
 //!
-//! Nothing here decides anything — it is the repetition that had accumulated
-//! four copies of the bind-entry helpers, two `fullscreen_pipeline`
-//! implementations, and nine pasted vertex stages across `render/` and
-//! `render/scenes/` (Plan 0031 Phase 5). One home, so a wgpu API change is one
-//! edit and a new stage starts from the same shapes as the existing ones.
+//! Nothing here decides anything — it is the repetition every pass in
+//! `render/` and `render/scenes/` would otherwise paste, in one home,
+//! so a wgpu API change is one edit and a new stage starts from the
+//! same shapes as the existing ones.
 //!
 //! # The two vertex preludes are not interchangeable
 //!
