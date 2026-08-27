@@ -17,7 +17,8 @@ were superseded orderings of the active roster.
   — closed 2026-08-27. Seven phases on `main` directly, no worktree: `37868d4`, `6ae4245`
   (+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, plus `807b6ef` repairing the
   first review's two majors. Review: **no blockers, no majors, five minors, one nit.**
-  Version: **0.84.0** (minor). Closed [design-backlog 0129](../design-backlog-archive.md), whose
+  Version: **0.85.0** (minor — **0.84.0** was already tagged on the unmerged
+  `plan-0098-nested-figure` branch, so `main` took the next free number). Closed [design-backlog 0129](../design-backlog-archive.md), whose
   remedy this plan inverted — asked whether to guard the 89 relative links in `.rs` comments, the
   answer was to stop writing them. Accepts [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
 
