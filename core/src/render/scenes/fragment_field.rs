@@ -50,6 +50,11 @@ const DEFAULT_SATURATION: f32 = 1.0;
 /// `palette_mix` default — 0 = palette A only (a no-op unless a preset declares
 /// `[palette_b]` and binds `palette_mix`).
 const DEFAULT_PALETTE_MIX: f32 = 0.0;
+/// The two rate parameters (ADR-0132), in units of the scene's own default
+/// speed. `1.0` is what this scene has always animated at, so a preset that
+/// binds neither renders exactly as before.
+const DEFAULT_FIELD_SPEED: f32 = 1.0;
+const DEFAULT_FOLD_SPEED: f32 = 1.0;
 
 const SHADER: &str = r#"
 struct Params {
@@ -62,6 +67,14 @@ struct Params {
     // x: palette_mix (A/B crossfade), y: occlude (ADR-0085),
     // z: palette_steps (integral, quantized CPU-side), w: palette_contour (ADR-0078)
     d: vec4<f32>,
+    // x: fold phase, y: field phase (ADR-0132) — both INTEGRATED on the CPU
+    // (`phase += rate * dt`) rather than derived here from `t * rate`. At a
+    // constant rate a phase equals `rate * t`, so the defaults reproduce the
+    // literals these replaced; what integration buys is that a rate BOUND TO
+    // AUDIO bends the motion instead of teleporting it — at t = 100 s a
+    // `warp_speed`-style multiply would move the phase fifty seconds in one
+    // frame. z, w: unused.
+    e: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -123,6 +136,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_mix = params.d.x;
     let palette_steps = params.d.z;
     let palette_contour = params.d.w;
+    let fold_phase = params.e.x;
+    let field_phase = params.e.y;
 
     var uv = in.ndc;
     uv.x = uv.x * aspect;
@@ -131,15 +146,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // slides the sampled field window (the shared ViewTransform, ADR-0018). The
     // vignette below stays screen-anchored (uses unshifted `uv`).
     var p = uv * zoom + pan;
+    // The fold's two rates keep their designed 0.7 : 0.6 quadrature ratio; what
+    // `fold_speed` scales is the phase they share, so slowing the fold does not
+    // flatten it the way `warp` does (ADR-0132).
     for (var i = 0; i < 5; i = i + 1) {
         let fi = f32(i);
         p = p + warp * vec2<f32>(
-            sin(p.y * 1.5 + t * 0.7 + fi),
-            cos(p.x * 1.5 - t * 0.6 + fi)
+            sin(p.y * 1.5 + fold_phase * 0.7 + fi),
+            cos(p.x * 1.5 - fold_phase * 0.6 + fi)
         ) / (fi + 1.0);
     }
 
-    let field = 0.5 + 0.5 * sin(p.x + p.y + t * 0.5);
+    let field = 0.5 + 0.5 * sin(p.x + p.y + field_phase * 0.5);
     // Field level indexes the gradient LUT: `color_span` sets the spanned range
     // (was a fixed 0.6), `color_center`/`hue` slide the window. Linear-filtered,
     // repeat-addressed (a hue rotation wraps like the cosine wheel).
@@ -176,6 +194,32 @@ struct Params {
     b: [f32; 4],
     c: [f32; 4],
     d: [f32; 4],
+    e: [f32; 4],
+}
+
+/// The scene's two integrated phases (ADR-0132).
+///
+/// Its own type, and unit-tested without a device, because the property that
+/// matters here is arithmetic rather than visual: a phase must advance by
+/// `rate * dt` **whatever the elapsed scene time**, which is exactly what
+/// `time * rate` fails to do the moment a preset binds the rate to audio.
+#[derive(Clone, Copy, Default)]
+struct Phases {
+    fold: f32,
+    field: f32,
+}
+
+impl Phases {
+    /// One frame's integration, at *this* frame's rates.
+    ///
+    /// Called from [`Scene::update`], never from `advance` — the per-frame order
+    /// is `set_time` → `advance` → `reset_params` → `set_param` → `update`
+    /// (`core/src/render/mod.rs`), so integrating in `advance` would use the
+    /// previous frame's rate values.
+    fn step(&mut self, fold_speed: f32, field_speed: f32, dt: f32) {
+        self.fold += fold_speed * dt;
+        self.field += field_speed * dt;
+    }
 }
 
 /// Fullscreen domain-warped fragment field, driven by named preset parameters.
@@ -196,6 +240,18 @@ pub struct FragmentFieldScene {
     palette_dirty: bool,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
+    /// This frame's elapsed real time, stored by `advance` and consumed by
+    /// `update` — the split ADR-0132 requires, since `advance` runs before this
+    /// frame's parameter values land.
+    dt: f32,
+    /// The integrated fold and field phases. **This is the scene's only state**:
+    /// everything else here is derived from `time` and the parameters, so a
+    /// capture's reproducibility now depends on the scene being rebuilt with the
+    /// preset as well as on the clock resetting (`reset_for_capture` does both).
+    phases: Phases,
+    /// Animation rates, in units of the scene's default speed (ADR-0132).
+    field_speed: f32,
+    fold_speed: f32,
     warp: f32,
     hue: f32,
     zoom: f32,
@@ -304,6 +360,10 @@ impl FragmentFieldScene {
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             time: 0.0,
+            dt: crate::render::scenes::FALLBACK_DT,
+            phases: Phases::default(),
+            field_speed: DEFAULT_FIELD_SPEED,
+            fold_speed: DEFAULT_FOLD_SPEED,
             warp: DEFAULT_WARP,
             hue: DEFAULT_HUE,
             zoom: DEFAULT_ZOOM,
@@ -329,6 +389,8 @@ impl FragmentFieldScene {
 /// the two drift.
 pub const PARAMS: &[&str] = &[
     "warp",
+    "field_speed",
+    "fold_speed",
     "hue",
     "zoom",
     "glow",
@@ -352,6 +414,18 @@ impl Scene for FragmentFieldScene {
         self.time = time;
     }
 
+    fn advance(&mut self, dt: f32) {
+        // Stored, not integrated: the rates this frame will use have not been
+        // set yet (ADR-0132). A non-finite or negative `dt` degrades to the
+        // capture step rather than poisoning the accumulators, which are the
+        // one piece of state here that a bad frame could corrupt permanently.
+        self.dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            crate::render::scenes::FALLBACK_DT
+        };
+    }
+
     fn set_occlude(&mut self, occlude: f32) {
         self.occlude = occlude;
     }
@@ -364,6 +438,11 @@ impl Scene for FragmentFieldScene {
     }
 
     fn reset_params(&mut self) {
+        // The two rates reset with every other param; the PHASES do not — they
+        // are state, and resetting them each frame would be the multiply this
+        // ADR exists to remove.
+        self.field_speed = DEFAULT_FIELD_SPEED;
+        self.fold_speed = DEFAULT_FOLD_SPEED;
         self.warp = DEFAULT_WARP;
         self.hue = DEFAULT_HUE;
         self.zoom = DEFAULT_ZOOM;
@@ -382,6 +461,8 @@ impl Scene for FragmentFieldScene {
     fn set_param(&mut self, name: &str, value: f32) {
         match name {
             "warp" => self.warp = value,
+            "field_speed" => self.field_speed = value,
+            "fold_speed" => self.fold_speed = value,
             "hue" => self.hue = value,
             "zoom" => self.zoom = value,
             "glow" => self.glow = value,
@@ -400,7 +481,10 @@ impl Scene for FragmentFieldScene {
 
     fn update(&mut self, _frame: &AnalysisFrame) {
         // Fully parameter-driven; the analysis reaches this scene only through
-        // the preset expressions bound to its parameters.
+        // the preset expressions bound to its parameters. The one thing that
+        // happens here is the phase integration, which runs after `set_param`
+        // so it uses this frame's rates (ADR-0132).
+        self.phases.step(self.fold_speed, self.field_speed, self.dt);
     }
 
     fn render(
@@ -428,6 +512,7 @@ impl Scene for FragmentFieldScene {
                 palette::band_steps(self.palette_steps),
                 palette::band_contour(self.palette_contour),
             ],
+            e: [self.phases.fold, self.phases.field, 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
@@ -453,5 +538,97 @@ impl Scene for FragmentFieldScene {
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_bind_group(1, &self.lut_bind_group, &[]);
         pass.draw(0..3, 0..1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The property ADR-0132 exists for, and the one `warp_mesh`'s `time *
+    /// wspeed` fails: a rate change moves the phase by `rate * dt` **whatever
+    /// the elapsed scene time**. Under a multiply the same change at t = 100 s
+    /// would move the picture fifty seconds in one frame — a teleport, on a lane
+    /// whose whole method is binding parameters to audio.
+    #[test]
+    fn a_rate_change_advances_the_phase_by_rate_times_dt_at_any_elapsed_time() {
+        let dt = 1.0 / 60.0;
+        let mut phases = Phases::default();
+        // Run a long way out, so a multiply-by-elapsed-time would be obvious.
+        for _ in 0..6_000 {
+            phases.step(1.0, 1.0, dt);
+        }
+        let elapsed = phases.fold;
+        assert!(
+            elapsed > 99.0,
+            "the fixture must be far from t = 0: {elapsed}"
+        );
+
+        // Now the preset's binding moves, as an audio-bound rate does.
+        let before = phases.fold;
+        phases.step(1.5, 0.25, dt);
+        let fold_step = phases.fold - before;
+        assert!(
+            (fold_step - 1.5 * dt).abs() < 1e-4,
+            "the fold advanced {fold_step}, not {} — a phase that scales with \
+             elapsed time is the defect",
+            1.5 * dt
+        );
+
+        // And each accumulator carries its own rate: the pair is not welded.
+        let field_before = phases.field;
+        phases.step(1.5, 0.25, dt);
+        // Tolerance is above the f32 ulp at this magnitude (~7.6e-6 near 100),
+        // which is the accumulation cost ADR-0132 accepts.
+        assert!(
+            (phases.field - field_before - 0.25 * dt).abs() < 1e-4,
+            "the field phase must follow field_speed alone: moved {}",
+            phases.field - field_before
+        );
+    }
+
+    /// At a constant rate the integrated phase equals `rate * t` — which is why
+    /// every shipped preset, all of which leave both parameters at their `1.0`
+    /// default, renders exactly as it did. Asserted rather than assumed: the
+    /// claim carries the plan's position that no golden may move.
+    #[test]
+    fn a_constant_rate_integrates_to_rate_times_elapsed_time() {
+        let dt = 1.0 / 60.0;
+        for rate in [1.0f32, 0.4, 2.5] {
+            let mut phases = Phases::default();
+            let mut clock = 0.0f32;
+            for _ in 0..600 {
+                phases.step(rate, rate, dt);
+                clock += dt;
+            }
+            assert!(
+                (phases.fold - rate * clock).abs() < 1e-3,
+                "rate {rate}: integrated {} against {}",
+                phases.fold,
+                rate * clock
+            );
+        }
+    }
+
+    /// The default is exactly `1.0` on both, so the phase is bit-identical to
+    /// the clock the three shader literals used to read — the capture path
+    /// accumulates `time` the same way, one `FALLBACK_DT` per frame.
+    #[test]
+    fn the_default_rates_make_the_phase_the_clock() {
+        assert_eq!(DEFAULT_FIELD_SPEED, 1.0);
+        assert_eq!(DEFAULT_FOLD_SPEED, 1.0);
+
+        let dt = crate::render::scenes::FALLBACK_DT;
+        let mut phases = Phases::default();
+        let mut clock = 0.0f32;
+        for _ in 0..240 {
+            phases.step(DEFAULT_FOLD_SPEED, DEFAULT_FIELD_SPEED, dt);
+            clock += dt;
+        }
+        assert_eq!(
+            phases.fold, clock,
+            "at rate 1.0 the accumulation must be bit-identical to the clock's"
+        );
+        assert_eq!(phases.field, clock);
     }
 }
