@@ -19,7 +19,7 @@
 )]
 
 use super::marks;
-use super::{FALLBACK_DT, Scene, SeededRng};
+use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
@@ -366,6 +366,15 @@ pub struct SwarmScene {
     dt: f32,
     force: f32,
     spin: f32,
+    /// The curl-noise field's own clock, integrated at `spin` ([`Phase`]).
+    ///
+    /// **Not `time * spin`** (ADR-0135). `spin` is the one rate here two shipped
+    /// worlds bind to a band, and under the multiply a binding that moved
+    /// rescaled every second already elapsed: at t = 100 s a 0.04 swing advanced
+    /// this clock by 4 s in a single frame against a nominal 0.019 s, and the
+    /// field re-rolled rather than flowing on. The particles steer by the field,
+    /// so it reads as the flow changing its mind, not as a teleport.
+    field_phase: Phase,
     burst: f32,
     hue: f32,
     brightness: f32,
@@ -548,6 +557,7 @@ impl SwarmScene {
             dt: FALLBACK_DT,
             force: DEFAULT_FORCE,
             spin: DEFAULT_SPIN,
+            field_phase: Phase::default(),
             burst: DEFAULT_BURST,
             hue: DEFAULT_HUE,
             brightness: DEFAULT_BRIGHTNESS,
@@ -707,7 +717,15 @@ impl Scene for SwarmScene {
     }
 
     fn advance(&mut self, dt: f32) {
-        self.dt = dt;
+        // A non-finite or negative `dt` degrades to the capture step rather than
+        // poisoning `field_phase`, which is the one piece of state here that a
+        // single bad frame could corrupt permanently — the damping `powf` below
+        // only loses the frame it is given.
+        self.dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            FALLBACK_DT
+        };
     }
 
     fn set_time(&mut self, time: f32) {
@@ -808,8 +826,11 @@ impl Scene for SwarmScene {
         }
         self.prev_reseed = self.reseed;
 
-        // Field evolves at `spin`; `force` steers, `burst` shoves outward.
-        let field_t = self.time * self.spin;
+        // Field evolves at `spin`; `force` steers, `burst` shoves outward. The
+        // clock integrates here, after this frame's `set_param` calls have
+        // landed, so it advances at *this* frame's rate.
+        self.field_phase.step(self.spin, self.dt);
+        let field_t = self.field_phase.get();
         let force = self.force;
         let burst_kick = self.burst;
         // Hoisted out of the loop: one read, 10 000 uses (Plan 0043 Phase 2).
