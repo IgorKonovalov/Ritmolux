@@ -342,19 +342,61 @@ fn band_contour(
 | 2 — preset names stop colliding | dev | done | `0f8fa98` |
 | 3 — `field_speed` and `fold_speed` | dev | done | `73d084c` |
 | 4 — `warp_speed` integrates too | dev | done | `4014682` |
-| 5 — the contour reads the LUT | dev | done | committed with this row |
+| 5 — the contour reads the LUT | dev | done | `324a30d` |
 | 6 — the content pass | human | not started | |
 
 ### Notes
 
+**Deviations from the plan.**
+
+- Phase 2 (`0f8fa98`) also touched `standalone/tests/shot_cli.rs`, which is not in its file list:
+  that test located the easing fixture's report row by a name prefix the middle-elision shortens.
+- Phase 5 (`324a30d`) also touched `core/src/render/scenes/warp_mesh/mod.rs`. `band_contour` is
+  written **four** times, not the three the phase lists, and the fourth copy's text had already
+  drifted (`dd` for `d`) — so `the_contour_reaches_the_fragment_sites_and_not_the_vertex_one` could
+  not have caught it: it iterated three sites, and the one place drift had happened was not among
+  them. The fourth copy is now canonical and the assertion covers it. `docs/preset-palettes.md`
+  documents `palette_contour` as live on warp-mesh. Scope put to the user before taking it.
+- Phase 5 (`324a30d`) added `core/tests/palette_contour.rs`. Its done-when requires assertions on
+  rendered output and names no test file.
+
+**Done-when criteria not satisfiable as stated.**
+
+- Phase 1, third bullet: *"the same sequence reversed or reordered does not [recover the step]"*.
+  `frame_diff` is symmetric, so a reversed sequence has the identical multiset of consecutive pairs
+  and a mean over them is reversal-invariant for **any** input. Asserted instead: **reordering**
+  changes `mean_consecutive_diff`, and **reversing** changes `probe_rate`, whose fixed window then
+  selects different frames. The invariance is stated in the test's own doc comment.
+- Phase 3, first bullet: the stated comparison holds — `rate` 0.0080 → 0.0063 at `fold_speed = 0.4`,
+  `cover` 0.994 → 0.988 — but `cover` sits near 1.0 on any fullscreen field and does not separate a
+  *slowed* fold from a *flattened* one: `warp` 0.55 → 0.22 moves it to 0.985. The
+  no-flattening claim rests instead on a matched-phase equivalence: at `fold_speed`/`field_speed`
+  0.4, frame 300 renders the picture the default renders at frame 120, while `warp` 0.22 at frame
+  300 renders a different, visibly flatter field. Both images are in the Phase 3 commit message's
+  numbers; the check was run by hand and is not in the suite.
+
+**Followups noticed, not acted on.**
+
+- A full-library `--report` marks **48 of 49** `rate` cells; only `Halo` reads unmarked. The plan's
+  risk list names this shape and the followup list already carries the question.
+- Phase 5's per-pixel cost was not measured against `docs/nfr.md`'s frame budget.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` only — no `.toml` changed
+  (`git diff --name-only 1af2e14..HEAD -- 'presets/*.toml'` is empty).
 - **Plan header `Closes:`** design-backlog 0131, 0137, 0138, 0139
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **What shipped:** feature and fix. Feature: `field_speed` / `fold_speed` on `fragment_field`, and
+  the `drive` / `rate` columns on `shot --report`. Fix: `warp_speed`'s teleport, the contour's
+  every-edge firing, and the report's name collision.
+- **Operator docs touched:** `docs/capturing.md`, `docs/preset-palettes.md`, `presets/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **1**, 5 broken —
+  **0131**, **0137**, **0138**, **0139** (the plan's four `Closes:` entries, each broken by its own
+  fix landing) and **0132**, whose third probe pinned the report's exact header string that Phase 1
+  widened. 0132's claim — *the report's column set carries no level column* — is unaffected:
+  neither `drive` nor `rate` is a level column.
+- **Outstanding `human` phases:** Phase 6, the `preset-author` content pass over
+  `fragment_driftmono` and `shape_contourmono`.
 
 ## Followups (after this lands)
 
