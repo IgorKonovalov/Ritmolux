@@ -286,13 +286,15 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
 | 0121 | A bundle that never names `decay` reads MilkDrop’s per-frame default as a per-second one | [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 1. Its own “it moves goldens” prediction was wrong. **Closed 2026-08-19** |
 
-**Closed 2026-08-25** at [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)'s **mid-plan**
+**Closed 2026-08-25** at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md)'s **mid-plan**
 review — the plan itself is still open (phases 5-7 unbuilt), but Phase 1b was placed before its stop
 gate precisely so this entry could not be orphaned by that outcome, and it discharges independently.
 
 | # | Entry | Went to |
 |---|-------|---------|
-| 0098 | `thickness` below 0.167 is a dead zone on every line scene, and nothing says so | [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) Phase 1b. The warning landed, the floor stays. Its own probe went red on delivery: the constant moved. **Closed 2026-08-25** |
+| 0098 | `thickness` below 0.167 is a dead zone on every line scene, and nothing says so | [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 1b. The warning landed, the floor stays. Its own probe went red on delivery: the constant moved. **Closed 2026-08-25** |
+| 0071 | The scalloped boundary was chosen as a real curve primitive, and the engine has none | [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) + [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 6, as roster member `scallop`. **Closed 2026-08-27** |
+| 0073 | Motif outlines show their vertices, and a sampled polyline does not read as a curve | [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) + [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phases 3 and 5. The straight-line half is now 0134. **Closed 2026-08-27** |
 
 <!-- roster:end -->
 
@@ -769,148 +771,8 @@ here at its merge**, because `main` had independently minted a `0070` the same d
 close. Commit messages from that lane (`3c0e56a`, `a35485a`) and the plan's own Phase 3 verdict
 still cite the old numbers; the mapping is `0070`→`0071`, `0071`→`0072`, `0072`→`0073`.
 
----
-
-## 0071 — the scalloped boundary was chosen as a real curve primitive, and the engine has none
-
-- **PROMOTED 2026-08-13 → [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) +
-  [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) Phase 6**, jointly with
-  [0073](#0073--motif-outlines-show-their-vertices-and-a-sampled-polyline-does-not-read-as-a-curve).
-  The user's decision has had no route for a week, and the reason it now has one is that it stops
-  being its own feature: **a closed scalloped outline is a chain of circular arcs**, so on the arc
-  primitive ADR-0098 adds it is a roster entry rather than a new mechanism. `star.rs:599`'s standing
-  note — *"the engine does not have [one]. Nothing here fakes one"* — is what that phase replaces.
-
-- **Raised:** 2026-08-06, at Plan 0065 Phase 3. **This is a user decision, not an open question.**
-- **Verified by measurement:** n/a — it is a look decision, taken from the `bound A touch` /
-  `bound B curve` A/B in the Phase 2 sample set.
-- **Verified 2026-08-15** — the standing note that [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)
-  Phase 6 replaces is still in the file: `present: Nothing here fakes one in: core/src/render/scenes/lines/star.rs`.
-  The promotion bullet cites it at `star.rs:599` and it now sits at line 606, which is why the probe
-  is on the sentence rather than the line.
-
-[ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)'s Notes left
-open whether the reference image's scalloped outer boundary is "a motif ring whose members touch, or
-a separate boundary curve". Phase 2 rendered it both ways and **the user chose the curve** — and
-chose it in the strong form, as a real primitive rather than as side B's approximation.
-
-Side B in the sample set is **not** a boundary curve. The engine has no such primitive and Phase 1
-did not add one; side B is 40 `arc` motifs scaled 1.12x so their members overlap and the scallops
-merge into something that *reads* continuous. The user was shown that distinction explicitly and
-picked the primitive anyway.
-
-### What a fix would be
-
-A new roster member or a new `[generator]` key on `star_pattern` — a closed scalloped curve whose
-lobe count and depth are parameters, sampled as one continuous outline rather than as N placed
-copies. Architect (ADR) then dev.
-
-### Priority
-
-**Blocked out of Plan 0065 by construction** — the plan's Phase 5 ships presets from the closed
-roster, and this is engine work by the user's own choice. It does not gate Phases 4-5: the three
-chosen compositions (four rings, six rings, rings in weave) carry no boundary ring.
-
----
-
-## 0073 — motif outlines show their vertices, and a sampled polyline does not read as a curve
-
-- **PROMOTED 2026-08-13 → [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) +
-  [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md)**, with
-  [0071](#0071--the-scalloped-boundary-was-chosen-as-a-real-curve-primitive-and-the-engine-has-none)
-  riding it. The route is a **circular-arc instance whose stroke is a per-pixel signed distance** —
-  no vertices at any resolution — with non-circular outlines expressed as a **G1-continuous biarc
-  chain**, because a polyline shows its joints for being only C0 and tangent continuity is what makes
-  the same handful of pieces read as a drawn curve.
-- **THIS ENTRY'S OWN HEDGE IS RESOLVED, and it resolves against the entry's first reading.** It asked
-  someone to *"verify against what Plan 0040 actually landed before assuming joins are absent"*.
-  Verified 2026-08-13: **the joins are present and working exactly as
-  [ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) specifies.** Each
-  joined endpoint extends its quad backward or forward by the half-width
-  (`core/src/render/scenes/lines/renderer.rs:129`), so adjacent quads *deliberately* overlap by half
-  a stroke — and the composite is additive, so that overlap **sums**. The bead is the join mechanism
-  working, not failing, which is why no amount of join work would have removed it and why raising the
-  sample count makes it worse per unit length. Faceting is the separate defect
-  (`star.rs:665` fixes vertex count per motif with no authorable resolution), and the two are not
-  both reachable from one lever.
-- **What the promotion does not promise:** the bead is **reduced, not removed**. A `circle` goes from
-  `SMOOTH_SAMPLES` joints to zero; a rose keeps as many as it has lobes, and those still overlap
-  additively. If that still reads badly, the remaining route is
-  [0069](#0069--there-is-no-way-to-draw-a-two-tone-object-a-fill-with-a-contrasting-outline-because-the-composite-is-additive)'s
-  composite question — and Plan 0087 Phase 4 is a `human` gate placed *before* the expensive half
-  precisely so that answer arrives cheaply.
-
-- **Raised:** 2026-08-06, at Plan 0065 Phase 3, from the user's verdict in the running app: "line
-  connections are visible, there is no curve lines".
-- **Verified by measurement:** **no** — user judgement in the running app, corroborated by the
-  Phase 2 sheets (the joints are clearest on `bound A touch`, where neighbouring `arc` members meet).
-  **The mechanism below is a hypothesis and has not been measured.**
-- **Verified 2026-08-15** — both mechanisms are still exactly as this entry's 2026-08-13 resolution
-  describes them. The join extends each flagged endpoint by the half-width
-  (`present: JOINED_A in: core/src/render/scenes/lines/renderer.rs`), and the per-motif vertex count
-  is still a fixed constant with no authorable resolution
-  (`present: fn vertex_count in: core/src/render/scenes/lines/star.rs`,
-  `present: SMOOTH_SAMPLES in: core/src/render/scenes/lines/star.rs`).
-  [Plan 0087](plans/0087-the-line-renderer-draws-a-curve.md) is written to falsify the second.
-
-Every motif in the closed roster is a parametric outline **sampled to straight segments** and drawn
-as instanced quads through the shared `LineRenderer`. Two consequences the user saw:
-
-- **Joints are brighter than the strokes they join.** Where two quads meet at a vertex they overlap
-  and sum additively, so a vertex reads as a bead. [Plan 0040](plans/done/0040-line-joins-finish-the-job.md)'s
-  close found the same shape on a mirrored line preset — the quietest part of the readout rendering
-  as its brightest — and Plan 0065's own Risks section predicted it for concentric strokes before the
-  plan was built. **Verify against what Plan 0040 actually landed before assuming joins are absent;**
-  the visible artifact may be additive overlap on top of working joins rather than missing joins.
-- **`circle`, `petal` and `arc` are polygons.** At the sample sheets' stroke and scale they read as
-  smooth; in the shipped preset, at motif `scale` 0.13-0.46 with an inflated glow, they do not.
-  Segment count per motif is fixed and is not an authorable parameter.
-
-### Update 2026-08-06, same day — this was re-judged after the retune and it is NOT 0072 wearing a mask
-
-The paragraph below hoped the faceting was mostly inflated strokes. It is not. The three presets
-were retuned to solid strokes at `glow = 1.0` with no trails, rendered, and the user's verdict on
-the result was **"we don't have curves, anything curved is based on several lines, and it's easy to
-see them — lines look upscaled and half baked"**. A crop of `Mandala Weave` confirms it directly:
-the `circle` motifs are visibly polygons, the strokes carry stair-stepped edges, and every vertex is
-a bright bead.
-
-**So this is a ceiling on the approach, not a defect in it.** A parametric outline sampled to
-straight segments cannot read as a drawn curve at ornament scale, and no tuning available to the
-content lane changes that. **All three ring-mandala presets were retired** (`star_mandala`,
-`star_mandala_six`, `star_weave`) and the `star_pattern` coverage floor reverted to `0.34` with them.
-
-**The mandala look then shipped as `presets/reaction_gilt.toml`** (itself retired at Plan 0075
-cohort 3; the register now lives in `fragment_mandala`, and the file survives in git history), by a
-different mechanism entirely: a Gray-Scott field's **analytic iso-contours** — curves evaluated per
-pixel in the shader, with no geometry and therefore no vertex at any resolution — folded into a
-10-to-18-wedge rosette by `kaleido_order`, on `kaleido_edge = 0` so it reads as an object on black.
-The symmetry is a composite-stage property rather than a placement rule, which is the user's own
-proposal ("mandalas really should be done differently — with kaleidoscope") and it is measurably
-better: it passes every gate, reacts on all four bands, and is not a near-duplicate of `Reef` or
-`Reliquary`.
-
-**What this does NOT close.** The `rings` capability itself is shipped, tested and documented, and
-`star_pattern` is no longer hollow — [ADR-0079](adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
-stands. What is now known is that placed outline geometry is the wrong mechanism *for this look*;
-whether it is right for some other look is untested, and the roster has no shipped user of it.
-
-### What a fix would be
-
-Unchanged in substance, and the candidates should still not be bundled: a curve-aware stroke in the
-line renderer, or an authorable sample resolution per motif. The third candidate — "wait and see
-what 0072's retune does to the faceting" — is **answered and closed**: the retune happened and the
-faceting survived it.
-
-### Priority
-
-**Low, and it changed shape rather than urgency.** It was deferred by the user as "maybe we can
-improve upon in the future"; it is lower now, because the look that made it urgent no longer routes
-through this code. It becomes urgent again the moment anyone wants a *line* scene to draw something
-that reads as a curve — which is every future user of `star_pattern`'s motif roster, and arguably
-`parametric_curve` too.
-
----
+**0071 and 0073 are CLOSED** (2026-08-27, Plan 0087) and their bodies are in
+[`design-backlog-archive.md`](design-backlog-archive.md); 0072 stays live above.
 
 ---
 
@@ -3312,3 +3174,109 @@ than assuming, and they are why this is a note and not a plan:
   `peak_to_mean` are threshold and ratio measures where code space is defensible, and `peak_to_mean`
   documents its 8-bit saturation deliberately. Changing them would move blessed baselines for no
   gain. The claim here is that the *level* question is missing, not that the shape ones are wrong.
+
+---
+
+## 0134 — a joined corner is blunt, and the stroke that hid it is gone
+
+`renderer.rs` extends a joined end by exactly `width` along its own direction; a corner of interior
+angle `theta` needs `width / sin(theta / 2)`. A `diamond`'s 61.9-degree vertex needs 26.3 px of a
+13.5 px half-width and gets 15, so the point is truncated to a flat bevel, and the two quads sum on
+the inner side to 1.38x the stroke.
+[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) accepted this because
+the quadratic falloff blurred it;
+[Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
+`0.25` and there is no blur left.
+
+- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 7,
+  in the running app. Verdict: *"how straight lines are connected, its clearly visible and doesn't
+  look solid"*. It is the other half of the sitting that closed 0073 — that entry bought the curved
+  motifs, this is what is left on the straight ones.
+- **Verified by measurement 2026-08-27** — a single `diamond` filling a 1000x1000 frame at
+  `thickness = 9`: the profile through the acute vertex is 26 px of flat 185 and then zero, with no
+  taper at all, and the corner patch reads 1.38x the stroke's own value. Both halves are the same
+  constant.
+- **Verified 2026-08-27** — the extension is still one unmitred `width`:
+  `present: let ext_a = select\(0\.0, width, in: core/src/render/scenes/lines/renderer.rs`
+
+**This revises ADR-0041**, whose disc-join alternative closes with *"worth revisiting only if the
+blunt corners above turn out to matter"*. They matter. It reaches all four line families and moves
+every line golden, and the shader cannot compute `theta` on its own: a segment does not know its
+neighbour's direction, which is the whole point of *per-endpoint on the segment instance*. Three
+designs are open and they differ in instance-buffer cost — a per-endpoint miter length carried on
+the instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex.
+
+### Priority
+
+**Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
+(`diamond`, `chevron`) are exactly the two Plan 0087 did *not* convert to arcs — so the defect is now
+concentrated rather than diffuse.
+
+---
+
+## 0135 — `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty
+
+[Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 5 gave
+`ParametricCurveScene` five new buffers, all `Vec::with_capacity(max_segments)` at construction:
+`arcs` and `single_arcs` (36 B each), `points` (8 B), `pieces` (~24 B) and `walk` (4 B). At Rich's
+`max_segments = 60_000` that is about 6.5 MB of Rust heap, on top of the ~4.8 MB `segments` and
+`single_buf` already cost — so it more than doubles the scene's allocation. **Four of the five stay
+permanently empty for every preset in the library**, because every shipped `d` is a chord web and
+`maurer_rose_pieces` declines the fit before it ever fills them.
+
+- **Raised:** 2026-08-27, at Plan 0087's Mode 4 review. `dev` disclosed the GPU side (+720 KB at
+  Floor, +2.1 MB at Rich, and a layered line preset builds a second one) and routed the tighter bound
+  to `architect`; the CPU side was not in that accounting and is the larger number.
+- **The same plan already found the answer, one file over.** `star.rs` sizes its arc buffers at load
+  from the roster the preset actually declared and reserves nothing when there are no arcs
+  (`ring_arcs.len()`, capped by the mirror order). `parametric_curve` can do the same once
+  `corner_fraction` has answered — it is the identical shape of decision, taken one frame later.
+- **A second, smaller defect in the same buffers:** `points` is one short. Its capacity is
+  `max_segments`, and `maurer_rose_pieces` pushes `drawn + 1` where `drawn <= samples <=
+  max_segments`, so a preset binding `samples` at the cap reallocates once inside a path whose own
+  doc says *"Allocation-free into preallocated buffers, because this runs every frame"*. One-shot,
+  not per-frame, but it falsifies the sentence.
+- **Verified 2026-08-27** — the eager preallocation is still there:
+  `present: arcs: Vec::with_capacity\(max_segments\) in: core/src/render/scenes/lines/parametric.rs`
+- Worth re-reading [`docs/nfr.md`](nfr.md) section 12 against both numbers while this is open: it
+  claims *"our own Rust state stays <~1 MB"*, and the pre-0087 4.8 MB already exceeded that. The NFR
+  line may be the thing that is wrong rather than the code.
+
+### Priority
+
+**Low.** It is a fixed cost on a floor the driver dominates (~327 MB), and nothing measures it today.
+It becomes worth doing the moment a second parametric layer ships, or alongside any other
+`max_segments` re-sizing.
+
+---
+
+## 0136 — a negative ring `scale` makes a `scallop` lobe bulge outward instead of dimpling inward
+
+`star.rs`'s `scallop_lobe` takes the ring `scale` as the lobe's **depth**. Past
+`depth ~ -R * (cos(s) + sin(s) - 1)` the arc's two ends move to the far side of its centre, and the
+counter-clockwise sweep then runs the long way round: the lobe bulges *outward* to roughly twice the
+ring radius instead of dimpling inward. The picture is wrong rather than degenerate — no panic, no
+cap violation, and nothing warns.
+
+- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md)'s Mode 4
+  review, by reading the construction rather than from a rendered frame.
+- **Its own comment names the wrong lever.** The code says the guard covers only the exactly-flat
+  case *"(`ring_scale` clamps at zero)"* — but `ring_scale` is the **bindable multiplier**, which is
+  clamped, while the **structural per-ring `scale`** is validated for finiteness alone
+  (`schema.rs`), and the two sibling arc branches carry explicit `.abs()` handling precisely because
+  a negative one is reachable and means a reflection. A second over-claim sits four lines below:
+  *"the sweep between them is under half a turn for any depth"* is false past the same threshold.
+- **The shipped preset cannot reach it.** `star_mandala_bordered` binds
+  `ring_scale = "1.00 + sin(time * 0.61) * 0.115 + clamp(mid * 0.20, 0, 0.17)"`, which is positive
+  everywhere, and its ring `scale` is `0.055`.
+- **What a fix is:** either an inward lobe drawn correctly (take the short way when the centre passes
+  the chord), or a load-time refusal saying `scallop` depth must be positive. The first is a few
+  lines; the second is honest and cheaper. It is a decision about whether an inward scallop is a look
+  anyone wants.
+- **Verified 2026-08-27** — the sweep is still taken unconditionally counter-clockwise:
+  `present: sweep: \(end - start\)\.rem_euclid\(TAU\) in: core/src/render/scenes/lines/star.rs`
+
+### Priority
+
+**Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
+author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.

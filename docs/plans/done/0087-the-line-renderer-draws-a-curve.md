@@ -1,19 +1,25 @@
 # 0087 — the line renderer draws a curve
 
-> **Status:** in-progress — **phases 1, 1b, 2, 3, 4, 5 and 6 are done; Phase 7 is `human` and not
-> started.** Every `dev` phase has landed. Phase 4's look gate returned a green light and Phase 5
-> built on it; Phase 6 closed [design-backlog 0071](../design-backlog.md). One thing is owed before a
-> push: `check-backlog-claims.mjs` exits 1 on **0071**, whose probe Phase 6 falsified *by discharging
-> it*, and closing that entry is an architect call. Phase 7 has begun and returned one engine
-> finding — a blunt joined corner on the straight-line motifs — **to be filed as a design-backlog
-> entry at the close**, drafted in the log
+> **Status:** done (2026-08-27) — all seven phases landed. Phases 1, 1b, 2, 3, 5 and 6 are the
+> `dev` run (`3f9e828`, `b97ff64`, `509eaff`, `82c031f`, `af4f118`, `8179f25`); Phase 4's look gate
+> returned *"circles looks fine but blurred"* and green-lit Phase 5; Phase 7 judged the three retired
+> mandalas in the running app — *"looks much better"* — and returned `star_mandala` to the shipped
+> set as `presets/star_mandala_bordered.toml` (`a7d7cd0`), the first preset in the library to bind a
+> `rings` roster. `star_mandala_six` and `star_weave` stay retired. **Mode 4 review: no blockers,
+> one major** (`docs/capturing.md` still described the in-frame geometry measure as segments-only
+> after Phase 2 widened it to arcs, and the close block reported that sweep as not owed), **five
+> minors and two nits** — repaired or filed at this close. Verified independently of the log:
+> `fmt` + `clippy --workspace --all-targets` clean and `cargo nextest run --workspace` **1028
+> passed / 0 failed**, which confirms "no golden baseline moved" at a scope the close block's
+> `-p lmv-core` run did not cover. Closes [design-backlog 0071](../../design-backlog.md),
+> [0073](../../design-backlog.md) and [0098](../../design-backlog.md).
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
-> supplementing [ADR-0007](../adrs/0007-line-geometry-generators.md),
-> [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md),
-> [ADR-0079](../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
-> **Closes:** [design-backlog 0073](../design-backlog.md), [design-backlog 0071](../design-backlog.md), [design-backlog 0098](../design-backlog.md) (folded in 2026-08-16 as Phase 1b — same subsystem, and no other plan touches these files)
+> **Related ADRs:** [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md),
+> supplementing [ADR-0007](../../adrs/0007-line-geometry-generators.md),
+> [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md),
+> [ADR-0079](../../adrs/0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)
+> **Closes:** [design-backlog 0073](../../design-backlog.md), [design-backlog 0071](../../design-backlog.md), [design-backlog 0098](../../design-backlog.md) (folded in 2026-08-16 as Phase 1b — same subsystem, and no other plan touches these files)
 
 ## TL;DR
 
@@ -45,7 +51,7 @@ presets were retired** (`star_mandala`, `star_mandala_six`, `star_weave`).
   variant — `SMOOTH_SAMPLES` for circle/petal/teardrop, `TREFOIL_SAMPLES` for the rose — and segment
   count per motif *is not an authorable parameter*. At motif `scale` 0.13–0.46 a circle is a polygon.
 - **Vertex beads, and the joins are not missing.** They work exactly as
-  [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) specifies: each
+  [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) specifies: each
   joined endpoint extends its quad **backward or forward by the half-width** (`renderer.rs:129`), so
   adjacent quads deliberately overlap by half a stroke on both sides of every shared vertex. The
   composite is additive, so that overlap **sums**, and a vertex renders brighter than the strokes it
@@ -59,7 +65,7 @@ lever that exists points the wrong way on one of the two defects.
 **And a user decision has been unbuildable for a week.** ADR-0079 left open whether the reference
 image's scalloped outer boundary is a ring of touching motifs or a separate boundary curve. Plan 0065
 Phase 2 rendered both, the user was shown explicitly that side B was 40 overlapping `arc` motifs
-faking continuity, and **chose the real primitive anyway** ([backlog 0071](../design-backlog.md)).
+faking continuity, and **chose the real primitive anyway** ([backlog 0071](../../design-backlog.md)).
 `star.rs:599` records it in the shipped code: *"the engine does not have [one]. Nothing here fakes
 one."*
 
@@ -69,7 +75,7 @@ therefore no vertex at any resolution. What has no route is a per-pixel curve in
 
 ## Decision
 
-Per [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md): add a
+Per [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md): add a
 **circular-arc instance** to `LineRenderer`, drawn as one bounding quad in the same additive pass,
 whose stroke distance is `abs(length(p - c) - r)` inside the angular span and the distance to the
 nearer endpoint outside it — exact, a handful of ALU operations, resolution-independent.
@@ -127,7 +133,7 @@ flowchart TB
 - **What:** a second instance kind, buffer and pipeline in `LineRenderer` — centre, radius, angular
   span, colour, half-width — expanded to one bounding quad and shaded by the per-pixel distance.
   Same additive pass, same premultiplied-alpha emission
-  ([ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)), same fixed-capacity
+  ([ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)), same fixed-capacity
   reused buffer so a full upload never allocates on the hot path.
 - **Files touched:** `core/src/render/scenes/lines/renderer.rs`, `renderer/tests.rs`.
 - **Done when:** an arc rendered through the new path matches a **densely-sampled polyline of the
@@ -135,17 +141,17 @@ flowchart TB
   quadratic falloff to the quad edge) matching the segment path's — so the primitive is a *drawing*
   of the same curve rather than a different look. Two properties are pinned rather than argued:
   the shading takes its **aspect from the render target**
-  ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) — this stage's family has
+  ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) — this stage's family has
   shipped that bug three times, so the control runs at a **non-16:9 target** where a grid-derived
   aspect and a target-derived one disagree, and is verified to **bite** by temporarily sourcing it
   wrongly); and the new bind-group layout is added to
-  [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s enumeration with its
+  [ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s enumeration with its
   evidence, or the guard is confirmed to place it in no colliding group.
 
 ### Phase 1b — a sub-floor `thickness` stops failing silently
 
 - **Owner skill:** dev
-- **What:** Closes [design-backlog 0098](../design-backlog.md), folded into this plan because this
+- **What:** Closes [design-backlog 0098](../../design-backlog.md), folded into this plan because this
   plan owns the line renderer and no other plan touches these files. **It is placed here, before
   Phase 4's stop gate, deliberately**: Phase 4 can send the whole plan to ADR-0098's Alternative C,
   and this repair must not be orphaned by that outcome — it is independent of whether arcs ever
@@ -174,7 +180,7 @@ flowchart TB
 
 - **Owner skill:** dev
 - **What:** `LineRenderer::draw`'s in-frame length measure
-  ([ADR-0083](../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md), the
+  ([ADR-0083](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md), the
   `geom` column) counts arc length as well as segment length. This is a **correctness obligation of
   Phase 1, not a followup**: an arc contributing nothing would shrink the denominator and make every
   arc-drawing preset read better-framed than it is.
@@ -196,7 +202,7 @@ flowchart TB
   instance count, not by looking at pixels) and is round at motif `scale` 0.13 and at full frame —
   the resolution-independence claim, checked at the small scale where the polygon was visible rather
   than at the large one where it was not. Frame cost is **measured and reported, naming the machine**
-  ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)) for a
+  ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)) for a
   40-member ring at Floor tier and 1080p. **This phase carries the plan's stop condition:** if the
   per-pixel cost fails NFR §1's 60 fps floor on the floor tier, the plan stops here and ADR-0098's
   Alternative C (accept the ceiling, route curve looks to the analytic-field family) is taken with
@@ -216,7 +222,7 @@ flowchart TB
   and **is the remaining bead — at genuine curve joints only — still objectionable?** A "yes, and the
   beads are gone with the vertices" green-lights Phase 5. A "the curves read but the joints still
   bead" is a **result**, not a failure: it routes the composite question to
-  [backlog 0069](../design-backlog.md) with this observation as its evidence, and Phase 5 proceeds
+  [backlog 0069](../../design-backlog.md) with this observation as its evidence, and Phase 5 proceeds
   anyway. A "it still does not read" stops the plan and takes Alternative C — which is why this gate
   is here and not after the biarc work.
 
@@ -247,7 +253,7 @@ flowchart TB
 - **Done when:** the boundary renders as one closed curve whose lobe count is a parameter, and
   `star.rs:599`'s standing note — *"It is an approximation and the user chose the real thing… Nothing
   here fakes one"* — is replaced by a pointer to the real primitive, closing
-  [backlog 0071](../design-backlog.md). `presets/README.md`'s motif and generator tables carry it,
+  [backlog 0071](../../design-backlog.md). `presets/README.md`'s motif and generator tables carry it,
   since the content lane keeps no catalogue of its own.
 
 ### Phase 7 — the retired mandalas, re-judged
@@ -259,7 +265,7 @@ flowchart TB
   radial shells. Re-render them on the arc primitive and judge in motion.
 - **Done when:** a verdict per preset, and a decision on whether any of the three returns to the
   shipped set. **Judging the look is content work**, so a preset that earns its place lands through
-  the [Plan 0067](done/0067-the-curation-route.md) route in the `preset-author` lane rather than
+  the [Plan 0067](0067-the-curation-route.md) route in the `preset-author` lane rather than
   here — this phase produces the verdict and the evidence, not the commits.
 
 ## Data shapes
@@ -293,7 +299,7 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
   on the hardware least able to pay it.
 - **The bead may survive at curve joints and still read badly.** Phase 4 asks that question directly.
   If it does, this plan will have bought a factor and the remaining route is the composite
-  question — which is a redesign and stays in [backlog 0069](../design-backlog.md).
+  question — which is a redesign and stays in [backlog 0069](../../design-backlog.md).
 - **`LineRenderer` gains a second instance kind, in the module four scene families share.** The guard
   against sprawl is that the arc carries only what an arc needs, and a third variant needs its own
   ADR rather than following by precedent.
@@ -363,7 +369,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   | lit pixels in the frame reaching >= 200/255 | **13.0 %** (control: 16.1 %) |
   | lit pixels in the frame reaching >= 100/255 | 32.1 % (control: 33.4 %) |
 
-  That is [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)'s `(1 - d/w)^2`
+  That is [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)'s `(1 - d/w)^2`
   applied across the **whole** half-width: a thin bright spine inside a wide gradient. **Phase 1's
   done-when required the arc to reproduce it exactly** — "a drawing of the same curve rather than a
   different look" — and it does, at mean 0.0000, so the reading is identical either side of this
@@ -555,12 +561,12 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   instruction to **keep the bordered one**. So `presets/star_mandala_bordered.toml` ships: the
   retired `star_mandala` roster and tuning exactly as they were rejected, on the new primitive, plus
   a 32-lobe `scallop` boundary. **This plan's own scope note says it does not author or re-land any
-  preset**, and that content lands through the [Plan 0067](done/0067-the-curation-route.md) curation
+  preset**, and that content lands through the [Plan 0067](0067-the-curation-route.md) curation
   route in the `preset-author` lane; the user asked for it here instead, so it is one commit of its
   own rather than folded into a phase. All 67 preset-gate tests (`sanity`, `reactivity`,
   `animation`, `distinctness`, `preset`) pass with it embedded. **The other three were not
   re-landed and Phase 7 still owes a verdict on each of them.**
-- **Phase 7 also returned an engine finding, and it is [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s
+- **Phase 7 also returned an engine finding, and it is [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s
   own revisit condition firing.** The user's one complaint was the **straight-line** motifs:
   *"how straight lines are connected, its clearly visible and doesn't look solid"*. Measured on a
   single `diamond` filling a 1000x1000 frame at `thickness = 9` (half-width 13.5 px), both halves of
@@ -573,7 +579,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
     own value.
   **ADR-0041 rejected both the miter and the disc join, and its stated reason no longer holds.** It
   argued "the falloff is quadratic to the quad edge, so a mitred corner and a rounded one differ by
-  less than the blur that is already there" — and [Plan 0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
+  less than the blur that is already there" — and [Plan 0114](0114-the-line-stroke-reads-as-a-drawn-line.md)
   removed that blur, taking `DEFAULT_SOFTNESS` from `1.0` to `0.25`. There is no longer any softness
   hiding the bevel, which is why this became visible now and not at Plan 0039. The ADR's disc-join
   alternative closes with *"worth revisiting only if the blunt corners above turn out to matter"*.
@@ -606,11 +612,11 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   circular members, Phase 5 for the three fitted ones, and it is now true of neither), and the
   `scallop` row with the three ring keys it reads differently.
 - **Plan header `Closes:`** — three entries, **two of them closed**:
-  - [design-backlog 0098](../design-backlog.md) — **closed** by Phase 1b.
-  - [design-backlog 0071](../design-backlog.md) — **closed** by Phase 6. The boundary curve exists,
+  - [design-backlog 0098](../../design-backlog.md) — **closed** by Phase 1b.
+  - [design-backlog 0071](../../design-backlog.md) — **closed** by Phase 6. The boundary curve exists,
     `star.rs`'s "Nothing here fakes one" note is replaced by a pointer to it, and
     `presets/README.md` carries it.
-  - [design-backlog 0073](../design-backlog.md) — **not closed.** Phase 4 answered its question for
+  - [design-backlog 0073](../../design-backlog.md) — **not closed.** Phase 4 answered its question for
     the circular motifs and Phase 5 removes the mechanism for the other three, but the three retired
     presets are not re-landed; that is Phase 7, and it is `human`.
 - **What shipped:** **feature.** The arc primitive and its instrument widening (Phases 1-3), the
@@ -632,7 +638,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   verdict and were not re-landed**, so the phase is not discharged.
 - **Owed to `docs/design-backlog.md` at the close:** **one new entry**, the blunt joined corner —
   drafted verbatim in the notes above, with its probe. Raised by Phase 7 in the running app, and it
-  revises [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
+  revises [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
 - **Outstanding `dev` phases:** **none.** 5 and 6 landed here.
 - **Lane state:** `plan-0087-biarc` is branched from `main` at `e205f8e` and carries four commits —
   `af4f118` (Phase 5), `8179f25` (Phase 6), `7631423` (the close block) and `a7d7cd0` (the preset). **`main` has moved since** — a parallel session is committing to it — so
@@ -645,6 +651,6 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
 ## Followups (after this lands)
 
 - If Phase 4 or Phase 7 says the remaining joint beads still read badly, that is
-  [backlog 0069](../design-backlog.md)'s evidence and its ADR's opening argument.
+  [backlog 0069](../../design-backlog.md)'s evidence and its ADR's opening argument.
 - `parametric_curve`'s roses are the largest untouched beneficiary; a content pass judging them on
   the biarc path is a `preset-author` sitting, not a plan.

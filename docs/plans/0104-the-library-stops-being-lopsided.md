@@ -96,7 +96,7 @@ entries are seventeen worlds or a family that converged.
 - **What:** `lsystem`, `shape_field` and `spectrum` each go from one world to four.
 - **Files touched:** `presets/*.toml`.
 - **Notes for the author:**
-  - **`star_pattern` is deliberately not in this phase.** [Plan 0087](0087-the-line-renderer-draws-a-curve.md)
+  - **`star_pattern` is deliberately not in this phase.** [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md)
     changes what the curve family draws and has already retired three mandala presets on
     [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md); a cohort
     authored now would be authored against a surface about to move. It gets its own phase, after.
@@ -135,7 +135,7 @@ entries are seventeen worlds or a family that converged.
 - **Owner skill:** human *(a `preset-author` session)*
 - **What:** `star_pattern` from one world to four.
 - **Files touched:** `presets/*.toml`.
-- **Notes for the author:** **takeable only once [0087](0087-the-line-renderer-draws-a-curve.md)
+- **Notes for the author:** **takeable only once [0087](done/0087-the-line-renderer-draws-a-curve.md)
   has landed or been routed to ADR-0098's Alternative C.** Either outcome settles what the family
   draws; authoring before then buys a cohort that has to be redone. If 0087 ends at Alternative C,
   the beading in `docs/images/gallery/star_pattern.png` is what the family looks like, and the
@@ -179,7 +179,7 @@ entries are seventeen worlds or a family that converged.
   because changing the vocabulary changes what `dev` branches on.
 - **Phase 1 may invalidate the arithmetic**, and that is the point of putting it first.
 - **Two phases are blocked on live plans** — Phase 2 partly on [0098](0098-the-figure-nests-properly.md)
-  (`shape_field`), Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md). Both are
+  (`shape_field`), Phase 4 wholly on [0087](done/0087-the-line-renderer-draws-a-curve.md). Both are
   stated rather than sequenced, so a session can take whatever is free.
 - **The weak-family problem may not be a content problem.** If `swarm` cannot read as cohesive at
   four worlds either, the finding is an engine gap and belongs in the backlog. Authoring harder

@@ -2,7 +2,7 @@
 
 > **Status:** accepted (2026-08-13, user approval)
 > **Date:** 2026-08-13
-> **Related plan(s):** [0087 — the line renderer draws a curve](../plans/0087-the-line-renderer-draws-a-curve.md)
+> **Related plan(s):** [0087 — the line renderer draws a curve](../plans/done/0087-the-line-renderer-draws-a-curve.md)
 > **Supplements:** [ADR-0007](0007-line-geometry-generators.md),
 > [ADR-0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md),
 > [ADR-0079](0079-the-mandala-interior-is-rings-of-motifs-inside-star-pattern.md)

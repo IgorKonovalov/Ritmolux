@@ -1996,9 +1996,13 @@ Two more habits from the same file, for the deposit rather than the motion:
 **It covers four scene families and not the other five.** `parametric_curve`,
 `lsystem`, `star_pattern` and `spectrum` build a CPU-side segment list and stroke
 it through one shared `LineRenderer`, and the measurement is taken there — the
-share of total drawn segment length that lands inside the render target's world
-rectangle `[-aspect, aspect] x [-1, 1]`, computed inside `LineRenderer::draw`
-from endpoints and an aspect it already holds
+share of total drawn **line length, segments and arcs alike**, that lands inside
+the render target's world rectangle `[-aspect, aspect] x [-1, 1]`, computed
+inside `LineRenderer::draw` from the geometry and an aspect it already holds. An
+arc contributes `|sweep| * radius`, clipped as 64 sub-arcs judged by their own
+chords (Plan 0087 Phase 2) — which matters because since that plan a mandala's
+whole figure is arcs, and a measure blind to them would report every arc-drawing
+preset as better-framed than it is
 ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
 `fragment_field`, `reaction_diffusion`, `attractor`, `swarm` and `emitter` build
 no segment list, are **not covered at all**, and keep pixel coverage. The split

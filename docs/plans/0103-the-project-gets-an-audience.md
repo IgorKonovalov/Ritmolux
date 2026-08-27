@@ -193,7 +193,7 @@ first because every later phase increases the number of people who meet the defe
   submits anything.**
 - **Contention:** `plugin-foobar/foo_lmv.cpp` (Phase 1), `README.md`, `docs/images/`, `scripts/`.
   Nothing on the roster touches these except a close ceremony's image re-render, which
-  [0087](0087-the-line-renderer-draws-a-curve.md) owes — sequence if they land together.
+  [0087](done/0087-the-line-renderer-draws-a-curve.md) owes — sequence if they land together.
 
 ## What this plan does NOT do
 

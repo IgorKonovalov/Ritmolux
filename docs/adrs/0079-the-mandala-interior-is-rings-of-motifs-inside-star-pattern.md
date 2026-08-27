@@ -193,3 +193,35 @@ So the honest status of this ADR is: **accepted, delivered, and currently unused
 library binds `rings`. Whether that capability earns its config surface without a shipped user is a
 real question and belongs to whoever next touches `star_pattern` — it is not answered here, because
 one rejected look is not enough to retire a tested capability.
+
+### Outcome addendum (2026-08-27, at Plan 0087's close) — the mechanism was replaced, and both readings above are now false
+
+The addendum above blamed the **mechanism**, and it was right to. What it could not know is that the
+mechanism was replaceable without touching this decision.
+[Plan 0087](../plans/done/0087-the-line-renderer-draws-a-curve.md) put a circular-arc instance in
+`LineRenderer` whose stroke is a signed distance evaluated per pixel
+([ADR-0098](0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)): `circle` and `arc`
+are one exact instance each, and `petal`, `teardrop` and `trefoil` are G1 arc chains. Six of the
+roster's members now have no vertex at any resolution. Judged in the running app on the same three
+retired compositions, at the same tunings that were rejected, the verdict was *"looks much better"*.
+
+Two sentences in this ADR are now wrong, and are left standing rather than edited:
+
+- **"the roster is closed at seven"** — it is closed at **eight**. Plan 0087 Phase 6 added `scallop`,
+  and that member is what answers this ADR's own Notes: the reference image's scalloped outer
+  boundary is **a separate boundary curve**, not a ring of touching motifs. The user chose the curve
+  at Plan 0065 Phase 2 and chose it in the strong form; there was no primitive to build it with until
+  the arc instance existed. `scallop` is one closed chain of arcs meeting at cusps, and it is the
+  only roster member that reads `count`, `radius` and `scale` with a meaning other than "a copy".
+- **"accepted, delivered, and currently unused. No preset in the library binds `rings`."** —
+  `presets/star_mandala_bordered.toml` does, as of this close. It is the retired `star_mandala`
+  roster and tuning exactly as they were rejected, drawn by the new primitive, inside a 32-lobe
+  `scallop` boundary. So the open question this ADR handed to "whoever next touches `star_pattern`"
+  — whether the capability earns its config surface without a shipped user — is answered by that
+  user existing.
+
+**What stays true is the part that was never about the primitive.** `rings` lives inside
+`star_pattern` rather than beside it; a ring ornament and a Hankin interlace are different geometry
+sharing one symmetry; the roster is a closed curated set and not an open grammar. The segment budget
+claim survives in a stronger form than it was made: a `circle` cost `SMOOTH_SAMPLES` instances and
+now costs one, and the four-ring mandala fixture fell from 1 092 instances to 492.
