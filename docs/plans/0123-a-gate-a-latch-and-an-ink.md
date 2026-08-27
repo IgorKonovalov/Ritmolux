@@ -322,8 +322,8 @@ struct LatchBank {
 | 1 — the gate asks both readings | dev | done | `c96f0fa` |
 | 2 — `collage_mono`'s sway comes back down | human | not started | |
 | 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
-| 4 — the latch bank runs | dev | done | committed with this row |
-| 5 — the grammar docs learn the latch | dev | not started | |
+| 4 — the latch bank runs | dev | done | `696fca9` |
+| 5 — the grammar docs learn the latch | dev | done | committed with this row |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
 | 7 — the line family gets a seam | dev | not started | |
 | 8 — the class is written down | dev | not started | |
@@ -356,6 +356,15 @@ forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
 rates back down, `Collage Mono` leaves the silent branch and the silent minimum
 returns to `0.0201` (`On White`). Left for the close to decide whether the comment
 is re-derived.
+
+**Phase 5 — two sentences the sweep had to retract, not just supplement.**
+`docs/presets.md` said "There is no per-frame state you can accumulate in a
+preset" in its anatomy section and "expressions are pure and stateless by hard
+invariant" in the section on shaping a value over time. Both are now statements
+about the *expression* rather than about the surface, with the latch named as the
+exception in each place. The `[latch]` reference sits in both documents — the
+grammar-side reading in `docs/presets.md`, the roster entry beside `[smoothing]`
+in `presets/README.md` — and both state the single-frame-probe consequence.
 
 **Phase 4 — the bank advances once per preset per frame, and that is a
 contract.** `LatchBank::advance` consumes the `fire` edge, so a second call in
