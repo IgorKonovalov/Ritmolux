@@ -3314,6 +3314,17 @@ parameter in this engine integrates a phase**, then enumerates two sites: the ne
 rather than left as a counterexample"*. There is a third, and it is the only one of the three that
 shipped content actually binds.
 
+> **Corrected 2026-08-27, same day, while planning the fix — this entry's own count was wrong in the
+> same direction as the ADR's.** There are **three** uncorrected sites, not one. `swarm` is the only
+> one that moves a picture today, which is why it is still the title; the other two are
+> `lines/parametric.rs:410` (`self.spin * self.time` — bound only to constants, by `curve_ionwake`
+> and `curve_nightbloom`, where the two forms agree by construction) and `warp_mesh/mod.rs:2070`
+> (`self.deposit_spin * self.time` — nothing binds it, exactly the status `warp_speed` had). Finding
+> the entry about undercounting undercounted is the argument for the guard rather than a fourth list.
+> **PROMOTED** to [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) +
+> [Plan 0122](plans/0122-every-rate-integrates.md), which take all three plus a shared `Phase` type
+> and a hygiene assertion. Stays live until that plan closes.
+
 - **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
   Mode 4 close review, by grepping for the pattern the ADR forbids rather than by reading the plan's
   list. **Owner if taken:** `dev`; the correction is the same three lines Phase 4 applied to
@@ -3322,6 +3333,10 @@ shipped content actually binds.
   `present: let field_t = self\.time \* self\.spin; in: core/src/render/scenes/swarm.rs`
 - **Verified 2026-08-27** — and a shipped preset binds that rate to a band:
   `present: spin = "0\.4 \+ clamp\(mid \* 0\.9, 0, 0\.75\)" in: presets/swarm_shatter.toml`
+- **Verified 2026-08-27** — the second uncorrected site, found while planning:
+  `present: let rotation = self\.spin \* self\.time; in: core/src/render/scenes/lines/parametric.rs`
+- **Verified 2026-08-27** — and the third:
+  `present: self\.deposit_spin \* self\.time, in: core/src/render/scenes/warp_mesh/mod.rs`
 
 ### The finding
 
@@ -3363,3 +3378,64 @@ it because no preset binds it"* — and that framing is what stopped anyone grep
 **Medium.** Live in shipped content on every loud passage, and it convicts a claim an accepted ADR
 makes about itself — but it is a look question rather than a crash, the two affected presets read
 acceptably today, and the fix cannot land without a content pass behind it.
+
+## 0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration
+
+`scene_for_mut` resolves a scene by `SystemKind`, so when a dissolve crosses two presets of the
+**same** system the outgoing side and the live side get the *same* `&mut Box<dyn Scene>`.
+`evaluate_preset` then runs twice against it in one frame, and everything `Scene::update` mutates
+advances twice.
+
+- **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
+  close review, and re-raised the same day while planning
+  [0122](plans/0122-every-rate-integrates.md) — which moves three more rates into the affected class.
+  **Owner if taken:** `dev`, but the design question is `architect`'s: see below.
+- **Verified 2026-08-27** — the scene is resolved by system, so both sides of a same-system dissolve
+  get one instance:
+  `present: fn scene_for_mut\(scenes: &mut SceneRoster, system: SystemKind\) in: core/src/render/mod.rs`
+- **Verified 2026-08-27** — and `update` carries per-frame state that is not idempotent:
+  `present: self\.spin_time = advance_spin\(self\.spin_time, self\.spin, self\.dt\); in: core/src/render/scenes/particles/mod.rs`
+- **Verified 2026-08-27** — the third claim, that no test can observe this, does not reduce:
+  `unprobeable: no test reaches the dual-live render path is a negative about the whole suite, not a
+  match count. The mechanism is a cfg(test) escape hatch on the transition's fidelity governor - a
+  headless capture has no frame-time clock, so dual_live_eligible always answers Freeze and the path
+  is reachable only through Transition::set_mode. The pointer is that function's own doc comment in
+  core/src/render/transition.rs`
+
+### The finding
+
+It is **pre-existing and it predates the rates.** `particles::spin_time` has integrated in `update`
+since ADR-0076, and `emitter`'s `self.field.step(time, &cfg)` steps a particle field there too. Both
+double-advance today on a same-system dissolve, and the library has twelve `fragment_field` worlds
+and seventeen attractors — so crossing two presets of one system is the *common* case, not the
+exotic one.
+
+`set_time` was idempotent, which is why nothing noticed: for years the only thing a scene took from
+the renderer per frame was a value, and setting it twice is setting it once. `update` growing state
+changed that quietly, one scene at a time.
+
+**Size:** the affected phase runs at 2x for the dissolve's duration and is permanently offset
+afterward. For a rotation or a noise coordinate a constant offset is invisible, so the visible part
+is the transient — a scene that visibly quickens for the length of a crossfade and then returns.
+
+- **What a fix looks like**, and the choice is a real one:
+  - **Make the integration idempotent per frame** — a frame counter or a dirty flag on the scene, so
+    the second `update` in a frame is a no-op. Smallest change, and it leaves the double
+    *evaluation* (two presets' expressions, two smoothers) doing its work correctly, which it is.
+  - **Give each side its own scene instance**, the way `side.layer` already does for layer scenes
+    (Plan 0076 Phase 2). Structurally right — the two sides genuinely are two presets — and much more
+    expensive: a second instance of every stateful scene, allocated at dissolve start, which is
+    exactly the mid-run GPU allocation ADR-0030 and the WARP trails note both warn about.
+  - **Do nothing, and document it** — the offset is invisible and the transient is short.
+- **The instrument problem is the real blocker, and it is why this is filed rather than planned.**
+  Whatever the fix, nothing in the suite can currently *observe* the bug, so nothing can observe the
+  repair either. A plan would have to start by making the dual-live path reachable from a test —
+  which is its own design question, since the governor's `Freeze` answer under capture is deliberate
+  and correct.
+
+### Priority
+
+**Low-Medium.** Invisible in the steady state and short-lived in the transient, on a path no test can
+reach — but it is now the shared failure mode of six rates rather than two, and every future
+`Scene::update` that grows state joins it silently. Revisit when a dissolve visibly misbehaves, or
+when someone needs the dual-live path testable for another reason.
