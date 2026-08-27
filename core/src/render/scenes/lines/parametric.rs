@@ -141,6 +141,15 @@ pub struct ParametricCurveScene {
     brightness: f32,
     glow: f32,
     softness: f32,
+    /// Whether this figure draws through the **opacity-preserving** seam
+    /// rather than the additive one, from `stroke_blend` (ADR-0138).
+    ///
+    /// At or above [`OPAQUE_BLEND`](super::OPAQUE_BLEND) the whole batch
+    /// composites over: a stroke laid on another replaces the interior of what
+    /// it covers instead of summing with it, so a quantized palette keeps its
+    /// plateaus. Below it the batch is additive light. `0` is the default, so a
+    /// preset that does not bind this draws exactly what it drew.
+    stroke_blend: f32,
     draw_progress: f32,
     zoom: f32,
     pan_x: f32,
@@ -186,6 +195,7 @@ impl ParametricCurveScene {
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             softness: super::DEFAULT_SOFTNESS,
+            stroke_blend: super::ADDITIVE_BLEND,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
@@ -300,6 +310,7 @@ pub const PARAMS: &[&str] = &[
     "brightness",
     "glow",
     "softness",
+    "stroke_blend",
     "draw_progress",
     "zoom",
     "pan_x",
@@ -335,6 +346,7 @@ impl Scene for ParametricCurveScene {
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.softness = super::DEFAULT_SOFTNESS;
+        self.stroke_blend = super::ADDITIVE_BLEND;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
@@ -362,6 +374,7 @@ impl Scene for ParametricCurveScene {
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "softness" => self.softness = value,
+            "stroke_blend" => self.stroke_blend = value,
             "draw_progress" => self.draw_progress = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
@@ -511,17 +524,32 @@ impl Scene for ParametricCurveScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer.borrow_mut().draw_arcs(
-            queue,
-            encoder,
-            view,
-            aspect,
-            self.glow,
-            self.softness,
-            xform,
-            &self.segments,
-            &self.arcs,
-        );
+        let mut renderer = self.renderer.borrow_mut();
+        if self.stroke_blend >= super::OPAQUE_BLEND {
+            renderer.draw_opaque(
+                queue,
+                encoder,
+                view,
+                aspect,
+                self.glow,
+                self.softness,
+                xform,
+                &self.segments,
+                &self.arcs,
+            );
+        } else {
+            renderer.draw_arcs(
+                queue,
+                encoder,
+                view,
+                aspect,
+                self.glow,
+                self.softness,
+                xform,
+                &self.segments,
+                &self.arcs,
+            );
+        }
     }
 }
 

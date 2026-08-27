@@ -766,6 +766,15 @@ pub struct LineRenderer {
     /// layout, so ADR-0058 has nothing new to separate. Only the vertex layout
     /// and the shader module differ.
     arc_pipeline: Option<wgpu::RenderPipeline>,
+    /// [`arc_pipeline`](Self::arc_pipeline) with the light composited **over**
+    /// rather than added — the arc half of the opacity-preserving seam
+    /// (ADR-0138), built exactly when [`over_pipeline`](Self::over_pipeline) and
+    /// the arc pipeline both are.
+    ///
+    /// Without it, [`draw_opaque`](Self::draw_opaque) on a scene whose motifs are
+    /// arcs would lay opaque strokes and additive circles into one picture, and
+    /// the limited-ink guarantee would hold for half of what the scene drew.
+    arc_over_pipeline: Option<wgpu::RenderPipeline>,
     instances: wgpu::Buffer,
     /// The arc instance buffer, `Some` exactly when
     /// [`arc_pipeline`](Self::arc_pipeline) is.
@@ -805,6 +814,25 @@ impl LineRenderer {
         label: &str,
     ) -> Self {
         Self::build(device, surface_format, capacity, label, true, 0)
+    }
+
+    /// [`new_with_arcs`](Self::new_with_arcs), plus the OVER pipelines
+    /// [`draw_opaque`](Self::draw_opaque) needs — the constructor the shared line
+    /// renderer takes, because any of the four line systems may ask for the
+    /// opacity-preserving seam (ADR-0138).
+    ///
+    /// The pipelines are built here rather than on the first preset that asks,
+    /// deliberately: building a GPU resource mid-run changes what a later pass
+    /// resolves to on the DX12 software adapter, which would make the seam's
+    /// arrival visible in scenes that never selected it.
+    pub fn new_split_with_arcs(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        capacity: usize,
+        arc_capacity: usize,
+        label: &str,
+    ) -> Self {
+        Self::build(device, surface_format, capacity, label, true, arc_capacity)
     }
 
     /// [`new`](Self::new), plus the arc pipeline and an `arc_capacity`-instance
@@ -940,48 +968,61 @@ impl LineRenderer {
                 mapped_at_creation: false,
             })
         });
-        let arc_pipeline = arcs.is_some().then(|| {
-            let arc_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        let arc_shader = arcs.is_some().then(|| {
+            device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some(&format!("{label}-arc-shader")),
                 source: wgpu::ShaderSource::Wgsl(arc_shader_source().into()),
-            });
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(&format!("{label}-arc-pipeline")),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &arc_shader,
-                    entry_point: Some("vs_main"),
-                    compilation_options: Default::default(),
-                    buffers: &[Some(wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<ArcInstance>() as u64,
-                        step_mode: wgpu::VertexStepMode::Instance,
-                        attributes: &wgpu::vertex_attr_array![
-                            0 => Float32x2,
-                            1 => Float32,
-                            2 => Float32,
-                            3 => Float32,
-                            4 => Float32x3,
-                            5 => Float32,
-                        ],
-                    })],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &arc_shader,
-                    entry_point: Some("fs_main"),
-                    compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: surface_format,
-                        blend: Some(crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview_mask: None,
-                cache: None,
             })
         });
+        // The arc pair is built from one closure for the reason the segment pair
+        // is: they differ in the blend state and in nothing else, and any other
+        // divergence would render as a difference between two batches of the same
+        // figure.
+        let make_arc = |blend: wgpu::BlendState, suffix: &str| {
+            let arc_shader = arc_shader.as_ref()?;
+            Some(
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(&format!("{label}-arc-pipeline{suffix}")),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: arc_shader,
+                        entry_point: Some("vs_main"),
+                        compilation_options: Default::default(),
+                        buffers: &[Some(wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<ArcInstance>() as u64,
+                            step_mode: wgpu::VertexStepMode::Instance,
+                            attributes: &wgpu::vertex_attr_array![
+                                0 => Float32x2,
+                                1 => Float32,
+                                2 => Float32,
+                                3 => Float32,
+                                4 => Float32x3,
+                                5 => Float32,
+                            ],
+                        })],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: arc_shader,
+                        entry_point: Some("fs_main"),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: surface_format,
+                            blend: Some(blend),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                }),
+            )
+        };
+        let arc_pipeline = make_arc(crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE, "");
+        let arc_over_pipeline = split
+            .then(|| make_arc(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "-over"))
+            .flatten();
 
         // Zero unless the pipeline exists, so `draw_all` needs no second test:
         // a renderer without arcs clamps every arc batch to nothing.
@@ -995,6 +1036,7 @@ impl LineRenderer {
             pipeline,
             over_pipeline,
             arc_pipeline,
+            arc_over_pipeline,
             instances,
             arcs,
             uniforms,
@@ -1103,6 +1145,7 @@ impl LineRenderer {
             segments,
             n_additive,
             &[],
+            false,
         );
     }
 
@@ -1146,16 +1189,53 @@ impl LineRenderer {
             segments,
             segments.len(),
             arcs,
+            false,
+        );
+    }
+
+    /// [`draw_arcs`](Self::draw_arcs), with the **whole batch composited over**
+    /// rather than added — the opacity-preserving seam of ADR-0138's limited-ink
+    /// class, reached by the four line systems through `stroke_blend`.
+    ///
+    /// Segments and arcs both take the OVER pipeline, so a scene whose figure is
+    /// part strokes and part circles draws one substance rather than two. Order
+    /// inside the batch becomes the order on screen: a later stroke replaces the
+    /// interior of what it covers instead of summing with it, which is the whole
+    /// property. Pass an empty `arcs` from a scene that draws none.
+    ///
+    /// A renderer built without the OVER pipelines falls back to the additive
+    /// ones, exactly as [`draw_split`](Self::draw_split) does — the wrong blend
+    /// rather than a panic, and unreachable in the shipped path, where the shared
+    /// line renderer is built with them.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "see `draw` — this is that signature plus the arc batch"
+    )]
+    pub fn draw_opaque(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+        glow: f32,
+        softness: f32,
+        xform: super::ViewTransform,
+        segments: &[SegmentInstance],
+        arcs: &[ArcInstance],
+    ) {
+        self.draw_all(
+            queue, encoder, view, aspect, glow, softness, xform, segments, 0, arcs, true,
         );
     }
 
     /// The one body behind [`draw`](Self::draw),
-    /// [`draw_split`](Self::draw_split) and [`draw_arcs`](Self::draw_arcs):
-    /// one buffer upload per kind, one uniform write, one render pass.
+    /// [`draw_split`](Self::draw_split), [`draw_arcs`](Self::draw_arcs) and
+    /// [`draw_opaque`](Self::draw_opaque): one buffer upload per kind, one
+    /// uniform write, one render pass.
     #[allow(
         clippy::too_many_arguments,
-        reason = "see `draw` — this is that signature plus the partition index \
-                  and the arc batch"
+        reason = "see `draw` — this is that signature plus the partition index, \
+                  the arc batch and the arc batch's own seam"
     )]
     fn draw_all(
         &mut self,
@@ -1169,6 +1249,7 @@ impl LineRenderer {
         segments: &[SegmentInstance],
         n_additive: usize,
         arcs: &[ArcInstance],
+        arcs_over: bool,
     ) {
         let count = segments.len().min(self.capacity);
         let drawn = segments.get(..count).unwrap_or(&[]);
@@ -1236,8 +1317,15 @@ impl LineRenderer {
         // additive light, and the OVER range has to land on top of the light it
         // covers. No scene draws both today; the ordering is here so that the
         // day one does, it is already right.
+        let arc_pipeline = if arcs_over {
+            self.arc_over_pipeline
+                .as_ref()
+                .or(self.arc_pipeline.as_ref())
+        } else {
+            self.arc_pipeline.as_ref()
+        };
         if let (Some(pipeline), Some(buffer), false) =
-            (&self.arc_pipeline, &self.arcs, arcs_drawn.is_empty())
+            (arc_pipeline, &self.arcs, arcs_drawn.is_empty())
         {
             pass.set_pipeline(pipeline);
             pass.set_vertex_buffer(0, buffer.slice(..));

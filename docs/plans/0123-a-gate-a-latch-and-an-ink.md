@@ -323,9 +323,9 @@ struct LatchBank {
 | 2 — `collage_mono`'s sway comes back down | human | not started | |
 | 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
 | 4 — the latch bank runs | dev | done | `696fca9` |
-| 5 — the grammar docs learn the latch | dev | done | committed with this row |
+| 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
-| 7 — the line family gets a seam | dev | not started | |
+| 7 — the line family gets a seam | dev | done | committed with this row |
 | 8 — the class is written down | dev | not started | |
 | 9 — a mono line world | human | not started | |
 
@@ -356,6 +356,34 @@ forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
 rates back down, `Collage Mono` leaves the silent branch and the silent minimum
 returns to `0.0201` (`On White`). Left for the close to decide whether the comment
 is re-derived.
+
+**Phase 7 — the WARP hazard the plan and `renderer.rs` both predicted did not
+fire. No golden moved.** The shared line renderer now builds through
+`new_split_with_arcs`, so the OVER pipelines exist for every line scene whether
+it selects them or not — the arrangement `renderer.rs`'s `over_pipeline` doc
+records as having moved five composite baselines. `golden` (28 baselines) and
+`composite` are byte-identical on the DX12 software adapter, and the whole 834-test
+core suite is green. Nothing was blessed, and no adapter comparison was needed
+because there was no drift to explain.
+
+**Phase 7 — the arc seam, added because `star_pattern` is one of the four.** The
+plan names the batch; `star_pattern`'s circular motifs are `ArcInstance`s drawn
+from a second pipeline, so routing only the segments would have given that scene
+opaque strokes and additive circles in one picture. `LineRenderer` now carries
+`arc_over_pipeline` beside `over_pipeline`, built from one closure the way the
+segment pair is, and `draw_opaque` takes both. Inside `renderer.rs`, which the
+phase lists.
+
+**Phase 7 — `core/src/preset/schema.rs` was not touched, and did not need to
+be.** The plan lists it, but `SystemKind::param_names()` already delegates to each
+scene module's `PARAMS`, so declaring `stroke_blend` in the four scenes is the
+whole of making it preset-reachable.
+
+**Phase 7 — one line of Phase 8's doc pass had to land here.**
+`every_declared_param_is_documented_in_the_presets_readme` fails the moment a
+`PARAMS` entry has no README mention, so `stroke_blend`'s roster rows and its
+entry beside `softness` are in this commit. The class-level prose the phase
+assigns to Phase 8 is not.
 
 **Phase 5 — two sentences the sweep had to retract, not just supplement.**
 `docs/presets.md` said "There is no per-frame state you can accumulate in a

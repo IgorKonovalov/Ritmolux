@@ -284,6 +284,15 @@ pub struct StarPatternScene {
     brightness: f32,
     glow: f32,
     softness: f32,
+    /// Whether this figure draws through the **opacity-preserving** seam
+    /// rather than the additive one, from `stroke_blend` (ADR-0138).
+    ///
+    /// At or above [`OPAQUE_BLEND`](super::OPAQUE_BLEND) the whole batch
+    /// composites over: a stroke laid on another replaces the interior of what
+    /// it covers instead of summing with it, so a quantized palette keeps its
+    /// plateaus. Below it the batch is additive light. `0` is the default, so a
+    /// preset that does not bind this draws exactly what it drew.
+    stroke_blend: f32,
     zoom: f32,
     pan_x: f32,
     pan_y: f32,
@@ -340,6 +349,7 @@ impl StarPatternScene {
             brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             softness: super::DEFAULT_SOFTNESS,
+            stroke_blend: super::ADDITIVE_BLEND,
             zoom: DEFAULT_ZOOM,
             pan_x: DEFAULT_PAN,
             pan_y: DEFAULT_PAN,
@@ -1564,6 +1574,7 @@ pub const PARAMS: &[&str] = &[
     "brightness",
     "glow",
     "softness",
+    "stroke_blend",
     "zoom",
     "pan_x",
     "pan_y",
@@ -1600,6 +1611,7 @@ impl Scene for StarPatternScene {
         self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.softness = super::DEFAULT_SOFTNESS;
+        self.stroke_blend = super::ADDITIVE_BLEND;
         self.zoom = DEFAULT_ZOOM;
         self.pan_x = DEFAULT_PAN;
         self.pan_y = DEFAULT_PAN;
@@ -1626,6 +1638,7 @@ impl Scene for StarPatternScene {
             "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "softness" => self.softness = value,
+            "stroke_blend" => self.stroke_blend = value,
             "zoom" => self.zoom = value,
             "pan_x" => self.pan_x = value,
             "pan_y" => self.pan_y = value,
@@ -1833,17 +1846,32 @@ impl Scene for StarPatternScene {
             pan: [self.pan_x, self.pan_y],
             _pad: 0.0,
         };
-        self.renderer.borrow_mut().draw_arcs(
-            queue,
-            encoder,
-            view,
-            aspect,
-            self.glow,
-            self.softness,
-            xform,
-            &self.draw_buf,
-            &self.arc_draw_buf,
-        );
+        let mut renderer = self.renderer.borrow_mut();
+        if self.stroke_blend >= super::OPAQUE_BLEND {
+            renderer.draw_opaque(
+                queue,
+                encoder,
+                view,
+                aspect,
+                self.glow,
+                self.softness,
+                xform,
+                &self.draw_buf,
+                &self.arc_draw_buf,
+            );
+        } else {
+            renderer.draw_arcs(
+                queue,
+                encoder,
+                view,
+                aspect,
+                self.glow,
+                self.softness,
+                xform,
+                &self.draw_buf,
+                &self.arc_draw_buf,
+            );
+        }
     }
 }
 
