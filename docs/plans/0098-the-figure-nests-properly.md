@@ -286,8 +286,8 @@ flowchart TD
 | 3 — The heart and the star take the coordinate | dev | done | `43b269a` |
 | 4 — `ring` gets an honest answer | dev | done | `4257596` |
 | 4b — The figure can turn | dev | done | `01f3775` |
-| 5 — What it costs at the floor tier | dev | done | committed with this row |
-| 6 — The docs learn both coordinates | dev | not started | |
+| 5 — What it costs at the floor tier | dev | done | `255f386` |
+| 6 — The docs learn both coordinates | dev | done | committed with this row |
 | 7 — The look gate | human | not started | |
 
 ### Notes
@@ -379,6 +379,21 @@ flowchart TD
   about ±3 % and the two closed-form arms are inside it. The curved star is cheaper because the
   distance walks two sampled polylines there (the edge plus the unjittered reference Phase 1 added)
   while the radius walks one and computes only the crossing.
+- **Phase 6 could not write its `palette_contour` done-when as stated, because the behaviour it
+  describes does not reproduce.** ADR-0111 books as a negative consequence that "the hairline will
+  not have the same weight it has today at the same `palette_contour` value". Measured on a
+  nine-ring heart at `palette_contour = "0.75"`, as the darkening the parameter adds: distance mode
+  `27.3` mean over 492 px (inner rings) and `32.6` over 2131 px (outer); radius mode `29.8` over
+  466 px and `31.3` over 1929 px. The modes differ by less than the inner and outer rings differ
+  *within* either one. The mechanism is `band_contour` dividing by `fwidth` of the banded
+  coordinate — the line is drawn within one **pixel** of a band edge, so a changed gradient is
+  exactly what that normalization absorbs. `docs/preset-palettes.md` carries the measurement and
+  says not to re-tune the parameter across the switch, plus what does change (where the rings sit).
+  **ADR-0111's consequence list is architect's to correct.**
+- Phase 6 also corrected `presets/README.md`'s three standing statements that Phase 1 falsified:
+  the **DO NOT BIND `gamma`** warning, the `gamma` row's "unusable on a curved or jittered star",
+  and the `star_curve` bullet. They now record that the defect is fixed and that a `color_span`
+  tuned against the old reference is out by roughly 1.1x-1.9x.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is
