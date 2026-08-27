@@ -3359,6 +3359,11 @@ has already spent a plan on an arm whose stated contract and actual behaviour di
 
 ## 0145 — the `animation` gate thresholds silent motion only, so a world whose liveliness is audio-driven fails it however alive it is
 
+> **PROMOTED 2026-08-27** to [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) +
+> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 1-2, which take the disjunction over this
+> gate's own statistic, the printed branch, and `collage_mono`'s sway back down. Stays live until that
+> plan closes.
+
 `core/tests/animation.rs` captures frames 24 and 48 against `AnalysisFrame::default()` and fails
 anything under `ANIM_FLOOR = 0.01`. That is deliberate and the module header says so — *"Silent
 audio is used deliberately, the motion under test is the shared scene clock, not an audio edge"* —
@@ -3465,6 +3470,10 @@ specifically, because nothing else in the engine makes a decay contour.
 
 ## 0147 — no latch: a gate cannot be armed on time and fired on the music (re-raise, second independent instance)
 
+> **PROMOTED 2026-08-27** to [ADR-0137](adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) +
+> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 3-6, which take the `[latch]` table with
+> render-layer state and load-time slot resolution. Stays live until that plan closes.
+
 The expression evaluator is pure by hard invariant and `[smoothing]` eases without holding, so there
 is no way to say *"fire once per window, on the music."* `min(mod(time, 100) > 60, onset > 0.6)` is
 an AND, and an edge-triggered binding re-fires on every onset inside the window rather than on the
@@ -3499,6 +3508,11 @@ version of this — but "may" is exactly the kind of claim that wants an ADR rat
 ---
 
 ## 0148 — a hard-ink palette cannot reach any additive scene, so the limited-ink class is confined to 4 of 12 systems
+
+> **PROMOTED 2026-08-27** to [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) +
+> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, which take the class at the draw seam,
+> the line family's blend selector and the enumeration of intermediate-value stages. Stays live until that
+> plan closes.
 
 Every line and particle scene draws additively and overlaps itself, so white over red sums to pink
 and a palette's flat plateaus are gone before the frame is composited. The mono ink set survives
