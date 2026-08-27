@@ -2,8 +2,7 @@
 //!
 //! **The seam between the two halves of Plan 0100.** `milkconv` compiles `.milk`
 //! text into an [`EelProgram`]; `core` executes one. Nothing here parses EEL2 —
-//! the parser is in the converter and never ships
-//! ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! the parser is in the converter and never ships (ADR-0113).
 //!
 //! # Why the encoding is text
 //!

@@ -299,6 +299,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0137 | `fragment_field` has three hardcoded animation rates and no parameter behind any of them | [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 3; see 0141. **Closed 2026-08-27** |
 | 0138 | `palette_contour` keys on the band grid and never reads the LUT | [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 5; see 0140. **Closed 2026-08-27** |
 | 0139 | Nothing in the harness measures motion rate or the silent-to-driven difference | [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 1. **Closed 2026-08-27** |
+| 0129 | The doc-link gate walks `.md` only, so the same links in `.rs` comments rot unwatched | [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) + [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md). **Closed 2026-08-27** |
 | 0096 | `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies | [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) + [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phases 2-4, as `coord_mode`. **Closed 2026-08-27** |
 | 0097 | A curved or jittered `star` returns a NEGATIVE normalized distance at its own centre | [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1. The reference was repaired, not the result clamped. **Closed 2026-08-27** |
 
@@ -2759,58 +2760,6 @@ shell-occupancy rescue, reading the tonal statistic at the quiet excitation too,
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
 
----
-
-## 0129 — the doc-link gate walks `.md` only, so the same links inside Rust doc comments rot unwatched
-
-**Raised by:** `architect`, at [Plan 0117](plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)'s
-close, when that plan's own new rustdoc link had to be repointed by hand because nothing would have
-caught it. **Owner if taken:** `dev` — the checker change is small and the repairs are mechanical.
-
-- **PROMOTED AND INVERTED, 2026-08-25, hours after it was filed —**
-  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) +
-  [Plan 0118](plans/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md). **The finding
-  below is sound and the remedy it proposes was rejected.** Asked whether to guard these links, the
-  user's answer was to stop writing them: a maintained checker to protect 89 links that do not
-  resolve in rustdoc, exist to save one `grep`, and encode the most brittle possible reference to a
-  document whose lifecycle includes being moved, is the wrong trade against deleting them once.
-  ADR-0127 Alternative A records that reasoning. Plan 0118 Phase 3 deletes all 89 in favour of
-  bare-number citations, and its gate rejects the *form* rather than validating the target. **This
-  entry closes when that plan closes**, not now — the eleven breaks it names are still on `main`.
-
-- **Verified 2026-08-25** — the walk collects markdown and nothing else: `present: endsWith\("\.md"\) in: scripts/check-doc-links.mjs`
-- **Verified 2026-08-25** — Rust sources carry the same link form: `present: \]: \.\./\.\./docs/ in: core/src/render/tests.rs`
-
-### The finding
-
-`scripts/check-doc-links.mjs` exists because a close ceremony's `git mv` breaks relative links in
-both directions, and by Plan 0060's close that had reached 74 breaks across 23 files. The gate now
-holds every `.md` in the repo — and only those. Rust doc comments use the identical markdown
-definition form (`[label]: ../../docs/...`), resolve relative to the **file**, and break the same way.
-
-**Eleven are broken on `main` today**, in two classes:
-
-    core/src/render/tests.rs:1284         -> ../../docs/plans/0053-...md
-    core/src/render/tests.rs:1112,1164,1165,1282,1283
-    core/src/render/scenes/emitter/tests.rs:1479
-    core/src/render/scenes/particles/mod.rs:359
-    core/src/render/scenes/particles/tests.rs:2506
-    standalone/src/shot/render.rs:103,106
-
-The first is **exactly the class step 1b of the close ceremony exists to prevent**: Plan 0053 moved
-to `plans/done/` and the citation was never repointed. The other ten are wrong-depth `../` counts —
-a link written from a file's own directory when it needed one or two more levels — which suggests
-they have never resolved at all.
-
-### Why it is worth doing rather than noting
-
-The repair is one directory walk and one extension test wider than the existing one; the link
-extraction, the code-span skipping and the reporting are already written and already handle this
-form. What it buys is that the close ceremony's most-missed step stops having a second file class it
-cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
-are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
-links are repaired or deleted — several may have been decorative from the start.
-
 ## 0130 — `boundary_density` scales with the capture resolution, and neither it nor its two floors names the 96x96 they were measured at
 
 **Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
@@ -3306,7 +3255,56 @@ when someone needs the dual-live path testable for another reason.
 
 ---
 
-## 0143 — the repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally
+## 0143 — 20 of the 24 `design-backlog.md#NNNN` anchors in the repo point at bodies that now live in the archive
+
+**Raised by:** `architect`, at [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)'s
+close, 2026-08-27, while repairing the two that plan's own implementation log had noticed.
+**Owner if taken:** `dev` — the repointing is mechanical; what is *not* mechanical is the scope
+call in the last paragraph, which is an `architect` decision to make first.
+
+- **Verified 2026-08-27** — the link gate says in its own header that it tests the file and not the
+  fragment: `present: fragments, not external URLs in: scripts/check-doc-links.mjs`
+- **Verified 2026-08-27** — an archived body still addressed by a live anchor:
+  `present: ^## 0072 in: docs/design-backlog-archive.md`
+
+### The finding
+
+The close ceremony archives a discharged backlog entry by moving its body verbatim to
+`design-backlog-archive.md` and leaving a ledger row behind. Anchors aimed at the moved body —
+`(../design-backlog.md#0072--sanityrss-coverage-floor-forces-...)` — keep resolving to a **file that
+exists**, so `scripts/check-doc-links.mjs` reports them clean: it validates paths and never
+fragments. The link lands at the top of the live backlog instead of at the entry, silently.
+
+Measured across every `.md` in the repo: **24 distinct entry numbers are addressed by anchor, and 20
+of them are archived** — `0009 0020 0022 0027 0033 0040 0055 0056 0057 0058 0059 0060 0061 0062
+0063 0067 0070 0084 0085 0088` — across roughly 20 files, mostly ADRs and closed plans. Two more
+(`0072`, twice in [Plan 0075](plans/done/0075-the-content-renaissance.md)) were repaired at Plan
+0118's close and are the reason this was measured at all.
+
+This is the same silent-rot family ADR-0127 retired one level down: a reference whose *form* cannot
+be checked, decaying on a routine ceremony step, visible only to a human who follows it. Step 3c of
+the architect skill already names it — *"the one class of break here that no gate will catch for
+you"* — which is why the accumulation is evidence that naming it was not enough.
+
+### The scope call, which is the actual question
+
+Most of the 20 sites are **append-only** documents: accepted ADRs and closed plans. Repointing them
+edits a historical record to keep a convenience link working, which cuts against the append-only
+rule. Three defensible answers, and one should be chosen before any editing:
+
+1. Repoint everything, treating a link target as mechanical rather than as content.
+2. Repoint only live documents and leave the historical ones, accepting that an old ADR's anchor
+   lands at the top of the backlog.
+3. Drop the anchor half repo-wide — `[backlog 0072](../design-backlog.md)` plus the bare number,
+   which is exactly ADR-0127's answer to the same problem in `.rs`, and would make the whole class
+   uncheckable-but-unbreakable.
+
+Option 3 also makes the gate question moot; options 1 and 2 leave a class that wants a fragment
+check in `check-doc-links.mjs` to stay repaired.
+
+---
+
+## 0144 — the repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally
 
 [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1 replaced the curved/jittered
 `star` arm's normalization reference and the interior contract came back with it — but only for a

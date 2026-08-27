@@ -1,6 +1,4 @@
-//! **Flat opaque elements painted on their own paper**
-//! ([ADR-0123](../../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md),
-//! Plan 0113).
+//! **Flat opaque elements painted on their own paper** (ADR-0123).
 //!
 //! Every other scene in this engine draws **light**: premultiplied additive
 //! colour into a linear-light composite, where nothing is in front of anything
@@ -10,31 +8,27 @@
 //! one and **the array index is the depth**. There is no depth buffer, no sort,
 //! and no ordering state — the painter's loop is the whole mechanism.
 //!
-//! # Why this needs no change to the composite
+//! # Three engine properties this look rests on, and breaks without
 //!
-//! Three facts, all measured before this scene existed (ADR-0123's Context):
+//! Measured in ADR-0123's Context; named here because each is a thing an
+//! unrelated edit could take away.
 //!
 //! - A fullscreen scene emitting alpha 1 **holds the backdrop out entirely** —
-//!   not darkened, absent (Plan 0091 Phase 1). So a scene that covers every
-//!   pixel owns its own ground, which is what lets this one paint paper.
+//!   not darkened, absent. So a scene covering every pixel owns its own ground.
 //! - The tonemap is **exactly the identity** below
-//!   [`KNEE`](crate::render::tonemap::KNEE)` = 0.6` (ADR-0046), so an element
-//!   whose brightest channel is at or under it survives the post chain
-//!   **unshaded** — the value it wrote is the value that leaves the tonemap.
-//!   Flatness is not argued for against this pipeline; below the knee the
-//!   pipeline is a no-op. This is *not* the claim that the authored hex reaches
-//!   the display: a palette stop is a **linear coefficient with no sRGB decode**
-//!   (`docs/preset-palettes.md`), so the byte written is its sRGB encoding and
-//!   `#111111` presents as `#494949`. Same curve for every element, no shading
-//!   and no halo — which is the property the look actually rests on.
-//! - Bloom's threshold sits **above** that knee, so a canvas living under it
-//!   gets no halo and hard edges stay hard, at no cost and with no parameter.
-//!   One constraint buys both properties this look is made of.
+//!   [`KNEE`](crate::render::tonemap::KNEE)` = 0.6` (ADR-0046), so an element at
+//!   or under it leaves the post chain **unshaded**. Below the knee the pipeline
+//!   is a no-op — flatness is not argued for against it.
+//! - Bloom's threshold sits **above** that knee, so a canvas living under it gets
+//!   no halo and hard edges stay hard, at no cost and no parameter.
 //!
-//! What the curve does not give is paper at pure white: `f(1.0) = 0.800`, and
-//! 1.0 is asymptotically unreachable. Both reference grounds are off-white, so
-//! that is a property to author against rather than a defect. See
-//! `docs/preset-palettes.md`.
+//! **This is not the claim that the authored hex reaches the display.** A
+//! palette stop is a linear coefficient with no sRGB decode
+//! (`docs/preset-palettes.md`), so the byte written is its sRGB encoding and
+//! `#111111` presents as `#494949`. Same curve for every element, no shading and
+//! no halo — that is the property the look rests on. Nor does the curve give
+//! paper at pure white: `f(1.0) = 0.800`, and 1.0 is asymptotically unreachable,
+//! so both reference grounds are off-white by construction.
 //!
 //! # Colour is a palette **coordinate**
 //!
@@ -44,7 +38,7 @@
 //! and deliberately a **raw** one: `color_span` and `palette_shift` move the
 //! elements' colours and must not drag the ground along with them.
 //!
-//! # The aspect comes from the render target ([ADR-0037](../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md))
+//! # The aspect comes from the render target (ADR-0037)
 //!
 //! This scene computes screen-destined geometry from a normalized space, which
 //! is exactly the shape of the bug that has shipped three times in this repo.
@@ -59,7 +53,7 @@
 //!
 //! The draw is O(elements) per pixel and the bounding-box reject removes the
 //! distance evaluation but **not** the loop step, so a wavefront walks every
-//! element regardless. That is the plan's real risk, and the bound on it is
+//! element regardless. The bound is
 //! [`TierConfig::collage_elements`](crate::render::TierConfig::collage_elements)
 //! — measured by `core/tests/collage_cost.rs`, not assumed.
 //!
@@ -146,8 +140,9 @@ const DEFAULT_SCALE: f32 = 1.0;
 /// Smallest `scale` the shader is handed. Not zero: the canvas transform divides
 /// by it.
 const MIN_SCALE: f32 = 0.05;
-/// Largest `scale`. Past this a single element fills the frame and the canvas is
-/// no longer a composition — the end of the useful range, not an arbitrary cap.
+/// Largest `scale`. Past this a single element fills the frame and the
+/// canvas stops being a composition — the end of the useful range, not
+/// an arbitrary cap.
 const MAX_SCALE: f32 = 20.0;
 
 /// Shared view transform (ADR-0018): `pan_*` moves the canvas.
@@ -775,7 +770,7 @@ const DEFAULT_PUMP: f32 = 0.0;
 /// flag must not re-run the generator every frame.
 const RECOMPOSE_THRESHOLD: f32 = 0.5;
 /// The longest crossfade `recompose_blend` may name, in seconds. Past this a
-/// recomposition is no longer an event.
+/// recomposition stops reading as an event.
 const MAX_BLEND_SECS: f32 = 10.0;
 /// How long an element takes to fade in or out when `density` moves it across
 /// the gate. Short enough to read as an arrival, long enough not to pop.

@@ -30,10 +30,10 @@ const PRESET: &str = "Mitosis";
 /// by more than this.
 const EPS: u8 = 10;
 
-/// An RD preset with the same lively field params plus an extra `[params]` line —
-/// used to isolate the view transform (Phase 2): the field is identical, so any
-/// render difference is the present-pass zoom/pan. The view transform touches only
-/// the present sampling (no background pipeline), so it is faithful on WARP.
+/// An RD preset with the same lively field params plus an extra `[params]` line,
+/// isolating the view transform (Phase 2): the field is identical, so any render
+/// difference is the present-pass zoom/pan. The view transform touches only the
+/// present sampling (no background pipeline), so it is faithful on WARP.
 fn rd_view_preset(name: &str, extra: &str) -> Preset {
     let toml = format!(
         "system = \"reaction_diffusion\"\nname = \"{name}\"\n[params]\n\

@@ -402,8 +402,7 @@ mod tests {
         // The v1 fix-up chain overshot the log curve and only died at band 32,
         // so v1's edges for bands 20..31 were artifacts of the collapse
         // handling rather than of the layout. From 32 up, v1 *was* the natural
-        // curve — and there this plan changes nothing at all. Half the axis,
-        // bit-identical.
+        // curve, so v2 reproduces it there bit for bit. Half the axis.
         for k in 32..SPECTRUM_BINS {
             let (lo, hi) = layout.bins[k];
             assert_eq!(
@@ -575,10 +574,10 @@ mod tests {
 
     #[test]
     fn the_long_window_was_chosen_by_measurement() {
-        // The plan's rule: 4096 first, 8192 only if 4096 still leaves sub-bass
-        // bands bin-starved. This records the measurement that decided it, so a
-        // later reader can re-derive the choice instead of trusting a commit
-        // message.
+        // The rule: 4096 first, 8192 only if 4096 still leaves sub-bass
+        // bands bin-starved. This records the measurement that decided it,
+        // so a later reader can re-derive the choice instead of trusting a
+        // commit message.
         let starved_at = |long: usize| BandLayout::with_windows(SR, WINDOW_SIZE, long).starved();
         // 4096 widens *all twenty* low bands — it buys nothing the 2048 window
         // did not already fail at, which is what made the choice unambiguous

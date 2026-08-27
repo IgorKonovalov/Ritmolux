@@ -77,16 +77,14 @@ const EPS: u8 = 10;
 /// light the **scene** put there.
 ///
 /// **Audited at Plan 0116 Phase 3 and deliberately left constant.** `sanity.rs`
-/// now derives its reference per capture ([ADR-0126]) because a scene that
-/// paints its own ground reads `coverage` exactly `1.0` against black. This
-/// measure has no single frame to derive from — `footprint_diff` masks over the
+/// now derives its reference per capture (ADR-0126) because a scene that paints
+/// its own ground reads `coverage` exactly `1.0` against black. This measure
+/// has no single frame to derive from — `footprint_diff` masks over the
 /// **union** of two captures, so a per-frame ground would give the mask two
 /// references and make the union ill-defined. It is also a *difference*: a
 /// scene whose ground is a constant off-white contributes nothing to the
 /// numerator whatever the reference calls it, which is the property
 /// [`ANIM_FLOOR`] is derived against.
-///
-/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 /// Lower bound on `footprint_diff`'s denominator, as a fraction of the frame —
 /// the guard ADR-0091 requires against a tiny mask amplifying noise. `0.015` of
@@ -112,10 +110,10 @@ const BG_PREFIX: &str = "bg_";
 /// statistic went straight back to diluting by emptiness). The background stage
 /// defaults to a black clear, so this is removing bindings, not adding a path.
 ///
-/// One semantic change rides along, deliberately: backdrop drift (a slow
-/// `bg_hue` sweep) no longer counts as animation. The gate's question is
-/// whether the *scene* moves; a picture whose only life is its vignette
-/// breathing is exactly what it should convict.
+/// Backdrop drift (a slow `bg_hue` sweep) deliberately does **not**
+/// count as animation. The gate's question is whether the *scene*
+/// moves; a picture whose only life is its vignette breathing is
+/// exactly what it should convict.
 fn without_backdrop(mut preset: Preset) -> Preset {
     preset.params.retain(|b| !b.name.starts_with(BG_PREFIX));
     preset
@@ -551,8 +549,7 @@ fn probes() -> Vec<(&'static str, &'static str, String)> {
 /// Per the phase, this is a **successful negative result**: it forecloses the
 /// cheap fix and leaves standing 0009's real successor — a coverage-aware
 /// statistic that normalizes motion by the **lit area** rather than by the frame.
-/// That was explicitly out of this plan's scope; this table is the evidence that
-/// it is now the only remaining option.
+/// This table is the evidence that it is the only remaining option.
 ///
 /// **That successor landed at Plan 0077 Phase 1 (ADR-0091)** — the gate above
 /// now scores `metrics::footprint_diff`. This ladder deliberately keeps

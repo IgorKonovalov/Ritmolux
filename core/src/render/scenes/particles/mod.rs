@@ -29,10 +29,11 @@
 //! unperturbed).
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
-//! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at 640x360, so the
-//! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
-//! display. That size is quantized to `TRAIL_GRID_STEP`, so a live window drag
-//! re-allocates the field a handful of times rather than once per frame.
+//! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at
+//! 640x360, so the present is close to 1:1 up to the cap instead of a soft
+//! upscale on a 1080p+ display. That size is quantized to `TRAIL_GRID_STEP`,
+//! so a live window drag re-allocates the field a handful of times rather
+//! than once per frame.
 //!
 //! **The field's own aspect is not the projection's** (Plan 0029 Phase 5). The
 //! present is a plain stretch (aspect ignored, as the reaction-diffusion present
@@ -107,11 +108,10 @@ const TRAIL_GRID_STEP: u32 = 256;
 /// scene's **cap and step** over the one shared policy
 /// ([`grid::grid_size`](crate::render::grid::grid_size)).
 ///
-/// A thin wrapper on purpose (Plan 0035 Phase 3). The arithmetic used to live
-/// here, and `post.rs` held a line-for-line copy of it; that duplication is how
-/// the aspect lesson this scene already paid for failed to reach the post stages
-/// and shipped as a defect a second time (ADR-0037). The **numbers** stay here,
-/// because they are genuinely this call site's — see
+/// A thin wrapper on purpose (Plan 0035 Phase 3). A line-for-line copy of this
+/// arithmetic in `post.rs` is how the aspect lesson this scene had already paid for
+/// failed to reach the post stages and shipped as a defect a second time (ADR-0037).
+/// The **numbers** stay here, because they are genuinely this call site's — see
 /// [`TierConfig::attractor_trail_cap`](crate::render::TierConfig::attractor_trail_cap)
 /// for why the attractor may take a larger grid than a post stage.
 ///
@@ -119,10 +119,10 @@ const TRAIL_GRID_STEP: u32 = 256;
 /// API widened for a test's benefit), and Plan 0035 re-examined it while touching
 /// the function: `core/tests/attractor.rs` is an integration test and can only
 /// reach a `pub` item, so narrowing to `pub(crate)` means moving that test set
-/// into the crate — a change to a file outside this plan's scope, for no
-/// behavioral gain. `core/` is not a published API surface; the cost of the
-/// widening is a doc-comment's worth of noise, and the cost of the churn is a
-/// silent scope expansion. Kept.
+/// into the crate — a change to a file outside that scope, for no behavioral
+/// gain. `core/` is not a published API surface; the cost of the widening is a
+/// doc-comment's worth of noise, and the cost of the churn is a silent scope
+/// expansion. Kept.
 pub fn trail_grid_size(width: u32, height: u32, cap: (u32, u32)) -> (u32, u32) {
     crate::render::grid::grid_size((width, height), cap, TRAIL_GRID_STEP)
 }
@@ -339,8 +339,8 @@ fn streak_flag(on: bool) -> f32 {
 ///
 /// **This value is set from rendered captures, and the first arithmetic argument
 /// for it was wrong.** The reasoning that picked `0.01` (500 particles) ran:
-/// [ADR-0065] holds total light invariant by weighting each particle
-/// `50 000 / active`, so a hundredth of the budget already concentrates a hundred
+/// ADR-0065 holds total light invariant by weighting each particle `50 000 /
+/// active`, so a hundredth of the budget already concentrates a hundred
 /// particles' worth of light into every point, and an order of magnitude below
 /// that must clip to white before it reads as a curve. Rendered at `fade = 0.95`,
 /// it does not. The banding first appears around `0.01`, and at `0.002` (100
@@ -355,8 +355,6 @@ fn streak_flag(on: bool) -> f32 {
 /// as the attractor; below it a preset is asking for single-digit trajectories,
 /// which is a few orbits rather than a figure. `active_particles` separately
 /// guarantees at least one particle, so nothing here can produce an empty draw.
-///
-/// [ADR-0065]: ../../../../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md
 pub const MIN_PARTICLE_DENSITY: f32 = 0.0005;
 
 /// Resolve a validated `density` against a tier's particle budget.
@@ -394,10 +392,9 @@ mod projection_mirror;
 ///
 /// Each of the first two `f32`s packs into the preceding `vec3`'s trailing slot
 /// (offsets 12 and 28), so std430 lays the first 32 bytes out as two tight
-/// 16-byte halves. **It used to be a tight 16**, then a tight 32, and that note
-/// is kept rather than deleted because the packing argument is the same one
-/// applied twice; `_pad` is the explicit name for the slot `seed` occupies in
-/// the first half.
+/// 16-byte halves. **The same packing argument settled the struct at a tight 16
+/// before it settled it at a tight 32**, which is why the note stays; `_pad` is
+/// the explicit name for the slot `seed` occupies in the first half.
 ///
 /// **Why 48 and not 40.** WGSL rounds a struct to a multiple of its alignment
 /// and `vec3<f32>` aligns to 16, so `age` and `map` land at offsets 32 and 36
@@ -549,9 +546,9 @@ const LIFETIME_SALT: u32 = 0x9E37_79B1;
 /// [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL)** — one round of the
 /// lowbias32 bit-mixer, then the top 24 bits as a fraction in `[0, 1)`.
 ///
-/// The two functions used to be declared inside [`STEP_SHADER`] itself; Plan 0082
-/// promoted them to a shared home when the tonemap's dither became their second
-/// caller, and `resources.rs` concatenates that text in front of the step shader.
+/// Plan 0082 promoted the two out of [`STEP_SHADER`] into a shared home
+/// when the tonemap's dither became their second caller, and
+/// `resources.rs` concatenates that text in front of the step shader.
 ///
 /// The same discipline `projection_mirror` follows: **the WGSL is the source and
 /// this is the mirror**. It exists because `seed()` has to place a particle at a
@@ -574,8 +571,9 @@ fn hash_unit(v: u32) -> f32 {
 /// coefficients (`a`,`b`,`c`,`d`), the look scalars (`size`,`hue`,`fade`), and a
 /// beat-driven `reseed` — so a preset binds them to the audio bands and beat.
 pub struct AttractorScene {
-    /// Cloned device handle (an `Arc` inside wgpu) used to build [`Resources`]
-    /// lazily on first render — see the module docs for why.
+    /// Cloned device handle (an `Arc` inside wgpu) that builds
+    /// [`Resources`] lazily on first render — see the module docs for
+    /// why.
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,
@@ -615,7 +613,7 @@ pub struct AttractorScene {
     seed_particles: Vec<Particle>,
     /// Re-upload the seed scatter next render. Set on first build and on a family
     /// change — the two places there is no existing cloud to disturb. A `reseed`
-    /// no longer sets it (ADR-0066); see [`Self::pending_jitter`].
+    /// does not set it (ADR-0066); see [`Self::pending_jitter`].
     needs_upload: bool,
     /// A `reseed` rising edge is pending: the next render encodes **one** jitter
     /// dispatch before its steps, kicking each particle where it already is.
@@ -643,19 +641,19 @@ pub struct AttractorScene {
     /// `u32` takes 2.3 years to go round, and the value's only job is to
     /// decorrelate successive draws.
     step_index: u32,
-    /// Real elapsed seconds for this frame, injected via `advance`, used to make
-    /// the trail decay frame-rate-independent.
+    /// Real elapsed seconds for this frame, injected via `advance`,
+    /// which makes the trail decay frame-rate-independent.
     dt: f32,
     /// The integrated spin, in **spin-scaled seconds** — advanced once per frame
     /// in [`update`](Scene::update), where this frame's `spin` is already
     /// resolved, and turned into radians by [`spin_phase`] at the uniform.
     ///
-    /// **This scene no longer reads the shared clock at all**, which is why
-    /// `set_time` is gone: the display rotation was the only thing that used it,
-    /// and a rate multiplier has to be integrated rather than multiplied against
-    /// elapsed time (see [`advance_spin`]). Determinism is unaffected — the phase
-    /// is a pure function of the injected `dt` sequence, which captures pin at
-    /// 1/60 s, and it starts at zero on every rebuild.
+    /// **This scene does not read the shared clock at all**, and has no
+    /// `set_time`: the display rotation was its only reader, and a rate
+    /// multiplier has to be integrated rather than multiplied against elapsed
+    /// time (see [`advance_spin`]). Determinism is unaffected — the phase is a
+    /// pure function of the injected `dt` sequence, which captures pin at 1/60
+    /// s, and it starts at zero on every rebuild.
     spin_time: f32,
     /// The active attractor map, selected data-driven via `[particles]`
     /// (ADR-0007 `configure`); its default coefficients seed `a`..`d`.
@@ -728,8 +726,8 @@ pub struct AttractorScene {
     /// deposit, which [`deposit_scale`] has already normalized by the particle
     /// count. So it composes with `density` instead of fighting it, and — being a
     /// property of the pixels this scene lays down — it blends across a dissolve
-    /// the way the picture does, which the engine-wide `exposure` presets used to
-    /// reach for does not.
+    /// the way the picture does, which the engine-wide `exposure` a preset might
+    /// reach for instead does not.
     brightness: f32,
     fade: f32,
     /// How much of this cloud's coverage the backdrop resolves against
@@ -955,11 +953,11 @@ impl AttractorScene {
     ///
     /// Neither is the particle buffer (Plan 0031 Phase 4, closing Plan 0029's
     /// close-review minor 1). It survives the split, so re-uploading the seed
-    /// scatter on a grid change is no longer *necessary* — and it was the surviving
-    /// half of "a fullscreen toggle pops the cloud back to its seed scatter": the
-    /// points kept iterating across a resize, then jumped back. Determinism does
-    /// not need it either, since a headless capture holds one target size for its
-    /// whole run.
+    /// scatter on a grid change is **not** necessary — and re-uploading is
+    /// the surviving half of "a fullscreen toggle pops the cloud back to its
+    /// seed scatter": the points keep iterating across a resize, then jump
+    /// back. Determinism does not need it either, since a headless capture
+    /// holds one target size for its whole run.
     fn rebuild_if_stale(&mut self) {
         let grid_stale = self
             .res
@@ -997,17 +995,16 @@ impl AttractorScene {
     /// **A test instrument** (Plan 0057 Phase 3), not a render path: it blocks on a
     /// buffer map, which the frame loop must never do. It exists because the
     /// property ADR-0066 changes is a property of *the cloud*, and a pixel
-    /// differential cannot state it — "the reseed no longer puts particles outside
+    /// differential cannot state it — "the reseed does not put particles outside
     /// the attractor's extent" is a claim about positions, and a frame diff would
     /// only say the picture moved, which the wipe also did.
     ///
     /// `None` before the first render, when there are no GPU resources yet.
     ///
-    /// Returns whole [`Particle`]s rather than the `(pos, prev)` pair it used to:
-    /// ADR-0087's `age` and `map` are the same kind of claim — a property of the
-    /// buffer that a capture can only report indirectly — so the readback hands
-    /// back the struct and each caller takes the fields its own assertion is
-    /// about.
+    /// Returns whole [`Particle`]s rather than a `(pos, prev)` pair: ADR-0087's
+    /// `age` and `map` are the same kind of claim — a property of the buffer
+    /// that a capture can only report indirectly — so the readback hands back
+    /// the struct and each caller takes the fields its own assertion is about.
     #[cfg(test)]
     fn read_particles(&self, queue: &wgpu::Queue) -> Option<Vec<Particle>> {
         let res = self.res.as_ref()?;
@@ -1494,11 +1491,12 @@ impl Scene for AttractorScene {
         // function of each particle's fixed seed and the reseed counter. The trail
         // field is kept, so the disturbance blooms through the trails.
         //
-        // This used to re-upload the seed scatter, which did not scatter the cloud
-        // — it *replaced* it, with a uniform fill of an axis-aligned box that then
-        // took a visible number of iterations to converge back onto the attractor.
-        // Every shipped preset header describes reseed as a percussive accent; the
-        // wipe is what it actually was.
+        // Re-uploading the seed scatter instead does not scatter the
+        // cloud — it *replaces* it, with a uniform fill of an
+        // axis-aligned box that then takes a visible number of
+        // iterations to converge back onto the attractor. Every shipped
+        // preset header describes reseed as a percussive accent, and
+        // that wipe is not one.
         if self.reseed >= RESEED_THRESHOLD && self.prev_reseed < RESEED_THRESHOLD {
             self.pending_jitter = true;
             self.reseed_count = self.reseed_count.wrapping_add(1);

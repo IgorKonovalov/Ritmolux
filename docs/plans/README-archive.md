@@ -16,8 +16,17 @@ were superseded orderings of the active roster.
 - [0098 — The figure nests properly](done/0098-the-figure-nests-properly.md)
   — closed 2026-08-27. Eight phases (1, 2, 3, 4, 4b, 5, 6, 7) on `plan-0098-nested-figure` in
   `WORK/lmv-plan-0098`, `28336c3`..`7411663`. Review: **no blockers, no majors, five minors, two
-  nits.** Version **0.84.0** (minor). Closed [design-backlog 0096 + 0097](../design-backlog.md);
-  filed 0143.
+  nits.** Version **0.86.0** (minor). Closed [design-backlog 0096 + 0097](../design-backlog.md);
+  filed 0144.
+
+  **Two numbers moved at the merge, and both are worth the line.** This lane tagged `v0.84.0` on its
+  own branch before merging; `main` meanwhile closed
+  [0118](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) and, finding 0.84.0
+  taken, skipped to **0.85.0** rather than reach into another lane's tag. ADR-0053 says the version
+  is chosen against what `main` actually reached — so this close re-bumped to **0.86.0** on top of
+  the merge and retired the unpushed `v0.84.0`, and **0.84.0 is a version this project never
+  shipped**. The filed backlog entry moved for the same reason: both closes landed on `0143` the
+  same day, `main` committed first, so this one is **0144**.
 
   **What landed.** `shape_field` gained a second palette coordinate. `coord_mode = "1"` hands the
   palette `r / r_boundary(theta)` instead of the normalized distance, so a band of the coordinate is
@@ -81,19 +90,62 @@ were superseded orderings of the active roster.
   reads `0.076`-`0.085` there (the reference is the unjittered figure's, the measurement the
   fragment's own spike's) and the exact-zero assert is gated to `jitter == 0`; `presets/README.md`
   said `shape_facet` "still pins `gamma`" after two later commits unpinned it (repaired at close);
-  the lane adds ~11 relative links and ~9 narration lines to Rust comments that [Plan
-  0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is concurrently deleting;
+  the lane carried 12 relative links and narration lines in Rust comments, written before ADR-0127
+  existed and **repaired at the merge** — [0118](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
+  armed that gate at pre-push and in CI while this lane ran, so it was a push blocker by the time
+  the two met rather than the coordination note the review called it;
   `schema.rs` hardcodes the `coord_mode` bounds instead of reading `COORD_MODES`; and the CPU mirror
   of `mark_boundary_radius` is not literally identical to the WGSL at `p == (0,0)` while its comment
   says it is. Two nits: a failure message naming a pentagon on a test that renders a triangle, and an
   implementation log at byte parity with the plan's own phase section. Filed as
-  [design-backlog 0143](../design-backlog.md).
+  [design-backlog 0144](../design-backlog.md).
 
   **Curation verdict (ADR-0081).** The shipped set is the same files — nothing embedded, nothing
   removed. One item the plan made stale that nobody has touched: `presets/shape_contourmono.toml`
   (landed on `main` from Plan 0121 while this lane ran) says its star's *"offset contours round off
   further with every ring outward"*, the exact property `coord_mode` now makes optional. Its header
   frames that rounding as deliberate, so this is a `preset-author` question and not a defect.
+- [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
+  — closed 2026-08-27. Seven phases on `main` directly, no worktree: `37868d4`, `6ae4245`
+  (+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, plus `807b6ef` repairing the
+  first review's two majors. Review: **no blockers, no majors, five minors, one nit.**
+  Version: **0.85.0** (minor — **0.84.0** was already tagged on the unmerged
+  `plan-0098-nested-figure` branch, so `main` took the next free number). Closed [design-backlog 0129](../design-backlog-archive.md), whose
+  remedy this plan inverted — asked whether to guard the 89 relative links in `.rs` comments, the
+  answer was to stop writing them. Accepts [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
+
+  **What landed.** `scripts/check-comment-hygiene.mjs`, the repo's fifth Node gate, armed at
+  pre-push and in the CI `links` job. It lexes Rust rather than grepping it, so a `//` inside a
+  string literal is not a comment, and it rejects exactly two classes: a relative link in a `.rs`
+  comment, and plan-relative narration (`this plan`, `used to`, `no longer`). Length is deliberately
+  not gated — ADR-0127 Alternative B, because a blank line games any threshold. Then the sweep:
+  131 links became bare-number citations (the plan estimated 89), 309 narration lines were deleted
+  or restated as properties of the code (252), and 70 comment blocks of 40+ lines came down across
+  both the uncontended and contended trees.
+
+  **What the close verified rather than accepted.** The diff over the whole plan range contains no
+  non-comment Rust line outside the gate's own fixture, which makes "changes no behaviour"
+  mechanical rather than asserted. All **115 ADR** and **101 plan** bare numbers now cited in `.rs`
+  resolve to real documents — Phase 3's done-when, and the one property no gate can check, since a
+  bare number naming nothing is unfalsifiable where a broken link at least breaks. The deletion rule
+  held where probed: `tier.rs`'s deleted collage cost ladder was the *second* copy of a measurement
+  that lives in `core/tests/collage_cost.rs`, the file the reading was taken in.
+
+  **What was falsified.** ADR-0127's Risks assumed `cargo doc` might have been emitting broken
+  anchors for the 131 relative links all along. It was not: the same 62 (later 48) "links to private
+  item" warnings appear before and after, so rustdoc emitted those hrefs without complaint. The
+  cost of the links was rot and unresolvability, not a warning anyone was ignoring.
+
+  **What outlived the plan.** Three facts were kept rather than deleted because no document held
+  them, and they are the architect's to promote: `kaleidoscope.rs:1`'s argument for authoring
+  `kaleido_zoom` in rings rather than `log r`; `sanity.rs:209`'s two reasons for
+  `MIN_STRUCTURAL_SHELLS` taking the structural measure, which Plan 0075 Phase 1 explicitly
+  required to live in the test; and `tier.rs:241`'s tier rule *"lower if it does not measure
+  clean"*. Two files are held untouched for the live `plan-0098-nested-figure` lane
+  (`scenes/marks.rs`, `scenes/shape_field.rs`). The sweep also found three defects rather than
+  causing them, all repaired: a stray copy-paste line in `tier.rs`'s `mesh_grid`, an `ink.rs`
+  comment claiming a fixed 16:9 internal resolution that ADR-0034 retired, and the `tonemap.rs`
+  miscitation the first review caught.
 
 - [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md)
   — closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`3f9e828`, `b97ff64`,

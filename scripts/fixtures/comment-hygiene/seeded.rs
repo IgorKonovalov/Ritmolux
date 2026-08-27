@@ -16,6 +16,10 @@
 // SILENT — a bare-number citation, which is the form ADR-0127 replaces the links
 // WITH. Plan 0045 Phase 3 argued the knee, and the plans README rosters it. A
 // gate that fired on the word "plan" would convict its own fix.
+//
+// SILENT for the same reason, in the possessive spelling a sentence
+// reaches for when the citation is the subject: the Plan 0045 Phase 4b
+// defect is reachable from a bound expression.
 pub const SEEDED_KNEE: f32 = 0.6;
 
 /// SEEDED, class 2 — plan-relative narration. There is no "this plan" any more;

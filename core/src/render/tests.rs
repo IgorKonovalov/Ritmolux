@@ -32,7 +32,7 @@ fn roster(names: &[&str]) -> Roster {
 /// resolves to its owner, the system's own names to the scene, and anything
 /// else to `Unclaimed` (dropped at apply time, already warned about at load).
 ///
-/// This is the answer the per-frame `set_param` fallthrough chain used to
+/// This is the answer a per-frame `set_param` fallthrough chain would
 /// re-derive on every bound param of every frame.
 #[test]
 fn each_namespace_resolves_to_its_owner() {
@@ -1104,12 +1104,10 @@ fn dissolve_at(
 }
 
 /// The mean per-channel difference `core/tests/golden.rs` calls cross-rasterizer
-/// drift rather than signal (its `MEAN_TOL`, per [ADR-0023]). Reused here only as
+/// drift rather than signal (its `MEAN_TOL`, per ADR-0023). Reused here only as
 /// a **lower bound on the control**: a denominator that sits inside the declared
 /// noise band cannot calibrate anything above it. Mechanism-derived rather than
 /// measured — the control peak reads `0.4078` on the local WARP, 20x this.
-///
-/// [ADR-0023]: ../../docs/adrs/0023-golden-drift-guard-uses-frozen-fixtures.md
 const NOISE_FLOOR: f32 = 0.02;
 
 /// **A dual-live dissolve runs, and its picture is not freeze's.** Same
@@ -1119,7 +1117,7 @@ const NOISE_FLOOR: f32 = 0.02;
 /// preset's own composite either way, before dual-live has anything extra to
 /// do. That pins the assertion to the dissolve rather than to a warm-up drift.
 ///
-/// **What is asserted is exact, not a threshold** ([ADR-0071]). This project's
+/// **What is asserted is exact, not a threshold** (ADR-0071). This project's
 /// determinism contract makes two runs of this code byte-identical — the
 /// opening-frame `assert_eq!` above is the demonstration — so "the two modes
 /// differ somewhere in the window" needs no number, where the floor it replaces
@@ -1127,7 +1125,7 @@ const NOISE_FLOOR: f32 = 0.02;
 /// band this project already calls noise.
 ///
 /// **On a software adapter that is a smoke check, not a guard on the defect**
-/// ([ADR-0074]). What it proves is that dual-live runs, that it produces a
+/// (ADR-0074). What it proves is that dual-live runs, that it produces a
 /// different picture from freeze somewhere in the window, and that the dissolve
 /// is dissolving. What it cannot prove is that the outgoing side is *live*:
 /// `dissolve_at`'s own docstring records that on WARP, allocating the dissolve's
@@ -1148,10 +1146,10 @@ const NOISE_FLOOR: f32 = 0.02;
 ///
 /// Signal and control are not the same kind of quantity — the control is the
 /// dissolve's own progression, the signal is the outgoing side rendering
-/// *through* trails accumulation — so the rasterizer does not cancel out of
-/// their ratio, and the CI signal lands under [`NOISE_FLOOR`] besides. A floor
-/// taken from either reading would be a measurement asserted universally, the
-/// shape [ADR-0071] exists to forbid. The claim goes to hardware instead —
+/// *through* trails accumulation — so the rasterizer does not cancel out of their
+/// ratio, and the CI signal lands under [`NOISE_FLOOR`] besides. A floor taken
+/// from either reading would be a measurement asserted universally, the shape
+/// ADR-0071 exists to forbid. The claim goes to hardware instead —
 /// [`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`], which
 /// takes these same two series on a non-software adapter, where the allocation
 /// quirk does not exist and the ratio therefore does carry a floor. (That
@@ -1160,9 +1158,6 @@ const NOISE_FLOOR: f32 = 0.02;
 /// `device_type == Cpu`, not "a discrete GPU" — so the measurement was taken here
 /// instead.) The series below stay printed so the next time these numbers move,
 /// the log says so.
-///
-/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
-/// [ADR-0074]: ../../docs/adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md
 #[test]
 fn dual_live_keeps_the_outgoing_side_animating() {
     const FRAMES: usize = 40;
@@ -1242,9 +1237,9 @@ const HW_RATIO_FLOOR: f32 = 0.018;
 /// something: a **non-software** adapter, where `dissolve_at`'s allocation quirk
 /// is absent and the opening frame is byte-identical to the ordinary frame it
 /// replaces. So the numerator is the outgoing side animating and nothing else,
-/// which is what the WARP sibling cannot say ([ADR-0074]).
+/// which is what the WARP sibling cannot say (ADR-0074).
 ///
-/// **This is a measurement, not a property** ([ADR-0071]). Taken 2026-08-04 on:
+/// **This is a measurement, not a property** (ADR-0071). Taken 2026-08-04 on:
 ///
 /// | | |
 /// |---|---|
@@ -1266,7 +1261,7 @@ const HW_RATIO_FLOOR: f32 = 0.018;
 /// decision — a number that reproduces on two configurations is still a
 /// measurement, not a portable floor — but it is the first evidence about *which*
 /// WARP reading was anomalous, and it belongs to the open question that ADR-0074
-/// left for Plan [0053].
+/// left for Plan 0053.
 ///
 /// **The signal sits under [`NOISE_FLOOR`], and that is not the objection it
 /// looks like.** That band is cross-*rasterizer* drift; this comparison is two
@@ -1278,10 +1273,6 @@ const HW_RATIO_FLOOR: f32 = 0.018;
 /// **CI never enforces this.** It skips on both runners — `windows-latest` offers
 /// only WARP, `macos-latest` has no software Metal at all (ADR-0016) — so the
 /// local gate and `.githooks/pre-push` are what run it.
-///
-/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
-/// [ADR-0074]: ../../docs/adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md
-/// [0053]: ../../docs/plans/0053-the-suite-stops-blessing-what-warp-gets-wrong.md
 #[test]
 fn a_dual_live_dissolve_moves_the_picture_against_its_own_progression() {
     const FRAMES: usize = 40;

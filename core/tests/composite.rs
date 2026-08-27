@@ -1,11 +1,11 @@
 //! Post-composite pixel guard (Plan 0035 Phase 2, ADR-0037).
 //!
-//! **The composite's two stages had no capture-level coverage of any kind.** No
-//! fixture in `tests/fixtures/` bound `trails` or `kaleido_*`, so the whole
-//! stage-active path — the routing, the internal grid, the aspect every scene is
-//! handed through it — was exercised by no capture in the suite. That is how a
-//! defect that stretched the entire frame by 28 % at 1280x800 shipped green
-//! (ADR-0037), and it is the gap Plan 0033's close review filed as major 3.
+//! **This file is the composite's only capture-level coverage.**
+//! Without a fixture binding `trails` or `kaleido_*` the whole
+//! stage-active path — the routing, the internal grid, the aspect every
+//! scene is handed through it — is exercised by no capture in the
+//! suite, which is how a defect that stretched the entire frame by 28 %
+//! at 1280x800 shipped green (ADR-0037).
 //!
 //! This is the same shape as `golden.rs`: a frozen fixture, rendered headless,
 //! compared against a committed baseline PNG within a mean + max-outlier
@@ -21,8 +21,8 @@
 //! **160x100, and not a square.** The post stages round each grid axis up to a
 //! 256 px step, so 160x100 takes a **256x256** grid: aspect 1.0 against the
 //! target's 1.6. Composing a stage therefore stretched the picture by **1.6x**
-//! before Phase 1 — stronger than the 1.28x at 1280x800 that the plan calls the
-//! worst ordinary case, at a sixty-fourth of the pixels.
+//! before Phase 1 — stronger than the 1.28x at 1280x800 that is the worst
+//! ordinary case, at a sixty-fourth of the pixels.
 //!
 //! A square or 16:9 capture size would defeat this guard entirely: the policy
 //! returns those aspect-exact, which is precisely why the defect was invisible at
@@ -31,20 +31,18 @@
 //!
 //! # `composite_kaleido.png` pins design-backlog 0010's **fix**
 //!
-//! It used to pin the defect: the fold sampled outside its rectangular source and
-//! the `ClampToEdge` sampler smeared the border texel radially, so the corners
-//! carried hard-edged streaks. Plan 0045 Phase 1 / ADR-0047 clamped the sample
-//! radius to the largest disc the source contains and faded past it, and this
-//! baseline was re-blessed by hand at that change — see the fixture's header for
-//! what moved and by how much.
+//! ADR-0047 clamps the fold's sample radius to the largest disc the
+//! source contains and fades past it, rather than letting a
+//! `ClampToEdge` sampler smear the border texel radially into
+//! hard-edged corner streaks. The fixture's own header carries what
+//! moved at that re-bless and by how much.
 //!
 //! # `composite_overlap.png` pins the composite's arithmetic, not its routing
 //!
-//! Plan 0045 Phase 3 made every intermediate linear-light `Rgba16Float` and put a
-//! tonemap at the surface boundary. The third fixture binds **no** post stage: it
-//! draws a dense additive rose whose self-crossings sum past 1.0, which the 8-bit
-//! chain clipped to flat white. Its guard is that no channel in *that frame*
-//! reaches 255.
+//! The third fixture binds **no** post stage: it draws a dense additive
+//! rose whose self-crossings sum past 1.0, which an 8-bit chain clips
+//! to flat white. Its guard is that no channel in *that frame* reaches
+//! 255.
 //!
 //! **That is a claim about this fixture, not a property of the curve, and the
 //! difference matters** (Plan 0045 Phase 4b). `f(x) < 1` for every finite `x` is
@@ -79,8 +77,8 @@ const MAX_OUTLIER: u8 = 48;
 /// one that computes geometry, `bloom_*` (Plan 0045 Phase 4) the one with an
 /// internal pyramid — plus, since Plan 0045 Phase 3, one that binds no stage at
 /// all and exercises the composite's **arithmetic** instead: a dense additive rose
-/// whose self-crossings used to clip to flat white on the 8-bit intermediates and
-/// now roll off through the tonemap.
+/// whose self-crossings would clip to flat white on 8-bit intermediates and roll
+/// off through the tonemap here.
 ///
 /// **One stage per fixture, never all of them at once.** Bloom adds four
 /// pipelines, and the WARP software adapter's sensitivity to coexisting pipelines
@@ -88,55 +86,33 @@ const MAX_OUTLIER: u8 = 48;
 /// would put every stage's pipelines on the device at once and make any
 /// mis-render impossible to attribute.
 ///
-/// `composite_kaleido_squash` (Plan 0055 Phase 4) is the one pair here that
-/// shares a stage rather than owning one. That does not break the rule above —
-/// both bind the kaleidoscope and nothing else, so neither puts a pipeline on the
-/// device that the other does not. What the two separate is the fold's
-/// **geometry** from its **edge treatment**, which ADR-0061 made a per-preset
-/// choice: `composite_kaleido` is a centred figure over an empty border, so it
-/// renders identically under every treatment (measured at Phase 3 — its
-/// `kaleido_edge` pinned to 0 and to 1 gives md5-identical PNGs) and therefore
-/// cannot pin the edge at all. Its sibling's own header carries the rest.
+/// Four groups here **share** a stage rather than owning one. That does
+/// not break the rule above: each group binds one stage and nothing
+/// else, so no member puts a pipeline on the device its siblings do
+/// not. Each names what its sibling structurally cannot pin, and its
+/// own fixture header carries the rest:
 ///
-/// `composite_bloom_exposed` (Plan 0066 Phase 3, ADR-0080) is the second
-/// pair-that-shares-a-stage, and the same argument applies to it: it binds
-/// bloom and nothing else, so it puts no pipeline on the device its sibling does
-/// not. What the two separate is the bright-pass's **units**. The threshold is now
-/// compared against post-`exposure` light, and `composite_bloom` cannot pin that
-/// because it leaves `exposure` unbound — at the neutral stop the new multiply is
-/// the identity, which is exactly what makes that baseline byte-identical across
-/// this change and exactly what makes it blind to it.
-///
-/// `composite_symmetry` (Plan 0064 Phase 5, ADR-0077 + ADR-0078) is the **third**
-/// on the kaleidoscope, and it is not a third opinion about the fold. The stage
-/// grew five coordinate terms and the palette grew two, and **neither existing
-/// fixture binds one of them** — `composite_kaleido` binds `kaleido_order` and
-/// `kaleido_angle`, `composite_kaleido_squash` adds `kaleido_edge`, and every other
-/// baseline in the suite leaves the whole radial group at its identity. So the log
-/// wrap, the spiral's branch-cut closure, the inner freeze and the zoom's scaling
-/// by the period could all have been broken with the suite green. Its own header
-/// carries the rest, including why every bound value is off its default.
-///
-/// `composite_warp_swirl` / `_ripple` / `_fisheye` (Plan 0046 Phase 2, ADR-0048)
-/// are the **fourth** group that shares a stage, and the largest. They bind the
-/// trails stage and nothing else, and — unlike every other pair here — they bind
-/// it with the *same parameters as `composite_trails`*, param for param. What each
-/// adds is one structural key, `[feedback] warp`, plus the `fb_warp` strength that
-/// makes it do anything.
-///
-/// So this quartet is a controlled comparison, and its four baselines are only
-/// worth having together: `composite_trails` cannot pin a warp (it selects none),
-/// and none of the three can pin the *others* (a shader taking one arm for every
-/// selector would pin three identical pictures perfectly happily). That second
-/// half is not a baseline claim at all and is asserted where it belongs, in
-/// `feedback.rs`'s `each_warp_kind_bends_the_past_its_own_way`; what lives here is
-/// the ordinary drift guard on each one's pixels.
-///
-/// They add **no pipeline** the trails stage did not already build. The warp is a
-/// selector in one shader, not a shader per kind — deliberately, because the WARP
-/// software adapter's sensitivity to coexisting pipelines is the reason this file
-/// exists in the shape it does, and four permutations of one stage is exactly the
-/// shape that bites (Plan 0046's own risk note).
+/// - `composite_kaleido_squash` — the fold's **edge treatment**, which ADR-0061
+///   made a per-preset choice. `composite_kaleido` is a centred figure over an
+///   empty border, so it renders identically under every treatment (measured:
+///   `kaleido_edge` pinned to 0 and to 1 gives md5-identical PNGs).
+/// - `composite_bloom_exposed` — the bright-pass's **units** (ADR-0080).
+///   `composite_bloom` leaves `exposure` unbound, and at the neutral stop the
+///   multiply is the identity, which is what makes it byte-identical across that
+///   change and blind to it.
+/// - `composite_symmetry` — the whole **radial group** (ADR-0077 + ADR-0078).
+///   Every other baseline leaves it at its identity, so the log wrap, the
+///   spiral's branch-cut closure, the inner freeze and the zoom's scaling by the
+///   period could all break with the suite green.
+/// - `composite_warp_swirl` / `_ripple` / `_fisheye` — each **warp kind**
+///   (ADR-0048). They bind the trails stage with `composite_trails`'s parameters
+///   param for param and add one structural key, `[feedback] warp`. Only the four
+///   together are worth having: `composite_trails` selects no warp, and a baseline
+///   cannot pin that the *others* differ — a shader taking one arm for every
+///   selector would pin three identical pictures happily. That half is asserted in
+///   `feedback.rs`'s `each_warp_kind_bends_the_past_its_own_way`; what lives here
+///   is the ordinary drift guard on each one's pixels. The warp is a selector in
+///   one shader rather than a shader per kind, so the quartet adds no pipeline.
 ///
 /// **Appended, never inserted**, for the reason `golden.rs`'s `EXTRA_FIXTURES`
 /// records: every pre-existing baseline is then rendered from the device state it
@@ -185,7 +161,7 @@ const FIXTURES: [(&str, &str); 10] = [
     ),
 ];
 
-/// The fixture whose whole point is that it no longer clips (Plan 0045 Phase 3).
+/// The fixture whose whole point is that it does not clip (Plan 0045 Phase 3).
 const OVERLAP: &str = "composite_overlap";
 
 fn golden_dir() -> PathBuf {

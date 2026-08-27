@@ -6,21 +6,19 @@
 //!
 //! ## `variant` is a contact angle, not an index (ADR-0060)
 //!
-//! It used to `floor` into one of three precomputed rosettes, so `[smoothing]`
-//! on it spent its time on fractional values a floor threw away and the change
-//! read as a stutter — design-backlog 0007's "change between star rosette shapes
-//! should be smooth". Now `variant` maps linearly onto a contact-angle offset:
-//! `0`, `1` and `2` land on exactly the `-24 / 0 / +24` degree offsets the three
-//! cached variants used to hold, so **a preset binding integers draws exactly
-//! what it drew before**, while a fractional value is a real rosette in between.
+//! `variant` maps linearly onto a contact-angle offset rather than flooring into
+//! one of three precomputed rosettes. `0`, `1` and `2` land on exactly the
+//! `-24 / 0 / +24` degree offsets of those three, so **a preset binding integers
+//! draws the rosette it names**, while a fractional value is a real rosette in
+//! between and `[smoothing]` has something to interpolate.
 //!
 //! The cache stays, keyed on the built angle with **hysteresis**: a request more
 //! than [`STEP_DEG`] from the built angle rebuilds, anything nearer reuses. That
 //! is what keeps generator work off the hot path (ADR-0007) now that a bound
 //! param can reach it.
 //!
-//! **The step is measured, not assumed** (ADR-0060 leaves the number to the
-//! plan). At `0.1` degrees:
+//! **The step is measured, not assumed** (ADR-0060 leaves the number open). At
+//! `0.1` degrees:
 //!
 //! - *Invisible in motion.* The worst case is the sharpest reachable rosette:
 //!   a 12-fold star at an 11-degree contact angle moves a vertex 11.0 px per
@@ -41,52 +39,47 @@
 //! ## The colour axis: **radius from the rosette centre** (ADR-0059)
 //!
 //! This scene honours `[palette]` / `[palette_b]` / `palette_mix` / `hue_spread`
-//! / `saturation` through the shared [`ColorRamp`]. Its declared axis is
-//! **normalized radius**: a Hankin rosette is rotationally symmetric about the
-//! frame centre, so a path-position axis would paint an arbitrary seam across a
-//! figure with no beginning, and radius is the only ordering the construction
-//! itself supplies.
+//! / `saturation` through the shared [`ColorRamp`], on a **normalized radius**
+//! axis: a Hankin rosette is rotationally symmetric about the frame centre, so
+//! radius is the only ordering the construction itself supplies.
 //!
-//! **And on the current construction that ramp is identically flat — measured,
-//! not estimated.** The rosette is `2n` *congruent* segments: each runs from a
+//! **On the bare rosette that ramp is identically flat — measured, not
+//! estimated.** The rosette is `2n` *congruent* segments: each runs from a
 //! contact point on the unit circle to a petal tip at radius
-//! `sin(a) / sin(pi/n + a)`, and every one of them is a rotation or reflection of
-//! every other about a centre that `normalize_fit` leaves at the origin (every
-//! tiling order the loader accepts — 4, 6, 8, 12 — is even, so the figure's
-//! bounding box is centred). So each segment's radial interval is the *same*
-//! interval, and one colour per segment has nothing to distinguish. Measured
-//! across both shipped presets and all three of their variants, the spread of
-//! segment radii is **1.2e-7**, which is f32 noise and not a range.
+//! `sin(a) / sin(pi/n + a)`, and every one is a rotation or reflection of every
+//! other about a centre that `normalize_fit` leaves at the origin (every tiling
+//! order the loader accepts — 4, 6, 8, 12 — is even, so the bounding box is
+//! centred). Each segment's radial interval is therefore the *same* interval, and
+//! one colour per segment has nothing to distinguish. Across both shipped presets
+//! and all three of their variants the spread of segment radii is **1.2e-7**,
+//! which is f32 noise and not a range.
 //!
-//! The *figure's* radial extent is a different quantity, and it is the one
-//! design-backlog 0007 reported as a "hollow ring": at `star_rosette`'s
-//! 12-fold / 20-degree rosette the strokes live between radius 0.54 and 0.90, so
-//! the inner **60%** of the disc is empty, and `star_lantern`'s 55-degree variant
-//! empties **87%** of it. That is real, and it is the interior question — not
-//! something a colour axis can answer.
+//! The *figure's* radial extent is a different quantity, and it is the "hollow
+//! ring" of design-backlog 0007: at `star_rosette`'s 12-fold / 20-degree rosette
+//! the strokes live between radius 0.54 and 0.90, so the inner **60%** of the
+//! disc is empty, and `star_lantern`'s 55-degree variant empties **87%**. That is
+//! the interior question, not something a colour axis can answer.
 //!
-//! `hue_spread` is therefore a **no-op on a rings-less preset**, and that is
-//! stated here and in `presets/README.md` rather than shipped as a lever that
-//! quietly does nothing. What such a preset does gain is `[palette]` itself: the
-//! rosette can finally be an ember or an ice figure instead of a point on the
-//! built-in cosine.
+//! `hue_spread` is therefore a **no-op on a rings-less preset**, stated here and
+//! in `presets/README.md` rather than shipped as a lever that quietly does
+//! nothing. What such a preset does gain is `[palette]` itself.
 //!
 //! ## The interior: rings of motifs (ADR-0079)
 //!
-//! **That day arrived.** `[generator] rings` is an optional roster of concentric
-//! rings — `{ motif, count, radius, scale, phase }` each — drawn through the same
-//! [`LineRenderer`] alongside, or instead of, the interlace. It is the answer to
-//! design-backlog 0007's hollow-ring half, and it is *placement* rather than
-//! construction: copy `i` of a ring of `k` sits at `2*pi*i/k + phase`, scaled by
-//! `scale`, at distance `radius`, in the same fit-normalized world the rosette
-//! lands in (the rosette spans `+/- 0.9`, so a `radius` near `0.9` sits on its
-//! rim and anything smaller is genuinely interior).
+//! `[generator] rings` is an optional roster of concentric rings — `{ motif,
+//! count, radius, scale, phase }` each — drawn through the same [`LineRenderer`]
+//! alongside, or instead of, the interlace. It answers design-backlog 0007's
+//! hollow-ring half, and it is *placement* rather than construction: copy `i` of
+//! a ring of `k` sits at `2*pi*i/k + phase`, scaled by `scale`, at distance
+//! `radius`, in the same fit-normalized world the rosette lands in (the rosette
+//! spans `+/- 0.9`, so a `radius` near `0.9` sits on its rim and anything smaller
+//! is genuinely interior).
 //!
 //! Two consequences worth stating where they can be read:
 //!
 //! - **With `rings` absent nothing here runs at all**, and the scene draws the
-//!   Hankin path it drew before, segment for segment — the rings live in their
-//!   own buffer and the combined one is never even allocated.
+//!   Hankin path segment for segment — the rings live in their own buffer and the
+//!   combined one is never even allocated.
 //! - **With `rings` present the radial colour axis stops being degenerate.** The
 //!   ramp is computed over the *combined* figure, which really does span radii,
 //!   so `hue_spread` becomes a live lever on exactly the presets that have an
@@ -97,13 +90,12 @@
 //!
 //! ## The rings move: three levers, and why two of them are radial
 //!
-//! Plan 0065 Phase 4 puts the ornament on the param surface without making the
-//! roster bindable — the roster stays structural, and what moves is a
-//! [`RingMotion`] applied to it: `ring_phase` turns **alternate rings in opposite
-//! directions**, `ring_spread` multiplies every radius about the centre, and
-//! `ring_scale` multiplies every motif's size. All three default to
-//! [`RingMotion::STATIC`], which is the exact identity (`+ 0`, `* 1`, `* 1`), so a
-//! preset that binds none of them draws Phase 1's figure bit for bit.
+//! The roster stays structural; what moves is a [`RingMotion`] applied to it.
+//! `ring_phase` turns **alternate rings in opposite directions**, `ring_spread`
+//! multiplies every radius about the centre, and `ring_scale` multiplies every
+//! motif's size. All three default to [`RingMotion::STATIC`], the exact identity
+//! (`+ 0`, `* 1`, `* 1`), so a preset that binds none of them draws the static
+//! ornament bit for bit.
 //!
 //! **The radial pair is not a garnish, and this is the one design note worth
 //! reading before authoring a mandala.** `core/tests/animation.rs` captures at
@@ -118,11 +110,10 @@
 //!
 //! Like the rosette, the ornament is **rebuilt under hysteresis**: a motion
 //! further than one step ([`RING_PHASE_STEP`] and friends) from what is held
-//! rebuilds, anything nearer reuses. A preset binding none of the three
-//! therefore never rebuilds after `configure`, which is the ADR-0007 property
-//! that made the roster structural in the first place — but a preset that
-//! *animates* a lever does re-place its ornament on most frames, and that is
-//! affordable rather than free. See [`RING_PHASE_STEP`] for the measurement.
+//! rebuilds, anything nearer reuses. A preset binding none of the three never
+//! rebuilds after `configure` — but one that *animates* a lever re-places its
+//! ornament on most frames, which is affordable rather than free. See
+//! [`RING_PHASE_STEP`] for the measurement.
 
 // Hot-path panic-denial pragma: `update`/`render` run every displayed frame.
 // `configure` (the Hankin construction) is build-time but colocated, so it
@@ -152,8 +143,8 @@ use crate::render::palette::{self, Palette};
 
 /// How far (degrees of contact angle) `variant` reaches either side of the
 /// preset's base angle — a pointier star at `0`, a blunter one at `2`. This is
-/// the span the three precomputed variants used to sit at (`-24 / 0 / +24`), kept
-/// so a preset binding integers is unchanged (ADR-0060).
+/// the span of the three precomputed variants (`-24 / 0 / +24`), so a preset
+/// binding integers draws one of them exactly (ADR-0060).
 const VARIANT_SPAN_DEG: f32 = 24.0;
 /// The `variant` value that means "the preset's own `contact_angle_deg`" — the
 /// middle of the range, and this scene's default.
@@ -494,10 +485,10 @@ impl StarPatternScene {
 /// The contact angle (degrees) a `variant` asks for, around the preset's
 /// `[generator] contact_angle_deg`.
 ///
-/// `variant` keeps the `0..2` range it has always had and 0 / 1 / 2 land exactly
-/// on the `-24 / 0 / +24` degree offsets the three precomputed variants used to
-/// hold, so a preset binding integers draws exactly what it drew before
-/// (ADR-0060). What is new is that everything between them is a real rosette.
+/// `variant` spans `0..2`, and 0 / 1 / 2 land exactly on the `-24 / 0 /
+/// +24` degree offsets of the three precomputed variants, so a preset
+/// binding integers draws one of them exactly (ADR-0060). Everything
+/// between them is a real rosette.
 ///
 /// **Total**, because it runs per frame from an author expression: a non-finite
 /// `variant` falls back to the centre rather than reaching the construction, and
@@ -697,13 +688,12 @@ pub enum Motif {
     /// A four-vertex rhombus, long along the radius.
     Diamond,
     /// An **open** circular arc bulging outward, chord tangential. One bead
-    /// among the others, and no longer the roster's answer to a scalloped
+    /// among the others, and **not** the roster's answer to a scalloped
     /// boundary.
     ///
-    /// **It was an approximation of one, and the user chose the real thing.**
-    /// Shown side by side with a dense overlapping arc ring at Plan 0065 Phase
-    /// 2, they picked a genuine boundary *curve primitive*, which the engine
-    /// did not then have (design-backlog 0071). It has one now:
+    /// A ring of these approximates one, and at Plan 0065 Phase 2 the user was
+    /// shown that side by side with a genuine boundary *curve primitive* and
+    /// picked the primitive (design-backlog 0071). That is
     /// [`Scallop`](Motif::Scallop), a single closed chain rather than a ring of
     /// copies faking continuity. Reach for that when you want a boundary, and
     /// for this when you want an open arc.
@@ -814,8 +804,8 @@ impl Motif {
     /// a chevron are nothing but straight lines.
     ///
     /// [`outline`](Self::outline) still returns the sampled polyline for the two
-    /// that have one, and it is no longer what `build_rings` draws them with.
-    /// It is kept because it is the *reference* the arc is checked against —
+    /// that have one, and it is **not** what `build_rings` draws them with. It
+    /// is kept because it is the *reference* the arc is checked against —
     /// `renderer/tests.rs` compares the primitive to a densely sampled polyline
     /// of the same arc, and this is where that polyline's shape is defined.
     fn arc_shape(self) -> Option<ArcShape> {
@@ -839,7 +829,7 @@ impl Motif {
     }
 
     /// This motif as a **G1 chain of circular arcs**, when its outline is a
-    /// curve that no single arc carries ([ADR-0098], Plan 0087 Phase 5).
+    /// curve that no single arc carries (ADR-0098, Plan 0087 Phase 5).
     ///
     /// `None` for the two circular members, which are exact single arcs already
     /// ([`arc_shape`](Self::arc_shape)), and for the two polygonal ones, whose
@@ -853,8 +843,6 @@ impl Motif {
     /// frame can change one. `build_rings` runs on most frames of an animated
     /// mandala, and re-deriving a constant there would put a build-time
     /// algorithm on the hot path.
-    ///
-    /// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
     fn chain(self) -> Option<&'static [Piece]> {
         let index = self.fitted_index()?;
         CHAINS
@@ -1118,12 +1106,12 @@ fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
 ///
 /// **One pixel at 1080p, at the largest scale the roster is drawn at.** A motif
 /// is authored spanning roughly one unit and placed at a ring `scale`; the three
-/// retired mandalas this plan exists for used `0.13` to `0.46`, so a copy at the
-/// top of that range covers `0.46` of the renderer's world y — 248 px at 1080p —
-/// and one of those pixels is `1 / 248 = 4.0e-3` of the local frame. Everything
-/// smaller is drawn better than the budget promises; a preset reaching past
-/// `0.46` (the ceiling is [`MAX_RING_SCALE`]) trades this off linearly and is
-/// still bounded by a chain that is G1 whatever its scale.
+/// retired mandalas it was measured against use `0.13` to `0.46`, so a copy at
+/// the top of that range covers `0.46` of the renderer's world y — 248 px at
+/// 1080p — and one of those pixels is `1 / 248 = 4.0e-3` of the local frame.
+/// Everything smaller is drawn better than the budget promises; a preset
+/// reaching past `0.46` (the ceiling is [`MAX_RING_SCALE`]) trades this off
+/// linearly and is still bounded by a chain that is G1 whatever its scale.
 const MOTIF_FIT_BUDGET: f32 = 4.0e-3;
 
 /// Every fitted motif's chain, in [`Motif::fitted_index`] order — see
@@ -1414,8 +1402,8 @@ pub(crate) fn build_rings(
         }
 
         // A circular motif is one arc per copy, with no interior joint at any
-        // scale (ADR-0098) — where it used to be `SMOOTH_SAMPLES` segments and
-        // as many additive beads.
+        // scale (ADR-0098), rather than `SMOOTH_SAMPLES` segments and as many
+        // additive beads.
         if let Some(shape) = ring.motif.arc_shape() {
             for i in 0..count {
                 if out.len() + arcs.len() >= cap {

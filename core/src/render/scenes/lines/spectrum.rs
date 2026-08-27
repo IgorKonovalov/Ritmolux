@@ -27,16 +27,12 @@
 //!   symmetric, the same near-no-op the Hankin star has); on bars and polyline
 //!   it is genuinely transformative, because those figures are not centred.
 //! - `[palette]` / `[palette_b]` / `palette_mix` / `hue` / `hue_spread` /
-//!   `saturation` — the colour surface (ADR-0021), sampled on the CPU. This was
-//!   the **first line scene to honor the palette**, and since Plan 0054
-//!   (ADR-0059) it is the pattern the other three follow: each walks
-//!   `hue_spread` along the axis its own generator makes meaningful — path
-//!   position on [`parametric`](super::parametric), generation depth on
-//!   [`lsystem`](super::lsystem), radius on [`star`](super::star) — and this
-//!   scene's is **band index**, unchanged. It mattered here first because
-//!   colouring elements along their own axis is what turns a frequency readout
-//!   into a look. The default `spectrum` palette is the engine cosine, so an
-//!   author who sets no `[palette]` sees the usual colour language.
+//!   `saturation` — the colour surface (ADR-0021), sampled on the CPU. Each line
+//!   scene walks `hue_spread` along the axis its own generator makes meaningful
+//!   (ADR-0059) — path position on [`parametric`](super::parametric), generation
+//!   depth on [`lsystem`](super::lsystem), radius on [`star`](super::star) — and
+//!   this scene's is **band index**. The default `spectrum` palette is the engine
+//!   cosine, so an author who sets no `[palette]` sees the usual colour language.
 //! - `thickness` / `brightness` / `scale` / `base` — ordinary stroke styling.
 //! - `curve` — the level-shaping exponent (ADR-0040, Plan 0038 Phase 3), applied
 //!   to the downsampled level **before** the per-element smoother so the easing
@@ -46,9 +42,9 @@
 //!   whole-figure like on the other three line scenes. Not a post bloom.
 //! - `softness` — the across-the-stroke profile (ADR-0124), whole-figure and
 //!   shared with the other three line scenes. Default `0.25`: a solid bar with
-//!   a short shoulder. `1.0` is the quadratic falloff these bars drew before
-//!   Plan 0114; `0` is solid with a one-pixel edge. A different quantity from
-//!   `glow`, which scales the light and never the coverage.
+//!   a short shoulder. `1.0` is the pure quadratic falloff; `0` is solid with a
+//!   one-pixel edge. A different quantity from `glow`, which scales the light and
+//!   never the coverage.
 //!
 //! Three parameters are **layout-specific**, and each is a no-op on the layouts
 //! it does not describe — stated in `presets/README.md` and `docs/presets.md`
@@ -110,10 +106,9 @@ const DEFAULT_RADIUS: f32 = 0.35;
 ///
 /// It is a **world** quantity, not a screen one. The renderer divides x by the
 /// target aspect on the GPU, so this scene never sees an aspect and cannot take
-/// one from the wrong place ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
-/// The honest consequence: *"fill the width"* is aspect-dependent — `span ≈
-/// 1.78` fills a 16:9 frame and leaves an ultrawide short. There is
-/// deliberately no `fit` mode.
+/// one from the wrong place (ADR-0037). The honest consequence: *"fill the
+/// width"* is aspect-dependent — `span ≈ 1.78` fills a 16:9 frame and leaves an
+/// ultrawide short. There is deliberately no `fit` mode.
 ///
 /// Applies to [`SpectrumLayout::Bars`] and [`SpectrumLayout::Polyline`]; a
 /// **no-op on [`SpectrumLayout::RadialRing`]**, which is sized by `radius`
@@ -130,9 +125,9 @@ const DEFAULT_SPAN: f32 = 1.0;
 /// frame centre, while one standing at `-0.85` throws its copy against the top
 /// edge (design-backlog 0018).
 const DEFAULT_BASELINE: f32 = -0.85;
-/// Level-shaping exponent ([ADR-0040](../../../../../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md)).
-/// `1.0` is exactly linear — `powf(x, 1.0) == x`, the map this scene had before
-/// Plan 0038 Phase 3 — `0.5` is a square root, and lower values compress harder.
+/// Level-shaping exponent (ADR-0040). `1.0` is exactly linear — `powf(x, 1.0) ==
+/// x`, the map this scene had before Plan 0038 Phase 3 — `0.5` is a square root,
+/// and lower values compress harder.
 ///
 /// It applies to the **downsampled level, before the per-element smoother**, so
 /// `[spectrum] smoothing` eases the displayed quantity the way meter ballistics

@@ -224,7 +224,7 @@ fn the_text_report_header_names_its_source_and_its_tier() {
 }
 
 /// The table body renders one row per preset, with the transient marks the cells
-/// carry — the formatting that used to be unreachable from any test.
+/// carry, which is otherwise unreachable from any test.
 #[test]
 fn the_text_report_emits_a_row_per_preset_with_its_transient_marks() {
     let fam = FamilyReport {
@@ -505,8 +505,8 @@ fn the_rate_reading_is_the_mean_of_consecutive_frame_differences() {
         mean_consecutive_diff(&ramp)
     );
 
-    // The same eight frames, reordered. The hops are no longer all `step`, so a
-    // statistic that reads consecutive pairs must now answer differently — a
+    // The same eight frames, reordered, so the hops are not all `step` and a
+    // statistic that reads consecutive pairs has to answer differently — a
     // first-against-last differential would be identical for any permutation
     // that kept its endpoints.
     let shuffled: Vec<CaptureImage> = [0usize, 2, 1, 3, 5, 4, 6, 7]

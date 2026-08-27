@@ -1,10 +1,10 @@
 //! The backdrop colours through the preset's palette (Plan 0072 Phase 1,
 //! ADR-0086).
 //!
-//! `background.rs` used to carry its own inline copy of the iq cosine, so
-//! `[palette]` stopped at the scene and never reached the sky. It now samples the
-//! same baked LUT pair every other scene samples. This suite is the two halves of
-//! that claim:
+//! An inline copy of the iq cosine in `background.rs` leaves
+//! `[palette]` stopping at the scene and never reaching the sky; the
+//! pass samples the same baked LUT pair every other scene samples
+//! instead. This suite is the two halves of that claim:
 //!
 //! - **Nothing moved for a preset that declares no `[palette]`.** The built-in
 //!   `spectrum` gradient is generated from the identical cosine, so the only
@@ -49,8 +49,8 @@ const FRAMES: u32 = 4;
 const BRIGHT: f32 = 0.55;
 
 /// The `d` term of the iq cosine `spectrum` bakes from (`palette.rs:109`) — the
-/// constant `background.rs` used to inline, and the reference the no-palette half
-/// is measured against.
+/// constant an inline copy in `background.rs` would carry, and the reference
+/// the no-palette half is measured against.
 const COSINE_D: [f32; 3] = [0.10, 0.42, 0.62];
 
 /// The analytic cosine at `t`, per channel: `0.5 + 0.5*cos(2π*(t + d))`, clamped.
@@ -156,12 +156,12 @@ fn assert_lit(image: &CaptureImage, what: &str) {
 /// **A preset that declares no `[palette]` did not move** — the load-bearing
 /// no-regression half of ADR-0086, asserted as a bound.
 ///
-/// `spectrum` is generated from the same `d = (0.10, 0.42, 0.62)` the pass used to
-/// inline, so the two differ only by the LUT: linear interpolation of that cosine
-/// over a 1/256 step errs by at most ~3.8e-5, and `Rgba8Unorm` storage adds at
-/// most half a step (~2.0e-3). Both are multiplied by `bg_bright`, so at this
-/// file's 0.55 the linear-light error is ~1.1e-3 — about a quarter of one 8-bit
-/// level, before `grad` and `vig` shrink it further.
+/// `spectrum` is generated from that same `d = (0.10, 0.42, 0.62)`, so the two
+/// differ only by the LUT: linear interpolation of that cosine over a 1/256
+/// step errs by at most ~3.8e-5, and `Rgba8Unorm` storage adds at most half a
+/// step (~2.0e-3). Both are multiplied by `bg_bright`, so at this file's 0.55
+/// the linear-light error is ~1.1e-3 — about a quarter of one 8-bit level,
+/// before `grad` and `vig` shrink it further.
 ///
 /// # How the reference is produced without re-deriving the shader
 ///

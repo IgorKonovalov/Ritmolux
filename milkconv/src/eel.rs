@@ -2,7 +2,7 @@
 //!
 //! **This never ships.** It parses the imperative program text a `.milk` file
 //! carries and emits the [`EelProgram`] `lmv-core`'s VM executes, ahead of time
-//! ([ADR-0113](../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! (ADR-0113).
 //!
 //! # The language, as MilkDrop uses it
 //!
@@ -274,7 +274,7 @@ impl Symbols {
         Self::default()
     }
 
-    /// The index of `name`, interning it if it is new.
+    /// The index of `name`, interning it on first sight.
     fn intern(&mut self, name: &str, at: usize) -> Result<u16, EelError> {
         if let Some(index) = self.index.get(name) {
             return Ok(*index);
@@ -399,7 +399,7 @@ impl<'a> Compiler<'a> {
         self.code.len() as u32
     }
 
-    /// Rewrite a previously-emitted jump's target to point at `here()`.
+    /// Rewrite an already-emitted jump's target to point at `here()`.
     fn patch(&mut self, index: usize, target: u32) {
         if let Some(op) = self.code.get_mut(index) {
             *op = match *op {

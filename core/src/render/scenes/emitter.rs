@@ -1,14 +1,13 @@
 //! Emitter scene: objects that **spawn**, follow an **analytic** ballistic path,
 //! age, and are **retired** — the first scene in the engine whose population is
-//! not fixed ([ADR-0057](../../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+//! not fixed (ADR-0057).
 //!
 //! It exists beside the swarm rather than inside it. The swarm's world is a
-//! **torus** ([ADR-0044](../../../../docs/adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)):
-//! `bounds(aspect)` wraps every particle back into frame, deliberately, so the
-//! field stays populated with no respawn hitches. A cascade is the opposite
-//! requirement — a thing that falls out of shot and does not come back — so the
-//! two worlds cannot share one scene without a mode switch that changes the world
-//! topology.
+//! **torus** (ADR-0044): `bounds(aspect)` wraps every particle back into frame,
+//! deliberately, so the field stays populated with no respawn hitches. A cascade
+//! is the opposite requirement — a thing that falls out of shot and does not come
+//! back — so the two worlds cannot share one scene without a mode switch that
+//! changes the world topology.
 //!
 //! # Position is a closed form, not an accumulator
 //!
@@ -20,11 +19,11 @@
 //! ```
 //!
 //! There is **no `dt` in the position at all**, so the trajectory is exactly
-//! frame-rate independent by construction rather than by tuning — the class of
-//! divergence Plan 0014 removed when it retired `SCENE_DT` cannot reappear here.
-//! It also makes the arithmetic checkable: an object launched with vertical speed
-//! `v0` against gravity `g` reaches its apex at `t = v0 / g` and at height
-//! `v0^2 / (2 g)`, on any cadence. See
+//! frame-rate independent by construction rather than by tuning — the `SCENE_DT`
+//! class of divergence (Plan 0014) cannot reappear here. It also makes the
+//! arithmetic checkable: an object launched with vertical speed `v0` against
+//! gravity `g` reaches its apex at `t = v0 / g` and at height `v0^2 / (2 g)`, on
+//! any cadence. See
 //! [`an_object_follows_the_closed_form_parabola`](tests::an_object_follows_the_closed_form_parabola).
 //!
 //! **Retirement is a closed form too, and that is not decoration.** Sampling "is
@@ -49,8 +48,7 @@
 //! Objects draw through the swarm's sprite idiom — `vec4(colour * g, g)` on
 //! [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`] — so this is the **third** pipeline
 //! that writes directly into the post chain's input and it owes the third
-//! lit-backdrop guard
-//! ([ADR-0056](../../../../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)).
+//! lit-backdrop guard (ADR-0056).
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Runs every displayed frame.
@@ -100,12 +98,12 @@ const BASE_SIZE: f32 = 0.019;
 /// Sized so the elongation reads at a few pixels across without the mark becoming
 /// a streak: at 0.55 the long axis is not quite twice the short one.
 ///
-/// **Plan 0070 answered the shape question this used to defer** (ADR-0084), and
-/// deliberately left this arm alone: `shape = disc` on the emitter is *this*
-/// figure, not a circle, so every existing preset and the golden baseline are
-/// untouched. The roster's other four silhouettes are evaluated on the
-/// un-squashed sprite frame, so a star is a star rather than a squashed one — and
-/// `spin` turns it, which is what makes a shaped mark read as an object.
+/// **Plan 0070 answered the shape question and deliberately left this arm alone**
+/// (ADR-0084): `shape = disc` on the emitter is *this* figure, not a circle, so
+/// every existing preset and the golden baseline are untouched. The roster's
+/// other four silhouettes are evaluated on the un-squashed sprite frame, so a
+/// star is a star rather than a squashed one — and `spin` turns it, which is what
+/// makes a shaped mark read as an object.
 const GLINT_ANISO: f32 = 0.55;
 
 /// The per-object twinkle rate, in Hz, at the two ends of the seeded draw.
@@ -161,7 +159,7 @@ const DEFAULT_SPIN: f32 = 0.0;
 const DEFAULT_TWINKLE: f32 = 0.0;
 // The source geometry (Plan 0090). Both defaults are the geometry this scene
 // shipped with, stated as values rather than as constants at the spawn site
-// ([ADR-0104](../../../../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)).
+// (ADR-0104).
 /// Where the source line sits, in world units. Just **below** the visible frame,
 /// so an upward-launched object rises into shot rather than appearing in it.
 ///
@@ -744,10 +742,10 @@ fn spawn_ramp(u: f32, spawn_fade: f32) -> f32 {
     (u / spawn_fade).clamp(0.0, 1.0)
 }
 
-/// **The per-object brightness multiplier** — the answer to the report this plan
-/// came from (ADR-0057 Notes: the user asked for stars that *blink* and got a
-/// field-wide flash, because a binding is evaluated once per frame for the whole
-/// scene).
+/// **The per-object brightness multiplier** — the answer to ADR-0057's
+/// Notes, where the user asked for stars that *blink* and got a
+/// field-wide flash, because a binding is evaluated once per frame for
+/// the whole scene.
 ///
 /// Both the rate and the phase come off the object's seed, so no two objects
 /// share an oscillator and the field never flashes as one sheet. Exactly `1.0`

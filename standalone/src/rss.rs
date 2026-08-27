@@ -23,7 +23,7 @@ pub fn current_rss_bytes() -> Option<u64> {
 
 /// macOS working set via mach `task_info(MACH_TASK_BASIC_INFO)`. Raw mach
 /// bindings so we add no dependency; unvalidated pending a Mac (the standing
-/// Plan 0001 carry-forward — macOS is not validated this plan).
+/// Plan 0001 carry-forward).
 #[cfg(target_os = "macos")]
 pub fn current_rss_bytes() -> Option<u64> {
     const MACH_TASK_BASIC_INFO: u32 = 20;

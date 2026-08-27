@@ -177,7 +177,7 @@ fn watch(slot: &Arc<Slot>, stop: &Arc<AtomicBool>) {
 /// what it is playing.
 fn rebind(manager: &Manager, watcher: &Arc<Watcher>) {
     // Drop the previous registration first: a handler left on a superseded
-    // session would keep reporting a track that is no longer playing.
+    // session would keep reporting a track that has stopped playing.
     if let Ok(mut bound) = watcher.bound.lock()
         && let Some((session, token)) = bound.take()
     {

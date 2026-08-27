@@ -1,6 +1,6 @@
-//! **The in-frame geometry fraction** (Plan 0069, [ADR-0083]) — the share of
-//! drawn segment length that lands inside the render target, measured at
-//! `LineRenderer::draw` and covering the four line-family scenes
+//! **The in-frame geometry fraction** (Plan 0069, ADR-0083) — the share
+//! of drawn segment length that lands inside the render target, measured
+//! at `LineRenderer::draw` and covering the four line-family scenes
 //! (`parametric_curve`, `lsystem`, `star_pattern`, `spectrum`) with one
 //! implementation.
 //!
@@ -31,8 +31,6 @@
 //! `Renderer::new_headless` in this binary would be a second GPU resource build
 //! mid-run, which `composite.rs` documents as changing what the software adapter
 //! resolves.
-//!
-//! [ADR-0083]: ../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md
 
 use lmv_core::{
     dsp::{AnalysisFrame, SPECTRUM_BINS},
@@ -333,7 +331,7 @@ const OVER_SCALED: [(&str, &str, &str); 2] = [
 /// `0.80` on the loud/moderate coverage ratio would have sat `0.055` from De
 /// Jong, the lowest *legitimate* content in the library — and convicted none of
 /// the three known-defective configurations, which scored *above* it. It is the
-/// benchmark this plan exists to beat, and it is quoted rather than recomputed
+/// benchmark this instrument exists to beat, quoted rather than recomputed
 /// because it belongs to a measurement that has already been taken.
 const PIXEL_COVERAGE_MARGIN: f32 = 0.055;
 
@@ -343,11 +341,11 @@ const PIXEL_COVERAGE_MARGIN: f32 = 0.055;
 /// asserted, because they are measurements of specific presets and content is
 /// allowed to move.
 ///
-/// **Set at five times the benchmark, and the plan asked for ten. Measured, the
+/// **Set at five times the benchmark, against a target of ten. Measured, the
 /// two pairs read `9.0x` (comb) and `14.2x` (corona)** — so the corona clears
-/// the plan's bar and the comb does not, and the reason is geometry rather than
-/// tuning. A comb roots every bar on a shared baseline, so a fully-driven bar at
-/// `scale = 3.80` stands `3.97` world units tall from `-0.85` and keeps the
+/// that target and the comb does not, and the reason is geometry rather than
+/// tuning. A comb roots every bar on a shared baseline, so a fully-driven bar
+/// at `scale = 3.80` stands `3.97` world units tall from `-0.85` and keeps the
 /// `1.85` below the top edge **in frame whatever else is done to it**: about
 /// `0.47` of its own length, which bounds the achievable separation near `0.53`
 /// before the repaired preset's own losses are counted. That is the same
@@ -399,7 +397,7 @@ fn fraction_of(renderer: &mut Renderer, preset: Preset) -> Option<f32> {
 /// # What is asserted, and what is only printed
 ///
 /// The absolute fraction of any given preset is **printed, not asserted**
-/// ([ADR-0071]): those are measurements of specific content, and content is
+/// (ADR-0071): those are measurements of specific content, and content is
 /// allowed to move. What is asserted is a *relation* — that correcting the one
 /// binding that was wrong moves this measure decisively, in the right direction,
 /// on both known defects — plus the structural facts that keep the sweep from
@@ -442,8 +440,6 @@ fn fraction_of(renderer: &mut Renderer, preset: Preset) -> Option<f32> {
 /// actually asks. Anyone reaching for `assert!(fraction > 0.5)` over the library
 /// would fail two shipped presets that are working as authored — which is
 /// exactly the mistake ADR-0083 catalogues pixel coverage making, one axis over.
-///
-/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 #[test]
 fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
     let Some(mut renderer) = headless() else {

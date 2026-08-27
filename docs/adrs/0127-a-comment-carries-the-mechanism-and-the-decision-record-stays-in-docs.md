@@ -1,8 +1,8 @@
 # ADR-0127 — a comment carries the mechanism, and the decision record stays in `docs/`
 
-> **Status:** proposed
+> **Status:** **accepted** (Plan 0118, closed 2026-08-27)
 > **Date:** 2026-08-25
-> **Related plan(s):** [0118 — the comments stop narrating the plans that wrote them](../plans/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
+> **Related plan(s):** [0118 — the comments stop narrating the plans that wrote them](../plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
 > **Supplements:** [ADR-0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md),
 > whose argument about index rows this applies one layer down
 

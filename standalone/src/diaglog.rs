@@ -111,8 +111,9 @@ impl DiagLog {
         let _ = file.flush();
     }
 
-    /// Open (creating dirs and the file) for appending, writing the header if the
-    /// file is new. A failure is reported once and leaves the logger dormant.
+    /// Open (creating dirs and the file) for appending, writing the
+    /// header when the file did not exist. A failure is reported once
+    /// and leaves the logger dormant.
     fn open(&mut self, path: &Path) {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);

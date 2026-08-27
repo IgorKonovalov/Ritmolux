@@ -69,7 +69,7 @@ fn the_vocabulary_carries_the_shared_roster() {
 }
 
 /// **The aspect comes from the render target, and this test bites**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// A `disc` is rendered at 2:1 and at 1:2 and its own extent is measured in
 /// pixels. The figure must be **round** — the same number of frame-widths across
@@ -257,8 +257,7 @@ fn banding_the_distance_draws_offsets_of_the_shape() {
 // one thing built is the response exponent.
 
 /// The response exponent is conditioned CPU-side, and **`1.0` is the exact
-/// identity** ([ADR-0092](../../../../../docs/adrs/0092-the-ink-remap-is-a-gamma-on-the-key.md)'s
-/// care, because `pow(x, 1.0)` is not bit-exact).
+/// identity** (ADR-0092's care, because `pow(x, 1.0)` is not bit-exact).
 #[test]
 fn the_response_exponent_is_an_exact_identity_at_one() {
     assert_eq!(applied_gamma(DEFAULT_GAMMA), 1.0);
@@ -416,17 +415,16 @@ fn the_figure_breathes_monotonically_with_scale() {
 }
 
 /// **Rings travel outward from `color_center`, and the wrap does not stutter** —
-/// the first of the three asks, and the plan's expectation was that it costs no
-/// code. It does not, and this is the evidence plus the check on the one seam
-/// that could have spoiled it.
+/// the first of the three asks, and it costs no code. This is the evidence, plus
+/// the check on the one seam that could have spoiled it.
 ///
 /// `color_center` offsets the palette coordinate, which is now a distance, so
-/// sliding it slides every contour outward together. The risk the plan named is
-/// the LUT's **repeat addressing**: the coordinate wraps at 1, and if the
-/// gradient's two ends differ the wrap is a visible seam crossing the figure. So
-/// this walks a full cycle of `color_center` and asserts two things — that the
-/// picture actually moves at every step, and that no single step is an outlier
-/// against the rest, which is what a stutter at the wrap would look like.
+/// sliding it slides every contour outward together. The risk is the LUT's
+/// **repeat addressing**: the coordinate wraps at 1, and if the gradient's two
+/// ends differ the wrap is a visible seam crossing the figure. So this walks a
+/// full cycle of `color_center` and asserts two things — that the picture
+/// actually moves at every step, and that no single step is an outlier against
+/// the rest, which is what a stutter at the wrap would look like.
 #[test]
 fn rings_travel_outward_with_color_center_and_the_wrap_does_not_stutter() {
     use crate::render::metrics::frame_diff;
@@ -493,9 +491,9 @@ fn rings_travel_outward_with_color_center_and_the_wrap_does_not_stutter() {
 /// **Ring count on the beat**: `palette_steps` is quantized CPU-side, so an
 /// eased binding visits whole counts and never a fractional one.
 ///
-/// The plan's open question is not whether it works but whether it *reads* — a
-/// band count is a global change to every pixel at once, "which is exactly the
-/// shape a strobe has". That is Phase 6's judgement, in the running app. What
+/// The open question is not whether it works but whether it *reads* — a band
+/// count is a global change to every pixel at once, which is exactly the
+/// shape a strobe has. That is Phase 6's judgement, in the running app. What
 /// this pins is the half a test can settle: each count is a distinct picture,
 /// and the distinctness is not an artifact of a fractional value crawling.
 #[test]
@@ -801,7 +799,7 @@ fn the_two_modes_coincide_on_a_disc() {
 
 // --- Phase 4: `ring` gets an honest answer -------------------------------------
 //
-// ADR-0111 names this as the one behavioural choice it leaves to the plan, with
+// ADR-0111 names this as the one behavioural choice it leaves open, with
 // three defensible answers. All three were rendered before one was chosen, and
 // the rendering is what settled it rather than the argument:
 //
@@ -936,7 +934,7 @@ fn the_rotation_passes_through_and_zero_is_the_identity() {
 }
 
 /// **A quarter turn does not shear the figure at a 2:1 target**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// The rotation happens in `uv`, which has already had x stretched by the
 /// **render target's** aspect — so one unit is the same length on both axes and
@@ -1037,8 +1035,8 @@ fn a_quarter_turn_neither_shears_nor_resizes_the_figure() {
     );
 }
 
-/// **The figure spins in place rather than orbiting the frame centre** — the
-/// choice the plan required be stated, asserted where it is visible.
+/// **The figure spins in place rather than orbiting the frame centre** — a
+/// stated choice, asserted where it is visible.
 ///
 /// `rotation` is applied to `uv - pan`, i.e. **after** the pan. Applied before
 /// it, the same two lines would swing the figure around the frame's middle on a

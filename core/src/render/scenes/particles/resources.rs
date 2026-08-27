@@ -202,7 +202,7 @@ pub(super) struct PipelineResources {
     /// The shared gradient LUT textures (A/B) the draw vertex shader samples +
     /// crossfades (ADR-0021); uploaded from the scene's baked palette on the first
     /// frame after a build and on a preset switch. They outlive a grid change, so
-    /// a resize no longer re-uploads the palette.
+    /// a resize does not re-upload the palette.
     pub(super) lut_texture_a: wgpu::Texture,
     pub(super) lut_texture_b: wgpu::Texture,
     /// Kept so a grid change can rebuild [`FieldResources`]' four bind groups

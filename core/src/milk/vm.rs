@@ -1,8 +1,7 @@
 //! The stack VM that executes an [`EelProgram`](super::bytecode::EelProgram).
 //!
 //! **The only half of the EEL2 machine that ships.** The compiler lives in
-//! `milkconv` and never enters `lmv.exe` or `foo_lmv.dll`
-//! ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! `milkconv` and never enters `lmv.exe` or `foo_lmv.dll` (ADR-0113).
 //!
 //! # The three properties this file exists to keep
 //!
@@ -51,8 +50,8 @@ use super::bytecode::{Binary, COMPARE_EPSILON, EelProgram, Mem, Op, Unary};
 /// EEL2's reference `megabuf` is 8 388 608 slots, which at `f32` is 32 MB **per
 /// preset** — by a wide margin the largest memory number Plan 0100 could
 /// introduce, and one that would be allocated whether or not a preset touched a
-/// single slot. The census taken before the plan started says only **4 %** of the
-/// corpus (435 of 10 347 files) mentions `megabuf` or `gmegabuf` at all.
+/// single slot. The corpus census says only **4 %** of it (435 of 10 347 files)
+/// mentions `megabuf` or `gmegabuf` at all.
 ///
 /// So the arena is sized from what the corpus plausibly uses rather than from the
 /// reference: 65 536 slots, 256 KB, allocated once per loaded preset and never

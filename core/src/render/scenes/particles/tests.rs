@@ -793,7 +793,7 @@ fn the_scene_integrates_the_spin_it_is_given() {
     let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
         return;
     };
-    // A held figure, across the 120 frames the plan names.
+    // A held figure, across 120 frames.
     h.scene.set_param("spin", 0.0);
     h.run(120);
     assert_eq!(
@@ -2293,12 +2293,13 @@ fn an_unusable_emergence_binding_clamps_instead_of_dividing() {
     }
 }
 
-/// **The retired names no longer resolve** (Plan 0074 Phase 3).
+/// **The retired names do not resolve** (Plan 0074 Phase 3).
 ///
 /// `set_param` silently ignores an unknown name — that is how a preset
-/// binding a typo warns at load rather than failing — so "it no longer
-/// resolves" has to be asserted as *the field it used to write does not
-/// move*, which here means the whole colour row stays at its default.
+/// binding a typo warns at load rather than failing — so "it does not
+/// resolve" has to be asserted as *the field that name would write does
+/// not move*, which here means the whole colour row stays at its
+/// default.
 #[test]
 fn the_age_colour_channel_is_gone_from_the_roster() {
     for retired in ["age_tint", "age_hue"] {
@@ -2491,7 +2492,7 @@ fn after_six_hundred_steps_the_population_holds_every_age() {
 /// **ceiling is therefore measured and printed, never asserted** — it is a
 /// property of each figure's invariant measure rather than of this code, and
 /// a threshold on it would be a frozen number asserted universally, the
-/// shape [ADR-0071] forbids. What *is* asserted is the property the claim was
+/// shape ADR-0071 forbids. What *is* asserted is the property the claim was
 /// reaching for and which holds on all five: the values reach an exact `0`
 /// and rise with **no gap wider than a decile of the occupied bulk**.
 ///
@@ -2502,8 +2503,6 @@ fn after_six_hundred_steps_the_population_holds_every_age() {
 ///
 /// The printed table is what the Phase 2 gate reads: it is the only place the
 /// per-figure ceilings are recorded from a live run.
-///
-/// [ADR-0071]: ../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 #[test]
 fn after_six_hundred_steps_the_root_channel_is_spread_on_every_figure() {
     const FRAMES: u32 = 600;

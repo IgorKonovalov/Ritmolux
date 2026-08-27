@@ -13,7 +13,7 @@
 > (the landing route)
 > **Serves:** [roadmap-visual-richness R6](../../roadmap-visual-richness.md)
 > **Closes (Phases 1-3):**
-> [backlog 0072](../../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo),
+> [backlog 0072](../../design-backlog-archive.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo),
 > [0067](../../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
 > [0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report),
 > [0061](../../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work),
@@ -99,7 +99,7 @@ flowchart TD
 - **Owner skill:** dev
 - **Area:** core (tests)
 - **What:** resolve
-  [backlog 0072](../../design-backlog.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo):
+  [backlog 0072](../../design-backlog-archive.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo):
   at 96x96 the `sanity.rs` coverage statistic cannot see a dense thin-stroke figure (the bare
   rosette and a 46x-denser mandala score identically), so the only lever that clears the floor
   is inflating `glow`/`trails` — the exact look the user rejected. The entry names the two

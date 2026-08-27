@@ -96,7 +96,7 @@ fn a_crossing_segment_contributes_its_clipped_share() {
 }
 
 /// **The rectangle follows the aspect the caller hands in, and only that**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// `measure_extent` is a free function over the endpoints: there is no
 /// `self`, no texture and no internal grid in scope, so the aspect parameter
@@ -436,14 +436,14 @@ fn half_slack(value: f32) -> f32 {
 /// **Where the strokes drew no light, the backdrop arrives intact** — the
 /// same guard `swarm.rs` installs, on the other draw seam.
 ///
-/// `fs_main` used to return `vec4(in.color * g * u.v.y, 1.0)`: colour carried
-/// the across-the-stroke falloff, alpha was a literal constant. With the
-/// alpha blend at `BlendComponent::OVER` and a source alpha of exactly 1,
-/// destination alpha saturated across the whole stroke quad — including the
-/// two long edges where the falloff reaches zero and the shader wrote
-/// nothing. The chain resolves `src.rgb + backdrop * (1 - src.a)`
-/// (ADR-0055), so those edges discarded the backdrop and rendered as black
-/// rims and wedges over the figure.
+/// Returning `vec4(in.color * g * u.v.y, 1.0)` from `fs_main` puts the
+/// across-the-stroke falloff in colour and a literal constant in alpha.
+/// With the alpha blend at `BlendComponent::OVER` and a source alpha of
+/// exactly 1, destination alpha saturates across the whole stroke quad —
+/// including the two long edges where the falloff reaches zero and the
+/// shader wrote nothing. The chain resolves `src.rgb + backdrop * (1 -
+/// src.a)` (ADR-0055), so those edges discarded the backdrop and rendered
+/// as black rims and wedges over the figure.
 ///
 /// **This is the quiet seam of the two, and that is a geometric fact rather
 /// than a difference in kind.** The swarm's falloff is radial over a *square*
@@ -978,7 +978,7 @@ fn arc_capture(
 /// width, so at this sampling density every vertex would overlap its
 /// neighbours by most of a stroke and the additive composite would sum to
 /// something far brighter than either primitive draws. That bead is the defect
-/// this plan exists to remove, not the baseline the arc should match — the
+/// ADR-0098 exists to remove, not the baseline the arc should match — the
 /// question here is whether the two draw the same *curve*.
 fn sampled_circle(centre: [f32; 2], radius: f32, width: f32) -> Vec<SegmentInstance> {
     let point = |k: usize| {
@@ -1166,7 +1166,7 @@ fn an_arc_draws_the_same_curve_as_a_dense_polyline() {
 /// different expressions reaching the same `stroke_coverage`, prepended to both
 /// modules by [`arc_shader_source`](super::arc_shader_source). Two hand-kept
 /// copies would compile and render, and the symptom would be a mandala whose
-/// circles and interlace no longer match. So the cross-sections are compared at
+/// circles and interlace stop matching. So the cross-sections are compared at
 /// **both ends of the `softness` range and one value between**, against a single
 /// straight segment rather than against a polyline — one quad has no seams and
 /// no unjoined corners, which is what makes the comparison survive a hard edge.
@@ -1329,9 +1329,7 @@ fn a_renderer_without_the_arc_pipeline_draws_no_arcs() {
 ///
 /// The count is a ratio against the arc's own full circle rather than an
 /// absolute pixel number, so it stays a property of the geometry rather than a
-/// number recorded off this capture size ([ADR-0071]).
-///
-/// [ADR-0071]: ../../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+/// number recorded off this capture size (ADR-0071).
 #[test]
 fn an_arcs_angular_span_is_what_it_draws() {
     const RADIUS: f32 = 0.6;
@@ -1559,7 +1557,7 @@ fn row_ndc_y(row: usize, height: u32) -> f32 {
 /// floors to [`MIN_HALF_WIDTH`](super::super::MIN_HALF_WIDTH) and lands at about
 /// a quarter pixel. The other two are **real shipped geometry**:
 /// `warp_mesh::draw`'s `THIN = 0.0025` NDC-y, the width every MilkDrop waveform,
-/// motion vector and thin border is stroked at, at the two target sizes the plan
+/// motion vector and thin border is stroked at, at the two target sizes ADR-0124
 /// reasons about. It is 1.35 px of half-width at 1080p and **1.0 px** at
 /// 1280x800, and byte-identity for `warp_mesh` — which is pinned at `1.0` and
 /// has no golden baseline shading a stroke — depends on the cap holding there.
@@ -1627,8 +1625,7 @@ fn the_edge_term_never_exceeds_the_softness_term() {
 }
 
 /// **The edge is a width in pixels of the render target, not a fraction of the
-/// stroke** ([ADR-0124], the other side of
-/// [ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// stroke** (ADR-0124, the other side of ADR-0037).
 ///
 /// At `softness = 0` the ramp is the edge term alone, so the coverage a pixel
 /// carries is a function of **how many pixels inside the stroke edge it sits**
@@ -1647,8 +1644,6 @@ fn the_edge_term_never_exceeds_the_softness_term() {
 /// one-pixel ramp spans at most one row of pixel centres per side: counting rows
 /// would be a comparison of small integers that a broken implementation could
 /// pass, where matching `min(p, 1)²` across forty rows cannot be.
-///
-/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 #[test]
 fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
     /// Fat enough that a couple of dozen rows land across the half-width, so
@@ -1713,9 +1708,9 @@ fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
     );
 }
 
-/// **A low `softness` puts a plateau across the stroke** — the defect this plan
-/// exists for, read off the cross-section rather than off a total-brightness
-/// statistic, which moves for several reasons.
+/// **A low `softness` puts a plateau across the stroke** — ADR-0124's
+/// defect, read off the cross-section rather than off a
+/// total-brightness statistic, which moves for several reasons.
 ///
 /// The statistic is the one Plan 0114's own measurement table uses: **how many
 /// rows sit within 10 % of the peak**. At `softness = 1.0` that is a handful —

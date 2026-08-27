@@ -210,9 +210,9 @@ fn the_generator_is_a_pure_function_of_its_recipe() {
 /// construction and reused by `clear` + `push`; a thousand recompositions across
 /// every grammar and every count must not move its capacity.
 ///
-/// This is the plan's no-allocation duty. The generator runs on the render
-/// thread rather than in the audio callback, so the real-time rule is not at
-/// stake — but a reallocation mid-frame is still a spike.
+/// The generator runs on the render thread rather than in the audio
+/// callback, so the real-time rule is not at stake — but a reallocation
+/// mid-frame is still a spike.
 #[test]
 fn a_thousand_recompositions_never_reallocate() {
     let mut v = Vec::with_capacity(CAP);
@@ -302,8 +302,8 @@ static GLOBAL: CountingAlloc = CountingAlloc;
 ///
 /// `compose` calls [`Element::build`] for **every live element on every frame**
 /// (`advance` -> `step` -> `compose`, unconditionally), so an allocation in any
-/// arm is one per element per frame on the render thread — against this plan's
-/// own "no allocation in the render path". The `segment`/`arc` arm held a
+/// arm is one per element per frame on the render thread, against the
+/// no-allocation-in-the-render-path rule. The `segment`/`arc` arm held a
 /// `Vec::with_capacity(9)` for its hull candidates until Plan 0113 Phase 9, so
 /// `collage_onwhite` paid roughly five heap allocations a frame; it is a fixed
 /// `[[f32; 2]; 9]` plus a length now.
@@ -557,10 +557,10 @@ fn raising_density_only_ever_adds() {
 /// **The canvas does not breathe in unison.**
 ///
 /// `pump_size` and `pump_alpha` are phase-offset per element, so at any instant
-/// the modulation across live elements differs. The plan asks for exactly this
-/// property and no threshold on the spread — a number there would be inventing
-/// one — so the assertion is that the values are *not all equal*, plus the
-/// non-vacuity that the pump moved anything at all.
+/// the modulation across live elements differs. No threshold is put on the
+/// spread — a number there would be inventing one — so the assertion is that
+/// the values are *not all equal*, plus the non-vacuity that the pump moved
+/// anything at all.
 #[test]
 fn the_pump_is_phase_offset_across_elements() {
     let Some(ctx) = context(64, 64) else {
@@ -1098,15 +1098,15 @@ fn a_checkers_cell_count_is_even() {
 }
 
 /// **The aspect comes from the render target, and this test bites**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// A circle element is painted at **1280x800** and its own extent measured in
 /// pixels. It must be round — the same number of pixels across as down — which
 /// an aspect taken from anywhere but the render target cannot be.
 ///
-/// The size is the plan's, and it is the point: 1920x1080 and this box's
-/// 2048x1152 are both exactly 16:9, where every wrong aspect source is right by
-/// accident. 16:10 distorts a dropped aspect by 1.6 and an inverted one by 2.56.
+/// The size is the point: 1920x1080 and this box's 2048x1152 are both
+/// exactly 16:9, where every wrong aspect source is right by accident.
+/// 16:10 distorts a dropped aspect by 1.6 and an inverted one by 2.56.
 /// The 1:1.6 case is rendered as well, so a hard-coded 1.6 fails too.
 ///
 /// **Confirmed to bite, in the reverted direction**, which is the only way this

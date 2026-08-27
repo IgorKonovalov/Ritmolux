@@ -30,7 +30,7 @@
 //!   steady-state cost. A governor reading p99 as it stands would demote a
 //!   preset running at 165 fps, during the one event that is already visually
 //!   disruptive. `frame_ms_p99_steady` is the same statistic with those windows
-//!   left out ([backlog 0082](../../docs/design-backlog.md), ADR-0099).
+//!   left out (backlog 0082, ADR-0099).
 //!
 //! Nothing here is a gate, and none of it runs in CI.
 
@@ -189,8 +189,9 @@ impl SoakLog {
         )
     }
 
-    /// Open (creating dirs and the file) for appending, writing the header if
-    /// the file is new. A failure is reported once and leaves the log dormant.
+    /// Open (creating dirs and the file) for appending, writing the
+    /// header when the file did not exist. A failure is reported once
+    /// and leaves the log dormant.
     fn open(&mut self) {
         let path: &Path = &self.path;
         if let Some(parent) = path.parent() {

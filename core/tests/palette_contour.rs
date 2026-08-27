@@ -1,14 +1,14 @@
 //! `palette_contour` fires where the **ink** changes, not at every band edge
-//! (Plan 0121 Phase 5, [ADR-0133]).
+//! (Plan 0121 Phase 5, ADR-0133).
 //!
-//! [ADR-0078] drew the contour from the fractional position within the band
-//! grid, which is a pure function of position and never reads the LUT. On the
-//! smooth gradients it was written against every band boundary *is* a colour
-//! change, so the distinction never came up. A limited-ink look is written as
-//! **plateaus** — runs of bands holding one colour, the only way to get flat ink
-//! out of `palette_steps` — and on those, most boundaries are white-meets-white,
-//! where the contour drew exactly the grey shading a two-ink print is defined by
-//! not having. Four of the nine presets naming the parameter set it to `0`.
+//! ADR-0078 drew the contour from the fractional position within the band grid,
+//! which is a pure function of position and never reads the LUT. On the smooth
+//! gradients it was written against every band boundary *is* a colour change, so
+//! the distinction never came up. A limited-ink look is written as **plateaus**
+//! — runs of bands holding one colour, the only way to get flat ink out of
+//! `palette_steps` — and on those, most boundaries are white-meets-white, where
+//! the contour drew exactly the grey shading a two-ink print is defined by not
+//! having. Four of the nine presets naming the parameter set it to `0`.
 //!
 //! Every assertion here is a **differential between two captures through the
 //! same pipeline**, identical but for `palette_contour`. The vignette, the
@@ -17,22 +17,19 @@
 //!
 //! # What this suite does NOT assert, and where that lives instead
 //!
-//! *"A smooth palette is unchanged"* is not testable here, because the old
-//! behaviour no longer exists to compare against. Its evidence is the **golden
+//! *"A smooth palette is unchanged"* is not testable here, because there is no
+//! second implementation to compare against. Its evidence is the **golden
 //! suite**: the five shipped presets carrying a non-zero `palette_contour` —
 //! `fragment_mandala`, `fragment_strata`, `fragment_tiled`, `fragment_vitrail`,
 //! `shape_pulse` — are all on smooth palettes, and none of their baselines moved.
 //! That is a byte-level claim this file could only weaken. What this file adds is
 //! the half a golden cannot see: that the suppression is driven by *colour* and
-//! not by step count, checked at a **high** step count as well as a low one —
-//! the failure mode ADR-0133's Alternative B was rejected for appears only when
+//! not by step count, checked at a **high** step count as well as a low one — the
+//! failure mode ADR-0133's Alternative B was rejected for appears only when
 //! adjacent band centres sit close together.
 //!
 //! **Software adapter** (`prefer_software`), like the other GPU suites
 //! (ADR-0016), so this runs on CI rather than only where a GPU happens to be.
-//!
-//! [ADR-0133]: ../../docs/adrs/0133-the-band-contour-fires-where-the-ink-changes.md
-//! [ADR-0078]: ../../docs/adrs/0078-banding-is-a-palette-coordinate-operation.md
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;

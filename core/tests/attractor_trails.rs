@@ -6,11 +6,11 @@
 //! the attractor, which puts the attractor's four pipelines (compute, draw,
 //! decay, present) and the trails stage's two into one command buffer. That is
 //! the densest coexistence of pipelines any shipped preset produces, and
-//! [ADR-0058]'s hazard — the DX12 WARP software adapter handing a pipeline
-//! whose bind-group layout matches another live one *the other pass's*
-//! resources — keys on exactly that. `golden.rs`'s `attractor.toml` binds no
-//! trails, and every `composite_*` fixture is a line scene, so nothing rendered
-//! it under a pinned baseline.
+//! ADR-0058's hazard — the DX12 WARP software adapter handing a pipeline whose
+//! bind-group layout matches another live one *the other pass's* resources —
+//! keys on exactly that. `golden.rs`'s `attractor.toml` binds no trails, and
+//! every `composite_*` fixture is a line scene, so nothing rendered it under a
+//! pinned baseline.
 //!
 //! # What this pins, and what it does not
 //!
@@ -48,8 +48,6 @@
 //! A square capture makes the grid's aspect and the target's identical and
 //! cannot see an ADR-0037 confusion between them — which is the bug that has
 //! shipped three times, once on this very scene.
-//!
-//! [ADR-0058]: ../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md
 
 use std::path::{Path, PathBuf};
 

@@ -106,9 +106,8 @@ impl MilkFile {
     }
 
     /// Whether the file declares itself a MilkDrop 2 preset, i.e. whether it can
-    /// carry HLSL. **82 % of the corpus does** (8 500 of 10 347, measured before
-    /// the plan started), which is what Phase 6's stop condition is priced
-    /// against.
+    /// carry HLSL. **82 % of the corpus does** (8 500 of 10 347, measured
+    /// 2026-08-17), which is what Phase 6's stop condition is priced against.
     pub fn is_milkdrop2(&self) -> bool {
         self.key("milkdrop_preset_version")
             .and_then(|v| v.trim().parse::<f32>().ok())

@@ -6411,3 +6411,57 @@ lane already hit it on its first attempt — four probe presets carry a `color_c
 only purpose is to dodge it.
 
 ---
+## 0129 — the doc-link gate walks `.md` only, so the same links inside Rust doc comments rot unwatched
+
+> **CLOSED 2026-08-27** by [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
+> + [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
+> The finding was sound and its proposed remedy was rejected: the 89 links are deleted rather than
+> guarded, and the gate rejects the form instead of validating the target.
+
+**Raised by:** `architect`, at [Plan 0117](plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)'s
+close, when that plan's own new rustdoc link had to be repointed by hand because nothing would have
+caught it. **Owner if taken:** `dev` — the checker change is small and the repairs are mechanical.
+
+- **PROMOTED AND INVERTED, 2026-08-25, hours after it was filed —**
+  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) +
+  [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md). **The finding
+  below is sound and the remedy it proposes was rejected.** Asked whether to guard these links, the
+  user's answer was to stop writing them: a maintained checker to protect 89 links that do not
+  resolve in rustdoc, exist to save one `grep`, and encode the most brittle possible reference to a
+  document whose lifecycle includes being moved, is the wrong trade against deleting them once.
+  ADR-0127 Alternative A records that reasoning. Plan 0118 Phase 3 deletes all 89 in favour of
+  bare-number citations, and its gate rejects the *form* rather than validating the target. **This
+  entry closes when that plan closes**, not now — the eleven breaks it names are still on `main`.
+
+- **Verified 2026-08-25** — the walk collects markdown and nothing else: `present: endsWith\("\.md"\) in: scripts/check-doc-links.mjs`
+- **Verified 2026-08-25** — Rust sources carry the same link form: `present: \]: \.\./\.\./docs/ in: core/src/render/tests.rs`
+
+### The finding
+
+`scripts/check-doc-links.mjs` exists because a close ceremony's `git mv` breaks relative links in
+both directions, and by Plan 0060's close that had reached 74 breaks across 23 files. The gate now
+holds every `.md` in the repo — and only those. Rust doc comments use the identical markdown
+definition form (`[label]: ../../docs/...`), resolve relative to the **file**, and break the same way.
+
+**Eleven are broken on `main` today**, in two classes:
+
+    core/src/render/tests.rs:1284         -> ../../docs/plans/0053-...md
+    core/src/render/tests.rs:1112,1164,1165,1282,1283
+    core/src/render/scenes/emitter/tests.rs:1479
+    core/src/render/scenes/particles/mod.rs:359
+    core/src/render/scenes/particles/tests.rs:2506
+    standalone/src/shot/render.rs:103,106
+
+The first is **exactly the class step 1b of the close ceremony exists to prevent**: Plan 0053 moved
+to `plans/done/` and the citation was never repointed. The other ten are wrong-depth `../` counts —
+a link written from a file's own directory when it needed one or two more levels — which suggests
+they have never resolved at all.
+
+### Why it is worth doing rather than noting
+
+The repair is one directory walk and one extension test wider than the existing one; the link
+extraction, the code-span skipping and the reporting are already written and already handle this
+form. What it buys is that the close ceremony's most-missed step stops having a second file class it
+cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
+are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
+links are repaired or deleted — several may have been decorative from the start.

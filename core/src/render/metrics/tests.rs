@@ -545,7 +545,7 @@ fn an_empty_frame_has_no_ground() {
 fn a_frame_of_one_tone_is_all_ground_and_nothing_is_lit() {
     // The property Plan 0116 Phase 6 rests on: a bare sheet of paper is its own
     // ground, so nothing departs from it. Under BLACK the same frame reads
-    // fully lit, which is the false negative the plan exists to close.
+    // fully lit, which is the false negative ADR-0126 exists to close.
     let bare = solid(32, 32, [250, 249, 247, 255]);
     assert_eq!(coverage(&bare, modal_ground(&bare), 8), 0.0);
     assert_eq!(quadrant_spread(&bare, modal_ground(&bare), 8), 0);

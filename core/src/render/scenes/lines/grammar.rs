@@ -51,7 +51,7 @@ mod tests {
         assert_eq!(expand("A", &rules, 3), "ABAAB");
         assert_eq!(expand("A", &rules, 5), "ABAABABAABAAB");
 
-        // The plan's named example: Koch edge F -> "F+F--F+F".
+        // The canonical example: Koch edge F -> "F+F--F+F".
         let koch = [('F', "F+F--F+F".to_string())];
         assert_eq!(expand("F", &koch, 1), "F+F--F+F");
         assert_eq!(

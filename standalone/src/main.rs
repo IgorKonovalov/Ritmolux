@@ -634,11 +634,11 @@ impl AppState {
     /// Toggle auto-rotate and **persist it** — the one path for both the `A`
     /// hotkey and the settings row.
     ///
-    /// The hotkey used to change the director and print to stderr without
-    /// writing `[rotate] auto`, unlike `F` and `D` which both persist. That left
-    /// the two controls able to disagree: set it with `A`, restart, and the
-    /// config's value came back. One path is what makes that impossible rather
-    /// than merely fixed.
+    /// A hotkey that changes the director and prints to stderr without
+    /// writing `[rotate] auto` — unlike `F` and `D`, which both persist
+    /// — leaves the two controls able to disagree: set it with `A`,
+    /// restart, and the config's value comes back. One path is what
+    /// makes that impossible rather than merely fixed.
     fn toggle_auto_rotate(&mut self) {
         let on = self.director.toggle_auto();
         self.config.rotate.auto = on;
@@ -945,12 +945,12 @@ impl AppState {
         }
 
         // **OS key repeat is honoured for modal navigation keys only** (Plan 0050
-        // Phase 2). The event loop used to drop every repeat before it got here,
-        // which is why holding an arrow in the browser did nothing. Widening that
-        // to "all keys" is what must not happen: a held `Space` would machine-gun
-        // preset switches through a ~1 s dissolve each, and a held `F` would
-        // thrash fullscreen. So the gate is here, where the key's role is known,
-        // rather than at the event site, where it is not.
+        // Phase 2). An event loop that drops every repeat before it gets here
+        // makes holding an arrow in the browser do nothing. Widening this to "all
+        // keys" is what must not happen: a held `Space` would machine-gun preset
+        // switches through a ~1 s dissolve each, and a held `F` would thrash
+        // fullscreen. So the gate is here, where the key's role is known, rather
+        // than at the event site, where it is not.
         let overlay_key = decode_overlay_key(code);
         if event.repeat && !(self.browse.is_open() && overlay_key.is_some_and(OverlayKey::is_nav)) {
             return;
@@ -1544,7 +1544,7 @@ fn dir_signature(dir: &Path) -> Option<(u128, usize)> {
 /// Malformed files are reported to stderr; a directory with no valid presets
 /// leaves the renderer's current set (embedded defaults or last good) in place.
 /// Non-fatal warnings (an unknown parameter name — usually a typo) are printed
-/// too: the preset still loads and renders, but the mistake is no longer silent
+/// too: the preset still loads and renders, and the mistake is not silent
 /// (ADR-0020).
 fn reload_presets(renderer: &mut Renderer, dir: &Path) {
     let report = lmv_core::preset::load_dir(dir);
@@ -1570,7 +1570,7 @@ fn reload_presets(renderer: &mut Renderer, dir: &Path) {
 }
 
 /// Print the enumerable audio devices (the `--list-devices` aid). Windows-first
-/// per the plan; other platforms note that device selection isn't wired there.
+/// per ADR-0001; other platforms note that device selection isn't wired there.
 #[cfg(windows)]
 fn list_devices_and_exit() {
     if let Err(err) = capture_win::list_devices() {

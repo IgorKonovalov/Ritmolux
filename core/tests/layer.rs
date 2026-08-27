@@ -274,9 +274,9 @@ fn a_same_system_pair_renders_two_independent_configurations() {
     );
 }
 
-/// The plan's named fixture — two fragment fields at different zooms — is
-/// legal and deterministic, and the layer instance's configuration is the
-/// live one.
+/// The canonical fixture — two fragment fields at different zooms — is
+/// legal and deterministic, and the layer instance's configuration is
+/// the live one.
 ///
 /// **What this deliberately does not assert**: that the *main* field stays
 /// visible. A fragment field presents premultiplied with full coverage, so an
@@ -533,7 +533,7 @@ fn luma_stats(img: &CaptureImage) -> (f32, f32, f32) {
     (min, sum as f32 / n.max(1) as f32, max)
 }
 
-/// **Plan 0091 Phase 1 — the one thing [ADR-0106] left unmeasured.**
+/// **Plan 0091 Phase 1 — the one thing ADR-0106 left unmeasured.**
 ///
 /// That ADR measured a `multiply` layer over the *chain* and found it reaches
 /// display luma 18.5 where the additive control cannot go below 181.6. It ran at
@@ -691,7 +691,7 @@ fn a_multiply_layer_meets_a_lit_backdrop() {
 /// The **trap** the two-tone route has to name, measured rather than asserted
 /// from the shader (Plan 0091 Phase 1).
 ///
-/// [ADR-0106] states that a particle scene in a `multiply` slot "cannot darken,
+/// ADR-0106 states that a particle scene in a `multiply` slot "cannot darken,
 /// because its alpha *is* its brightness" — so a `swarm` heart and a field heart
 /// would have different colour capabilities. `swarm.rs`'s fragment stage says
 /// something narrower: it emits `vec4(color * g, g)`, where `g` is the mark's

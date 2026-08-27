@@ -15,10 +15,10 @@
 //! (NFR 6). [`Palette::sample`] is allocation-free and runs per particle per
 //! frame (swarm), so this module carries the hot-path panic pragma.
 //!
-//! **The `spectrum` default is the exact current cosine**, so a preset that
-//! declares no `[palette]` renders identically to before this module existed —
-//! the shipped presets are unchanged until re-authored (the load-bearing
-//! no-regression guarantee, gated by a unit test comparing sampled colors).
+//! **The `spectrum` default *is* the cosine model exactly**, so a
+//! preset that declares no `[palette]` is unaffected by this module —
+//! the load-bearing no-regression guarantee, gated by a unit test
+//! comparing sampled colors.
 //!
 //! ## Saturation (the single source of truth)
 //!
@@ -639,9 +639,9 @@ mod tests {
     // --- Banding (ADR-0078) ---------------------------------------------
 
     /// `palette_steps = N` leaves exactly `N` distinct palette coordinates over
-    /// the gradient's range — the plan's done-when, asserted on the CPU-side
-    /// expression rather than on a capture, because a pixel count would also see
-    /// the bloom, the backdrop and the 8-bit round-trip.
+    /// the gradient's range. Asserted on the CPU-side expression rather than on
+    /// a capture, because a pixel count would also see the bloom, the backdrop
+    /// and the 8-bit round-trip.
     #[test]
     fn six_steps_leave_exactly_six_palette_coordinates() {
         for n in [2.0f32, 4.0, 6.0, 8.0, 16.0] {

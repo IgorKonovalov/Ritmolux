@@ -35,10 +35,10 @@ const SIZE: u32 = 96;
 const MAP_2D: &str = "Ink on Paper";
 const FLOW_3D: &str = "Thomas";
 
-/// A De Jong attractor preset with an extra `[params]` line — used to isolate the
-/// view transform (Phase 4): the compute/accumulation path is identical, so any
-/// render difference is the vertex-shader zoom/pan. The transform touches only the
-/// draw projection (no background pipeline), so it is faithful on WARP.
+/// A De Jong attractor preset with an extra `[params]` line, isolating the view
+/// transform (Phase 4): the compute/accumulation path is identical, so any render
+/// difference is the vertex-shader zoom/pan. The transform touches only the draw
+/// projection (no background pipeline), so it is faithful on WARP.
 fn attractor_view_preset(name: &str, extra: &str) -> Preset {
     let toml =
         format!("system = \"attractor\"\nname = \"{name}\"\n[params]\nsize = \"1.0\"\n{extra}");

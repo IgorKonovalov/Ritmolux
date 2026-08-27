@@ -1,5 +1,5 @@
 //! Biarc fitting: a sampled outline in, a **G1-continuous chain of circular
-//! arcs** out ([ADR-0098]).
+//! arcs** out (ADR-0098).
 //!
 //! This is the half of ADR-0098 that makes the cheap primitive enough. A
 //! sampled polyline shows its joints because it is only **C0** — the tangent
@@ -27,8 +27,6 @@
 //! Pure: no clock, no randomness, no global state, so the same outline always
 //! yields the same chain (the determinism rule). Allocation-free into a
 //! caller-preallocated `out`, because `parametric_curve` resamples every frame.
-//!
-//! [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
 
 // Hot-path panic-denial pragma. The fit is build-time for the motif roster and
 // **per frame** for `parametric_curve`, whose build model is a resample every
@@ -124,11 +122,10 @@ const G1_TOLERANCE: f32 = 1e-4;
 /// stroke needs: one ulp at magnitude `R` is `R * 2^-23`, so at `R = 64` the
 /// distance resolves to `7.6e-6` — a two-hundredth of a pixel at 1080p — and at
 /// `R = 1e6` it resolves to `0.06`, twenty stroke widths. A piece flat enough
-/// to want a radius past this deviates from its own chord by less than
-/// `L^2 / (8R)`, which for the longest piece the fit emits is under half a
-/// pixel — so the straight line it becomes is not an approximation anyone can
-/// see, and it is the primitive the plan's own scope note asks for on a
-/// straight run.
+/// to want a radius past this deviates from its own chord by less than `L^2 /
+/// (8R)`, which for the longest piece the fit emits is under half a pixel — so
+/// the straight line it becomes is not an approximation anyone can see, and a
+/// straight line is the right primitive for a straight run.
 const MAX_RADIUS: f32 = 64.0;
 
 /// Samples the motif roster's outlines are re-drawn at for fitting.
@@ -255,8 +252,8 @@ impl Piece {
     }
 }
 
-/// What one [`fit`] cost and how well it did — the numbers the plan asks be
-/// reported against the segment counts they replace, and the ones a test reads
+/// What one [`fit`] cost and how well it did — the numbers reported
+/// against the segment counts they replace, and the ones a test reads
 /// instead of re-deriving the fit's internals.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct FitStats {

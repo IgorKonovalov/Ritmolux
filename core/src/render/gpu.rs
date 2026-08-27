@@ -2,11 +2,10 @@
 //! scene-seam blend state, the fullscreen-pass pipeline, the
 //! fullscreen-triangle vertex preludes, and the fixed-timestep accumulator.
 //!
-//! Nothing here decides anything — it is the repetition that had accumulated
-//! four copies of the bind-entry helpers, two `fullscreen_pipeline`
-//! implementations, and nine pasted vertex stages across `render/` and
-//! `render/scenes/` (Plan 0031 Phase 5). One home, so a wgpu API change is one
-//! edit and a new stage starts from the same shapes as the existing ones.
+//! Nothing here decides anything — it is the repetition every pass in
+//! `render/` and `render/scenes/` would otherwise paste, in one home,
+//! so a wgpu API change is one edit and a new stage starts from the
+//! same shapes as the existing ones.
 //!
 //! # The two vertex preludes are not interchangeable
 //!
@@ -25,15 +24,14 @@
 //! Clip space is Y-up; `@builtin(position)` and texture space are Y-down. A
 //! fullscreen fragment at clip `p.y` writes framebuffer row `(1 - (p.y+1)/2)*H`,
 //! so the only `uv` that round-trips to that same row is the **flipped** one.
-//! There used to be a third prelude here, `FULLSCREEN_VS_UV`, handing over
-//! unflipped coordinates and justified as "for a ping-pong chain where every pass
-//! uses this convention, so the flips would cancel". They do not cancel, and no
-//! arrangement of neighbouring passes makes them: an unflipped read samples row
-//! `((p.y+1)/2)*H` while the fragment writes the opposite row, so the mirror is
-//! **complete within one pass**. It shipped in the attractor's decay pass, whose
-//! target the draw pass writes in clip space, and every attractor rendered as
-//! `figure ∪ mirror(figure)` for the life of the scene
-//! ([ADR-0070](../../../docs/adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)).
+//! **There is no unflipped prelude**, and a ping-pong chain is not an exception
+//! to that: "every pass uses this convention, so the flips cancel" is false, and
+//! no arrangement of neighbouring passes makes it true — an unflipped read
+//! samples row `((p.y+1)/2)*H` while the fragment writes the opposite row, so
+//! the mirror is **complete within one pass**. It shipped in the attractor's
+//! decay pass, whose target the draw pass writes in clip space, and every
+//! attractor rendered as `figure ∪ mirror(figure)` for the life of the scene
+//! (ADR-0070).
 //!
 //! The alternative to a round-tripping `uv` is to skip `uv` entirely and address
 //! by `@builtin(position)` through `textureLoad`, which is exact — that is what
@@ -313,8 +311,8 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
 ///
 /// This is also the only correct choice for a **feedback** pass re-reading the
 /// target it writes: the flip is what makes `uv` round-trip to the fragment's own
-/// framebuffer row. See the module docs — the unflipped variant that used to sit
-/// below this one mirrored every such read and has been retired (ADR-0070).
+/// framebuffer row. See the module docs: an unflipped variant mirrors every such
+/// read, which is why there is not one (ADR-0070).
 pub(crate) const FULLSCREEN_VS_UV_FLIPPED: &str = r#"
 struct VsOut {
     @builtin(position) pos: vec4<f32>,

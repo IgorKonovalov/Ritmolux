@@ -14,8 +14,7 @@
 //! anywhere; an IFS converges only while every map contracts, and one map past
 //! unit operator norm sends every position to infinity and then to `NaN`, killing
 //! the particle buffer for the rest of the session. Everything here is arranged
-//! so that cliff is **unreachable** rather than guarded against — see
-//! [ADR-0075](../../../../../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md).
+//! so that cliff is **unreachable** rather than guarded against — see ADR-0075.
 //!
 //! The mechanism is the parameterization. Every map is carried as the **singular
 //! value decomposition** of its linear part, `M = R(θ)·diag(sx, sy)·R(φ)` with
@@ -995,7 +994,7 @@ pub fn chaos_extent(table: &IfsTable, iterations: u32) -> Extent {
 /// One map's fixed point `(I − M)⁻¹ t` — **a point that is on the attractor**.
 ///
 /// That it lies on `A` is a consequence of the parameterization rather than of
-/// anything this plan added: `A = ⋃ fᵢ(A)` with `A` closed makes each `fᵢ`'s
+/// anything constructed here: `A = ⋃ fᵢ(A)` with `A` closed makes each `fᵢ`'s
 /// fixed point the limit of `fᵢⁿ(x)` for any `x ∈ A` (ADR-0075's Notes,
 /// ADR-0087). **It does not exist for De Jong, Clifford, Thomas or Lorenz**, and
 /// that is why the respawn ADR-0087 builds on this is IFS-only structurally

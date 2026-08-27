@@ -25,10 +25,10 @@
 //!
 //! # The seams, and why there are three rather than five
 //!
-//! The plan enumerates five: the field (A), the present pass (B), the backdrop +
-//! `layer_blend` composite (C), bloom (D) and the tonemap (E). **For these two
-//! subjects C and D do not exist**, and that is a measurement rather than an
-//! assumption:
+//! There are five in the general case: the field (A), the present pass
+//! (B), the backdrop + `layer_blend` composite (C), bloom (D) and the
+//! tonemap (E). **For these two subjects C and D do not exist**, and
+//! that is a measurement rather than an assumption:
 //!
 //! - every post stage reports [`active`](super::post::PostStage::active) only
 //!   when its own param exceeds zero, and neither converted fixture binds
@@ -39,9 +39,9 @@
 //! - `bg_bright` defaults to `0.0` and neither fixture binds it, so the backdrop
 //!   pre-pass contributes nothing.
 //!
-//! So B, C and D are one texture, and the chain this plan bisects is
-//! `field -> present pass -> tonemap -> display`. Two stages. The probe reports
-//! the collapsed seam once, named for what it is, rather than printing one read
+//! So B, C and D are one texture, and the chain this probe bisects is `field ->
+//! present pass -> tonemap -> display`. Two stages. The probe reports the
+//! collapsed seam once, named for what it is, rather than printing one read
 //! three times as though it were three.
 //!
 //! # What a departure means
@@ -49,8 +49,7 @@
 //! Seam E is display-referred and every other seam is linear, so a seam-to-seam
 //! comparison of *levels* would be meaningless. The comparison is between the two
 //! **subjects** at one seam — same units on both sides — and then between those
-//! dimensionless ratios across seams, which is what the plan's `SeamTrace`
-//! comment describes.
+//! dimensionless ratios across seams, which is what [`SeamTrace`] carries.
 
 use super::{HeadlessOptions, RenderError, Renderer, capture, scene_for};
 use crate::dsp::AnalysisFrame;
@@ -166,7 +165,7 @@ enum Seam {
 /// Both textures are `COMPOSITE_FORMAT` and both already carried `COPY_SRC`
 /// before this probe existed — the field for Plan 0109 Phase 4, the tonemap's
 /// input for its own CPU-mirror test. Nothing here adds a render target, which is
-/// what keeps this probe clear of the adapter hazard the plan warns about.
+/// what keeps this probe clear of the adapter hazard ADR-0058 records.
 fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
     let texture = match seam {
         Seam::Field => {
@@ -194,9 +193,9 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
 ///
 /// This test **asserts no threshold on the ratio** (ADR-0071). What separation is
 /// large enough to call a departure is exactly what the phase is measuring, and a
-/// number chosen before the measurement would be the tuning this plan forbids.
-/// What it does assert is that the instrument works: both subjects render and
-/// every seam reads back.
+/// number chosen before the measurement would be tuning to the instrument. What
+/// it does assert is that the instrument works: both subjects render and every
+/// seam reads back.
 ///
 /// # What it measured, 2026-08-19
 ///

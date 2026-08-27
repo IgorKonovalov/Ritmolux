@@ -7,17 +7,15 @@
 //! is free to exceed 1.0 and nothing clips. This pass reads that unbounded frame,
 //! applies `exposure`, folds everything into `[0, 1)`, and writes the result at
 //! the **surface** format. Downstream of it the frame is display-referred, which
-//! is what [`Ink`](super::ink::Ink) has always assumed it was reading (ADR-0028 /
-//! ADR-0032 are unchanged by this plan — only the pass that hands ink its input
-//! is new).
+//! is what [`Ink`](super::ink::Ink) assumes it is reading (ADR-0028 / ADR-0032).
 //!
 //! # Not skippable
 //!
 //! Every other pass in `render/` skips when its amount param is off. This one
 //! cannot: it is not a look, it is the **format boundary**. Skipping it would
-//! present linear values above 1.0 into an 8-bit surface, which is the clipped
-//! composite this plan exists to retire. `exposure = 1.0` (the default) still
-//! runs the pass — it is a near-identity below the knee, not a no-op.
+//! present linear values above 1.0 into an 8-bit surface, and clip the
+//! composite. `exposure = 1.0` (the default) still runs the pass — it is a
+//! near-identity below the knee, not a no-op.
 //!
 //! # The curve
 //!
@@ -33,30 +31,21 @@
 //! — so it is C1-continuous at the knee, strictly monotone, and bounded. At
 //! `k = 0.6`: `f(1) = 0.800`, `f(2) = 0.911`, `f(4) = 0.958`, `f(8) = 0.980`.
 //!
-//! ADR-0046 requires the curve be **monotone, hue-preserving, and near-identity
-//! below the mid-range**. The first and third are the curve's own shape; the
-//! second is how it is applied to colour: the scale factor `f(m)/m` is computed
-//! from the **brightest channel** `m` and applied to all three, so the ratios
-//! between R, G and B are exactly preserved and the roll-off never rotates a hue
-//! or washes a saturated core toward white. It is also gamut-safe by
-//! construction — the largest channel lands on `f(m) < 1`, so no channel can
-//! exceed 1 and be clipped by the 8-bit write.
-//!
-//! Plain Reinhard (`x / (1 + x)`) was not an option despite being the obvious
-//! one: it maps 0.8 to 0.44, so every existing preset would have gone dark.
-//! ADR-0046's "near-identity below the mid-range" is what rules it out, and it is
-//! what keeps this plan's golden re-bless confined to the regions that were
-//! actually clipping.
+//! **Hue-preserving** is a property of how the curve is applied, not of its shape: the scale
+//! factor `f(m)/m` is computed from the **brightest channel** `m` and applied to all three, so the
+//! ratios between R, G and B are exactly preserved and the roll-off never rotates a hue or washes a
+//! saturated core toward white. It is also gamut-safe by construction — the largest channel lands
+//! on `f(m) < 1`, so no channel can exceed 1 and be clipped by the 8-bit write. Plain Reinhard
+//! (`x / (1 + x)`) fails the near-identity requirement and is ADR-0046's rejected alternative: it
+//! maps 0.8 to 0.44.
 //!
 //! # Why the output is 8-bit, not float
 //!
-//! Plan 0045 Phase 3's file list reads "…and ink-src to `Rgba16Float`". Taken
-//! literally that needs **two** tonemap pipelines — one targeting ink's float
-//! input, one targeting the surface for the (common) ink-off frame — against this
-//! plan's own documented WARP pipeline-count risk. The linear region therefore
-//! ends *at this pass's input*: the tonemap writes display-referred values at the
-//! surface format into ink's input, or straight into the surface when ink is off.
-//! One pipeline, and ink's semantics are bit-for-bit what they were.
+//! The linear region ends *at this pass's input*: the tonemap writes display-referred values at the
+//! surface format into ink's input, or straight into the surface when ink is off. Targeting a float
+//! ink-input instead needs **two** tonemap pipelines — one per destination format — against the
+//! WARP software adapter's documented sensitivity to pipeline count (ADR-0046). One pipeline, and
+//! ink's semantics are bit-for-bit unchanged.
 //!
 //! # The write dithers (Plan 0082, ADR-0096)
 //!
@@ -505,9 +494,8 @@ impl Tonemap {
     }
 
     /// The stop this pass will **actually apply** this frame: the bound value with
-    /// the two guards [`resolve`](Self::resolve) used to apply inline — negatives
-    /// floored (a negative stop would invert the frame) and a non-finite binding
-    /// replaced by the default.
+    /// its two guards applied — negatives floored (a negative stop would invert
+    /// the frame) and a non-finite binding replaced by the default.
     ///
     /// Extracted so the bloom stage can threshold against the same number rather
     /// than a second transcription of it (ADR-0080). It is a **one-way read**: the

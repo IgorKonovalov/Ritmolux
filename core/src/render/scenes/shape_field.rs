@@ -1,6 +1,5 @@
 //! **The mark roster, drawn at frame scale as a distance field**
-//! ([ADR-0105](../../../../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md),
-//! Plan 0091).
+//! (ADR-0105, Plan 0091).
 //!
 //! Every other scene here hands the palette a *level* — a noise field, a
 //! chemical concentration, a particle's depth. This one hands it a **distance**,
@@ -22,7 +21,7 @@
 //! anything in.
 //!
 //! # Two coordinates now, and the second is the one the references asked for
-//! ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md), Plan 0098)
+//! (ADR-0111, Plan 0098)
 //!
 //! An offset family is an **erosion**, and erosion rounds a reflex corner while
 //! keeping convex ones sharp — so a nested heart keeps its bottom point and
@@ -58,7 +57,7 @@
 //! and repaired the two arms that were wrong out there; see `marks.rs`'s own
 //! header for what it found and what it deliberately left approximate.
 //!
-//! # The aspect comes from the render target ([ADR-0037](../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md))
+//! # The aspect comes from the render target (ADR-0037)
 //!
 //! There is no internal grid here to take an aspect from by accident, which
 //! removes the usual mechanism for that bug but not the obligation. The figure
@@ -127,8 +126,7 @@ const MAX_GAMMA: f32 = 20.0;
 /// `0` hands the palette the normalized **distance** to the figure, whose level
 /// sets are offset curves; `1` hands it `r / r_boundary(theta)`, whose level
 /// sets are **scaled copies** of the outline
-/// ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)).
-/// Both are `0` at the figure's centre and exactly `1` on its outline; what
+/// (ADR-0111). Both are `0` at the figure's centre and exactly `1` on its outline; what
 /// differs is the shape of everything in between.
 pub(crate) const COORD_MODES: [&str; 2] = ["distance", "radius"];
 
@@ -575,7 +573,7 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// # The `ring` fallback, and why it is not silent
 ///
 /// An annulus's centre is in its hole, so `r / r_boundary` has no single value
-/// there — the one behavioural choice [ADR-0111] leaves to the plan. Plan 0098
+/// there — the one behavioural choice ADR-0111 leaves open. Plan 0098
 /// Phase 4 rendered the three defensible answers before picking, and what
 /// settled it is that defining the boundary as the outer rim produces a figure
 /// **byte-identical to a `disc`**: the coordinate collapses to `length(p)` and
@@ -587,8 +585,6 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// it (ADR-0020's shape, the `thickness` dead-zone precedent). The silent
 /// fallback was the third candidate and it is the one this rejects — it renders
 /// the same pixels as this does and costs an author the afternoon.
-///
-/// [ADR-0111]: ../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md
 fn applied_coord_mode(mode: f32, shape: f32) -> f32 {
     if shape == marks::RING_SHAPE {
         return DEFAULT_COORD_MODE;

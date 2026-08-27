@@ -19,7 +19,7 @@
 //!
 //! # The four columns
 //!
-//! Three are the plan's grammars and the fourth is the **control**: the
+//! Three are the generator's grammars and the fourth is the **control**: the
 //! hand-authored canvas Phase 1 shipped, which is the one composition a human
 //! has already approved. Judging three generated candidates with nothing to
 //! judge them against is how a gate ends up picking the best of three bad
@@ -42,7 +42,7 @@ use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
 use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
-/// Sample-sheet render size. 1080p per the plan: these are judged by eye at
+/// Sample-sheet render size. 1080p, because these are judged by eye at
 /// full size, and a composition read at thumbnail scale is a different
 /// question from the one Phase 5 is asking.
 const WIDTH: u32 = 1920;
@@ -62,9 +62,9 @@ const GRAMMARS: [(u32, &str); 4] = [
     (3, "size-hierarchy"),
 ];
 
-/// The seeds the sheet sweeps — five, per the plan's "at least 5 seeds".
-/// Arbitrary and fixed: what matters is that they are the *same* five in every
-/// column, so a row is one seed across four strategies.
+/// The five seeds the sheet sweeps. Arbitrary and fixed: what matters
+/// is that they are the *same* five in every column, so a row is one
+/// seed across four strategies.
 const SEEDS: [u32; 5] = [1, 7, 19, 43, 101];
 
 /// Elements per cell.

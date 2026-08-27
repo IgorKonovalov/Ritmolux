@@ -1,6 +1,5 @@
 //! The MilkDrop runtime: compiled EEL2 programs, the machine that executes them,
-//! and the driver that turns their output into warp-mesh parameters
-//! ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! and the driver that turns their output into warp-mesh parameters (ADR-0113).
 //!
 //! **No `.milk` text, no HLSL and no translator is anywhere in this module.**
 //! Conversion happens ahead of time in `milkconv`, which never ships; what
@@ -28,9 +27,9 @@
 //!
 //! # Rates: MilkDrop is per frame, this engine is per second
 //!
-//! **The single most consequential translation in the whole plan, and it is
-//! here rather than in the converter.** MilkDrop's `zoom`, `rot`, `dx`, `dy`,
-//! `warp` and `decay` are all *per rendered frame*: a preset written on a machine
+//! **The single most consequential translation in the conversion, and it is here
+//! rather than in the converter.** MilkDrop's `zoom`, `rot`, `dx`, `dy`, `warp`
+//! and `decay` are all *per rendered frame*: a preset written on a machine
 //! running 30 fps drifts at half the speed on one running 60. This engine's
 //! vocabulary is per second throughout (ADR-0019), which is what makes a look
 //! identical on any display.
@@ -133,8 +132,7 @@ pub struct MilkBundle {
     /// `0..=3`. Zero means the blur chain never runs for this preset.
     pub blur_level: u8,
     /// How many levels this bundle's **feedback field** quantizes to at the end
-    /// of the warp pass ([ADR-0118](../../../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)),
-    /// defaulting to [`DEFAULT_QUANTIZE_STEPS`].
+    /// of the warp pass (ADR-0118), defaulting to [`DEFAULT_QUANTIZE_STEPS`].
     ///
     /// **The presence of a bundle is what turns this on**, which is the whole
     /// per-bundle shape: the reference's 8-bit target truncates a `decay`-scaled
