@@ -14,6 +14,7 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use lmv_core::preset::{GateFlag, GateKind};
+use lmv_core::render::CaptureImage;
 use lmv_core::render::metrics::StepResponse;
 
 use super::*;
@@ -35,6 +36,8 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         reactivity_low: [0.4, 0.2, 0.1, 0.05],
         reactivity_footprint: [0.9375, 0.4688, 0.2344, 0.1172],
         animation: 0.75,
+        drive: 0.625,
+        rate: 0.0123,
         coverage: 0.5,
         geometry: None,
         transient: Transient {
@@ -471,4 +474,191 @@ fn a_dead_gate_on_a_layer_binding_flags_in_the_reachability_walk() {
         !names.contains(&"warp"),
         "the live top-level gate must not flag: {names:?}"
     );
+}
+
+/// A flat RGBA image whose every channel holds `value` — the only fixture
+/// [`mean_consecutive_diff`] needs, since `frame_diff` is a per-channel mean and
+/// a uniform frame makes the expected answer exact rather than approximate.
+fn flat(value: u8) -> CaptureImage {
+    CaptureImage {
+        width: 4,
+        height: 4,
+        rgba: vec![value; 4 * 4 * 4],
+    }
+}
+
+/// `rate` is the one statistic in this module that walks the sequence, so its
+/// defining property is that **order matters** — every other column here
+/// differences two frames a fixed count apart and is blind to what happened
+/// between them (ADR-0134).
+///
+/// A uniform ramp of `step` per frame must read back exactly `step / 255`, and
+/// the same frames dealt in another order must not.
+#[test]
+fn the_rate_reading_is_the_mean_of_consecutive_frame_differences() {
+    let step = 3u8;
+    let ramp: Vec<CaptureImage> = (0..8).map(|i| flat(10 + i * step)).collect();
+    let expected = step as f32 / 255.0;
+    assert!(
+        (mean_consecutive_diff(&ramp) - expected).abs() < 1e-6,
+        "a constant per-frame step must come back as the mean: got {}, want {expected}",
+        mean_consecutive_diff(&ramp)
+    );
+
+    // The same eight frames, reordered. The hops are no longer all `step`, so a
+    // statistic that reads consecutive pairs must now answer differently — a
+    // first-against-last differential would be identical for any permutation
+    // that kept its endpoints.
+    let shuffled: Vec<CaptureImage> = [0usize, 2, 1, 3, 5, 4, 6, 7]
+        .iter()
+        .map(|&i| flat(10 + (i as u8) * step))
+        .collect();
+    assert!(
+        (mean_consecutive_diff(&shuffled) - expected).abs() > 1e-4,
+        "reordering the frames must change the reading, got {} either way",
+        mean_consecutive_diff(&shuffled)
+    );
+
+    // Degenerate inputs answer "no motion" rather than dividing by zero.
+    assert_eq!(mean_consecutive_diff(&[]), 0.0);
+    assert_eq!(mean_consecutive_diff(&[flat(7)]), 0.0);
+}
+
+/// `probe_rate` reads a **fixed window** of the probe schedule — the settled
+/// tail of the loud plateau — so it is sensitive to *where* motion sits in the
+/// capture, not only to how much of it there is.
+///
+/// The fixture puts a known step in that tail and holds every other region
+/// still; reversing the same frames moves other regions into the window, so the
+/// reading must change. (Reversal alone cannot change [`mean_consecutive_diff`]:
+/// `frame_diff` is symmetric, so a reversed sequence has the identical multiset
+/// of consecutive pairs. What reversal changes here is which frames the window
+/// selects.)
+#[test]
+fn probe_rate_reads_the_settled_tail_of_the_loud_plateau_and_not_the_rest() {
+    let plateau_end = PROBE_PRE + PROBE_WINDOW;
+    let tail_start = plateau_end - RATE_TAIL;
+    let total = PROBE_PRE + 2 * PROBE_WINDOW;
+    let step = 3u8;
+    let seq: Vec<CaptureImage> = (0..total)
+        .map(|i| {
+            if i < tail_start {
+                flat(10)
+            } else if i < plateau_end {
+                // Only the tail ramps, and at a known rate.
+                flat(10 + (i - tail_start) as u8 * step)
+            } else {
+                // The fall segment sits somewhere else entirely, and still.
+                flat(200)
+            }
+        })
+        .collect();
+    let expected = step as f32 / 255.0;
+    assert!(
+        (probe_rate(&seq) - expected).abs() < 1e-6,
+        "the tail's own step is the reading: got {}, want {expected}",
+        probe_rate(&seq)
+    );
+
+    let mut reversed = seq;
+    reversed.reverse();
+    assert!(
+        (probe_rate(&reversed) - expected).abs() > 1e-4,
+        "reversing moves other frames into the window, so the reading must change: got {}",
+        probe_rate(&reversed)
+    );
+
+    // A capture shorter than the schedule yields an empty window, not a panic.
+    assert_eq!(probe_rate(&[]), 0.0);
+}
+
+/// The `rate` cell is marked from the probe's **rise**: an unsettled rise means
+/// the frames it averaged were still travelling toward the plateau, so the
+/// number describes the transient rather than the steady motion.
+#[test]
+fn a_rate_cell_marks_exactly_when_the_rise_did_not_settle() {
+    assert_eq!(rate_cell(0.0123, true), "0.0123");
+    assert_eq!(rate_cell(0.0123, false), "0.0123+");
+    assert_eq!(rate_cell(0.0, true), "0.0000");
+    assert_eq!(rate_cell(0.0, false), "0.0000+");
+}
+
+/// Both motion readings print in the table and both reach `--json`, and the
+/// JSON carries the size `rate` was measured at rather than leaving a consumer
+/// to assume it matches the columns beside it (ADR-0134).
+#[test]
+fn the_motion_columns_print_in_the_table_and_carry_their_size_in_the_json() {
+    let fam = || FamilyReport {
+        system: SystemKind::Swarm,
+        presets: vec![preset_report("drifter", vec![])],
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam()], Tier::Floor);
+    assert!(out.contains("drive"), "the drive header prints:\n{out}");
+    assert!(out.contains("rate"), "the rate header prints:\n{out}");
+    assert!(out.contains("0.625"), "the drive value prints:\n{out}");
+    // `rise_settled` is true on the fixture, so this cell is bare.
+    assert!(out.contains("0.0123"), "the rate value prints:\n{out}");
+    assert!(
+        !out.contains("0.0123+"),
+        "a settled rise leaves the rate cell unmarked:\n{out}"
+    );
+    assert!(
+        out.contains("NEITHER IS A THRESHOLD") && out.contains("anchor"),
+        "the anchoring caveat rides beside the columns, not in a footnote:\n{out}"
+    );
+
+    let json = render_json("src", &[fam()], Tier::Floor);
+    assert!(json.contains("\"drive\":0.625"), "{json}");
+    assert!(
+        json.contains(&format!(
+            "\"rate\":{{\"mean\":0.0123,\"settled\":true,\"measured_at_px\":{PROBE_SIZE}}}"
+        )),
+        "the rate object carries its own size: {json}"
+    );
+    assert_eq!(
+        json.matches('{').count(),
+        json.matches('}').count(),
+        "braces balance with the new keys: {json}"
+    );
+}
+
+/// The widest possible row — a line family, so the `geom` column is present too
+/// — still fits a 100-column terminal with both new columns in place. The
+/// content lane reads this table many times a session, and a wrapped row stops
+/// lining up with its header.
+#[test]
+fn no_report_table_line_wraps_at_a_hundred_columns() {
+    let mut line_preset = preset_report("Star Mandala Bordered", vec![]);
+    line_preset.geometry = Some(0.3492);
+    let fam = FamilyReport {
+        system: SystemKind::StarPattern,
+        presets: vec![line_preset],
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam], Tier::Floor);
+    // The explanatory prose blocks wrap on their own and have no columns to
+    // line up; the claim is about the header and the rows under it. Both are
+    // found by content rather than by position, so a block inserted between
+    // them later cannot silently drop this test's coverage.
+    let table: Vec<&str> = out
+        .lines()
+        .filter(|l| l.contains("Star Mandala") || l.trim_start().starts_with("preset "))
+        .collect();
+    assert_eq!(
+        table.len(),
+        6,
+        "all three tables carry a header and this preset's row:\n{out}"
+    );
+    for line in table {
+        assert!(
+            line.chars().count() <= 100,
+            "a table line is {} columns wide:\n{line}",
+            line.chars().count()
+        );
+    }
 }

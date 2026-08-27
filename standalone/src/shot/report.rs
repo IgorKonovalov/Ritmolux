@@ -82,6 +82,16 @@ const PROBE_WINDOW: usize = 48;
 /// before its transient cell is marked. Matches the easing suite's own gate.
 const PROBE_SETTLE_TOL: f32 = 0.02;
 
+/// Frames at the **end** of the probe's loud plateau that the `rate` reading
+/// averages over (ADR-0134).
+///
+/// The step response occupies the plateau's leading edge, so averaging the
+/// whole plateau would fold that transient into a statistic about *steady*
+/// motion — the two things the report is trying to tell apart. Half the window
+/// is the same split [`segment_settled`] extrapolates its trend from, so the
+/// number and the mark that qualifies it describe the same frames.
+const RATE_TAIL: usize = PROBE_WINDOW / 2;
+
 struct PresetReport {
     name: String,
     reactivity: [f32; 4], // bass, mid, treb, onset
@@ -112,6 +122,35 @@ struct PresetReport {
     /// sits below the mean — never lie in the new direction.
     reactivity_footprint: [f32; 4],
     animation: f32,
+    /// The **combined**-stimulus differential: the silent 48-frame capture
+    /// against the fully-driven one, at [`REPORT_SIZE`] (ADR-0134). The four
+    /// reactivity columns drive one band at a time, so a preset that reads
+    /// several bands together can measure low on every one of them and still be
+    /// strongly driven — or read plausibly on all four and be driven by none of
+    /// them together. This asks the question the listener asks.
+    ///
+    /// A **reading, never a gate.** It rides captures `build_family_report`
+    /// already holds for `anim` and `cover`, so it costs one CPU loop.
+    drive: f32,
+    /// Mean [`frame_diff`] between **consecutive** frames over the settled tail
+    /// of the transient probe's loud plateau — motion *per frame*, the axis no
+    /// other column here can see (ADR-0134). Every other statistic in this
+    /// struct differences two frames a fixed count apart, which carries no
+    /// information about what happened between them.
+    ///
+    /// **Measured at [`PROBE_SIZE`] (96x96), not [`REPORT_SIZE`] (192x192) like
+    /// the columns printed beside it.** `frame_diff` is a normalized mean so
+    /// the two are broadly comparable, but "broadly" is not a property — this
+    /// project has already been bitten by a statistic that scaled with capture
+    /// resolution and did not say so. Read it against family neighbours; never
+    /// across sizes, and never sorted on: motion inside a static repeating
+    /// structure reads calmer than the same motion unanchored, and nothing here
+    /// models anchoring.
+    ///
+    /// Qualified by the probe's own `rise_settled`: a rate read while the step
+    /// response is still travelling measures the transient rather than the
+    /// steady motion, so the cell is marked rather than published bare.
+    rate: f32,
     coverage: f32,
     /// The in-frame geometry fraction of the fully-driven capture's last frame
     /// (Plan 0075 Phase 2, design-backlog 0070): the share of drawn segment
@@ -209,11 +248,16 @@ fn build_family_report(
     r.resize(PROBE_SIZE, PROBE_SIZE);
     let stimulus = step_stimulus();
     let mut transients = Vec::with_capacity(names.len());
+    // The `rate` reading rides the probe's frames rather than adding a capture
+    // — that is what makes it free, and it is also why it is the one column
+    // measured at `PROBE_SIZE` (ADR-0134).
+    let mut rates = Vec::with_capacity(names.len());
     for name in names {
         let images = r
             .capture_preset_over(name, &stimulus)
             .map_err(|e| format!("probe `{name}`: {e}"))?;
         transients.push(probe_response(&images));
+        rates.push(probe_rate(&images));
     }
     r.resize(REPORT_SIZE, REPORT_SIZE);
 
@@ -254,6 +298,10 @@ fn build_family_report(
         let fixed = capture(r, name, &loud, REPORT_FRAMES_LATE)?;
         let geometry = take_draw_extent().and_then(|extent| extent.fraction());
         set_extent_diagnostic(false);
+        // Silence against full drive, same frame count and same size — the
+        // combined-stimulus differential the per-band columns cannot express
+        // (ADR-0134). No new capture: both frames are already here.
+        let drive = frame_diff(&late, &fixed);
         let bg = corner(&fixed);
         let cov = coverage(&fixed, bg, COVERAGE_EPS);
         // Belt-and-braces "not a dot" note folded into coverage via spread:
@@ -266,6 +314,8 @@ fn build_family_report(
             reactivity_low,
             reactivity_footprint,
             animation,
+            drive,
+            rate: rates.get(index).copied().unwrap_or(0.0),
             coverage: cov,
             geometry,
             transient: transients.get(index).copied().unwrap_or(Transient {
@@ -797,6 +847,59 @@ fn probe_response(images: &[CaptureImage]) -> Transient {
     }
 }
 
+/// Mean [`frame_diff`] between **consecutive** frames of `frames`.
+///
+/// Every other statistic in this module differences two frames a fixed count
+/// apart; this one walks the sequence, which is the only way to see a *rate*
+/// (ADR-0134). Order therefore matters here in a way it does not anywhere else
+/// above — reordering the frames changes the answer.
+///
+/// Fewer than two frames is no pair to difference, which reads as no motion.
+fn mean_consecutive_diff(frames: &[CaptureImage]) -> f32 {
+    let pairs = frames.len().saturating_sub(1);
+    if pairs == 0 {
+        return 0.0;
+    }
+    let sum: f32 = frames
+        .windows(2)
+        .map(|pair| match pair {
+            [a, b] => frame_diff(a, b),
+            _ => 0.0,
+        })
+        .sum();
+    sum / pairs as f32
+}
+
+/// The `rate` reading: [`mean_consecutive_diff`] over the last [`RATE_TAIL`]
+/// frames of the probe's loud plateau.
+///
+/// The plateau runs from [`PROBE_PRE`] for [`PROBE_WINDOW`] frames — see
+/// [`step_stimulus`] — and the tail is its settled end. A capture shorter than
+/// the schedule yields an empty slice, which reads as no motion rather than
+/// panicking.
+fn probe_rate(images: &[CaptureImage]) -> f32 {
+    let plateau_end = PROBE_PRE + PROBE_WINDOW;
+    let tail = images
+        .get(plateau_end.saturating_sub(RATE_TAIL)..plateau_end)
+        .unwrap_or_default();
+    mean_consecutive_diff(tail)
+}
+
+/// One `rate` cell: the reading, suffixed `+` when the probe's rise had not
+/// settled, in the same shape the transient cells use.
+///
+/// An unsettled rise means the frames this averaged were still travelling
+/// toward the plateau, so the number describes the transient rather than the
+/// steady motion. Same suffix as [`transient_cell`] because it is the same
+/// claim: not a settled measurement.
+fn rate_cell(rate: f32, settled: bool) -> String {
+    if settled {
+        format!("{rate:.4}")
+    } else {
+        format!("{rate:.4}+")
+    }
+}
+
 /// One transient cell: the frame count, suffixed `+` when `segment_settled`
 /// could not certify the response arrived. Read a marked cell as *at least this
 /// many*, never as a measurement.
@@ -898,8 +1001,18 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         // and a fabricated cell would read as a finding (backlog 0070).
         let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
         let mut header = format!(
-            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
-            "preset", "bass", "mid", "treb", "onset", "anim", "cover", "rise", "fall"
+            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
+            "preset",
+            "bass",
+            "mid",
+            "treb",
+            "onset",
+            "drive",
+            "anim",
+            "rate",
+            "cover",
+            "rise",
+            "fall"
         );
         if show_geometry {
             let _ = write!(header, " {:>6}", "geom");
@@ -907,13 +1020,17 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         let _ = writeln!(out, "{header}");
         for p in &fam.presets {
             let mut row = format!(
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>5} {:>5}",
+                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7.3} {:>5} {:>5}",
                 p.name,
                 p.reactivity[0],
                 p.reactivity[1],
                 p.reactivity[2],
                 p.reactivity[3],
+                p.drive,
                 p.animation,
+                // Marked from the *rise*: an unsettled rise is exactly the case
+                // where the averaged frames were still travelling.
+                rate_cell(p.rate, p.transient.rise_settled),
                 p.coverage,
                 transient_cell(p.transient.response.rise_frames, p.transient.rise_settled),
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
@@ -930,6 +1047,27 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             }
             let _ = writeln!(out, "{row}");
         }
+        // The two motion readings, explained where they are read (ADR-0134).
+        // The anchoring caveat sits here rather than in a footnote because the
+        // number it qualifies is one a reader will otherwise sort on.
+        let _ = writeln!(
+            out,
+            "  drive is silence against full drive at the same depth — the combined \
+             stimulus the per-band columns above measure only one at a time"
+        );
+        let _ = writeln!(
+            out,
+            "  rate is the mean frame-to-frame difference over the settled tail of the \
+             probe's loud plateau, so it alone is measured at {PROBE_SIZE}px rather \
+             than {REPORT_SIZE}px; a `+` marks a rise that had not settled"
+        );
+        let _ = writeln!(
+            out,
+            "  NEITHER IS A THRESHOLD and rate does not sort (ADR-0134): motion inside \
+             a static repeating structure reads calmer than the same motion \
+             unanchored, and nothing here models anchoring — read both against family \
+             neighbours"
+        );
         if show_geometry {
             let _ = writeln!(
                 out,
@@ -1100,6 +1238,21 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 num(p.reactivity_footprint[3]),
             ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
+            out.push_str(&format!("\"drive\":{},", num(p.drive)));
+            // The size travels with the number rather than being implied by the
+            // report's own: `rate` is the one reading measured at PROBE_SIZE,
+            // and a consumer that compares it across sizes is reading a
+            // different statistic (ADR-0134).
+            out.push_str(&format!(
+                "\"rate\":{{\"mean\":{},\"settled\":{},\"measured_at_px\":{}}},",
+                num(p.rate),
+                if p.transient.rise_settled {
+                    "true"
+                } else {
+                    "false"
+                },
+                PROBE_SIZE
+            ));
             out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
             // Only where the measurement exists — the JSON mirrors the text
             // table's omission rather than inventing a null convention.

@@ -562,14 +562,17 @@ cross-machine byte equality does not hold and nothing here asserts it.
 ### What the report's columns mean
 
 ```
-  preset            bass     mid    treb   onset    anim   cover  rise  fall
-  Smooth Pulse     0.167   0.087   0.250   0.206   0.076   0.927    26    31
+  preset            bass     mid    treb   onset   drive    anim    rate   cover  rise  fall
+  Drift Mono       0.320   0.489   0.204   0.174   0.455   0.316 0.0411+   0.450    9+   24+
+  Static Control   0.000   0.000   0.000   0.000   0.000   0.122 0.0057+   0.997   43+   42+
 ```
 
 | column | question it answers |
 |---|---|
 | `bass` `mid` `treb` `onset` | how far the frame moves when that stimulus alone comes up, against silence — "does this preset respond to bass at all" |
+| `drive` | how far the frame moves under the **combined** stimulus — silence against everything up at once, same depth and same size ([the two motion readings](#the-two-motion-readings)) |
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
+| `rate` | how far the frame moves **frame to frame** — the only column that walks consecutive frames, and the only one measured at 96x96 ([the two motion readings](#the-two-motion-readings)) |
 | `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
@@ -591,6 +594,59 @@ holds one stimulus for every frame it renders, so each smoother has converged
 long before the pixels are read. That is the right question for "does it
 respond", and it is exactly why those columns are **identical for any
 `[smoothing]` constant**.
+
+#### The two motion readings
+
+`drive` and `rate` were added by [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md),
+which exists because the report could not see either axis. Every other statistic
+on this page is a **settled differential** — two frames captured a fixed count
+apart — so it cannot see *rate* at all, and the reactivity columns drive one band
+at a time, so they cannot see combined drive either. A preset needed four live
+passes with a person watching before the lane found its defect, and the harness
+stayed green and unchanged through all four.
+
+**`drive`** is the silent 48-frame capture differenced against the fully-driven
+one: same frame count, same scene time, same `REPORT_SIZE`. It is the question
+the listener asks — *does this change when the music does* — and it is not the
+same question as the four band columns beside it, which drive one stimulus each.
+A preset reading several bands together can measure low on every one of them and
+still be strongly driven; one can read plausibly on all four and be driven by
+none of them together. A preset with no audio binding at all reads `0.000`.
+
+**`rate`** is the mean difference between **consecutive** frames over the settled
+tail of the transient probe's loud plateau. It separates frozen from boiling,
+which is the axis the report has never had.
+
+Both ride captures the report already takes — no extra render pass, no extra
+readback, no resize — so the full-library wall clock is unchanged.
+
+Two things to know before reading either number:
+
+- **`rate` is measured at `PROBE_SIZE` (96x96), not `REPORT_SIZE` (192x192) like
+  every column printed beside it.** It rides the probe's frames, and the probe
+  runs small for the reasons in [the transient columns](#the-transient-columns).
+  `frame_diff` is a normalized mean so the two are broadly comparable, but
+  "broadly" is not a property: never compare a `rate` against a number measured
+  at another size. `--json` carries `measured_at_px` beside the value for exactly
+  this reason.
+- **A `rate` cell carries the same `+` mark the transient cells do**, taken from
+  the probe's own `rise_settled`. An unsettled rise means the frames it averaged
+  were still travelling toward the plateau, so the number describes the transient
+  rather than the steady motion. The mark is **common, not exceptional** — see
+  the transient section on why a great many presets never settle inside 48
+  frames.
+
+**Neither number is a gate, and `rate` does not sort the library.** This is the
+finding the ADR turns on rather than a caveat bolted to it. Motion inside a
+static repeating structure reads as *calm* — the eye reads a pattern updating in
+place — while the same amount of motion in an unanchored world moves the whole
+sheet bodily and has to be far quieter to watch. Measured: `fragment_tiledmono`
+and `fragment_drostemono` both sit **higher** than a draft that was rejected for
+shaking, and both are comfortable. No pixel statistic in this harness models
+anchoring, so any threshold consistent with the rejected draft would fail two
+shipped presets. Read both columns **against family neighbours**, the way `geom`
+is read ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)),
+and never sort on them.
 
 #### The transient columns
 
@@ -1129,9 +1185,15 @@ figures; whether it needs a re-gain pass is
 
 The `--report --json` schema is a nested object of numbers keyed by
 family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint`,
-`animation`, `coverage`, `transient` (`rise_frames` / `fall_frames` as integers
-plus their `ratio`), `reachability`, the pairwise `pixel`/`shape` distinctness
-matrices, and `near_duplicates`.
+`animation`, `drive`, `rate`, `coverage`, `transient` (`rise_frames` /
+`fall_frames` as integers plus their `ratio`), `reachability`, the pairwise
+`pixel`/`shape` distinctness matrices, and `near_duplicates`.
+
+`rate` is an **object**, not a bare number: `mean`, `settled`, and
+`measured_at_px` — the size it was captured at, which is not the one the columns
+beside it use ([the two motion readings](#the-two-motion-readings)). A consumer
+that drops `measured_at_px` and compares a `rate` against a differently-sized run
+is reading a different statistic.
 
 `reachability` carries `dead_branches`, `unapproached_ceilings` and
 `saturated_clamps` counts, the full `gates` list (each with `param`, `source`,
