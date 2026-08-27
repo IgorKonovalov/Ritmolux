@@ -59,14 +59,13 @@ const PROBE_PRE: usize = 6;
 /// different truncation bias.
 ///
 /// **48 frames is 0.8 s, and a great many presets do not settle inside it.**
-/// This comment used to say such a response "reads *clamped* rather than
-/// measured — the asymmetry still shows, the magnitude understates", and every
-/// clause of that was wrong (corrected by Plan 0038 Phase 8). Nothing is
-/// clamped: `frames_to_settle` normalizes against the segment's own last frame,
-/// so a still-travelling response supplies a short total, crosses every
-/// threshold early, and returns a **plausible smaller number** with no signal
-/// that anything went wrong. The bias is uneven across thresholds, so the shape
-/// is distorted toward *even* as well — which is how a truncated window once
+/// Such a response does **not** read *clamped* (Plan 0038 Phase 8 corrected the
+/// reverse claim, which had been written here). Nothing is clamped:
+/// `frames_to_settle` normalizes against the segment's own last frame, so a
+/// still-travelling response supplies a short total, crosses every threshold
+/// early, and returns a **plausible smaller number** with no signal that
+/// anything went wrong. The bias is uneven across thresholds, so the shape is
+/// distorted toward *even* as well — which is how a truncated window once
 /// falsified an ADR here.
 ///
 /// The arithmetic: staying inside [`PROBE_SETTLE_TOL`] needs about
@@ -823,7 +822,7 @@ fn step_stimulus() -> Vec<AnalysisFrame> {
 /// its output carries no evidence about its own validity — a truncated response
 /// and a settled one are indistinguishable from the number alone. Only
 /// `segment_settled` can tell them apart, which is why an unmarked cell is a
-/// claim this report was not previously entitled to make.
+/// claim only a settled segment entitles this report to make.
 #[derive(Clone, Copy)]
 struct Transient {
     response: StepResponse,

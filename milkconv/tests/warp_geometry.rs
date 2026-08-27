@@ -356,8 +356,8 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 /// MilkDrop's composite draws the finished frame twice: once straight, once
 /// zoomed about the centre and flipped per `nVideoEchoOrientation`, at
 /// `fVideoEchoAlpha`. 2.4 % of the corpus sets a non-zero alpha and where it is
-/// set it is load-bearing. This engine had no such stage until Phase 3, and the
-/// converter used to name the three values as unconsumed.
+/// set it is load-bearing. Phase 3 built the stage; without it the converter
+/// names the three values as unconsumed.
 ///
 /// # Why the property changed
 ///

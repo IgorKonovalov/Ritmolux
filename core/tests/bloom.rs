@@ -28,8 +28,8 @@
 //! file's posture and `kaleidoscope.rs`'s: these need many captures at differing
 //! params and a second renderer for the tier comparison, which is the one thing
 //! the file holding the blessed baselines exists to avoid. The blessed *baseline*
-//! for this stage does live there, as the plan's file list asks — this is the
-//! behavioural half beside it. Skips with no adapter per ADR-0016.
+//! for this stage does live there — this is the behavioural half beside it. Skips
+//! with no adapter per ADR-0016.
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
@@ -327,10 +327,10 @@ fn the_halo_follows_its_params_and_is_round() {
 /// **`bloom_threshold` is compared against EXPOSED light** (Plan 0066 Phase 2,
 /// ADR-0080).
 ///
-/// The chain is scene -> post -> tonemap, so the bright-pass used to threshold the
-/// frame *before* `exposure` scaled it. That made the parameter meaningful only
-/// while a preset sat near `exposure = 1.0`: at `0.03` the whole figure is over
-/// every threshold the engine allows (`MAX_THRESHOLD = 8.0`), so `0.95` and `8.0`
+/// The chain is scene -> post -> tonemap, so a bright-pass that thresholds the
+/// frame *before* `exposure` scales it makes the parameter meaningful only while
+/// a preset sits near `exposure = 1.0`: at `0.03` the whole figure is over every
+/// threshold the engine allows (`MAX_THRESHOLD = 8.0`), so `0.95` and `8.0`
 /// selected the same thing. `presets/attractor_lorenz.toml` shipped its threshold
 /// pinned at the ceiling with a header saying to read it as *capped, not tuned* —
 /// this is the property that was absent under it.
@@ -407,8 +407,8 @@ fn the_bright_pass_thresholds_exposed_light() {
     //
     // The strict threshold still blooms a great deal, and that is correct rather
     // than a weak result: the rose's self-crossings sum well past 8 even after the
-    // stop, so the 8.0 ceiling still selects the knot's core. What changed is that
-    // it no longer selects the whole figure.
+    // stop, so the 8.0 ceiling still selects the knot's core — without selecting
+    // the whole figure.
     assert!(
         tight_halo * 1.25 < loose_halo,
         "`bloom_threshold` does not discriminate at `exposure = {LOW_STOP}`: the 8.0 \

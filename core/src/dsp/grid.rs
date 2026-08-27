@@ -28,10 +28,10 @@
 //! to sharpen. The lock is a phase-locked loop over the onset **envelope**, not
 //! the beat flag: two exponentially-decayed quadrature accumulators give the
 //! energy-weighted mean phase of the recent envelope relative to the grid, and
-//! the grid is nudged toward it by a small per-hop gain. That is the plan's
-//! "correct toward the onset stream's aggregate phase over a window rather than
-//! snapping to each event", and it is what keeps the over-firing detector from
-//! yanking the grid the way it yanks [`tempo`](super::tempo)'s `bar` phase.
+//! the grid is nudged toward it by a small per-hop gain. It corrects toward the
+//! onset stream's aggregate phase over a window rather than snapping to each
+//! event, which is what keeps the over-firing detector from yanking the grid
+//! the way it yanks [`tempo`](super::tempo)'s `bar` phase.
 //!
 //! Pure and allocation-free after construction: state is five scalars, the only
 //! clock is the hop counter, and the same `(bpm, onset)` sequence always yields
@@ -441,9 +441,9 @@ mod tests {
     /// same-run comparison: one analyzer with a grid driven off its own output
     /// every hop, one with no grid at all, and the three series must match bit
     /// for bit — which catches any feedback from the grid into Layer 1. The
-    /// second is structural and outlives Phase 3, when the grid moves inside the
-    /// analyzer and the first arm can no longer be built: the three are exactly
-    /// the counter and the timer derived from the beat-flag stream, so anything
+    /// second is structural and outlives Phase 3, where the grid moves inside
+    /// the analyzer and the first arm cannot be built at all: the three are the
+    /// counter and the timer derived from the beat-flag stream, so anything
     /// that re-times them shows up as a broken derivation rather than as a
     /// number nobody has a reference for.
     #[test]

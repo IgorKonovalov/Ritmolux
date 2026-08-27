@@ -540,7 +540,7 @@ fn a_source_past_the_bound_is_clamped_and_still_spawns_live_objects() {
 /// for both so the horizontal extent is the *source's* and not the cone's.
 ///
 /// The off-centre jet is the narrow source plus the scene's own `pan_x` — the
-/// two together are the look `presets/README.md` used to route to engine
+/// two together are the look `presets/README.md` once routed to engine
 /// feedback, so the third capture asserts the column actually moves.
 ///
 /// Needs a GPU adapter, so it skips where there is none (ADR-0016).
@@ -654,8 +654,8 @@ fn a_narrow_source_draws_a_column_and_pan_carries_it_off_centre() {
 /// `age = 0` is the case that forces it: the natural arithmetic is `u / fade`,
 /// which is `0/0` at the default and would give a NaN that propagates into a
 /// colour. The exactness matters beyond that one point — the whole "no pixel
-/// moves" claim of this plan is that the product picks up a factor of exactly
-/// one, and `x * 1.0` is `x` in IEEE-754 while `x * 0.9999999` is not.
+/// moves" claim rests on the product picking up a factor of exactly one, and
+/// `x * 1.0` is `x` in IEEE-754 while `x * 0.9999999` is not.
 ///
 /// The hostile values are the same discipline every other param on this scene
 /// gets: a binding is arbitrary arithmetic and may hand over anything.
@@ -913,9 +913,9 @@ fn a_prewarmed_pool_matches_one_that_actually_ran() {
 ///
 /// The rendered half of this claim is
 /// [`a_spawn_rate_on_onset_bursts_and_then_idles`], which asserts an *empty*
-/// frame before its transient and is left unmodified by this plan — a
-/// default-on prewarm would break it. Here is the pool-level statement: nothing
-/// is back-dated, so the first step holds only what that instant is due.
+/// frame before its transient — a default-on prewarm would break it. Here is
+/// the pool-level statement: nothing is back-dated, so the first step holds
+/// only what that instant is due.
 #[test]
 fn a_zero_prewarm_starts_the_pool_empty() {
     let cold = cfg(600.0, 1.5, 1.9);
@@ -1021,9 +1021,9 @@ fn live_launch_angles(cfg: &Spawn, time: f32) -> Vec<f32> {
 /// second and what makes the first non-vacuous in both directions.
 ///
 /// Stated as the property (the population varies, and stops varying when the
-/// distribution is closed) rather than as a distribution statistic: this plan
-/// measured neither the shape of the draw nor what a "correct" variance would
-/// be, so pinning one would be inventing a number.
+/// distribution is closed) rather than as a distribution statistic: neither
+/// the shape of the draw nor what a "correct" variance would be has been
+/// measured, so pinning one would be inventing a number.
 #[test]
 fn objects_alive_at_one_instant_differ_and_a_zero_spread_collapses_them() {
     const SPREAD: f32 = 0.8;
@@ -1161,10 +1161,11 @@ fn a_twinkling_field_does_not_flash_as_one_sheet() {
 /// **The scene reads no clock** (NFR §6), asserted against the source rather
 /// than inferred from a pair of captures that happened to agree.
 ///
-/// The reproducibility this plan claims is not "the seed is fixed" — it is
-/// that the scene is a pure function of `(seed, scene time)`, and the one way
-/// to break that without touching the seed is to reach for wall-clock time.
-/// A capture comparison cannot see a clock read that is merely coarse.
+/// The reproducibility claimed is not "the seed is fixed" — it is that
+/// the scene is a pure function of `(seed, scene time)`, and the one
+/// way to break that without touching the seed is to reach for
+/// wall-clock time. A capture comparison cannot see a clock read that
+/// is merely coarse.
 #[test]
 fn the_scene_reads_no_wall_clock() {
     let path =

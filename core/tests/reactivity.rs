@@ -19,9 +19,9 @@
 //! four preset gates ask questions about the frame and are correct as they stand
 //! (`docs/capturing.md`).
 //!
-//! **The four columns are no longer orthogonal, and that is the analyzer being
-//! honest.** A hand-built frame could set exactly one band; real signals cannot.
-//! A click track is broadband, so it raises `bass` as well as `onset`, and a
+//! **The four columns are not orthogonal, and that is the analyzer being
+//! honest.** A hand-built frame can set exactly one band; real signals cannot. A
+//! click track is broadband, so it raises `bass` as well as `onset`, and a
 //! steady tone's attack raises `onset` once — under ADR-0049's normalization,
 //! which scales each level against its own recent peak, "once" is enough to read
 //! `1.0`. So a preset bound only to `bass` scores on the `onset` column too. The
@@ -78,10 +78,10 @@ const FORMAT: AudioFormat = AudioFormat {
 /// readbacks are the measurement, and only the warm-up renders were removed.
 ///
 /// **The gate's numbers moved, and that was accepted rather than discovered.**
-/// The plan expected the warm-up renders to be pure waste; they were also the
-/// scene warm-up ([`HOPS`] below). Removing them left 35 of the 36 per-band
-/// vectors different — every one of them *larger* — with `spectrum/Halo`, the
-/// only preset in the set with no accumulating state, bit-identical. Nothing
+/// The warm-up renders were expected to be pure waste; they were also the scene
+/// warm-up ([`HOPS`] below). Removing them left 35 of the 36 per-band vectors
+/// different — every one of them *larger* — with `spectrum/Halo`, the only
+/// preset in the set with no accumulating state, bit-identical. Nothing
 /// regressed: the lowest max across the library went 0.0287 -> 0.0504 against
 /// the 0.020 floor, so the tightest headroom in the set roughly doubled. Read a
 /// figure recorded before 2026-08-13 as a different measurement, not as drift.
@@ -95,10 +95,11 @@ const SIGNAL_HOPS: usize = 24;
 /// deliberate: the analyzer needs enough window to fill, not a musical phrase,
 /// and this gate already sweeps the whole shipped set.
 ///
-/// **These hops used to render, at silence, and doubled as the scene warm-up.**
-/// They no longer do, which is why every preset carrying GPU-integrated state —
-/// trails, particles, a reaction-diffusion field — meets the measured window
-/// [`WARMUP_HOPS`] steps colder than it once did. Scenes driven only by time and
+/// **These hops advance the analyzer without rendering.** Rendering
+/// them at silence would double as a scene warm-up, so every preset
+/// carrying GPU-integrated state — trails, particles, a
+/// reaction-diffusion field — meets the measured window [`WARMUP_HOPS`]
+/// steps colder for their being skipped. Scenes driven only by time and
 /// audio are unaffected, because the clock advances either way.
 const HOPS: usize = WARMUP_HOPS + SIGNAL_HOPS;
 
@@ -195,9 +196,10 @@ fn measured_hops() -> Vec<u32> {
 /// Drive `pcm` through the gate's capture shape: the analyzer's warm-up hops
 /// advanced without pixels, the measured window rendered.
 ///
-/// The count is asserted rather than trusted. Every hop in this clip used to be
-/// rasterized and all but the measured window thrown away, so the one thing
-/// that could silently undo this is a warm-up that starts drawing again.
+/// The count is asserted rather than trusted: the one thing that could
+/// silently undo this is a warm-up that starts drawing again,
+/// rasterizing every hop in the clip and throwing all but the measured
+/// window away.
 fn capture(renderer: &mut Renderer, name: &str, pcm: &[f32], hops: &[u32]) -> Vec<CaptureImage> {
     let run = renderer
         .capture_audio_after_warmup(name, pcm, FORMAT, hops, WARMUP_HOPS)

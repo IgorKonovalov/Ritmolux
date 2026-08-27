@@ -994,7 +994,7 @@ pub fn chaos_extent(table: &IfsTable, iterations: u32) -> Extent {
 /// One map's fixed point `(I − M)⁻¹ t` — **a point that is on the attractor**.
 ///
 /// That it lies on `A` is a consequence of the parameterization rather than of
-/// anything this plan added: `A = ⋃ fᵢ(A)` with `A` closed makes each `fᵢ`'s
+/// anything constructed here: `A = ⋃ fᵢ(A)` with `A` closed makes each `fᵢ`'s
 /// fixed point the limit of `fᵢⁿ(x)` for any `x ∈ A` (ADR-0075's Notes,
 /// ADR-0087). **It does not exist for De Jong, Clifford, Thomas or Lorenz**, and
 /// that is why the respawn ADR-0087 builds on this is IFS-only structurally

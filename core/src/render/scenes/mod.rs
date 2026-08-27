@@ -200,11 +200,11 @@ impl GeneratorConfig {
 /// Which construction hit the segment cap, for the surfaced message.
 ///
 /// An enum rather than a `String` because one of the two producers is **per
-/// frame**: an audio-driven `mirror_order` sitting over the cap used to build a
-/// fresh `format!("mirror x{order}")` on every single frame for as long as it
-/// stayed there — a heap allocation on the hot path (Plan 0031 Phase 4). The
-/// formatting now happens only in [`Display`](std::fmt::Display), i.e. only when
-/// something actually prints it.
+/// frame**: with a `String`, an audio-driven `mirror_order` sitting over the cap
+/// builds a fresh `format!("mirror x{order}")` on every single frame for as long
+/// as it stayed there — a heap allocation on the hot path (Plan 0031 Phase 4).
+/// The formatting now happens only in [`Display`](std::fmt::Display), i.e. only
+/// when something actually prints it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OverflowContext {
     /// An N-fold geometry mirror replicated past the cap — per frame, from the
@@ -328,7 +328,7 @@ pub(crate) trait Scene {
     /// exists because Plan 0111 Phase 2's bisect requires its five seams to be
     /// read from **one run** — same signal, same hop, same size, same adapter —
     /// and a `Box<dyn Scene>` cannot otherwise be asked for the one quantity that
-    /// sits upstream of everything the plan is bisecting. Measuring seam A on a
+    /// sits upstream of everything the bisect covers. Measuring seam A on a
     /// separately-driven scene would satisfy the arithmetic and quietly break
     /// that requirement.
     #[cfg(test)]
@@ -458,9 +458,9 @@ pub(crate) trait Scene {
 /// mid-show is a lookup, never a hitch.
 ///
 /// The keying is the point: the renderer addresses a scene by the kind its preset
-/// names, so a scene can no longer silently end up in the wrong slot. Nothing
-/// here is positional — reordering [`SystemKind::ALL`] reorders construction and
-/// nothing else.
+/// names, so a scene cannot silently end up in the wrong slot. Nothing here is
+/// positional — reordering [`SystemKind::ALL`] reorders construction and nothing
+/// else.
 pub(crate) fn create_all(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
@@ -730,8 +730,8 @@ mod tests {
 
     /// Every `SystemKind::ALL` entry builds the scene that kind is supposed to
     /// drive, and the roster covers exactly the roster — so transposing two
-    /// factory arms, which used to silently point every preset of one system at
-    /// another's scene, now fails here.
+    /// factory arms — which silently points every preset of one system at
+    /// another's scene — fails here.
     ///
     /// Needs a GPU adapter to build the scenes, so it skips on runners without
     /// one (ADR-0016).

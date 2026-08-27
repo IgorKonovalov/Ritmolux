@@ -88,7 +88,7 @@ below wrong for the wrong reason.
 | 1 — a relative link in a `.rs` comment | a `[label]: ../../../docs/adrs/…` definition | reported, naming the target |
 | 2 — plan-relative narration | the phrase `this plan` in a doc comment | reported, naming the phrase |
 
-The four silences are the load-bearing half, because a gate that cries wolf gets escaped rather
+The five silences are the load-bearing half, because a gate that cries wolf gets escaped rather
 than obeyed ([ADR-0127](../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md),
 Negative 3):
 
@@ -96,6 +96,7 @@ Negative 3):
 |------|-----------|----------|
 | a rustdoc intra-doc link | `[Seeded::render]` and `[the renderer](crate::render::Renderer)` | not reported — `rustc` resolves these, so they cannot rot silently |
 | a bare-number citation | `Plan 0045 Phase 3` in prose that also says "the plans README" | not reported — this is the form the links are replaced *with* |
+| the same citation as a sentence's subject | `the Plan 0045 Phase 4b defect` | not reported — `the plan` is exempt in front of a number, or the gate would convict its own fix |
 | an escaped false positive | `hygiene-allow: <reason>` above a line carrying two rejected phrases | not reported — the escape covers its own line and the next |
 | a comment marker inside a string | `"https://…/../not/a/link"`, a raw string, and an escaped `"` | not reported — the checker lexes Rust rather than grepping lines |
 

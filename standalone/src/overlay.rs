@@ -137,12 +137,12 @@ impl ListLayout {
 /// Lay out `visible_len` rows in a surface of `width` x `height` device px, with
 /// `highlight` the row that must stay on screen.
 ///
-/// Vertical arithmetic is exactly what the single-column list already used
-/// (`floor((height - ROWS_TOP) / ROW_H)`, at least one row), so a change to
-/// `ROW_H` or `LIST_TOP` moves the pinned numbers in the tests deliberately.
-/// Horizontal is new: the roster asks for `ceil(len / rows_per_col)` columns and
-/// gets however many fit, and scrolling survives as the fallback for the case
-/// where the columns still cannot hold it.
+/// Vertical arithmetic is the single-column list's (`floor((height -
+/// ROWS_TOP) / ROW_H)`, at least one row), so a change to `ROW_H` or
+/// `LIST_TOP` moves the pinned numbers in the tests deliberately.
+/// Horizontally the roster asks for `ceil(len / rows_per_col)` columns and
+/// gets however many fit, with scrolling as the fallback for the case where
+/// the columns still cannot hold it.
 pub fn layout(visible_len: usize, highlight: usize, width: f32, height: f32) -> ListLayout {
     let rows_per_col = (((height - ROWS_TOP) / ROW_H).floor().max(1.0)) as usize;
     let needed = visible_len.div_ceil(rows_per_col).max(1);

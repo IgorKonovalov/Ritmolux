@@ -126,8 +126,8 @@ pub struct TierConfig {
     /// The floor value is NFR §12 memory arithmetic, **redone for the linear-light
     /// composite** (Plan 0045 Phase 3 / ADR-0046). Every intermediate upstream of
     /// the tonemap is now [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT) — 8
-    /// bytes/texel, not 4 — so the stage offscreens that used to be charged at the
-    /// surface format doubled, while the trails accumulation
+    /// bytes/texel, not 4 — so a stage offscreen costs twice what the surface
+    /// format would charge, while the trails accumulation
     /// ([`PingPongField`](super::feedback::PingPongField), two textures) was
     /// already float and did not move.
     ///
@@ -143,12 +143,12 @@ pub struct TierConfig {
     ///
     /// Plan 0023's dual-live dissolve holds two whole `PostChain`s, so the peak is
     /// ~133 MB rather than ~100. Outside the chains the frame carries one more
-    /// surface-sized float buffer than it used to — the tonemap's input, 16.6 MB,
-    /// which is the one genuinely *new* allocation this plan adds — plus the
-    /// blend's snapshot/live pair at 16.6 MB each while a dissolve runs (was 8.3),
+    /// surface-sized float buffer beyond the chains — the tonemap's input, 16.6
+    /// MB, the one allocation ADR-0046 genuinely adds — plus the blend's
+    /// snapshot/live pair at 16.6 MB each while a dissolve runs (8.3 at 8-bit),
     /// and ink's 8.3 MB input, which stays 8-bit because the tonemap hands it
-    /// display-referred pixels. Worst case — dual-live, both stages, ink on —
-    /// is ~191 MB against NFR §12's ~350 MB soft ceiling, which is mostly driver
+    /// display-referred pixels. Worst case — dual-live, both stages, ink on — is
+    /// ~191 MB against NFR §12's ~350 MB soft ceiling, which is mostly driver
     /// floor already.
     ///
     /// At the rich cap (2560x1440) the same arithmetic is ~118 MB per chain and
@@ -289,8 +289,8 @@ pub struct TierConfig {
     /// largest grid the rule admits and it is what `Rich` takes. The format's own
     /// maximum is therefore **refused**: at 1.92 ms it is 11.5 % of the frame on
     /// a desktop CPU, which is not a number any tier should spend on one
-    /// parameter surface. That is the plan's "lower if it does not [measure
-    /// clean]", exercised.
+    /// parameter surface. The grid is lowered because it did not measure clean,
+    /// which is the whole of the rule.
     ///
     /// **`Floor` sits a step further down than the rule alone would put it, and
     /// deliberately.** The rig above is a desktop CPU; NFR §1's floor tier
@@ -370,18 +370,17 @@ pub struct TierConfig {
     /// roster landed, when a canvas was quads, circles and triangles. The roster
     /// made the loop **cheaper**, because rings, sectors and checker patches
     /// shade far less of their own bounding box than a quad does, so the
-    /// pre-roster ladder overstates the shipped cost by about half again
-    /// (12.7 % against 8.2 % at eight elements). Quote it for the gate's
-    /// reasoning; quote the post-roster table for what a canvas costs today.
-    /// (This sentence quoted 36-39 % until Plan 0113 Phase 9 — the pre-Phase-3
-    /// sweep's figures, taken from the instrument the paragraph five lines up
-    /// forbids quoting — and then the pre-roster ladder's 12.7 % / 16.8 % until
-    /// Phase 10.) The ceiling then went to the
-    /// densest thing the plan still has to build, Kandinsky's *On White II*,
-    /// which ADR-0123 counts at just above 40 once its lines and arcs are
-    /// included. So this value sits **exactly on** that canvas rather than over
-    /// it, and a `collage_onwhite` that needs a forty-first element moves this
-    /// number rather than being quietly truncated.
+    /// pre-roster ladder overstates the shipped cost by about half again (12.7 %
+    /// against 8.2 % at eight elements). Quote it for the gate's reasoning;
+    /// quote the post-roster table for what a canvas costs today. (This sentence
+    /// quoted 36-39 % until Plan 0113 Phase 9 — the pre-Phase-3 sweep's figures,
+    /// taken from the instrument the paragraph five lines up forbids quoting —
+    /// and then the pre-roster ladder's 12.7 % / 16.8 % until Phase 10.) The
+    /// ceiling then went to the densest canvas in ADR-0123's roster, Kandinsky's
+    /// *On White II*, which ADR-0123 counts at just above 40 once its lines and
+    /// arcs are included. So this value sits **exactly on** that canvas rather
+    /// than over it, and a `collage_onwhite` that needs a forty-first element
+    /// moves this number rather than being quietly truncated.
     ///
     /// `Rich` is provisional in the sense every [`RICH`](TierConfig::RICH) value
     /// is — see that constant's own note.

@@ -44,9 +44,9 @@ const LADDER: [f32; 5] = [0.25, 0.5, 1.0, 2.0, 4.0];
 /// **Property 1: the default is the *exact* identity** (ADR-0092).
 ///
 /// Not "within a byte" — bit-for-bit, over the whole key range. This is what
-/// makes the plan's zero-baseline claim structural: every shipped ink preset and
-/// every golden fixture leaves `ink_gamma` unbound, so they all key through this
-/// branch and no capture can move by a rounding step.
+/// makes the zero-baseline claim structural: every shipped ink preset and
+/// every golden fixture leaves `ink_gamma` unbound, so they all key through
+/// this branch and no capture can move by a rounding step.
 #[test]
 fn the_default_exponent_is_the_exact_identity() {
     assert_eq!(

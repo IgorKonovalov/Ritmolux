@@ -23,21 +23,21 @@
 //! The `surface_format` this stage is built with is the **composite's** format
 //! (`Rgba16Float`, ADR-0046), not the surface's: the max-decay already ran in
 //! linear light — an 8-bit *sRGB* target blends linearly — so the arithmetic is
-//! unchanged, but a bright head no longer clips at 1.0 on its way into the
-//! accumulation, which was always `Rgba16Float` anyway.
+//! the same, and a bright head does **not** clip at 1.0 on its way into the
+//! accumulation, which is `Rgba16Float` either way.
 //!
 //! The composite runs at an internal resolution that **follows the render target**
 //! (ADR-0034), quantized to a 256 px step and capped — see
-//! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
-//! 1280x720, which on anything above 720p upscaled the whole frame: line geometry
-//! rasterized at full resolution was thrown away and came back soft, and the
-//! preset lane's only recourse was to drop `trails` from every line preset to get
+//! [`internal_grid_size`](super::post::internal_grid_size), rather than a fixed
+//! 1280x720, which on anything above 720p upscales the whole frame: line geometry
+//! rasterized at full resolution is thrown away and comes back soft, and the
+//! preset lane's only recourse is to drop `trails` from every line preset to get
 //! its sharpness back. Following the target is what lets those presets keep both.
 //!
 //! # The past moves: the accumulation is read through a transform (ADR-0048)
 //!
-//! The feedback pass no longer samples `prev` at the identical uv. It samples it
-//! through an **inverse per-frame affine** — `fb_zoom`, `fb_rotate`, `fb_dx`,
+//! The feedback pass does **not** sample `prev` at the identical uv. It samples
+//! it through an **inverse per-frame affine** — `fb_zoom`, `fb_rotate`, `fb_dx`,
 //! `fb_dy` about the bindable centre `fb_center_x`/`fb_center_y` — so a zoom is a
 //! tunnel, a rotation a spiral, a translation a directional smear. Inverse,
 //! because a destination pixel asks "where was I last frame"; the forward motion
@@ -65,7 +65,7 @@
 //!   samples the literal `in.uv` it always did.
 //!
 //! **Off-frame reads are transparent, not clamped** (the edge policy ADR-0048
-//! leaves to this plan). A zoom-out, a pan, or a rotation about an off-centre
+//! leaves open). A zoom-out, a pan, or a rotation about an off-centre
 //! `fb_center_*` all reach outside the accumulation, and the two candidates read
 //! very differently: `ClampToEdge` re-deposits the border texel every frame, so
 //! the edge row smears inward and compounds into a permanent bar of colour — the

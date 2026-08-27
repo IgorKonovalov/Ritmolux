@@ -738,8 +738,8 @@ const STAR_INTERIOR_ERROR: f32 = 0.25;
 /// count** — 0.00075 at 3 points, 0.06597 at 5, 0.13800 at 7, 0.24822 at 12
 /// (see [`STAR_INTERIOR_ERROR`]). Repairing it would change what every shipped
 /// `shape = "3"` mark looks like, since the sprite reads only the interior, and
-/// this plan's contract is that the particle path moves zero pixels. So it is
-/// recorded with its error, which is the other half of the phase's done-when.
+/// the particle path is contracted to move zero pixels. So it is recorded with
+/// its error instead.
 ///
 /// The one place that matters today is `core/tests/fixtures/swarm_shaped.toml`,
 /// a 7-pointed star: its marks are drawn from a field 0.138 out at the centre,
@@ -998,7 +998,7 @@ fn the_spike_jitter_is_seeded_and_reproducible() {
     );
     println!("spike hash over 12 spikes: {draws:?}");
 
-    // ...and it genuinely changes the figure: the tips are no longer all at 1.
+    // ...and it genuinely changes the figure: the tips are not all at 1.
     let tip_radius = |spike: u32| -> f32 {
         let seg = std::f32::consts::TAU / n;
         let axis = seg * spike as f32;

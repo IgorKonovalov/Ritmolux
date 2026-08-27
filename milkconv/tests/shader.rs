@@ -200,9 +200,9 @@ fn loops_nested_past_the_cap_reject() {
     assert_eq!(err.class, "too-big");
 }
 
-/// **A disk texture rejects with the class the plan prices.** This is the
-/// deliberate 19 %-of-corpus exclusion; the sampler's own name is in the
-/// message so Phase 5's ranking and a human both see what was asked for.
+/// **A disk texture rejects with its own class.** This is the deliberate
+/// 19 %-of-corpus exclusion; the sampler's own name is in the message so
+/// Phase 5's ranking and a human both see what was asked for.
 #[test]
 fn a_disk_texture_rejects_by_name() {
     for src in [

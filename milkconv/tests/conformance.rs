@@ -164,8 +164,8 @@ fn logical_and_bitwise_are_different_operators() {
     check("`band` is not lazy", "x = 0; band(0, x = 9); x", 9.0);
 }
 
-/// **`if` / `above` / `below` / `equal`**, the four the plan names, plus the
-/// value each yields.
+/// **`if` / `above` / `below` / `equal`** — the four branching
+/// builtins, plus the value each yields.
 #[test]
 fn the_branching_builtins() {
     check("if takes the true branch", "if(1, 10, 20)", 10.0);
@@ -183,9 +183,8 @@ fn the_branching_builtins() {
     );
 }
 
-/// **`loop` with a bounded count** — the plan's own wording. The count is
-/// evaluated once, the body runs that many times, and the whole thing is an
-/// expression.
+/// **`loop` with a bounded count.** The count is evaluated once, the
+/// body runs that many times, and the whole thing is an expression.
 #[test]
 fn bounded_loops() {
     check(
@@ -338,7 +337,7 @@ fn malformed_programs_are_errors() {
     }
 }
 
-/// **The `q1`–`q32` and `t1`–`t8` bridges** — the plan's own list.
+/// **The `q1`–`q32` and `t1`–`t8` bridges**, in full.
 ///
 /// The bridge is not a feature of the language: it is the shared register file.
 /// A `q` name written by `per_frame` and read by `per_vertex` is one register

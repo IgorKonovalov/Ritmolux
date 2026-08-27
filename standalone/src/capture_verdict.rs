@@ -120,7 +120,7 @@ mod tests {
 
     /// **Every arm renders something, and no two arms render the same thing.**
     /// A future arm that forgets to set its verdict would otherwise render as a
-    /// success, which is the exact failure this plan exists to end.
+    /// success, which is the exact failure this type exists to prevent.
     #[test]
     fn the_three_verdicts_are_distinguishable_non_empty_strings() {
         let live = CaptureVerdict::Live {

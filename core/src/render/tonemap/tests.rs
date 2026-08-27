@@ -17,8 +17,8 @@ use crate::render::{CaptureImage, HeadlessOptions, Renderer};
 /// all at or below the knee comes back unchanged to well within a byte.
 ///
 /// This is the property that rules plain Reinhard out — it maps 0.8 to 0.44,
-/// which would have darkened every shipped preset — and it is what confines
-/// this plan's golden re-bless to the regions that were actually clipping.
+/// which would darken every shipped preset — and it is what confined
+/// ADR-0046's golden re-bless to the regions that were actually clipping.
 #[test]
 fn the_curve_is_near_identity_below_the_mid_range() {
     // A byte is 1/255 ~ 0.0039; hold the curve an order of magnitude inside
@@ -65,8 +65,8 @@ fn a_saturating_ramp_maps_monotonically_and_never_reaches_clip() {
         previous = y;
         x *= 1.05;
     }
-    // The shoulder's whole point: an accumulation that used to clip to flat
-    // white is now separable — 2.0 and 4.0 land on different bytes.
+    // The shoulder's whole point: an accumulation that would clip to
+    // flat white is separable — 2.0 and 4.0 land on different bytes.
     let two = (map(2.0) * 255.0).round();
     let four = (map(4.0) * 255.0).round();
     assert!(
@@ -245,7 +245,7 @@ fn headless() -> Option<Renderer> {
 ///    crossings are found above 1.0 there. On the pre-Plan-0045 8-bit chain
 ///    this readback could not exceed 1.0 by construction.
 ///
-/// 2. *Two overlapping full-brightness strokes no longer clip to flat
+/// 2. *Two overlapping full-brightness strokes do not clip to flat
 ///    white.* The same frame's 8-bit surface is compared at two pixels the
 ///    **linear** buffer identifies rather than at hard-coded coordinates: the
 ///    brightest (a crossing, above 1.0) and one sitting at a single stroke's
@@ -1141,10 +1141,10 @@ const RIG: &str = "2026-08-09, DX12 hardware vs WARP, 160x100/40 frames";
 ///
 /// Nothing may be added here without a measurement. The list is checked in
 /// three directions: a colliding pair with no entry fails; an entry naming a
-/// pair that no longer collides fails, so separating a pair later cannot leave
-/// a stale allowance behind that would silently cover a *different* collision
-/// if the shapes ever met again; and an entry whose `evidence` does not record
-/// a comparison fails, because an entry with no measurement is not an entry.
+/// pair that does not collide fails, so separating a pair later cannot leave a
+/// stale allowance behind that would silently cover a *different* collision if
+/// the shapes ever met again; and an entry whose `evidence` does not record a
+/// comparison fails, because an entry with no measurement is not an entry.
 const ALLOWED: &[AllowedCollision] = &[
     // --- `[Uniform:FRAGMENT]`: the fullscreen scenes' single uniforms ---
     //
@@ -1304,7 +1304,7 @@ fn no_two_layouts_share_a_shape_without_recorded_evidence() {
         unrecorded.join("\n  ")
     );
 
-    // The other direction: an entry that no longer describes a real collision.
+    // The other direction: an entry that describes no real collision.
     let stale: Vec<String> = ALLOWED
         .iter()
         .filter(|entry| !covered.contains(&(entry.a, entry.b)))

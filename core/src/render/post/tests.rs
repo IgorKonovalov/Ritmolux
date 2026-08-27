@@ -19,7 +19,7 @@ use crate::render::gpu;
 /// The tier every test in this module runs at, and the one every golden
 /// baseline is blessed at (ADR-0045). These tests pin the **policy** — the
 /// quantization, the single scale factor, the purity — not the tier, so they
-/// read the floor cap the constants here used to be.
+/// read the floor cap rather than a constant of their own.
 const FLOOR: TierConfig = TierConfig::FLOOR;
 const POST_MAX_W: u32 = FLOOR.post_cap.0;
 const POST_MAX_H: u32 = FLOOR.post_cap.1;
@@ -93,9 +93,10 @@ fn the_internal_grid_follows_the_target_instead_of_a_fixed_720p() {
         );
         assert!(grid.0 <= POST_MAX_W && grid.1 <= POST_MAX_H, "{grid:?}");
     }
-    // The display this plan exists for. 2048x1152 is 16:9 and above the width
-    // cap, so it comes back capped *with its aspect exactly preserved* — a
-    // 1.07x downscale, and emphatically not 1280x720 (ADR-0034).
+    // The display ADR-0034 was raised on. 2048x1152 is 16:9 and above the
+    // width cap, so it comes back capped *with its aspect exactly
+    // preserved* — a 1.07x downscale, and emphatically not 1280x720
+    // (ADR-0034).
     assert_eq!(floor_grid((2048, 1152)), (1920, 1080));
     assert_ne!(floor_grid((2048, 1152)), (1280, 720));
 }
@@ -186,9 +187,10 @@ fn the_grid_policy_is_a_pure_function_of_the_target() {
 ///
 /// The second half is what makes the first mean something. A tier raises a
 /// **ceiling**, not the grid itself, so a preset diverges only where the floor
-/// was actually costing it resolution — which is also why every golden
-/// baseline is untouched by this plan (they capture at 1280x720 and smaller,
-/// squarely in the agreeing set, and `new_headless` pins the floor regardless).
+/// was actually costing it resolution — which is also why the tier leaves
+/// every golden baseline untouched (they capture at 1280x720 and smaller,
+/// squarely in the agreeing set, and `new_headless` pins the floor
+/// regardless).
 ///
 /// **1920x1080 belongs in the *binding* set, not the agreeing one**, and that
 /// is worth stating because it is the display size the floor was written for.
@@ -433,9 +435,9 @@ fn any_lit_pixel(image: &CaptureImage) -> bool {
         .any(|px| px[0] > 0 || px[1] > 0 || px[2] > 0)
 }
 
-/// Plan 0030 Phase 2 — **the Plan 0023 unblock**: two `PostChain`s built
-/// against one device hold fully independent GPU state, so a dual-live
-/// transition can run two composites in one frame.
+/// Plan 0030 Phase 2 — **the Plan 0023 unblock.** Two `PostChain`s
+/// built against one device hold fully independent GPU state, so a
+/// dual-live transition can run two composites in one frame.
 ///
 /// Trails is the stage that matters: it is the one owning cross-frame state (a
 /// [`PingPongField`](crate::render::feedback::PingPongField)), which is exactly
@@ -990,8 +992,8 @@ fn disc_extent_ratio(ctx: &RenderContext, surface: (u32, u32), through_a_stage: 
     lit_extent_ratio(&img)
 }
 
-/// **The defect this plan exists for**: turning a post stage on must change the
-/// picture's softness, never its **shape** (ADR-0037).
+/// **The defect ADR-0037 records**: turning a post stage on must change
+/// the picture's softness, never its **shape**.
 ///
 /// A radially symmetric figure is composited twice at the same target size —
 /// once with the chain skipped, once through an active `trails` — and the two
@@ -1418,10 +1420,10 @@ fn the_own_fold_scales_alpha_by_exactly_one() {
 /// every frame.
 ///
 /// The clamp is not decoration: past 1 the blend's `1 - a * occlude` goes
-/// negative and *subtracts* the backdrop under the figure, which is the Plan
-/// 0045 Phase 4b defect reachable again through a bound expression. A
-/// `[smoothing]` ease sweeps this param continuously, so it is the value the
-/// frame uses that has to be in range.
+/// negative and *subtracts* the backdrop under the figure — the Plan 0045
+/// Phase 4b defect, reachable through a bound expression. A `[smoothing]`
+/// ease sweeps this param continuously, so it is the value the frame uses
+/// that has to be in range.
 #[test]
 fn the_chain_clamps_and_resets_occlude() {
     let Some(ctx) = headless_context_or_skip() else {

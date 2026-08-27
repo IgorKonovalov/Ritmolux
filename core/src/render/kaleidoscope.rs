@@ -13,10 +13,10 @@
 //! The operation is polar but the source is rectangular, so the two do not have
 //! the same shape. Each output pixel keeps its radius and only changes its angle,
 //! which means any pixel whose radius exceeds the source's extent *in the folded
-//! direction* reconstructs a coordinate outside `[0, 1]`. That used to be handed
-//! to a `ClampToEdge` sampler, which smeared the border texel radially into hard
-//! streaks and chevron debris — design-backlog 0010, user-reported three times,
-//! and catastrophic in a portrait window, where most of the frame is out of range
+//! direction* reconstructs a coordinate outside `[0, 1]`. Handing that to a
+//! `ClampToEdge` sampler smears the border texel radially into hard streaks and
+//! chevron debris — design-backlog 0010, user-reported three times, and
+//! catastrophic in a portrait window, where most of the frame is out of range
 //! rather than just the corners.
 //!
 //! So the **sample** radius is clamped to `r_max`, the largest disc around the
@@ -37,7 +37,7 @@
 //! of the frame at 16:9 lies outside it** (the same at 9:16, by symmetry). Seen in
 //! motion, one treatment could not serve both of the fold's populations: the
 //! residual rays read as leftovers around a *centred figure*, and the disc *crops*
-//! a border-filling *field* that used to fill the frame.
+//! a border-filling *field*.
 //!
 //! So [`PARAMS`]'s `kaleido_edge` selects the treatment per preset, from a closed
 //! roster, inside **one** pipeline — every arm is a uniform branch on how `r` maps
@@ -101,7 +101,7 @@
 //!
 //! Runs at an internal resolution that **follows the render target** (ADR-0034),
 //! quantized and capped by
-//! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
+//! [`internal_grid_size`](super::post::internal_grid_size), rather than a fixed
 //! 1280x720 with the fold's aspect correction baked to match.
 //!
 //! **The fold's aspect is the render target's, never that grid's** (ADR-0037). The
@@ -984,9 +984,10 @@ impl Kaleidoscope {
         self.builds
     }
 
-    /// Whether the **fold term** is live — order at least 2, as it always was.
-    /// Since ADR-0077 this is no longer the same question as whether the *stage*
-    /// is live: another term can keep it running with the fold off, and the
+    /// Whether the **fold term** is live — order at least 2.
+    ///
+    /// Not the same question as whether the *stage* is live (ADR-0077):
+    /// another term can keep it running with the fold off, and the
     /// uniform then carries [`IDENTITY_ORDER`].
     fn fold_active(&self) -> bool {
         self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()

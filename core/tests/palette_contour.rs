@@ -17,15 +17,15 @@
 //!
 //! # What this suite does NOT assert, and where that lives instead
 //!
-//! *"A smooth palette is unchanged"* is not testable here, because the old
-//! behaviour no longer exists to compare against. Its evidence is the **golden
+//! *"A smooth palette is unchanged"* is not testable here, because there is no
+//! second implementation to compare against. Its evidence is the **golden
 //! suite**: the five shipped presets carrying a non-zero `palette_contour` —
 //! `fragment_mandala`, `fragment_strata`, `fragment_tiled`, `fragment_vitrail`,
 //! `shape_pulse` — are all on smooth palettes, and none of their baselines moved.
 //! That is a byte-level claim this file could only weaken. What this file adds is
 //! the half a golden cannot see: that the suppression is driven by *colour* and
-//! not by step count, checked at a **high** step count as well as a low one —
-//! the failure mode ADR-0133's Alternative B was rejected for appears only when
+//! not by step count, checked at a **high** step count as well as a low one — the
+//! failure mode ADR-0133's Alternative B was rejected for appears only when
 //! adjacent band centres sit close together.
 //!
 //! **Software adapter** (`prefer_software`), like the other GPU suites

@@ -137,7 +137,7 @@ fn v2_math_functions_compute_expected_values() {
     assert_eq!(eval("smoothstep(0, 1, 9)"), 1.0);
     assert_eq!(eval("smoothstep(0, 1, 0.25)"), 0.15625); // t*t*(3-2t)
 
-    // The plan's composite expression: -1 + 2 + 8 + 1 + 0.5 = 10.5.
+    // One composite of all five: -1 + 2 + 8 + 1 + 0.5 = 10.5.
     let composite = "cos(pi) + sqrt(4) + pow(2,3) + mod(7,3) + smoothstep(0,1,0.5)";
     assert!((eval(composite) - 10.5).abs() < 1e-6);
 }
@@ -1211,8 +1211,8 @@ fn declared_params_match_set_param() {
                 "bg_bright",
                 "bg_vignette",
                 // The ramp (ADR-0094): a palette segment swept along one axis,
-                // with the brightness tilt that used to be hardcoded retired
-                // into the two ends of a ramp on that same axis.
+                // with the formerly hardcoded brightness tilt carried by the
+                // two ends of a ramp on that same axis.
                 "bg_angle",
                 "bg_hue_span",
                 "bg_shade",
@@ -1317,11 +1317,12 @@ fn declared_params_match_set_param() {
 /// **The three additive-particle scenes spell their level lever the same way**
 /// (Plan 0066 Phase 1 / ADR-0080).
 ///
-/// `swarm`, `emitter` and `attractor` all draw additive particle marks, and until
-/// this plan only two of them could say how bright. The one without it is the one
-/// whose shipped presets reached for the engine-wide `exposure` instead — which
-/// crossfades across a dissolve and sits downstream of the bloom bright-pass, so
-/// the substitution cost them both.
+/// `swarm`, `emitter` and `attractor` all draw additive particle marks,
+/// and each says how bright through its own scene-local level. A scene
+/// without one leaves its presets reaching for the engine-wide
+/// `exposure` instead — which crossfades across a dissolve and sits
+/// downstream of the bloom bright-pass, so the substitution costs them
+/// both.
 ///
 /// Pinned on the **name**, not just on the capability, because ADR-0080
 /// Alternative D is exactly the temptation this guards against: a distinct name
@@ -1892,10 +1893,10 @@ fn probed_evaluation_returns_exactly_what_eval_returns_across_the_library() {
 #[test]
 fn a_bare_comparison_is_observed_two_valued_and_arithmetic_is_not_observed_at_all() {
     // The shape Plan 0041 was blind to (ADR-0043): `reseed = "onset > 0.55"` is
-    // the idiomatic boolean-param form and holds no `select()`, so nothing in
-    // the tree used to be observed. `onset` is raw spectral flux — it never
-    // approaches 0.55 in real material, which is how all five attractor presets
-    // shipped without ever reseeding.
+    // the idiomatic boolean-param form and holds no `select()`, so a checker
+    // that only walks `select()` observes nothing in the tree. `onset` is raw
+    // spectral flux — it never approaches 0.55 in real material, which is how
+    // all five attractor presets shipped without ever reseeding.
     let spectrum = [0.0f32; 64];
     let dead = compile("onset > 0.55").expect("compiles");
     let mut obs = lmv_core::preset::Observations::new();
@@ -2002,8 +2003,8 @@ fn a_comparison_that_is_a_selects_own_condition_is_not_reported_twice() {
 
 #[test]
 fn a_bare_comparison_is_reported_as_its_own_gate() {
-    // The reseed shape: no `select()` anywhere, so nothing suppresses it and
-    // nothing used to report it either.
+    // The reseed shape: no `select()` anywhere, so nothing suppresses
+    // it and a `select()`-only walk reports nothing.
     let e = compile("onset > 0.55").expect("compiles");
     let mut obs = lmv_core::preset::Observations::new();
     for onset in [0.0f32, 0.004, 0.016, 0.1, 0.3] {
@@ -2026,8 +2027,8 @@ fn a_bare_comparison_is_reported_as_its_own_gate() {
 
 #[test]
 fn both_halves_of_a_composite_condition_are_named_separately() {
-    // The case that reported *clean* before this plan (ADR-0043): the flag named
-    // the whole `min(...)`, and the report's own guidance says a `tempo` gate is
+    // The case the pre-ADR-0043 report called *clean*: the flag named the whole
+    // `min(...)`, and the report's own guidance says a `tempo` gate is
     // legitimately one-sided under a single-BPM probe — so a reader dismissed a
     // flag whose other half was separately dead. Neither comparison is the
     // `select()`'s direct condition, so neither is suppressed.

@@ -43,8 +43,8 @@
 //!
 //! This generalizes the convention ADR-0026 already established at the scene seam,
 //! where the fullscreen scenes present premultiplied over the backdrop and the
-//! emissive ones draw additive in colour with `OVER` alpha — scene alpha was always
-//! meaningful; the chain simply used to discard it.
+//! emissive ones draw additive in colour with `OVER` alpha. Scene alpha is
+//! meaningful at both seams, and the chain carries it rather than discarding it.
 //!
 //! # The chain runs in linear light (ADR-0046)
 //!
@@ -121,17 +121,17 @@ const POST_GRID_STEP: u32 = 256;
 /// call site's **cap and step** over the one shared policy
 /// ([`grid::grid_size`](super::grid::grid_size)).
 ///
-/// A thin wrapper on purpose. The arithmetic used to live here as a line-for-line
-/// copy of the attractor's, which is how the two ended up with different aspect
+/// A thin wrapper on purpose. Holding the arithmetic here as a line-for-line
+/// copy of the attractor's is how the two ended up with different aspect
 /// behavior and how ADR-0037's defect shipped a second time; the numbers are
 /// what is genuinely this call site's, and they stay here with their reasoning
 /// (Plan 0035 Phase 3).
 ///
-/// `cap` is the active tier's [`post_cap`](super::TierConfig::post_cap) — the one
-/// number this call site used to hold as a constant (Plan 0044 Phase 1). It is
-/// passed rather than read from a global so the function stays pure: a stage
-/// resolves it once at construction and the chain's rebuild comparison keeps
-/// answering a pure function of `surface`.
+/// `cap` is the active tier's [`post_cap`](super::TierConfig::post_cap),
+/// which is why this call site holds no cap constant of its own (Plan 0044
+/// Phase 1). It is passed rather than read from a global so the function
+/// stays pure: a stage resolves it once at construction and the chain's
+/// rebuild comparison keeps answering a pure function of `surface`.
 pub(crate) fn internal_grid_size(surface: (u32, u32), cap: (u32, u32)) -> (u32, u32) {
     super::grid::grid_size(surface, cap, POST_GRID_STEP)
 }
@@ -313,7 +313,7 @@ pub(crate) trait PostStage {
 /// What a stage's [`resolve`](PostStage::resolve) finds in `out` — and therefore
 /// how it must treat what is already there (ADR-0055).
 ///
-/// The chain carries **premultiplied alpha**, and the backdrop is no longer inside
+/// The chain carries **premultiplied alpha**, and the backdrop is **not** inside
 /// its input: it is painted into the chain's destination and the chain composites
 /// over it. So the last active stage must *blend*, while every earlier one is
 /// writing into a scratch offscreen it owns outright.
@@ -509,12 +509,13 @@ pub(crate) struct SceneTarget {
     /// handed back so [`PostChain::resolve`] consumes it rather than recomputing
     /// it (Plan 0031 Phase 6, closing Plan 0030's close-review minor 1).
     ///
-    /// The two used to call `routing()` independently. That was correct only
-    /// because no stage's [`active`](PostStage::active) changes between them —
-    /// a whole frame's correctness resting on an incidental property. Threading
-    /// the value through makes "one routing decision per frame" structural: there
-    /// is no way to call `resolve` without the `Routing` `begin` produced.
-    /// `Routing` is `Copy` and fixed-size, so this costs nothing.
+    /// Calling `routing()` independently in each is correct only because
+    /// no stage's [`active`](PostStage::active) changes between them — a
+    /// whole frame's correctness resting on an incidental property.
+    /// Threading the value through makes "one routing decision per frame"
+    /// structural: there is no way to call `resolve` without the `Routing`
+    /// `begin` produced. `Routing` is `Copy` and fixed-size, so this costs
+    /// nothing.
     pub routing: Routing,
 }
 
@@ -820,10 +821,11 @@ impl PostChain {
                 let stage = self.stages.get_mut(index)?;
                 let size = stage.internal_size(surface);
                 let view = stage.begin(encoder, surface)?;
-                // The scene loads rather than clears (the backdrop pass used to
-                // own this clear, and now owns `destination`'s instead), and a
-                // stage offscreen persists between frames — so without this the
-                // scene would accumulate onto the previous frame.
+                // The scene loads rather than clears — the backdrop
+                // pass owns `destination`'s clear, not this one — and a
+                // stage offscreen persists between frames, so without
+                // this the scene would accumulate onto the previous
+                // frame.
                 clear_transparent(encoder, &view, "post-chain-input-clear");
                 Some((view, size))
             })

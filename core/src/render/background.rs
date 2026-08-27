@@ -7,10 +7,11 @@
 //!
 //! # It paints the chain's *destination*, not the chain's input (ADR-0055)
 //!
-//! The backdrop used to render into the first active post stage's offscreen, which
-//! put it **inside** the texture the chain folds — so the kaleidoscope folded
-//! `bg_vignette`'s radial darkening into its wedges, and the fold's falloff had no
-//! backdrop to land on and faded to black instead.
+//! Rendering the backdrop into the first active post stage's offscreen
+//! puts it **inside** the texture the chain folds — the kaleidoscope
+//! then folds `bg_vignette`'s radial darkening into its wedges, and the
+//! fold's falloff has no backdrop to land on and fades to black
+//! instead.
 //!
 //! It now paints the chain's destination and the chain composites *over* it with
 //! premultiplied alpha. The backdrop is therefore never folded, never blurred, and
@@ -21,11 +22,11 @@
 //!
 //! # It colours through the preset's palette (ADR-0086)
 //!
-//! This pass used to carry its own inline copy of the iq cosine — the third copy
-//! of the constant ADR-0021 ([`super::palette`]) was written to de-duplicate — so
-//! `[palette]`, `saturation` and `palette_mix` stopped at the scene and never
-//! reached the sky. It now samples the **same baked LUT pair every other scene
-//! samples**: `bg_hue` is a coordinate in the preset's own gradient (cyclic, like
+//! An inline copy of the iq cosine here — a third copy of the constant ADR-0021
+//! ([`super::palette`]) was written to de-duplicate — leaves `[palette]`,
+//! `saturation` and `palette_mix` stopping at the scene and never reaching the
+//! sky. This pass samples the **same baked LUT pair every other scene samples**:
+//! `bg_hue` is a coordinate in the preset's own gradient (cyclic, like
 //! `color_center` / `hue_center`, because the LUT sampler repeat-addresses `u`),
 //! and the two shared colour modulations move the backdrop with the figure.
 //!
@@ -46,13 +47,13 @@
 //! other palette coordinate in this engine uses, because two shipped presets
 //! already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
 //!
-//! **There is one brightness ramp on the frame, not two.** The fixed
-//! `mix(0.72, 1.0, ndc.y)` tilt this pass used to hardcode has *retired into*
-//! that ramp as `bg_shade` / `bg_shade_end`'s defaults, on the same axis as the
-//! colour sweep. Keeping the tilt and multiplying an authorable ramp on top would
-//! have been the cheaper identity guarantee, and it is exactly what was rejected:
-//! the tilt is welded to `+y` while the ramp can point anywhere, so any angled
-//! backdrop would carry a second vertical gradient no param explains.
+//! **There is one brightness ramp on the frame, not two.** The fixed `mix(0.72,
+//! 1.0, ndc.y)` tilt is *inside* that ramp, as `bg_shade` / `bg_shade_end`'s
+//! defaults, on the same axis as the colour sweep. Keeping the tilt and
+//! multiplying an authorable ramp on top would have been the cheaper identity
+//! guarantee, and it is exactly what was rejected: the tilt is welded to `+y`
+//! while the ramp can point anywhere, so any angled backdrop would carry a second
+//! vertical gradient no param explains.
 //!
 //! **One exponent shapes the ramp, and it shapes the *position* rather than
 //! either channel.** `bg_ramp_gamma` eases where things sit along the axis ahead
@@ -121,14 +122,13 @@
 //! during the headless no-bg captures, where the DX12 WARP software adapter would
 //! otherwise mis-render the coexisting scene pipelines.
 //!
-//! **That second reason used to end "a documented quirk with no validation error"
-//! — it is neither undocumented nor a quirk any more.** Plan 0053 Phase 3
+//! **That second reason is neither undocumented nor a quirk.** Plan 0053 Phase 3
 //! reproduced it, isolated it against a control, and fixed it: the quirk was this
 //! pass's `[Uniform:FRAGMENT]` bind-group layout colliding with the fullscreen
 //! scenes' (ADR-0058), and the explicit `min_binding_size` in
 //! [`Resources::build`] separates them. The laziness above is still worth having
-//! for its own reason, but it is no longer load-bearing against a mis-render.
-//! Real hardware was never affected, which is exactly what made it expensive: the
+//! for its own reason, and it is not load-bearing against a mis-render. Real
+//! hardware was never affected, which is exactly what made it expensive: the
 //! whole golden suite captures on WARP.
 //!
 //! The **fragment field** is the one scene that still draws opaquely over the
@@ -166,10 +166,10 @@ const DEFAULT_HUE_SPAN: f32 = 0.0;
 /// rather than an approximation of it.
 const DEFAULT_ANGLE: f32 = 0.0;
 /// The brightness ramp's two ends, on the same axis as the colour sweep. These
-/// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt the pass used to
-/// hardcode: the shader still runs that instruction with those constants, so the
-/// retirement costs no pixels. A preset that binds them can now point the
-/// brightness the other way, which the tilt could never do.
+/// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt: the shader runs
+/// that instruction with these as its constants, so an unbound preset pays no
+/// pixels for the generality. A preset that binds them can point the
+/// brightness the other way, which a hardcoded tilt cannot.
 const DEFAULT_SHADE: f32 = 0.72;
 const DEFAULT_SHADE_END: f32 = 1.0;
 /// The ramp's response exponent (ADR-0094, in ADR-0092's form). `1.0` is the
@@ -753,9 +753,9 @@ impl Background {
             band_curve: DEFAULT_BAND_CURVE,
             band_hue: DEFAULT_BAND_HUE,
             band_hue_span: DEFAULT_BAND_HUE_SPAN,
-            // Seeded with the default `spectrum` (the cosine this pass used to
-            // inline), so a backdrop painted before any `set_palette` call is the
-            // colour it always was rather than black.
+            // Seeded with the default `spectrum`, so a backdrop painted
+            // before any `set_palette` call is that palette's colour
+            // rather than black.
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             saturation: DEFAULT_SATURATION,
@@ -864,10 +864,10 @@ impl Background {
         view: &wgpu::TextureView,
         surface: (u32, u32),
     ) {
-        // **A band alone is enough to build this pass** (ADR-0095). The condition
-        // used to read `bright <= 0` alone, which would have made a galaxy over a
-        // near-black sky render nothing at all — and that is the configuration
-        // the reference photograph actually is, not an edge case.
+        // **A band alone is enough to build this pass** (ADR-0095).
+        // Testing `bright <= 0` alone makes a galaxy over a near-black
+        // sky render nothing at all — and that is the configuration the
+        // reference photograph is, not an edge case.
         if self.bright <= 0.0 && self.band_amount <= 0.0 {
             // Passthrough: a plain black clear establishes the frame without a
             // second fullscreen pipeline (module docs: NFR §1 + WARP).

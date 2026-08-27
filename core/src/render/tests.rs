@@ -32,7 +32,7 @@ fn roster(names: &[&str]) -> Roster {
 /// resolves to its owner, the system's own names to the scene, and anything
 /// else to `Unclaimed` (dropped at apply time, already warned about at load).
 ///
-/// This is the answer the per-frame `set_param` fallthrough chain used to
+/// This is the answer a per-frame `set_param` fallthrough chain would
 /// re-derive on every bound param of every frame.
 #[test]
 fn each_namespace_resolves_to_its_owner() {

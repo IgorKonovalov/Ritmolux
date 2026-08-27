@@ -18,13 +18,12 @@
 //! property of `falloff` alone. It is not a rule about folding, and a fill
 //! treatment "tripping" it is that treatment working.
 //!
-//! **`falloff` is no longer the default, so every capture that asserts its
-//! properties binds [`EDGE_FALLOFF`] explicitly.** Phase 2's live A/B made `tile`
-//! the resting treatment; before that these tests got `falloff` by saying nothing,
-//! and leaving them silent would have quietly turned three domain assertions into
-//! assertions about a treatment that fills the frame by design. Anything here that
-//! does *not* pin the param is exercising the shipped default deliberately, and
-//! says so.
+//! **`falloff` is not the default, so every capture that asserts its properties
+//! binds [`EDGE_FALLOFF`] explicitly.** Phase 2's live A/B made `tile` the resting
+//! treatment; a test that gets `falloff` by saying nothing would quietly turn
+//! three domain assertions into assertions about a treatment that fills the frame
+//! by design. Anything here that does *not* pin the param is exercising the
+//! shipped default deliberately, and says so.
 //!
 //! The two fill treatments carry the properties that are true of *them*
 //! ([`the_fill_treatments_cover_the_out_of_disc_region_without_smearing`]): the
@@ -73,7 +72,7 @@
 //! the bug is present, which is a green test that proves nothing.
 //!
 //! Rotate the fold and the cancellation goes: the two rows are then `a = angle ±
-//! (pi - d)`, no longer negatives of each other, and they land half a wedge apart.
+//! (pi - d)` — not negatives of each other — and they land half a wedge apart.
 //! That is not a contrived configuration — **10 of the 12 shipped presets with an
 //! active fold drive `kaleido_angle = "time * k"`** (a thirteenth, `swarm_dense`,
 //! pins the order at 1 so the fold is off), so the angle is non-zero on all but a
@@ -430,7 +429,7 @@ fn the_falloff_treatment_paints_nothing_outside_its_disc() {
         ..Default::default()
     };
     // `kaleido_edge` is pinned: `falloff` is the treatment this property belongs
-    // to and it is no longer what an unbound preset gets (module docs).
+    // to and it is **not** what an unbound preset gets (module docs).
     let mut capture = |order: f32| {
         let toml = format!(
             "{FIELD_FIXTURE}kaleido_order = \"{order}\"\nkaleido_angle = \"{ANGLE}\"\n\
@@ -497,7 +496,7 @@ fn the_falloff_treatment_paints_nothing_outside_its_disc() {
 
 /// A lit backdrop for the fold fixtures. `bg_vignette` is deliberately non-zero:
 /// it is the backdrop's own frame-centred radial structure, and the second test
-/// below is that the fold no longer replicates it into the wedges.
+/// below is that the fold does not replicate it into the wedges.
 const LIT_BG: &str = "bg_bright = \"0.55\"\nbg_hue = \"0.62\"\nbg_vignette = \"0.35\"\n";
 
 /// An off-centre fold axis for the invariance test.
@@ -603,11 +602,11 @@ fn the_falloff_lands_on_the_backdrop_not_on_black() {
 /// The backdrop is composited **under** the fold, so moving the fold axis does not
 /// move the backdrop.
 ///
-/// `post.rs` used to render the backdrop into the first active stage's *input*,
-/// which put it inside the texture the kaleidoscope folds: `bg_vignette`'s radial
-/// darkening was replicated into the wedges, around an axis that — once Phase 1
-/// made the fold centre bindable — need not be the vignette's centre at all. With
-/// the backdrop underneath the chain (ADR-0055), the region outside the disc is
+/// Rendering the backdrop into the first active stage's *input* would put it
+/// inside the texture the kaleidoscope folds: `bg_vignette`'s radial darkening
+/// replicated into the wedges, around an axis that — the fold centre being
+/// bindable since Phase 1 — need not be the vignette's centre at all. With the
+/// backdrop underneath the chain (ADR-0055), the region outside the disc is
 /// untouched backdrop and is therefore *identical* however the fold axis moves.
 #[test]
 fn the_backdrop_is_not_folded_so_it_does_not_move_with_the_fold_axis() {

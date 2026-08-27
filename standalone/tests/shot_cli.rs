@@ -15,11 +15,11 @@
 //! ones in `.claude/skills/**` that cannot be edited. So the binary is located
 //! under `target/<profile>/examples/` instead.
 //!
-//! `cargo nextest run` **does** build `examples/` targets — verified for this plan
-//! by deleting `target/debug/examples/shot.exe` and watching `cargo nextest run -p
-//! standalone` rebuild it — so neither CI nor the pre-push hook needs an explicit
-//! build step. If the binary is missing anyway the tests fail with an actionable
-//! message rather than passing silently.
+//! `cargo nextest run` **does** build `examples/` targets — verified by deleting
+//! `target/debug/examples/shot.exe` and watching `cargo nextest run -p
+//! standalone` rebuild it — so neither CI nor the pre-push hook needs an
+//! explicit build step. If the binary is missing anyway the tests fail with an
+//! actionable message rather than passing silently.
 //!
 //! The GPU-free cases all exit before a renderer is constructed, so they run
 //! everywhere. The rendering cases need a real adapter (`shot` asks for hardware,
@@ -46,12 +46,12 @@ const SHIPPED_PRESET_FILE: &str = "presets/fragment_supernova.toml";
 const SHIPPED_PRESET_NAME: &str = "Supernova";
 
 /// A shipped preset whose `zoom` is gated on `tempo` — the evidence that
-/// `--set tempo=` reaches the grammar rather than merely being accepted.
-/// A minimal tempo-gated preset the tempo test writes to its own scratch dir.
-/// It used to point at a *shipped* tempo-gated preset (`rose_zoom`), which
-/// coupled a CLI-plumbing assertion to the content library — and broke the
-/// day Plan 0075's cohort one retired the file. The probe owns its subject
-/// now: two tempos, two camera depths, no dependency on what ships.
+/// `--set tempo=` reaches the grammar rather than merely being accepted. A
+/// minimal tempo-gated preset the tempo test writes to its own scratch dir.
+/// Pointing at a *shipped* tempo-gated preset (`rose_zoom`) coupled a
+/// CLI-plumbing assertion to the content library, and broke the day Plan
+/// 0075's cohort one retired the file. The probe owns its subject: two
+/// tempos, two camera depths, no dependency on what ships.
 const TEMPO_GATED_SRC: &str = r#"
 system = "fragment_field"
 name = "probe_tempo_gate"
@@ -1624,11 +1624,12 @@ fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
 /// `core/tests/easing.rs` owns at a probe window long enough to let the release
 /// constant settle.
 ///
-/// `--report`'s own window is shorter, and this comment used to say the fall
-/// therefore "reads clamped rather than measured". It does not — nothing clamps;
-/// `frames_to_settle` returns a plausible smaller number (Plan 0038 Phase 8).
-/// That is why the cell carries a `+` here, which this test now also asserts
-/// reaches both presentations. The separation is what matters either way.
+/// `--report`'s own window is shorter, and the fall does **not**
+/// therefore read clamped — nothing clamps; `frames_to_settle` returns a
+/// plausible smaller number (Plan 0038 Phase 8 corrected the reverse
+/// claim, which had been written here). That is why the cell carries a
+/// `+` here, which this test also asserts reaches both presentations. The
+/// separation is what matters either way.
 #[test]
 fn the_report_transient_columns_separate_the_two_easing_fixtures() {
     /// `(rise, fall, fall_marked)` off the one data row of a single-preset text

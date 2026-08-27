@@ -22,12 +22,11 @@
 //!
 //! Per ADR-0071 every number printed here is a **measurement** and every
 //! number asserted is a **property**. The one absolute tolerance below is
-//! stated, not discovered: the plan's done-when asks for the estimate to land
-//! within a stated tolerance of the truth *or of an exact octave of it*, and
-//! **the octave is its own column** rather than folded into the error — an
-//! estimator that reports half the true tempo is making a different mistake
-//! from one that reports 0.94x of it, and a single error column cannot say
-//! which.
+//! stated, not discovered: the estimate must land within a stated tolerance
+//! of the truth *or of an exact octave of it*, and **the octave is its own
+//! column** rather than folded into the error — an estimator that reports
+//! half the true tempo is making a different mistake from one that reports
+//! 0.94x of it, and a single error column cannot say which.
 
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{Analyzer, HOP_SIZE};
@@ -233,8 +232,8 @@ fn the_tempo_estimate_is_measured_against_known_truth() {
     // --- properties, not measurements -------------------------------------
     //
     // (1) The unambiguous ladder lands on *some* octave of the truth, within a
-    //     stated tolerance. This is the plan's done-when, and the split into
-    //     two columns is what makes it meaningful: an estimator reading 59.8
+    //     stated tolerance. The split into two columns is what makes that
+    //     meaningful: an estimator reading 59.8
     //     for 60 is refining correctly on the coarse lag grid, and one reading
     //     30 is on the wrong octave — the second is Phase 2's problem and the
     //     first is not a problem at all.
@@ -370,22 +369,21 @@ fn octave_shares(pcm: &[f32]) -> Octaves {
 /// Phase 2 — the octave ambiguity is **one-sided**, which is why the repair is
 /// a hold rather than an octave-preference rule.
 ///
-/// The plan named three candidate repairs and said it would not pick one blind.
-/// This is the reading that picked. An autocorrelation cannot tell a clean click
-/// train from material whose accent period is twice its click period, because
-/// *every* periodic signal correlates strongly at twice its own lag — so the
-/// question "is the true beat slower than this?" has no discriminating evidence
-/// in the curve, and a rule that preferred the slower reading takes the fast end
-/// of the ladder down an octave. The mirrored question does have evidence: a
-/// clean train's correlation at *half* its winning lag is negative, because
-/// there is nothing between its clicks, while a half-time feel reads strongly
-/// positive there.
+/// Three candidate repairs were named and none picked blind. This is the reading
+/// that picked. An autocorrelation cannot tell a clean click train from material
+/// whose accent period is twice its click period, because *every* periodic
+/// signal correlates strongly at twice its own lag — so the question "is the
+/// true beat slower than this?" has no discriminating evidence in the curve, and
+/// a rule that preferred the slower reading takes the fast end of the ladder
+/// down an octave. The mirrored question does have evidence: a clean train's
+/// correlation at *half* its winning lag is negative, because there is nothing
+/// between its clicks, while a half-time feel reads strongly positive there.
 ///
 /// That asymmetry is asserted below as an **overlap** and a **separation**, both
 /// comparisons taken inside this run (ADR-0071). It is also why correcting the
 /// doubling direction alone was refused: the material such a rule fires on is a
 /// 60-100 BPM track with events between the beats, which describes most of the
-/// hip-hop in the capture set this plan is repairing.
+/// hip-hop in the capture set.
 #[test]
 fn the_octave_ambiguity_is_one_sided() {
     println!("\nPlan 0095 Phase 2 - correlation at the winning lag's octave neighbours");

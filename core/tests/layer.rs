@@ -274,9 +274,9 @@ fn a_same_system_pair_renders_two_independent_configurations() {
     );
 }
 
-/// The plan's named fixture — two fragment fields at different zooms — is
-/// legal and deterministic, and the layer instance's configuration is the
-/// live one.
+/// The canonical fixture — two fragment fields at different zooms — is
+/// legal and deterministic, and the layer instance's configuration is
+/// the live one.
 ///
 /// **What this deliberately does not assert**: that the *main* field stays
 /// visible. A fragment field presents premultiplied with full coverage, so an

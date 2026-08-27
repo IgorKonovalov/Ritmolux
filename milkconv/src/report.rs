@@ -15,18 +15,18 @@
 //! - **compile** — every EEL2 program in it turned into bytecode.
 //! - **render non-blank** — the emitted preset loaded into the engine and put
 //!   light on screen. That last one is the only one that catches a preset which
-//!   converts perfectly and draws nothing, which is the failure class the plan's
-//!   Risks call the worst for reputation, so it is worth the GPU. It is opt-in
+//!   converts perfectly and draws nothing — the worst failure class this
+//!   converter has for reputation, so it is worth the GPU. It is opt-in
 //!   (`--render`) because it is also the only slow part.
 //!
 //! # Reading the ranking
 //!
-//! The plan states the distribution the census predicts **before** the converter
-//! runs — a disk-texture class near 19 % and a shaderless-only success class near
-//! 18 % — so a ranking that disagrees sharply with either is evidence about the
-//! converter rather than about the corpus. [`Report::render`] prints those
-//! predictions beside the measurement rather than leaving the comparison to
-//! whoever reads it.
+//! The census predicts the distribution **before** the converter runs — a
+//! disk-texture class near 19 % and a shaderless-only success class near 18
+//! % — so a ranking that disagrees sharply with either is evidence about
+//! the converter rather than about the corpus. [`Report::render`] prints
+//! those predictions beside the measurement rather than leaving the
+//! comparison to whoever reads it.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;

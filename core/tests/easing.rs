@@ -51,8 +51,8 @@ const PRE: usize = 12;
 /// which is the number its own fixture header predicts. 3 s is 6 τ, a 0.25 %
 /// residual — the margin the scalar arm (`0.25`, 12 τ) always had.
 ///
-/// Do not shorten this back without checking `segment_settled` still passes on
-/// both arms; the guard that used to sit here could not have told you.
+/// Do not shorten this without checking `segment_settled` still passes
+/// on both arms; nothing else here would tell you.
 const WINDOW: usize = 180;
 
 /// Fraction of a segment's travel that may remain unfinished at its last frame
