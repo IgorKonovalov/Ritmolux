@@ -321,8 +321,8 @@ struct LatchBank {
 |---|---|---|---|
 | 1 — the gate asks both readings | dev | done | `c96f0fa` |
 | 2 — `collage_mono`'s sway comes back down | human | not started | |
-| 3 — `[latch]` parses and resolves to a slot | dev | done | committed with this row |
-| 4 — the latch bank runs | dev | not started | |
+| 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
+| 4 — the latch bank runs | dev | done | committed with this row |
 | 5 — the grammar docs learn the latch | dev | not started | |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
 | 7 — the line family gets a seam | dev | not started | |
@@ -356,6 +356,31 @@ forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
 rates back down, `Collage Mono` leaves the silent branch and the silent minimum
 returns to `0.0201` (`On White`). Left for the close to decide whether the comment
 is re-derived.
+
+**Phase 4 — the bank advances once per preset per frame, and that is a
+contract.** `LatchBank::advance` consumes the `fire` edge, so a second call in
+the same frame would swallow the rise. The frame path calls it once per side and
+hands the returned `Variables` to `evaluate_preset`, the `[per_vertex]` table and
+`evaluate_layer` alike — the two call sites that used to build
+`vars.with_salt(...)` separately now share one bundle. `advance`'s doc says so.
+
+**Phase 4 — one bank per preset, not per surface.** A `[layer]` has its own
+`ParamSmoother` because layer bindings are indexed within the layer's `params`;
+a latch has no such collision (its slot is fixed at load) and is preset-level
+state by ADR-0137, so a layer binding reads the same event the main scene does.
+The outgoing side gets its own bank, handed over at the same roster flip the
+smoothers are, so a latch mid-hold keeps reading through a dual-live dissolve.
+
+**Phase 4 — a file the phase did not list, touched twice.**
+`core/src/preset/expr.rs` gains `Variables::with_latches`, which is the write end
+of the reserved block and has nowhere else to live, and its module header plus
+`core/src/preset/mod.rs`'s are corrected — that second edit is the comment sweep
+the phase's own done-when requires. The sweep's result: `expr.rs:1` and
+`preset/mod.rs:2` both said the surface was a pure expression language without
+qualification, and `render/mod.rs:385` claimed the smoothing state was the only
+per-frame state the expression path has. Every other `pure` in `core/src/preset/`
+is a claim about the *evaluator*, which is still true and deliberately left
+standing — that it survives is ADR-0137's central point.
 
 **Phase 3 — the reserved block moved no other constant.** `LATCH_SLOT_BASE = 22`
 sits between `VERTEX_SLOT_BASE` (18, four wide) and `index`; `RAW_`, `CLOCK_`,

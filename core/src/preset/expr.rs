@@ -16,6 +16,16 @@
 //! There are no boolean operators: with clean `0/1` results, `min` is and,
 //! `max` is or, and `1 - c` is not.
 //!
+//! One thing an expression reads is **not** a function of this frame's analysis:
+//! a `[latch]` variable (ADR-0137). Its value is armed-and-fired state held in
+//! the render layer and written into the reserved slots of [`Variables`] once
+//! per preset per frame, before the params that read it. That leaves everything
+//! here intact — evaluation is still a pure, re-entrant function of the bundle
+//! it is handed, which is what lets one compiled expression run once per vertex
+//! or once per element — while making the *bundle* depend on the frames before
+//! it. A caller that runs no bank, and that is every probe and every
+//! single-frame capture, reads a latch at its rest value of `0`.
+//!
 //! Variables: `bass mid treb onset beat bar time tempo novelty index`, the
 //! per-vertex position `x y rad ang`, the
 //! absolute-level escapes `bass_raw mid_raw treb_raw onset_raw`, and the musical
@@ -332,6 +342,26 @@ impl<'a> Variables<'a> {
         .with_beat_clock(frame.beat_index, frame.time_since_beat)
         .with_bar(frame.beat_in_bar, frame.bar_index, frame.bar_phase)
         .with_spectrum(&frame.spectrum)
+    }
+
+    /// Bind the reserved `[latch]` block from `values` (ADR-0137), leaving
+    /// everything else as it was.
+    ///
+    /// The render layer's latch bank calls this once per preset per frame,
+    /// before the params that read a latch. Entries past [`LATCH_CAP`] are
+    /// ignored, and a slot no latch declares keeps its `0.0` rest value — which
+    /// is what any caller that does not run a bank (a probe, a test, a
+    /// single-frame capture) sees for every latch.
+    pub fn with_latches(self, values: &[f32]) -> Self {
+        let mut next = self;
+        let n = values.len().min(LATCH_CAP);
+        if let (Some(slots), Some(src)) = (
+            next.values.get_mut(LATCH_SLOT_BASE..LATCH_SLOT_BASE + n),
+            values.get(..n),
+        ) {
+            slots.copy_from_slice(src);
+        }
+        next
     }
 
     /// Rebind the per-element `index` to `t` (the element's normalized `0..1`

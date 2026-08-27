@@ -1,6 +1,11 @@
 //! The preset layer — ADR-0002 layers 1-2: TOML data binding built-in system
 //! parameters to a pure expression language over the audio analysis.
 //!
+//! *Pure* is a statement about the evaluator, not about the surface: a
+//! `[latch]` (ADR-0137) reads state the render layer holds between frames, and
+//! [`expr`]'s own header says how that is arranged without the evaluator
+//! learning it.
+//!
 //! [`expr`] compiles and evaluates expression strings; [`schema`] parses a
 //! TOML preset into compiled [`Binding`]s. This module also loads presets in
 //! bulk: [`default_presets`] embeds the shipped examples (so the C-ABI/foobar
@@ -16,11 +21,12 @@ pub mod schema;
 use std::path::{Path, PathBuf};
 
 pub use expr::{
-    Expr, ExprError, GateFlag, GateKind, NodeObservation, Observations, SATURATED_OCCUPANCY,
-    Variables, compile,
+    Expr, ExprError, GateFlag, GateKind, LATCH_CAP, NodeObservation, Observations,
+    SATURATED_OCCUPANCY, Variables, compile,
 };
 pub use schema::{
-    Binding, Easing, Layer, LayerBlend, LayerJoin, Preset, PresetError, SystemKind, is_known_param,
+    Binding, Easing, Latch, Layer, LayerBlend, LayerJoin, Preset, PresetError, SystemKind,
+    is_known_param,
 };
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
