@@ -3288,3 +3288,120 @@ cap violation, and nothing warns.
 
 **Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
 author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
+
+## 0137 — `fragment_field` has three hardcoded animation rates and no parameter behind any of them, so "slow it down" and "flatten it out" are one knob
+
+The scene's three clocks are shader literals with no uniform behind them
+(`core/src/render/scenes/fragment_field.rs:137-142`): the two fold rates `t * 0.7` and `t * 0.6`
+inside the five-iteration sine fold, and the field sweep `t * 0.5` that indexes the palette. The
+only lever a preset has over the two fold rates is `warp`, because they are scaled by it — so
+asking for a calmer world and asking for a flatter one are the same request.
+
+- **Raised:** 2026-08-27, from the mono cohort (`fragment_drostemono`, `shape_contourmono`,
+  `fragment_driftmono`, committed `d6ffa54`), by `preset-author`.
+- **The field rate is reachable, but only by accident.** `pan` is added into the same sum the
+  field sine sees (`var p = uv * zoom + pan`, then `sin(p.x + p.y + t * 0.5)`), so a pan of
+  `r * time` on **both** axes leaves a residual sweep of `0.5 + 2r`, and `r = -0.25` cancels the
+  clock outright. That is what shipped as the basis for `fragment_driftmono`'s tuning. It works,
+  it is a coincidence of where `pan` lands in the expression, and it costs the pan binding, which
+  the preset then cannot use for anything else.
+- **The useful quantity is not the rate but the contour crawl**, `residual / (zoom * sqrt(2))`,
+  because `zoom` sets the spatial frequency the phase runs against. Every verdict the preset
+  collected fell out of that one line — which had to be derived by hand from the shader.
+- **Only one cancellation direction works, and the other one lies.** A symmetric pan (`+r` on both
+  axes) moves the field's phase and is visible. An ANTI-symmetric pan (`+a` on x, `-a` on y)
+  leaves the sum untouched, so it translates the sampled window at zero cost to the sweep — which
+  looks like free motion and is not, because that direction is the base field's own contour
+  direction. Measured: tripling the glide that way LOWERED frame-to-frame change (2.09 -> 1.51)
+  instead of raising it.
+- **Correction to the raising note.** It called this "the most-used scene in the library (12 of
+  46)". It is the **second** most-used: `attractor` has 19 of the 49 shipped presets and
+  `fragment_field` has 12. The impact argument survives the correction intact.
+- **What a fix is:** a rate parameter, or several. Whichever shape it takes, a rate binding that
+  multiplies **absolute** scene time teleports the picture the moment an audio-bound rate changes
+  — `warp_mesh` already does exactly that (`let wt = time * wspeed`, `warp_mesh/mod.rs:486`), and
+  no shipped preset has found it only because nothing binds `warp_speed` yet.
+- **Verified 2026-08-27** — the scene still exposes no rate parameter:
+  `absent: field_speed in: core/src/render/scenes/fragment_field.rs`
+
+### Priority
+
+**Medium.** Twelve presets on the affected system, and the workaround costs a binding and has to
+be rediscovered by every author who wants a calm version of this world.
+
+## 0138 — `palette_contour` keys on the band grid and never reads the LUT, so on any limited-ink palette its only usable value is zero
+
+`band_contour` is a pure function of position within the band grid
+(`core/src/render/palette.rs:742`, copied verbatim into `fragment_field.rs`,
+`reaction_diffusion.rs` and `shape_field.rs`): `let d = min(fract(f), 1.0 - fract(f))`, darkened
+by `amount`. It never consults the gradient LUT, so it draws a hairline at **every** band
+boundary whether or not the colour changes there.
+
+- **Raised:** 2026-08-27, from `shape_contourmono` — a two-ink-plus-accent distance-field print,
+  on one of the three scenes where this parameter is not inert.
+- **Why a limited-ink palette breaks it.** Flat ink out of `palette_steps` is written as
+  *plateaus* — runs of bands holding one colour — so most boundaries are white-meets-white and
+  black-meets-black. On those the contour is a `smoothstep` grey line drawn across flat colour,
+  which is precisely the shading a two-ink print is defined by not having. At the few real run
+  boundaries it has nothing to add either, because black already meets white there and that is
+  maximum contrast.
+- **The arithmetic, from the shipped preset:** 20 steps in 5 runs (black 5 / white 5 / black 4 /
+  white 4 / red 2) has 20 band edges, of which 5 are ink changes. `palette_contour` treats all 20
+  alike.
+- **It is set to zero in four of the nine presets that name it** — `fragment_driftmono`,
+  `fragment_drostemono`, `fragment_tiledmono` and `shape_contourmono`, the last of which carries a
+  header comment saying so outright.
+- **What a fix is:** fire only where the two band centres either side of the edge resolve to
+  different LUT colours. The scoping in ADR-0078 stays untouched — this is about *which* edges,
+  not about which stages have derivatives.
+- **Verified 2026-08-27** — the canonical WGSL still takes no LUT:
+  `present: fn band_contour\(t: f32, steps: f32, amount: f32\) in: core/src/render/palette.rs`
+
+### Priority
+
+**Medium.** Narrow but total: on a plateau palette the parameter has exactly one usable setting
+and it is off. Low frequency until 2026-08-27, when the count of limited-ink looks went from one
+to four.
+
+## 0139 — nothing in the harness measures motion RATE or the silent-to-driven difference, so a preset can pass every gate and still be unwatchable in either direction
+
+Every statistic in `shot --report` is a **settled differential** — a driven frame against a quiet
+one, each captured after its own fixed frame count (`standalone/src/shot/report.rs:244`, where
+`anim = frame_diff(silent@24, silent@48)`). That answers "does this react", which is a different
+question from "does this react at a rate a person can watch", and it cannot see rate at all.
+`--horizon` measures the other end of the time axis and excludes any preset that does not
+accumulate.
+
+- **Raised:** 2026-08-27, after `fragment_driftmono` needed four live passes with the user and the
+  harness was green and unchanged through all of them:
+
+  | draft | the user's verdict | `--report` |
+  |---|---|---|
+  | v1 | "shaking way too much" | bass 0.465, anim 0.358, 13/13 pass |
+  | v2 | "not moving at all" | bass 0.182, anim 0.154, 13/13 pass |
+  | v3 | "still not moving enough" | bass 0.191, anim 0.324, 13/13 pass |
+  | v4 | "doesn't move to music" | bass 0.191, anim 0.324, 13/13 pass |
+
+  `anim` is the closest existing statistic and it moved in the **wrong direction** relative to the
+  verdicts.
+- **Two throwaway instruments made progress where the harness could not.** Frame-to-frame change
+  between consecutive analyzer hops (`--frame-at` at hops N, N+1, ...) catches frozen and catches
+  boiling; and the difference between a silent frame and a fully-driven one — music off against
+  music on — is the defect the user actually reported at v4, and no column looks at it. The second
+  reads 72.7 before the fix and 112.7 after, against 115.1 for `fragment_drostemono` and 119.6 for
+  `shape_contourmono`.
+- **A raw rate does not rank presets by watchability, and the raiser misread it twice before
+  noticing.** `fragment_tiledmono` measures 8.19 and `fragment_drostemono` 6.42 — both HIGHER than
+  the draft rejected for shaking, and both fine to watch. The difference is **anchoring**: those
+  two put their motion inside a repeating structure that holds still, so the eye reads a pattern
+  updating, while an unanchored world moves bodily and must be far quieter to read as equally
+  calm. So a threshold would be wrong; a printed column, read against family neighbours the way
+  `cover` and `anim` already are, would not.
+- **What a fix is:** printed columns, never a gate — the ADR-0083 shape.
+- **Verified 2026-08-27** — no such column exists:
+  `absent: "drive" in: standalone/src/shot/report.rs`
+
+### Priority
+
+**Medium.** This lane's whole claim is that it verifies before showing; on motion it currently
+cannot, and the cost is live round trips with the user — four of them on one preset.
