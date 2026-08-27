@@ -7,14 +7,31 @@
 # NOTHING about the dynamics regime the stable shipped swarm runs at — near
 # default force and spin, no field_freq override, no scatter clock, the whole
 # torus in view — and carries the identity only in the marks and the beat:
-# glass-coloured shards, a burst per beat, the silhouette re-cut per beat.
+# glass-coloured shards and a burst per beat.
+#
+# `spin` WIDENED TO 0.4-2.6 (Plan 0122), and the old 0.4-1.15 was not a taste.
+# Until that plan the scene computed `field_t = time * spin`, so a `spin` bound
+# to `mid` rescaled every second already elapsed: at t = 100 s the 0.75 swing
+# through a tau-0.3 ease advanced the field clock ~4 s in ONE frame against a
+# nominal 0.019 s, and it grew without bound as a set ran. The field re-rolled
+# on every loud passage, which read as churn and was really a teleport. `spin`
+# now integrates, so it is an honest rate and the range can be what the look
+# wants: a loud passage genuinely accelerates the field ~6x instead of jumping
+# it. Judged in the app against the pre-fix build, 2026-08-27.
+#
+# THE SILHOUETTE NO LONGER RE-CUTS. It was `3 + floor(hash(beat_index) * 1.999)`
+# — triangles or quads, one of the three things this file's identity rested on —
+# and it read as flicker rather than as a re-cut, because `beat_index` counts
+# onset DETECTIONS at 1.2-2.3x per musical beat (ADR-0109), so the shard changed
+# shape several times a phrase. Pinned to quads. If the re-cut comes back it
+# wants a coarser clock than `beat_index`, not a narrower hash.
 #
 # THE BRIEF'S "shatter on LIGHT ground" IS ROUTED, NOT SHIPPED: dark marks on
 # a light page need the ink stage, which has no contrast lever (a brightness
 # sweep 3.5 -> 6 printed the same mid-grey; the Etching glow sweep measured
 # the same gap). When ink grows a contrast control, the light-ground twin
 # becomes authorable.
-# Drives: bass leans the steering, mid stirs the field, beat bursts + re-cuts,
+# Drives: bass leans the steering, mid stirs the field, beat bursts,
 # treble sharpens the glass chroma, onset blooms the edges.
 system = "swarm"
 name = "Shatter"
@@ -31,10 +48,10 @@ stops = [
 
 [params]
 force = "1.6 + clamp(bass * 1.4, 0, 1.2)"
-spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"
+spin = "0.4 + clamp(mid * 2.6, 0, 2.2)"
 burst = "beat * (bar < 0.25) * 9"   # the shatter — a pulse per beat (a held burst smears the cloud blank in captures)
 shape = "2"                                   # polygon
-points = "3 + floor(hash(beat_index) * 1.999)"  # the shard re-cuts every beat: triangles or quads
+points = "4"                                  # quads, fixed
 size = "2.2"
 brightness = "1.2"
 hue = "0"
