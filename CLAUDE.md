@@ -165,6 +165,17 @@ audio + graphics**, where the usual "just allocate and log it" habits cause glit
   checked once where audio enters the core; the hot path downstream assumes them valid.
 - **Lightweight is a feature.** Small binaries, few dependencies, low idle CPU/GPU. Every new
   crate is a cost — justify it. Pin direct dependencies to exact versions in `Cargo.toml`.
+- **A comment carries the mechanism; the decision record stays in `docs/`.** A comment states what
+  the code does, the invariant it holds, the trap that would bite whoever changes it, and any
+  formula or constant a reader cannot re-derive. Why an approach beat the alternative, what was
+  measured, and what a threshold was argued from belong in the ADR or plan — cited by **bare
+  number** (`ADR-0046`, `Plan 0045 Phase 3`), never by a relative link, which rots on the next
+  `plans/done/` move and does not resolve in rustdoc anyway. Rustdoc intra-doc links stay; `rustc`
+  resolves those. **No plan-relative narration** — describe the code as it is (*"the phase is
+  locked, not free-running"*), never as a history (*"used to be free-running until Plan 0095"*).
+  `scripts/check-comment-hygiene.mjs` gates those two mechanical classes at pre-push and in CI;
+  `hygiene-allow: <reason>` in a comment escapes a false positive. Length is not gated — see
+  [ADR-0127](docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
 
 ## Platform realities (don't rediscover these)
 
