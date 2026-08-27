@@ -683,6 +683,47 @@ impl Preset {
             }
         }
 
+        // A `ring` asked for the scaled-copy coordinate (Plan 0098 Phase 4,
+        // ADR-0111's one open behavioural choice). An annulus is the single arm
+        // of the roster that is not star-shaped about its own centre — that
+        // centre is in the hole, a ray from it crosses the boundary twice, and
+        // `r / r_boundary` has no value there. The scene therefore renders the
+        // distance instead, and this is what stops that from being silent.
+        //
+        // Announcing it is the whole point. The three defensible answers were
+        // rendered before one was chosen, and the outer-edge definition came out
+        // BYTE-IDENTICAL to a `disc`: the coordinate collapses to `length(p)`
+        // and the hole stops existing. A preset would name one roster entry and
+        // be shown another. The silent fallback renders exactly what this does
+        // and only differs in whether anyone is told.
+        //
+        // A warning rather than an error, in ADR-0020's shape and on the
+        // `thickness` dead-zone surface above: both values are legal, the
+        // preset is otherwise good, and only a binding that *rests* on the
+        // combination can be seen from here.
+        if system.param_names().contains(&"coord_mode") {
+            let resting = |name: &str| -> Option<f32> {
+                params
+                    .iter()
+                    .find(|b| b.name == name)
+                    .and_then(|b| b.expr.as_const())
+            };
+            let shape = resting("shape").map(crate::render::scenes::marks::mark_shape);
+            let mode = resting("coord_mode");
+            if shape == Some(crate::render::scenes::marks::RING_SHAPE)
+                && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, 1.0).round() >= 1.0)
+            {
+                warnings.push(
+                    "parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in \
+                     its hole, so a ray from there crosses the outline twice and the \
+                     scaled-copy coordinate has no single value. The figure is drawn with the \
+                     distance instead. Defining it against the outer rim was the alternative \
+                     and it renders a `disc` — the hole stops existing"
+                        .to_string(),
+                );
+            }
+        }
+
         // Palette selection (ADR-0021): validated at this boundary into a
         // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
         // error, never a panic. `None` -> the default `spectrum`. `[palette_b]`

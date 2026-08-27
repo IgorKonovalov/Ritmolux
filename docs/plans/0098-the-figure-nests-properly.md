@@ -283,8 +283,8 @@ flowchart TD
 |---|---|---|---|
 | 1 — The star's interior stops lying | dev | done | `28336c3` |
 | 2 — The coordinate exists, and a polygon proves it | dev | done | `a6bb867` |
-| 3 — The heart and the star take the coordinate | dev | done | committed with this row |
-| 4 — `ring` gets an honest answer | dev | not started | |
+| 3 — The heart and the star take the coordinate | dev | done | `43b269a` |
+| 4 — `ring` gets an honest answer | dev | done | committed with this row |
 | 4b — The figure can turn | dev | not started | |
 | 5 — What it costs at the floor tier | dev | not started | |
 | 6 — The docs learn both coordinates | dev | not started | |
@@ -347,6 +347,20 @@ flowchart TD
   carries `0.00472`, which is the 8-segment Bezier polyline's sagitta — the same residual
   `the_curved_star_exterior_is_re_measured` records at `0.0032` for the distance — so it is bounded
   separately, at `0.01`.
+- **Phase 4 chose the load warning plus the distance.** All three candidates were rendered at
+  420x420 first. The two fallbacks (silent, and warned) render the same annulus. The outer-rim
+  definition renders a file that is **byte-identical to a `disc`** at the same settings — md5
+  `6df825d9…` for both — because the coordinate collapses to `length(p)` and the hole stops
+  existing. The rendered pair is what ruled it out rather than the argument.
+- **Phase 4 touched two files outside its list**, both to wire the answer it chose:
+  `core/src/render/scenes/shape_field.rs` (`applied_coord_mode` gained the quantized `shape` and
+  returns the default on `RING_SHAPE` — the fallback has to live at the call site, and the phase's
+  list names only `marks.rs`, `schema.rs` and the README), and `core/tests/preset.rs` (the two
+  load-warning tests, which is where the `thickness` dead-zone precedent's tests live). The
+  rendered fallback assertion went into `core/src/render/scenes/shape_field/tests.rs`.
+- The warning fires only on a `shape` that **rests** at `ring`, the same limit the `thickness`
+  dead-zone check has. An animated `shape` sweeping through `ring` still falls back frame by frame
+  and nothing warns.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is

@@ -3,8 +3,8 @@
 use super::{
     DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_VALLEY,
     HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS,
-    RING_HALF, RING_MID, SHAPES, STAR_SEGMENTS, mark_points, mark_shape, sdf_wgsl, spike_hash01,
-    star_curve, star_jitter, star_valley,
+    RING_HALF, RING_MID, RING_SHAPE, SHAPES, STAR_SEGMENTS, mark_points, mark_shape, sdf_wgsl,
+    spike_hash01, star_curve, star_jitter, star_valley,
 };
 
 /// The neutral star configuration — `(valley, curve, jitter)` at their defaults.
@@ -527,6 +527,10 @@ fn an_eased_points_sweep_visits_only_whole_counts() {
 #[test]
 fn the_shape_roster_is_pinned() {
     assert_eq!(SHAPES, ["disc", "ring", "polygon", "star", "heart"]);
+    assert_eq!(
+        SHAPES[RING_SHAPE as usize], "ring",
+        "RING_SHAPE indexes the arm the scaled-copy coordinate is undefined on"
+    );
     assert_eq!(MAX_SHAPE, 4.0);
     assert_eq!(DEFAULT_SHAPE, 0.0);
     assert_eq!(DEFAULT_POINTS, 5.0);

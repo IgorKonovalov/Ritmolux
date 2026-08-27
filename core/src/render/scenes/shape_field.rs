@@ -461,15 +461,37 @@ fn applied_scale(scale: f32) -> f32 {
 
 /// The `coord_mode` the shader is handed: clamped into the roster, then
 /// **rounded to an integer**, with a non-finite binding falling back to the
-/// default.
+/// default — and **forced back to the distance on a `ring`**.
 ///
-/// `marks::mark_shape`'s treatment for `marks::mark_shape`'s reason, and the
-/// `kaleido_edge` precedent behind both. A mode's values are **identities**
-/// rather than a quantity: `[smoothing]` and preset dissolves interpolate a
-/// binding continuously from one setting to another, so easing the distance to
-/// the radius passes through 0.4 and 0.6, and there is nothing halfway between
-/// an offset curve and a scaled copy for the shader to draw there.
-fn applied_coord_mode(mode: f32) -> f32 {
+/// The quantizing half is `marks::mark_shape`'s treatment for
+/// `marks::mark_shape`'s reason, and the `kaleido_edge` precedent behind both. A
+/// mode's values are **identities** rather than a quantity: `[smoothing]` and
+/// preset dissolves interpolate a binding continuously from one setting to
+/// another, so easing the distance to the radius passes through 0.4 and 0.6, and
+/// there is nothing halfway between an offset curve and a scaled copy for the
+/// shader to draw there.
+///
+/// # The `ring` fallback, and why it is not silent
+///
+/// An annulus's centre is in its hole, so `r / r_boundary` has no single value
+/// there — the one behavioural choice [ADR-0111] leaves to the plan. Plan 0098
+/// Phase 4 rendered the three defensible answers before picking, and what
+/// settled it is that defining the boundary as the outer rim produces a figure
+/// **byte-identical to a `disc`**: the coordinate collapses to `length(p)` and
+/// the hole stops existing, so a preset naming one roster entry would be shown
+/// another. That is the negative ADR-0111 records, reached in practice.
+///
+/// So the combination is refused rather than approximated, and the refusal is
+/// **announced**: `Preset::from_toml_str` warns at load when a preset rests on
+/// it (ADR-0020's shape, the `thickness` dead-zone precedent). The silent
+/// fallback was the third candidate and it is the one this rejects — it renders
+/// the same pixels as this does and costs an author the afternoon.
+///
+/// [ADR-0111]: ../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md
+fn applied_coord_mode(mode: f32, shape: f32) -> f32 {
+    if shape == marks::RING_SHAPE {
+        return DEFAULT_COORD_MODE;
+    }
     if mode.is_finite() {
         mode.clamp(MIN_COORD_MODE, MAX_COORD_MODE).round()
     } else {
@@ -593,6 +615,10 @@ impl Scene for ShapeFieldScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
+        // Quantized once, because `applied_coord_mode` has to see the same value
+        // the shader will: the `ring` refusal is a fact about the SELECTED arm,
+        // not about the raw binding.
+        let shape = marks::mark_shape(self.shape);
         if self.palette_dirty {
             palette::write_lut(queue, &self.lut_texture_a, &self.palette.lut_a_bytes());
             palette::write_lut(queue, &self.lut_texture_b, &self.palette.lut_b_bytes());
@@ -604,7 +630,7 @@ impl Scene for ShapeFieldScene {
             // scene is drawing into — never a size this scene chose (ADR-0037).
             a: [
                 aspect.max(0.1),
-                marks::mark_shape(self.shape),
+                shape,
                 marks::mark_points(self.points),
                 applied_scale(self.scale),
             ],
@@ -618,7 +644,7 @@ impl Scene for ShapeFieldScene {
             d: [
                 self.occlude,
                 applied_gamma(self.gamma),
-                applied_coord_mode(self.coord_mode),
+                applied_coord_mode(self.coord_mode, shape),
                 0.0,
             ],
             e: [

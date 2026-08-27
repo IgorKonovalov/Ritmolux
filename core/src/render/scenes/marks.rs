@@ -114,6 +114,17 @@
 /// `architect` (ADR-0084's closed-roster consequence).
 pub(crate) const SHAPES: [&str; 5] = ["disc", "ring", "polygon", "star", "heart"];
 
+/// The `ring` index, named because three files have to test for it.
+///
+/// An annulus is the one arm of the roster that is **not star-shaped about its
+/// own centre**: that centre lies in the hole, a ray from there crosses the
+/// boundary twice, and `r / r_boundary` therefore has no single value. So it is
+/// the one arm the scaled-copy coordinate is undefined on
+/// ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)),
+/// and Plan 0098 Phase 4 settles what a preset asking for that combination gets:
+/// a load warning and the distance, never a silent third figure.
+pub(crate) const RING_SHAPE: f32 = 1.0;
+
 /// The first index the roster defines (0 = `disc`).
 const MIN_SHAPE: f32 = 0.0;
 /// The last index the roster defines. Values past it clamp here rather than
@@ -603,11 +614,18 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         return 1.0;
     }
     if (shape < 1.5) {
-        // ring: an annulus's centre lies in its hole and a ray from there
-        // crosses the boundary twice, so the ratio has no single value here.
-        // ADR-0111 books this as the one behavioural choice it leaves open and
-        // Plan 0098 Phase 4 settles it against a rendered figure. Until then,
-        // the outer rim.
+        // ring: **`shape_field` never asks for this**, and that is the answer
+        // Plan 0098 Phase 4 chose rather than a gap it left. An annulus's centre
+        // lies in its hole, a ray from there crosses the boundary twice, and the
+        // ratio has no single value — so the scene refuses the combination on
+        // the CPU, warns at load, and hands the palette the distance instead.
+        //
+        // Rendering the alternative is what settled it: defining the boundary as
+        // the outer rim makes a `ring` come out **byte-identical to a `disc`** at
+        // the same settings, because the coordinate collapses to `length(p)` and
+        // the hole stops existing. A preset would name one roster entry and be
+        // shown another, silently. The rim stays here as the arm's honest answer
+        // to a question nothing asks.
         return MARK_RING_MID + MARK_RING_HALF;
     }
     if (shape < 2.5) {

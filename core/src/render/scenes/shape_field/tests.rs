@@ -571,21 +571,27 @@ fn the_ring_count_steps_between_whole_figures() {
 /// curve and a scaled copy for the shader to draw there.
 #[test]
 fn the_coordinate_mode_clamps_rounds_and_falls_back() {
-    assert_eq!(applied_coord_mode(DEFAULT_COORD_MODE), 0.0);
-    assert_eq!(applied_coord_mode(-3.0), MIN_COORD_MODE);
-    assert_eq!(applied_coord_mode(99.0), MAX_COORD_MODE);
-    assert_eq!(applied_coord_mode(0.4), 0.0);
-    assert_eq!(applied_coord_mode(0.6), 1.0);
-    assert_eq!(applied_coord_mode(f32::NAN), DEFAULT_COORD_MODE);
-    assert_eq!(applied_coord_mode(f32::INFINITY), DEFAULT_COORD_MODE);
+    // Any arm but `ring`, which refuses the radius mode outright and has
+    // its own test below.
+    const NOT_RING: f32 = marks::DEFAULT_SHAPE;
+    assert_eq!(applied_coord_mode(DEFAULT_COORD_MODE, NOT_RING), 0.0);
+    assert_eq!(applied_coord_mode(-3.0, NOT_RING), MIN_COORD_MODE);
+    assert_eq!(applied_coord_mode(99.0, NOT_RING), MAX_COORD_MODE);
+    assert_eq!(applied_coord_mode(0.4, NOT_RING), 0.0);
+    assert_eq!(applied_coord_mode(0.6, NOT_RING), 1.0);
+    assert_eq!(applied_coord_mode(f32::NAN, NOT_RING), DEFAULT_COORD_MODE);
+    assert_eq!(
+        applied_coord_mode(f32::INFINITY, NOT_RING),
+        DEFAULT_COORD_MODE
+    );
     for (i, _) in COORD_MODES.iter().enumerate() {
-        assert_eq!(applied_coord_mode(i as f32), i as f32);
+        assert_eq!(applied_coord_mode(i as f32, NOT_RING), i as f32);
     }
 
     // ...and nothing the quantizer emits is ever fractional, anywhere in range.
     for i in 0..=400 {
         let raw = -1.0 + 3.0 * i as f32 / 400.0;
-        let q = applied_coord_mode(raw);
+        let q = applied_coord_mode(raw, NOT_RING);
         assert_eq!(
             q,
             q.round(),
@@ -790,5 +796,108 @@ fn the_two_modes_coincide_on_a_disc() {
         "the two coordinates must draw the SAME disc — `mark_distance` is \
          `length(p)` there and the ratio is `length(p) / 1`, so a difference is \
          the wiring rather than the shape"
+    );
+}
+
+// --- Phase 4: `ring` gets an honest answer -------------------------------------
+//
+// ADR-0111 names this as the one behavioural choice it leaves to the plan, with
+// three defensible answers. All three were rendered before one was chosen, and
+// the rendering is what settled it rather than the argument:
+//
+// | answer | what it renders | verdict |
+// |---|---|---|
+// | silent fallback to the distance | the annulus, banded about its mid-radius | right picture, no way to know why |
+// | **warn, then the distance** | the same picture | **chosen** |
+// | define it against the outer rim | **byte-identical to a `disc`** | the hole stops existing |
+//
+// The third is the one that had to be seen. `r / r_outer` collapses to
+// `length(p)`, so the annulus renders as a plain radial ramp — the same file,
+// to the byte, as `shape = "0"` at the same settings. A preset would name one
+// roster entry and be shown another. That is the negative ADR-0111 predicted,
+// reached in practice, and it is why the arm is refused rather than defined.
+//
+// Between the first two the picture is identical and only the telling differs,
+// which is the whole of ADR-0020's argument for a load warning.
+
+/// **A `ring` never reaches the shader with the radius mode selected**, whatever
+/// the binding says.
+#[test]
+fn the_ring_arm_falls_back_to_the_distance() {
+    // Every mode, every way of spelling it, on a ring: always the distance.
+    for raw in [0.0f32, 0.6, 1.0, 4.0, -2.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            applied_coord_mode(raw, marks::RING_SHAPE),
+            DEFAULT_COORD_MODE,
+            "a ring must take the distance whatever `coord_mode` says ({raw})"
+        );
+    }
+    // ...and the refusal is scoped to that one arm. Every other shape still
+    // gets the mode it asked for.
+    for shape in [0.0f32, 2.0, 3.0, 4.0] {
+        assert_eq!(applied_coord_mode(1.0, shape), 1.0, "shape {shape}");
+        assert_eq!(applied_coord_mode(0.0, shape), 0.0, "shape {shape}");
+    }
+}
+
+/// **A `ring` under either mode renders the same frame, to the byte** — the
+/// fallback, proved where it is visible rather than at the quantizer.
+///
+/// This is the assertion that would have failed under the outer-rim definition:
+/// there the two frames differ completely, and the radius one matches a `disc`.
+#[test]
+fn a_ring_renders_identically_under_both_modes_and_is_not_a_disc() {
+    const SIZE: u32 = 220;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    let body = |shape: &str, mode: &str| {
+        format!(
+            "shape = \"{shape}\"\nscale = \"0.55\"\ncolor_span = \"0.5\"\n\
+             palette_steps = \"7\"\npalette_contour = \"0.55\"\ncoord_mode = \"{mode}\"\n"
+        )
+    };
+    renderer.set_presets(vec![
+        preset("ring_d", &body("1", "0")),
+        preset("ring_r", &body("1", "1")),
+        preset("disc_r", &body("0", "1")),
+    ]);
+    let shot = |renderer: &mut Renderer, name: &str| {
+        renderer
+            .capture_preset(name, &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"))
+    };
+    let ring_d = shot(&mut renderer, "ring_d");
+    let ring_r = shot(&mut renderer, "ring_r");
+    let disc_r = shot(&mut renderer, "disc_r");
+
+    let differing = |a: &CaptureImage, b: &CaptureImage| -> usize {
+        a.rgba
+            .chunks_exact(4)
+            .zip(b.rgba.chunks_exact(4))
+            .filter(|(x, y)| x[..3] != y[..3])
+            .count()
+    };
+    let total = (SIZE * SIZE) as usize;
+    let same_mode = differing(&ring_d, &ring_r);
+    let vs_disc = differing(&ring_r, &disc_r);
+    println!(
+        "ring: {same_mode} of {total} pixels differ between the modes; \
+         {vs_disc} differ from a disc under the radius mode"
+    );
+
+    assert_eq!(
+        same_mode, 0,
+        "a ring must render the SAME figure under either mode — the scene \
+         refuses the scaled-copy coordinate there and hands the palette the \
+         distance"
+    );
+    // The control, and the reason the refusal exists: under the rejected
+    // outer-rim definition this number is 0 and the one above is not.
+    assert!(
+        vs_disc * 20 > total,
+        "the ring renders like a disc ({vs_disc} of {total} pixels differ) — \
+         that is exactly the collapse Phase 4 refused, where the hole stops \
+         existing and a preset is shown a shape it did not name"
     );
 }
