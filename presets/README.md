@@ -538,6 +538,18 @@ from neighbours falling onto the *same* streamline and travelling together — s
 coarse field (low `field_freq`) with a near-frozen one (low `spin`) is the
 formation-holding end, and raising either dissolves the flock toward shimmer.
 
+`spin` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
+the same shape `fragment_field`'s
+[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121),
+`warp_mesh`'s `warp_speed` and `parametric_curve`'s `spin` take — so it is safe to
+bind to audio. Until Plan 0122 it multiplied the shared clock, and of those four it is
+the one shipped content had already found: `swarm_shatter` and `swarm_drift` both bind
+it to `mid`, and across a `0.75` swing a hundred seconds into a set the field clock
+advanced about **four seconds in one frame** against a nominal `0.019` — a re-roll of
+the whole field, growing without bound as a set runs. Both worlds were retuned onto the
+corrected clock at that plan's close, so a `spin` range lifted from either file is a
+range for the integrated form.
+
 Since Plan 0077 the swarm's marks individuate the way the emitter's do —
 same names, same semantics (see [Individuation](#individuation--the-distribution-params)).
 `size_spread` widens the per-mark size as a fraction either side of `size`; the

@@ -156,7 +156,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | accepted 2026-08-27 (Plan 0121) |
-| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | proposed 2026-08-27 (Plan 0122) |
+| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | accepted 2026-08-28 (Plan 0122) |
 | [0136](0136-the-animation-gate-asks-its-question-in-both-readings.md) | The animation gate asks its question in both readings | proposed 2026-08-27 (Plan 0123) |
 | [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | proposed 2026-08-27 (Plan 0123) |
 | [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | proposed 2026-08-27 (Plan 0123) |

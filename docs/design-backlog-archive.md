@@ -6465,3 +6465,90 @@ form. What it buys is that the close ceremony's most-missed step stops having a 
 cannot see. Two things to decide rather than assume: whether `cargo doc` intra-doc `[`Type`]` links
 are in scope (they are a different resolver and probably are not), and whether the ten wrong-depth
 links are repaired or deleted — several may have been decorative from the start.
+
+---
+
+## 0141 — ADR-0132's rule is engine-wide and its enumeration was not: `swarm`'s field clock is still `time * spin`, and two shipped presets bind that rate to the music
+
+[ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
+parameter in this engine integrates a phase**, then enumerates two sites: the new `field_speed` /
+`fold_speed` on `fragment_field`, and `warp_speed` on `warp_mesh`, *"which is corrected to match
+rather than left as a counterexample"*. There is a third, and it is the only one of the three that
+shipped content actually binds.
+
+> **Corrected 2026-08-27, same day, while planning the fix — this entry's own count was wrong in the
+> same direction as the ADR's.** There are **three** uncorrected sites, not one. `swarm` is the only
+> one that moves a picture today, which is why it is still the title; the other two are
+> `lines/parametric.rs:410` (`self.spin * self.time` — bound only to constants, by `curve_ionwake`
+> and `curve_nightbloom`, where the two forms agree by construction) and `warp_mesh/mod.rs:2070`
+> (`self.deposit_spin * self.time` — nothing binds it, exactly the status `warp_speed` had). Finding
+> the entry about undercounting undercounted is the argument for the guard rather than a fourth list.
+> **PROMOTED** to [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) +
+> [Plan 0122](plans/done/0122-every-rate-integrates.md), which take all three plus a shared `Phase` type
+> and a hygiene assertion. Stays live until that plan closes.
+
+- **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
+  Mode 4 close review, by grepping for the pattern the ADR forbids rather than by reading the plan's
+  list. **Owner if taken:** `dev`; the correction is the same three lines Phase 4 applied to
+  `warp_mesh`.
+- **Verified 2026-08-27** — the swarm's field clock still multiplies absolute scene time:
+  `present: let field_t = self\.time \* self\.spin; in: core/src/render/scenes/swarm.rs`
+- **Verified 2026-08-27** — and a shipped preset binds that rate to a band:
+  `present: spin = "0\.4 \+ clamp\(mid \* 0\.9, 0, 0\.75\)" in: presets/swarm_shatter.toml`
+- **Verified 2026-08-27** — the second uncorrected site, found while planning:
+  `present: let rotation = self\.spin \* self\.time; in: core/src/render/scenes/lines/parametric.rs`
+- **Verified 2026-08-27** — and the third:
+  `present: self\.deposit_spin \* self\.time, in: core/src/render/scenes/warp_mesh/mod.rs`
+
+### The finding
+
+`core/src/render/scenes/swarm.rs` computes `let field_t = self.time * self.spin;`, four lines under
+its own comment *"Field evolves at `spin`"* — so `spin` is a rate, it is in the scene's `PARAMS`
+roster, and it is exactly the shape ADR-0132 exists to remove. Two shipped presets bind it:
+
+    presets/swarm_shatter.toml:34   spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"     [smoothing] 0.3
+    presets/swarm_drift.toml:96     spin = "0.040 + sin(time * 0.019) * 0.010
+                                            + clamp(mid * 0.041, 0, 0.035)"      [smoothing] 1.30
+
+**Size of it on `swarm_shatter`, arithmetic rather than measured.** A one-pole at `tau = 0.3`
+closes about 5.4 % of its gap per 60 Hz frame, so across the 0.75 swing `spin` moves ~0.04 in a
+frame. At t = 100 s that advances `field_t` by ~4.0 s of field time in one frame, against a nominal
+`1.15 / 60 = 0.019` s — roughly **210x**, on every loud passage, growing without bound as a set runs.
+
+**Why nobody has reported it, and why that is not reassurance.** Unlike `warp_mesh`, whose phase
+drives a vertex displacement and would visibly teleport the picture, `field_t` is the time
+coordinate of the curl-noise field the particles *steer* by. A jump re-rolls the flow rather than
+moving the particles, so it reads as the field losing its thread — which is a look, not obviously a
+bug, and is the kind of thing a viewer attributes to the music. Plan 0121's own Context asserts the
+opposite premise — *"the rate hazard already exists in the engine: `warp_mesh` … Nothing has found
+it because no preset binds it"* — and that framing is what stopped anyone grepping.
+
+- **What a fix looks like.** The `warp_mesh` correction, applied unchanged: store `dt` in `advance`,
+  accumulate `field_phase += spin * dt` in `update` (after `set_param`, so it uses this frame's
+  value), and read the phase where `field_t` is read now. At a constant `spin` the phase equals
+  `spin * time`, so `swarm_drift`'s slow constant term is unchanged and only the bound swing bends.
+  **Not free of visual consequence, unlike the other three:** both presets bind `spin`, so this one
+  *will* move their pictures, and it needs a `preset-author` look pass rather than an equivalence
+  assertion. That is the whole reason it is a separate entry and not a fifth phase.
+- **And the general repair is the sweep, not the site.** The enumeration failed once; the thing that
+  keeps it from failing again is a test, not a longer list — a hygiene-style assertion that no
+  `core/src/render/scenes/**` source multiplies `self.time` by a settable field. That is cheap, it
+  is text, and it would have caught this one.
+
+### Priority
+
+**Medium.** Live in shipped content on every loud passage, and it convicts a claim an accepted ADR
+makes about itself — but it is a look question rather than a crash, the two affected presets read
+acceptably today, and the fix cannot land without a content pass behind it.
+
+- **CLOSED 2026-08-28**, at [Plan 0122](plans/done/0122-every-rate-integrates.md)'s close, on
+  [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md). All three sites
+  moved onto one shared `scenes::Phase`, together with the three helpers that were already correct
+  and were three separate copies of the same three lines, and `core/tests/hygiene.rs` now fails the
+  build on `self.<field> * self.time` in any scene source. `swarm_shatter` and `swarm_drift` were
+  retuned onto the corrected clock in a content pass whose verdict was taken in the running app.
+  **This entry's count was wrong once and the ADR's three times** — the final tally is nine bindable
+  rates, and the three the fix does not reach multiply a per-element `age`, which the new guard
+  cannot see: 0149. All four of its probes went red on delivery, which is what they were written to
+  do. The `dt` sanitizer the fix left duplicated across four callers, with none on the attractor, is
+  0150.

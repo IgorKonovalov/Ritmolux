@@ -13,6 +13,58 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0122 — Every rate integrates](done/0122-every-rate-integrates.md)
+  — closed 2026-08-28. Five phases on `plan-0122-every-rate-integrates` in `WORK/lmv-plan-0122`,
+  `5c258d0`..`7ac363f`. Review: **no blockers, two majors** (both discharged before the close),
+  **two minors.** Version **0.87.0** (minor). Closed [design-backlog 0141](../design-backlog.md);
+  filed 0149 and 0150.
+
+  **The plan's subject was an enumeration that kept being wrong, and the enumeration was wrong
+  again inside the plan.** ADR-0132 named two bindable rates; Plan 0121's close found a third;
+  planning this found two more and built ADR-0135 around six; this plan's own Mode 4 review found
+  **three more**, bringing the tally to nine. The ADR's body was corrected while it was still
+  `proposed` (`e186bd2`) rather than accepted with an Outcome, which is the point — a document that
+  has not been accepted is still a draft, and the correction is an edit rather than a reversal. Its
+  Notes section now says four attempts were needed and tells a tenth rate's author to grep for the
+  mechanism instead of reading the table.
+
+  **What the guard is actually worth, stated in the ADR rather than discovered later.** The
+  `hygiene.rs` assertion matches `self.<field> * self.time` — a *spelling*, not the rule. The three
+  rates the review found sit outside it: `shape_collage`'s `drift` and `spin` and `emitter`'s `spin`
+  all multiply a per-element `age`, which needs an accumulator per element rather than one `Phase`
+  per scene, and three shipped `collage_*` worlds bind two of them to bands. Filed as backlog 0149
+  with the repair shape left open, because baking the rate at spawn changes what the parameter
+  means. The ADR's Negative section had already predicted a *different* escape hatch
+  (`let time = self.time;`) and the one that bit was a third — which is the honest measure of a
+  text guard.
+
+  **The close recorded two `minor` findings that nothing else would have.** `Phase::step` takes
+  `rate` and `dt` on trust while four `Scene::advance` impls carry a byte-identical `dt` sanitizer
+  and `particles/mod.rs:1340` — holding a `Phase` — carries none, so a non-finite `dt` poisons the
+  attractor's accumulator permanently and nothing can clear it. That is ADR-0135's own
+  four-copies-of-three-lines argument one level down, and it is **backlog 0150** rather than a fix,
+  because where the guard belongs (the type, the trait seam, or a `Dt` newtype) is a design call and
+  `self.dt` has readers that are not `Phase`. The second was `presets/README.md` documenting "integrates
+  a phase" for `deposit_spin` and `parametric_curve`'s `spin` but saying nothing for `swarm`'s — the
+  one parameter whose behaviour actually changed for authors; fixed in the close commit.
+
+  **`dev`'s own log convicted a Phase 3 measurement, which is the reading worth keeping.** The
+  before/after `drive`/`rate`/`cover` table named five swarm presets; three of them —
+  `Dense`, `Starfield`, `Storm` — were retired 2026-08-11 by `9bf2b23` and were never in the tree
+  the plan ran against. `shot --report family=swarm` with no `--presets` resolves to the seeded
+  `%APPDATA%` copy, and seeding is write-if-absent and never deletes. The plan's done-when *"read
+  against their family neighbours"* was therefore **unsatisfiable as written**: the swarm family is
+  two presets and both bind `spin`, so no unaffected control exists. Confirmed at the close —
+  `shot --presets presets --report family=swarm` reports exactly two.
+
+  **Phase 5's verdict went to the retuned variants on both presets**, taken in the running app
+  against a `b250d0d` build on one track. The finding inside it: `swarm_drift`'s `spin` carries a
+  `sin(time)` term the plan's analysis had missed, and multiplied by elapsed time its derivative
+  carried a `0.00019 · t` piece, so by t = 300 s the field periodically ran **backwards**, unbounded.
+  Also swept at the close: `curve_nightbloom.toml`'s header justified a constant `spin` with a
+  constraint Phase 2 had removed, and the stale-workaround grep **could not have found it** — the
+  header cites no ADR, plan or backlog number at all.
+
 - [0098 — The figure nests properly](done/0098-the-figure-nests-properly.md)
   — closed 2026-08-27. Eight phases (1, 2, 3, 4, 4b, 5, 6, 7) on `plan-0098-nested-figure` in
   `WORK/lmv-plan-0098`, `28336c3`..`7411663`. Review: **no blockers, no majors, five minors, two
