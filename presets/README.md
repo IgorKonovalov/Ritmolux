@@ -1663,8 +1663,10 @@ wrong one is the trap the `glow` entry below records.
   the whole batch — segments and any arcs together — composites **over**, so a
   stroke laid on another **replaces the interior of what it covers** and a
   quantized palette keeps its plateaus. That is the difference between a
-  luminous world and a printed one, and it is the entry point to the
-  [limited-ink class](../docs/preset-palettes.md).
+  luminous world and a printed one, and it is what puts these four systems in
+  the [limited-ink class](../docs/preset-palettes.md#limited-ink--a-supported-palette-class-at-the-draw-seam),
+  whose enumerated list of every later stage that would put a fourth colour in
+  your frame — and each one's off switch — is on that page.
 
   > **It is a switch, not a mix**: a draw call has one blend mode, so the
   > decision is taken at `0.5` on the CPU each frame. Values in between select
