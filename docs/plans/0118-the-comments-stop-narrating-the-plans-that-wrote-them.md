@@ -254,7 +254,7 @@ flowchart TB
 | 4 — the 252 narration lines go | dev | done | `add5710` |
 | 5 — the gate is armed | dev | done | `29a0a9d` |
 | 6 — the long blocks come down, outside the contended trees | dev | done | `52c3bcb` |
-| 7 — the long blocks come down, inside the contended trees | dev | done | committed with this row |
+| 7 — the long blocks come down, inside the contended trees | dev | done | `6e48021` |
 
 ### Notes
 
