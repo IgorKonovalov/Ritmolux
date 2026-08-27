@@ -142,13 +142,17 @@ contradicts this file is a plan bug — surface it, don't guess.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `lmv-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **six** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
-  `unsafe` (UB), the coverage ratchet below, and the three Node doc gates that share the `links`
+- Plus **eight** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
+  `unsafe` (UB), the coverage ratchet below, and the five Node doc gates that share the `links`
   job — `check-doc-links.mjs` (every relative markdown link resolves — Plan 0061 Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
-  [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)), and
+  [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
   `check-backlog-claims.mjs` (every live backlog entry's probe still holds —
-  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
+  [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)),
+  `check-filter-figures.mjs` (the diffusion filter's cost figures live in one page —
+  [ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)), and
+  `check-comment-hygiene.mjs` (no `.rs` comment carries a relative link or plan-relative narration —
+  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
 - **The nine GPU-heavy suites run once per push, not twice**
   ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), Plan 0061 Phase 2b). They render the shipped
   preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and

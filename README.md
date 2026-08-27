@@ -385,20 +385,26 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Doc links | `node scripts/check-doc-links.mjs` |
 | Index rows | `node scripts/check-index-rows.mjs` |
 | Backlog claims | `node scripts/check-backlog-claims.mjs` |
+| Filter figures | `node scripts/check-filter-figures.mjs` |
+| Comment hygiene | `node scripts/check-comment-hygiene.mjs` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Tests | `cargo nextest run --workspace` (narrowed — see below) |
 
-The three Node steps come first because they are the cheapest (tens of
-milliseconds between them): every relative markdown link in the repo must
-resolve, every row inside a marked roster region must stay under 320 bytes
+The Node steps come first because they are the cheapest (tens of milliseconds
+between them): every relative markdown link in the repo must resolve, every row
+inside a marked roster region must stay under 320 bytes
 ([ADR-0116](docs/adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
-and every live `docs/design-backlog.md` entry must carry a probe that still holds
-([ADR-0108](docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)).
-If `node` is not on your `PATH` all three **skip with a notice** rather than
+every live `docs/design-backlog.md` entry must carry a probe that still holds
+([ADR-0108](docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)),
+the diffusion filter's cost figures must live in one file
+([ADR-0122](docs/adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)), and no `.rs`
+comment may carry a relative link or plan-relative narration
+([ADR-0127](docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
+If `node` is not on your `PATH` they all **skip with a notice** rather than
 failing the push; nothing else here needs Node. That skip is about the hook only
-— CI's `links` job runs the same three checks on `ubuntu-latest`, where they
-cannot skip and are not bypassable.
+— CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot
+skip and are not bypassable.
 
 **Measured warm wall time: ~48.6 s** (2026-08-08; dominated by the tests — `fmt`
 and `clippy` are under two seconds between them). The hook excludes the nine
