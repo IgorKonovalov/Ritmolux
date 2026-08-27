@@ -644,10 +644,12 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
     // The explanatory prose blocks wrap on their own and have no columns to
     // line up; the claim is about the header and the rows under it. Both are
     // found by content rather than by position, so a block inserted between
-    // them later cannot silently drop this test's coverage.
+    // them later cannot silently drop this test's coverage. The row is found by
+    // the label the fitter produces, not by the raw name.
+    let label = fit_name("Star Mandala Bordered");
     let table: Vec<&str> = out
         .lines()
-        .filter(|l| l.contains("Star Mandala") || l.trim_start().starts_with("preset "))
+        .filter(|l| l.contains(&label) || l.trim_start().starts_with("preset "))
         .collect();
     assert_eq!(
         table.len(),
@@ -660,5 +662,82 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
             "a table line is {} columns wide:\n{line}",
             line.chars().count()
         );
+    }
+}
+
+/// design-backlog 0131: two presets whose display names share their first
+/// [`NAME_WIDTH`] characters must print as **distinguishable** rows in all three
+/// tables. Constructed as an explicit pair rather than leaned on the shipped
+/// library, so curating the colliding preset away cannot silently retire this.
+#[test]
+fn two_names_sharing_their_first_fourteen_characters_print_as_distinct_rows() {
+    // The live collision at the time of writing: `Tiled Rosette` is 13
+    // characters, so a 14-wide tail truncation pads it to exactly what it
+    // truncates `Tiled Rosette Mono` to.
+    let fam = FamilyReport {
+        system: SystemKind::FragmentField,
+        presets: vec![
+            preset_report("Tiled Rosette", vec![]),
+            preset_report("Tiled Rosette Mono", vec![]),
+        ],
+        pixel: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+        shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam], Tier::Floor);
+
+    // Every table prints two rows, and in each table the two labels differ.
+    let labels: Vec<&str> = out
+        .lines()
+        .filter(|l| l.starts_with("  Tiled"))
+        .map(|l| l.get(2..2 + NAME_WIDTH).unwrap_or(l))
+        .collect();
+    assert_eq!(labels.len(), 6, "three tables, two rows each:\n{out}");
+    for pair in labels.chunks(2) {
+        assert_ne!(
+            pair.first(),
+            pair.last(),
+            "the two rows print the same label:\n{out}"
+        );
+    }
+    // And every cell is still exactly the column width, so the numbers line up.
+    for label in &labels {
+        assert_eq!(label.chars().count(), NAME_WIDTH, "got {label:?}");
+    }
+}
+
+/// The fitter elides the **middle**, because the distinguishing part of a name
+/// in this library is its tail (`Mono`, `Gallery`, `Bordered`). A name that fits
+/// is passed through untouched, so no historical row label moves.
+#[test]
+fn fit_name_keeps_short_names_whole_and_elides_the_middle_of_long_ones() {
+    assert_eq!(fit_name("Whorl"), "Whorl");
+    assert_eq!(fit_name("Thomas Gallery"), "Thomas Gallery");
+    assert_eq!(fit_name("Thomas Gallery").chars().count(), NAME_WIDTH);
+
+    let long = fit_name("Star Mandala Bordered");
+    assert_eq!(long.chars().count(), NAME_WIDTH, "got {long:?}");
+    assert!(long.contains('~'), "the elision is marked: {long:?}");
+    assert!(long.starts_with("Star Ma"), "the head survives: {long:?}");
+    assert!(long.ends_with("rdered"), "the tail survives: {long:?}");
+}
+
+/// The whole shipped library fits into distinct row labels. This is the claim
+/// the report is actually read under — a fitter that resolved the one known pair
+/// and collided somewhere else would pass the pair test above and still print an
+/// ambiguous table.
+#[test]
+fn every_shipped_preset_name_fits_to_a_distinct_label() {
+    let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for preset in lmv_core::preset::default_presets() {
+        let label = fit_name(&preset.name);
+        assert!(
+            label.chars().count() <= NAME_WIDTH,
+            "{:?} fits to {label:?}, wider than the column",
+            preset.name
+        );
+        if let Some(other) = seen.insert(label.clone(), preset.name.clone()) {
+            panic!("{:?} and {:?} both print as {label:?}", other, preset.name);
+        }
     }
 }
