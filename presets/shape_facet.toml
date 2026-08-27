@@ -81,8 +81,20 @@
 #
 # WHAT DRIVES WHAT
 #   scale       a slow breath plus the low end - the sparkle opens and closes
+#   rotation    a slow turn, a kick on each onset, a re-roll on each detection
+#   star_curve  the mids bow and straighten the arms
+#   gamma       the top end tightens the graded ground
 #   pan_x/pan_y a slow drift across the frame
-#   saturation  the top end, gently; the only colour lever here
+#   saturation  the top end, gently
+#
+# 2026-08-27: THIS WORLD DID NOT REACT TO MUSIC AND NOW IT DOES, and note 5's
+# old claim - that the drift is the only safe motion lever here - was true when
+# it was written and is not any more. It measured bass 0.115 / mid 0.000 /
+# treb 0.009 / onset 0.000 with `anim` 0.019; it now measures 0.110 / 0.021 /
+# 0.043 / 0.122 with `anim` 0.038. Plan 0098 is what changed: Phase 4b gave the
+# scene a `rotation` that moves the SAMPLE POINT rather than the mapping, and
+# Phase 1 made `gamma` bindable on a curved star. Both were unavailable to the
+# author of this file.
 
 system = "shape_field"
 name   = "Facet"
@@ -208,10 +220,8 @@ stops = [
 shape        = "3"
 points       = "4"
 star_valley  = "0.20"
-star_curve   = "0.55"
+# `star_curve` is bound below, with the bound that keeps it safe.
 
-# The look, not a workaround - see note 3, which used to say otherwise.
-gamma        = "1.0"
 
 # See note 3. These two are a re-scaling of the shipped pair, and their SUM is
 # the number that matters (note 1).
@@ -223,14 +233,48 @@ palette_steps = "56"
 # swell so the figure is alive in silence.
 scale        = "0.95 + 0.06 * sin(time * 0.90) + clamp(bass * 0.2353, 0, 0.20)"
 
-# A SLOW DRIFT, AND IT IS THE ONLY MOTION LEVER THAT IS SAFE HERE. Everything else
-# that would move this picture - `color_span`, `color_center`, `gamma` - shifts the
-# palette COORDINATE, which would drag band 3's boundary off d = 1 and quietly
-# start drawing an offset of the star instead of the star (note 1). `scale` and
-# `pan_*` move the figure in space and leave the mapping alone, so the outline
-# stays the outline. `pan` also moves the graded ground with it, which is what
-# earns this preset its animation score: the figure alone is too small a share of
-# the frame to register.
+# THE FIGURE TURNS, AND THIS LEVER DID NOT EXIST WHEN THIS WORLD WAS AUTHORED
+# (Plan 0098 Phase 4b). It is the only reactivity lever on this scene that does
+# not touch the palette coordinate at all - it moves the sample point, not the
+# mapping - so note 1's invariant is untouched by construction. For a four-point
+# sparkle a turn is the most legible motion there is.
+#
+# The `hash` term re-rolls on each ONSET (not each musical beat - ADR-0109), so
+# the sparkle kicks to a new angle on activity and drifts between kicks. Eased
+# below, so a kick arrives as a settle rather than a snap.
+rotation     = "time * 0.09 + hash(beat_index) * 0.50 + clamp(onset * 0.2500, 0, 0.15)"
+
+# THE ARMS BOW AND STRAIGHTEN ON THE MIDS, AND THE DOWNWARD-ONLY BOUND IS THE
+# WHOLE REASON THIS IS SAFE. `star_curve` moves the figure's inradius, which is
+# what note 3's colour pair is scaled against - so a binding that raised it would
+# quietly invalidate `color_span` every frame. Measured across the range: the
+# inradius stays PINNED at the valley radius (0.20000) for every curve up to
+# about 0.60, and only moves above it - 0.19992 at 0.65, 0.18048 at 0.85. This
+# binding rests at 0.55 and only ever goes DOWN, so the mapping stays exact.
+star_curve   = "0.55 - clamp(mid * 0.2353, 0, 0.20)"
+
+# THE GROUND RAMP TIGHTENS ON THE TOP END. `gamma` was unbindable here until
+# Plan 0098 Phase 1 (note 3) and is now ordinary - and it is safe for note 1 for
+# a reason worth stating: `1^gamma` is 1 at every exponent, so band 3's boundary
+# cannot leave the outline however this moves. What it reshapes is where the
+# bands sit either side of it.
+#
+# The cap is small and note 4 is why: past band 34 the ground is a single
+# near-black and spending the ramp there wastes it. At 1.08 the frame corner
+# reaches band ~30, still inside the fitted range; at 1.2 it would reach ~38 and
+# the corners would go flat.
+gamma        = "1.0 + clamp(treb * 0.1333, 0, 0.08)"
+
+# A SLOW DRIFT. `color_span` and `color_center` are still the two levers that must
+# NOT move: they shift the palette coordinate, which would drag band 3's boundary
+# off d = 1 and quietly start drawing an offset of the star instead of the star
+# (note 1). `gamma` used to be listed beside them and no longer belongs there -
+# `1^gamma` is 1 at every exponent, so it cannot move that boundary.
+#
+# `scale`, `pan_*` and `rotation` move the figure in space and leave the mapping
+# alone, so the outline stays the outline. `pan` also moves the graded ground with
+# it, which used to be the whole of this preset's animation score; `rotation` now
+# sweeps the ground as well, and doubled it.
 pan_x        = "0.07 * sin(time * 0.55)"
 pan_y        = "0.05 * cos(time * 0.47)"
 saturation   = "1.0 + clamp(treb * 0.25, 0, 0.15)"
@@ -245,3 +289,8 @@ bloom_amount = "0.12"
 [smoothing]
 scale      = 0.45
 saturation = 0.3
+# Different constants on the three new levers so they never resolve together and
+# the picture reads as several things moving rather than one pulse.
+rotation   = 0.35
+star_curve = 0.28
+gamma      = 0.40
