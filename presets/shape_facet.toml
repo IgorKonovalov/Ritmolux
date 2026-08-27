@@ -8,27 +8,50 @@
 #
 # -- FOUR NUMBERS THAT ARE NOT TASTE ---------------------------------------------
 #
-# 1. THE EDGE IS THE OUTLINE. `color_center + color_span` = 0.01125 + 0.04234 =
+# 1. THE EDGE IS THE OUTLINE. `color_center + color_span` = 0.00149 + 0.05210 =
 #    0.05359 = 3/56, so band 3's boundary lands exactly on d = 1, the figure's
 #    true outline. Put it anywhere else and you draw an OFFSET of the shape: at
 #    1.35x every tip comes back blunt, because an outward offset rounds a convex
 #    corner. That is how the first probe sheet for this arm failed.
 #
+#    THE SUM IS THE INVARIANT, NOT EITHER NUMBER. Both halves moved at Plan 0098
+#    Phase 1 (note 3) and the sum did not, which is what kept the outline on the
+#    outline through that change.
+#
 # 2. `palette_steps` IS WHY THIS LOOKS CLEAN. The palette LUT is 256 texels, and
-#    a sharp star's inradius (0.16 here) forces `color_span` down near 0.042 - so
-#    the figure's whole interior would otherwise be drawn through about 11 texels
+#    a sharp star's inradius (0.20 here) forces `color_span` down near 0.052 - so
+#    the figure's whole interior would otherwise be drawn through about 13 texels
 #    with a 1-texel edge, which renders as a soft, dirty, upscaled figure
 #    (design-backlog 0099). Banding snaps the coordinate to a band CENTRE before
 #    the LUT read, so nothing anywhere is interpolated.
 #
-# 3. `gamma` IS PINNED AT EXACTLY 1.0, AND IT IS NOT DECORATION. A star with
-#    `star_curve` non-zero returns a NEGATIVE distance at its own centre
-#    (design-backlog 0097). The shader takes `select(pow(d, gamma), d, gamma == 1.0)`
-#    - and `pow` of a negative base is NaN, which lands as a hard artifact in the
-#    middle of the figure. Only the exact identity branch avoids it.
-#    **The `color_center` offset that entry recommends does NOT save you here**,
-#    because it is added AFTER the exponent. Any `gamma` binding on a curved or
-#    jittered star is unsafe until Plan 0098 Phase 1 lands.
+# 3. THE TWO COLOUR NUMBERS WERE RE-TUNED AT PLAN 0098 PHASE 1, AND THAT IS WHY
+#    THEY LOOK ARBITRARY. That phase closed design-backlog 0097: a curved star
+#    used to normalize its true distance by the STRAIGHT edge plane's
+#    perpendicular, which is always shorter than the figure's real deepest-point
+#    distance - so `d` came out negative at the centre and every exterior reading
+#    was stretched. For this configuration the reference moved 0.16253 -> 0.20000,
+#    a factor of 1.2306, and `d - 1` scales as its reciprocal.
+#
+#    The repair is a pure re-scaling of the same mapping: `color_span` multiplied
+#    by that factor (0.04234 -> 0.05210) and `color_center` taking whatever the
+#    sum in note 1 leaves (0.01125 -> 0.00149). Both the outline and the frame
+#    corner then land exactly where they did before the engine changed - the
+#    corner reads band 19.7 at the resting scale either way. Left untuned it read
+#    16.6, i.e. the graded ground never reached its dark end.
+#
+#    THE OLD `color_center` WAS A DODGE, AND ITS SIZE IS THE PROOF. It existed to
+#    hold the coordinate positive over the centre, where the old reference drove
+#    `d` negative. The centre's actual coordinate under the shipped numbers was
+#    0.00149 - which is exactly the `color_center` the re-scaling above derives.
+#    The dodge and the honest value are the same number, because the centre now
+#    reads a true `d = 0`.
+#
+#    `gamma` IS NO LONGER UNSAFE, and the old warning here is retired. `pow` of a
+#    negative base is a NaN, and the base is not negative any more. It stays at
+#    1.0 because that is the look, not because binding it would break the figure -
+#    and note that any exponent keeps band 3 on the outline, since `1^gamma` is 1.
+#    What it WOULD reshape is the ground's ramp, which note 4 fits by hand.
 #
 # 4. THE GROUND IS GRADED, AND THE GATE IS THE REASON. A `shape_field` preset
 #    covers every pixel, so a flat dark ground puts ~96 % of the frame in one
@@ -187,13 +210,13 @@ points       = "4"
 star_valley  = "0.20"
 star_curve   = "0.55"
 
-# See note 3. Do not bind this.
+# The look, not a workaround - see note 3, which used to say otherwise.
 gamma        = "1.0"
 
-# See note 3 - this offset keeps the coordinate positive over the centre, where a
-# curved star's distance goes negative.
-color_center = "0.01125"
-color_span   = "0.04234"
+# See note 3. These two are a re-scaling of the shipped pair, and their SUM is
+# the number that matters (note 1).
+color_center = "0.00149"
+color_span   = "0.05210"
 palette_steps = "56"
 
 # Gain from the cap by the house rule (C / 0.85 for bass). The sine is a ~33 s
