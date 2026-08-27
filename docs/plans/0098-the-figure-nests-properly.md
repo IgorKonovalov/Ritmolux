@@ -404,12 +404,28 @@ flowchart TD
   Measured head to head: `anim` `0.019` to `0.020`, `cover` `0.818` to `0.826`, bands and gates
   unchanged. Its header's notes 1-3 are corrected; note 3 had said a bound `gamma` is unsafe on a
   curved star "until Plan 0098 Phase 1 lands".
+- **`shape_facet` was then given reactivity (`7411663`), which this plan did not ask for.** Flagged
+  because it is content work beyond the plan's scope, done at the user's request and *enabled* by
+  it: the preset measured `mid`, `treb` and `onset` at `0.000 / 0.009 / 0.000`, and its own note 5
+  recorded that a slow drift was the only safe motion lever — true when written, because every
+  other lever moved the palette coordinate off note 1's invariant. Phase 4b's `rotation` moves the
+  sample point rather than the mapping, and Phase 1 made `gamma` bindable on a curved star, so both
+  constraints are retired. Now `0.021 / 0.043 / 0.122`, with `anim` `0.019` to `0.038`.
+  `star_curve` rides the mids bound **downward only**, because it moves the inradius note 3's
+  colour pair is scaled against: measured pinned at `0.20000` up to curve ~0.60, moving above it.
 
 ### Close triggers
 
 - **`presets/` touched:** yes — `presets/README.md`; `presets/shape_pulse.toml` re-authored at
   Phase 7 (`30b2bce`); `presets/shape_facet.toml` re-scaled onto Phase 1's repaired star reference
-  (`82a3211`). Nothing embedded or removed: the shipped set is the same files.
+  (`82a3211`) and then given reactivity (`7411663`). Nothing embedded or removed: the shipped set
+  is the same files.
+- **Merge state:** `main` moved **12 commits** ahead while this branch ran (Plan 0121 closed and
+  released `0.83.0`; Plan 0122 approved). Three files overlap — `shape_field.rs`,
+  `docs/preset-palettes.md`, `presets/README.md`. `git merge-tree --write-tree main HEAD` reports
+  **no conflict**, and the merged `shape_field.rs` was read: Plan 0121's 7-argument `band_contour`
+  and this plan's `coord_mode` branch are both intact and consistent. It has **not been built** —
+  that is the ceremony's own step.
 - **Plan header `Closes:`** design-backlog 0096, design-backlog 0097.
 - **What shipped:** feature (one fix — Phase 1 — plus a new preset-facing parameter surface:
   `coord_mode` and `rotation` on `shape_field`, a new load warning, and a new cost test).
