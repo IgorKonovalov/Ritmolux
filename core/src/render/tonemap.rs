@@ -31,30 +31,25 @@
 //! — so it is C1-continuous at the knee, strictly monotone, and bounded. At
 //! `k = 0.6`: `f(1) = 0.800`, `f(2) = 0.911`, `f(4) = 0.958`, `f(8) = 0.980`.
 //!
-//! ADR-0046 requires the curve be **monotone, hue-preserving, and near-identity
-//! below the mid-range**. The first and third are the curve's own shape; the
-//! second is how it is applied to colour: the scale factor `f(m)/m` is computed
-//! from the **brightest channel** `m` and applied to all three, so the ratios
-//! between R, G and B are exactly preserved and the roll-off never rotates a hue
-//! or washes a saturated core toward white. It is also gamut-safe by
-//! construction — the largest channel lands on `f(m) < 1`, so no channel can
-//! exceed 1 and be clipped by the 8-bit write.
-//!
-//! Plain Reinhard (`x / (1 + x)`) was not an option despite being the obvious
-//! one: it maps 0.8 to 0.44, so every existing preset would have gone dark.
-//! ADR-0046's "near-identity below the mid-range" is what rules it out, and
-//! it is what confined the golden re-bless to the regions that were actually
-//! clipping.
+//! **Hue-preserving** is a property of how the curve is applied, not of
+//! its shape: the scale factor `f(m)/m` is computed from the
+//! **brightest channel** `m` and applied to all three, so the ratios
+//! between R, G and B are exactly preserved and the roll-off never
+//! rotates a hue or washes a saturated core toward white. It is also
+//! gamut-safe by construction — the largest channel lands on `f(m) <
+//! 1`, so no channel can exceed 1 and be clipped by the 8-bit write.
+//! Plain Reinhard (`x / (1 + x)`) fails the near-identity requirement
+//! and is ADR-0046's rejected alternative: it maps 0.8 to 0.44.
 //!
 //! # Why the output is 8-bit, not float
 //!
-//! Plan 0045 Phase 3's file list reads "…and ink-src to `Rgba16Float`". Taken
-//! literally that needs **two** tonemap pipelines — one targeting ink's float
-//! input, one targeting the surface for the (common) ink-off frame — against this
-//! plan's own documented WARP pipeline-count risk. The linear region therefore
-//! ends *at this pass's input*: the tonemap writes display-referred values at the
-//! surface format into ink's input, or straight into the surface when ink is off.
-//! One pipeline, and ink's semantics are bit-for-bit what they were.
+//! The linear region ends *at this pass's input*: the tonemap writes
+//! display-referred values at the surface format into ink's input, or
+//! straight into the surface when ink is off. Targeting a float
+//! ink-input instead needs **two** tonemap pipelines — one per
+//! destination format — against the WARP pipeline-count hazard
+//! (ADR-0058). One pipeline, and ink's semantics are bit-for-bit
+//! unchanged.
 //!
 //! # The write dithers (Plan 0082, ADR-0096)
 //!

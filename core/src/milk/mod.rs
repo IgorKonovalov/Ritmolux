@@ -27,9 +27,9 @@
 //!
 //! # Rates: MilkDrop is per frame, this engine is per second
 //!
-//! **The single most consequential translation in the whole plan, and it is
-//! here rather than in the converter.** MilkDrop's `zoom`, `rot`, `dx`, `dy`,
-//! `warp` and `decay` are all *per rendered frame*: a preset written on a machine
+//! **The single most consequential translation in the conversion, and it is here
+//! rather than in the converter.** MilkDrop's `zoom`, `rot`, `dx`, `dy`, `warp`
+//! and `decay` are all *per rendered frame*: a preset written on a machine
 //! running 30 fps drifts at half the speed on one running 60. This engine's
 //! vocabulary is per second throughout (ADR-0019), which is what makes a look
 //! identical on any display.

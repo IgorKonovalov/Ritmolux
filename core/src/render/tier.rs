@@ -1,9 +1,8 @@
 //! Quality tiers: the engine's capacity constants, resolved once (ADR-0045).
 //!
-//! NFR §1 has always specified two quality levels — a reduced tier holding 60 fps
-//! at 1080p on the ~2015-iGPU baseline, and a richer presentation on capable
-//! hardware — and only the first was ever built, so every machine ran the weakest
-//! machine's numbers. This module is the second half.
+//! NFR §1 specifies two quality levels — a reduced tier holding 60 fps
+//! at 1080p on the ~2015-iGPU baseline, and a richer presentation on
+//! capable hardware. This module is where both live.
 //!
 //! # What a tier is
 //!
@@ -15,18 +14,18 @@
 //! reaction-diffusion simulation grid, whose pattern scale moves with its
 //! resolution (ADR-0034) — deliberately does **not** live here.
 //!
-//! **That separation is a property of the consuming scene, not of this struct,
-//! and one scene broke it for four plans.** The attractor draws its particles
-//! with an *additive* blend into a linear accumulation, so
-//! [`attractor_particles`](TierConfig::attractor_particles) set the total light in
-//! the frame as directly as it set the sample count: `Rich` rendered every
-//! attractor preset three stops hot, behind a green suite, because no capture
-//! could pin `Rich` to see it. Fixed at its cause in Plan 0057 —
-//! [`deposit_scale`](super::scenes::particles::deposit_scale) divides the deposit
-//! by the count (ADR-0065), so the claim above holds again. The lesson
-//! generalizes: **a count feeding an accumulating pass is a look value until
-//! something normalizes it.** If a future field lands here for such a pass, that
-//! normalization is part of adding it.
+//! **That separation is a property of the consuming scene, not of this
+//! struct.** The attractor draws its particles with an *additive* blend
+//! into a linear accumulation, so
+//! [`attractor_particles`](TierConfig::attractor_particles) sets the
+//! total light in the frame as directly as it sets the sample count —
+//! `Rich` rendered every attractor preset three stops hot behind a
+//! green suite, because no capture pins `Rich`. What holds the claim up
+//! is [`deposit_scale`](super::scenes::particles::deposit_scale)
+//! dividing the deposit by the count (ADR-0065). The lesson
+//! generalizes: **a count feeding an accumulating pass is a look value
+//! until something normalizes it.** If a future field lands here for
+//! such a pass, that normalization is part of adding it.
 //!
 //! # Where the numbers come from
 //!
@@ -239,9 +238,6 @@ pub struct TierConfig {
     /// and its instance buffer are well under a megabyte at both tiers.
     pub emitter_objects: usize,
 
-    /// Ceiling on the segment count a line scene may draw in one frame, after
-    /// generation and mirror replication.
-    ///
     /// Ceiling on the warp mesh's grid, in **cells**, width then height
     /// (Plan 0100 Phase 1).
     ///
@@ -298,9 +294,7 @@ pub struct TierConfig {
     /// box does not model, and this is CPU work on the render thread, so a
     /// slower machine pays proportionally more of a budget it is already
     /// struggling to hold. `64x48` is 2.9 % here and leaves room for that
-    /// machine to be several times slower before the surface is a problem. Plan
-    /// 0100's own Risks note says as much: if the cap lands low, the honest
-    /// answer is a low cap and a recorded number.
+    /// machine to be several times slower before the surface is a problem.
     ///
     /// **When the floor tier is next exercised on real target hardware this is
     /// the constant to re-measure**, and the ladder prints exactly what that
@@ -330,57 +324,26 @@ pub struct TierConfig {
     /// # Where the floor value comes from
     ///
     /// **Measured, then decided by a human** — Plan 0113 Phases 2 and 3.
-    /// `core/tests/collage_cost.rs` sweeps the count on hardware and prints the
-    /// ladder on every run; its module docs carry the reading. Taken
-    /// **2026-08-25 on the development box**, 1920x1080, on that machine's
-    /// **integrated** GPU — which is much the closer model of the ~2015-iGPU
-    /// class `docs/nfr.md` §1 quotes the floor tier against than a discrete GPU
-    /// would be:
+    /// `core/tests/collage_cost.rs` sweeps the count on hardware, prints
+    /// the ladder on every run, and its module docs own the readings and
+    /// the trap in quoting them. **Two tables are not interchangeable**:
+    /// the pre-roster ladder is what the Phase 3 gate read, and the
+    /// post-roster table is what a canvas costs today — the eight-kind
+    /// roster made the loop cheaper, because rings, sectors and checker
+    /// patches shade far less of their own bounding box than a quad
+    /// does.
     ///
-    /// ```text
-    ///  elements    per frame    share of 16.67 ms
-    ///     8         2.113 ms       12.7 %
-    ///    16         2.794 ms       16.8 %
-    ///    24         3.597 ms       21.6 %
-    ///    32         4.383 ms       26.3 %
-    ///    40  <- Floor 4.824 ms     28.9 %
-    /// ```
-    ///
-    /// The cost is **linear at roughly 0.09 ms an element**, over an intercept
-    /// of about 1.5 ms that is the frame's own fixed cost at this size and not
-    /// this scene's to be charged for.
-    ///
-    /// **Do not quote the pre-Phase-3 sweep's numbers**, which ran rungs to 128
-    /// against the provisional cap and read nearly 4 ms higher at every rung
-    /// including the sparse ones. That instrument's absolute readings move with
-    /// its own total load on a power-shared iGPU; `collage_cost.rs` carries the
-    /// finding.
-    ///
-    /// **40 is the reference set's own top, not a budget line.** The gate that
-    /// set it was a look judgement, and the numbers were not the binding
-    /// constraint: the user's working density is **8 to 14 elements**, which on
-    /// the system **as shipped** costs **8.2 % at eight and 10.7 % at sixteen** —
-    /// and denser canvases were rejected on sight long before they were rejected
-    /// on cost.
-    ///
-    /// **Those two figures are from `collage_cost.rs`'s post-roster table, not
-    /// from the ladder above**, and the distinction is the whole reason this
-    /// sentence is on its third revision. The ladder above is what Phase 3 read,
-    /// and it is correctly frozen at what Phase 3 saw — *before* the eight-kind
-    /// roster landed, when a canvas was quads, circles and triangles. The roster
-    /// made the loop **cheaper**, because rings, sectors and checker patches
-    /// shade far less of their own bounding box than a quad does, so the
-    /// pre-roster ladder overstates the shipped cost by about half again (12.7 %
-    /// against 8.2 % at eight elements). Quote it for the gate's reasoning;
-    /// quote the post-roster table for what a canvas costs today. (This sentence
-    /// quoted 36-39 % until Plan 0113 Phase 9 — the pre-Phase-3 sweep's figures,
-    /// taken from the instrument the paragraph five lines up forbids quoting —
-    /// and then the pre-roster ladder's 12.7 % / 16.8 % until Phase 10.) The
-    /// ceiling then went to the densest canvas in ADR-0123's roster, Kandinsky's
-    /// *On White II*, which ADR-0123 counts at just above 40 once its lines and
-    /// arcs are included. So this value sits **exactly on** that canvas rather
-    /// than over it, and a `collage_onwhite` that needs a forty-first element
-    /// moves this number rather than being quietly truncated.
+    /// **40 is the reference set's own top, not a budget line.** The
+    /// gate was a look judgement and the cost was not the binding
+    /// constraint: the user's working density is **8 to 14 elements**,
+    /// which on the system as shipped costs **8.2 % of a 60 Hz frame at
+    /// eight and 10.7 % at sixteen**, and denser canvases were rejected
+    /// on sight long before they were rejected on cost. The ceiling is
+    /// the densest canvas in ADR-0123's roster, Kandinsky's *On White
+    /// II*, counted at just above 40 once its lines and arcs are
+    /// included — so this value sits **exactly on** that canvas, and a
+    /// `collage_onwhite` needing a forty-first element moves this
+    /// number rather than being quietly truncated.
     ///
     /// `Rich` is provisional in the sense every [`RICH`](TierConfig::RICH) value
     /// is — see that constant's own note.

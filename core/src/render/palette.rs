@@ -15,10 +15,10 @@
 //! (NFR 6). [`Palette::sample`] is allocation-free and runs per particle per
 //! frame (swarm), so this module carries the hot-path panic pragma.
 //!
-//! **The `spectrum` default is the exact current cosine**, so a preset that
-//! declares no `[palette]` renders identically to before this module existed —
-//! the shipped presets are unchanged until re-authored (the load-bearing
-//! no-regression guarantee, gated by a unit test comparing sampled colors).
+//! **The `spectrum` default *is* the cosine model exactly**, so a
+//! preset that declares no `[palette]` is unaffected by this module —
+//! the load-bearing no-regression guarantee, gated by a unit test
+//! comparing sampled colors.
 //!
 //! ## Saturation (the single source of truth)
 //!

@@ -3,27 +3,25 @@
 //! blur pyramid, and an additive recombine, so light that is genuinely *over
 //! range* spills into the pixels around it.
 //!
-//! # Why this could not be built before Phase 3
+//! # It reads linear light, and that is what makes the threshold mean anything
 //!
-//! A bright-pass is a **question about values above 1.0**, and until Phase 3 the
-//! composite had none: every hand-off wrote through an 8-bit gate, so a stroke at
-//! brightness 4 and a stroke at brightness 1 arrived here as the same white. A
-//! threshold over that frame selects *area*, not *energy*, which is exactly the
-//! "lifted floor makes the halo flat paint" failure design-backlog 0005 measured
-//! (ADR-0046, Alternative B). Now the stage reads
-//! [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT) linear light and
-//! `bloom_threshold` defaults to **1.0** — the value that means "bloom only what
-//! the display could not have shown anyway".
+//! A bright-pass is a **question about values above 1.0**. Over an
+//! 8-bit hand-off a stroke at brightness 4 and a stroke at brightness 1
+//! arrive as the same white, so a threshold selects *area*, not
+//! *energy* — ADR-0046's Alternative B, and the "lifted floor makes the
+//! halo flat paint" failure design-backlog 0005 measured. This stage
+//! reads [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT), and
+//! `bloom_threshold` defaults to **1.0**: bloom only what the display
+//! could not have shown anyway.
 //!
 //! # Off by default, and therefore absent by default
 //!
 //! `bloom_amount` defaults to 0, which reports [`active`](super::post::PostStage::active)
-//! `false`, which drops the stage from the frame entirely — no offscreens, no
-//! pyramid, no pipelines. That is the existing skip discipline (see
-//! [`trails`](super::trails) and [`kaleidoscope`](super::kaleidoscope)) and it is
-//! what makes this phase's "every existing baseline is byte-identical" claim
-//! structural rather than a tolerance: on a preset that does not bind
-//! `bloom_amount` the GPU never hears of this module.
+//! `false`, which drops the stage from the frame entirely — no offscreens, no pyramid, no
+//! pipelines. That is the skip discipline [`trails`](super::trails) and
+//! [`kaleidoscope`](super::kaleidoscope) follow, and it is what makes "a preset that does
+//! not bind `bloom_amount` is byte-identical" structural rather than a tolerance: the GPU
+//! never hears of this module.
 //!
 //! # The pyramid
 //!
@@ -62,15 +60,12 @@
 //! # The bind layouts are chosen, not stylistic
 //!
 //! The DX12 WARP software adapter hands a pipeline whose bind-group layout matches
-//! another live one *the other pass's resources*. The hazard itself is recorded in
-//! ADR-0058; it was twice-observed before this stage — first during Plan 0020's
-//! palette work, then on the tonemap in Plan 0045 Phase 3, where the wrong uniform
-//! reproduced to the byte — and a third time here, on the blur, which is why it now
-//! binds none (see [`Resources`]). Every layout this stage adds is a shape no other
-//! live pipeline in the engine has — **asserted, not claimed**, by
-//! `the_bloom_layouts_are_four_shapes_nothing_else_shares` in `tonemap/tests.rs`
-//! (Plan 0053 Phase 2). A table making that claim in prose asserts nothing, which
-//! is what the tonemap's comment did while its own claim was false:
+//! another live one *the other pass's resources* (ADR-0058). It bit this stage's
+//! blur, which is why the blur binds no uniform at all (see [`Resources`]). Every
+//! layout this stage adds is a shape no other live pipeline in the engine has —
+//! **asserted, not claimed**, by
+//! `the_bloom_layouts_are_four_shapes_nothing_else_shares` in `tonemap/tests.rs`.
+//! A table making that claim in prose asserts nothing:
 //!
 //! | pass                     | layout                               |
 //! |--------------------------|--------------------------------------|
@@ -101,13 +96,15 @@
 //! already opaque (`base.a = 1`) a non-zero halo does exactly that, which is why
 //! the symptom is a dark hole tracking the bloom.
 //!
-//! It shipped because every bloom fixture runs `bg_bright = 0` on purpose (a black
-//! backdrop makes the baseline measure the pyramid rather than the backdrop) — and
-//! on a black backdrop subtracting the backdrop and covering it are the same
-//! picture. `a_backdrop_under_an_active_halo_only_ever_adds_light` below is the
-//! guard that closes it, the same shape as `core/tests/kaleidoscope.rs`'s for the
-//! fold; **it reads the linear composite rather than a capture**, and its docs say
-//! why a display-byte version of the same assertion cannot be written.
+//! **Every bloom fixture runs `bg_bright = 0` on purpose** — a black
+//! backdrop makes the baseline measure the pyramid rather than the
+//! backdrop — and on a black backdrop subtracting the backdrop and
+//! covering it are the same picture, so no fixture here can see that
+//! defect. `a_backdrop_under_an_active_halo_only_ever_adds_light` below
+//! is the guard that does, the same shape as
+//! `core/tests/kaleidoscope.rs`'s for the fold; **it reads the linear
+//! composite rather than a capture**, and its docs say why a
+//! display-byte version of the same assertion cannot be written.
 //!
 //! # Every pass is orientation-preserving
 //!
