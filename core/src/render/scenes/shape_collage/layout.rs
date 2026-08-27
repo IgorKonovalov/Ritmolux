@@ -6,9 +6,8 @@
 //!
 //! # Four options, and one of them is a control
 //!
-//! Plan 0113 Phase 5 is a human gate that picks the composition from rendered
-//! samples, so this module's job is to make candidates **comparable**, not to
-//! make one of them good. Three grammars are offered:
+//! Three grammars, written to be **comparable** rather than for one of them to
+//! win:
 //!
 //! - [`Grammar::AnchorSatellites`] — one or two dominant elements carry the
 //!   canvas and the rest cluster around them, so the picture has a subject.
@@ -18,13 +17,11 @@
 //!   many small) with **position independent of size**, so the picture has a
 //!   range but no centre.
 //!
-//! The fourth, [`Grammar::Authored`], is not a grammar at all: it is the
-//! fourteen-element canvas Phase 1 shipped, kept as the **control** the three
-//! are judged against. It is the default, which is what keeps the golden
-//! baseline and the shipped preset from moving underneath Phase 5's decision —
-//! and it is the one composition a human has already approved, so throwing it
-//! away before that gate would have discarded the only fixed point the
-//! comparison has.
+//! The fourth, [`Grammar::Authored`], is not a grammar at all: it is a fixed
+//! fourteen-element canvas, kept as the **control** the three are judged
+//! against and as the human-approved fixed point of the comparison. It is the
+//! default, which is what holds the golden baseline and the shipped preset
+//! still while a grammar is being evaluated.
 //!
 //! # Determinism, and what it is a function of
 //!

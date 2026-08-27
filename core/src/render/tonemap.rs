@@ -31,25 +31,21 @@
 //! — so it is C1-continuous at the knee, strictly monotone, and bounded. At
 //! `k = 0.6`: `f(1) = 0.800`, `f(2) = 0.911`, `f(4) = 0.958`, `f(8) = 0.980`.
 //!
-//! **Hue-preserving** is a property of how the curve is applied, not of
-//! its shape: the scale factor `f(m)/m` is computed from the
-//! **brightest channel** `m` and applied to all three, so the ratios
-//! between R, G and B are exactly preserved and the roll-off never
-//! rotates a hue or washes a saturated core toward white. It is also
-//! gamut-safe by construction — the largest channel lands on `f(m) <
-//! 1`, so no channel can exceed 1 and be clipped by the 8-bit write.
-//! Plain Reinhard (`x / (1 + x)`) fails the near-identity requirement
-//! and is ADR-0046's rejected alternative: it maps 0.8 to 0.44.
+//! **Hue-preserving** is a property of how the curve is applied, not of its shape: the scale
+//! factor `f(m)/m` is computed from the **brightest channel** `m` and applied to all three, so the
+//! ratios between R, G and B are exactly preserved and the roll-off never rotates a hue or washes a
+//! saturated core toward white. It is also gamut-safe by construction — the largest channel lands
+//! on `f(m) < 1`, so no channel can exceed 1 and be clipped by the 8-bit write. Plain Reinhard
+//! (`x / (1 + x)`) fails the near-identity requirement and is ADR-0046's rejected alternative: it
+//! maps 0.8 to 0.44.
 //!
 //! # Why the output is 8-bit, not float
 //!
-//! The linear region ends *at this pass's input*: the tonemap writes
-//! display-referred values at the surface format into ink's input, or
-//! straight into the surface when ink is off. Targeting a float
-//! ink-input instead needs **two** tonemap pipelines — one per
-//! destination format — against the WARP pipeline-count hazard
-//! (ADR-0058). One pipeline, and ink's semantics are bit-for-bit
-//! unchanged.
+//! The linear region ends *at this pass's input*: the tonemap writes display-referred values at the
+//! surface format into ink's input, or straight into the surface when ink is off. Targeting a float
+//! ink-input instead needs **two** tonemap pipelines — one per destination format — against the
+//! WARP software adapter's documented sensitivity to pipeline count (ADR-0046). One pipeline, and
+//! ink's semantics are bit-for-bit unchanged.
 //!
 //! # The write dithers (Plan 0082, ADR-0096)
 //!

@@ -4,76 +4,60 @@
 //! fraction of the frame (`coverage`) and spreads across at least two quadrants
 //! (`quadrant_spread`) — "not blank, not a dot".
 //!
-//! **Plan 0058 / ADR-0067: the capture measures the scene, not the backdrop.**
-//! The frame's own corner is the tempting reference and it is the wrong one.
-//! `bg_vignette` darkens the frame toward its edges, so on any preset that
-//! binds one **pixel (0, 0) is the darkest pixel in the image** and nearly
-//! every pixel toward the centre differs from it by more than [`EPS`] — the
-//! backdrop reads as a large, well-spread, lit figure. 24 of the 35 shipped
-//! presets bind `bg_vignette` and the sparse-system floor is 0.01, so a corner
-//! reference satisfies the floor from the backdrop alone over most of the
-//! library, whatever the scene does. `spectrum_ridge` demonstrated it by
-//! shipping a contour drawn 3.3 world units off the top of a frame of
-//! half-height 1.0 and passing.
+//! # The reference is neither the frame's corner nor a fixed black
 //!
-//! So the roster this gate renders has its `bg_*` bindings **removed**
-//! ([`without_backdrop`]). The background stage already defaults `bright` and
-//! `vignette` to `0.0` (`core/src/render/background.rs`), so this is *not
-//! applying three bindings* rather than a new render path: the pass renders the
-//! plain black clear it renders for any preset that never mentions `bg_*`.
-//! Nothing outside this file changes — `golden`, `distinctness`, `reactivity`
-//! and `shot` all keep the shipped composite, backdrop included.
+//! Both are traps, and each one has already let a defect ship.
 //!
-//! **Plan 0116 / ADR-0126: the reference is derived from the frame, not fixed
-//! at black.** Suppressing the backdrop answered *whose light is this* and left
-//! a second question standing: what a scene that paints **its own** ground is
-//! measured against. Against a constant black it is measured against nothing —
-//! the paper is not black, so every pixel counts as lit and the frame scores as
-//! completely full whatever was drawn on it. That is not a corner case: the
-//! attractor's ink duotones and every fullscreen field read exactly `1.0000`,
-//! which made `coverage`, `quadrant_spread` and `radial_shell_occupancy`
-//! constants rather than measurements for a third of the library, and left an
-//! **emptied** canvas and a **broken** one as the same picture
-//! ([`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`]).
+//! **Not the corner** (ADR-0067). `bg_vignette` darkens the frame toward its
+//! edges, so on any preset that binds one **pixel (0, 0) is the darkest pixel in
+//! the image** and nearly every pixel toward the centre differs from it by more
+//! than [`EPS`] — the backdrop itself reads as a large, well-spread, lit figure,
+//! satisfying the sparse floor whatever the scene does. So the roster this gate
+//! renders has its `bg_*` bindings **removed** ([`without_backdrop`]). The
+//! background stage already defaults `bright` and `vignette` to `0.0`
+//! (`core/src/render/background.rs`), so this is *not applying three bindings*
+//! rather than a new render path. Nothing outside this file changes — `golden`,
+//! `distinctness`, `reactivity` and `shot` all keep the shipped composite.
 //!
-//! So [`ground`] estimates the reference per capture — the mean tone of the
-//! frame's most populous luminance band — and every statistic below asks the
-//! same question in both worlds: *how far does this picture depart from the
-//! ground it is drawn on?* A scene drawing light onto darkness is unaffected,
-//! because its modal band **is** the black it was already compared to; the
-//! estimator was measured against the whole library before it was threaded and
-//! moved no verdict. [`BLACK`] survives here as the historical reference the
-//! two-lens fixtures assert against, not as anything the gate reads.
+//! **Not a fixed black** (ADR-0126). A scene that paints its **own** ground is
+//! measured against nothing there: the paper is not black, so every pixel counts
+//! as lit and the frame reads exactly `1.0000` however little was drawn on it —
+//! which makes an emptied canvas and a broken one the same picture
+//! ([`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`]). So
+//! [`ground`] estimates the reference per capture, as the mean tone of the
+//! frame's most populous luminance band, and every statistic below asks the same
+//! question in both worlds: *how far does this picture depart from the ground it
+//! is drawn on?* A scene drawing light onto darkness is unaffected, its modal
+//! band **being** the black it was already compared to. [`BLACK`] survives as
+//! the reference the two-lens fixtures assert against, not as anything the gate
+//! reads.
 //!
-//! Coverage floors stay per-system, because the systems still differ by an order
-//! of magnitude in how much they paint — `fragment_field` fills the frame while
+//! # The floors are per-system, and there are three questions
+//!
+//! Coverage floors stay per-system because the systems differ by an order of
+//! magnitude in how much they paint — `fragment_field` fills the frame while
 //! `spectrum` draws a contour — so a single broad floor would be either
-//! tautological for one or impossible for the other. **Every floor was
-//! re-derived in Plan 0058 Phase 2**, each of them having been measured through
-//! a backdrop until then. They sit at half each system's lowest shipped preset
-//! and [`MAX_FLOOR_SLACK`] keeps them there; the `swarm` is not "sparse points"
-//! — that was folklore, and it measures `0.84`.
+//! tautological for one or impossible for the other. They sit at half each
+//! system's lowest shipped preset and [`MAX_FLOOR_SLACK`] keeps them there. The
+//! `swarm` is not sparse points: it measures `0.84`.
 //!
-//! **Plan 0058 Phase 3 adds a second excitation.** Every question above is asked
-//! of one fully-driven frame, which cannot see a figure that is fine at rehearsal
-//! level and gone at the top of its range.
-//! [`a_louder_frame_is_reported_against_a_quieter_one`] captures the library at
-//! [`MODERATE`] as well as [`LOUD`] and reports the ratio between them. It is a
-//! **report, not a gate** — the measurement in its doc comment is the argument,
-//! and the short version is that no threshold on that axis convicts any of the
-//! three known defective configurations while the nearest content to one is the
-//! attractor family's deliberate idiom. The second capture does buy one gate:
-//! [`MODERATE_MIN_COVERAGE`], that a preset is a picture at a realistic level.
+//! **A second excitation** (Plan 0058 Phase 3), because one fully-driven frame
+//! cannot see a figure that is fine at rehearsal level and gone at the top of
+//! its range. [`a_louder_frame_is_reported_against_a_quieter_one`] captures at
+//! [`MODERATE`] as well as [`LOUD`] and reports the ratio — a **report, not a
+//! gate**, since no threshold on that axis convicts any known defective
+//! configuration while the nearest content to one is the attractor family's
+//! deliberate idiom. The second capture buys one gate,
+//! [`MODERATE_MIN_COVERAGE`]: that a preset is a picture at a realistic level.
 //!
-//! **Plan 0056 Phase 5 adds a third question: does the shape have an interior?**
-//! "Not blank, not a dot" is satisfied completely by a fully saturated
-//! single-tone mass — a real figure, the right size, in every quadrant, and a
-//! blot. That is how four attractor presets shipped flat behind this gate, and
-//! `tonal_flatness` is the statistic that names it. It is general, not
+//! **A third question — does the shape have an interior?** "Not blank, not a
+//! dot" is satisfied completely by a fully saturated single-tone mass, which is
+//! a real figure, the right size, in every quadrant, and a blot. `tonal_flatness`
+//! is the statistic that names it, and it is general rather than
 //! attractor-specific: any drive that stacks past the additive ceiling produces
-//! it. It is also the one statistic the derived ground could **not** repair: a
-//! duotone has two large populations, and removing whichever is the ground
-//! leaves the other holding nearly all of what remains either way (ADR-0128).
+//! it. It is also the one statistic the derived ground **cannot** repair — a
+//! duotone has two large populations, so removing whichever is the ground leaves
+//! the other holding nearly all of what remains either way (ADR-0128).
 
 use lmv_core::{
     dsp::AnalysisFrame,
@@ -136,28 +120,21 @@ const BG_PREFIX: &str = "bg_";
 const MIN_QUADRANTS: u8 = 2;
 
 /// Maximum share of the lit figure that may sit inside one narrow luminance
-/// band (Plan 0056 Phase 5, backlog 0047) — the point past which the picture has
-/// no tonal structure left, only a mass of one tone.
+/// band — the point past which the picture has no tonal structure left, only a
+/// mass of one tone.
 ///
 /// # It is one of two terms, not a verdict
 ///
-/// Plan 0119 Phase 3, implementing ADR-0128 as settled by ADR-0130. Everything
-/// below this heading argues, from the library's own distribution, that a
-/// frame over this line **is** a blot. That argument was wrong about an idiom
-/// rather than about a number: a two-ink print reads near `1.0` here because
-/// being tonally flat is what a two-ink print *is*, and no ground estimator
-/// repairs it (Plan 0116 Phase 1 measured all three).
+/// Crossing this ceiling convicts nothing on its own. A preset is failed only
+/// when it is **also** below [`boundary_floor`] on `metrics::boundary_density` —
+/// whether the lit set has any interior, the orthogonal question ADR-0128 asked
+/// for and ADR-0130 settled. Read every measurement below as *the first half of
+/// a conjunction*: the distribution, the `0.0161` margin and the shelf life are
+/// all still true of this statistic, and none of them is a verdict.
 ///
-/// So crossing this ceiling convicts nothing on its own. A preset is failed
-/// only when it is **also** below [`boundary_floor`] on
-/// `metrics::boundary_density` — whether the lit set has any interior, the
-/// orthogonal question ADR-0128 asked for. Read every measurement below as *the
-/// first half of a conjunction*: the distribution it was taken from, the
-/// `0.0161` margin and the shelf life are all still true of this statistic, and
-/// none of them is a verdict any more.
-///
-/// The value is untouched by that change, which is deliberate — Plan 0119 moved
-/// the meaning of the check and not the constant in it.
+/// The reason the second term is needed rather than a wider ceiling: a two-ink
+/// print reads near `1.0` here because being tonally flat is what a two-ink
+/// print *is*, and no ground estimator repairs it (all three were measured).
 ///
 /// # Where the number came from
 ///
@@ -166,48 +143,29 @@ const MIN_QUADRANTS: u8 = 2;
 /// is a real shape, the right size, in every quadrant, and it is also a blot.
 /// This is the third question.
 ///
-/// **Measured, from the shipped library's own values.**
-/// `every_preset_draws_a_real_shape` prints the whole distribution on every run.
-/// **Re-measured under ADR-0067** (backdrop suppressed, compared against
-/// [`BLACK`]), because removing the backdrop changes which pixels are counted at
-/// all — and it changed this statistic more than it changed any other:
+/// **Measured from the shipped library's own values** under the ADR-0067 capture
+/// (backdrop suppressed, compared against [`BLACK`]).
+/// `every_preset_draws_a_real_shape` prints the whole distribution on every run;
+/// its top:
 ///
 /// ```text
-///          this measurement        corner-sampled
-/// 0.8839   Rose Web                0.8655  Spectrum Ridge
-/// 0.7211   Rose Trails             0.8300  Rose Trails
-/// 0.6755   Ink on Paper            0.7645  Rose Web
-/// 0.4249   Cathedral               0.6588  Coral
-/// 0.4107   Aurora                  0.6438  De Jong
-/// 0.3604   Supernova               0.4923  Coral Head
-/// 0.3147   Leviathan               0.4518  Coral Bloom
-/// 0.3014   Rose Overflow           0.4453  Leviathan
+/// 0.8839   Rose Web
+/// 0.7211   Rose Trails
+/// 0.6755   Ink on Paper
+/// 0.4249   Cathedral
+/// 0.4107   Aurora
+/// 0.3604   Supernova
+/// 0.3147   Leviathan
+/// 0.3014   Rose Overflow
 /// ```
 ///
-/// **The value did not move and the two numbers behind it did.** Read the
-/// columns against each other rather than down:
-///
-/// - `Spectrum Ridge` fell `0.8655` → **`0.1916`**, off the table entirely. It
-///   was never a flat *preset*; it was a lit `bg_vignette` measured as if it were
-///   one, which is [`KNOWN_FLAT`]'s note and the whole of ADR-0067's case. `Coral`
-///   (`0.6588` → `0.2681`) and `De Jong` (`0.6438` → `0.2606`) were the same
-///   error at lower amplitude.
-/// - `Rose Web` went the other way, `0.7645` → `0.8839`, and now tops the
-///   distribution. Nothing about the preset changed. The vignette had been
-///   contributing a broad spread of mid-tones that diluted the share sitting in
-///   any one band; with it gone, what is left is the figure, and a web of
-///   near-equal-brightness strokes genuinely has very little tonal structure.
-///   The number is worse because it is now honest.
-///
-/// **Re-measuring does not widen the `0.035` margin** — a finding rather than a
-/// reason to move the constant. The margin above the library is now **`0.0161`**
-/// (`0.90` over `Rose Web`'s `0.8839`), narrower than before. Below, the
-/// deliberately flattened fixture reads `0.9815`, so `0.90` still separates the
-/// library from the fixture, but it sits `0.0161` above one and `0.0915` below
-/// the other — not a midpoint. `0.90` is left where it is because the margin
-/// narrowed for a *real* reason: the top of the distribution is now an actual
-/// figure with an actual tonal problem, and a preset drifting over the ceiling is
-/// a preset to route, not a constant to nudge.
+/// **The margin above the library is `0.0161`** (`0.90` over `Rose Web`), and
+/// the deliberately flattened fixture reads `0.9815` — so `0.90` separates the
+/// library from the fixture but sits `0.0161` above one and `0.0915` below the
+/// other, **not a midpoint**. It is left there because the margin narrowed for a
+/// real reason: the top of the distribution is an actual figure with an actual
+/// tonal problem, and a preset drifting over the ceiling is a preset to route,
+/// not a constant to nudge.
 ///
 /// The top three are structural rather than accidental — a trails-heavy line
 /// look is mostly faint tail at one level, a web is mostly stroke, and
@@ -346,16 +304,14 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 
 /// Per-system minimum lit fraction, **measured from the shipped library** under
 /// the ADR-0067 capture (backdrop suppressed) against the frame's own derived
-/// ground (ADR-0126, Plan 0116 Phase 3) — not against [`BLACK`], which is what
-/// every number below the 2026-08-26 block was measured against.
+/// ground (ADR-0126).
 ///
-/// **Five floors were re-derived on 2026-08-26 (Plan 0116 Phase 4) and six were
-/// not, and the split is measured rather than chosen.** The derived ground only
-/// moves a preset that paints its own; for a scene drawing light onto darkness
-/// the modal band *is* the black it was already compared to, and the coverage
-/// comes back identical to the digit. So the families whose minimum moved are
-/// re-derived here, and the families whose minimum did not are left exactly as
-/// they were — there is nothing in them to re-measure.
+/// **Each floor is half its system's lowest shipped preset**, so the gap is a
+/// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. Five floors
+/// were re-derived on 2026-08-26 and six were not, and the split is measured
+/// rather than chosen: the derived ground only moves a preset that paints its
+/// own, so for a scene drawing light onto darkness the modal band *is* the black
+/// it was already compared to and the coverage comes back identical to the digit.
 ///
 /// ```text
 /// system              floor          family minimum              why
@@ -371,145 +327,46 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// reaction_diffusion  0.09           0.1603 Mitosis (unmoved)         lit-on-dark
 /// ```
 ///
-/// `shape_field` is in that first group for a different reason: its minimum did
-/// not move, but the arm claimed the family "has zero shipped members", and
-/// `Facet` and `Pulse` both ship. That claim is false, and the floor here is
-/// derived from the distribution.
+/// **The table is a snapshot; the distribution `every_preset_draws_a_real_shape`
+/// prints on every run is authoritative.** Upward drift in a family minimum is
+/// the safe direction and [`MAX_FLOOR_SLACK`] is what eventually calls it.
 ///
-/// Each floor is set at half its system's lowest shipped preset, so the gap is a
-/// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
-/// distribution is printed by `every_preset_draws_a_real_shape` on every run;
-/// the lowest member and the resulting factor per system:
+/// # Two traps for whoever re-measures
 ///
-/// ```text
-/// system              floor   lowest preset            factor
-/// fragment_field      0.50    0.9926  Kaleido Field      1.99
-/// swarm               0.42    0.8407  Storm              2.00
-/// parametric_curve    0.33    0.6722  Rose Trails        2.04
-/// lsystem             0.50    1.0000  Vellum             2.00
-/// star_pattern        0.34    0.6908  Star Lantern       2.03
-/// reaction_diffusion  0.09    0.1910  Verdigris          2.12
-/// attractor           0.18    0.3442  Leviathan          1.91
-/// spectrum            0.28    0.5843  Halo               2.09
-/// ```
+/// **`ink_*` is a terminal engine stage rather than a `bg_*` binding, so no
+/// backdrop suppression reaches it.** This is the only place in the tree that
+/// records it, and any future lens assuming a suppressed frame is dark will be
+/// wrong here for the same reason the [`BLACK`] predicate was: a preset setting
+/// `ink_amount = 1` renders paper-white, every pixel differs from black, and the
+/// frame reads `1.0000` as a measurement artifact rather than a saturated figure.
 ///
-/// **This table is a snapshot and the printed distribution is authoritative.**
-/// As of 2026-08-06 three rows have drifted *upward* without any floor needing
-/// to move — `swarm`'s minimum is now `0.6208` Starfield (slack `1.48`),
-/// `attractor`'s is `0.2356` Lorenz (`1.31`), and `emitter` postdates the table
-/// entirely at `0.25` against `0.3086` Squall (`1.23`). Upward drift is the safe
-/// direction and [`MAX_FLOOR_SLACK`] is what will eventually call it; the rows
-/// are left as written because the prose below narrates the numbers in them.
+/// **A `1.0000` in any older record is a [`BLACK`]-predicate reading, not a
+/// current one.** Against the derived ground the two presets that produced them
+/// read `0.2167` and `0.2917`, which is what the `SystemKind::Attractor` arm
+/// below is half of. Quoting a historical reading as current is the mistake.
 ///
-/// **The `star_pattern` floor went to `0.12` on 2026-08-06 and came back to
-/// `0.34` the same day, and both moves were correct.** Plan 0065 filled the
-/// interior of that scene with three ring-mandala presets measuring `0.2442` /
-/// `0.2505` / `0.2544`, which moved the family minimum below the floor, so the
-/// floor was re-derived to `0.2442 / 2 = 0.12` exactly as the rule below says to.
-/// Then the user rejected all three on sight in the running app and they were
-/// **retired**, taking the minimum back to `0.6908` Star Lantern and the floor
-/// back to `0.34`.
+/// # What the factor of 2 costs, stated rather than discovered
 ///
-/// **Keep the round trip in mind before treating a re-derivation as permanent.**
-/// The reason the presets were cut is not the reason the floor moved: every motif
-/// in that scene is a parametric outline *sampled to straight segments*, so the
-/// vertices are visible and a circle reads as a polygon — a ceiling on the
-/// approach, not a tuning miss (design-backlog 0073). The mandala look now ships
-/// as `reaction_gilt`, an analytic iso-contour field folded by `kaleido_order`,
-/// where there is no geometry and so no vertex at any resolution.
-///
-/// **What the episode still proves about this measure stands, and it is filed.**
-/// At this test's 96x96 capture a hairline over a 46-fold ornament aliases to
-/// almost nothing, so `coverage` on that content measured the halo and the trail
-/// rather than the figure — the bare rosette and the 46x-denser mandala scored
-/// *identically*, and 54 % more geometry moved the number 2.6 %. See
-/// design-backlog 0072, which stays open at medium-high and asks for a structural
-/// occupancy measure; nothing about retiring the presets answers it.
-///
-/// **The attractor floor moved on 2026-08-03 and the mechanism above is why it
-/// was noticed rather than missed.** It was `0.12` against `0.2461` De Jong.
-/// Plan 0057 Phase 6 re-raised the exposure of Clifford, De Jong and Leviathan,
-/// undoing a compensation `00d99d0` had carried for a 3x deposit that ADR-0065
-/// removed, and the family's minimum rose to `0.3785`, moving from De Jong to
-/// **Leviathan**. That put the slack at `3.15x` and
-/// [`report_coverage_distribution`] failed the run with the number, which is
-/// exactly the shelf life this constant was given. The floor is re-derived
-/// from the printed distribution, not nudged until green. The family read
-/// `0.3785 Leviathan`, `0.4746 De Jong`, `0.5381 Lorenz`, `0.7817 Clifford`,
-/// `1.0000 Ink on Paper`, `1.0000 Thomas`.
-///
-/// **Every attractor number above fell on 2026-08-04 (Plan 0059 Phase 1b) and the
-/// floor did not have to move.** ADR-0070 stopped the trail sampling its own
-/// target mirrored, so each figure is one copy rather than `figure ∪
-/// mirror(figure)` — strictly less lit area, by 6-13 %. The family now reads
-/// `0.3442 Leviathan`, `0.4480 De Jong`, `0.5268 Lorenz`, `0.6831 Clifford`,
-/// `1.0000 Ink on Paper`, `1.0000 Thomas`, putting the slack at `1.91x`. It is
-/// recorded rather than acted on because the floor is still inside
-/// [`MAX_FLOOR_SLACK`], and Plan 0059 Phase 4 re-authors this whole family
-/// against the un-doubled figure — re-deriving the constant now would set it from
-/// exposure nobody has judged yet.
-///
-/// Reaction-diffusion is unchanged here **and that is a result, not an
-/// omission**: Phase 1b moved its three passes to the same prelude, which
-/// reversed the direction a positive `pan_y` scrolls the field and moved `Coral`
-/// to `0.1546` (slack `2.21x`, failing this gate by a hair). The phase restored
-/// the sign rather than re-measuring the floor, and `Coral` returned to `0.1420`
-/// exactly — which is the evidence that the reversal, not the un-mirroring, was
-/// what moved it.
-///
-/// Two of that six deserve a note, because a reader checking the arithmetic
-/// will trip on them. **Under the [`BLACK`] predicate this table was taken
-/// against**, `Ink on Paper` and `Thomas` both read exactly `1.0000`, and for
-/// `Ink` that was a **measurement artifact rather than a saturated figure**: it
-/// sets `ink_amount = 1`, and the ink remap is a terminal engine
-/// stage, not a `bg_*` binding, so ADR-0067's backdrop suppression does not
-/// reach it - the whole frame is paper-white and every pixel differs from
-/// [`BLACK`]. Its tonal flatness (`0.6756`) is the statistic that actually
-/// described it.
-///
-/// **That artifact is gone as of 2026-08-26** (ADR-0126, Plan 0116 Phase 3):
-/// against the frame's own derived ground the same two presets read `0.2167`
-/// and `0.2917`, which is what the `SystemKind::Attractor` arm below is now
-/// half of. The `1.0000` above is kept rather than overwritten because it is
-/// what the floors in the table around it were derived from — but it is a
-/// **historical** reading, and quoting it as a current one is the mistake this
-/// paragraph exists to prevent.
-///
-/// **The mechanism sentence outlives the number**, and this is the only place
-/// in the tree that records it: `ink_*` is a terminal engine stage rather than
-/// a `bg_*` binding, so no backdrop suppression reaches it, and any future lens
-/// that assumes a suppressed frame is dark will be wrong here for the same
-/// reason this one was.
-///
-/// `Lorenz` was deliberately left un-retuned pending Plan 0057
-/// Phase 5, so its `0.5381` is a pre-retune number and will move again.
-///
-/// **These numbers replace floors that could not be failed.** Under the old
-/// corner-sampled measurement the same six sparse systems all read `0.01` and
-/// `bg_vignette` cleared that on its own; the pre-repair `spectrum_ridge` scored
-/// `0.5421` while drawing nothing at all
-/// (`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`). Re-deriving
-/// them was not optional bookkeeping — a floor derived from inflated numbers is
-/// not a floor (ADR-0067).
-///
-/// **What the factor of 2 costs, stated rather than discovered.** This is
-/// deliberately the sensitive end of the range, unlike
+/// This is deliberately the sensitive end of the range, unlike
 /// [`SATURATED_OCCUPANCY`](lmv_core::preset::SATURATED_OCCUPANCY), which took a
-/// wide margin because a HARD gate that fires on good content buys exemptions.
-/// The difference is what "wrong" looks like on each side: an over-driven clamp
-/// is a *number* that stopped moving and a generous threshold still catches it,
-/// whereas an off-frame figure is a *picture that is not there*, and the sparsest
-/// legitimate content in this library still paints twice the floor. A new preset
-/// that fails one of these has drawn less than half of what the thinnest shipped
-/// member of its own family draws, which is worth a look even when it turns out
-/// to be fine.
+/// wide margin because a HARD gate firing on good content buys exemptions. The
+/// difference is what "wrong" looks like on each side: an over-driven clamp is a
+/// *number* that stopped moving and a generous threshold still catches it,
+/// whereas an off-frame figure is a *picture that is not there*. A new preset
+/// failing one of these has drawn less than half of what the thinnest shipped
+/// member of its own family draws, which is worth a look even when it is fine.
 ///
-/// Three families vary internally by 3-5x (`attractor` 0.2461-1.0000, `spectrum`
-/// 0.1189-0.5541, `reaction_diffusion` 0.1420-0.4427), so their floors sit over
-/// the most movement and are the ones most likely to need a re-measure. The
-/// response to a legitimately sparser new preset is to re-derive that system's
-/// floor from the printed distribution, and to say in the commit which preset
-/// moved the minimum — not to nudge a constant back until the run goes green.
+/// One caveat on the statistic itself: at this test's 96x96 capture a hairline
+/// over a dense ornament aliases to almost nothing, so `coverage` there measures
+/// the halo and the trail rather than the figure — a bare rosette and a 46x-denser
+/// mandala scored *identically*. design-backlog 0072 stays open on it and asks
+/// for a structural occupancy measure.
+///
+/// The families that vary internally by 3-5x sit over the most movement and are
+/// the ones most likely to need a re-measure. The response to a legitimately
+/// sparser new preset is to re-derive that system's floor from the printed
+/// distribution, and to say in the commit which preset moved the minimum — not
+/// to nudge a constant back until the run goes green.
 fn coverage_floor(system: SystemKind) -> f32 {
     match system {
         // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.50. The old number
@@ -627,13 +484,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
 
 /// Per-system minimum [`boundary_density`] — the **second term** of the flatness
 /// conjunction, below which a frame that is also over [`MAX_TONAL_FLATNESS`] is
-/// convicted as a blot (Plan 0119 Phase 3, ADR-0130).
+/// convicted as a blot (ADR-0130).
 ///
-/// # Why it is per system, which is a measurement and not a convenience
+/// # Per system, which is a measurement and not a convenience
 ///
 /// A single global number is provably impossible on this library. The floor must
 /// sit **above** the frozen `Blown Out` blot's `0.2631` to convict it, and
-/// **below** `Suprematist`'s `0.2565` to admit a mono conversion of a ADR-0123
+/// **below** `Suprematist`'s `0.2565` to admit a mono conversion of an ADR-0123
 /// flat-graphic composition. `Suprematist` scores *under the purpose-built
 /// defect*, so no such number exists and the split is forced. The mechanism is
 /// the one [`coverage_floor`] already uses in this file.
@@ -646,37 +503,31 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// two places — `1.18x` above the defect and `1.16x` below the composition.
 ///
 /// It is **not** *half the sparsest legitimate content*, the ceremony every
-/// `coverage_floor` arm above follows, and the reason is not laziness. A
+/// `coverage_floor` arm above follows, and the reason is structural: a
 /// conjunction's second term is only ever asked about frames that already failed
-/// the first, and conditioned that way the population has **two members**: the
-/// blot and the one preset this change exists to admit. Half-the-sparsest would
-/// therefore be derived from the very frame being admitted, which is circular.
-/// A claim of a derived floor on this arm is the exact error ADR-0129 was
-/// written to stop, so the arm claims a two-point measurement instead and
-/// carries its own risk in the open: **the first genuinely flat preset from a
-/// third family is what tests this number, and it does not exist yet.**
+/// the first, and conditioned that way the population has **two members** — the
+/// blot and the one preset this arm exists to admit. Half-the-sparsest would be
+/// derived from the very frame being admitted, which is circular (ADR-0129). So
+/// the arm claims a two-point measurement and carries its risk in the open:
+/// **the first genuinely flat preset from a third family is what tests this
+/// number, and it does not exist yet.**
 ///
 /// **`0.13` is the ordinary ceremony** — half the sparsest legitimate member of
-/// the family (`Suprematist`, `0.2565`), exactly how every coverage floor above
-/// is set. It leaves `Suprematist` at `1.97x` and `On White` at `2.36x` above
-/// their own floor, so both survive a mono conversion with room.
+/// the family (`Suprematist`, `0.2565`). It leaves `Suprematist` at `1.97x` and
+/// `On White` at `2.36x` above their own floor, so both survive a mono
+/// conversion with room.
 ///
 /// # Why `shape_collage` earns an arm where an idiom flag would not
 ///
-/// Not a preference and not a style exemption. ADR-0123 holds that family's
-/// whole canvas under ADR-0046's tonemap knee, which gives up the engine's
-/// entire over-range vocabulary — no bloom, no glow, no highlight modelling and
-/// no over-range path at all. **The additive stacking that produced `Blown Out`,
-/// and that put four attractor presets into the library flat, cannot occur
-/// there.** The family is structurally exempt from the defect, so it is exempt
-/// from the term that catches it. That is what distinguishes this from the
-/// `palette_steps` scoping ADR-0129 Alternative B rejected: a `SystemKind`
-/// selects a different renderer, where a param is a one-line edit any preset can
-/// make and so an exemption reachable by declaration.
-///
-/// A `shape_collage` blot would not be caught at `0.13`. Accepted on the
-/// argument above, which is a claim about the *renderer* — if that family ever
-/// gains an over-range path, this arm is re-opened with it.
+/// ADR-0123 holds that family's whole canvas under ADR-0046's tonemap knee,
+/// giving up the engine's entire over-range vocabulary — no bloom, no glow, no
+/// highlight modelling. **The additive stacking that produced `Blown Out` cannot
+/// occur there**, so the family is structurally exempt from the defect and
+/// therefore from the term that catches it. A `SystemKind` selects a different
+/// renderer, where a param is a one-line edit any preset can make — which is
+/// what separates this from the idiom scoping ADR-0130 rejected. A
+/// `shape_collage` blot would not be caught at `0.13`; if that family ever gains
+/// an over-range path, this arm is re-opened with it.
 ///
 /// # Every other family is un-derived on purpose
 ///
@@ -685,11 +536,10 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// has never been asked about them. **22 of the 42 shipped presets read below
 /// their family's floor today and pass only because term one clears them** —
 /// `every_preset_draws_a_real_shape` prints that count on every run. Converting
-/// one of those to a two-ink print raises its flatness toward `1.0` and leaves
-/// its boundary alone, so **each such conversion needs its own arm with its own
-/// derivation** before it can ship. That is a per-family decision, not a
-/// constant to nudge, and for `attractor` it is a real fork: the ceremony-derived
-/// number there is `0.0220`, `12x` below the blot and vacuous.
+/// one to a two-ink print raises its flatness toward `1.0` and leaves its
+/// boundary alone, so **each such conversion needs its own arm with its own
+/// derivation** before it can ship. For `attractor` that is a real fork: the
+/// ceremony-derived number there is `0.0220`, `12x` below the blot and vacuous.
 fn boundary_floor(system: SystemKind) -> f32 {
     match system {
         // Half the sparsest legitimate member of the family (`Suprematist`,
@@ -1842,7 +1692,7 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
 /// is still being drawn.
 const MODERATE_MIN_COVERAGE: f32 = 0.04;
 
-/// **Plan 0058 Phase 3 — "more audio must not mean less picture", measured.**
+/// **"More audio must not mean less picture", measured.**
 ///
 /// Captures every preset at [`MODERATE`] and [`LOUD`] and reports
 /// `coverage(loud) / coverage(moderate)` — a ratio against the preset's own
@@ -1851,9 +1701,7 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 ///
 /// # This ships as a report, not as a gate, and the measurement is why
 ///
-/// Either outcome was authorized and the choice left to the numbers.
-/// They came back like this — the whole library, plus the pre-repair
-/// ridge as a control:
+/// The whole library, plus the pre-repair ridge as a control:
 ///
 /// ```text
 ///  ratio   cov@0.4  cov@1.0  preset
@@ -1869,42 +1717,30 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 ///     inf   0.0000   0.0000  Spectrum Ridge (pre-repair)
 /// ```
 ///
-/// **No threshold on this axis convicts anything it was built for.** Three known
-/// defective configurations exist and the ratio reaches none of them:
+/// **No threshold on this axis convicts anything it was built for**, and that is
+/// the trap for whoever tries to arm one. `Spectrum Comb` was the live candidate
+/// and scores `1.0891` — it draws *more* when loud, because a comb roots every
+/// bar on a shared baseline, so clipping the tips off the tallest bars costs a
+/// rounding error of coverage while the body of the figure stays put. The layout
+/// the check was designed around is the layout it cannot see. `Spectrum Corona`
+/// is the same at `1.0514`. The pre-repair ridge is `0/0`: its contour is already
+/// off frame at [`MODERATE`], and a ratio needs a denominator.
 ///
-/// - **`Spectrum Comb` does not fail. It scores `1.0891` — it draws *more* when
-///   loud.** It was the live candidate and it came back clean: a comb roots
-///   every bar on a shared
-///   baseline, and clipping the tips off the tallest bars costs a rounding error
-///   of coverage while the body of the figure stays exactly where it was. The
-///   layout the check was designed around is the layout it cannot see.
-/// - **`Spectrum Corona` is the same at `1.0514`**, for the same reason.
-/// - **The pre-repair ridge is `0/0`, undefined.** Its contour is already off
-///   frame at `MODERATE` (`scale = 3.20` puts a driven element ~1.9 world units
-///   up at level `0.4`, against a half-height of `1.0`), so there is no
-///   moderate-excitation picture to compare the loud one against. A ratio needs a
-///   denominator and a total defect does not have one.
-///
-/// Meanwhile the only content anywhere near a plausible threshold is **correct**:
-/// `De Jong` at `0.8552` and `Leviathan` at `0.9568` are the attractor family's
-/// deliberate *peak buys structure* idiom, which ADR-0062's Alternatives records
-/// as real and as the reason a directional assertion was rejected there too. A
-/// gate at `0.80` would sit `0.055` from `De Jong` — tight enough that a retune
-/// trips it — while catching none of the three cases above. That trade is
-/// strictly negative: every unit of sensitivity buys risk of convicting the
-/// attractor idiom and zero demonstrated detection.
+/// Meanwhile the only content near a plausible threshold is **correct** — `De
+/// Jong` at `0.8552` and `Leviathan` at `0.9568` are the attractor family's
+/// deliberate *peak buys structure* idiom, which ADR-0062 records as real. A gate
+/// at `0.80` would sit `0.055` from `De Jong`, tight enough that a retune trips
+/// it, while catching none of the three cases above.
 ///
 /// So the ratio is printed, watched, and not enforced. What *is* enforced here is
 /// [`MODERATE_MIN_COVERAGE`], the one property the second capture supports: a
 /// preset must be a picture at a realistic level, not only when fully driven.
 ///
-/// **What this means for the class this instrument aims at.** The over-scale
-/// defect is real and this instrument does not reach it — pixel coverage is the
-/// wrong measure for a figure whose *tips* leave the frame, because tips are
-/// almost no pixels. ADR-0067 already names the successor: an in-frame **geometry
-/// fraction**, rejected there as the primary mechanism but explicitly kept as the
-/// supplement for the line and spectrum families. This measurement is the
-/// evidence that it is now wanted.
+/// **The over-scale defect is real and this instrument does not reach it** —
+/// pixel coverage is the wrong measure for a figure whose *tips* leave the frame,
+/// because tips are almost no pixels. ADR-0067 names the successor, an in-frame
+/// **geometry fraction**, kept there as the supplement for the line and spectrum
+/// families; this measurement is the evidence that it is wanted.
 #[test]
 fn a_louder_frame_is_reported_against_a_quieter_one() {
     let Some(mut renderer) = headless() else {
@@ -2780,47 +2616,34 @@ struct StructureRow {
 ///
 /// # This gates nothing, and cannot
 ///
-/// It is `#[ignore]`d and contains no assertion, for the reason Phase 1's
-/// harness carries: a report built to inform a **stop gate** must not be able to
-/// redden CI on its own, or the gate is decided by whichever candidate happens
-/// to be green.
+/// It is `#[ignore]`d and contains no assertion: a report built to inform a
+/// **stop gate** must not be able to redden CI on its own, or the gate is
+/// decided by whichever candidate happens to be green.
 ///
 /// # The stop condition, which is mechanical
 ///
-/// ADR-0129's three parts, all of which must hold for one candidate column:
-///
-/// 1. **Separation.** `Blown Out` reads below `Tiled Rosette Mono`.
-/// 2. **Nothing convictable in the gap.** No shipped frame lies between them
-///    *whose own `tonal_flatness` is above [`MAX_TONAL_FLATNESS`]* — no other
-///    frame can reach a second term. Frames in the gap below the ceiling are
-///    printed with their flatness, as reported and not disqualifying, so the
-///    reading is checkable rather than asserted. The criterion is judged over
-///    the conditional population, never over the whole library.
-/// 3. **A threshold convicts the blot.** With two members in the conditional
-///    population, *half the sparsest legitimate content* is not available — the
-///    one legitimate member is the preset being admitted, so deriving from it
-///    would be circular. The number is therefore a measurement between the two
-///    frozen fixtures, and the report prints the margin and the column's
-///    legitimate spread beside it so "with margin" is judgeable rather than
-///    declared.
-///
-/// If no candidate passes all three, the search stops: ADR-0129 gains a dated
-/// `Outcome` and `fragment_tiledmono` stays held. The report prints that verdict
-/// per candidate rather than leaving it to be read off the rows.
+/// ADR-0129's three parts, all of which must hold for one candidate column —
+/// separation, nothing convictable in the gap, and a threshold that convicts the
+/// blot with margin. Two things the report does rather than assumes: the
+/// gap criterion is judged over the **conditional** population (frames in the
+/// gap below [`MAX_TONAL_FLATNESS`] are printed with their flatness, as reported
+/// and not disqualifying), and the third part's number is a measurement between
+/// the two frozen fixtures rather than a derived floor, so the margin and the
+/// column's legitimate spread are printed beside it. If no candidate passes all
+/// three the search stops, and the report prints that verdict per candidate
+/// rather than leaving it to be read off the rows.
 ///
 /// # Thin-stroke content is in the table on purpose
 ///
-/// Design-backlog 0072 measured that a hairline over a 46-fold ornament aliases
-/// to almost nothing at 96×96, which is what made `coverage` a halo-meter. A
-/// boundary-length measure is exactly the kind of statistic that could inherit
-/// that failure, so the three frozen [`retired_mandalas`] are rows here rather
-/// than assumed safe.
+/// A hairline over a 46-fold ornament aliases to almost nothing at 96×96, which
+/// is what made `coverage` a halo-meter (design-backlog 0072). A boundary-length
+/// measure is exactly the kind of statistic that could inherit that failure, so
+/// the three frozen [`retired_mandalas`] are rows here rather than assumed safe.
 ///
 /// Run it with:
 ///
 /// ```text
-/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
-///     each_structure_candidate_is_tabled_against_the_library --no-capture
+/// cargo nextest run -p lmv-core --test sanity --run-ignored all ///     each_structure_candidate_is_tabled_against_the_library --no-capture
 /// ```
 #[test]
 #[ignore = "measurement, not a gate: this informs a mechanical stop condition"]

@@ -280,13 +280,17 @@ flowchart TB
   the backlog step removed. On `main` the hook stops earlier, at `check-backlog-claims.mjs` — see
   Close triggers.
 - Phases 6 and 7's "no block over 40 lines survives unless the log names it": **70 survive**, named
-  below.
+  below. **Phase 7 was reopened at the close review** — see `### Close-review repairs`.
 
 **Kept rather than deleted, per the Decision's rule — the fact is in no document.**
 
 - `core/src/render/kaleidoscope.rs:1` — the argument for authoring `kaleido_zoom` in **rings**
   rather than in `log r` ("only one spelling survives re-tuning `kaleido_radial`"). Neither ADR-0077
   nor Plan 0064 records it.
+- `core/tests/sanity.rs:209` — `MIN_STRUCTURAL_SHELLS`'s two reasons for taking the structural
+  measure over a per-family thin-stroke floor. Plan 0075 Phase 1 names the two candidate mechanisms
+  and says *"Choose at implementation and record why in the test"*, so the argument was required to
+  live here and no document holds it. Kept whole (close-review pass).
 - `core/src/render/tier.rs:241` — the quoted tier rule *"lower if it does not measure clean"* is in
   no ADR or plan. The attribution was dropped and the fact kept as prose.
 
@@ -327,6 +331,57 @@ flowchart TB
 
 - `check-backlog-claims.mjs`'s advisory names 41 probed paths as moved since their entries were
   stamped, which is this sweep touching 130 files rather than any entry going stale.
+- `docs/plans/done/0075-the-content-renaissance.md` Phase 1 links backlog 0072 by anchor
+  (`design-backlog.md#0072--...`). That entry is now in `design-backlog-archive.md`, so the fragment
+  no longer resolves. `check-doc-links.mjs` does not validate fragments and reports the file as fine.
+
+### Close-review repairs
+
+The Mode 4 review returned two majors; both are repaired in the commit carrying this section, and
+the counts recorded above it are the pre-repair readings.
+
+- **`core/src/render/tonemap.rs` cited ADR-0058 for a hazard ADR-0058 does not record.** Phase 6
+  replaced the prose *"against this plan's own documented WARP pipeline-count risk"* with
+  `(ADR-0058)`, which is the bind-group-layout collision decision. The pipeline-count sensitivity is
+  ADR-0046's, stated in its Consequences and in Plan 0045's Risks. Corrected to ADR-0046.
+- **Phase 7 was completed rather than left at its 5-line delivery.** Three of the four lanes the
+  plan named as contended have since closed; only `plan-0098-nested-figure` is live, and it holds
+  four files. Those four are **untouched and held**: `scenes/marks.rs` (68 lines),
+  `scenes/marks/tests.rs`, `scenes/shape_field.rs` (42) and `scenes/shape_field/tests.rs`.
+
+Phase 7's scope went **1,542 -> 1,306 lines** in blocks of 40+ (1,432 -> 1,196 excluding the two
+held blocks). Workspace-wide: **41,110 -> 40,906** comment lines. `core/tests/sanity.rs`, the file
+the plan called the heaviest in the sweep, went **565 -> 352** across 7 blocks -> 6.
+
+**Twenty-four blocks of 40+ survive in this scope, and what needs the length:**
+
+- **A derivation from the code's own arithmetic, or a formula a reader cannot redo** (7):
+  `sanity.rs:305` (the floor table and the half-rule), `sanity.rs:485` (two arms of different kinds
+  per ADR-0071, each with its own derivation), `metrics.rs:589` (the geometric-tail extrapolation
+  and the 8-bit-quantum trap under it), `emitter.rs:1` (closed-form position and death time),
+  `star.rs:1` (the congruent-segment argument for the flat ramp), `warp_mesh/tests.rs:183` (the
+  branch cut and handedness, both read off `vertex_position` rather than a picture),
+  `lines/renderer/tests.rs:436` (the alpha-1 backdrop-discard seam).
+- **A dated measurement carrying the configuration it was taken on** (7): `sanity.rs:122` (the
+  flatness distribution and the `0.0161` margin), `sanity.rs:1695` (the loud/moderate ratio table
+  and why no threshold on that axis convicts anything), `star.rs:1` (step size, rebuild cost, the
+  `1.2e-7` spread, the 60 % / 87 % extents), `warp_mesh/draw.rs:1` (28.5 % of the corpus at
+  `fDecay >= 1.0`, 2 949 of 10 347), `warp_mesh/tests.rs:885` + `:1312` (the field instrument and
+  the decay-domain hypothesis, both skipping with a notice per ADR-0016),
+  `lines/star/tests.rs:1643` (a ratio stated as a property, ADR-0071), `lines/renderer/tests.rs:1041`
+  (the aspect verified to bite, and why the outlier arm is the one that convicts).
+- **An invariant or trap the code cannot state** (8): `sanity.rs:1` (two reference traps, each of
+  which has already let a defect ship, and the `ink_*` terminal-stage fact this is the only record
+  of), `shape_collage.rs:1` (three engine properties the look breaks without, plus the sRGB trap),
+  `warp_mesh/mod.rs:1` and `particles/mod.rs:1` (ADR-0037 where the grid is user-visible),
+  `layout.rs:1` (aspect deliberately not an input; allocation-free refill), `spectrum.rs:1` (the
+  param roster, where each entry's no-op semantics is the thing an author cannot see),
+  `lsystem.rs:1` (the normalization measurement that contradicts what ADR-0059 wrote).
+- **Required by the plan that commissioned it** (1): `sanity.rs:209`, above.
+- **Held for a live lane** (2): `marks.rs:1`, `shape_field.rs:1`.
+
+`cargo doc --workspace --no-deps` emits the **same 48** "links to private item" warnings before and
+after, compared against a detached worktree at `8848a12` rather than by recollection.
 
 ### Close triggers
 

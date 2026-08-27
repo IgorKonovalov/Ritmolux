@@ -18,11 +18,12 @@
 //! p(t) = p0 + v0 * (t - t0) + 0.5 * a * (t - t0)^2
 //! ```
 //!
-//! There is **no `dt` in the position at all**, so the trajectory is exactly frame-rate independent
-//! by construction rather than by tuning — the `SCENE_DT` class of divergence (Plan 0014) cannot
-//! reappear here. It also makes the arithmetic checkable: an object launched with vertical speed
-//! `v0` against gravity `g` reaches its apex at `t = v0 / g` and at height `v0^2 / (2 g)`, on any
-//! cadence. See
+//! There is **no `dt` in the position at all**, so the trajectory is exactly
+//! frame-rate independent by construction rather than by tuning — the `SCENE_DT`
+//! class of divergence (Plan 0014) cannot reappear here. It also makes the
+//! arithmetic checkable: an object launched with vertical speed `v0` against
+//! gravity `g` reaches its apex at `t = v0 / g` and at height `v0^2 / (2 g)`, on
+//! any cadence. See
 //! [`an_object_follows_the_closed_form_parabola`](tests::an_object_follows_the_closed_form_parabola).
 //!
 //! **Retirement is a closed form too, and that is not decoration.** Sampling "is
