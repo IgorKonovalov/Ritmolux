@@ -326,168 +326,116 @@ struct LatchBank {
 | 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
 | 7 — the line family gets a seam | dev | done | `e745c45` |
-| 8 — the class is written down | dev | done | committed with this row |
+| 8 — the class is written down | dev | done | `a9a16b9` |
 | 9 — a mono line world | human | not started | |
 
 ### Notes
 
-**Phase 1 — the driven floor's derivation, and the sweep it came off.**
-`DRIVEN_FLOOR = 0.017`. Shipped-library minimum on the driven statistic is
-**0.0345** (`Valentine`) over 53 presets, median 0.19, maximum 0.71 — measured
-2026-08-27, DX12 software adapter, backdrops suppressed. Half the minimum,
-rounded down; slack 2.03x against `ANIM_FLOOR`'s 2.05x. The noise ceiling is
-literally the same one (same statistic, same mask floor), so ADR-0091's
-`1/139 = 0.0072` sits under it with 2.4x margin.
+**Derivations and measurements**
 
-**Phase 1 — the driven branch carries nothing today.** Every one of the 53
-shipped presets passes on the *silent* branch, so the printed
-`still in silence, live on the music` roster is empty and the gate's strength is
-unchanged as it stands. The branch is exercised by
-`the_driven_branch_carries_the_world_that_is_still_by_design`, which rewrites
-`collage_mono`'s two rate lines out of the shipped file: at `0.07`/`0.09` it reads
-silent **0.0025** / driven **0.0621**. The roster becomes non-empty when Phase 2
-lands.
+- **`DRIVEN_FLOOR = 0.017`** (Phase 1). Shipped-library minimum on the driven
+  statistic is **0.0345** (`Valentine`), median 0.19, maximum 0.71 — 53 presets,
+  2026-08-27, DX12 software adapter, backdrops suppressed. Half the minimum,
+  rounded down; slack 2.03x against `ANIM_FLOOR`'s 2.05x. The noise ceiling is
+  literally the same one (same statistic, same mask floor), so ADR-0091's
+  `1/139 = 0.0072` sits under it with 2.4x margin.
+- **The driven branch carries nothing yet** (Phase 1). All 53 shipped presets
+  pass on the *silent* branch, so the printed roster is empty and the gate is no
+  weaker than it was. The branch is exercised by
+  `the_driven_branch_carries_the_world_that_is_still_by_design`, which rewrites
+  `collage_mono`'s two rate lines out of the shipped file: at `0.07`/`0.09` it
+  reads silent **0.0025** / driven **0.0621**. Phase 2 makes the roster non-empty.
+- **`collage_mono` measured with every enumerated mixer off** (Phase 8), 1280x720:
+  three flat regions, `#000000` exact over 86 007 px, and **none of the three
+  carrying the palette's literal RGB** (`#ffffff` → `#e7e7e7`, `#b00808` →
+  `#d63131`).
 
-**Phase 1 — a finding about `ANIM_FLOOR`, not acted on.** Its doc comment records
-the shipped library's silent minimum as `0.0205` (`Banded Mandala`). The sweep now
-reads **0.0143** — `Collage Mono`, whose sway was raised for this measurement — so
-that constant's stated 2.05x slack is really 1.43x as the library stands. The plan
-forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
-rates back down, `Collage Mono` leaves the silent branch and the silent minimum
-returns to `0.0201` (`On White`). Left for the close to decide whether the comment
-is re-derived.
+**Findings**
 
-**Phase 8 — the done-when as worded is not achievable, and the measurement is
-why.** It asks that a reader following the list "arrive at a frame whose colours
-are the palette's". Rendered: `collage_mono` at 1280x720 with every enumerated
-mixer at its off value comes back with three flat regions and **none of the three
-is the palette's literal RGB** — `#ffffff` arrives as `#e7e7e7` and `#b00808` as
-`#d63131`. The page states the achievable claim instead, that three inks leave
-three plateaus, with the measurement printed under it.
+- **`ANIM_FLOOR`'s recorded derivation is stale** (Phase 1). Its comment names the
+  shipped silent minimum as `0.0205` (`Banded Mandala`); the sweep now reads
+  **0.0143** — `Collage Mono`, whose sway was raised for this measurement — so its
+  stated 2.05x slack is really 1.43x. The plan forbids touching it, and Phase 2
+  restores the premise: with the rates back down the silent minimum returns to
+  `0.0201` (`On White`). Left for the close to decide whether to re-derive.
+- **Four intermediate-value stages ADR-0138 does not name** (Phase 8), added per
+  the phase's instruction: the **backdrop composite**, the **A/B palette
+  crossfade**, the **duotone ink pass**, an **`over` layer join** (all four
+  `LayerBlend` variants are mixers; the off switch is `join = "under"`), and the
+  **internal post grid**, whose linear resample mixes neighbours whenever any
+  stage is active.
+- **One leak has no off switch**: the tonemap's static display dither (ADR-0096),
+  ±1 encoded level before the 8-bit store. Its amplitude falls to zero at the
+  rails, which the `collage_mono` measurement confirms.
+- **One leak is about the preset's numbers**: the palette bakes into a 256-entry
+  LUT sampled **linearly**, so a stop pair written to jump (`0.1249`/`0.1251`) is
+  narrower than a texel and the whole transition sits inside it. The fix is to
+  sample at plateau centres; there is no switch.
+- **The WARP hazard did not fire** (Phase 7). The shared line renderer now builds
+  the OVER pipelines unconditionally — the arrangement `renderer.rs`'s
+  `over_pipeline` doc records as having moved five composite baselines. `golden`
+  and `composite` are byte-identical and nothing was blessed.
+- **A pre-existing defect, left alone** (Phase 3). `core/src/preset/schema.rs:756`
+  and its `[layer]` twin build a warning string whose line continuation was lost
+  (`...(x/y/rad/ang), which                      reads 0...`). On `main` since
+  `4bd33fd`; cosmetic, and outside the phase.
 
-**Phase 8 — the sweep found four stages ADR-0138 does not name, and one of them
-has no off switch.** The ADR lists bloom, the tonemap, trails, kaleidoscope
-resampling and `palette_contour`. Also on the page, per the phase's instruction to
-add rather than omit: the **backdrop composite**, the **A/B palette crossfade**,
-the **duotone ink pass**, an **`over` layer join** (all four `LayerBlend` variants
-are mixers and there is no replacing blend — the off switch is `join = "under"`,
-where the layer draws through the same seam), and the **internal post grid**,
-whose linear resample mixes neighbours whenever any stage is active.
+**Unmet done-whens and deviations**
 
-The one with no switch is the **tonemap's display dither** (ADR-0096): a static
-±1-encoded-level triangular dither before the 8-bit store, with no parameter and
-no business having one. Its amplitude falls to zero at the rails, so pure black
-and pure white come through exact and only the inks between them speckle — which
-the `collage_mono` measurement confirms exactly (`#000000` exact over 86 007
-pixels; the paper and the red each ±1).
-
-**Phase 8 — one leak that is about the preset's numbers rather than a stage.** The
-palette bakes into a 256-entry LUT sampled with **linear** filtering, so a stop
-pair written to jump (`0.1249` then `0.1251`) is narrower than one texel and the
-whole transition sits inside it. A coordinate landing on that texel reads a blend.
-The fix is to sample at plateau centres, which `collage_mono`'s palette header
-already does; there is no switch and the page says so.
-
-**Phase 7 — the WARP hazard the plan and `renderer.rs` both predicted did not
-fire. No golden moved.** The shared line renderer now builds through
-`new_split_with_arcs`, so the OVER pipelines exist for every line scene whether
-it selects them or not — the arrangement `renderer.rs`'s `over_pipeline` doc
-records as having moved five composite baselines. `golden` (28 baselines) and
-`composite` are byte-identical on the DX12 software adapter, and the whole 834-test
-core suite is green. Nothing was blessed, and no adapter comparison was needed
-because there was no drift to explain.
-
-**Phase 7 — the arc seam, added because `star_pattern` is one of the four.** The
-plan names the batch; `star_pattern`'s circular motifs are `ArcInstance`s drawn
-from a second pipeline, so routing only the segments would have given that scene
-opaque strokes and additive circles in one picture. `LineRenderer` now carries
-`arc_over_pipeline` beside `over_pipeline`, built from one closure the way the
-segment pair is, and `draw_opaque` takes both. Inside `renderer.rs`, which the
-phase lists.
-
-**Phase 7 — `core/src/preset/schema.rs` was not touched, and did not need to
-be.** The plan lists it, but `SystemKind::param_names()` already delegates to each
-scene module's `PARAMS`, so declaring `stroke_blend` in the four scenes is the
-whole of making it preset-reachable.
-
-**Phase 7 — one line of Phase 8's doc pass had to land here.**
-`every_declared_param_is_documented_in_the_presets_readme` fails the moment a
-`PARAMS` entry has no README mention, so `stroke_blend`'s roster rows and its
-entry beside `softness` are in this commit. The class-level prose the phase
-assigns to Phase 8 is not.
-
-**Phase 5 — two sentences the sweep had to retract, not just supplement.**
-`docs/presets.md` said "There is no per-frame state you can accumulate in a
-preset" in its anatomy section and "expressions are pure and stateless by hard
-invariant" in the section on shaping a value over time. Both are now statements
-about the *expression* rather than about the surface, with the latch named as the
-exception in each place. The `[latch]` reference sits in both documents — the
-grammar-side reading in `docs/presets.md`, the roster entry beside `[smoothing]`
-in `presets/README.md` — and both state the single-frame-probe consequence.
-
-**Phase 4 — the bank advances once per preset per frame, and that is a
-contract.** `LatchBank::advance` consumes the `fire` edge, so a second call in
-the same frame would swallow the rise. The frame path calls it once per side and
-hands the returned `Variables` to `evaluate_preset`, the `[per_vertex]` table and
-`evaluate_layer` alike — the two call sites that used to build
-`vars.with_salt(...)` separately now share one bundle. `advance`'s doc says so.
-
-**Phase 4 — one bank per preset, not per surface.** A `[layer]` has its own
-`ParamSmoother` because layer bindings are indexed within the layer's `params`;
-a latch has no such collision (its slot is fixed at load) and is preset-level
-state by ADR-0137, so a layer binding reads the same event the main scene does.
-The outgoing side gets its own bank, handed over at the same roster flip the
-smoothers are, so a latch mid-hold keeps reading through a dual-live dissolve.
-
-**Phase 4 — a file the phase did not list, touched twice.**
-`core/src/preset/expr.rs` gains `Variables::with_latches`, which is the write end
-of the reserved block and has nowhere else to live, and its module header plus
-`core/src/preset/mod.rs`'s are corrected — that second edit is the comment sweep
-the phase's own done-when requires. The sweep's result: `expr.rs:1` and
-`preset/mod.rs:2` both said the surface was a pure expression language without
-qualification, and `render/mod.rs:385` claimed the smoothing state was the only
-per-frame state the expression path has. Every other `pure` in `core/src/preset/`
-is a claim about the *evaluator*, which is still true and deliberately left
-standing — that it survives is ADR-0137's central point.
-
-**Phase 3 — the reserved block moved no other constant.** `LATCH_SLOT_BASE = 22`
-sits between `VERTEX_SLOT_BASE` (18, four wide) and `index`; `RAW_`, `CLOCK_`,
-`BAR_` and `VERTEX_` are all literals below it and are unmoved, and `INDEX_SLOT`
-is still `VAR_COUNT - 1` with `VAR_COUNT` at 27. Two `const` assertions bracket
-the new block at compile time and `latch_slots_are_where_the_names_say` (renamed
-from `raw_slots_are_where_the_names_say`) holds every block to its names.
-
-**Phase 3 — three invariants the plan did not name, added because the shape
-demanded them.** A latch expression compiles with **no** latch names in scope, so
-a latch cannot read a latch and "every latch, then the params" is a complete
-order rather than a dependency graph. A latch name colliding with a variable,
-constant or function is a load error, because latch names resolve last and
-`recut = bass` would otherwise silently be the band. The four reserved
-placeholders (`_latch0`..`_latch3`) are in `VAR_NAMES` for the positional
-assertion and held out of the identifier lookup, so `_latch2` is not a second
-spelling of a latch. Each is covered by an assertion in `core/tests/preset.rs`.
-
-**Phase 3 — a pre-existing defect noticed and left alone.**
-`core/src/preset/schema.rs:756` and its `[layer]` twin build a warning string
-whose line continuation was lost, so the message reads
-`...(x/y/rad/ang), which                      reads 0 outside...`. Present on
-`main` since `4bd33fd`; cosmetic, in a file this phase touches, and outside the
-phase's scope.
-
-**Phase 1 — one deviation from ADR-0136's stated cost.** The ADR prices the second
-reading at "two more captures per preset"; it costs **one**. The driven
-differential is anchored at `FRAME_B` and shares that frame's silent capture with
-the autonomous reading, which also keeps both readings at the same point on the
-scene's own clock. Three captures per preset, not four.
+- **Phase 8's done-when is not achievable as worded.** It asks that following the
+  list yields "a frame whose colours are the palette's"; the measurement above
+  shows three *plateaus* whose values are all remapped. The page states the
+  achievable claim, with the measurement under it.
+- **Phase 1 costs one extra capture, not ADR-0136's two.** The driven differential
+  is anchored at `FRAME_B` and shares that frame's silent capture, which also
+  keeps both readings at the same point on the scene's clock.
+- **Phase 3 added three invariants the plan does not name**, each with an
+  assertion: a latch expression compiles with no latch name in scope (so a latch
+  cannot read a latch, and "every latch, then the params" is a complete order); a
+  latch name colliding with a variable, constant or function is a load error
+  (latch names resolve last, so `recut = bass` would silently be the band); and
+  the reserved `_latchN` placeholders are held out of the identifier lookup.
+- **Phase 4 touched `core/src/preset/expr.rs` and `core/src/preset/mod.rs`**,
+  which it does not list. `Variables::with_latches` is the write end of the
+  reserved block and has nowhere else to live; the two module headers are the
+  comment sweep the phase's own done-when requires. That sweep's result: three
+  comments claimed the expression *layer* holds no state between frames, and are
+  corrected. Every remaining `pure` in `core/src/preset/` is a claim about the
+  *evaluator*, still true and deliberately left standing.
+- **Phase 7 added `arc_over_pipeline`**, inside the file it lists. `star_pattern`
+  is one of the four systems and its motifs are arcs from a second pipeline, so
+  routing only the segments would have given that scene opaque strokes and
+  additive circles in one picture.
+- **Phase 7 did not touch `core/src/preset/schema.rs`**, which it lists.
+  `SystemKind::param_names()` already delegates to each scene's `PARAMS`, so
+  declaring `stroke_blend` in the four scenes is the whole of making it reachable.
+- **Phase 7 landed one line of Phase 8's doc pass.**
+  `every_declared_param_is_documented_in_the_presets_readme` fails the moment a
+  `PARAMS` entry has no README mention, so `stroke_blend`'s roster rows and its
+  entry are in Phase 7's commit; the class prose is in Phase 8's.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0145, 0147, 0148
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no `.toml`. `presets/README.md` only, in Phases 7 and 8.
+- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. Each entry's **engine
+  half** shipped; each one's content half is an outstanding `human` phase (0145 →
+  Phase 2, 0147 → Phase 6, 0148 → Phase 9).
+- **What shipped:** feature. A `[latch]` grammar table with render-layer state, a
+  preset-reachable `stroke_blend` on the four line systems, a disjunctive
+  `animation` gate with a second derived floor, and `AnalysisFrame::fully_driven`
+  in `core`. No C ABI change, no new scene, no new dependency.
+- **Operator docs touched:** `docs/capturing.md`, `docs/presets.md`,
+  `docs/preset-palettes.md`, `presets/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`): exits 1, one
+  broken.** `docs/design-backlog.md:3389` — 0145's probe asserts
+  `present: let audio = AnalysisFrame::default\(\); in: core/tests/animation.rs`,
+  and Phase 1 renamed that binding to `silent_audio`. The entry is one this plan
+  `Closes:`, so the probe is describing code the plan changed on purpose. **The
+  tree's tip is red on this gate and `pre-push` runs it.** Nothing here edited
+  `docs/design-backlog.md` — the backlog is architect's lane.
+- **Outstanding `human` phases:** 2 (`collage_mono`'s sway back down), 6
+  (`collage_mono` recomposes on a latch), 9 (a mono line world on the new seam).
+  All three are `preset-author` sessions and none blocks another.
 
 ## Followups (after this lands)
 
