@@ -3059,6 +3059,66 @@ instant hit with a slow decay. A scalar entry is exactly
 > should *hit* (`burst`, `mirror_reflect`, `thickness` on a beat); leave
 > continuous params symmetric.
 
+## An event with a memory — the `[latch]` table
+
+An optional top-level `[latch]` table declares named **armed-and-fired events**
+([ADR-0137](../docs/adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md)).
+It sits beside `[smoothing]` in every sense: same place in the file, same
+resolved-once-at-load treatment, same reset on a preset switch — and it answers
+the question `[smoothing]` cannot, because easing shapes a value over time
+without ever holding one.
+
+```toml
+[latch]
+recut = { arm = "mod(time, 100) > 90", fire = "onset > 0.6", hold = 0.5 }
+
+[params]
+recompose = "recut"
+```
+
+| key | value | meaning |
+|---|---|---|
+| `arm` | expression | Above `0.5` opens an **arming window**; the fall closes it, the next rise opens a new one. Required. |
+| `fire` | expression | The latch fires on this expression's **rising edge** inside an open window. A value already above `0.5` when the window opened is not an edge. Required. |
+| `hold` | seconds | How long the fired latch reads `1.0`. A bare number, not an expression. Optional; default `0`, which is a single frame. |
+
+The name on the left is yours, and it becomes an ordinary variable in every
+expression of the preset — `[params]`, `[per_vertex]` and `[layer.params]` — so it
+multiplies, gates, eases through `[smoothing]`, and can be read by several
+bindings at once.
+
+**The property, stated once because everything else follows from it: one rise per
+arming window.** However many `fire` edges a window contains, the latch rises on
+the first and on no other, and the next rise requires `arm` to have fallen and
+risen again. A window with no `fire` edge in it produces no rise at all. That is
+what separates a latch from `min(arm_expr, fire_expr)`, which goes true on every
+onset in the window.
+
+`hold` runs on real elapsed time, so it is the same duration at any refresh rate,
+and it is validated non-negative and finite at load.
+
+**The cap is four latches per preset.** That is a chosen number rather than a
+measured one — as many independent events as a preset can hold in one reader's
+head — and the storage behind it is a fixed block resolved at load, so asking for
+a fifth is a load error naming the cap rather than a slower path. Two further
+load errors, both there to stop a binding silently reading something else: a latch
+name that the grammar already resolves (`bass`, `time`, `pi`, `sin`, …) is
+rejected, and a latch's `arm`/`fire` may not name another latch.
+
+> **A latch is the one part of the preset surface whose value depends on the
+> frames before this one.** The state lives in the render layer beside the
+> smoothers, never inside the expression, so the evaluator is unchanged — but two
+> things follow that no other table has.
+>
+> **A single-frame probe reads a latch at rest.** Anything evaluating one frame in
+> isolation sees `0.0` and cannot distinguish a latch that can never fire from one
+> that has not fired yet. `shot --report` drives a frame sequence and does see a
+> latch; a one-frame reading does not.
+>
+> **A latch nothing reads is a load warning**, in the shape an inert
+> `[occupancy] exempt` entry gets and for the same reason: you would otherwise
+> believe an event was wired up while nothing consumed it.
+
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 
 `core/tests/saturation.rs` is a **HARD gate**: it walks every shipped preset's
