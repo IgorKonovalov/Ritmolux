@@ -1,6 +1,6 @@
 # 0122 — Every rate integrates
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-27
 > **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
@@ -299,3 +299,24 @@ impl Phase {
 
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** worktree `WORK/lmv-plan-0122` on `plan-0122-every-rate-integrates`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | committed with this row |
+| 2 — the two rates nothing binds | dev | not started | |
+| 3 — `swarm`'s field clock | dev | not started | |
+| 4 — the guard | dev | not started | |
+| 5 — the swarm content pass | human | not started | |
+
+### Notes
+
+- Phase 1 also touched `warp_mesh/tests.rs` (two tests call `integrate_phase`) and
+  `particles/encode.rs` (a doc link to `advance_spin`); neither is in the phase's file list.
+- The no-`Add` done-when is recorded here as tried-and-observed rather than as a `compile_fail`
+  doctest: `Phase` is `pub(crate)`, so a doctest cannot name it and would fail on privacy instead of
+  on arithmetic. Probe: `let _probe = self.fold_phase + self.fold_speed * self.time;` added to
+  `fragment_field::update`, `cargo check -p lmv-core` → `error[E0369]: cannot add f32 to Phase`;
+  reverted.
+

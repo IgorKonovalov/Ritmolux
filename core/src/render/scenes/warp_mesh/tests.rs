@@ -1442,15 +1442,16 @@ fn the_decay_domain_is_not_the_wash() {
 fn a_constant_warp_speed_integrates_to_the_multiply_it_replaced() {
     let dt = super::super::FALLBACK_DT;
     for rate in [1.0f32, 0.25, 3.0] {
-        let mut phase = 0.0f32;
+        let mut phase = Phase::default();
         let mut time = 0.0f32;
         for _ in 0..600 {
-            phase = integrate_phase(phase, rate, dt);
+            phase.step(rate, dt);
             time += dt;
         }
         assert!(
-            (phase - rate * time).abs() < 1e-3,
-            "rate {rate}: integrated {phase} against the multiply's {}",
+            (phase.get() - rate * time).abs() < 1e-3,
+            "rate {rate}: integrated {} against the multiply's {}",
+            phase.get(),
             rate * time
         );
     }
@@ -1464,17 +1465,17 @@ fn a_constant_warp_speed_integrates_to_the_multiply_it_replaced() {
 #[test]
 fn a_warp_speed_change_bends_the_phase_instead_of_teleporting_it() {
     let dt = super::super::FALLBACK_DT;
-    let mut phase = 0.0f32;
+    let mut phase = Phase::default();
     let mut time = 0.0f32;
     for _ in 0..6_000 {
-        phase = integrate_phase(phase, 1.0, dt);
+        phase.step(1.0, dt);
         time += dt;
     }
     assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
 
-    let before = phase;
-    phase = integrate_phase(phase, 1.5, dt);
-    let step = phase - before;
+    let before = phase.get();
+    phase.step(1.5, dt);
+    let step = phase.get() - before;
     assert!(
         (step - 1.5 * dt).abs() < 1e-4,
         "the phase advanced {step}, not {}",

@@ -5,9 +5,9 @@
 use super::{
     AttractorFamily, AttractorScene, Basis, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
     DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
-    MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, RESEED_DRAWS_STREAK, SPIN_RATE,
-    STEP_SLOTS, Scene, StepUniform, active_particles, advance_spin, brightness_factor,
-    deposit_scale, family, ifs, projection_mirror, spin_phase, streak_flag,
+    MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, Phase, RESEED_DRAWS_STREAK, SPIN_RATE,
+    STEP_SLOTS, Scene, StepUniform, active_particles, brightness_factor, deposit_scale, family,
+    ifs, projection_mirror, spin_phase, streak_flag,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::context::RenderContext;
@@ -673,7 +673,7 @@ fn spin_ramp() -> Vec<f32> {
 #[test]
 fn the_spin_phase_integrates_rather_than_multiplying() {
     let dt = FIXED_STEP;
-    let mut spin_time = 0.0f32;
+    let mut spin_time = Phase::default();
     let mut running = 0.0f32;
     let mut elapsed = 0.0f32;
     let mut worst_integrated_step = 0.0f32;
@@ -682,14 +682,15 @@ fn the_spin_phase_integrates_rather_than_multiplying() {
 
     let ramp = spin_ramp();
     for spin in ramp.iter().copied() {
-        let before = spin_phase(spin_time);
-        spin_time = advance_spin(spin_time, spin, dt);
+        let before = spin_phase(spin_time.get());
+        spin_time.step(spin, dt);
         running += spin * SPIN_RATE * dt;
         elapsed += dt;
 
         // The integrated phase moves by at most one frame's worth of angle,
         // whatever the binding did. That is what "accelerates" means.
-        worst_integrated_step = worst_integrated_step.max((spin_phase(spin_time) - before).abs());
+        worst_integrated_step =
+            worst_integrated_step.max((spin_phase(spin_time.get()) - before).abs());
 
         // The rejected form, evaluated alongside it.
         let multiplied = elapsed * spin * SPIN_RATE;
@@ -698,9 +699,9 @@ fn the_spin_phase_integrates_rather_than_multiplying() {
     }
 
     assert!(
-        (spin_phase(spin_time) - running).abs() < 1e-6,
+        (spin_phase(spin_time.get()) - running).abs() < 1e-6,
         "the phase is {} but the running sum of spin * SPIN_RATE * dt is {running}",
-        spin_phase(spin_time)
+        spin_phase(spin_time.get())
     );
 
     // ...and it is NOT the product. Not a near miss: the two disagree by more
@@ -709,13 +710,13 @@ fn the_spin_phase_integrates_rather_than_multiplying() {
     println!(
         "after {} frames: integrated {:.6} rad, multiplied {multiplied:.6} rad",
         ramp.len(),
-        spin_phase(spin_time)
+        spin_phase(spin_time.get())
     );
     assert!(
-        (spin_phase(spin_time) - multiplied).abs() > spin_phase(spin_time).abs(),
+        (spin_phase(spin_time.get()) - multiplied).abs() > spin_phase(spin_time.get()).abs(),
         "the integrated phase {} and the multiplied one {multiplied} agree — this test \
          cannot tell the two formulations apart",
-        spin_phase(spin_time)
+        spin_phase(spin_time.get())
     );
 
     // The snap, stated as the thing a viewer would see. The largest angle one
@@ -754,13 +755,13 @@ fn the_spin_phase_integrates_rather_than_multiplying() {
 #[test]
 fn the_default_spin_reproduces_the_shipped_rate_exactly() {
     let dt = FIXED_STEP;
-    let (mut spin_time, mut clock) = (0.0f32, 0.0f32);
+    let (mut spin_time, mut clock) = (Phase::default(), 0.0f32);
     for _ in 0..600 {
-        spin_time = advance_spin(spin_time, DEFAULT_SPIN, dt);
+        spin_time.step(DEFAULT_SPIN, dt);
         // The renderer's own accumulation, verbatim (`self.time += dt`).
         clock += dt;
         assert_eq!(
-            spin_phase(spin_time),
+            spin_phase(spin_time.get()),
             clock * SPIN_RATE,
             "the integrated phase has drifted from the clock-multiplied one it replaced"
         );
@@ -768,19 +769,23 @@ fn the_default_spin_reproduces_the_shipped_rate_exactly() {
     assert_eq!(DEFAULT_SPIN, 1.0);
 
     // `spin = 0` holds the angle fixed, exactly, however long it runs.
-    let mut held = 0.0f32;
+    let mut held = Phase::default();
     for _ in 0..600 {
-        held = advance_spin(held, 0.0, dt);
+        held.step(0.0, dt);
     }
-    assert_eq!(spin_phase(held), 0.0, "spin = 0 must hold the figure still");
+    assert_eq!(
+        spin_phase(held.get()),
+        0.0,
+        "spin = 0 must hold the figure still"
+    );
 
     // ...and negative reverses it, rather than being clamped away.
-    let mut back = 0.0f32;
+    let mut back = Phase::default();
     for _ in 0..60 {
-        back = advance_spin(back, -1.0, dt);
+        back.step(-1.0, dt);
     }
     assert!(
-        spin_phase(back) < 0.0,
+        spin_phase(back.get()) < 0.0,
         "a negative spin must turn the other way"
     );
 }
@@ -797,7 +802,7 @@ fn the_scene_integrates_the_spin_it_is_given() {
     h.scene.set_param("spin", 0.0);
     h.run(120);
     assert_eq!(
-        spin_phase(h.scene.spin_time),
+        spin_phase(h.scene.spin_time.get()),
         0.0,
         "spin = 0 did not hold the projection angle across 120 frames"
     );
@@ -805,15 +810,15 @@ fn the_scene_integrates_the_spin_it_is_given() {
     // ...then let it turn, and the phase is exactly the frames it ran for.
     h.scene.set_param("spin", 1.0);
     h.run(60);
-    let mut expected = 0.0f32;
+    let mut expected = Phase::default();
     for _ in 0..60 {
-        expected = advance_spin(expected, 1.0, FIXED_STEP);
+        expected.step(1.0, FIXED_STEP);
     }
     assert_eq!(
         h.scene.spin_time, expected,
         "the scene's accumulator is not the frame-by-frame integral of its `spin`"
     );
-    assert!(spin_phase(h.scene.spin_time) > 0.0);
+    assert!(spin_phase(h.scene.spin_time.get()) > 0.0);
 }
 
 // -----------------------------------------------------------------------

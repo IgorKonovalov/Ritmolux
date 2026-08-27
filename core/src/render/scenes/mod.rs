@@ -43,6 +43,58 @@ use crate::render::palette::Palette;
 /// function of its inputs.
 pub(crate) const FALLBACK_DT: f32 = 1.0 / 60.0;
 
+/// One integrated animation phase — the only way a bindable rate advances
+/// anything in this engine (ADR-0135, finishing the rule ADR-0132 stated).
+///
+/// **A rate multiplier has to be integrated to be a rate at all.** A phase
+/// computed as `time * rate` lets a rate bound to audio retroactively rescale
+/// *all* elapsed time on every frame: at t = 100 s a swing from `1.0` to `1.5`
+/// moves the phase by fifty seconds in a single frame — the figure snaps to a
+/// new position rather than accelerating toward it, on a lane whose whole
+/// method is binding parameters to audio. Integrated, the same swing bends the
+/// motion.
+///
+/// [`step`](Self::step) is the **only** mutator, and there is deliberately no
+/// `Add`/`AddAssign`/`Deref`/`DerefMut` impl. The constraint is the value: with
+/// one, a scene could write `phase + self.rate * self.time` and compile, which
+/// is exactly the door this type exists to close.
+///
+/// # No constant scale is folded into the accumulation
+///
+/// A scene carrying its own fixed rate — the attractor's `SPIN_RATE` — applies
+/// it where the phase is **read**, never inside the sum. The accumulator is then
+/// `Σ (rate · dt)` with `rate` at its `1.0` default, i.e. `Σ dt` term for term:
+/// bit-for-bit the same summation the renderer performs for its own clock, so
+/// the integrated form reproduces the multiply it replaced *exactly* and no
+/// golden baseline moves. Folding a `0.18` in would sum `0.18 · dt` instead and
+/// drift in the last bits of every capture.
+///
+/// # It steps in `update`, never in `advance`
+///
+/// The per-frame order is `set_time` → `advance` → `reset_params` → `set_param`
+/// → `update` (`core/src/render/mod.rs`), so a scene stores the `dt` that
+/// [`Scene::advance`] hands it and integrates in [`Scene::update`], where *this*
+/// frame's rate has landed. Integrating in `advance` would use the previous
+/// frame's.
+///
+/// The type is arithmetic with no device in it, which is what keeps every rate
+/// in the engine testable on the CPU without rendering anything.
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+pub(crate) struct Phase(f32);
+
+impl Phase {
+    /// One frame's integration, at *this* frame's rate.
+    pub(crate) fn step(&mut self, rate: f32, dt: f32) {
+        self.0 += rate * dt;
+    }
+
+    /// The accumulated phase, in rate-scaled seconds. A scene with its own
+    /// constant scale applies it here, on the read.
+    pub(crate) fn get(self) -> f32 {
+        self.0
+    }
+}
+
 /// Declarative structural config a scene consumes once at preset load
 /// (ADR-0007): **not** expressions — the family / grammar / tiling the sampler
 /// or generator builds from. Delivered through the optional

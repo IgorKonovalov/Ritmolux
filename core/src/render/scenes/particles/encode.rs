@@ -35,8 +35,8 @@ pub(super) struct UniformInputs {
     /// is and how big, which is what makes a distant tuple reachable at all.
     /// Read instead of `family.projection()`, which is entry 0's.
     pub(super) framing: Framing,
-    /// The integrated spin in spin-scaled seconds, not a wall clock — see
-    /// [`advance_spin`].
+    /// The integrated spin in spin-scaled seconds, not a wall clock — read from
+    /// the scene's [`Phase`](crate::render::scenes::Phase).
     pub(super) spin_time: f32,
     pub(super) dt: f32,
     /// How many fixed steps this frame will encode — one uniform slot each.
