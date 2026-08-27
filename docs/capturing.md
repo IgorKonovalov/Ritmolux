@@ -576,6 +576,13 @@ cross-machine byte equality does not hold and nothing here asserts it.
 | `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
+The name column is fourteen characters wide, and a longer name is **elided in
+the middle**, not at the tail: `Tiled Rosette Mono` prints as `Tiled R~e Mono`.
+The tail is what distinguishes a name in this library — `Mono`, `Gallery`,
+`Bordered`, `Walk` — and a tail truncation threw it away, which is how two
+presets came to print as one row label in all three tables (design-backlog 0131).
+A `~` in a label means characters were dropped there.
+
 Two extra labeled blocks print under the table (the table itself stays un-widened,
 so every historical number keeps its place): the **realistic-levels** reading
 (`reactivity_low` — the same bands at the levels real music reaches, ADR-0042) and,

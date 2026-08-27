@@ -885,6 +885,39 @@ fn probe_rate(images: &[CaptureImage]) -> f32 {
     mean_consecutive_diff(tail)
 }
 
+/// Column width of every preset-name cell, in all three tables.
+const NAME_WIDTH: usize = 14;
+
+/// A display name fitted to [`NAME_WIDTH`] by eliding its **middle**.
+///
+/// Tail truncation collides, and the library reached the case: `Tiled Rosette`
+/// and `Tiled Rosette Mono` share their first fourteen characters, so both rows
+/// printed the same label in all three tables and the only way to tell them
+/// apart was that one had zeroes in its `mid` and `onset` columns
+/// (design-backlog 0131). The distinguishing part of a name in this library is
+/// nearly always its **tail** — `Mono`, `Gallery`, `Bordered`, `Walk` — which is
+/// exactly what a tail truncation throws away.
+///
+/// Widening the column instead would cost seven more columns on a table Plan
+/// 0121 had just widened by two, and it would only postpone the collision to the
+/// next longer pair. Eliding the middle keeps the width fixed.
+///
+/// The marker is ASCII so a cell's rendered width equals its character count on
+/// any terminal — the columns either side of it have to line up.
+fn fit_name(name: &str) -> String {
+    let len = name.chars().count();
+    if len <= NAME_WIDTH {
+        return name.to_string();
+    }
+    // Head, marker, tail. The tail gets the smaller half because a head that is
+    // too short stops naming the family the row belongs to.
+    let tail = NAME_WIDTH / 2 - 1;
+    let head = NAME_WIDTH - tail - 1;
+    let kept: String = name.chars().take(head).collect();
+    let end: String = name.chars().skip(len - tail).collect();
+    format!("{kept}~{end}")
+}
+
 /// One `rate` cell: the reading, suffixed `+` when the probe's rise had not
 /// settled, in the same shape the transient cells use.
 ///
@@ -1001,7 +1034,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         // and a fabricated cell would read as a finding (backlog 0070).
         let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
         let mut header = format!(
-            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
+            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
             "preset",
             "bass",
             "mid",
@@ -1012,7 +1045,8 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             "rate",
             "cover",
             "rise",
-            "fall"
+            "fall",
+            name_w = NAME_WIDTH
         );
         if show_geometry {
             let _ = write!(header, " {:>6}", "geom");
@@ -1020,8 +1054,8 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         let _ = writeln!(out, "{header}");
         for p in &fam.presets {
             let mut row = format!(
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7.3} {:>5} {:>5}",
-                p.name,
+                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7.3} {:>5} {:>5}",
+                fit_name(&p.name),
                 p.reactivity[0],
                 p.reactivity[1],
                 p.reactivity[2],
@@ -1034,6 +1068,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 p.coverage,
                 transient_cell(p.transient.response.rise_frames, p.transient.rise_settled),
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
+                name_w = NAME_WIDTH,
             );
             if show_geometry {
                 match p.geometry {
@@ -1090,18 +1125,24 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         );
         let _ = writeln!(
             out,
-            "  {:<14} {:>7} {:>7} {:>7} {:>7}",
-            "preset", "bass", "mid", "treb", "onset"
+            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7}",
+            "preset",
+            "bass",
+            "mid",
+            "treb",
+            "onset",
+            name_w = NAME_WIDTH
         );
         for p in &fam.presets {
             let _ = writeln!(
                 out,
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3}",
-                p.name,
+                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3}",
+                fit_name(&p.name),
                 p.reactivity_footprint[0],
                 p.reactivity_footprint[1],
                 p.reactivity_footprint[2],
                 p.reactivity_footprint[3],
+                name_w = NAME_WIDTH,
             );
         }
 
@@ -1117,15 +1158,23 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         );
         let _ = writeln!(
             out,
-            "  {:<14} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5}",
-            "preset", "bass", "mid", "treb", "onset", "gates", "ceils", "occ"
+            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5}",
+            "preset",
+            "bass",
+            "mid",
+            "treb",
+            "onset",
+            "gates",
+            "ceils",
+            "occ",
+            name_w = NAME_WIDTH
         );
         for p in &fam.presets {
             let (dead, ceilings, saturated) = gate_counts(p);
             let _ = writeln!(
                 out,
-                "  {:<14.14} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7} {:>5}",
-                p.name,
+                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7} {:>5}",
+                fit_name(&p.name),
                 p.reactivity_low[0],
                 p.reactivity_low[1],
                 p.reactivity_low[2],
@@ -1133,6 +1182,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 dead,
                 ceilings,
                 saturated,
+                name_w = NAME_WIDTH,
             );
         }
         let dead: Vec<(&str, &GateReport)> = fam

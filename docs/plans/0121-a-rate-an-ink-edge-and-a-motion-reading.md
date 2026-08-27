@@ -338,8 +338,8 @@ fn band_contour(
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--report` gains `drive` and `rate` | dev | done | committed with this row |
-| 2 — preset names stop colliding | dev | not started | |
+| 1 — `--report` gains `drive` and `rate` | dev | done | `63461ee` |
+| 2 — preset names stop colliding | dev | done | committed with this row |
 | 3 — `field_speed` and `fold_speed` | dev | not started | |
 | 4 — `warp_speed` integrates too | dev | not started | |
 | 5 — the contour reads the LUT | dev | not started | |
