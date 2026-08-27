@@ -9,8 +9,9 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    DEFAULT_GAMMA, DEFAULT_SCALE, MAX_GAMMA, MAX_SCALE, MIN_GAMMA, MIN_SCALE, PARAMS,
-    applied_gamma, applied_scale, coord,
+    COORD_MODES, DEFAULT_COORD_MODE, DEFAULT_GAMMA, DEFAULT_SCALE, MAX_COORD_MODE, MAX_GAMMA,
+    MAX_SCALE, MIN_COORD_MODE, MIN_GAMMA, MIN_SCALE, PARAMS, applied_coord_mode, applied_gamma,
+    applied_scale, coord,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
@@ -552,4 +553,242 @@ fn the_ring_count_steps_between_whole_figures() {
             );
         }
     }
+}
+
+// --- Phase 2: the scaled-copy coordinate ---------------------------------------
+//
+// ADR-0111's second coordinate. The claims that matter are about what reaches
+// the frame, so two of the three below are rendered: a mode that reached the
+// uniform but was never read would pass any CPU-side test of the arithmetic.
+
+/// The mode selector is closed at both ends, **rounds**, and a broken binding
+/// lands on the default rather than on a bound (`kaleido_edge`'s rule, which
+/// `marks::mark_shape` already follows for the same reason).
+///
+/// The rounding is the load-bearing half: `[smoothing]` and preset dissolves
+/// interpolate a binding continuously, so easing the distance to the radius
+/// passes through 0.4 and 0.6 — and there is nothing halfway between an offset
+/// curve and a scaled copy for the shader to draw there.
+#[test]
+fn the_coordinate_mode_clamps_rounds_and_falls_back() {
+    assert_eq!(applied_coord_mode(DEFAULT_COORD_MODE), 0.0);
+    assert_eq!(applied_coord_mode(-3.0), MIN_COORD_MODE);
+    assert_eq!(applied_coord_mode(99.0), MAX_COORD_MODE);
+    assert_eq!(applied_coord_mode(0.4), 0.0);
+    assert_eq!(applied_coord_mode(0.6), 1.0);
+    assert_eq!(applied_coord_mode(f32::NAN), DEFAULT_COORD_MODE);
+    assert_eq!(applied_coord_mode(f32::INFINITY), DEFAULT_COORD_MODE);
+    for (i, _) in COORD_MODES.iter().enumerate() {
+        assert_eq!(applied_coord_mode(i as f32), i as f32);
+    }
+
+    // ...and nothing the quantizer emits is ever fractional, anywhere in range.
+    for i in 0..=400 {
+        let raw = -1.0 + 3.0 * i as f32 / 400.0;
+        let q = applied_coord_mode(raw);
+        assert_eq!(
+            q,
+            q.round(),
+            "coord_mode reached the shader at {q}, from {raw}"
+        );
+    }
+    assert_eq!(COORD_MODES, ["distance", "radius"]);
+    assert!(PARAMS.contains(&"coord_mode"));
+}
+
+/// **Under the radius mode a contour is a SCALED COPY of the outline, and under
+/// the distance mode it is not** — the property this whole plan exists for,
+/// measured on the one arm of Phase 2's pair that can show the difference.
+///
+/// # Why a polygon, and why the contour measured is OUTSIDE it
+///
+/// A scaled polygon keeps its corners and an offset one rounds them — but that
+/// is only true **outside** the figure, and the difference is worth stating
+/// because the obvious reading of this test is vacuous.
+///
+/// *Inside* a **regular** polygon the two coordinates are not merely similar,
+/// they are the same expression. The interior arm is `r cos(f) / apothem`, whose
+/// level set is the line `x = c * apothem` in folded coordinates — a regular
+/// polygon of apothem `c * apothem`, i.e. a scaled copy. Eroding a regular
+/// polygon moves every edge inward by the same amount and rounds nothing,
+/// because erosion rounds **reflex** corners and a convex polygon has none. So
+/// an interior contour measures 0 spread under both modes and proves nothing.
+/// (Measured, on a pentagon: mean 0.2513 and relative spread 0.0177 under both,
+/// to four figures.)
+///
+/// Outside, the arm measures to the edge as a **segment**, so its level set
+/// carries a circular arc around each vertex while the radius mode's stays a
+/// sharp scaled triangle. `palette_steps * color_span` is set below 1 on
+/// purpose, which puts the **first** band boundary past the outline — so the
+/// first contour each ray meets is already the exterior one, with no band
+/// counting to get wrong.
+///
+/// # The measurement, and the control that makes it non-vacuous
+///
+/// Rays are walked out from the figure's centre until the rendered band changes.
+/// Each hit is converted into the figure's own frame and divided by
+/// `r_boundary(theta)` — the closed form the shader used, mirrored in
+/// `marks::tests`. Under the radius mode that ratio is **constant in theta**,
+/// which is the definition of a scaled copy.
+///
+/// The same measurement under the **distance** mode is the control, and both
+/// numbers are printed. Without it the first assertion would pass on a disc, on
+/// a bug, and on a coordinate that was never wired up: a spread of zero proves
+/// nothing unless something in the same harness produces a spread that is not.
+#[test]
+fn the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets() {
+    // Large on purpose: the band edge is located to the nearest pixel, so the
+    // radius mode's residual spread IS the pixel grid. At this size the contour
+    // sits 96..192 px out, which puts that residual near 0.003 — two orders
+    // below the effect being measured rather than one.
+    const W: u32 = 640;
+    const H: u32 = 640;
+    // Square target on purpose: it takes the aspect out of the arithmetic below
+    // so this test is about the coordinate alone. The aspect has its own test.
+    let Some(mut renderer) = headless(W, H) else {
+        return;
+    };
+    // A TRIANGLE, because the corner is where the two constructions differ and
+    // three corners are the sharpest the roster allows. `palette_steps *
+    // color_span = 0.5`, below 1, so the first band boundary sits at a
+    // coordinate of **2.0** — well outside the outline, where the difference
+    // lives and where it is largest.
+    const SCALE: f32 = 0.3;
+    const POINTS: f32 = 3.0;
+    let params = |mode: &str| {
+        format!(
+            "shape = \"2\"\npoints = \"3\"\nscale = \"0.3\"\ncolor_span = \"0.125\"\n\
+             palette_steps = \"4\"\ncoord_mode = \"{mode}\"\n"
+        )
+    };
+    renderer.set_presets(vec![
+        preset("offsets", &params("0")),
+        preset("copies", &params("1")),
+    ]);
+
+    let (cx, cy) = (W as f32 / 2.0, H as f32 / 2.0);
+    let mut spread_of = |name: &str| -> (f32, f32, usize) {
+        let img = renderer
+            .capture_preset(name, &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"));
+        let start = luma(&img, cx as u32, cy as u32);
+        let mut ratios = Vec::new();
+        let rays = 90;
+        for i in 0..rays {
+            let theta = std::f32::consts::TAU * i as f32 / rays as f32;
+            let (dx, dy) = (theta.cos(), theta.sin());
+            let mut hit = None;
+            let mut r = 1.0f32;
+            while r < (W as f32) * 0.48 {
+                if (luma(&img, (cx + dx * r) as u32, (cy + dy * r) as u32) - start).abs() > 8.0 {
+                    hit = Some(r);
+                    break;
+                }
+                r += 0.25;
+            }
+            let Some(r) = hit else { continue };
+            // Pixel -> the scene's square-unit space -> the figure's own frame.
+            // NDC y is up, pixel y is down, and the target is square so the
+            // aspect is 1.
+            let ndc = [
+                (cx + dx * r) / (W as f32) * 2.0 - 1.0,
+                1.0 - (cy + dy * r) / (H as f32) * 2.0,
+            ];
+            let p = [ndc[0] / SCALE, ndc[1] / SCALE];
+            let boundary = marks::tests::mark_boundary_radius(
+                p,
+                marks::tests::POLYGON,
+                POINTS,
+                marks::tests::NEUTRAL_STAR,
+            );
+            ratios.push((p[0] * p[0] + p[1] * p[1]).sqrt() / boundary);
+        }
+        let n = ratios.len();
+        let mean = ratios.iter().sum::<f32>() / n as f32;
+        let sd = (ratios.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / n as f32).sqrt();
+        (mean, sd / mean, n)
+    };
+
+    let (d_mean, d_spread, d_n) = spread_of("offsets");
+    let (r_mean, r_spread, r_n) = spread_of("copies");
+    println!(
+        "first contour, r / r_boundary(theta) over 90 rays on a triangle:\n  \
+         distance mode: mean {d_mean:.4}, relative spread {d_spread:.4} ({d_n} rays)\n  \
+         radius   mode: mean {r_mean:.4}, relative spread {r_spread:.4} ({r_n} rays)"
+    );
+
+    assert!(
+        d_n > 60 && r_n > 60,
+        "only {d_n} / {r_n} of 90 rays found a band edge — the frame is not \
+         banded and this test is measuring nothing"
+    );
+    // The claim: the contour IS a scaled copy, so the ratio does not vary.
+    assert!(
+        r_spread < 0.02,
+        "under the radius mode the first contour's `r / r_boundary` varies by \
+         {r_spread:.4} of its mean — a band of THAT coordinate is a band of \
+         constant scaling, so the ratio must be constant in theta or the level \
+         set is not a scaled copy of the outline"
+    );
+    // The control: on the same figure, in the same run, the offset coordinate's
+    // does. A dimensionless comparison, so the adapter cancels (ADR-0071).
+    assert!(
+        d_spread > 4.0 * r_spread,
+        "the distance mode's spread ({d_spread:.4}) is not meaningfully larger \
+         than the radius mode's ({r_spread:.4}) — on a pentagon an offset curve \
+         rounds the corners and a scaled copy keeps them, so if these agree the \
+         harness cannot tell the two constructions apart and the assertion above \
+         proves nothing"
+    );
+}
+
+/// **The two modes agree on a `disc`** — the harness check, and the reason the
+/// disc arm returns a literal `1.0`.
+///
+/// For a circle the two constructions coincide exactly: `mark_distance` is
+/// `length(p)` and the ratio is `length(p) / 1`. So a disagreement here convicts
+/// the wiring rather than the shape, and it is the one place in this pair where
+/// "no difference" is the claim rather than the failure.
+#[test]
+fn the_two_modes_coincide_on_a_disc() {
+    use crate::render::metrics::frame_diff;
+
+    const SIZE: u32 = 200;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    let params = |mode: &str| {
+        format!(
+            "shape = \"0\"\nscale = \"0.55\"\ncolor_span = \"0.5\"\n\
+             palette_steps = \"7\"\npalette_contour = \"0.6\"\ncoord_mode = \"{mode}\"\n"
+        )
+    };
+    renderer.set_presets(vec![
+        preset("disc_d", &params("0")),
+        preset("disc_r", &params("1")),
+    ]);
+    let a = renderer
+        .capture_preset("disc_d", &AnalysisFrame::default(), 2)
+        .expect("capture the disc under the distance mode");
+    let b = renderer
+        .capture_preset("disc_r", &AnalysisFrame::default(), 2)
+        .expect("capture the disc under the radius mode");
+
+    let differing = a
+        .rgba
+        .chunks_exact(4)
+        .zip(b.rgba.chunks_exact(4))
+        .filter(|(x, y)| x[..3] != y[..3])
+        .count();
+    println!(
+        "disc under both modes: frame_diff {:.6}, {differing} of {} pixels differ",
+        frame_diff(&a, &b),
+        (SIZE * SIZE) as usize
+    );
+    assert_eq!(
+        differing, 0,
+        "the two coordinates must draw the SAME disc — `mark_distance` is \
+         `length(p)` there and the ratio is `length(p) / 1`, so a difference is \
+         the wiring rather than the shape"
+    );
 }

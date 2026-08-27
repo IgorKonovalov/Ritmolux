@@ -321,7 +321,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` `coord_mode` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
@@ -905,6 +905,7 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20`. **Unusable on a curved or jittered star — see the warning below** |
+| `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 
 > **DO NOT BIND `gamma` WHEN `star_curve` OR `star_jitter` IS NON-ZERO. It is a NaN, and the
 > `color_center` workaround does not save you.** Those two params take the star arm's curved branch,
@@ -915,6 +916,45 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 > applied on the **next line**, after the exponent, so it cannot repair a NaN that has already
 > happened. **Only the exact identity `gamma = "1.0"` avoids it**, because that branch never calls
 > `pow`. `presets/shape_facet.toml` pins it for this reason and says so. Plan 0098 Phase 1 fixes it.
+
+#### Two coordinates — offsets and scaled copies
+
+`coord_mode` decides **what a band of the palette is a band of**. Both coordinates
+are `0` at the figure's centre and exactly `1` on its outline; what differs is
+everything in between
+([ADR-0111](../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)).
+
+| `coord_mode` | the coordinate | a contour is |
+|---|---|---|
+| `"0"` (default) | the normalized **distance** to the figure | an **offset** of the outline |
+| `"1"` | `r / r_boundary(theta)` — how far out you are as a **fraction** of the outline in that direction | a **scaled copy** of the outline |
+
+The difference is not a nuance on the shapes with a corner. An inward offset is
+an **erosion**, and erosion rounds a **reflex** corner while keeping convex ones
+sharp — so under `"0"` a nested heart keeps its bottom point and loses its top
+notch as the rings move inward, and no value of `gamma` or `palette_steps`
+recovers it. Under `"1"` the inner figures are the same figure, smaller.
+
+```toml
+[params]
+shape         = "4"        # the heart
+coord_mode    = "1"        # <- nested SCALED COPIES rather than offsets
+palette_steps = "9"        # the ring count, and now nothing trades against it
+gamma         = "1.0"      # spacing only; it no longer decides notch sharpness
+```
+
+> **`color_span` DOES NOT TRANSFER between the two modes**, on top of the
+> shape-to-shape trap the same parameter already has (above). Under `"0"` the
+> exterior is divided by the shape's inradius; under `"1"` it grows linearly in
+> `r`. A preset that switches modes has to re-tune its span, and nothing warns.
+
+**`"0"` is the default and it is bit-for-bit the arithmetic that shipped**, so no
+existing preset moves. On a `disc` the two modes are the same picture by
+construction — its offsets and its scaled copies are the same circles — and on a
+**regular polygon** they are the same picture *inside* the figure too, since
+eroding a regular polygon moves every edge in by the same amount and rounds
+nothing. The two separate outside it, and on any shape with a reflex corner they
+separate everywhere.
 
 **There is no rotation on this scene**, and `kaleido_*` is not a substitute — it folds the finished
 frame about a screen-centred axis rather than turning the figure about its own, and it fights a

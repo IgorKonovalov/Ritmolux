@@ -123,6 +123,27 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
     1.0 + heart_sd(q) / HEART_INRADIUS
 }
 
+/// **The CPU mirror of `mark_boundary_radius`** (Plan 0098 Phase 2). Kept
+/// identical by inspection, the same arrangement [`mark_distance`]'s own mirror
+/// uses and for the same reason.
+pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, _star: [f32; 3]) -> f32 {
+    if shape < 0.5 {
+        return 1.0;
+    }
+    if shape < 1.5 {
+        return RING_MID + RING_HALF;
+    }
+    if shape < 2.5 {
+        let seg = std::f32::consts::TAU / points;
+        let h = 0.5 * seg;
+        let a = p[1].atan2(p[0]);
+        let f = a - seg * (a / seg).floor() - h;
+        return h.cos() / f.cos();
+    }
+    // star and heart: Phase 3.
+    1.0
+}
+
 /// **The curved star arm's normalization reference**, mirroring the second
 /// polyline walked inside `mark_distance` above: the distance from the origin to
 /// the **unjittered** sampled boundary of one spike.
@@ -477,6 +498,7 @@ fn the_shader_chunk_substitutes_every_placeholder() {
         "unsubstituted placeholder in the mark SDF chunk:\n{wgsl}"
     );
     assert!(wgsl.contains("fn mark_distance("));
+    assert!(wgsl.contains("fn mark_boundary_radius("));
 }
 
 // --- The exterior contract (Plan 0091 Phase 2) ---------------------------------

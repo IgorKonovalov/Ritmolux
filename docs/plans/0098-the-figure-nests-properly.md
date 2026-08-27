@@ -281,8 +281,8 @@ flowchart TD
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The star's interior stops lying | dev | done | committed with this row |
-| 2 — The coordinate exists, and a polygon proves it | dev | not started | |
+| 1 — The star's interior stops lying | dev | done | `28336c3` |
+| 2 — The coordinate exists, and a polygon proves it | dev | done | committed with this row |
 | 3 — The heart and the star take the coordinate | dev | not started | |
 | 4 — `ring` gets an honest answer | dev | not started | |
 | 4b — The figure can turn | dev | not started | |
@@ -315,6 +315,24 @@ flowchart TD
   - `atan2(0, 0)` is undefined and the `star` and `polygon` arms fold on it, so a render target
     whose pixel grid puts a fragment centre exactly on the figure's centre samples one garbage
     fragment. Even-sized targets do not.
+- **Phase 2: the polygon proves the property OUTSIDE the figure, not inside it, and the plan's
+  stated mechanism does not hold in the interior.** "A scaled polygon keeps its corners, an eroded
+  one rounds them" is true outside the outline only: erosion rounds a **reflex** corner, and a
+  convex polygon has none, so eroding a *regular* polygon moves every edge in by the same amount
+  and produces a scaled copy. The two coordinates are therefore literally the same expression
+  inside one — the arm's interior is `r cos(f) / apothem` and `r_boundary` is `apothem / cos(f)`.
+  Measured on a pentagon at the first interior contour: mean `0.2513`, relative spread `0.0177`
+  under **both** modes, agreeing to four figures. `palette_steps * color_span` is set below 1 in
+  the test so the first band boundary an outward ray meets is already the exterior one; there the
+  arm measures to the edge as a segment and the separation is real — on a triangle, relative
+  spread `0.0027` (radius) against `0.0631` (distance), 23x.
+- Phase 2's selector is `coord_mode`, numeric, `0` = distance (default) and `1` = radius, quantized
+  CPU-side. It lives in `shape_field`'s own `PARAMS`, not in the shared `marks` roster: the two
+  particle scenes never call `mark_boundary_radius`.
+- `mark_boundary_radius` takes the point `p` rather than the diagram's `theta` and folds the angle
+  itself, which is `mark_distance`'s own signature and keeps the two arms reading one fold.
+- The `disc` renders **0 of 40000 pixels** different between the two modes, which is the harness
+  check ADR-0111 predicts rather than a tolerance that happened to hold.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is

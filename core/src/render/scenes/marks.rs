@@ -575,6 +575,56 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
     let q = p * MARK_HEART_SCALE + vec2<f32>(0.0, MARK_HEART_CY);
     return 1.0 + mark_heart_sd(q) / MARK_HEART_INRADIUS;
 }
+
+// The radius at which the ray from the figure's centre through `p` crosses the
+// outline — the denominator of the SCALED-COPY coordinate `r / r_boundary`
+// (ADR-0111, Plan 0098).
+//
+// It returns a radius in the same sprite-local units `mark_distance` takes, and
+// it is `mark_distance`'s sibling rather than its replacement: for a region
+// star-shaped about its centre, `length(p) / mark_boundary_radius(p, ...)` is 0
+// at the centre and exactly 1 on the outline, which is the contract the distance
+// already honours — but its level sets are **scaled copies** of the outline
+// rather than offsets of it, and no offset family can produce those.
+//
+// **Closed form per arm, never a march of the SDF.** Sphere-tracing `mark_distance`
+// would be generic and would extend to a future arm for free, at 10-20 SDF
+// evaluations per pixel, fullscreen and unconditional. ADR-0111 Alternative A
+// rejects that trade because the roster is CLOSED (ADR-0084): five closed forms
+// buy the same thing for a handful of ALU ops.
+//
+// Only `shape_field` calls this. The particle scenes read `mark_distance` and
+// only its interior, so nothing on that path can notice it exists.
+fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 {
+    if (shape < 0.5) {
+        // disc: the unit circle, at every angle. Its offsets and its scaled
+        // copies are the SAME circles, which is exactly what makes this arm the
+        // control that convicts a broken harness rather than a broken shape.
+        return 1.0;
+    }
+    if (shape < 1.5) {
+        // ring: an annulus's centre lies in its hole and a ray from there
+        // crosses the boundary twice, so the ratio has no single value here.
+        // ADR-0111 books this as the one behavioural choice it leaves open and
+        // Plan 0098 Phase 4 settles it against a rendered figure. Until then,
+        // the outer rim.
+        return MARK_RING_MID + MARK_RING_HALF;
+    }
+    if (shape < 2.5) {
+        // regular polygon: solve the arm's own `r * cos(f) / apothem = 1` for r.
+        // The fold is the SAME expression `mark_distance` computes, which is
+        // what keeps the two describing one outline rather than two.
+        let seg = MARK_TAU / points;
+        let h = 0.5 * seg;
+        let a = atan2(p.y, p.x);
+        let f = a - seg * floor(a / seg) - h;
+        return cos(h) / cos(f);
+    }
+    // star and heart: Plan 0098 Phase 3. Both admit a closed form and neither is
+    // one line, so they land together with the tests that grade them against the
+    // numerically sampled outline.
+    return 1.0;
+}
 "#;
 
 // Crate-visible under `cfg(test)` only: `shape_field`'s contour test needs the

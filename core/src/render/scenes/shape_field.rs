@@ -10,6 +10,8 @@
 //! palette coordinate = mark_distance(p) * color_span + color_center
 //! ```
 //!
+//! (that is `coord_mode`'s default; the second coordinate is below.)
+//!
 //! Because a band of the palette coordinate is now a band of constant distance,
 //! turning `palette_steps` up produces **concentric offset contours of the
 //! chosen shape** — not concentric circles, and not an outline sampled to
@@ -18,6 +20,30 @@
 //! this through the line renderer). `palette_contour` then draws thin outlines
 //! at those band boundaries, and this is the third scene that param does
 //! anything in.
+//!
+//! # Two coordinates now, and the second is the one the references asked for
+//! ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md), Plan 0098)
+//!
+//! An offset family is an **erosion**, and erosion rounds a reflex corner while
+//! keeping convex ones sharp — so a nested heart keeps its bottom point and
+//! loses its top notch as the contours move inward, and no amount of tuning
+//! reaches the construction two batches of user reference images have asked for.
+//! `coord_mode = "1"` hands the palette
+//!
+//! ```text
+//! s = length(p) / r_boundary(theta)
+//! ```
+//!
+//! instead — `0` at the centre and exactly `1` on the outline, the same contract,
+//! but its level sets are **scaled copies** of the outline. The ring count is
+//! then `palette_steps` alone and the innermost figure is a scaled copy at any
+//! count, so notch sharpness stops trading against ring count.
+//!
+//! **The distance stays the default and stays bit-identical**, which is what
+//! keeps every shipped preset and every golden baseline on the arithmetic it has
+//! today. The two are not interchangeable settings of one knob: `color_span`
+//! means a different thing under each, because the exterior is divided by the
+//! shape's inradius under one and grows linearly in `r` under the other.
 //!
 //! # It shares the shape vocabulary rather than restating it
 //!
@@ -85,6 +111,23 @@ const DEFAULT_GAMMA: f32 = 1.0;
 const MIN_GAMMA: f32 = 0.05;
 const MAX_GAMMA: f32 = 20.0;
 
+/// The `coord_mode` roster, in the order the numeric parameter selects them.
+///
+/// `0` hands the palette the normalized **distance** to the figure, whose level
+/// sets are offset curves; `1` hands it `r / r_boundary(theta)`, whose level
+/// sets are **scaled copies** of the outline
+/// ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)).
+/// Both are `0` at the figure's centre and exactly `1` on its outline; what
+/// differs is the shape of everything in between.
+pub(crate) const COORD_MODES: [&str; 2] = ["distance", "radius"];
+
+/// `coord_mode` default — **0, the distance**, and that is an obligation rather
+/// than a preference: it is the arithmetic every shipped preset and every golden
+/// baseline has today.
+const DEFAULT_COORD_MODE: f32 = 0.0;
+const MIN_COORD_MODE: f32 = 0.0;
+const MAX_COORD_MODE: f32 = COORD_MODES.len() as f32 - 1.0;
+
 /// Shared palette colour knobs (ADR-0021). `color_span = 0.6` puts the
 /// silhouette's interior (`d` in `0..1`) across the gradient's first 60 %, so
 /// the exterior contours have somewhere to go.
@@ -106,7 +149,8 @@ struct Params {
     // CPU-side), w: palette_contour
     c: vec4<f32>,
     // x: occlude (ADR-0085), y: gamma (the response exponent on the distance,
-    // exactly 1.0 for the identity), zw: reserved.
+    // exactly 1.0 for the identity), z: coord_mode (quantized CPU-side; 0 = the
+    // distance, 1 = the scaled-copy radius), w: reserved.
     d: vec4<f32>,
     // xyz: the star arm's shape params (valley, curve, jitter), conditioned
     // CPU-side. Inert on every other silhouette.
@@ -177,6 +221,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_steps = params.c.z;
     let palette_contour = params.c.w;
     let gamma = params.d.y;
+    let coord_mode = params.d.z;
     let star = params.e.xyz;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
@@ -189,10 +234,27 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let p = (uv - pan) / scale;
 
     // THE substitution this scene exists for: the palette coordinate is a
-    // DISTANCE. `mark_distance` is 0 at the figure's deepest interior point,
-    // exactly 1 on its outline, and grows outward — so a band of coordinate is
-    // a band of constant distance, which is the definition of an offset curve.
-    let d = mark_distance(p, shape, points, star);
+    // FIGURE coordinate rather than a level. Both modes are 0 at the figure's
+    // centre and exactly 1 on its outline, and both grow outward — what differs
+    // is what a band of the coordinate is a band OF.
+    //
+    // An `if` rather than a `select`, and that is not style: `select` evaluates
+    // both arms, and the second arm here is a whole second shape evaluation. The
+    // mode is a per-draw uniform, so this branch is uniform across a warp and
+    // the hardware takes one arm rather than both.
+    var d: f32;
+    if (coord_mode < 0.5) {
+        // Mode 0 — a band of the coordinate is a band of constant DISTANCE,
+        // which is the definition of an offset curve (ADR-0105). This is the
+        // default and it is bit-for-bit the arithmetic that shipped.
+        d = mark_distance(p, shape, points, star);
+    } else {
+        // Mode 1 — a band of the coordinate is a band of constant SCALING, so
+        // its level sets are scaled copies of the outline (ADR-0111). On a
+        // polygon that keeps the corners the offsets round off; on a heart it
+        // keeps the notch, which is the construction the reference images are.
+        d = length(p) / max(mark_boundary_radius(p, shape, points, star), 1e-6);
+    }
     // The response exponent, applied to the distance BEFORE it becomes a palette
     // coordinate — so it reshapes where the contours sit rather than which
     // colours they take. Above 1 the bands crowd toward the centre, which is what
@@ -263,6 +325,10 @@ pub struct ShapeFieldScene {
     /// The response exponent on the distance, raw as the preset bound it;
     /// [`applied_gamma`] conditions it on the way to the uniform.
     gamma: f32,
+    /// Which coordinate the palette is handed, raw as the preset bound it;
+    /// [`applied_coord_mode`] quantizes it on the way to the uniform, which is
+    /// where a selector's precondition belongs.
+    coord_mode: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame — **not** a named param, so
     /// it is not reset by `reset_params`.
@@ -372,6 +438,7 @@ impl ShapeFieldScene {
             palette_steps: palette::DEFAULT_PALETTE_STEPS,
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             gamma: DEFAULT_GAMMA,
+            coord_mode: DEFAULT_COORD_MODE,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -389,6 +456,24 @@ fn applied_scale(scale: f32) -> f32 {
         scale.clamp(MIN_SCALE, MAX_SCALE)
     } else {
         DEFAULT_SCALE
+    }
+}
+
+/// The `coord_mode` the shader is handed: clamped into the roster, then
+/// **rounded to an integer**, with a non-finite binding falling back to the
+/// default.
+///
+/// `marks::mark_shape`'s treatment for `marks::mark_shape`'s reason, and the
+/// `kaleido_edge` precedent behind both. A mode's values are **identities**
+/// rather than a quantity: `[smoothing]` and preset dissolves interpolate a
+/// binding continuously from one setting to another, so easing the distance to
+/// the radius passes through 0.4 and 0.6, and there is nothing halfway between
+/// an offset curve and a scaled copy for the shader to draw there.
+fn applied_coord_mode(mode: f32) -> f32 {
+    if mode.is_finite() {
+        mode.clamp(MIN_COORD_MODE, MAX_COORD_MODE).round()
+    } else {
+        DEFAULT_COORD_MODE
     }
 }
 
@@ -438,6 +523,7 @@ pub const PARAMS: &[&str] = &[
     "palette_steps",
     "palette_contour",
     "gamma",
+    "coord_mode",
 ];
 
 impl Scene for ShapeFieldScene {
@@ -470,6 +556,7 @@ impl Scene for ShapeFieldScene {
         self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.gamma = DEFAULT_GAMMA;
+        self.coord_mode = DEFAULT_COORD_MODE;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -489,6 +576,7 @@ impl Scene for ShapeFieldScene {
             "palette_steps" => self.palette_steps = value,
             "palette_contour" => self.palette_contour = value,
             "gamma" => self.gamma = value,
+            "coord_mode" => self.coord_mode = value,
             _ => {}
         }
     }
@@ -527,7 +615,12 @@ impl Scene for ShapeFieldScene {
                 palette::band_steps(self.palette_steps),
                 palette::band_contour(self.palette_contour),
             ],
-            d: [self.occlude, applied_gamma(self.gamma), 0.0, 0.0],
+            d: [
+                self.occlude,
+                applied_gamma(self.gamma),
+                applied_coord_mode(self.coord_mode),
+                0.0,
+            ],
             e: [
                 marks::star_valley(self.star_valley),
                 marks::star_curve(self.star_curve),
