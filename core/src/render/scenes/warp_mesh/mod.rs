@@ -1062,6 +1062,10 @@ pub struct WarpMeshScene {
     deposit_arms: f32,
     deposit_twist: f32,
     deposit_spin: f32,
+    /// The integrated deposit-arm rotation ([`Phase`]), beside `warp_phase` and
+    /// for the same reason (ADR-0135): a rate multiplying the shared clock lets
+    /// a binding that moves rescale all elapsed time in one frame.
+    deposit_phase: Phase,
     gamma: f32,
     wrap: f32,
     darken_center: f32,
@@ -1175,6 +1179,7 @@ impl WarpMeshScene {
             deposit_arms: DEFAULT_DEPOSIT_ARMS,
             deposit_twist: DEFAULT_DEPOSIT_TWIST,
             deposit_spin: DEFAULT_DEPOSIT_SPIN,
+            deposit_phase: Phase::default(),
             gamma: DEFAULT_GAMMA,
             wrap: DEFAULT_COMPOSITE_FLAG,
             darken_center: DEFAULT_COMPOSITE_FLAG,
@@ -1866,6 +1871,7 @@ impl Scene for WarpMeshScene {
         // `advance` runs before this frame's `set_param` calls and would
         // therefore use the previous frame's rate (ADR-0132).
         self.warp_phase.step(self.warp_speed, self.dt);
+        self.deposit_phase.step(self.deposit_spin, self.dt);
         // Kept for `render`, which drives the per-vertex program and is the only
         // place the render target's aspect is known.
         self.frame = *frame;
@@ -2053,7 +2059,7 @@ impl Scene for WarpMeshScene {
                     self.deposit_twist,
                 ],
                 c: [
-                    self.deposit_spin * self.time,
+                    self.deposit_phase.get(),
                     self.hue + self.color_center,
                     self.color_span,
                     self.saturation,

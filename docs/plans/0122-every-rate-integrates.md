@@ -304,8 +304,8 @@ impl Phase {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | committed with this row |
-| 2 — the two rates nothing binds | dev | not started | |
+| 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `5c258d0` |
+| 2 — the two rates nothing binds | dev | done | committed with this row |
 | 3 — `swarm`'s field clock | dev | not started | |
 | 4 — the guard | dev | not started | |
 | 5 — the swarm content pass | human | not started | |
@@ -314,6 +314,16 @@ impl Phase {
 
 - Phase 1 also touched `warp_mesh/tests.rs` (two tests call `integrate_phase`) and
   `particles/encode.rs` (a doc link to `advance_spin`); neither is in the phase's file list.
+- Phase 2's done-when argues the parametric golden is bit-identical because
+  `fixtures/parametric_curve.toml` binds `spin = "0"`. Four further golden fixtures bind this
+  scene's `spin` to the constant `0.4` — `composite_trails.toml`, `composite_warp_fisheye.toml`,
+  `composite_warp_ripple.toml`, `composite_warp_swirl.toml` — so the bit-identity argument covers
+  one fixture of five. The other four sit in `swarm.toml`'s class instead: `Σ(rate · dt)` against
+  `rate · Σ(dt)`, differing in the last bits of an `f32`. No baseline moved.
+- `parametric_curve`'s `time` field and its `set_time` impl are removed: the rotation was the
+  shared clock's only reader in that scene, so the field would be written and never read.
+- Phase 2 also touched `warp_mesh/tests.rs` (the two new `deposit_spin` tests) and
+  `presets/README.md`; the latter is named by the phase's last done-when but not in its file list.
 - The no-`Add` done-when is recorded here as tried-and-observed rather than as a `compile_fail`
   doctest: `Phase` is `pub(crate)`, so a doctest cannot name it and would fail on privacy instead of
   on arithmetic. Probe: `let _probe = self.fold_phase + self.fold_speed * self.time;` added to
