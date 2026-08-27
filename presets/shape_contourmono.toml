@@ -1,0 +1,146 @@
+# Contour Mono - the LIMITED INK SET of `fragment_tiledmono.toml` carried onto
+# the mechanism that suits it best: `shape_field`, where the palette coordinate
+# IS the distance to a figure, so a band of palette is a band of constant
+# distance and quantizing it draws concentric offset contours of the shape
+# (ADR-0105). Black, white and one red held to an accent - a woodcut emblem
+# rather than a printed cloth.
+#
+# THIS SCENE IS FLAT BY CONSTRUCTION, AND THAT IS THE REASON TO USE IT FOR A
+# MONO LOOK. The tiled sibling has to fight `fragment_field`'s baked-in radial
+# vignette (`glow * (1 - 0.25 * r)`) by driving its whites into the tonemap
+# shoulder at `glow = 2.6`. There is nothing to fight here: `shape_field` has no
+# `glow` param at all, and its shader hands the LUT colour to the composite
+# untouched but for the contour term. No shoulder trick, no over-range, no
+# vignette. Flat colour in, flat colour out.
+#
+# `palette_contour` IS LIVE ON THIS SCENE AND IS STILL SET TO ZERO. It is inert
+# on the particle and line scenes for want of a fragment-stage derivative, and
+# this is one of the four scenes where it genuinely works - which makes it worth
+# saying why it is off rather than leaving it looking like an oversight. It
+# darkens a hairline at EVERY band edge, and twenty steps in five runs means most
+# of those edges fall INSIDE a plateau - white meeting white, black meeting
+# black. On those the hairline is a smoothstep grey line across flat colour,
+# which is precisely the shading a two-ink print is defined by not having. At the
+# five run boundaries it has nothing to add either: black already meets white
+# there, which is maximum contrast.
+#
+# PALETTE SHARE IS PIXEL SHARE HERE, AND THAT INVERTS THE TILED SIBLING'S RULE.
+# That preset records a band taking about HALF the screen area its palette width
+# suggests, because its field is `0.5 + 0.5 * sin(...)` - arcsine, dwelling at the
+# ends of the coordinate range. A distance ramp has no such dwell: it sweeps the
+# coordinate at a near-constant rate, so every band is visited about equally.
+# Measured at loud excitation, counting every 2nd pixel:
+#
+#     red 3 bands / 15 % of palette  ->  14.86 %   (a third equal ink, not an accent)
+#     red 1 band  /  5 % of palette  ->   4.74 % loud, 4.99 % quiet
+#     red 2 bands / 10 % of palette  ->   9.42 %   <- shipped
+#
+# The correspondence is close enough to read as exact, which makes the band count
+# a direct lever on this scene in a way it is not on the other two mono worlds.
+# Two bands is what puts the ring at a confident stroke weight at full size while
+# staying inside the 5-10 % brief; one band held up at 720x405 but thinned to a
+# hairline at 1280x720 and above.
+#
+# `gamma` IS PINNED TO THE IDENTITY. `star_curve` and `star_jitter` are both zero
+# here so the NaN trap in the star arm's curved branch is not armed - but 1.0 is
+# also the only value that skips the `pow` entirely, and the contours want even
+# spacing rather than crowding. Nothing to gain by binding it.
+#
+# NO HORIZON RUN, DELIBERATELY. Nothing accumulates - no trails, no feedback, no
+# particles. Every frame is a closed-form distance evaluated from scratch, so
+# there is no axis for a horizon to find drift along (ADR-0099's trigger is not
+# met).
+system = "shape_field"
+name = "Contour Mono"
+
+[palette]
+# Twenty bands in five runs: black 5 / white 5 / black 4 / white 4 / RED 2, the
+# red wrapping back onto the opening black so the accent carries a white edge on
+# one side and a black one on the other. Read outward from the figure, that puts
+# the red ring between the white contour and the black ground every cycle.
+#
+# The red's hex is LINEAR - the palette bakes hex straight through with no sRGB
+# decode - so `#b00808` is what puts a saturated red on the glass. `#ff0000`
+# written here comes out pink.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.24, color = "#000000" },
+  { at = 0.26, color = "#ffffff" },
+  { at = 0.49, color = "#ffffff" },
+  { at = 0.51, color = "#000000" },
+  { at = 0.69, color = "#000000" },
+  { at = 0.71, color = "#ffffff" },
+  { at = 0.89, color = "#ffffff" },
+  { at = 0.91, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `scale` (the figure breathes, and every contour breathes with it)
+#   treb  -> `color_span` (the contours crowd or open out)
+#   onset -> a `color_center` push (the rings surge outward on a hit)
+#   time  -> `color_center` (the rings travel outward, forever)
+#
+# NOTHING drives luminance - there is no luminance lever on this scene to drive.
+# All of the music goes into the geometry, which is where a two-ink print wants
+# it: a flat ink cannot get brighter, only bigger.
+
+# THE FIGURE. A six-pointed star with a high valley radius - 0.62 puts the
+# valleys well out toward the tips, so the silhouette reads as a rounded rosette
+# rather than a spiky burst, and its offset contours round off further with every
+# ring outward. `star_curve` and `star_jitter` stay at their exact identities;
+# see the `gamma` note in the header.
+shape       = "3"
+points      = "6"
+star_valley = "0.62"
+star_curve  = "0"
+star_jitter = "0"
+gamma       = "1.0"
+# THE BREATH. Gain sized off the cap: a clamped term reaches its ceiling at C/G,
+# so this tops out at 0.15/0.176 = 0.85 - a typical passage sits near half, a
+# real peak reaches the cap. Measured elsewhere as monotonic in `scale`, so the
+# figure grows honestly rather than pumping.
+scale       = "0.46 + clamp(bass * 0.176, 0, 0.15)"
+
+# THE INK COUNT. Twenty bands in five runs. Contour off - see the header, this
+# is the deliberate choice on this scene rather than the default one.
+palette_steps   = "20"
+palette_contour = "0"
+
+# THE RING SPACING. `color_span` scales the distance before it becomes a palette
+# coordinate, so it sets how many full cycles of the five-run palette fit between
+# the figure and the frame edge. 0.50 gives about one and a half - roughly ten
+# contours across the short axis, coarse enough that each run reads as a stroke
+# rather than as a moire. The first draft ran 2.2 and packed six cycles in, which
+# read as an eye chart.
+color_span   = "0.50 + clamp(treb * 0.10, 0, 0.06)"
+# THE TRAVEL. Sliding the coordinate slides every contour together, and because
+# the coordinate is a distance they all travel OUTWARD from the figure. The LUT
+# is repeat-addressed, so this never resets: it wraps at 1 and the wrap lands on
+# the red-to-black seam, which is a hard edge in a look made entirely of hard
+# edges. The steady term is slow on purpose - the world's resting pulse, under
+# the breath - and the onset term rides on top of it as a surge: a hit shoves
+# every contour outward at once and it relaxes back through the release.
+color_center = "time * 0.09 + clamp(onset * 0.333, 0, 0.20)"
+saturation   = "1.0"
+
+pan_x = "0"
+pan_y = "0"
+
+# OFF - each is a gradient generator. Bloom blurs exactly the hard edges the
+# banding creates; trails would smear one ring into the next as they travel.
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+# The ring push is the one term in the mono cohort with an asymmetric constant:
+# a hit should arrive as a surge and then relax, not ease in from both sides.
+color_center = { attack = 0.08, release = 0.60 }
+# Spacing eases long - it moves every contour in the frame at once.
+color_span = 0.50
+
+# The breath eases hard: `scale` moves every contour in the frame at once, so an
+# unsmoothed bass transient reads as the whole picture flinching rather than as
+# the figure swelling.
+scale = 0.45
