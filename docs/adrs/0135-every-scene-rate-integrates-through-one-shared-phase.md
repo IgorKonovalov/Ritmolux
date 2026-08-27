@@ -33,7 +33,7 @@ rates; three integrate, three multiply the shared clock, and three multiply a pe
 **This decision corrects the first six and leaves the last three**, which is a deliberate scope call
 and not an oversight discovered later: `age` is a per-element quantity reset at spawn or at
 recomposition, so the repair is an accumulator per element rather than one `Phase` per scene, and
-that is a different shape. They are design-backlog 0145. What matters here is that the guard below
+that is a different shape. They are design-backlog 0149. What matters here is that the guard below
 **cannot see them** — see the Negative section.
 
 The three that are correct are **three separate implementations of the same three lines**, written
@@ -100,7 +100,7 @@ targets a *field* multiplying the clock, so the roughly ten legitimate `time * <
 - **`swarm_shatter` and `swarm_drift` stop lurching**, and that is the whole visible payoff of this
   ADR. They are the only presets binding a **clock**-multiplied rate to audio; `collage_onwhite`,
   `collage_suprematist` and `collage_mono` bind two `age`-multiplied ones and are not fixed here
-  (backlog 0145).
+  (backlog 0149).
 - **No golden may move, and that is arithmetic rather than hope.** Migrating the three correct sites
   preserves the summation term for term. Of the three defective sites, `swarm_shaped.toml`,
   `parametric_curve.toml` and `DEFAULT_DEPOSIT_SPIN` all sit at rate `0`, where the two forms are

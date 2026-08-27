@@ -3355,7 +3355,7 @@ claim is prose, the duplication is two constants, and the mirror divergence is u
 reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
 has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
 
-## 0145 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them
+## 0149 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them
 
 [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
 parameter in this engine integrates a phase**. [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
