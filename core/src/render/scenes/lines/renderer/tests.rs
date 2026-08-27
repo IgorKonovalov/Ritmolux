@@ -1407,6 +1407,195 @@ fn an_arcs_angular_span_is_what_it_draws() {
 }
 
 // -----------------------------------------------------------------------
+// The opacity-preserving seam (Plan 0123 Phase 7, ADR-0138)
+// -----------------------------------------------------------------------
+
+/// Two crossing strokes of two different inks, drawn either additively or over,
+/// read back as linear light. The **second** stroke in the batch is the later
+/// one, so it is the one that must survive in the overlap.
+///
+/// A sibling of [`profile_capture`] for the reason that one is a sibling of
+/// [`arc_capture`]: the property here is about the colour of specific pixels, so
+/// the target's size and the batch's composition both belong to this fixture.
+/// One context per call, as everything else in this file does.
+fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
+    use crate::render::capture;
+    use crate::render::context::RenderContext;
+
+    const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+    const SIZE: u32 = 64;
+
+    let ctx = match RenderContext::new_headless(SIZE, SIZE, true) {
+        Ok(ctx) => ctx,
+        Err(_) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+    };
+    let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("overlap-target"),
+        size: wgpu::Extent3d {
+            width: SIZE,
+            height: SIZE,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&Default::default());
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("overlap-capture"),
+        });
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("overlap-clear"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: &view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+
+    // Two fat strokes crossing at the centre, wide enough that the overlap has a
+    // real interior rather than only the coverage ramps of two edges. Red first,
+    // then white: the property names the LATER one.
+    let segments = [
+        SegmentInstance {
+            a: [-4.0, 0.0],
+            b: [4.0, 0.0],
+            color: [1.0, 0.0, 0.0],
+            width: 0.30,
+            joined: 0,
+            alpha: 1.0,
+        },
+        SegmentInstance {
+            a: [0.0, -4.0],
+            b: [0.0, 4.0],
+            color: [1.0, 1.0, 1.0],
+            width: 0.30,
+            joined: 0,
+            alpha: 1.0,
+        },
+    ];
+
+    let mut renderer =
+        super::LineRenderer::new_split_with_arcs(&ctx.device, FORMAT, segments.len(), 0, "overlap");
+    // `softness = 0`: a solid stroke with a one-pixel edge, so the centre of the
+    // overlap is at full coverage and the property is read where it is stated —
+    // in the INTERIOR, not on a ramp.
+    if opaque {
+        renderer.draw_opaque(
+            &ctx.queue,
+            &mut encoder,
+            &view,
+            1.0,
+            1.0,
+            0.0,
+            ViewTransform::default(),
+            &segments,
+            &[],
+        );
+    } else {
+        renderer.draw(
+            &ctx.queue,
+            &mut encoder,
+            &view,
+            1.0,
+            1.0,
+            0.0,
+            ViewTransform::default(),
+            &segments,
+        );
+    }
+
+    let (buffer, padded_bpr) = capture::create_linear_readback(&ctx.device, SIZE, SIZE);
+    capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, SIZE, SIZE);
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+    Some(
+        capture::read_back_linear(&ctx.device, &buffer, SIZE, SIZE, padded_bpr)
+            .expect("read back the overlap capture"),
+    )
+}
+
+/// The `(r, g, b)` of the pixel at the centre of a `SIZE`-square linear capture.
+fn centre_rgb(pixels: &[f32], size: u32) -> (f32, f32, f32) {
+    let mid = size / 2;
+    let i = ((mid * size + mid) * 4) as usize;
+    (pixels[i], pixels[i + 1], pixels[i + 2])
+}
+
+/// **The property ADR-0138's first delivery is for**: in the *interior* of an
+/// overlap, two strokes of two different inks give the colour of the **later**
+/// stroke, not the sum of the two.
+///
+/// Stated for the interior because a stroke's edge is a coverage ramp and the
+/// property there is a blend by construction — a different claim, and one this
+/// fixture deliberately does not make. The centre pixel is interior to both
+/// strokes at these widths.
+///
+/// The additive control is what makes this non-vacuous: the same two strokes
+/// through the additive seam **do** sum, which is the behaviour the limited-ink
+/// class exists to opt out of, and the reason a quantized palette's plateaus
+/// vanish on every line scene that cannot.
+#[test]
+fn the_opaque_seam_replaces_the_interior_of_an_overlap_where_additive_sums_it() {
+    const SIZE: u32 = 64;
+    // Slack for the half-precision target and the profile's one-pixel edge term
+    // at the centre. Both properties below are exact in real arithmetic.
+    const SLACK: f32 = 0.02;
+
+    let Some(additive) = overlap_capture(false) else {
+        return;
+    };
+    let Some(opaque) = overlap_capture(true) else {
+        return;
+    };
+
+    let (ar, ag, ab) = centre_rgb(&additive, SIZE);
+    let (or_, og, ob) = centre_rgb(&opaque, SIZE);
+
+    // The later stroke is white, so every channel is up. Green and blue are the
+    // discriminating pair: the earlier stroke is pure red and contributes
+    // nothing to them, so they cannot separate the two seams — but red can.
+    assert!(
+        og > 1.0 - SLACK && ob > 1.0 - SLACK,
+        "the later (white) stroke must own the overlap interior under OVER, \
+         got ({or_}, {og}, {ob})"
+    );
+    assert!(
+        (or_ - 1.0).abs() < SLACK,
+        "under OVER the interior is the later stroke's red, 1.0 — not the sum of \
+         two reds; got {or_}"
+    );
+
+    // The control. Additive light sums the two reds, so the interior is over
+    // range where the OVER seam holds it at the ink's own value.
+    assert!(
+        ar > 1.0 + 4.0 * SLACK,
+        "THE ADDITIVE CONTROL must sum the two reds past the ink's own 1.0, or \
+         this test is not separating two seams; got {ar} against {or_}"
+    );
+    assert!(
+        ag > 1.0 - SLACK && ab > 1.0 - SLACK,
+        "sanity: the additive control's white stroke lights every channel, \
+         got ({ar}, {ag}, {ab})"
+    );
+}
+
+// -----------------------------------------------------------------------
 // The across-the-stroke profile (Plan 0114 Phase 1, ADR-0124)
 // -----------------------------------------------------------------------
 

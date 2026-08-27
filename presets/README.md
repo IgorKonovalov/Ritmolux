@@ -314,12 +314,12 @@ preset folder — so while you are editing a file it re-rolls on each save.
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `field_speed` `fold_speed` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` `star_valley` `star_curve` `star_jitter` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `stroke_blend` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `stroke_blend` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `softness` `stroke_blend` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `stroke_blend` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` `coord_mode` `rotation` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
@@ -1657,6 +1657,28 @@ wrong one is the trap the `glow` entry below records.
   > profile whatever it asks for. That is the same regime as the `thickness` dead
   > zone above, one derivative up.
 
+- `stroke_blend` — which **seam** the figure draws through, default `0`. At `0`
+  the batch is **additive light** (ADR-0056), which is what these four scenes
+  have always drawn: overlapping strokes sum, so white over red is pink. At `1`
+  the whole batch — segments and any arcs together — composites **over**, so a
+  stroke laid on another **replaces the interior of what it covers** and a
+  quantized palette keeps its plateaus. That is the difference between a
+  luminous world and a printed one, and it is the entry point to the
+  [limited-ink class](../docs/preset-palettes.md).
+
+  > **It is a switch, not a mix**: a draw call has one blend mode, so the
+  > decision is taken at `0.5` on the CPU each frame. Values in between select
+  > one seam or the other, not a blend of the two — a `[smoothing]` entry on this
+  > param buys you a delayed flip, nothing more.
+  >
+  > **Opaque strokes are ordered.** Additive light is order-independent; OVER is
+  > not, so which stroke wins an overlap is the order the scene emits its
+  > geometry in. That is what makes the seam useful and also what makes a figure
+  > look different beyond its palette when you flip it.
+  >
+  > **Turning it on usually costs `brightness`.** Additive light builds up where
+  > a figure crosses itself, and a dense rosette leans on that. Under OVER it
+  > does not, so the same `brightness` reads flatter and often darker.
 - `glow` — the line renderer's **per-segment light** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
   four. **It multiplies the stroke's colour and never its coverage**: a dimmed
