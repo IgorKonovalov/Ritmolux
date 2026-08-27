@@ -297,12 +297,12 @@ fn each_kind_renders_its_own_dissolve() {
     // **This tolerance is wider than the spatial one, and Plan 0045 Phase 3 is
     // why.** `region_progress` measures in the linear light of the *displayed*
     // frames, and since the tonemap those are downstream of a compressive curve
-    // (ADR-0046): a region whose pre-map values sit above the knee has its
-    // `|mid - a|` squeezed harder than its `|b - a|`, so it *reads* as less
-    // travelled even though the blend mixed it uniformly. The uniformity claim is
-    // about the blend, which still works in linear light; only the measurement
-    // now sees the mix through the map. Measured 0.514 dark vs 0.239 bright right
-    // after the conversion — 0.275 apart, against the 0.25 this used to allow.
+    // (ADR-0046): a region whose pre-map values sit above the knee has its `|mid
+    // - a|` squeezed harder than its `|b - a|`, so it *reads* as less travelled
+    // even though the blend mixed it uniformly. The uniformity claim is about the
+    // blend, which still works in linear light; only the measurement now sees the
+    // mix through the map. Measured 0.514 dark vs 0.239 bright right after the
+    // conversion — 0.275 apart, against a pre-conversion allowance of 0.25.
     assert!(
         (cf_dark - cf_bright).abs() < 0.35,
         "crossfade mixes uniformly across tones: {cf_dark} vs {cf_bright}"
@@ -655,16 +655,16 @@ fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
         span > 0.05,
         "the heavy pair must actually look different across the dissolve: {span}"
     );
-    // 0.15, not 0.2, since Plan 0045 Phase 3. This pair is deliberately
-    // lopsided — the attractor's accumulation is far brighter than the diffusion
-    // field — so a linear-light crossfade already sits nearer the bright side at
-    // t = 0.5, and the float composite moved it nearer still: the attractor's
-    // densest regions used to clip to white, and a clipped side contributes the
-    // *same* value to the mix as to its own endpoint. Unclipped, it carries more
-    // of the midpoint. Measured 0.194 of the span right after the conversion,
-    // against the 0.2 this used to require. The claim being made — the midpoint
-    // is neither endpoint — is unaffected; only the margin was calibrated on a
-    // clipping composite.
+    // 0.15, not 0.2, since Plan 0045 Phase 3. This pair is deliberately lopsided
+    // — the attractor's accumulation is far brighter than the diffusion field —
+    // so a linear-light crossfade already sits nearer the bright side at t =
+    // 0.5, and the float composite moves it nearer still: on an 8-bit composite
+    // the attractor's densest regions clip to white, and a clipped side
+    // contributes the *same* value to the mix as to its own endpoint. Unclipped,
+    // it carries more of the midpoint. Measured 0.194 of the span right after
+    // the conversion, against a pre-conversion requirement of 0.2. The claim
+    // being made — the midpoint is neither endpoint — is unaffected; only the
+    // margin was calibrated on a clipping composite.
     assert!(
         frame_diff(mid, first) > 0.15 * span && frame_diff(mid, last) > 0.15 * span,
         "the heavy pair's mid-dissolve frame must be a blend of both, not either end"
@@ -872,8 +872,8 @@ fn a_switch_mid_dissolve_lands_on_the_last_requested_preset() {
 /// close review, minor 1).
 ///
 /// A dissolve does not flip the roster until its *capture* frame has rendered, so
-/// a second switch arriving before that frame used to read a roster still pointing
-/// at the outgoing preset — `cycle_preset` would compute "next" from where the show
+/// a second switch arriving before that frame reads a roster still pointing at
+/// the outgoing preset — `cycle_preset` would compute "next" from where the show
 /// started rather than where it was already going, and silently absorb the press.
 /// Settling the dissolve in flight before reading the roster is what makes a
 /// double-tap of Space behave like two taps either side of a frame.

@@ -1,5 +1,5 @@
 //! **The warp mesh renders, moves, and reacts** (Plan 0100 Phase 1's done-when,
-//! [ADR-0113](../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! ADR-0113).
 //!
 //! # Why this file exists at all
 //!
@@ -55,15 +55,13 @@ const SIZE: u32 = 96;
 ///
 /// **Audited at Plan 0116 Phase 3: `BLACK` stayed, and it is now a divergence
 /// rather than a restatement.** `sanity.rs` derives its reference from each
-/// capture ([ADR-0126]); this file does not. Every floor below was measured
+/// capture (ADR-0126); this file does not. Every floor below was measured
 /// against the constant, and re-basing the predicate without re-deriving them
 /// would move this file's verdicts on a plan that measured none — Plan 0116
 /// Phase 4 re-derives `sanity.rs`'s own floors and is scoped to that file. The
 /// `warp_mesh` presets are lit-on-dark, so the two lenses agree on them today;
 /// the day one paints its own ground, these floors need the same re-derivation
 /// and this comment is the pointer to it.
-///
-/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 const EPS: u8 = 10;
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 const MIN_QUADRANTS: u8 = 2;
@@ -558,7 +556,7 @@ fn shader_fixture() -> Preset {
 /// followed by translated code. The prelude is ~2 KB of generated text and
 /// ADR-0118 changed it this month, so a verbatim copy in a `.toml` **will**
 /// drift. When it does, this fails and names the repair — rather than the
-/// fixture silently pinning a surface the engine no longer emits.
+/// fixture silently pinning a surface the engine does not emit.
 #[test]
 fn the_fixture_shaders_begin_with_the_prelude() {
     use lmv_core::milk::shader::{COMP_GROUP, WARP_GROUP, fragment_prelude};
@@ -788,9 +786,9 @@ fn with_blur_level(text: &str, level: u8) -> String {
 /// whichever blocks its `.milk` had, and carrying one shader and not the other
 /// is ordinary.
 ///
-/// The bar is the plan's — each variant builds and renders a full-size frame
-/// without panicking — and deliberately not `sanity.rs`'s floors. A surface with
-/// half its shaders replaced by the built-in defaults renders a legitimately
+/// The bar is that each variant builds and renders a full-size frame without
+/// panicking, and deliberately not `sanity.rs`'s floors. A surface with half
+/// its shaders replaced by the built-in defaults renders a legitimately
 /// different picture, and holding it to the whole fixture's numbers would pin
 /// something this phase does not claim.
 #[test]
@@ -870,8 +868,8 @@ fn each_partly_absent_shader_surface_builds_and_renders() {
 /// arms can differ at all.
 ///
 /// If this ever comes back equal, that is a finding about what bindings 12..14
-/// resolve to when no chain is built — it belongs in the plan's followups, and
-/// it is **not** a cue to tune the fixture until it goes away.
+/// resolve to when no chain is built — that is a followup to file, and it is
+/// **not** a cue to tune the fixture until it goes away.
 #[test]
 fn the_blur_chain_changes_the_picture() {
     let Some(mut renderer) = headless() else {

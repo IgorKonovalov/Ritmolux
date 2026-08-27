@@ -87,11 +87,10 @@ use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 ///
 /// The scene targets, both post stages, the transition blend's two sides and the
 /// tonemap's own input are all this — the surface format stops at the tonemap,
-/// which is where the frame becomes display-referred. Before this plan every one
-/// of those intermediates ran at the surface's 8 bits, so an additive
-/// accumulation clipped per channel at each hand-off: the "additive ceiling"
-/// ADR-0046's Context catalogues, and the reason a bright-pass had nothing
-/// correct to bloom from.
+/// which is where the frame becomes display-referred. Running those
+/// intermediates at the surface's 8 bits instead clips an additive accumulation
+/// per channel at each hand-off: the "additive ceiling" ADR-0046's Context
+/// catalogues, and the reason a bright-pass had nothing correct to bloom from.
 ///
 /// `Rgba16Float` rather than 32-bit because it is the format
 /// [`PingPongField`](feedback::PingPongField) has shipped on since Plan 0014 —
@@ -1552,10 +1551,10 @@ impl Renderer {
     /// The active adapter's description — name, backend, device type and driver.
     ///
     /// **For reports that have to name the machine they were taken on**
-    /// ([ADR-0071](../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
-    /// a frame time is a fact about a GPU and a driver rather than about the
-    /// code, so a cost instrument that prints one has to say which. Read by
-    /// `core/tests/collage_cost.rs`; nothing on a render path consults it.
+    /// (ADR-0071): a frame time is a fact about a GPU and a driver rather
+    /// than about the code, so a cost instrument that prints one has to say
+    /// which. Read by `core/tests/collage_cost.rs`; nothing on a render path
+    /// consults it.
     pub fn adapter_description(&self) -> &str {
         self.ctx.adapter()
     }

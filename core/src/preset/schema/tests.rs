@@ -193,9 +193,9 @@ fn a_declared_roster_parses_in_order_with_its_defaults() {
     assert_eq!(rings[1].phase, 0.0, "phase defaults");
 }
 
-/// **Validated once, at the boundary** (the project's rule, and the plan's
-/// explicit instruction): an unknown motif and a non-positive count are load
-/// errors rather than something the placement arithmetic has to survive.
+/// **Validated once, at the boundary** (the project's rule): an unknown
+/// motif and a non-positive count are load errors rather than something
+/// the placement arithmetic has to survive.
 #[test]
 fn a_malformed_ring_is_a_load_error_naming_what_is_wrong() {
     let unknown =

@@ -1,5 +1,5 @@
 //! **What the scaled-copy coordinate costs, per frame** (Plan 0098 Phase 5,
-//! [ADR-0111](../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)).
+//! ADR-0111).
 //!
 //! ADR-0111 argues that the closed forms are "a handful of ALU ops, the same
 //! order as the SDF they sit beside", and that this is what makes the second
@@ -13,8 +13,7 @@
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
+//! Per ADR-0071 a numeric contract states a property or names the configuration it was taken
 //! on. A frame time is the second kind — a fact about a GPU, a driver and a
 //! window size — so **there is no threshold here.** The test renders the cases,
 //! prints what it saw, and asserts only that it measured genuinely different

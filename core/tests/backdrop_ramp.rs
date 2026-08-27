@@ -1,14 +1,14 @@
 //! The backdrop paints a directional ramp (Plan 0080, ADR-0094) and one curved
 //! band over it (Plan 0081, ADR-0095).
 //!
-//! The pass used to take **one** palette sample and multiply it by a fixed
-//! upward brightness tilt. It now sweeps a *segment* of the preset's gradient
-//! along a ramp axis, with a brightness ramp on that same axis, an easing
-//! exponent shaping both, and an angle turning it — and adds a soft gaussian
-//! band over the result, on an axis of its own. This suite is the behavioural
-//! half of both; the identity half — that every default renders byte-identically
-//! to the picture before it — is the golden suite's bless-to-bless control, which
-//! is a claim about *bytes* and belongs there rather than here.
+//! The pass sweeps a *segment* of the preset's gradient along a ramp axis, with a
+//! brightness ramp on that same axis, an easing exponent shaping both, and an
+//! angle turning it — rather than taking **one** palette sample and multiplying
+//! it by a fixed upward tilt — and adds a soft gaussian band over the result, on
+//! an axis of its own. This suite is the behavioural half of both; the identity
+//! half — that every default renders byte-identically to the picture before it —
+//! is the golden suite's bless-to-bless control, which is a claim about *bytes*
+//! and belongs there rather than here.
 //!
 //! **One file, not two**, because the band is the same pass through the same
 //! helpers: a second binary would duplicate every capture, probe and locator
@@ -165,9 +165,9 @@ fn distance(a: [u8; 3], b: [u8; 3]) -> i32 {
         .sum()
 }
 
-/// The mid-column row whose colour is closest to `target`. Used to *locate* a
-/// ramp's midpoint against a pinned control rather than to compute where it
-/// should be.
+/// The mid-column row whose colour is closest to `target`. It *locates*
+/// a ramp's midpoint against a pinned control rather than computing
+/// where it should be.
 fn closest_row(image: &CaptureImage, target: [u8; 3]) -> u32 {
     let column = mid_column(image);
     let mut best = (0u32, i32::MAX);
@@ -465,8 +465,7 @@ fn an_out_of_range_exponent_lands_on_its_rail() {
 
 /// **The ramp's angle is true in screen pixels, and the aspect it uses comes
 /// from the destination surface rather than the chain's internal grid** —
-/// [ADR-0037](../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
-/// trap, which has shipped twice and is worse than usual here.
+/// ADR-0037's trap, which has shipped twice and is worse than usual here.
 ///
 /// At `bg_angle = 0` the aspect term *provably* cancels (`d = (0, 1)`, so the
 /// denominator is `aspect * 0 + 1`), so no default-angle test anywhere in this
@@ -487,12 +486,12 @@ fn an_out_of_range_exponent_lands_on_its_rail() {
 ///
 /// # Why a post stage has to be active
 ///
-/// With an empty chain `target.size` **is** `surface`, so the wrong source
-/// would measure right and the control would be theatre. `trails` forces the
+/// With an empty chain `target.size` **is** `surface`, so the wrong source would
+/// measure right and the control would be theatre. `trails` forces the
 /// disagreement: at a 160x100 surface the internal grid quantizes to a **square
 /// 256x256** (a 256 px step over a 1920x1080 cap), which is aspect 1.0 exactly —
-/// the plan's "aspect forced to 1.0" is not a hypothetical, it is what the
-/// adjacent line in `composite_into` would hand over.
+/// an "aspect forced to 1.0" is not a hypothetical here, it is what the adjacent
+/// line in `composite_into` would hand over.
 ///
 /// The stage is safe to switch on here because the backdrop is **not inside the
 /// chain** (ADR-0055): it paints `destination` and the chain composites over it.
@@ -769,10 +768,11 @@ fn the_bands_envelope_reaches_one_over_e_at_the_half_width_its_param_names() {
 /// build condition (ADR-0095), and the near-black sky the reference photograph
 /// actually is.
 ///
-/// Below a visible `bg_bright` this pass used to skip building its gradient
-/// pipeline entirely and clear the frame black. A galaxy over an unlit ground
-/// would have rendered *nothing*, silently, and no test that only ever runs a
-/// lit backdrop could see it: the one-line condition is the whole subject here.
+/// A build condition on `bg_bright` alone skips the gradient pipeline
+/// entirely below a visible sky and clears the frame black, so a galaxy
+/// over an unlit ground renders *nothing*, silently, where no test that
+/// only ever runs a lit backdrop can see it: the one-line condition is
+/// the whole subject here.
 ///
 /// The `bg_band_amount = 0` companion capture is what makes this a measurement
 /// of the condition rather than of the band — same preset, same unlit ground,
@@ -876,7 +876,7 @@ fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
 }
 
 /// **The bow is where the arithmetic puts it, and it is symmetric** — the arc
-/// (ADR-0095), and the *second* place [ADR-0037] applies in this pass.
+/// (ADR-0095), and the *second* place ADR-0037 applies in this pass.
 ///
 /// `centre = bg_band_pos + bg_band_curve * 4t(1-t)`, where `t` runs **along** the
 /// band. That form is zero at both ends and `1` in the middle, so `bg_band_curve`
@@ -891,10 +891,10 @@ fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
 ///
 /// # Why this runs at a non-square target, and what it does and does not catch
 ///
-/// The along-band axis is new, and until this phase **nothing read it**: with
-/// `bg_band_curve = 0` the shader never touches `t`. So this is the first
-/// measurement that can see its normalizer at all, and it can only see it where
-/// the aspect is not 1.
+/// **Nothing reads the along-band axis unless `bg_band_curve` is
+/// non-zero**: at zero the shader never touches `t`. So a measurement
+/// can only see that axis's normalizer with the curve on, and only
+/// where the aspect is not 1.
 ///
 /// `t` is unclamped by design. With the right normalizer it lands in [0, 1] by
 /// construction; with a wrong one it leaves that range near the frame edges,
@@ -903,16 +903,14 @@ fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
 /// numerator) moves the edge columns' centrelines to rows 30.39 and 29.03 and
 /// shears the arc by 1.36 rows, failing on the first edge assertion.
 ///
-/// **What this does *not* catch is [ADR-0037]'s own trap, and that is fine.**
-/// The plan expected the along-axis aspect *not* to cancel at the default angle.
-/// It does: the denominator is `aspect` while the numerator carries
-/// `ndc.x * aspect`, so the two divide out exactly as they do on the ramp. It
-/// costs nothing, because all three axes read the single aspect the pass is
-/// handed — so where that number comes from is one property with one control,
-/// and [`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`] is
+/// **What this does *not* catch is ADR-0037's own trap, and that is fine.** The
+/// plan expected the along-axis aspect *not* to cancel at the default angle. It
+/// does: the denominator is `aspect` while the numerator carries `ndc.x *
+/// aspect`, so the two divide out exactly as they do on the ramp. It costs
+/// nothing, because all three axes read the single aspect the pass is handed —
+/// so where that number comes from is one property with one control, and
+/// [`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`] is
 /// already it.
-///
-/// [ADR-0037]: ../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
 #[test]
 fn the_bands_centreline_bows_by_its_curve_and_stays_symmetric() {
     // Aspect 2.5, and 64 rows so the across-axis geometry is the one the 1/e

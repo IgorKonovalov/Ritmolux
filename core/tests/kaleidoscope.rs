@@ -1,7 +1,7 @@
 //! Pixel-level properties of the kaleidoscope fold: it does not tear at a
 //! fractional order (Plan 0049 Phase 1), it does not paint outside its disc
-//! (Plan 0045 Phase 1 / [ADR-0047], design-backlog 0010), and — Plan 0045 Phase
-//! 2b / [ADR-0055] — its falloff lands on the **backdrop** rather than on black,
+//! (Plan 0045 Phase 1 / ADR-0047, design-backlog 0010), and — Plan 0045 Phase
+//! 2b / ADR-0055 — its falloff lands on the **backdrop** rather than on black,
 //! while the backdrop itself stays out of the fold.
 //!
 //! The last two need a **lit** backdrop and say so in their own comments: every
@@ -18,13 +18,12 @@
 //! property of `falloff` alone. It is not a rule about folding, and a fill
 //! treatment "tripping" it is that treatment working.
 //!
-//! **`falloff` is no longer the default, so every capture that asserts its
-//! properties binds [`EDGE_FALLOFF`] explicitly.** Phase 2's live A/B made `tile`
-//! the resting treatment; before that these tests got `falloff` by saying nothing,
-//! and leaving them silent would have quietly turned three domain assertions into
-//! assertions about a treatment that fills the frame by design. Anything here that
-//! does *not* pin the param is exercising the shipped default deliberately, and
-//! says so.
+//! **`falloff` is not the default, so every capture that asserts its properties
+//! binds [`EDGE_FALLOFF`] explicitly.** Phase 2's live A/B made `tile` the resting
+//! treatment; a test that gets `falloff` by saying nothing would quietly turn
+//! three domain assertions into assertions about a treatment that fills the frame
+//! by design. Anything here that does *not* pin the param is exercising the
+//! shipped default deliberately, and says so.
 //!
 //! The two fill treatments carry the properties that are true of *them*
 //! ([`the_fill_treatments_cover_the_out_of_disc_region_without_smearing`]): the
@@ -45,23 +44,20 @@
 //!
 //! # Why the disc guard lives here and not in `composite.rs`
 //!
-//! Plan 0045 Phase 1 lists `core/tests/composite.rs` for it. That file pins two
-//! **blessed baselines** at a load-bearing 160x100, and its own module docs are
-//! the record of why building GPU resources mid-run must not happen near them: a
-//! second `Renderer::new_headless` is documented to change what the trails stage
-//! resolves to on the WARP software adapter. This guard needs a *portrait* target
-//! and a border-filling fixture, so it cannot share that renderer — it would have
-//! to construct a second one in the same binary, beside the baselines, which is
-//! the one thing that file exists to avoid. It is the same fold, so it joins the
-//! fold's own binary instead. Nothing else about the assertion changes.
+//! This guard needs a *portrait* target and a border-filling fixture,
+//! so it cannot share `composite.rs`'s renderer — it would have to
+//! build a second one in that binary, beside two blessed baselines, and
+//! that file's own module docs record why building GPU resources
+//! mid-run must not happen near them. It is the same fold, so it joins
+//! the fold's own binary instead.
 //!
 //! The fold wraps `a = atan2(p.y, p.x) + angle` with `a - seg * floor(a / seg)`,
 //! `seg = 2*pi/order`, then mirrors within the wedge. `atan2`'s branch cut lies on
 //! the **-x ray**, where the angle jumps by exactly `2*pi`. The wrap-and-mirror is
 //! periodic in `seg`, so it absorbs that jump only when `2*pi` is a whole multiple
-//! of `seg` — only, that is, when `order` is an integer. Before Phase 1 the CPU
-//! side clamped the order and never rounded it, so a fractional order tore the
-//! frame along one horizontal ray from the centre to the left edge.
+//! of `seg` — only, that is, when `order` is an integer. A fractional order that
+//! reaches the shader unrounded tears the frame along one horizontal ray from the
+//! centre to the left edge, which is why the CPU side rounds it.
 //!
 //! # `kaleido_angle` must be non-zero or there is nothing to see
 //!
@@ -73,7 +69,7 @@
 //! the bug is present, which is a green test that proves nothing.
 //!
 //! Rotate the fold and the cancellation goes: the two rows are then `a = angle ±
-//! (pi - d)`, no longer negatives of each other, and they land half a wedge apart.
+//! (pi - d)` — not negatives of each other — and they land half a wedge apart.
 //! That is not a contrived configuration — **10 of the 12 shipped presets with an
 //! active fold drive `kaleido_angle = "time * k"`** (a thirteenth, `swarm_dense`,
 //! pins the order at 1 so the fold is off), so the angle is non-zero on all but a
@@ -430,7 +426,7 @@ fn the_falloff_treatment_paints_nothing_outside_its_disc() {
         ..Default::default()
     };
     // `kaleido_edge` is pinned: `falloff` is the treatment this property belongs
-    // to and it is no longer what an unbound preset gets (module docs).
+    // to and it is **not** what an unbound preset gets (module docs).
     let mut capture = |order: f32| {
         let toml = format!(
             "{FIELD_FIXTURE}kaleido_order = \"{order}\"\nkaleido_angle = \"{ANGLE}\"\n\
@@ -497,7 +493,7 @@ fn the_falloff_treatment_paints_nothing_outside_its_disc() {
 
 /// A lit backdrop for the fold fixtures. `bg_vignette` is deliberately non-zero:
 /// it is the backdrop's own frame-centred radial structure, and the second test
-/// below is that the fold no longer replicates it into the wedges.
+/// below is that the fold does not replicate it into the wedges.
 const LIT_BG: &str = "bg_bright = \"0.55\"\nbg_hue = \"0.62\"\nbg_vignette = \"0.35\"\n";
 
 /// An off-centre fold axis for the invariance test.
@@ -603,11 +599,11 @@ fn the_falloff_lands_on_the_backdrop_not_on_black() {
 /// The backdrop is composited **under** the fold, so moving the fold axis does not
 /// move the backdrop.
 ///
-/// `post.rs` used to render the backdrop into the first active stage's *input*,
-/// which put it inside the texture the kaleidoscope folds: `bg_vignette`'s radial
-/// darkening was replicated into the wedges, around an axis that — once Phase 1
-/// made the fold centre bindable — need not be the vignette's centre at all. With
-/// the backdrop underneath the chain (ADR-0055), the region outside the disc is
+/// Rendering the backdrop into the first active stage's *input* would put it
+/// inside the texture the kaleidoscope folds: `bg_vignette`'s radial darkening
+/// replicated into the wedges, around an axis that — the fold centre being
+/// bindable since Phase 1 — need not be the vignette's centre at all. With the
+/// backdrop underneath the chain (ADR-0055), the region outside the disc is
 /// untouched backdrop and is therefore *identical* however the fold axis moves.
 #[test]
 fn the_backdrop_is_not_folded_so_it_does_not_move_with_the_fold_axis() {

@@ -224,7 +224,7 @@ flowchart TB
   - **The preset's own header stops naming a blocker that no longer exists.** It records what held it
     and what released it, in the shape `presets/pending/README.md` requires of an entry — an entry
     leaves as soon as its blocker lifts, and a stale blocker in a shipped preset's header is the
-    class of comment [Plan 0118](../0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
+    class of comment [Plan 0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is
     about. **It also carries the one line that makes it un-editable-by-accident**: this preset's
     frame is a calibration anchor for `boundary_floor`'s default arm, and re-tuning it re-opens
     that constant.

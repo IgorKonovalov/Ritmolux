@@ -4,7 +4,7 @@
 //! their own file because they are the single largest thing in `particles/` and
 //! they change for entirely different reasons than the scene that dispatches
 //! them: Plans 0073 and 0074 nearly doubled `STEP_SHADER` and `DRAW_SHADER`
-//! between two re-measures of this plan.
+//! between two re-measures of the module.
 //!
 //! `projection_mirror` — the CPU transcription that pins `DRAW_SHADER`'s
 //! projection — stays a child of `particles`, so it still reaches these

@@ -74,11 +74,10 @@ pub const BINDINGS: &[&str] = &[
 /// `vec4` rows per matrix — the shape `float4x3` indexes as.
 pub const ROT_MATRICES: usize = 24;
 
-/// **The feedback-field quantizer** ([ADR-0118](../../../docs/adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)),
-/// as WGSL — the *one* text, emitted into every converted module by
-/// [`fragment_prelude`] and concatenated onto the engine's own built-in warp
-/// fragment by `render/scenes/warp_mesh`. A transfer function written out twice
-/// is a transfer function that drifts.
+/// **The feedback-field quantizer** (ADR-0118), as WGSL — the *one* text,
+/// emitted into every converted module by [`fragment_prelude`] and concatenated
+/// onto the engine's own built-in warp fragment by `render/scenes/warp_mesh`. A
+/// transfer function written out twice is a transfer function that drifts.
 ///
 /// # Why the round trip
 ///

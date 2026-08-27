@@ -317,7 +317,7 @@ fn ring(motif: Motif, count: u32, radius: f32, scale: f32) -> RingSpec {
 /// (design-backlog 0073). The roster is kept here verbatim because what it
 /// pins is the *geometry* claim — rings put segments at four radii where a
 /// bare interlace puts them at one — and that is unaffected by whether any
-/// preset ships it. It is now a fixture, and no longer also a preset.
+/// preset ships it. It is a fixture here, and nothing else.
 fn mandala_roster() -> Vec<RingSpec> {
     vec![
         ring(Motif::Trefoil, 1, 0.00, 0.46),
@@ -777,11 +777,11 @@ fn a_placed_motif_keeps_its_outward_end_outward() {
     assert!(inner[1] < 0.6, "the cusp is on the centre side of the copy");
 }
 
-/// **The cap is a silent truncation, not a new failure mode** (the plan's
-/// explicit instruction, and ADR-0007's behaviour on the turtle). It also
-/// must not be a *slow* one: the build stops at the cap rather than looping
-/// over a large `count` to count drops it will never emit, which is what the
-/// arithmetic below stands in for.
+/// **The cap is a silent truncation, not a new failure mode** — ADR-0007's
+/// behaviour on the turtle, applied here. It also must not be a *slow* one:
+/// the build stops at the cap rather than looping over a large `count` to
+/// count drops it will never emit, which is what the arithmetic below stands
+/// in for.
 #[test]
 fn the_cap_truncates_and_the_drop_is_counted_without_being_surfaced() {
     let cap = 100usize;
@@ -843,8 +843,9 @@ fn the_cap_truncates_and_the_drop_is_counted_without_being_surfaced() {
         widest < 36,
         "and it costs fewer than the 36 segments it was, not more: {widest}"
     );
-    // ...and the cheapest is now a circle, which used to be among the dearest.
-    // That inversion is ADR-0098's tier-headroom claim stated as an ordering.
+    // ...and the cheapest is a circle, which under sampled polylines is
+    // among the dearest. That inversion is ADR-0098's tier-headroom
+    // claim stated as an ordering.
     assert_eq!(
         Motif::Circle.instances(),
         1,

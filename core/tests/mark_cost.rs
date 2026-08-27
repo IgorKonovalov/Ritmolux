@@ -1,5 +1,5 @@
 //! **What a shaped mark costs, per frame** (Plan 0070 Phase 4,
-//! [ADR-0084](../../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)).
+//! ADR-0084).
 //!
 //! The silhouette roster puts a branch in the hottest fragment shader in the
 //! engine: the swarm draws its whole tier of sprites every frame, and every
@@ -8,14 +8,13 @@
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
-//! on. A frame time is the second kind — it is a fact about a GPU, a driver and a
-//! window size, not about the code — so **there is no threshold here.** The test
-//! renders the cases, prints what it saw, and asserts only that it measured
-//! genuinely different shaders. Nothing about `main` being green depends on the
-//! numbers, which is exactly the point: a threshold on this would be a
-//! re-measurement waiting for the next runner image.
+//! Per ADR-0071 a numeric contract states a property or names the configuration
+//! it was taken on. A frame time is the second kind — it is a fact about a GPU, a
+//! driver and a window size, not about the code — so **there is no threshold
+//! here.** The test renders the cases, prints what it saw, and asserts only that
+//! it measured genuinely different shaders. Nothing about `main` being green
+//! depends on the numbers, which is exactly the point: a threshold on this would
+//! be a re-measurement waiting for the next runner image.
 //!
 //! It also skips on a software rasterizer, with a notice. WARP's frame time says
 //! nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken there
@@ -32,10 +31,10 @@
 //! disc, reproducibly, which says nothing at all about the branch.
 //!
 //! The third probe is the isolate: a **12-sided polygon**, which covers 75 % of
-//! the quad — within 5 % of the disc's coverage — and takes the full
-//! `atan2` + `floor` + `cos` path. Disc against polygon-12 is the arithmetic
-//! priced at matched coverage; disc against star-7 is what the figure the plan
-//! was written for actually costs in a frame.
+//! the quad — within 5 % of the disc's coverage — and takes the full `atan2` +
+//! `floor` + `cos` path. Disc against polygon-12 is the arithmetic priced at
+//! matched coverage; disc against star-7 is what a shaped silhouette actually
+//! costs in a frame.
 //!
 //! **The reading, on the machine Plan 0070 was implemented on** — Windows 10
 //! 19045, DX12, NVIDIA GeForce RTX 3080 Laptop GPU, **release** profile,
@@ -46,16 +45,15 @@
 //! |---|---|---|---|
 //! | `disc` — the default, `length(local)` | 78 % | **0.877 ms** | — |
 //! | `polygon`, 12 sides (matched coverage) | 75 % | **0.858 ms** | **-0.019 ms, -2 %** |
-//! | `star`, 7 points (the plan's figure) | 34 % | **0.710 ms** | **-0.167 ms, -19 %** |
+//! | `star`, 7 points (the shaped figure) | 34 % | **0.710 ms** | **-0.167 ms, -19 %** |
 //!
-//! The run-to-run spread on the polygon delta is about `0.01 ms` (-1.4 % to
-//! -2.4 % across three runs), so **the branch's arithmetic is below the
-//! resolution of this measurement** — even at matched coverage the shaped arm is
-//! not slower than the disc, and the silhouette the plan is for is a clear net
-//! saving because it lights a third of the quad instead of three quarters. In the
-//! **debug** profile the same probes read 1.974 / 1.965 / 1.981 ms, i.e. all
-//! three within 0.5 % of each other, because the 10 000-particle CPU update
-//! dominates there.
+//! The run-to-run spread on the polygon delta is about `0.01 ms` (-1.4 % to -2.4
+//! % across three runs), so **the branch's arithmetic is below the resolution of
+//! this measurement** — even at matched coverage the shaped arm is not slower
+//! than the disc, and a shaped silhouette is a clear net saving because it
+//! lights a third of the quad instead of three quarters. In the **debug**
+//! profile the same probes read 1.974 / 1.965 / 1.981 ms, i.e. all three within
+//! 0.5 % of each other, because the 10 000-particle CPU update dominates there.
 //!
 //! Against `docs/nfr.md` §7's 16.7 ms budget none of this is a number worth
 //! tuning for, and ADR-0084's fallback — separate pipelines per shape, with its
@@ -103,7 +101,7 @@ const FRAMES_LONG: u32 = 270;
 const REPEATS: usize = 3;
 
 /// The probes, in report order: the default, the matched-coverage isolate, and
-/// the figure the plan exists for. `(label, shape, points)`.
+/// the shaped figure. `(label, shape, points)`.
 const CASES: [(&str, &str, &str); 3] = [
     ("disc      ", "0", "7"),
     ("polygon12 ", "2", "12"),

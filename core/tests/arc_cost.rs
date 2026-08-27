@@ -1,5 +1,5 @@
 //! **What an arc-drawn ring costs, per frame** (Plan 0087 Phase 3,
-//! [ADR-0098](../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)).
+//! ADR-0098).
 //!
 //! The arc primitive trades vertices for **fill**. A `circle` motif is one
 //! instance instead of `SMOOTH_SAMPLES`, but that instance rasterizes a bounding
@@ -7,20 +7,19 @@
 //! polyline shaded only thin quads along its chords. On a dense ornament those
 //! boxes overlap, so the shaded area is larger than the stroke area — fill-rate
 //! work on the hardware least able to pay it, which is ADR-0098's own named risk
-//! and this plan's stop condition.
+//! and the stop condition this file measures against.
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
-//! on. A frame time is the second kind, so **there is no threshold here.** The
-//! test renders the cases, prints what it saw, and asserts only that it measured
-//! genuinely different figures. It skips on a software rasterizer: WARP's frame
-//! time says nothing about the iGPU floor in `docs/nfr.md` §1, and a reading
-//! taken there would be a number that looks like evidence and is not. Its shape
-//! is `mark_cost.rs`'s — interleaved cases, a two-length slope to subtract the
-//! fixed costs, the minimum of several repeats — and that file's header explains
-//! each of those choices.
+//! Per ADR-0071 a numeric contract states a property or names the configuration
+//! it was taken on. A frame time is the second kind, so **there is no threshold
+//! here.** The test renders the cases, prints what it saw, and asserts only that
+//! it measured genuinely different figures. It skips on a software rasterizer:
+//! WARP's frame time says nothing about the iGPU floor in `docs/nfr.md` §1, and
+//! a reading taken there would be a number that looks like evidence and is not.
+//! Its shape is `mark_cost.rs`'s — interleaved cases, a two-length slope to
+//! subtract the fixed costs, the minimum of several repeats — and that file's
+//! header explains each of those choices.
 //!
 //! # Four probes, because the ring's cost is not one number
 //!
@@ -29,10 +28,10 @@
 //! than a whole frame's.
 //!
 //! - `arcs x40` at motif scale 0.13 — the retired `star_mandala`'s outermost
-//!   ring, and the figure the plan exists to make shippable. At this scale the
+//!   ring, and the figure the arc primitive exists to make shippable. At this scale the
 //!   forty boxes barely touch.
 //! - `arcs x40` at motif scale 0.46 — the top of the range
-//!   [ADR-0098](../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)
+//!   ADR-0098
 //!   quotes, where the boxes overlap heavily. This is the fill-rate case, and it
 //!   is here because a measurement taken only at 0.13 would price the primitive
 //!   at its cheapest and call it priced.
@@ -49,7 +48,7 @@
 //! **On the machine Plan 0087 was implemented on** — Windows 10 19045, DX12,
 //! NVIDIA GeForce RTX 3080 Laptop GPU, **release** profile, 1920x1080, Floor
 //! tier, best of three interleaved repeats. See the printed table for the run
-//! this file was committed against; the numbers live in the plan's
+//! this file was committed against; the numbers live in Plan 0087's
 //! implementation log rather than here, so a re-run has one place to update.
 //!
 //! **The run-to-run spread is about 0.06 ms on the marginal figures**, measured
@@ -111,8 +110,8 @@ const FRAMES_LONG: u32 = 210;
 /// least contaminated by everything that is not the render.
 const REPEATS: usize = 3;
 
-/// The ring the plan names: forty copies, which is what a mandala's outer ring
-/// carries and what ADR-0079's budget arithmetic was quoted against.
+/// Forty copies, which is what a mandala's outer ring carries and what
+/// ADR-0079's budget arithmetic was quoted against.
 const RING_COUNT: u32 = 40;
 
 /// `(label, rings-table body)` — the baseline first, then the three rings.

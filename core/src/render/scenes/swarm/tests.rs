@@ -290,7 +290,7 @@ fn default_hue_band_is_the_prior_full_wheel() {
 /// A narrow `hue_spread` collapses the full particle-hue range into a tight
 /// LUT band, so the sampled colours cluster (a coherent single-family swarm)
 /// where `spread = 1` samples the whole wheel (rainbow confetti). Measured as
-/// the spread of sampled RGB — the gap the plan closes.
+/// the spread of sampled RGB.
 #[test]
 fn narrow_spread_makes_colour_coherent() {
     let pal = Palette::default_spectrum();
@@ -1145,12 +1145,12 @@ fn half_slack(value: f32) -> f32 {
 /// **Where the swarm drew no light, the backdrop arrives intact** — the guard
 /// the scene→chain seam shipped without.
 ///
-/// `fs_main` used to return `vec4(in.color * g, 1.0)`: colour carried the
-/// radial falloff, alpha was a literal constant. With the alpha blend at
-/// `BlendComponent::OVER` and a source alpha of exactly 1, destination alpha
-/// saturated to 1 across every sprite's **square** quad — including the four
-/// corners outside the inscribed disc, about 21 % of each sprite, where the
-/// shader wrote nothing at all. The chain's resolve computes
+/// Returning `vec4(in.color * g, 1.0)` from `fs_main` puts the radial
+/// falloff in colour and a literal constant in alpha. With the alpha blend
+/// at `BlendComponent::OVER` and a source alpha of exactly 1, destination
+/// alpha saturates to 1 across every sprite's **square** quad — including
+/// the four corners outside the inscribed disc, about 21 % of each sprite,
+/// where the shader wrote nothing at all. The chain's resolve computes
 /// `src.rgb + backdrop * (1 - src.a)` (ADR-0055), so those corners discarded
 /// the backdrop and rendered as black rectangular notches, dozens per frame.
 /// See `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`.

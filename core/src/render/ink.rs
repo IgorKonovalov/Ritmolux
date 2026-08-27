@@ -38,18 +38,19 @@
 //! the chain has to honor. It still runs before the text/overlay passes, so the HUD
 //! is never inverted.
 //!
-//! **Passthrough and unbuilt when `ink_amount <= 0`** — every shipped preset until
-//! one opts in — so the renderer skips the pass entirely and the chain folds
-//! straight to the surface: no offscreen, no pipeline, golden/determinism
-//! unchanged, the NFR §1 iGPU floor pays nothing,
-//! and (like the background/trails/kaleidoscope passes) the DX12 WARP software
-//! adapter never sees a coexisting remap pipeline during the no-ink captures. When
-//! active the pipeline builds lazily and is dropped on the capture scene-rebuild.
+//! **Passthrough and unbuilt when `ink_amount <= 0`** — so the renderer
+//! skips the pass entirely and the chain folds straight to the surface:
+//! no offscreen, no pipeline, the NFR §1 iGPU floor pays nothing, and
+//! (like the background/trails/kaleidoscope passes) the DX12 WARP
+//! software adapter never sees a coexisting remap pipeline during the
+//! no-ink captures. When active the pipeline builds lazily and is
+//! dropped on the capture scene-rebuild.
 //!
-//! Unlike the trails/kaleidoscope stages (fixed 16:9 internal resolution), the ink
-//! offscreen is **surface-sized** — the remap is a 1:1 per-pixel operation, so its
-//! input must match the surface to avoid a resample blur on the final present. The
-//! offscreen is rebuilt lazily whenever the surface size changes.
+//! The ink offscreen is **surface-sized** rather than running at a post
+//! stage's quantized internal grid: the remap is a 1:1 per-pixel
+//! operation, so its input must match the surface to avoid a resample
+//! blur on the final present. It is rebuilt lazily whenever the surface
+//! size changes.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). The remap pass encodes every displayed frame it is active.

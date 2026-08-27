@@ -1,12 +1,12 @@
 //! Plan 0095 Phase 1 — the tempo estimate, measured before it is touched.
 //!
-//! [ADR-0109] gives Layer 2 its own bar grid, built from the autocorrelated
-//! tempo. A grid is only as good as the rate under it, and the live captures
-//! ([Plan 0086] Phase 2) read a p10 of 64.0 against a 128.0 median and a p90 of
-//! 200.9 against a 100.2 median — both at the `MIN_BPM`/`MAX_BPM` search bounds.
-//! That is a *field* reading on material with no ground truth. This file is the
-//! bench reading: synthesized clips at **known** tempos through the real
-//! [`Analyzer`], printing the estimate against the truth.
+//! ADR-0109 gives Layer 2 its own bar grid, built from the autocorrelated tempo.
+//! A grid is only as good as the rate under it, and the live captures (Plan 0086
+//! Phase 2) read a p10 of 64.0 against a 128.0 median and a p90 of 200.9 against
+//! a 100.2 median — both at the `MIN_BPM`/`MAX_BPM` search bounds. That is a
+//! *field* reading on material with no ground truth. This file is the bench
+//! reading: synthesized clips at **known** tempos through the real [`Analyzer`],
+//! printing the estimate against the truth.
 //!
 //! **The deliverable is the printed table, not the pass/fail.** Phase 2 chooses
 //! its repair against these numbers, so what matters is which rungs are wrong
@@ -20,18 +20,13 @@
 //! (Unlike `downbeat_probe.rs` this file carries no `.config/nextest.toml`
 //! override, so a passing run hides the table unless it is asked for.)
 //!
-//! Per [ADR-0071] every number printed here is a **measurement** and every
+//! Per ADR-0071 every number printed here is a **measurement** and every
 //! number asserted is a **property**. The one absolute tolerance below is
-//! stated, not discovered: the plan's done-when asks for the estimate to land
-//! within a stated tolerance of the truth *or of an exact octave of it*, and
-//! **the octave is its own column** rather than folded into the error — an
-//! estimator that reports half the true tempo is making a different mistake
-//! from one that reports 0.94x of it, and a single error column cannot say
-//! which.
-//!
-//! [ADR-0109]: ../../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md
-//! [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
-//! [Plan 0086]: ../../docs/plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
+//! stated, not discovered: the estimate must land within a stated tolerance
+//! of the truth *or of an exact octave of it*, and **the octave is its own
+//! column** rather than folded into the error — an estimator that reports
+//! half the true tempo is making a different mistake from one that reports
+//! 0.94x of it, and a single error column cannot say which.
 
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{Analyzer, HOP_SIZE};
@@ -237,8 +232,8 @@ fn the_tempo_estimate_is_measured_against_known_truth() {
     // --- properties, not measurements -------------------------------------
     //
     // (1) The unambiguous ladder lands on *some* octave of the truth, within a
-    //     stated tolerance. This is the plan's done-when, and the split into
-    //     two columns is what makes it meaningful: an estimator reading 59.8
+    //     stated tolerance. The split into two columns is what makes that
+    //     meaningful: an estimator reading 59.8
     //     for 60 is refining correctly on the coarse lag grid, and one reading
     //     30 is on the wrong octave — the second is Phase 2's problem and the
     //     first is not a problem at all.
@@ -374,22 +369,21 @@ fn octave_shares(pcm: &[f32]) -> Octaves {
 /// Phase 2 — the octave ambiguity is **one-sided**, which is why the repair is
 /// a hold rather than an octave-preference rule.
 ///
-/// The plan named three candidate repairs and said it would not pick one blind.
-/// This is the reading that picked. An autocorrelation cannot tell a clean click
-/// train from material whose accent period is twice its click period, because
-/// *every* periodic signal correlates strongly at twice its own lag — so the
-/// question "is the true beat slower than this?" has no discriminating evidence
-/// in the curve, and a rule that preferred the slower reading takes the fast end
-/// of the ladder down an octave. The mirrored question does have evidence: a
-/// clean train's correlation at *half* its winning lag is negative, because
-/// there is nothing between its clicks, while a half-time feel reads strongly
-/// positive there.
+/// Three candidate repairs were named and none picked blind. This is the reading
+/// that picked. An autocorrelation cannot tell a clean click train from material
+/// whose accent period is twice its click period, because *every* periodic
+/// signal correlates strongly at twice its own lag — so the question "is the
+/// true beat slower than this?" has no discriminating evidence in the curve, and
+/// a rule that preferred the slower reading takes the fast end of the ladder
+/// down an octave. The mirrored question does have evidence: a clean train's
+/// correlation at *half* its winning lag is negative, because there is nothing
+/// between its clicks, while a half-time feel reads strongly positive there.
 ///
 /// That asymmetry is asserted below as an **overlap** and a **separation**, both
 /// comparisons taken inside this run (ADR-0071). It is also why correcting the
 /// doubling direction alone was refused: the material such a rule fires on is a
 /// 60-100 BPM track with events between the beats, which describes most of the
-/// hip-hop in the capture set this plan is repairing.
+/// hip-hop in the capture set.
 #[test]
 fn the_octave_ambiguity_is_one_sided() {
     println!("\nPlan 0095 Phase 2 - correlation at the winning lag's octave neighbours");

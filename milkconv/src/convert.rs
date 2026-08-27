@@ -236,7 +236,7 @@ pub enum ConvertError {
     /// preset is rejected **by name** rather than converted without its shader:
     /// a preset whose picture lives in its `warp` block would otherwise load
     /// without complaint and render something its author never drew, which is
-    /// the failure class the plan's Risks call the worst for reputation.
+    /// the worst failure class this converter has for reputation.
     Shader {
         /// `"warp"` or `"comp"`.
         stage: &'static str,

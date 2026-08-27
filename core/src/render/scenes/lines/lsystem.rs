@@ -16,9 +16,7 @@
 //! makes meaningful, and for an L-system that axis is **generation depth**: the
 //! branch-nesting level the turtle drew a segment at, `0` on the trunk and one
 //! more for every open `[`. Colouring by it makes an older branch read as older,
-//! which is what the whole subject of a rewriting system is; traversal order —
-//! the plausible alternative — interleaves branches of different generations and
-//! tracks the string rewriting rather than anything visible in the figure.
+//! which is what the whole subject of a rewriting system is.
 //!
 //! **The ramp is normalized over the figure's own deepest generation, not over
 //! `visible_depth`.** ADR-0059 wrote the latter; it is wrong in both directions

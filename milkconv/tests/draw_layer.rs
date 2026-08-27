@@ -457,8 +457,8 @@ fn segment_length(s: &lmv_core::render::scenes::lines::SegmentInstance) -> f32 {
 
 /// **`wave_usedots = 1` puts separated marks along the trace where `= 0` puts a
 /// continuous stroke, in every mode** — Plan 0108 Phase 4's behavioural claim
-/// for the symptom the plan names cheapest to convict, because it is binary:
-/// the beads appear or they do not.
+/// for the symptom cheapest to convict, because it is binary: the beads appear
+/// or they do not.
 ///
 /// The reported symptom is *Cosmic Dust 2*'s `wave_usedots` beads never
 /// appearing (design-backlog 0107). This asks the geometry stage first, which
@@ -738,10 +738,10 @@ fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[
 ///
 /// **Pure**, so the same trace builds the same geometry at two well-separated
 /// times: 61 s was half a turn under the old term, the furthest apart two frames
-/// could be. **Horizontal**, stated as the plan states it — a trace authored
-/// horizontal (`wave_mystery = 0`, a flat trace) has every endpoint at one
-/// height. And **still steered by `wave_mystery`**, which is the non-vacuity: a
-/// figure that ignored its angle entirely would pass the first two.
+/// could be. **Horizontal** in the strict sense — a trace authored horizontal
+/// (`wave_mystery = 0`, a flat trace) has every endpoint at one height. And
+/// **still steered by `wave_mystery`**, which is the non-vacuity: a figure that
+/// ignored its angle entirely would pass the first two.
 #[test]
 fn a_mode_six_figure_is_oriented_by_mystery_alone() {
     let waveform = ramp_waveform();

@@ -13,10 +13,10 @@
 //! The operation is polar but the source is rectangular, so the two do not have
 //! the same shape. Each output pixel keeps its radius and only changes its angle,
 //! which means any pixel whose radius exceeds the source's extent *in the folded
-//! direction* reconstructs a coordinate outside `[0, 1]`. That used to be handed
-//! to a `ClampToEdge` sampler, which smeared the border texel radially into hard
-//! streaks and chevron debris — design-backlog 0010, user-reported three times,
-//! and catastrophic in a portrait window, where most of the frame is out of range
+//! direction* reconstructs a coordinate outside `[0, 1]`. Handing that to a
+//! `ClampToEdge` sampler smears the border texel radially into hard streaks and
+//! chevron debris — design-backlog 0010, user-reported three times, and
+//! catastrophic in a portrait window, where most of the frame is out of range
 //! rather than just the corners.
 //!
 //! So the **sample** radius is clamped to `r_max`, the largest disc around the
@@ -24,24 +24,19 @@
 //! aspect-corrected space). Nothing is ever sampled outside the source, at any
 //! aspect or fold centre. Past `r_max` the result fades out over
 //! [`FALLOFF_BAND`], so the boundary is a designed vignette rather than a hard
-//! ring. Content outside that disc is discarded — the fold shows less of the
-//! source frame than the broken version pretended to, which ADR-0047 weighed and
-//! accepted for centred figures, the fold's overwhelming use.
+//! ring. Content outside that disc is discarded (ADR-0047).
 //!
 //! # ...and what happens **outside** that disc is a choice (`kaleido_edge`, ADR-0061)
 //!
-//! ADR-0047 picked one treatment for the region beyond `r_max`, and that region is
-//! not a trim: with `r_max = 0.5` in aspect-corrected space and a corner radius of
-//! `0.5 * sqrt(aspect^2 + 1)`, the corner sits at **2.04x `r_max` at 16:9** and the
-//! inscribed disc covers only `pi r_max^2` of an `aspect x 1` frame — so **55.8 %
-//! of the frame at 16:9 lies outside it** (the same at 9:16, by symmetry). Seen in
-//! motion, one treatment could not serve both of the fold's populations: the
-//! residual rays read as leftovers around a *centred figure*, and the disc *crops*
-//! a border-filling *field* that used to fill the frame.
-//!
-//! So [`PARAMS`]'s `kaleido_edge` selects the treatment per preset, from a closed
-//! roster, inside **one** pipeline — every arm is a uniform branch on how `r` maps
-//! to a sample radius `rs` and an output weight `w` (`m = r / r_max`):
+//! That region is not a trim: with `r_max = 0.5` in aspect-corrected
+//! space and a corner radius of `0.5 * sqrt(aspect^2 + 1)`, the corner
+//! sits at **2.04x `r_max` at 16:9** and the inscribed disc covers only
+//! `pi r_max^2` of an `aspect x 1` frame, so **55.8 % of the frame at
+//! 16:9 lies outside it** (the same at 9:16, by symmetry). No single
+//! treatment serves both of the fold's populations, so [`PARAMS`]'s
+//! `kaleido_edge` selects one per preset, from a closed roster, inside
+//! **one** pipeline — every arm is a uniform branch on how `r` maps to
+//! a sample radius `rs` and an output weight `w` (`m = r / r_max`):
 //!
 //! | Value | Name | `rs` | `w` | Reads through |
 //! |---|---|---|---|---|
@@ -49,39 +44,31 @@
 //! | **1** | **`tile`** (default) | `r` | `1` | **`MirrorRepeat`** |
 //! | 2 | `squash` | `r_max * tanh(m)` | `1` | `ClampToEdge` |
 //!
-//! Plan 0055 shipped five candidates and its Phase 2 A/B — in the running app, in
-//! motion, over a lit backdrop, on a centred figure and a border-filling field, at
-//! two aspects — deleted two of them. `vignette` (the fade moved inside the disc)
-//! and `mirror` (the radius reflected as a triangle wave) won on neither scene and
-//! are gone from the shader rather than left dead. The three that remain keep their
-//! **relative order** from that roster, which is why the numbering has a gap in its
-//! history but not in its values.
+//! The roster is closed and its numbering is historical — ADR-0061
+//! swept five candidates and kept three in their original relative
+//! order, so the values have no gap even though the roster does.
 //!
 //! **The default is `tile` (1), not `falloff` (0)** — the one place this stage's
-//! numbering is deliberately not "0 is the default". Two separate facts, kept
-//! separate on purpose: `0 = falloff` preserves the "0 is what ADR-0047 shipped"
-//! association that preset comments and this file's own history carry, and the A/B
-//! then chose a *different* member of the roster as the resting behaviour. So a
-//! preset that binds no `kaleido_edge` **fills its frame** rather than cropping to
-//! a disc, and every fold-bearing golden baseline moved once, by hand, when that
-//! landed.
+//! numbering is deliberately not "0 is the default", because `0 = falloff` is
+//! what ADR-0047 shipped and ADR-0061 then chose a different member as the
+//! resting behaviour. A preset that binds no `kaleido_edge` **fills its frame**
+//! rather than cropping to a disc.
 //!
-//! `falloff` and `squash` keep `rs` inside `[0, r_max]`, so they inherit ADR-0047's
-//! real guarantee unchanged — the design-backlog 0010 smear came from
-//! *reconstructing a coordinate outside the source* and handing it to
-//! `ClampToEdge`, and neither does that. **`tile` is the exception, and it is now
-//! the default**, which is the single most important thing to know about this
-//! stage: its coordinate is *meant* to leave `[0,1]`, and that is safe **only**
-//! because a `MirrorRepeat` sampler defines the read. Wired to the `ClampToEdge`
-//! sampler it is design-backlog 0010 under a new name, unguarded by the disc
-//! assertion (which `tile` is supposed to break) — see
-//! `core/tests/kaleidoscope.rs`, where the guard that does catch it is the
-//! ray-variance property.
+//! `falloff` and `squash` keep `rs` inside `[0, r_max]`, so they
+//! inherit ADR-0047's guarantee: the design-backlog 0010 smear came
+//! from *reconstructing a coordinate outside the source* and handing it
+//! to `ClampToEdge`, and neither does that. **`tile` is the exception,
+//! and it is the default** — the single most important thing to know
+//! about this stage. Its coordinate is *meant* to leave `[0,1]`, and
+//! that is safe **only** because a `MirrorRepeat` sampler defines the
+//! read. Wired to the `ClampToEdge` sampler it is design-backlog 0010
+//! under a new name, unguarded by the disc assertion (which `tile` is
+//! supposed to break) — see `core/tests/kaleidoscope.rs`, where the
+//! guard that does catch it is the ray-variance property.
 //!
 //! `squash` is **not** the identity inside the disc the way a clamp is: `tanh(m) <
 //! m` for every `m > 0`, so it compresses the whole interior, 1:1 only in the limit
-//! at the fold axis. That is the cost of its filling the frame without a crop or a
-//! ray, and it is why a preset picks between it and `tile` by eye.
+//! at the fold axis.
 //!
 //! `kaleido_edge` is the stage's **second stepped param**. Like `kaleido_order` it
 //! is clamped and rounded on the CPU ([`fold_edge`]), for the [`fold_order`]
@@ -91,24 +78,23 @@
 //! visible in Rust.
 //!
 //! **Identity passthrough when every term is at its identity** — `kaleido_order <
-//! 2` *and* `kaleido_radial <= 1` *and* `kaleido_tile <= 1`, which is every shipped
-//! preset until one opts in — so the [`PostChain`](super::post::PostChain) skips
-//! this stage entirely: no offscreen, no
-//! pipeline, golden/determinism unchanged, the NFR §1 iGPU floor pays nothing,
-//! and (like the background/trails passes) the DX12 WARP software adapter never
-//! sees a coexisting fold pipeline during the no-kaleidoscope captures. When
-//! active the pipeline builds lazily and is dropped on the capture scene-rebuild.
+//! 2` *and* `kaleido_radial <= 1` *and* `kaleido_tile <= 1` — so the
+//! [`PostChain`](super::post::PostChain) skips this stage entirely: no offscreen,
+//! no pipeline, the NFR §1 iGPU floor pays nothing, and (like the
+//! background/trails passes) the DX12 WARP software adapter never sees a
+//! coexisting fold pipeline during the no-kaleidoscope captures. When active the
+//! pipeline builds lazily and is dropped on the capture scene-rebuild.
 //!
 //! Runs at an internal resolution that **follows the render target** (ADR-0034),
 //! quantized and capped by
-//! [`internal_grid_size`](super::post::internal_grid_size). It used to be a fixed
+//! [`internal_grid_size`](super::post::internal_grid_size), rather than a fixed
 //! 1280x720 with the fold's aspect correction baked to match.
 //!
-//! **The fold's aspect is the render target's, never that grid's** (ADR-0037). The
-//! grid is quantized to a 256 px step, so its ratio is only approximately the
-//! window's, and folding about the grid's axis skewed every wedge whenever the two
-//! disagreed — which is most window sizes, but not the 16:9 ones this was
-//! developed at.
+//! **The fold's aspect is the render target's, never that grid's**
+//! (ADR-0037). The grid is quantized to a 256 px step, so its ratio is
+//! only approximately the window's, and folding about the grid's axis
+//! skews every wedge wherever the two disagree — which is most window
+//! sizes, and not the 16:9 ones.
 //!
 //! On a line scene, prefer the **geometry** mirror (`mirror_order` /
 //! `mirror_reflect`) over this fold when either would do: that one replicates real
@@ -124,9 +110,10 @@
 //! the one outside it. The second half is what turns a flat rosette into a mandala.
 //!
 //! The composed order is **tile → fold → radial → spiral**, expressed
-//! destination-to-source, and it is **fixed, not author-selectable** — that is what
-//! keeps the whole stage one pipeline and one resample however many terms are live.
-//! Read forwards it means the polar rosette is the motif the tile replicates.
+//! destination-to-source, and it is **fixed, not author-selectable** —
+//! one pipeline and one resample however many terms are live
+//! (ADR-0077). Read forwards it means the polar rosette is the motif
+//! the tile replicates.
 //!
 //! | Param | Identity | Default | What it is |
 //! |---|---|---|---|
@@ -139,26 +126,24 @@
 //!
 //! The two columns agree on every row but the last, and that one disagreement is
 //! deliberate — see [`DEFAULT_INNER`]. It costs nothing while the repeat is off,
-//! since the whole radial group is skipped then, so no preset written before
-//! ADR-0077 can see it.
+//! since the whole radial group is skipped then.
 //!
 //! Three facts about the composition are worth having before reading the shader:
 //!
 //! - **The repeat subsumes the edge treatment.** Every destination radius wraps
 //!   into the canonical band `(r_max/radial, r_max]`, so with `kaleido_radial > 1`
 //!   nothing is ever outside the disc, nothing is clamped, nothing fades, and
-//!   `kaleido_edge` is inert. That is ADR-0077's "one radius policy" in one line:
-//!   the repeat *is* a radius policy, and two of them would fight.
+//!   `kaleido_edge` is inert — ADR-0077's "one radius policy".
 //! - **The zoom's period is exact, and its unit is the ring.** The map is periodic
 //!   in `log r` with period `L = ln(radial)`, so an offset of exactly `L` is the
 //!   identity map rather than an approximation of it — an audio- or time-driven
 //!   `kaleido_zoom` is an endless tunnel with no reset and no crossfade.
 //!   `kaleido_zoom` is authored in **rings**, not in `log r`: the shader multiplies
 //!   it by `L` itself ([`fold_zoom`]), so `kaleido_zoom = 1` advances exactly one
-//!   ring at **every** `kaleido_radial`. That is Plan 0064 Phase 4's decision, and
-//!   it is the whole difference between `"bar_phase * 1.0"` and asking an author to
-//!   write a logarithm of a ratio they chose by eye — the two are the same map, but
-//!   only one of them survives re-tuning `kaleido_radial`.
+//!   ring at **every** `kaleido_radial`. The unit is the whole difference between
+//!   `"bar_phase * 1.0"` and asking an author for the logarithm of a ratio they
+//!   chose by eye — the same map, but only one spelling survives re-tuning
+//!   `kaleido_radial`.
 //! - **The spiral's winding number is quantized CPU-side, and must be.** Shearing
 //!   `log r` by `k·θ` shifts the radius by `2πk` over one revolution, so the image
 //!   closes only when `2πk` is a whole multiple of `L` — that is, `k = m·L/(2π)`
@@ -173,15 +158,14 @@
 //! destination pixel against a bilinear sampler's four. `kaleido_inner` freezes the
 //! repeat below a radius, which makes that region *radially constant* (continuous
 //! at the cutoff, since `r_eff = max(r, inner·r_max)` agrees with `r` there) and
-//! therefore alias-free. The proper answer is a mip chain with an LOD from the
-//! map's Jacobian; the post chain's offscreens are single-level, so it is deferred.
+//! therefore alias-free.
 //!
 //! **So its default is [`DEFAULT_INNER`] = 0.06 rather than 0**, which is the one
-//! place on this stage where the resting value is not the identity. Plan 0064
-//! Phase 4 read the sweep and found 0.06 indistinguishable from 0 on every source
-//! rendered — full-frame field, accumulating attractor, sparse line figure — while
-//! it caps the worst minification for free. A preset that wants the repeat all the
-//! way to the axis writes `kaleido_inner = "0"` and gets it; nothing clamps it up.
+//! place on this stage where the resting value is not the identity — chosen for
+//! costing nothing rather than for fixing anything visible, since no aliasing
+//! onset was observed at any cutoff (ADR-0077's Outcome). A preset that wants the
+//! repeat all the way to the axis writes `kaleido_inner = "0"` and gets it;
+//! nothing clamps it up.
 //!
 //! **With the fold inactive the stage can still be active** — a preset binding only
 //! `kaleido_radial` or only `kaleido_tile` gets those terms and no fold. The
@@ -984,9 +968,10 @@ impl Kaleidoscope {
         self.builds
     }
 
-    /// Whether the **fold term** is live — order at least 2, as it always was.
-    /// Since ADR-0077 this is no longer the same question as whether the *stage*
-    /// is live: another term can keep it running with the fold off, and the
+    /// Whether the **fold term** is live — order at least 2.
+    ///
+    /// Not the same question as whether the *stage* is live (ADR-0077):
+    /// another term can keep it running with the fold off, and the
     /// uniform then carries [`IDENTITY_ORDER`].
     fn fold_active(&self) -> bool {
         self.order >= MIN_ACTIVE_ORDER && self.order.is_finite()

@@ -81,13 +81,16 @@ docs/
 .githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
                      #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
                      #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance. Three Node doc gates, all run by pre-push, by the CI
-                     #   `links` job, and by the architect close ceremony — because a close is
-                     #   what breaks each of them. check-doc-links.mjs asserts every relative
+scripts/             # Repo maintenance. Five Node gates, all run by pre-push and by the CI
+                     #   `links` job; the first three also by the architect close ceremony, because
+                     #   a close is what breaks them. check-doc-links.mjs asserts every relative
                      #   markdown link resolves (moving a plan to plans/done/ breaks links in both
                      #   directions); check-index-rows.mjs holds every roster row to 320 bytes
                      #   (ADR-0116); check-backlog-claims.mjs re-runs each live backlog entry's
-                     #   probe (ADR-0108). scripts/fixtures/ holds their seeded bite checks.
+                     #   probe (ADR-0108); check-filter-figures.mjs keeps the diffusion filter's
+                     #   cost figures on one page; check-comment-hygiene.mjs rejects relative links
+                     #   and plan-relative narration in .rs comments (ADR-0127).
+                     #   scripts/fixtures/ holds their seeded bite checks.
 ```
 
 ## How we work (canonical workflow)

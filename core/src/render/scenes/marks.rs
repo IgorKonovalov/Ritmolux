@@ -1,13 +1,10 @@
 //! **A particle mark's silhouette, as a signed-distance function**
-//! ([ADR-0084](../../../../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md),
-//! Plan 0070).
+//! (ADR-0084, Plan 0070).
 //!
-//! Every mark this engine drew before Plan 0070 was a round additive blob. The
-//! swarm's fragment shader was three lines —
-//! `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff * falloff;`
-//! — with no shape input at all, and the emitter's sprite was the same idea with
-//! one axis scaled. This module is the shape vocabulary those two scenes share:
-//! one WGSL chunk, one roster, one quantizer, so the two cannot drift.
+//! This module is the shape vocabulary `swarm` and `emitter` share: one WGSL chunk, one
+//! roster, one quantizer, so the two cannot drift. Without it a mark is a round additive
+//! blob — `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff *
+//! falloff;` — with no shape input at all.
 //!
 //! # The normalization is one rule, and it is what keeps `disc` exact
 //!
@@ -27,9 +24,9 @@
 //!
 //! - **The `disc` arm is `length(p)` and nothing else.** A unit disc has
 //!   `sd = length(p) - 1` and `R = 1`, so the rule collapses to `length(p)` —
-//!   *literally* the line it replaces, not an approximation of it. That is why
-//!   every pre-existing golden baseline is byte-identical: no shipped preset
-//!   names a shape, so they all take this arm.
+//!   the unshaped blob's own expression, not an approximation of it. A preset
+//!   that names no shape takes this arm and is byte-identical to one drawn
+//!   without the roster.
 //! - **Only the interior matters — *to a particle*.** The falloff downstream is
 //!   unchanged — `g = max(0, 1 - d)^2` — so every fragment at `d >= 1` is
 //!   black. For `swarm` and `emitter` the lit region *is* the silhouette, and a
@@ -71,7 +68,7 @@
 //! endpoint's radius, so that reference is always **shorter** than the figure's
 //! real deepest-point distance, and `1 + sd/R` at the centre is therefore always
 //! negative: measured `-0.23` to `-0.94` across the five configurations
-//! [design-backlog 0097](../../../../docs/design-backlog.md) reports. On a
+//! design-backlog 0097 reports. On a
 //! particle it only saturates the falloff brighter, which is why it shipped; on
 //! `shape_field` the palette repeat-addresses and it is a hard n-sided hole
 //! through the middle of the figure, and a bound `gamma` makes it a **NaN**
@@ -120,8 +117,8 @@ pub(crate) const SHAPES: [&str; 5] = ["disc", "ring", "polygon", "star", "heart"
 /// own centre**: that centre lies in the hole, a ray from there crosses the
 /// boundary twice, and `r / r_boundary` therefore has no single value. So it is
 /// the one arm the scaled-copy coordinate is undefined on
-/// ([ADR-0111](../../../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)),
-/// and Plan 0098 Phase 4 settles what a preset asking for that combination gets:
+/// (ADR-0111), and Plan 0098 Phase 4 settles what a preset asking for that
+/// combination gets:
 /// a load warning and the distance, never a silent third figure.
 pub(crate) const RING_SHAPE: f32 = 1.0;
 
@@ -283,13 +280,10 @@ pub(crate) fn mark_shape(v: f32) -> f32 {
 /// integer. At a fractional count the mark tears along one ray.
 ///
 /// So an eased `points` **steps**. That is the opposite of what the surrounding
-/// vocabulary teaches — `variant` interpolates
-/// ([ADR-0060](../../../../docs/adrs/0060-star-pattern-variants-interpolate.md)),
-/// the IFS morphs
-/// ([ADR-0075](../../../../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md))
-/// — which is exactly why it is stated at the parameter rather than assumed.
-/// A star's angle fold is periodic in the count: a fractional count is a
-/// discontinuity, not an intermediate figure.
+/// vocabulary teaches — `variant` interpolates (ADR-0060), the IFS morphs
+/// (ADR-0075) — which is exactly why it is stated at the parameter rather than
+/// assumed. A star's angle fold is periodic in the count: a fractional count is
+/// a discontinuity, not an intermediate figure.
 pub(crate) fn mark_points(v: f32) -> f32 {
     if v.is_finite() {
         v.clamp(MIN_POINTS, MAX_POINTS).round()
@@ -359,8 +353,7 @@ pub(crate) fn spike_hash01(index: u32) -> f32 {
 /// **same** `mark_distance` and a roster change reaches both at once. It defines
 /// no bindings and no entry points — it is arithmetic — so splicing it in
 /// changes neither scene's bind-group layout (which on the DX12 WARP adapter is
-/// not a free thing to change; see `emitter.rs`'s layout comment and
-/// [ADR-0058](../../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md)).
+/// not a free thing to change; see `emitter.rs`'s layout comment and ADR-0058).
 pub(crate) fn sdf_wgsl() -> String {
     SDF_WGSL
         .replace("%RING_MID%", &format!("{RING_MID:?}"))

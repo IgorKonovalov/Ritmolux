@@ -127,9 +127,9 @@ pub(super) fn flush_deferred_uploads(
         *needs_clear = false;
     }
     // (Re)upload the seeded scatter — on first build and on a family change. A
-    // `reseed` no longer comes through here: it disturbs the live cloud on the GPU
-    // instead (ADR-0066), because re-uploading this array *replaced* the cloud with
-    // a uniform box rather than scattering it.
+    // A `reseed` does **not** come through here: it disturbs the live cloud on
+    // the GPU instead (ADR-0066), because re-uploading this array *replaces*
+    // the cloud with a uniform box rather than scattering it.
     if *needs_upload {
         queue.write_buffer(
             &pipelines.particles,

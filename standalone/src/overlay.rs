@@ -33,11 +33,10 @@ pub const ROWS_TOP: f32 = LIST_TOP + ROW_H;
 ///
 /// glyphon shapes a proportional system font and `core` exposes no
 /// text-measurement API; adding one to place a list is out of proportion to the
-/// problem ([ADR-0009](../../docs/adrs/0009-glyphon-text-rendering.md) would need
-/// a supplement). So the width is derived from the font size and a character
-/// budget, and [`fit`] truncates a name that overruns the budget — which makes an
-/// **under**estimate cosmetic rather than a collision, and an overestimate merely
-/// wasted horizontal space.
+/// problem (ADR-0009 would need a supplement). So the width is derived from the
+/// font size and a character budget, and [`fit`] truncates a name that overruns
+/// the budget — which makes an **under**estimate cosmetic rather than a
+/// collision, and an overestimate merely wasted horizontal space.
 ///
 /// `0.62` is a conservative advance-per-character ratio for a proportional face
 /// at this size: real lowercase Latin averages nearer `0.5`, and the roster's
@@ -138,12 +137,12 @@ impl ListLayout {
 /// Lay out `visible_len` rows in a surface of `width` x `height` device px, with
 /// `highlight` the row that must stay on screen.
 ///
-/// Vertical arithmetic is exactly what the single-column list already used
-/// (`floor((height - ROWS_TOP) / ROW_H)`, at least one row), so a change to
-/// `ROW_H` or `LIST_TOP` moves the pinned numbers in the tests deliberately.
-/// Horizontal is new: the roster asks for `ceil(len / rows_per_col)` columns and
-/// gets however many fit, and scrolling survives as the fallback for the case
-/// where the columns still cannot hold it.
+/// Vertical arithmetic is the single-column list's (`floor((height -
+/// ROWS_TOP) / ROW_H)`, at least one row), so a change to `ROW_H` or
+/// `LIST_TOP` moves the pinned numbers in the tests deliberately.
+/// Horizontally the roster asks for `ceil(len / rows_per_col)` columns and
+/// gets however many fit, with scrolling as the fallback for the case where
+/// the columns still cannot hold it.
 pub fn layout(visible_len: usize, highlight: usize, width: f32, height: f32) -> ListLayout {
     let rows_per_col = (((height - ROWS_TOP) / ROW_H).floor().max(1.0)) as usize;
     let needed = visible_len.div_ceil(rows_per_col).max(1);

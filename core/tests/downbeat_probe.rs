@@ -1,6 +1,6 @@
 //! Plan 0068 — the downbeat estimator's terms, made visible.
 //!
-//! The estimator locks on 3.1 % of audible time ([ADR-0082]), and the only
+//! The estimator locks on 3.1 % of audible time (ADR-0082), and the only
 //! instrument for that is a 1 Hz column printing the *outcome*. Three terms
 //! could be responsible — the accent feature, the 4/4 fold, the confidence
 //! measure — and an outcome cannot tell them apart. This file prints the terms.
@@ -18,13 +18,10 @@
 //! (`.config/nextest.toml` also keeps these two audible on a passing run, the
 //! same override the other two reporting tests carry.)
 //!
-//! Per [ADR-0071], every number printed here is a **measurement** and every
+//! Per ADR-0071, every number printed here is a **measurement** and every
 //! number asserted is a **property**: the assertions are comparisons between
 //! two readings taken in the same run, so the machine cancels. No absolute
 //! confidence value is asserted.
-//!
-//! [ADR-0082]: ../../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md
-//! [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 
 use lmv_core::dsp::downbeat::{BEATS_PER_BAR, BarClock, DownbeatTerms, DownbeatTracker};
 
@@ -524,8 +521,8 @@ fn crossing(rungs: &[Rung]) -> Option<f32> {
 
 /// Where the crossing *would* be if the noise correction were not applied. The
 /// gap between this and [`crossing`] is exactly how much of the shortfall the
-/// correction is responsible for, which is one of the plan's three suspects
-/// asked directly rather than inferred.
+/// correction is responsible for — one of the three suspects below, asked
+/// directly rather than inferred.
 fn crossing_uncorrected(rungs: &[Rung]) -> Option<f32> {
     crossing_by(rungs, |r| r.raw)
 }
@@ -544,7 +541,7 @@ fn first_sub_gate(rungs: &[Rung]) -> Option<&Rung> {
 /// confidence value at a rung is a measurement of this machine; "contrast is
 /// steeper than jitter" is a property of the estimator).
 ///
-/// How the reading separates the three suspects, per the plan:
+/// How the reading separates the three suspects:
 ///
 /// - collapse on **contrast loss** indicts the accent feature;
 /// - survival of contrast loss but collapse on **dropouts** indicts the fold's
@@ -709,7 +706,7 @@ fn the_degradation_ladder_says_which_axis_is_steep() {
     }
 
     // (4) **The fold still knows the answer at the rung where the gate shuts on
-    //     it.** This is the discriminator the plan asks for: an alignment that
+    //     it.** This is the discriminator: an alignment that
     //     is right while the confidence is under the gate says the fold found
     //     the downbeat and the confidence measure declined to publish it. Both
     //     numbers come from the same rung of the same run.

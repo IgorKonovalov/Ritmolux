@@ -138,6 +138,15 @@ jobs:
       # that duplicates do not EXIST rather than that they agree, which is the
       # only shape that would have caught it.
       - run: node scripts/check-filter-figures.mjs
+      # And the fifth (ADR-0127): a relative link in a `.rs` comment, and
+      # plan-relative narration. The link half is why this job is the right home
+      # rather than the close ceremony alone - check-doc-links.mjs above walks
+      # `.md` only, so eleven `.rs` links sat broken on main under a green gate,
+      # and they break at exactly the moment a plan moves into docs/plans/done/.
+      # It says nothing about how LONG a comment is: length correlates weakly
+      # with the defect and is gamed by a blank line, so that judgement stays
+      # with the Mode 4 review.
+      - run: node scripts/check-comment-hygiene.mjs
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no

@@ -1,5 +1,4 @@
-//! **What an element costs, per frame** (Plan 0113 Phase 2,
-//! [ADR-0123](../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+//! **What an element costs, per frame** (Plan 0113 Phase 2, ADR-0123).
 //!
 //! `shape_collage` draws every element **in every pixel**. Each fragment walks
 //! the whole live array, and the axis-aligned bounding box removes the distance
@@ -10,14 +9,14 @@
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
-//! on. A frame time is the second kind — a fact about a GPU, a driver, a build
-//! profile and a window size, not about the code — so **there is no threshold
-//! here.** The sweep renders the rungs, prints what it saw, and asserts only
-//! that it genuinely measured different configurations. Nothing about `main`
-//! being green depends on the numbers, which is the point: a threshold on this
-//! would be a re-measurement waiting for the next runner image.
+//! Per ADR-0071 a numeric contract states a property or names the configuration
+//! it was taken on. A frame time is the second kind — a fact about a GPU, a
+//! driver, a build profile and a window size, not about the code — so **there
+//! is no threshold here.** The sweep renders the rungs, prints what it saw, and
+//! asserts only that it genuinely measured different configurations. Nothing
+//! about `main` being green depends on the numbers, which is the point: a
+//! threshold on this would be a re-measurement waiting for the next runner
+//! image.
 //!
 //! It also **skips on a software rasterizer, with a notice**. A WARP frame time
 //! says nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken

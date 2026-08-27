@@ -349,15 +349,15 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 }
 
 /// **At full alpha the frame IS its own transformed copy** — Plan 0109 Phase 7,
-/// [ADR-0119], superseding the property Phase 3 shipped.
+/// ADR-0119, superseding the property Phase 3 shipped.
 ///
 /// # What the stage is
 ///
 /// MilkDrop's composite draws the finished frame twice: once straight, once
 /// zoomed about the centre and flipped per `nVideoEchoOrientation`, at
 /// `fVideoEchoAlpha`. 2.4 % of the corpus sets a non-zero alpha and where it is
-/// set it is load-bearing. This engine had no such stage until Phase 3, and the
-/// converter used to name the three values as unconsumed.
+/// set it is load-bearing. Phase 3 built the stage; without it the converter
+/// names the three values as unconsumed.
 ///
 /// # Why the property changed
 ///
@@ -381,8 +381,6 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 /// This also still walks the converter, so it pins the half that is not the
 /// shader: three outputs once warned about as unconsumed are seeded into the
 /// bundle and read by the scene.
-///
-/// [ADR-0119]: ../../docs/adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md
 #[test]
 fn at_full_alpha_the_echo_is_the_mirror_of_the_control() {
     let Some(mut renderer) = headless() else {

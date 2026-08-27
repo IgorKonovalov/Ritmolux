@@ -7,27 +7,28 @@
 //!
 //! # It paints the chain's *destination*, not the chain's input (ADR-0055)
 //!
-//! The backdrop used to render into the first active post stage's offscreen, which
-//! put it **inside** the texture the chain folds — so the kaleidoscope folded
-//! `bg_vignette`'s radial darkening into its wedges, and the fold's falloff had no
-//! backdrop to land on and faded to black instead.
+//! Rendering the backdrop into the first active post stage's offscreen
+//! would put it **inside** the texture the chain folds: the
+//! kaleidoscope would fold `bg_vignette`'s radial darkening into its
+//! wedges, and the fold's falloff would have no backdrop to land on and
+//! fade to black.
 //!
-//! It now paints the chain's destination and the chain composites *over* it with
-//! premultiplied alpha. The backdrop is therefore never folded, never blurred, and
-//! never accumulated into the trails feedback — it is the plate underneath.
+//! It paints the chain's destination instead, and the chain composites *over* it
+//! with premultiplied alpha — so the backdrop is never folded, never blurred, and
+//! never accumulated into the trails feedback. It is the plate underneath.
 //! [`PostChain::begin`](super::post::PostChain::begin) clears the chain's own input
 //! to transparent in its place. When no stage is active the two views are the same
 //! texture, so that path is unchanged.
 //!
 //! # It colours through the preset's palette (ADR-0086)
 //!
-//! This pass used to carry its own inline copy of the iq cosine — the third copy
-//! of the constant ADR-0021 ([`super::palette`]) was written to de-duplicate — so
-//! `[palette]`, `saturation` and `palette_mix` stopped at the scene and never
-//! reached the sky. It now samples the **same baked LUT pair every other scene
-//! samples**: `bg_hue` is a coordinate in the preset's own gradient (cyclic, like
-//! `color_center` / `hue_center`, because the LUT sampler repeat-addresses `u`),
-//! and the two shared colour modulations move the backdrop with the figure.
+//! An inline copy of the iq cosine here would leave `[palette]`, `saturation`
+//! and `palette_mix` stopping at the scene and never reaching the sky — a third
+//! copy of the constant [`super::palette`] exists to de-duplicate. This pass
+//! samples the **same baked LUT pair every other scene samples**: `bg_hue` is a
+//! coordinate in the preset's own gradient (cyclic, like `color_center` /
+//! `hue_center`, because the LUT sampler repeat-addresses `u`), and the two
+//! shared colour modulations move the backdrop with the figure.
 //!
 //! `saturation` and `palette_mix` stay in the **scenes'** vocabularies — the
 //! backdrop declares neither, and [`PARAMS`] is unchanged. The renderer fans one
@@ -46,13 +47,13 @@
 //! other palette coordinate in this engine uses, because two shipped presets
 //! already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
 //!
-//! **There is one brightness ramp on the frame, not two.** The fixed
-//! `mix(0.72, 1.0, ndc.y)` tilt this pass used to hardcode has *retired into*
-//! that ramp as `bg_shade` / `bg_shade_end`'s defaults, on the same axis as the
-//! colour sweep. Keeping the tilt and multiplying an authorable ramp on top would
-//! have been the cheaper identity guarantee, and it is exactly what was rejected:
-//! the tilt is welded to `+y` while the ramp can point anywhere, so any angled
-//! backdrop would carry a second vertical gradient no param explains.
+//! **There is one brightness ramp on the frame, not two.** The fixed `mix(0.72,
+//! 1.0, ndc.y)` tilt is *inside* that ramp, as `bg_shade` / `bg_shade_end`'s
+//! defaults, on the same axis as the colour sweep. Multiplying an authorable
+//! ramp on top of the tilt is the cheaper identity guarantee and ADR-0094's
+//! rejected alternative: the tilt is welded to `+y` while the ramp can point
+//! anywhere, so any angled backdrop would carry a second vertical gradient no
+//! param explains.
 //!
 //! **One exponent shapes the ramp, and it shapes the *position* rather than
 //! either channel.** `bg_ramp_gamma` eases where things sit along the axis ahead
@@ -81,14 +82,11 @@
 //! **And the centreline bows.** `bg_band_curve` displaces it by `curve * 4t(1-t)`
 //! in the *along-band* coordinate `t`, a form that is zero at both ends and
 //! exactly `1` in the middle — so the param is the bow's depth in across-axis
-//! units, and `0` is exactly straight rather than nearly so. The straight band
-//! ADR-0095 Alternative F would have shipped is still here; it just is not the
-//! only shape.
+//! units, and `0` is exactly straight rather than nearly so.
 //!
 //! Every axis is the **same function** ([`axis_pos`] in the shader), called with
-//! a direction. One copy rather than three, precisely so
-//! [ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
-//! trap cannot be fixed in one axis and left in the other.
+//! a direction. One copy rather than three, precisely so ADR-0037's trap cannot
+//! be fixed in one axis and left in the other.
 //!
 //! **The band takes its own segment of the same `[palette]`.** `bg_band_hue` is
 //! an **absolute** coordinate in that gradient — not an offset from the ground's
@@ -103,15 +101,16 @@
 //! shader takes a `select` arm, so the pre-band expression is the *untaken*
 //! branch and no shipped preset or baseline can move by a rounding step.
 //!
-//! **And the pass now builds for a band alone.** The build condition below
-//! widened from `bg_bright > 0` to `bg_bright > 0 || bg_band_amount > 0`,
-//! because the sky this was written for is nearly black away from the horizon —
-//! without it a galaxy over an unlit ground would silently render nothing.
+//! **A band alone builds the pass.** The build condition below is
+//! `bg_bright > 0 || bg_band_amount > 0`, because the sky this was
+//! written for is nearly black away from the horizon — testing
+//! `bg_bright` alone renders a galaxy over an unlit ground as nothing
+//! at all.
 //!
-//! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`, `bg_hue_span`) the renderer
-//! routes here before the scene's own bindings. At the defaults (`bg_bright = 0`)
-//! the backdrop is black, so a preset that binds none renders exactly as before —
-//! the migration is neutral until a preset opts into a backdrop.
+//! Driven by named params (`bg_hue`, `bg_bright`, `bg_vignette`,
+//! `bg_hue_span`) the renderer routes here before the scene's own
+//! bindings. At the defaults (`bg_bright = 0`) the backdrop is black,
+//! so a preset that binds none is unaffected by this pass.
 //!
 //! **When no backdrop is bound at all (`bg_bright <= 0` *and*
 //! `bg_band_amount <= 0`) the pass is a plain black clear** — no gradient
@@ -122,15 +121,13 @@
 //! during the headless no-bg captures, where the DX12 WARP software adapter would
 //! otherwise mis-render the coexisting scene pipelines.
 //!
-//! **That second reason used to end "a documented quirk with no validation error"
-//! — it is neither undocumented nor a quirk any more.** Plan 0053 Phase 3
-//! reproduced it, isolated it against a control, and fixed it: the quirk was this
+//! **That second reason is fixed rather than avoided.** The mis-render is this
 //! pass's `[Uniform:FRAGMENT]` bind-group layout colliding with the fullscreen
 //! scenes' (ADR-0058), and the explicit `min_binding_size` in
-//! [`Resources::build`] separates them. The laziness above is still worth having
-//! for its own reason, but it is no longer load-bearing against a mis-render.
-//! Real hardware was never affected, which is exactly what made it expensive: the
-//! whole golden suite captures on WARP.
+//! [`Resources::build`] separates them — so the laziness above is worth having
+//! for its own reason and is not load-bearing against it. **Real hardware is
+//! never affected**, which is what makes the class expensive: the whole golden
+//! suite captures on WARP.
 //!
 //! The **fragment field** is the one scene that still draws opaquely over the
 //! backdrop, so its bg params have no visible effect. Every other scene composites
@@ -167,10 +164,10 @@ const DEFAULT_HUE_SPAN: f32 = 0.0;
 /// rather than an approximation of it.
 const DEFAULT_ANGLE: f32 = 0.0;
 /// The brightness ramp's two ends, on the same axis as the colour sweep. These
-/// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt the pass used to
-/// hardcode: the shader still runs that instruction with those constants, so the
-/// retirement costs no pixels. A preset that binds them can now point the
-/// brightness the other way, which the tilt could never do.
+/// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt: the shader runs
+/// that instruction with these as its constants, so an unbound preset pays no
+/// pixels for the generality. A preset that binds them can point the
+/// brightness the other way, which a hardcoded tilt cannot.
 const DEFAULT_SHADE: f32 = 0.72;
 const DEFAULT_SHADE_END: f32 = 1.0;
 /// The ramp's response exponent (ADR-0094, in ADR-0092's form). `1.0` is the
@@ -611,23 +608,15 @@ impl Resources {
 ///   before and after this change** (`208.724 138.047 72.030` and
 ///   `158.394 100.674 50.482`, both commits). Nothing aliased: an opaque scene
 ///   over a re-coloured sky is the same picture.
-/// - **On WARP that configuration was already wrong before this change**, and for
-///   an unrelated, documented reason — the fullscreen-scene + background-pipeline
-///   coexistence in the module docs above. The parent commit renders those two
-///   probes at `11.817 11.716 11.663` and `0.000 0.000 0.000` against hardware's
-///   values above. It is a different flavour of wrong afterwards; it was not
-///   *made* wrong here.
-///
-///   **That "unrelated reason" has since been identified, and it was not
-///   unrelated** (Plan 0053 Phase 3). It was the *other* ADR-0058 collision this
-///   pass was in — its single-uniform layout against the fullscreen scenes' —
-///   and the explicit `min_binding_size` in [`Resources::build`] fixes it. A
-///   fragment field over a lit backdrop now renders `130.989 170.538 141.359` on
-///   WARP against `131.010 170.559 141.381` on hardware. So the bullet below
-///   still stands and this one is discharged: the LUT pair was live and
-///   colliding throughout, and fixing only the uniform group made the frame
-///   correct — which is a stronger statement of "this pair does not alias" than
-///   the original measurement could make.
+/// - **On WARP that configuration was wrong for a second reason, and it was the
+///   *other* ADR-0058 collision this pass was in** (Plan 0053 Phase 3) — its
+///   single-uniform layout against the fullscreen scenes'. The explicit
+///   `min_binding_size` in [`Resources::build`] fixes it, and a fragment field
+///   over a lit backdrop then renders `130.989 170.538 141.359` on WARP against
+///   `131.010 170.559 141.381` on hardware. That discharges this bullet with a
+///   stronger statement than the original measurement could make: the LUT pair
+///   was live and colliding throughout, and fixing only the uniform group made
+///   the frame correct.
 /// - **Every probe whose scene is not the fragment field agrees between the two
 ///   adapters to under 0.15 of one 8-bit level**, before and after — swarm with no
 ///   palette, with a flat palette, desaturated, and over `ember` with trails.
@@ -754,9 +743,9 @@ impl Background {
             band_curve: DEFAULT_BAND_CURVE,
             band_hue: DEFAULT_BAND_HUE,
             band_hue_span: DEFAULT_BAND_HUE_SPAN,
-            // Seeded with the default `spectrum` (the cosine this pass used to
-            // inline), so a backdrop painted before any `set_palette` call is the
-            // colour it always was rather than black.
+            // Seeded with the default `spectrum`, so a backdrop painted
+            // before any `set_palette` call is that palette's colour
+            // rather than black.
             palette: Palette::default_spectrum(),
             palette_dirty: true,
             saturation: DEFAULT_SATURATION,
@@ -853,12 +842,11 @@ impl Background {
     /// This pass paints `destination`, which `composite_into` sizes from the
     /// surface. The `target.size` sitting on the next line there is the post
     /// chain's quantized, capped internal grid — a *resolution, not a shape*
-    /// ([ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)),
-    /// and at a 160x100 surface it is a square 256x256. Taking it would be that
-    /// defect for the third time, and it is invisible at `bg_angle = 0` where the
-    /// aspect term provably cancels — which is why `backdrop_ramp.rs` carries a
-    /// negative control at a non-zero angle *with a stage active*, where the two
-    /// sources disagree.
+    /// (ADR-0037), and at a 160x100 surface it is a square 256x256. Taking it
+    /// would be that defect for the third time, and it is invisible at `bg_angle
+    /// = 0` where the aspect term provably cancels — which is why
+    /// `backdrop_ramp.rs` carries a negative control at a non-zero angle *with a
+    /// stage active*, where the two sources disagree.
     pub fn render(
         &mut self,
         queue: &wgpu::Queue,
@@ -866,10 +854,10 @@ impl Background {
         view: &wgpu::TextureView,
         surface: (u32, u32),
     ) {
-        // **A band alone is enough to build this pass** (ADR-0095). The condition
-        // used to read `bright <= 0` alone, which would have made a galaxy over a
-        // near-black sky render nothing at all — and that is the configuration
-        // the reference photograph actually is, not an edge case.
+        // **A band alone is enough to build this pass** (ADR-0095).
+        // Testing `bright <= 0` alone makes a galaxy over a near-black
+        // sky render nothing at all — and that is the configuration the
+        // reference photograph is, not an edge case.
         if self.bright <= 0.0 && self.band_amount <= 0.0 {
             // Passthrough: a plain black clear establishes the frame without a
             // second fullscreen pipeline (module docs: NFR §1 + WARP).

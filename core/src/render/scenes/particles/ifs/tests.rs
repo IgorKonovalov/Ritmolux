@@ -7,10 +7,9 @@ use super::{
     skeleton_diameter, skeleton_scale,
 };
 
-/// The tolerance the plan states for the round trip: well above `f32`
-/// round-trip error on values of order 1 through five multiplies and two
-/// trig calls, and well below any coefficient difference that would be
-/// visible.
+/// The tolerance on the round trip: well above `f32` round-trip error on
+/// values of order 1 through five multiplies and two trig calls, and
+/// well below any coefficient difference that would be visible.
 const ROUND_TRIP_TOL: f32 = 1e-5;
 
 /// Every figure name a preset can write parses, and nothing else does.
@@ -298,7 +297,7 @@ fn every_figure_is_framed_at_the_reference_aspect() {
 // The morph (Plan 0062 Phase 3 / ADR-0075)
 // -----------------------------------------------------------------------
 
-/// The sweep resolution the plan names, and the one the fit LUT uses too.
+/// The sweep resolution, which is the one the fit LUT uses too.
 const MORPH_STEPS: usize = 33;
 
 /// The 33 sweep positions, `0.0` and `1.0` inclusive and exact at both ends.
@@ -649,8 +648,8 @@ const RESIDUAL_TOL: f32 = 1e-4;
 /// arithmetic, and this is only the last-bits allowance.
 const BOUND_SLACK: f32 = 1e-4;
 
-/// Neutral plus both documented extremes — a superset of the sweep the plan
-/// names, because neutral is what every unbound preset actually ships.
+/// Neutral plus both documented extremes — neutral is included because
+/// it is what every unbound preset actually ships.
 const LEVER_SETTINGS: [Levers; 3] = [Levers::NEUTRAL, Levers::EXTREMES[0], Levers::EXTREMES[1]];
 
 fn norm(q: [f32; 2]) -> f32 {
@@ -1216,7 +1215,7 @@ fn the_fit_frames_a_figure_that_does_not_turn() {
         );
 
         // 2. The closed form is what the SHIPPED fit produces, not a parallel
-        //    arithmetic that happens to agree with the plan.
+        //    arithmetic that happens to agree with it.
         let fill = fit_scale(half, aspect) * r;
         let closed = if a <= aspect {
             super::FRAME_FILL * (1.0 + a * a).sqrt()

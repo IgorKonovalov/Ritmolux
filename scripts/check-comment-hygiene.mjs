@@ -222,7 +222,11 @@ const DEFINITION = /\[[^\]]*\]:\s*(\.\.?\/[^\s)]+)/g;
 const INLINE = /\]\((\.\.?\/[^)\s]+)\)/g;
 
 // Written from inside a plan session, and undecodable once that session closes.
-const VOCABULARY = /\b(this plan|the plan|used to|no longer|is new|previously)\b/gi;
+//
+// `the plan` is exempt in front of a number, because `the Plan 0045 Phase 4b
+// defect` is a bare-number citation — the form ADR-0127 asks for — and a gate
+// that convicted it would be sending authors back to the links.
+const VOCABULARY = /\b(this plan|the plan(?![ \t]+\d)|used to|no longer|is new|previously)\b/gi;
 
 // `hygiene-allow: <reason>` — the reason is what makes it an escape rather than
 // a silencer, so it is required.

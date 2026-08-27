@@ -49,9 +49,9 @@ fn edit_at(row: SettingsRow, right: bool, v: &SettingsView) -> SettingsAction {
     )
 }
 
-/// **Every row emits the action the plan's table names**, both directions.
-/// This is the mapping the shell executes blind, so a row silently wired to
-/// the wrong effect is invisible everywhere else.
+/// **Every row emits its own action**, in both directions. This is the
+/// mapping the shell executes blind, so a row silently wired to the wrong
+/// effect is invisible everywhere else.
 #[test]
 fn each_row_emits_the_action_its_table_row_names() {
     let v = view();
