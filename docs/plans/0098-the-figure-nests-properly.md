@@ -288,7 +288,7 @@ flowchart TD
 | 4b — The figure can turn | dev | done | `01f3775` |
 | 5 — What it costs at the floor tier | dev | done | `255f386` |
 | 6 — The docs learn both coordinates | dev | done | `de1df96` |
-| 7 — The look gate | human | not started | |
+| 7 — The look gate | human | done | `30b2bce` |
 
 ### Notes
 
@@ -385,15 +385,24 @@ flowchart TD
   the **DO NOT BIND `gamma`** warning, the `gamma` row's "unusable on a curved or jittered star",
   and the `star_curve` bullet. They now record that the defect is fixed and that a `color_span`
   tuned against the old reference is out by roughly 1.1x-1.9x.
-- Noticed and not acted on: `presets/shape_facet.toml` pins `gamma = "1.0"` and its header
+- **Phase 7 ran in the app, and both verdicts came back.** The user judged an A/B of one heart
+  preset differing only in `coord_mode`, at 165 fps / p99 7.0 ms: (1) the reference reproduces —
+  under `"1"` every ring keeps the notch where `"0"` rounds it into a blob by the third ring
+  inward; (2) `shape_pulse` is **re-authored** rather than left. The engine phases were already
+  committed, so this landed after the close block as `30b2bce`.
+- The re-author is `coord_mode = "1"` and nothing else. `color_span` was deliberately held at
+  `0.45`: both coordinates put the outline at exactly 1, so holding it holds the interior banding
+  fixed at the same four boundaries. The alternative — raising it to `0.85` to restore the old
+  corner density — was rendered and rejected as a busier figure (seven boundaries inside instead of
+  four). The surround consequently carries ~20 rings to the corner where it carried ~41.
+- Still noticed and not acted on: `presets/shape_facet.toml` pins `gamma = "1.0"` and its header
   explains the pin by design-backlog 0097, which Phase 1 closed. The pin is now unnecessary rather
   than load-bearing, and the preset also carries a `color_span` tuned against the old reference.
-  No `.toml` was touched by this plan — that is `preset-author`'s lane and Phase 7's question.
 
 ### Close triggers
 
-- **`presets/` touched:** yes — `presets/README.md` only. **No `.toml`**, so the shipped preset set
-  is unchanged and nothing was embedded or removed.
+- **`presets/` touched:** yes — `presets/README.md`, and `presets/shape_pulse.toml` re-authored at
+  Phase 7 (`30b2bce`). Nothing embedded or removed: the shipped set is the same files.
 - **Plan header `Closes:`** design-backlog 0096, design-backlog 0097.
 - **What shipped:** feature (one fix — Phase 1 — plus a new preset-facing parameter surface:
   `coord_mode` and `rotation` on `shape_field`, a new load warning, and a new cost test).
@@ -403,5 +412,5 @@ flowchart TD
   stamped-before-touch staleness notice because this plan edited files their probes name: `0096`
   and `0097` (`shape_field.rs`, `marks.rs`) — the two this plan closes — plus `0128` and `0133`
   (`schema.rs`, from Phase 4's warning). No probe failed.
-- **Outstanding `human` phases:** Phase 7, the look gate. It gates nothing below it, and the plan
-  says it may carry forward to `docs/content-brief.md`.
+- **Outstanding `human` phases:** none. Phase 7 was judged in the running app; it did not carry
+  forward, so nothing moves to `docs/content-brief.md`.
