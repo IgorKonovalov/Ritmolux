@@ -1138,6 +1138,15 @@ properties of the pattern rather than of a vertex:
 | `warp_scale` | the wobble's spatial scale. Larger is coarser. Default `1` |
 | `warp_speed` | how fast its frequencies drift. Default `1` |
 
+`warp_speed` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
+the same shape `fragment_field`'s
+[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121)
+take — so it is safe to bind to audio. Until Plan 0121 it multiplied the shared
+clock, where a swing from `1` to `1.5` a hundred seconds into a set would have
+moved the warp's phase by **fifty seconds in one frame**: a teleport, not an
+acceleration. No shipped preset binds it, which is the only reason nobody found
+that.
+
 **A `[smoothing]` entry naming a `[per_vertex]` binding is ignored, with a
 warning** — the same rule a per-element `index` binding takes, and for the same
 reason: a series has no single value for the smoother to hold. Ease the scalar
