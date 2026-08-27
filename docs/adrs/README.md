@@ -153,7 +153,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | accepted 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
 | [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119) |
 | [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) | The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm | proposed 2026-08-26 (Plan 0120) |
-| [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | proposed 2026-08-27 (Plan 0121) |
-| [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | proposed 2026-08-27 (Plan 0121) |
-| [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | proposed 2026-08-27 (Plan 0121) |
+| [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome |
+| [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
+| [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | accepted 2026-08-27 (Plan 0121) |
 <!-- roster:end -->

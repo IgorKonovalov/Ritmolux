@@ -295,6 +295,10 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0098 | `thickness` below 0.167 is a dead zone on every line scene, and nothing says so | [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 1b. The warning landed, the floor stays. Its own probe went red on delivery: the constant moved. **Closed 2026-08-25** |
 | 0071 | The scalloped boundary was chosen as a real curve primitive, and the engine has none | [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) + [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 6, as roster member `scallop`. **Closed 2026-08-27** |
 | 0073 | Motif outlines show their vertices, and a sampled polyline does not read as a curve | [ADR-0098](adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) + [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phases 3 and 5. The straight-line half is now 0134. **Closed 2026-08-27** |
+| 0131 | `shot --report` truncates preset names to 14 characters, and the library now has its first collision | [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 2. Elided in the middle, column unwidened. **Closed 2026-08-27** |
+| 0137 | `fragment_field` has three hardcoded animation rates and no parameter behind any of them | [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 3; see 0141. **Closed 2026-08-27** |
+| 0138 | `palette_contour` keys on the band grid and never reads the LUT | [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 5; see 0140. **Closed 2026-08-27** |
+| 0139 | Nothing in the harness measures motion rate or the silent-to-driven difference | [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 1. **Closed 2026-08-27** |
 
 <!-- roster:end -->
 
@@ -3000,47 +3004,6 @@ resolution and is comparable only at a fixed one, and "measured at the 96x96 san
 a fixed internal capture or a documented per-resolution floor — that is the design question, and it
 is not answered here.
 
-## 0131 — `shot --report` truncates preset names to 14 characters, and the library now has its first collision
-
-**Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
-Mode 4 review, 2026-08-26, while running the close ceremony's own curation sweep.
-**Owner if taken:** `dev`.
-
-- **Verified 2026-08-26** — the truncating format, in all three of the report's per-preset tables:
-  `present: \{:<14\.14\} in: standalone/src/shot/report.rs`
-- **Verified 2026-08-26** — the pair that collides under it, one shipped by Plan 0119:
-  `present: name = "Tiled Rosette Mono" in: presets/fragment_tiledmono.toml`
-
-### The finding
-
-`report.rs` formats every per-preset row with `{:<14.14}`, which pads *and truncates* to fourteen
-characters. `Tiled Rosette` is thirteen; `Tiled Rosette Mono` truncates to `Tiled Rosette `. Since
-Plan 0119 shipped the second one, `cargo run -p standalone --example shot -- --presets presets
---report family=fragment_field` prints two rows labelled `Tiled Rosette` in each of its three tables,
-with no way to tell which is which except row order:
-
-```text
-  Tiled Rosette    0.082   0.100   0.021   0.019   0.048   0.337   20+   43+
-  Tiled Rosette    0.347   0.000   0.119   0.000   0.523   0.576   15+   43+
-```
-
-It is the library's first collision at that width, so nothing has ever exercised it.
-
-### Why it matters more than a formatting nit
-
-This report **is** the instrument the architect close ceremony's preset-curation step reads — *"does
-the new content earn its place against what already ships, or did a family just converge?"* — and the
-two rows it cannot distinguish are precisely a base preset and its variant, which is the shape a
-convergence takes. The near-duplicate flag is computed on real names and is unaffected; the human
-reading of the table is what breaks.
-
-### What a fix looks like
-
-Widen the column to the longest name in the family being printed, or drop the `.14` precision and let
-the numeric columns align on their own `{:>7}` widths. Either is a one-line change; the second is
-closer to what the surrounding tables already do. A `shot_cli` assertion that no two rows in one
-family table carry the same label is the thing that would keep it from coming back.
-
 ## 0133 — `docs-shots.mjs` cannot run at all, so the operator-doc image sweep has been dead since 2026-08-15
 
 **Raised by:** `architect`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s
@@ -3111,8 +3074,12 @@ by how much* — had no instrument and the lane had to write one in a scratch di
   `present: fn luma\(px: &\[u8\]\) -> f32 in: core/src/render/metrics.rs`
 - **Verified 2026-08-26** — it *does* linearize, for exactly one question, behind a private table:
   `present: fn srgb_decode_lut\(\) -> &'static \[f32; 256\] in: core/src/render/metrics.rs`
-- **Verified 2026-08-26** — the report's column set carries no level column:
-  `present: "preset", "bass", "mid", "treb", "onset", "anim", "cover", "rise", "fall" in: standalone/src/shot/report.rs`
+- **Re-verified 2026-08-27** — the report's column set still carries no level column. Plan 0121
+  Phase 1 added `drive` and `rate`, neither of which is one, and broke the old probe by widening the
+  header string it pinned column by column. The replacement pins the numeric-column *shape* instead,
+  so a level column arriving is still a re-read trigger without the probe having to name every
+  column that exists:
+  `present: \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>5\} \{:>5\} in: standalone/src/shot/report.rs`
 
 ### The finding
 
@@ -3289,123 +3256,6 @@ cap violation, and nothing warns.
 **Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
 author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
 
-## 0137 — `fragment_field` has three hardcoded animation rates and no parameter behind any of them, so "slow it down" and "flatten it out" are one knob
-
-The scene's three clocks are shader literals with no uniform behind them
-(`core/src/render/scenes/fragment_field.rs:137-142`): the two fold rates `t * 0.7` and `t * 0.6`
-inside the five-iteration sine fold, and the field sweep `t * 0.5` that indexes the palette. The
-only lever a preset has over the two fold rates is `warp`, because they are scaled by it — so
-asking for a calmer world and asking for a flatter one are the same request.
-
-- **Raised:** 2026-08-27, from the mono cohort (`fragment_drostemono`, `shape_contourmono`,
-  `fragment_driftmono`, committed `d6ffa54`), by `preset-author`.
-- **The field rate is reachable, but only by accident.** `pan` is added into the same sum the
-  field sine sees (`var p = uv * zoom + pan`, then `sin(p.x + p.y + t * 0.5)`), so a pan of
-  `r * time` on **both** axes leaves a residual sweep of `0.5 + 2r`, and `r = -0.25` cancels the
-  clock outright. That is what shipped as the basis for `fragment_driftmono`'s tuning. It works,
-  it is a coincidence of where `pan` lands in the expression, and it costs the pan binding, which
-  the preset then cannot use for anything else.
-- **The useful quantity is not the rate but the contour crawl**, `residual / (zoom * sqrt(2))`,
-  because `zoom` sets the spatial frequency the phase runs against. Every verdict the preset
-  collected fell out of that one line — which had to be derived by hand from the shader.
-- **Only one cancellation direction works, and the other one lies.** A symmetric pan (`+r` on both
-  axes) moves the field's phase and is visible. An ANTI-symmetric pan (`+a` on x, `-a` on y)
-  leaves the sum untouched, so it translates the sampled window at zero cost to the sweep — which
-  looks like free motion and is not, because that direction is the base field's own contour
-  direction. Measured: tripling the glide that way LOWERED frame-to-frame change (2.09 -> 1.51)
-  instead of raising it.
-- **Correction to the raising note.** It called this "the most-used scene in the library (12 of
-  46)". It is the **second** most-used: `attractor` has 19 of the 49 shipped presets and
-  `fragment_field` has 12. The impact argument survives the correction intact.
-- **What a fix is:** a rate parameter, or several. Whichever shape it takes, a rate binding that
-  multiplies **absolute** scene time teleports the picture the moment an audio-bound rate changes
-  — `warp_mesh` already does exactly that (`let wt = time * wspeed`, `warp_mesh/mod.rs:486`), and
-  no shipped preset has found it only because nothing binds `warp_speed` yet.
-- **Verified 2026-08-27** — the scene still exposes no rate parameter:
-  `absent: field_speed in: core/src/render/scenes/fragment_field.rs`
-
-### Priority
-
-**Medium.** Twelve presets on the affected system, and the workaround costs a binding and has to
-be rediscovered by every author who wants a calm version of this world.
-
-## 0138 — `palette_contour` keys on the band grid and never reads the LUT, so on any limited-ink palette its only usable value is zero
-
-`band_contour` is a pure function of position within the band grid
-(`core/src/render/palette.rs:742`, copied verbatim into `fragment_field.rs`,
-`reaction_diffusion.rs` and `shape_field.rs`): `let d = min(fract(f), 1.0 - fract(f))`, darkened
-by `amount`. It never consults the gradient LUT, so it draws a hairline at **every** band
-boundary whether or not the colour changes there.
-
-- **Raised:** 2026-08-27, from `shape_contourmono` — a two-ink-plus-accent distance-field print,
-  on one of the three scenes where this parameter is not inert.
-- **Why a limited-ink palette breaks it.** Flat ink out of `palette_steps` is written as
-  *plateaus* — runs of bands holding one colour — so most boundaries are white-meets-white and
-  black-meets-black. On those the contour is a `smoothstep` grey line drawn across flat colour,
-  which is precisely the shading a two-ink print is defined by not having. At the few real run
-  boundaries it has nothing to add either, because black already meets white there and that is
-  maximum contrast.
-- **The arithmetic, from the shipped preset:** 20 steps in 5 runs (black 5 / white 5 / black 4 /
-  white 4 / red 2) has 20 band edges, of which 5 are ink changes. `palette_contour` treats all 20
-  alike.
-- **It is set to zero in four of the nine presets that name it** — `fragment_driftmono`,
-  `fragment_drostemono`, `fragment_tiledmono` and `shape_contourmono`, the last of which carries a
-  header comment saying so outright.
-- **What a fix is:** fire only where the two band centres either side of the edge resolve to
-  different LUT colours. The scoping in ADR-0078 stays untouched — this is about *which* edges,
-  not about which stages have derivatives.
-- **Verified 2026-08-27** — the canonical WGSL still takes no LUT:
-  `present: fn band_contour\(t: f32, steps: f32, amount: f32\) in: core/src/render/palette.rs`
-
-### Priority
-
-**Medium.** Narrow but total: on a plateau palette the parameter has exactly one usable setting
-and it is off. Low frequency until 2026-08-27, when the count of limited-ink looks went from one
-to four.
-
-## 0139 — nothing in the harness measures motion RATE or the silent-to-driven difference, so a preset can pass every gate and still be unwatchable in either direction
-
-Every statistic in `shot --report` is a **settled differential** — a driven frame against a quiet
-one, each captured after its own fixed frame count (`standalone/src/shot/report.rs:244`, where
-`anim = frame_diff(silent@24, silent@48)`). That answers "does this react", which is a different
-question from "does this react at a rate a person can watch", and it cannot see rate at all.
-`--horizon` measures the other end of the time axis and excludes any preset that does not
-accumulate.
-
-- **Raised:** 2026-08-27, after `fragment_driftmono` needed four live passes with the user and the
-  harness was green and unchanged through all of them:
-
-  | draft | the user's verdict | `--report` |
-  |---|---|---|
-  | v1 | "shaking way too much" | bass 0.465, anim 0.358, 13/13 pass |
-  | v2 | "not moving at all" | bass 0.182, anim 0.154, 13/13 pass |
-  | v3 | "still not moving enough" | bass 0.191, anim 0.324, 13/13 pass |
-  | v4 | "doesn't move to music" | bass 0.191, anim 0.324, 13/13 pass |
-
-  `anim` is the closest existing statistic and it moved in the **wrong direction** relative to the
-  verdicts.
-- **Two throwaway instruments made progress where the harness could not.** Frame-to-frame change
-  between consecutive analyzer hops (`--frame-at` at hops N, N+1, ...) catches frozen and catches
-  boiling; and the difference between a silent frame and a fully-driven one — music off against
-  music on — is the defect the user actually reported at v4, and no column looks at it. The second
-  reads 72.7 before the fix and 112.7 after, against 115.1 for `fragment_drostemono` and 119.6 for
-  `shape_contourmono`.
-- **A raw rate does not rank presets by watchability, and the raiser misread it twice before
-  noticing.** `fragment_tiledmono` measures 8.19 and `fragment_drostemono` 6.42 — both HIGHER than
-  the draft rejected for shaking, and both fine to watch. The difference is **anchoring**: those
-  two put their motion inside a repeating structure that holds still, so the eye reads a pattern
-  updating, while an unanchored world moves bodily and must be far quieter to read as equally
-  calm. So a threshold would be wrong; a printed column, read against family neighbours the way
-  `cover` and `anim` already are, would not.
-- **What a fix is:** printed columns, never a gate — the ADR-0083 shape.
-- **Verified 2026-08-27** — no such column exists:
-  `absent: "drive" in: standalone/src/shot/report.rs`
-
-### Priority
-
-**Medium.** This lane's whole claim is that it verifies before showing; on motion it currently
-cannot, and the cost is live round trips with the user — four of them on one preset.
-
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
 [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) fixed *which* edges
@@ -3455,3 +3305,61 @@ the frame — so the contour is the only source of intermediate values in the pi
 **Low.** One preset wants it, the workaround (full strength, ink core, soft edges) is shipped and
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
+
+## 0141 — ADR-0132's rule is engine-wide and its enumeration was not: `swarm`'s field clock is still `time * spin`, and two shipped presets bind that rate to the music
+
+[ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
+parameter in this engine integrates a phase**, then enumerates two sites: the new `field_speed` /
+`fold_speed` on `fragment_field`, and `warp_speed` on `warp_mesh`, *"which is corrected to match
+rather than left as a counterexample"*. There is a third, and it is the only one of the three that
+shipped content actually binds.
+
+- **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
+  Mode 4 close review, by grepping for the pattern the ADR forbids rather than by reading the plan's
+  list. **Owner if taken:** `dev`; the correction is the same three lines Phase 4 applied to
+  `warp_mesh`.
+- **Verified 2026-08-27** — the swarm's field clock still multiplies absolute scene time:
+  `present: let field_t = self\.time \* self\.spin; in: core/src/render/scenes/swarm.rs`
+- **Verified 2026-08-27** — and a shipped preset binds that rate to a band:
+  `present: spin = "0\.4 \+ clamp\(mid \* 0\.9, 0, 0\.75\)" in: presets/swarm_shatter.toml`
+
+### The finding
+
+`core/src/render/scenes/swarm.rs` computes `let field_t = self.time * self.spin;`, four lines under
+its own comment *"Field evolves at `spin`"* — so `spin` is a rate, it is in the scene's `PARAMS`
+roster, and it is exactly the shape ADR-0132 exists to remove. Two shipped presets bind it:
+
+    presets/swarm_shatter.toml:34   spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"     [smoothing] 0.3
+    presets/swarm_drift.toml:96     spin = "0.040 + sin(time * 0.019) * 0.010
+                                            + clamp(mid * 0.041, 0, 0.035)"      [smoothing] 1.30
+
+**Size of it on `swarm_shatter`, arithmetic rather than measured.** A one-pole at `tau = 0.3`
+closes about 5.4 % of its gap per 60 Hz frame, so across the 0.75 swing `spin` moves ~0.04 in a
+frame. At t = 100 s that advances `field_t` by ~4.0 s of field time in one frame, against a nominal
+`1.15 / 60 = 0.019` s — roughly **210x**, on every loud passage, growing without bound as a set runs.
+
+**Why nobody has reported it, and why that is not reassurance.** Unlike `warp_mesh`, whose phase
+drives a vertex displacement and would visibly teleport the picture, `field_t` is the time
+coordinate of the curl-noise field the particles *steer* by. A jump re-rolls the flow rather than
+moving the particles, so it reads as the field losing its thread — which is a look, not obviously a
+bug, and is the kind of thing a viewer attributes to the music. Plan 0121's own Context asserts the
+opposite premise — *"the rate hazard already exists in the engine: `warp_mesh` … Nothing has found
+it because no preset binds it"* — and that framing is what stopped anyone grepping.
+
+- **What a fix looks like.** The `warp_mesh` correction, applied unchanged: store `dt` in `advance`,
+  accumulate `field_phase += spin * dt` in `update` (after `set_param`, so it uses this frame's
+  value), and read the phase where `field_t` is read now. At a constant `spin` the phase equals
+  `spin * time`, so `swarm_drift`'s slow constant term is unchanged and only the bound swing bends.
+  **Not free of visual consequence, unlike the other three:** both presets bind `spin`, so this one
+  *will* move their pictures, and it needs a `preset-author` look pass rather than an equivalence
+  assertion. That is the whole reason it is a separate entry and not a fifth phase.
+- **And the general repair is the sweep, not the site.** The enumeration failed once; the thing that
+  keeps it from failing again is a test, not a longer list — a hygiene-style assertion that no
+  `core/src/render/scenes/**` source multiplies `self.time` by a settable field. That is cheap, it
+  is text, and it would have caught this one.
+
+### Priority
+
+**Medium.** Live in shipped content on every loud passage, and it convicts a claim an accepted ADR
+makes about itself — but it is a look question rather than a crash, the two affected presets read
+acceptably today, and the fix cannot land without a content pass behind it.
