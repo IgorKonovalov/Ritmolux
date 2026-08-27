@@ -1,0 +1,264 @@
+# Drift Mono - the LIMITED INK SET of `fragment_tiledmono.toml` with the whole
+# symmetry stage taken away. No tile, no fold, no radial repeat: just the bare
+# domain-warp field, banded to black, white and one red. Marbled endpaper /
+# suminagashi - the red as a thread pulled through flowing ink rather than as an
+# outline on a printed motif.
+#
+# Only the INKS and the tonemap-shoulder trick are inherited. The band LAYOUT is
+# deliberately different, and the reason is the whole point of this file.
+#
+# THE FINDING THIS WORLD EXISTS ON: WHERE THE RED SITS IN THE PALETTE MATTERS
+# MORE THAN HOW MANY BANDS IT HOLDS. The field is `0.5 + 0.5 * sin(...)`, whose
+# distribution is arcsine - it DWELLS at the two ends of the coordinate range and
+# hurries through the middle. The tiled sibling puts its red at the top of the
+# range, at the wrap, and gets away with it because its tile and fold chop the
+# field into small cells before any of it is seen. With the symmetry stage gone
+# there is nothing to chop it, so a red at the dwell point pools into a SLAB:
+# measured 12.12 % of the frame, and visibly a continuous red mass filling the
+# left of the picture rather than an accent.
+#
+# The fix is placement, not count. The dwell points sit at coordinate
+# `frac(hue)` and `frac(0.35 + hue)` - about 0.08 and 0.43 here - and those two
+# are given to BLACK and WHITE, which is what a ground should be. The red is
+# moved to band centres 0.625 / 0.675 / 0.725, in the fast-crossing region
+# between them, where the coordinate sweeps through quickly and the ink draws as
+# a line. Measured at 1280x720:
+#
+#     red 3 bands at the range END (0.91-1.00)  ->  12.12 %, a slab
+#     red 2 bands at 0.66-0.74 (fast-crossing)  ->   4.42 % loud, 4.36 % quiet
+#     red 3 bands at 0.61-0.74 (fast-crossing)  ->   6.46 % loud, 6.34 % quiet  <- shipped
+#
+# So the arcsine halving the tiled sibling documents - a band taking about half
+# the screen area its palette width suggests - is not a property of the palette
+# at all. It is a property of WHERE in the palette the band sits. Three bands is
+# 15 % of palette space and lands at 6.5 % of pixels here, which is the same
+# halving read from the other side.
+#
+# AND `hue` MUST BE A CONSTANT, WHICH IS THE SECOND HALF OF THE SAME FINDING.
+# `hue` offsets the coordinate, so it slides the two dwell points. Left drifting
+# on `time` - as the tiled sibling has it, where drift merely reshuffles which
+# cell is which ink - it sweeps those dwell points through the entire palette
+# over about ninety seconds, so the red pools periodically no matter how few
+# bands it holds and no matter where they are placed. `color_center` keeps a
+# small oscillation (0.03, down from the sibling's 0.10) so the ink distribution
+# still breathes without carrying a dwell point across a run boundary.
+#
+# NO HORIZON RUN, DELIBERATELY. Nothing here accumulates - no trails, no feedback
+# table, no particles, no reaction-diffusion. The field is a closed-form function
+# of position and time, so every frame is computed from scratch and there is no
+# axis for a horizon to find drift along (ADR-0099's trigger is not met).
+system = "fragment_field"
+name = "Drift Mono"
+
+[palette]
+# Twenty bands in five runs, read as band counts: black 5 / white 5 / black 3 /
+# RED 3 / white 4. Plateaus are written wide of their run boundaries so every
+# band centre - 0.025, 0.075, ... 0.975 - lands on flat colour and the 0.02-wide
+# transitions are never sampled.
+#
+# The ORDER is the load-bearing part; see the header. The red run sits at 0.625 /
+# 0.675 / 0.725, between the two dwell points rather than on one, with black
+# before it and white after - so the thread keeps a dark edge on one side and a
+# light one on the other wherever it crosses the field.
+#
+# The red's hex is LINEAR - the palette bakes hex straight through with no sRGB
+# decode - so `#b00808` is what puts a saturated red on the glass at this glow.
+# `#ff0000` written here comes out pink.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.24, color = "#000000" },
+  { at = 0.26, color = "#ffffff" },
+  { at = 0.49, color = "#ffffff" },
+  { at = 0.51, color = "#000000" },
+  { at = 0.59, color = "#000000" },
+  { at = 0.61, color = "#b00808" },
+  { at = 0.74, color = "#b00808" },
+  { at = 0.76, color = "#ffffff" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `warp` (the ink is stirred harder)
+#   treb  -> `warp` (a smaller share of the same stir)
+#   mid   -> `pan`, symmetric, which SURGES the bands across the frame
+#   onset -> a short `warp` kick on the hit
+#
+# NOTHING drives luminance, and that is structural rather than taste: every band
+# is already pinned to black or driven into the tonemap shoulder, so a reactive
+# `glow` could only unpin it and put the grey back. All the music energy goes
+# into how densely the ink is folded, and how far the sheet surges.
+#
+# THE REACTIVITY WAS REBUILT AFTER A REAL DEFECT: "doesn't move to music, I
+# don't see anything change with music on/off". The calm pass that fixed the
+# shaking had cut every reactive amplitude AND lengthened every smoothing
+# constant about tenfold, and the second of those was the killer - a 4-second
+# constant averages real music, which fluctuates over tenths of a second, into
+# very nearly a constant. The preset was tracking the MEAN LEVEL of the music
+# rather than the music. Constants are back to 0.45-0.55 s and the amplitudes
+# are real; the calm now comes from feature scale and base fold amplitude, which
+# is where it belonged all along.
+#
+# Measured as the frame difference between a silent frame and a fully-driven
+# one - literally music off against music on:
+#
+#     before the rebuild   ->   72.7      (the reported defect)
+#     after                ->  112.7
+#     `fragment_drostemono` -> 115.1      for scale
+#     `shape_contourmono`   -> 119.6
+#
+# `zoom` IS DELIBERATELY A CONSTANT AND MUST STAY ONE. It was the obvious lever
+# for treble and it is the wrong one twice over: a zoom pump is a camera move
+# rather than a change in the thing being drawn, which is a standing preference
+# in this project, and this scene's feature size is the ONE thing that has to
+# hold still for the flow to stay legible (see the drift note). Treble went into
+# the stir instead, where it means "brighter music, more intricate ink".
+#
+# AND `color_span` IS NOT AVAILABLE AS A REACTIVE LEVER ON THIS PALETTE, WHICH
+# COST A ROUND TRIP TO LEARN. It was the natural treble binding - it packs more
+# palette cycles into the field, so it reads as thread density, exactly the kind
+# of structural change this world wants. But this palette's whole ink balance is
+# tuned against a FIXED span: moving the span slides the arcsine dwell points
+# across the red plateau, and the red share does not merely drift, it swings
+# non-monotonically. Measured at loud, span reactivity capped at:
+#
+#     +0.45  ->  red 12.73 %      +0.30  ->  red 20.59 %
+#     +0.20  ->  red 12.51 %      +0.12  ->  red  5.76 %
+#
+# For 0.4 of a delta point it put the accent anywhere between a hairline and a
+# fifth of the frame. Dropped entirely. Any future reactive binding on `hue`,
+# `color_center` or `palette_steps` has the same defect for the same reason -
+# they all move the coordinate mapping the ink layout was measured against.
+
+# THE INK COUNT. Twenty bands in five runs, no contour. Contour is a smoothstep
+# at every band edge, most of which fall inside a plateau here - a grey hairline
+# across flat colour is exactly the shading this look is defined by not having.
+palette_steps   = "20"
+palette_contour = "0"
+
+# THE FLOW, AND THE THREE PASSES THAT SET IT. The draft was "shaking way too
+# much, needs to be smoother 10x"; the second pass overshot to "seems not to be
+# moving at all"; the third was still "not moving enough". All three verdicts
+# came from a person watching the running app, and the arithmetic below is what
+# finally made them predictable instead of guessed at. Gains are still sized off
+# their own caps - a clamped term reaches its ceiling at C/G, so bass tops out
+# at 0.15/0.176 = 0.85, treb at 0.10/0.167 = 0.60, mid at 0.10/0.118 = 0.85.
+#
+# THE SETTLEMENT: THE CALM COMES FROM FEATURE SCALE AND FOLD AMPLITUDE, NOT FROM
+# SLOWING THE FIELD DOWN. The draft and this file run the field at exactly the
+# same rate. What changed is `warp` 1.05 -> 0.50 and `zoom` 1.15 -> 2.00, and
+# that alone is worth about 1.9x on frame-to-frame change (6.97 -> 3.64).
+# Everything spent trying to slow the CLOCK instead either barely moved the
+# needle or killed the world; see the drift note below, which is kept because
+# the lever it documents is real and someone will want it.
+#
+# `warp` IS THE ONLY LEVER OVER THE FOLD'S OWN CHURN. The shader folds the
+# domain five times with `warp * sin(p.y * 1.5 + t * 0.7)` and
+# `warp * cos(p.x * 1.5 - t * 0.6)`, and those two rates are HARDCODED - there
+# is no speed parameter on this scene. The only way to quiet the folding is to
+# shrink its amplitude, and the folding is what BOILS: it reorganizes the
+# picture in place, which is the component that read as shake. Measured on warp
+# alone at the draft's other values: 1.05 -> 7.07, 0.80 -> 5.61, 0.60 -> 4.75,
+# 0.45 -> 4.11.
+#
+# `zoom` SETS FEATURE SIZE, AND IT MUST BE SET FOR LOOKS, NOT FOR CALM. A higher
+# zoom does make a finer pattern whose contours crawl slower - true arithmetic,
+# and a trap. The second pass rode it to 5.00, where the field degenerates into
+# near-parallel diagonal bands with no eddies and no closed loops - NO
+# LANDMARKS. A pattern with nothing trackable in it does not read as moving
+# slowly, it reads as not moving, however much it changes. 2.00 keeps the eddies
+# and closed loops that make the flow legible.
+warp  = "0.42 + noise(time * 0.02) * 0.08 + clamp(bass * 0.494, 0, 0.42) + clamp(treb * 0.250, 0, 0.15) + clamp(onset * 0.200, 0, 0.12)"
+zoom  = "2.00"
+# THE DRIFT. Two bounded, slow `noise` wanders, offset by 50 on the second axis
+# so they do not trace the same path. There is deliberately NO linear pan term,
+# and the rest of this note is why - because two passes were spent putting one
+# here, and the lever is worth knowing about even though this preset does not
+# use it.
+#
+# THIS SCENE'S HARDCODED ANIMATION RATE IS AUTHORABLE THROUGH `pan`. The field
+# is `sin(p.x + p.y + t * 0.5)` and `p = uv * zoom + pan`, so the sum the sine
+# sees is `zoom * (ux + uy) + (pan.x + pan.y) + t * 0.5`. Pan enters on exactly
+# the same footing as the time term, so a pan of `r * time` on BOTH axes leaves
+# a residual sweep of `0.5 + 2r`. That is a continuous rate knob on a constant
+# the shader does not expose, and `r = -0.25` cancels the clock outright.
+#
+# AND THE CONTOUR CRAWL IT BUYS IS THE THING TO PREDICT, not the rate itself:
+#
+#     crawl (NDC/s) = residual / (zoom * sqrt(2))
+#
+# because the phase gradient is `zoom` along each axis and the contours run
+# perpendicular to (1,1). Every verdict this preset collected falls straight out
+# of that one line, which is why it is written here rather than re-derived:
+#
+#     draft        residual 0.50, zoom 1.15  ->  0.307 NDC/s   6.5 s per frame
+#     pass 2       residual 0.00, zoom 5.00  ->  0.000         never  - DEAD
+#     pass 3       residual 0.03, zoom 2.00  ->  0.011       190   s  - too slow
+#     shipped      residual 0.50, zoom 2.00  ->  0.177        11.3 s
+#
+# TO RETUNE THE SPEED, MOVE THE RESIDUAL AND LEAVE EVERYTHING ELSE ALONE. Add
+# `r * time` to both pan axes: r = -0.05 gives 0.141 NDC/s, r = -0.11 gives
+# 0.099, r = -0.16 gives 0.064. Nothing else in the file needs to move with it.
+#
+# WHAT DOES NOT WORK, MEASURED, SO NOBODY TRIES IT TWICE: an ANTI-symmetric pan
+# (`+a` on x, `-a` on y) leaves the sum untouched, so it translates the window
+# at zero cost to the sweep - it looks like free motion and it is not. That
+# direction is the base field's own contour direction, so it slides the bands
+# along themselves and is very nearly invisible. Measured: tripling the glide
+# that way LOWERED frame-to-frame change (2.09 -> 1.51) instead of raising it.
+# The only visible bulk motion this field has is the perpendicular sweep, and
+# the residual is the only thing that sets it.
+#
+# THE REFERENCE FIGURES THAT MAKE ANY OF THIS READABLE, and the finding worth
+# keeping. On frame-to-frame change `fragment_tiledmono` reads 8.19 and
+# `fragment_drostemono` 6.42 - BOTH HIGHER THAN THE DRAFT THAT WAS REJECTED FOR
+# SHAKING, and both fine to watch. Per-pixel change is simply not what reads as
+# shake. Those two put their motion inside a repeating structure that holds
+# still, so the eye has an anchor and reads the change as a pattern updating.
+# This world has no repeat anywhere in it, so its motion moves the whole sheet
+# bodily. What it needs is not less change but change that stays LEGIBLE:
+# landmarks that persist, travelling at a speed the eye can follow. No gate in
+# this repo measures that, in either direction.
+pan_x = "noise(time * 0.015) * 0.05 + clamp(mid * 0.412, 0, 0.35)"
+pan_y = "noise(time * 0.015 + 50) * 0.05 + clamp(mid * 0.412, 0, 0.35)"
+
+# LUMINANCE, HELD FLAT AND HELD HIGH. Carried from the tiled sibling, which
+# measured it: the scene shader multiplies by a FIXED radial vignette,
+# `glow * (1 - 0.25 * r)`, with no param on the 0.25 - a 2:1 centre-to-corner
+# ramp that on flat colour reads as exactly the shading this look is trying not
+# to have. The fix is the tonemap, not the vignette: driving the whites past the
+# 0.6 knee compresses them and their neighbours together, so the vignette
+# survives as a breath instead of a ramp, and black is 0 times anything and does
+# not move at all. This is the one place in the repo where deliberate over-range
+# is correct rather than the additive-ceiling mistake, because the palette is
+# quantized upstream and cannot smear.
+glow  = "2.6"
+flash = "0"
+
+# COLOUR WINDOW. `hue` is a CONSTANT and that is load-bearing - see the header.
+# `color_center` keeps a small oscillation so the distribution still breathes.
+hue          = "0.08"
+color_span   = "1.35"
+color_center = "sin(time * 0.029) * 0.03"
+saturation   = "1.0"
+
+# OFF - each of these is a gradient generator. Bloom blurs exactly the hard edges
+# the banding creates; trails would smear the flow into a wash.
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+# Back to musical time constants. The calm pass had these at 2.5-4.0 s, which is
+# what made the preset deaf: a low-pass that long turns a bar of music into its
+# average. Half a second tracks phrasing and beats while still refusing to
+# follow individual frames.
+#
+# `warp` is asymmetric because it carries the onset kick as well as the two band
+# terms: a hit should arrive promptly and relax, and a symmetric constant long
+# enough to be calm on the way down is too sluggish on the way up.
+warp = { attack = 0.12, release = 0.55 }
+
+# The surge eases evenly - it translates the whole sheet, so it wants to read as
+# a swell rather than as a shove.
+pan_x = 0.45
+pan_y = 0.45

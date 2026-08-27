@@ -1,0 +1,168 @@
+# Droste Mono - the LIMITED INK SET of `fragment_tiledmono.toml` carried onto a
+# different mechanism: the symmetry stage's Droste terms (`kaleido_radial` x
+# `kaleido_spiral` x `kaleido_zoom`) instead of its wallpaper tile. Black, white
+# and one red held to an accent; an endless tunnel of shrinking, sheared copies
+# rather than a flat printed cloth.
+#
+# Only the INKS and the tonemap-shoulder trick are inherited. The geometry, the
+# band layout and every gain were derived here, against the numbers below.
+#
+# WHY THE FOLD IS A CONSTANT. `fragment_tiled` and `fragment_tiledmono` both ride
+# a 6 -> 9 `kaleido_order` ladder, and that ladder is their signature. This world
+# holds the fold at 5 and puts the music on the tunnel's own axis - travel
+# (`kaleido_zoom`) and field deformation - so it is a different look rather than
+# a third tuning of the rosette.
+#
+# THE ONE THING THAT BREAKS THIS LOOK: A SOURCE FIELD THAT IS TOO COARSE.
+# The Droste stage resamples the FINISHED frame through a log-polar disc, so only
+# a small region of the field ever feeds the rings. At the field fineness the
+# tiled presets use (`zoom` ~ 1.05) that disc lands inside a single black stripe
+# and the whole tunnel prints one ink: measured red 0.00 %, black 82.02 %. The
+# fix is field fineness, not palette. Measured sweep at 720x405, loud:
+#
+#     zoom 1.05 / span 1.35  ->  red  0.00 %   (dead - the failure above)
+#     zoom 1.60 / span 2.60  ->  red  2.69 %
+#     zoom 2.20 / span 1.35  ->  red  4.83 %   <- shipped geometry
+#     zoom 2.20 / span 2.60  ->  red  4.42 %
+#     zoom 3.20 / span 1.35  ->  red  2.68 %   (too fine - rings lose their runs)
+#
+# THE RED, AND WHY THE BAND COUNT READS DIRECTLY HERE. `fragment_tiledmono`
+# records that palette share is about DOUBLE pixel share on its field, because
+# `0.5 + 0.5 * sin(...)` is arcsine and dwells at the ends of the coordinate
+# range. That correction does NOT apply through a Droste: the log-polar resample
+# spreads the sampled disc across the coordinate range fairly evenly, so palette
+# share lands close to pixel share. Two bands of twenty - 10 % of palette space -
+# measure 9.23 % loud and 7.83 % quiet at 1280x720. Both inside the 5-10 % brief.
+#
+# THE VANISHING POINT IS A SINGULARITY, NOT AN ARTIFACT TO TUNE OUT. The spiral
+# shears `log r` by a whole winding per revolution, and `log r` diverges at the
+# axis, so the angular frequency runs away there and the centre fans into rays.
+# Three attempts to remove it all failed and are recorded so nobody repeats them:
+#   - raising `kaleido_inner` (0.12, 0.22, 0.32, 0.45, 0.65) does not close it -
+#     the freeze smears the frozen disc radially, so the fan GROWS with the value;
+#   - `kaleido_order = 1` removes the fold but not the fan, and costs the nesting
+#     that makes the tunnel readable;
+#   - moving the axis toward a corner (`kaleido_center_*` 0.10 / 0.14) is far
+#     worse - the frame fills with two magnified bands and the red disappears.
+# The shipped `star_rosewindow.toml` carries the same singularity for the same
+# reason. It reads as a vanishing point; leave it alone.
+#
+# JUDGE THIS ONE AT FULL SIZE. The band edges are hard and the outer rings are
+# magnified, so a small render exaggerates the stair-stepping: non-ink pixels
+# (pure edge antialiasing) measure 1.06 % at 720x405 but 0.45 % at 1920x1080 -
+# close to the 0.51 % the tiled sibling records. The 720p jaggies are the raster,
+# not the preset.
+#
+# NO HORIZON RUN, DELIBERATELY. Nothing here accumulates - no trails, no feedback
+# table, no particles, no reaction-diffusion. The symmetry stage is a coordinate
+# map, so every frame is computed from scratch and there is no axis for a horizon
+# to find drift along (ADR-0099's trigger is not met).
+system = "fragment_field"
+name = "Droste Mono"
+
+[palette]
+# Twenty bands in five runs, read as band counts: black 5 / white 5 / black 4 /
+# white 4 / RED 2, the red wrapping straight back onto the opening black so the
+# accent has a white edge on one side and a black one on the other. Plateaus are
+# written wide of their run boundaries, so every band centre - 0.025, 0.075, ...
+# 0.975 - lands on flat colour and the 0.02-wide transitions are never sampled.
+#
+# The red's hex is LINEAR: the palette bakes hex straight through with no sRGB
+# decode and the surface encodes on write, so `#b00808` is what puts a saturated
+# red on the glass at this glow. A screen-space `#ff0000` here comes out pink.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.24, color = "#000000" },
+  { at = 0.26, color = "#ffffff" },
+  { at = 0.49, color = "#ffffff" },
+  { at = 0.51, color = "#000000" },
+  { at = 0.69, color = "#000000" },
+  { at = 0.71, color = "#ffffff" },
+  { at = 0.89, color = "#ffffff" },
+  { at = 0.91, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `kaleido_zoom` (travel INTO the tunnel) + `warp` (ring deformation)
+#   mid   -> `kaleido_angle` (the tunnel twists on its own axis)
+#   treb  -> `zoom` (source-field fineness, so ring detail)
+#   onset -> a `warp` kick (the rings flex on a hit)
+#
+# NOTHING drives luminance, and that is structural rather than taste: every band
+# is already pinned to black or driven into the tonemap shoulder, so a reactive
+# `glow` could only unpin it and put the grey back.
+
+# THE TUNNEL. `radial` 1.85 sits in the 1.6-2.2 window where one whole winding of
+# `spiral` reads as a clear Droste twist; below about 1.3 the rings pack too
+# closely for the shear to displace anything visible. `kaleido_zoom`'s unit is
+# the RING and the map is periodic in it, so this travel loops seamlessly with no
+# reset and no crossfade - a bass push moves the tunnel forward and it simply
+# keeps going.
+kaleido_tile   = "1"
+kaleido_order  = "5"
+kaleido_radial = "1.85"
+kaleido_spiral = "1"
+kaleido_zoom   = "time * 0.06 + clamp(bass * 0.412, 0, 0.35)"
+kaleido_inner  = "0.12"
+# The twist is an ABSOLUTE angle, not a rate, so a mid term rocks the tunnel
+# back and forth around its steady turn rather than accelerating it away.
+kaleido_angle  = "time * 0.02 + clamp(mid * 0.212, 0, 0.18)"
+
+# THE INK COUNT. Twenty bands in five runs, no contour - see the header.
+palette_steps   = "20"
+palette_contour = "0"
+
+# FIELD. Gains sized off their own caps: a clamped term reaches its ceiling at
+# C/G, so bass tops out at 0.18/0.212 = 0.85 and treb at 0.12/0.20 = 0.60 - a
+# typical passage sits near half, a real peak reaches the cap. Both ranges are
+# deliberately NARROW: under a Droste the source field is magnified several times
+# over in the outer rings, so a deformation that reads as lively unfolded reads
+# as churn here.
+warp  = "0.45 + noise(time * 0.03) * 0.06 + clamp(bass * 0.212, 0, 0.18) + clamp(onset * 0.133, 0, 0.08)"
+zoom  = "2.20 + clamp(treb * 0.20, 0, 0.12)"
+pan_x = "0"
+pan_y = "0"
+
+# LUMINANCE, HELD FLAT AND HELD HIGH. Carried from the tiled sibling, which
+# measured it: the scene shader multiplies by a FIXED radial vignette,
+# `glow * (1 - 0.25 * r)`, with no param on the 0.25 - a 2:1 centre-to-corner
+# ramp that on flat colour reads as exactly the shading this look is trying not
+# to have. The fix is the tonemap, not the vignette: driving the whites past the
+# 0.6 knee compresses them and their neighbours together, so the vignette
+# survives as a breath instead of a ramp, and black is 0 times anything and does
+# not move at all. This is the one place in the repo where deliberate over-range
+# is correct rather than the additive-ceiling mistake, because the palette is
+# quantized upstream and cannot smear.
+glow  = "2.6"
+flash = "0"
+
+# COLOUR WINDOW. Constant `hue`: a drifting one slides which field levels land in
+# which ink, and under a Droste - where the sampled disc is already a narrow slice
+# of the field - that swings the ink balance instead of reshuffling it. Measured
+# on the drifting first draft: red between 0.00 % and well over the brief within a
+# single filmstrip.
+hue          = "0.08"
+color_span   = "1.35"
+color_center = "sin(time * 0.029) * 0.10"
+saturation   = "1.0"
+
+# OFF - each of these is a gradient generator. Bloom blurs exactly the hard edges
+# the banding creates; trails would smear one ring's content into the next.
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+# The twist eases long - it turns every ring at once.
+kaleido_angle = 0.70
+
+# The travel term gets a constant of its own: a bass push that arrives as a step
+# reads as the tunnel JUMPING a ring rather than surging forward.
+kaleido_zoom = 0.30
+
+# Raised the way the tiled sibling's were, and for the same reason one level up:
+# the radial repeat multiplies motion, so whatever the source field does, every
+# ring does at once and the eye reads the sum.
+warp = 0.60
+zoom = 0.50
