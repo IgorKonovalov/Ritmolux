@@ -455,7 +455,12 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         let h = 0.5 * seg;
         let a = atan2(p.y, p.x);
         let spike = floor((a + h) / seg);
-        let f = abs(a - seg * spike);
+        // `|a - seg * spike| <= h` holds by construction, but not in f32: the
+        // same direction scaled by a different radius can round `atan2` by an
+        // ulp, and the fold then lands a hair PAST the wedge the sub-segments
+        // below span. The ray misses every one of them and `boundary_r` keeps
+        // its seed. Clamping restores the invariant the fold already has.
+        let f = min(abs(a - seg * spike), h);
         let r = length(p);
         let k = star.x;
         let curve = star.y;
@@ -537,7 +542,13 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         // region is star-shaped about the origin, so exactly one sub-segment
         // spans this angle, and comparing radii is the inside test — found in
         // the same loop as the distance rather than in a second pass.
-        var boundary_r = 0.0;
+        //
+        // Seeded with the valley's own projection rather than 0: at `f == h`
+        // the ray runs exactly through the polyline's last vertex, where `ts`
+        // can round past 1 and be rejected by both its segments. `dot(valley,
+        // u)` IS the crossing at that angle, so a rejected pair costs nothing,
+        // and the seed can never report the origin as the boundary.
+        var boundary_r = dot(valley, u);
         var prev = tip;
         var prev0 = tip0;
         for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
@@ -639,7 +650,10 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         let h = 0.5 * seg;
         let a = atan2(p.y, p.x);
         let spike = floor((a + h) / seg);
-        let f = abs(a - seg * spike);
+        // Clamped for the reason `mark_distance`'s fold above is: an ulp of
+        // `atan2` puts the ray outside the wedge its sub-segments span, and
+        // this arm's whole return value is that crossing.
+        let f = min(abs(a - seg * spike), h);
         let k = star.x;
         let curve = star.y;
         let jitter = star.z;
@@ -663,7 +677,10 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         let valley = vec2<f32>(k * cos(h), k * sin(h));
         let ctrl = 0.5 * (tip + valley) * (1.0 - curve);
         let u = vec2<f32>(cos(f), sin(f));
-        var boundary_r = 0.0;
+        // Seeded with the valley's projection, not 0 — see the same seed in
+        // `mark_distance`. A zero here is worse than a wrong radius: every
+        // caller divides by it, so the coordinate blows up along the ray.
+        var boundary_r = dot(valley, u);
         var prev = tip;
         for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
             let t = f32(i) / f32(MARK_STAR_SEGMENTS);
