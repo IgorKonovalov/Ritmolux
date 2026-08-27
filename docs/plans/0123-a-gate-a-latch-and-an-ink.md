@@ -319,9 +319,9 @@ struct LatchBank {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the gate asks both readings | dev | done | committed with this row |
+| 1 — the gate asks both readings | dev | done | `c96f0fa` |
 | 2 — `collage_mono`'s sway comes back down | human | not started | |
-| 3 — `[latch]` parses and resolves to a slot | dev | not started | |
+| 3 — `[latch]` parses and resolves to a slot | dev | done | committed with this row |
 | 4 — the latch bank runs | dev | not started | |
 | 5 — the grammar docs learn the latch | dev | not started | |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
@@ -356,6 +356,30 @@ forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
 rates back down, `Collage Mono` leaves the silent branch and the silent minimum
 returns to `0.0201` (`On White`). Left for the close to decide whether the comment
 is re-derived.
+
+**Phase 3 — the reserved block moved no other constant.** `LATCH_SLOT_BASE = 22`
+sits between `VERTEX_SLOT_BASE` (18, four wide) and `index`; `RAW_`, `CLOCK_`,
+`BAR_` and `VERTEX_` are all literals below it and are unmoved, and `INDEX_SLOT`
+is still `VAR_COUNT - 1` with `VAR_COUNT` at 27. Two `const` assertions bracket
+the new block at compile time and `latch_slots_are_where_the_names_say` (renamed
+from `raw_slots_are_where_the_names_say`) holds every block to its names.
+
+**Phase 3 — three invariants the plan did not name, added because the shape
+demanded them.** A latch expression compiles with **no** latch names in scope, so
+a latch cannot read a latch and "every latch, then the params" is a complete
+order rather than a dependency graph. A latch name colliding with a variable,
+constant or function is a load error, because latch names resolve last and
+`recut = bass` would otherwise silently be the band. The four reserved
+placeholders (`_latch0`..`_latch3`) are in `VAR_NAMES` for the positional
+assertion and held out of the identifier lookup, so `_latch2` is not a second
+spelling of a latch. Each is covered by an assertion in `core/tests/preset.rs`.
+
+**Phase 3 — a pre-existing defect noticed and left alone.**
+`core/src/preset/schema.rs:756` and its `[layer]` twin build a warning string
+whose line continuation was lost, so the message reads
+`...(x/y/rad/ang), which                      reads 0 outside...`. Present on
+`main` since `4bd33fd`; cosmetic, in a file this phase touches, and outside the
+phase's scope.
 
 **Phase 1 — one deviation from ADR-0136's stated cost.** The ADR prices the second
 reading at "two more captures per preset"; it costs **one**. The driven

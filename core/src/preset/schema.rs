@@ -428,6 +428,32 @@ pub struct Binding {
     pub tau: Easing,
 }
 
+/// One `[latch]` entry, compiled (ADR-0137): a gate armed on one condition and
+/// fired by the first rising edge of another inside the arming window.
+///
+/// Its **slot is its position in [`Preset::latches`]**, and that is the only
+/// place the mapping exists: the loader resolved the author's name onto a
+/// reserved variable slot while compiling the bindings, so nothing per-frame
+/// looks a latch up by name. The same reasoning that keeps `[smoothing]` off
+/// [`Preset`] as a table — a fact about the preset, resolved once, and the
+/// preset does not change while it renders.
+///
+/// The two expressions are compiled **without** any latch name in scope, so a
+/// latch cannot read a latch. That is not a restriction waiting to be lifted: it
+/// is what makes "evaluate every latch, then the params that read them" a
+/// complete order rather than one with a dependency graph inside it.
+#[derive(Debug)]
+pub struct Latch {
+    /// The author's name for it, which its bindings reference.
+    pub name: String,
+    /// While this holds (`> 0.5`), the latch is armed. Its fall re-arms.
+    pub arm: Expr,
+    /// The rising edge that fires an armed latch.
+    pub fire: Expr,
+    /// How long the fired latch reads `1.0`, in seconds. `0` is one frame.
+    pub hold: f32,
+}
+
 /// A loaded, ready-to-evaluate preset.
 #[derive(Debug)]
 pub struct Preset {
@@ -452,6 +478,14 @@ pub struct Preset {
     /// value for the smoother to hold. A `[smoothing]` entry naming one is a
     /// load warning.
     pub per_vertex: Vec<Binding>,
+    /// The `[latch]` table's entries (ADR-0137), in slot order — the one part of
+    /// the preset surface whose value depends on frame history.
+    ///
+    /// Empty for a preset declaring no table, which is the overwhelmingly common
+    /// case and costs exactly what it cost before latches existed: the render
+    /// layer's bank advances nothing and every reserved slot stays at its rest
+    /// value of `0.0`.
+    pub latches: Vec<Latch>,
     /// Declarative structural config for a line scene (ADR-0007), applied once
     /// at preset load via `Scene::configure`. `None` for the fragment/swarm
     /// systems and for curve presets that accept the family default.
@@ -541,14 +575,24 @@ impl Preset {
             .ok_or_else(|| PresetError::UnknownSystem(raw.system.clone()))?;
         let name = raw.name.unwrap_or_else(|| raw.system.clone());
 
+        // The `[latch]` table (ADR-0137), resolved **before** the bindings that
+        // may name a latch — the params below compile against these names, so
+        // there is no other order. A preset declaring no table gets an empty
+        // list and every expression below compiles exactly as it did before
+        // latches existed.
+        let latches = build_latches(&raw.latch)?;
+        let latch_names: Vec<String> = latches.iter().map(|l| l.name.clone()).collect();
+
         // The raw params come from a BTreeMap, so bindings land name-sorted:
         // evaluation is order-independent, but determinism is cheap to keep.
         let mut params = Vec::with_capacity(raw.params.len());
         let mut warnings = Vec::new();
         for (param, source) in raw.params {
-            let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
-                param: param.clone(),
-                err,
+            let expr = expr::compile_with_latches(&source, &latch_names).map_err(|err| {
+                PresetError::Expr {
+                    param: param.clone(),
+                    err,
+                }
             })?;
             // A name the system does not consume is a warning, not an error:
             // one typo must not discard the rest of an otherwise-good preset
@@ -745,8 +789,14 @@ impl Preset {
 
         // The `[per_vertex]` table (Plan 0100 Phase 1): the warp mesh's
         // per-vertex program, compiled like any binding and never eased.
-        let per_vertex =
-            build_per_vertex(system, raw.per_vertex, &raw.smoothing, "", &mut warnings)?;
+        let per_vertex = build_per_vertex(
+            system,
+            raw.per_vertex,
+            &raw.smoothing,
+            &latch_names,
+            "",
+            &mut warnings,
+        )?;
         // A `[params]` binding reaching for a vertex variable reads a flat zero
         // there — the names are crate-wide because expression slots are
         // positional, and only a `[per_vertex]` table ever binds them.
@@ -759,19 +809,43 @@ impl Preset {
             }
         }
 
-        // The optional second scene layer (ADR-0090 / Plan 0076), validated
-        // last so a preset with several problems reports its main-surface
-        // errors first — the layer is the optional extra, not the preset.
+        // A latch nothing reads is inert, and inert-and-silent is what this file
+        // exists to prevent — the same warning an `[occupancy] exempt` entry
+        // naming an unbound param gets, for the same reason: the author believes
+        // an event is wired up while nothing consumes it. Every surface that can
+        // name a latch is searched, including the layer's, which is why this sits
+        // after the layer is built.
         let layer = raw
             .layer
-            .map(|l| build_layer(l, &mut warnings))
+            .map(|l| build_layer(l, &latch_names, &mut warnings))
             .transpose()?;
+        for (slot, latch) in latches.iter().enumerate() {
+            let mut read = params
+                .iter()
+                .chain(&per_vertex)
+                .any(|b| b.expr.uses_latch(slot));
+            if let Some(l) = layer.as_ref() {
+                read = read
+                    || l.params
+                        .iter()
+                        .chain(&l.per_vertex)
+                        .chain(l.mix.as_ref())
+                        .any(|b| b.expr.uses_latch(slot));
+            }
+            if !read {
+                warnings.push(format!(
+                    "[latch] '{}' is inert: no binding in this preset names it",
+                    latch.name
+                ));
+            }
+        }
 
         Ok(Preset {
             name,
             system,
             params,
             per_vertex,
+            latches,
             config,
             feedback,
             palette,
@@ -783,6 +857,73 @@ impl Preset {
             warnings,
         })
     }
+}
+
+/// Compile and validate the `[latch]` table (ADR-0137).
+///
+/// Slot order is the `BTreeMap`'s, so it is the entries' **name order** and not
+/// their order in the file: a preset's latch-to-slot mapping is then a function
+/// of the set of names alone, and re-ordering the table in the TOML cannot move
+/// a latch onto a different slot.
+///
+/// Everything here is a load-time check, in the shape the rest of this file
+/// uses: a bad expression is a [`PresetError::Expr`] naming which key of which
+/// latch, and every other failure is a [`PresetError::Config`]. The two
+/// expressions compile with **no** latch names in scope — see [`Latch`] for why
+/// that is the design rather than an omission.
+fn build_latches(raw: &BTreeMap<String, RawLatch>) -> Result<Vec<Latch>, PresetError> {
+    if raw.len() > expr::LATCH_CAP {
+        return Err(PresetError::Config(format!(
+            "[latch] declares {} entries; a preset may hold at most {} (ADR-0137: the \
+             reserved variable block is a fixed size, so this is a wall rather than a \
+             slower path)",
+            raw.len(),
+            expr::LATCH_CAP,
+        )));
+    }
+    let mut out = Vec::with_capacity(raw.len());
+    for (name, entry) in raw {
+        if !expr::is_identifier(name) {
+            return Err(PresetError::Config(format!(
+                "[latch] name '{name}' is not an identifier: a latch is referenced from \
+                 an expression, so its name must start with a letter or underscore and \
+                 hold only letters, digits and underscores"
+            )));
+        }
+        if expr::is_reserved_ident(name) {
+            return Err(PresetError::Config(format!(
+                "[latch] name '{name}' is already a variable, constant or function in the \
+                 expression grammar; a binding naming it would read that instead of the \
+                 latch"
+            )));
+        }
+        check_hold(name, entry.hold)?;
+        let compile = |key: &str, source: &str| {
+            expr::compile(source).map_err(|err| PresetError::Expr {
+                param: format!("[latch] {name}.{key}"),
+                err,
+            })
+        };
+        out.push(Latch {
+            name: name.clone(),
+            arm: compile("arm", &entry.arm)?,
+            fire: compile("fire", &entry.fire)?,
+            hold: entry.hold,
+        });
+    }
+    Ok(out)
+}
+
+/// Validate one `[latch] hold`, in `check_tau`'s shape and at the same boundary:
+/// a non-negative, finite number of seconds, checked once here and trusted by
+/// the render layer's countdown.
+fn check_hold(name: &str, seconds: f32) -> Result<(), PresetError> {
+    if seconds.is_finite() && seconds >= 0.0 {
+        return Ok(());
+    }
+    Err(PresetError::Config(format!(
+        "[latch] '{name}' hold must be a non-negative number of seconds, got {seconds}"
+    )))
 }
 
 /// Compile a `[per_vertex]` table into bindings (Plan 0100 Phase 1).
@@ -799,6 +940,7 @@ fn build_per_vertex(
     system: SystemKind,
     raw: BTreeMap<String, String>,
     smoothing: &BTreeMap<String, RawSmoothing>,
+    latch_names: &[String],
     label: &str,
     warnings: &mut Vec<String>,
 ) -> Result<Vec<Binding>, PresetError> {
@@ -814,10 +956,11 @@ fn build_per_vertex(
     }
     let mut out = Vec::with_capacity(raw.len());
     for (param, source) in raw {
-        let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
-            param: format!("{label}[per_vertex] {param}"),
-            err,
-        })?;
+        let expr =
+            expr::compile_with_latches(&source, latch_names).map_err(|err| PresetError::Expr {
+                param: format!("{label}[per_vertex] {param}"),
+                err,
+            })?;
         if !crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS.contains(&param.as_str()) {
             warnings.push(format!(
                 "unknown {label}[per_vertex] parameter '{param}' (expected one of: {}) \
@@ -847,7 +990,11 @@ fn build_per_vertex(
 /// rejects the preset, because it selects a code path and a silent default
 /// would render a look the author never asked for. Unknown *param* names warn
 /// and keep the binding, exactly like the top level (ADR-0020).
-fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, PresetError> {
+fn build_layer(
+    raw: RawLayer,
+    latch_names: &[String],
+    warnings: &mut Vec<String>,
+) -> Result<Layer, PresetError> {
     let system = SystemKind::from_name(&raw.system)
         .ok_or_else(|| PresetError::UnknownSystem(raw.system.clone()))?;
     // Any pair of systems is legal — including the same system twice, and two
@@ -888,10 +1035,14 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
     // The layer's bindings, name-sorted off the BTreeMap like the preset's own.
     let mut params = Vec::with_capacity(raw.params.len());
     for (param, source) in raw.params {
-        let expr = expr::compile(&source).map_err(|err| PresetError::Expr {
-            param: format!("[layer] {param}"),
-            err,
-        })?;
+        // The preset's latch names, not a layer-local set: a latch is one piece
+        // of state per preset (ADR-0137), and `[latch]` is a top-level table for
+        // that reason. A layer binding reads the same event the main scene does.
+        let expr =
+            expr::compile_with_latches(&source, latch_names).map_err(|err| PresetError::Expr {
+                param: format!("[layer] {param}"),
+                err,
+            })?;
         // Layer params are namespaced to the layer's scene — they reach no
         // compositing stage — so "known" is the layer system's own vocabulary,
         // and a global name deserves the sharper message.
@@ -957,9 +1108,11 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
         .mix
         .as_deref()
         .map(|source| {
-            let expr = expr::compile(source).map_err(|err| PresetError::Expr {
-                param: "[layer] mix".into(),
-                err,
+            let expr = expr::compile_with_latches(source, latch_names).map_err(|err| {
+                PresetError::Expr {
+                    param: "[layer] mix".into(),
+                    err,
+                }
             })?;
             Ok(Binding {
                 name: "mix".into(),
@@ -974,8 +1127,14 @@ fn build_layer(raw: RawLayer, warnings: &mut Vec<String>) -> Result<Layer, Prese
 
     // `[layer.per_vertex]` — the same surface as the top level's, against the
     // layer's own system and its own smoothing table.
-    let per_vertex =
-        build_per_vertex(system, raw.per_vertex, &raw.smoothing, "[layer] ", warnings)?;
+    let per_vertex = build_per_vertex(
+        system,
+        raw.per_vertex,
+        &raw.smoothing,
+        latch_names,
+        "[layer] ",
+        warnings,
+    )?;
     for binding in &params {
         if binding.expr.uses_vertex() {
             warnings.push(format!(
@@ -1223,6 +1382,11 @@ struct RawPreset {
     /// `{ attack, release }` pair. Absent means every param is applied instantly.
     #[serde(default)]
     smoothing: BTreeMap<String, RawSmoothing>,
+    /// The optional `[latch]` table (ADR-0137): named armed-and-fired events,
+    /// each an `arm`/`fire` pair plus a `hold` in seconds. Absent means the
+    /// preset holds no state between frames in its expression layer.
+    #[serde(default)]
+    latch: BTreeMap<String, RawLatch>,
     /// The optional `[palette]` color table (ADR-0021): a built-in `name` or
     /// custom `stops`. Absent means the default `spectrum` cosine.
     #[serde(default)]
@@ -1342,6 +1506,21 @@ struct RawOccupancy {
     /// Parameter names whose clamps may sit at their bound.
     #[serde(default)]
     exempt: Vec<String>,
+}
+
+/// One `[latch]` entry, before validation (ADR-0137).
+///
+/// `hold` defaults to `0`, which is a **single frame** at whatever rate the
+/// display runs — the shortest pulse a binding can read, and the right default
+/// for an edge-triggered consumer like `recompose`, which acts on the rise and
+/// ignores the rest.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLatch {
+    arm: String,
+    fire: String,
+    #[serde(default)]
+    hold: f32,
 }
 
 /// One `[smoothing]` entry, before validation: today's scalar, or ADR-0035's
