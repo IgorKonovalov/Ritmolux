@@ -2,12 +2,23 @@
 # The first shipped world on `shape_field` (ADR-0105, Plan 0091), authored from
 # the user's reference images at that plan's Phase 6 look gate.
 #
-# THE MECHANISM: this scene hands the palette a DISTANCE rather than a level, so
-# a band of the palette coordinate is a band of constant distance - which is the
-# definition of an offset curve. `palette_steps` turns that into flat graphic
-# bands and `palette_contour` draws the hairline between them. Nothing here is
-# geometry; it is one signed distance evaluated per pixel, so it does not facet
-# and it costs the same at any resolution.
+# THE MECHANISM: this scene hands the palette a FIGURE COORDINATE rather than a
+# level, and since Plan 0098 there are two of them. This world takes the second,
+# `coord_mode = "1"`: the coordinate is `r / r_boundary(theta)`, so a band of it
+# is a band of constant SCALING and every contour is a scaled copy of the
+# outline. `palette_steps` turns that into flat graphic bands and
+# `palette_contour` draws the hairline between them. Nothing here is geometry; it
+# is evaluated per pixel, so it does not facet and it costs the same at any
+# resolution.
+#
+# WHY NOT THE DEFAULT COORDINATE. `coord_mode = "0"` hands over a DISTANCE
+# instead, whose level sets are offset curves - and an inward offset is an
+# EROSION, which rounds a reflex corner while keeping convex ones sharp. On a
+# heart that means the bottom point survives and the top notch fills in, further
+# at every step inward, so the core came out as a rounded blob with a dip in it.
+# That is not tunable: it is what an offset family is. The whole of the change
+# from the shipped 0.82.0 look is the one line `coord_mode = "1"` below, and it
+# is the difference between a nested blob and a nested heart.
 #
 # WHAT DRIVES WHAT
 #   color_center  a slow outward drift, plus a shove on each onset
@@ -28,6 +39,10 @@
 #    the breath instead - as `scale` moves, every contour slides across the frame
 #    with it while the core stays the colour it is.
 #
+#    This holds under BOTH coordinates, which is why the pin survived the
+#    re-author: `r / r_boundary` is 0 at the figure's centre exactly as the
+#    distance is, so the core's colour is still `color_center` and nothing else.
+#
 #    IF YOU EVER WANT CONTINUOUS TRAVEL BACK, the price is the fixed core, and
 #    the palette must then be cyclic (first stop == last) or the wrap is a hard
 #    seam crossing the figure once per cycle - this palette already satisfies
@@ -47,8 +62,29 @@
 #    The fix is not a lower gamma alone - it is a LARGER FIGURE, so less exterior
 #    is on screen. At scale 0.78 / gamma 2.0 the corner reaches ~5.3, i.e. ~48
 #    bands and ~23 px each at 1080p, and the character is intact. Keep the corner
-#    coordinate under about 6 if you retune: d_corner = 1 + (2.04/scale - 1)/0.637
-#    for this shape, and the coordinate is d_corner^gamma * color_span.
+#    coordinate under about 6 if you retune.
+#
+#    THE FORMULA CHANGED WITH THE COORDINATE, so the one this file used to carry
+#    is the wrong one now. Under `coord_mode = "0"` it was
+#    `d_corner = 1 + (2.04/scale - 1)/0.637`; under `"1"` the exterior grows
+#    LINEARLY in r instead, so it is
+#
+#        d_corner = (2.04 / scale) / 1.023        # 1.023 = r_boundary toward a
+#                                                 # 16:9 corner, for THIS shape
+#
+#    and the coordinate is still `d_corner^gamma * color_span`. That reads 3.15
+#    at the smallest scale this file breathes to, against 5.94 before - so the
+#    re-author moved AWAY from the moire wall rather than toward it, and the
+#    surround carries about 20 rings out to the corner where it used to carry 41.
+#
+# 3. `color_span` WAS DELIBERATELY NOT RE-TUNED, and that is the whole reason the
+#    figure is the one that shipped. The two coordinates put the outline at the
+#    same place (both are exactly 1 there), so holding the span at 0.45 holds the
+#    interior banding fixed: the same 4 boundaries, at d = 0.47, 0.68, 0.85, 0.99.
+#    Raising it to 0.85 would have restored the old corner density instead, at
+#    the cost of 7 boundaries inside the figure - thinner rings, nearly twice as
+#    many, a much smaller core. Rendered side by side and rejected: the brief was
+#    the same figure with a sharp core, not a busier one.
 
 system = "shape_field"
 name   = "Pulse"
@@ -78,6 +114,11 @@ stops = [
 
 [params]
 shape = "4"
+
+# THE ONE LINE THIS RE-AUTHOR IS. Scaled copies rather than offsets - see the
+# mechanism note above. Every ring is the same heart at a smaller size, down to
+# the core.
+coord_mode = "1"
 
 # PINNED. See note 1 - this is the core's colour, so it is the one number that
 # must not move.
