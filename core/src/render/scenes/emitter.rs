@@ -98,12 +98,12 @@ const BASE_SIZE: f32 = 0.019;
 /// Sized so the elongation reads at a few pixels across without the mark becoming
 /// a streak: at 0.55 the long axis is not quite twice the short one.
 ///
-/// **Plan 0070 answered the shape question this used to defer** (ADR-0084), and
-/// deliberately left this arm alone: `shape = disc` on the emitter is *this*
-/// figure, not a circle, so every existing preset and the golden baseline are
-/// untouched. The roster's other four silhouettes are evaluated on the
-/// un-squashed sprite frame, so a star is a star rather than a squashed one — and
-/// `spin` turns it, which is what makes a shaped mark read as an object.
+/// **Plan 0070 answered the shape question and deliberately left this arm alone**
+/// (ADR-0084): `shape = disc` on the emitter is *this* figure, not a circle, so
+/// every existing preset and the golden baseline are untouched. The roster's
+/// other four silhouettes are evaluated on the un-squashed sprite frame, so a
+/// star is a star rather than a squashed one — and `spin` turns it, which is what
+/// makes a shaped mark read as an object.
 const GLINT_ANISO: f32 = 0.55;
 
 /// The per-object twinkle rate, in Hz, at the two ends of the seeded draw.
@@ -742,10 +742,10 @@ fn spawn_ramp(u: f32, spawn_fade: f32) -> f32 {
     (u / spawn_fade).clamp(0.0, 1.0)
 }
 
-/// **The per-object brightness multiplier** — the answer to the report this plan
-/// came from (ADR-0057 Notes: the user asked for stars that *blink* and got a
-/// field-wide flash, because a binding is evaluated once per frame for the whole
-/// scene).
+/// **The per-object brightness multiplier** — the answer to ADR-0057's
+/// Notes, where the user asked for stars that *blink* and got a
+/// field-wide flash, because a binding is evaluated once per frame for
+/// the whole scene.
 ///
 /// Both the rate and the phase come off the object's seed, so no two objects
 /// share an oscillator and the field never flashes as one sheet. Exactly `1.0`

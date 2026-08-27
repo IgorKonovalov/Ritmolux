@@ -632,8 +632,8 @@ mod tests {
 
     /// At a constant rate the integrated phase equals `rate * t` — which is why
     /// every shipped preset, all of which leave both parameters at their `1.0`
-    /// default, renders exactly as it did. Asserted rather than assumed: the
-    /// claim carries the plan's position that no golden may move.
+    /// default, renders unchanged. Asserted rather than assumed, because it is
+    /// what makes moving no golden a property rather than an observation.
     #[test]
     fn a_constant_rate_integrates_to_rate_times_elapsed_time() {
         let dt = 1.0 / 60.0;
@@ -654,7 +654,7 @@ mod tests {
     }
 
     /// The default is exactly `1.0` on both, so the phase is bit-identical to
-    /// the clock the three shader literals used to read — the capture path
+    /// the clock the three shader literals read — the capture path
     /// accumulates `time` the same way, one `FALLBACK_DT` per frame.
     #[test]
     fn the_default_rates_make_the_phase_the_clock() {

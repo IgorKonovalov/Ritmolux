@@ -178,9 +178,9 @@ impl AttractorFamily {
     /// shape. The discrete 2D maps converge from any small box, so theirs is the
     /// historical ~[-1.5, 1.5] (kept identical so their seeded look is unchanged;
     /// `z` is unused there). It feeds the initial fill and a family change only
-    /// (ADR-0066) — a `reseed` no longer re-fills it, see
-    /// [`Framing::jitter_extent`], because re-filling replaced the cloud with a
-    /// uniform axis-aligned rectangle, which is what a reseed visibly was.
+    /// (ADR-0066) — a `reseed` does **not** re-fill it, see
+    /// [`Framing::jitter_extent`], because re-filling replaces the cloud with a
+    /// uniform axis-aligned rectangle, which reads as a wipe rather than a kick.
     pub(super) fn canonical_framing(self) -> Framing {
         match self {
             AttractorFamily::DeJong | AttractorFamily::Clifford => Framing {
@@ -312,12 +312,12 @@ impl AttractorFamily {
 /// One roster entry's framing (ADR-0093): where the figure is and how big, as
 /// the two constants the render path needs.
 ///
-/// **The unit that travels with a tuple.** It used to be two per-family
-/// constants, which is exactly why a distant tuple was unreachable: the
-/// coefficients were bindable and their framing was not. Both derived
-/// quantities below hang off it, so `reseed` and the depth cues follow a tuple
-/// without a second table to keep in step — the Plan 0062 coupling, preserved
-/// by construction rather than by discipline.
+/// **The unit that travels with a tuple.** Two per-family constants instead
+/// are exactly what makes a distant tuple unreachable: the coefficients are
+/// bindable and a per-family framing is not. Both derived quantities below
+/// hang off it, so `reseed` and the depth cues follow a tuple without a second
+/// table to keep in step — the Plan 0062 coupling, preserved by construction
+/// rather than by discipline.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct Framing {
     /// (world scale, dim 2/3, world centre) — see

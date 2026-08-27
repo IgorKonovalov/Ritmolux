@@ -13,9 +13,9 @@ use lmv_core::dsp::{HOP_SIZE, WARMUP_HOPS};
 ///
 /// **Derived, not chosen.** [`WARMUP_HOPS`] is when the analyzer publishes its
 /// first frame (ADR-0049); the original four hops of slack past that boundary are
-/// kept. This used to be a bare `8` against a 2048-sample window, which Plan 0048
-/// Phase 1 silently invalidated — deriving it means changing a window size cannot
-/// leave the harness sampling zero frames again.
+/// kept. A bare `8` against a 2048-sample window is what Plan 0048 Phase 1
+/// silently invalidated — deriving the constant means changing a window size
+/// cannot leave the harness sampling zero frames again.
 pub const FILMSTRIP_WARMUP: usize = WARMUP_HOPS + 4;
 
 /// Rendered height of each frame in a strip.

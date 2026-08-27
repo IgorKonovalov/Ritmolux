@@ -793,7 +793,7 @@ fn the_scene_integrates_the_spin_it_is_given() {
     let Some(mut h) = Harness::new(AttractorFamily::Lorenz) else {
         return;
     };
-    // A held figure, across the 120 frames the plan names.
+    // A held figure, across 120 frames.
     h.scene.set_param("spin", 0.0);
     h.run(120);
     assert_eq!(
@@ -2293,12 +2293,13 @@ fn an_unusable_emergence_binding_clamps_instead_of_dividing() {
     }
 }
 
-/// **The retired names no longer resolve** (Plan 0074 Phase 3).
+/// **The retired names do not resolve** (Plan 0074 Phase 3).
 ///
 /// `set_param` silently ignores an unknown name — that is how a preset
-/// binding a typo warns at load rather than failing — so "it no longer
-/// resolves" has to be asserted as *the field it used to write does not
-/// move*, which here means the whole colour row stays at its default.
+/// binding a typo warns at load rather than failing — so "it does not
+/// resolve" has to be asserted as *the field that name would write does
+/// not move*, which here means the whole colour row stays at its
+/// default.
 #[test]
 fn the_age_colour_channel_is_gone_from_the_roster() {
     for retired in ["age_tint", "age_hue"] {

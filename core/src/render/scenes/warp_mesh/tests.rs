@@ -928,8 +928,7 @@ fn the_echo_orientation_quantizes_to_four_states() {
 // Whether the engine should apply `decay` there — and what to do about the 15 %
 // that would then apply it twice — is a design call about matching the
 // reference, not an implementation detail. It needs the reference on screen,
-// which is Phase 5, and an ADR. Phase 4 stops here, which is the branch the plan
-// wrote for it.
+// which is Phase 5, and an ADR. Phase 4 stops here.
 
 /// Field-probe capture size. Small: the recursion under test is per-texel, so
 /// resolution buys nothing but readback time.
@@ -1140,10 +1139,10 @@ fn field_trace(
 /// it. Over their 300 frames (5 s at the probe's `dt`) this fades to `0.98^5 =
 /// 0.904` — present, and negligible against what the deposit adds.
 ///
-/// **It is stated here rather than defaulted.** These probes used to pass `None`
-/// and get a near-unity factor for free, because `FrameSlots::read` returned the
-/// `decay` default *unconverted* — MilkDrop's per-frame `0.98` landing in a field
-/// that means per-second. Plan 0111 Phase 1 fixed that (design-backlog 0121), so
+/// **It is stated here rather than defaulted.** A probe passing `None` got a
+/// near-unity factor for free while `FrameSlots::read` returned the `decay`
+/// default *unconverted* — MilkDrop's per-frame `0.98` landing in a field that
+/// means per-second. Plan 0111 Phase 1 fixed that (design-backlog 0121), so
 /// `None` now yields the converted `0.5455`/s, which is a real fade and a
 /// different experiment: under it the unquantized field settles by frame 450
 /// rather than climbing. `0.98` reproduces what these two always measured, and

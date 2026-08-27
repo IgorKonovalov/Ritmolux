@@ -21,8 +21,8 @@
 //! **160x100, and not a square.** The post stages round each grid axis up to a
 //! 256 px step, so 160x100 takes a **256x256** grid: aspect 1.0 against the
 //! target's 1.6. Composing a stage therefore stretched the picture by **1.6x**
-//! before Phase 1 — stronger than the 1.28x at 1280x800 that the plan calls the
-//! worst ordinary case, at a sixty-fourth of the pixels.
+//! before Phase 1 — stronger than the 1.28x at 1280x800 that is the worst
+//! ordinary case, at a sixty-fourth of the pixels.
 //!
 //! A square or 16:9 capture size would defeat this guard entirely: the policy
 //! returns those aspect-exact, which is precisely why the defect was invisible at
@@ -31,12 +31,12 @@
 //!
 //! # `composite_kaleido.png` pins design-backlog 0010's **fix**
 //!
-//! It used to pin the defect: the fold sampled outside its rectangular source and
-//! the `ClampToEdge` sampler smeared the border texel radially, so the corners
-//! carried hard-edged streaks. Plan 0045 Phase 1 / ADR-0047 clamped the sample
-//! radius to the largest disc the source contains and faded past it, and this
-//! baseline was re-blessed by hand at that change — see the fixture's header for
-//! what moved and by how much.
+//! The defect it once pinned: the fold sampled outside its rectangular source
+//! and the `ClampToEdge` sampler smeared the border texel radially, so the
+//! corners carried hard-edged streaks. Plan 0045 Phase 1 / ADR-0047 clamped the
+//! sample radius to the largest disc the source contains and faded past it, and
+//! this baseline was re-blessed by hand at that change — see the fixture's
+//! header for what moved and by how much.
 //!
 //! # `composite_overlap.png` pins the composite's arithmetic, not its routing
 //!
@@ -79,8 +79,8 @@ const MAX_OUTLIER: u8 = 48;
 /// one that computes geometry, `bloom_*` (Plan 0045 Phase 4) the one with an
 /// internal pyramid — plus, since Plan 0045 Phase 3, one that binds no stage at
 /// all and exercises the composite's **arithmetic** instead: a dense additive rose
-/// whose self-crossings used to clip to flat white on the 8-bit intermediates and
-/// now roll off through the tonemap.
+/// whose self-crossings would clip to flat white on 8-bit intermediates and roll
+/// off through the tonemap here.
 ///
 /// **One stage per fixture, never all of them at once.** Bloom adds four
 /// pipelines, and the WARP software adapter's sensitivity to coexisting pipelines
@@ -185,7 +185,7 @@ const FIXTURES: [(&str, &str); 10] = [
     ),
 ];
 
-/// The fixture whose whole point is that it no longer clips (Plan 0045 Phase 3).
+/// The fixture whose whole point is that it does not clip (Plan 0045 Phase 3).
 const OVERLAP: &str = "composite_overlap";
 
 fn golden_dir() -> PathBuf {

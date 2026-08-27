@@ -62,17 +62,16 @@ use std::fmt;
 ///
 /// The first nine are the analysis frame's headline values, `bass` through
 /// `novelty`. The four `*_raw` names after them are the absolute magnitudes the
-/// first four used to carry before ADR-0049 normalized them — reachable for
-/// looks that genuinely want absolute level rather than "loud for this track".
-/// Then `beat_index` and `time_since_beat`, ADR-0050's unconditional Layer 1
-/// musical clock, and `beat_in_bar`/`bar_index`/`bar_phase`, its Layer 2 bar
-/// position — gated on a confidence the grammar deliberately cannot see, so these
-/// three are always *something* sensible and never wrong about the music.
-/// Then `x`/`y`/`rad`/`ang`, the **vertex's own position** during a per-vertex
+/// first four carried before ADR-0049 normalized them — reachable for looks that
+/// genuinely want absolute level rather than "loud for this track". Then
+/// `beat_index` and `time_since_beat`, ADR-0050's unconditional Layer 1 musical
+/// clock, and `beat_in_bar`/`bar_index`/`bar_phase`, its Layer 2 bar position —
+/// gated on a confidence the grammar deliberately cannot see, so these three are
+/// always *something* sensible and never wrong about the music. Then
+/// `x`/`y`/`rad`/`ang`, the **vertex's own position** during a per-vertex
 /// evaluation (Plan 0100 Phase 1) — the same kind of thing as `index` one axis
-/// up, and `0` anywhere else.
-/// `index` stays **last** and is different in kind: it is not
-/// audio but the *element's own position* during a per-element evaluation
+/// up, and `0` anywhere else. `index` stays **last** and is different in kind: it
+/// is not audio but the *element's own position* during a per-element evaluation
 /// (Plan 0034 Phase 4), and it reads `0` anywhere else.
 pub const VAR_NAMES: [&str; 23] = [
     "bass",
@@ -817,9 +816,9 @@ impl Node {
     }
 
     /// Re-render this subtree as source text, parenthesized only where its own
-    /// precedence is below `parent_prec`. Used to *name* a flagged gate: a node
-    /// index tells a reader nothing, and the preset's original text is not kept
-    /// past compile.
+    /// precedence is below `parent_prec`. This is what *names* a flagged gate:
+    /// a node index tells a reader nothing, and the preset's original text is
+    /// not kept past compile.
     ///
     /// Round-trips through [`compile`] (asserted in the tests) but is not
     /// character-identical to what the author wrote — whitespace and redundant
@@ -1083,7 +1082,7 @@ fn collect_flags(
                 // Only argument 0 of a `select()` is a condition. A comparison
                 // one level deeper — `select(min(tempo > 124, bass > 0.38), …)` —
                 // is *not* suppressed, which is the whole point: the excusable
-                // half no longer launders the inexcusable one.
+                // half must not launder the inexcusable one.
                 let condition = matches!(func, Func::Select) && i == 0;
                 collect_flags(arg, obs, at, condition, out);
                 at += arg.node_count();

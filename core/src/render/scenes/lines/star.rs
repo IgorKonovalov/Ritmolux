@@ -6,13 +6,14 @@
 //!
 //! ## `variant` is a contact angle, not an index (ADR-0060)
 //!
-//! It used to `floor` into one of three precomputed rosettes, so `[smoothing]`
-//! on it spent its time on fractional values a floor threw away and the change
-//! read as a stutter — design-backlog 0007's "change between star rosette shapes
-//! should be smooth". Now `variant` maps linearly onto a contact-angle offset:
-//! `0`, `1` and `2` land on exactly the `-24 / 0 / +24` degree offsets the three
-//! cached variants used to hold, so **a preset binding integers draws exactly
-//! what it drew before**, while a fractional value is a real rosette in between.
+//! `variant` maps linearly onto a contact-angle offset rather than
+//! flooring into one of three precomputed rosettes — a floor throws
+//! every fractional value away, which spends `[smoothing]` on nothing
+//! and reads as a stutter (design-backlog 0007's "change between star
+//! rosette shapes should be smooth"). `0`, `1` and `2` land on exactly
+//! the `-24 / 0 / +24` degree offsets of those three rosettes, so **a
+//! preset binding integers draws the rosette it names**, while a
+//! fractional value is a real rosette in between.
 //!
 //! The cache stays, keyed on the built angle with **hysteresis**: a request more
 //! than [`STEP_DEG`] from the built angle rebuilds, anything nearer reuses. That
@@ -152,8 +153,8 @@ use crate::render::palette::{self, Palette};
 
 /// How far (degrees of contact angle) `variant` reaches either side of the
 /// preset's base angle — a pointier star at `0`, a blunter one at `2`. This is
-/// the span the three precomputed variants used to sit at (`-24 / 0 / +24`), kept
-/// so a preset binding integers is unchanged (ADR-0060).
+/// the span of the three precomputed variants (`-24 / 0 / +24`), so a preset
+/// binding integers draws one of them exactly (ADR-0060).
 const VARIANT_SPAN_DEG: f32 = 24.0;
 /// The `variant` value that means "the preset's own `contact_angle_deg`" — the
 /// middle of the range, and this scene's default.
@@ -494,10 +495,10 @@ impl StarPatternScene {
 /// The contact angle (degrees) a `variant` asks for, around the preset's
 /// `[generator] contact_angle_deg`.
 ///
-/// `variant` keeps the `0..2` range it has always had and 0 / 1 / 2 land exactly
-/// on the `-24 / 0 / +24` degree offsets the three precomputed variants used to
-/// hold, so a preset binding integers draws exactly what it drew before
-/// (ADR-0060). What is new is that everything between them is a real rosette.
+/// `variant` spans `0..2`, and 0 / 1 / 2 land exactly on the `-24 / 0 /
+/// +24` degree offsets of the three precomputed variants, so a preset
+/// binding integers draws one of them exactly (ADR-0060). Everything
+/// between them is a real rosette.
 ///
 /// **Total**, because it runs per frame from an author expression: a non-finite
 /// `variant` falls back to the centre rather than reaching the construction, and
@@ -697,13 +698,12 @@ pub enum Motif {
     /// A four-vertex rhombus, long along the radius.
     Diamond,
     /// An **open** circular arc bulging outward, chord tangential. One bead
-    /// among the others, and no longer the roster's answer to a scalloped
+    /// among the others, and **not** the roster's answer to a scalloped
     /// boundary.
     ///
-    /// **It was an approximation of one, and the user chose the real thing.**
-    /// Shown side by side with a dense overlapping arc ring at Plan 0065 Phase
-    /// 2, they picked a genuine boundary *curve primitive*, which the engine
-    /// did not then have (design-backlog 0071). It has one now:
+    /// A ring of these approximates one, and at Plan 0065 Phase 2 the user was
+    /// shown that side by side with a genuine boundary *curve primitive* and
+    /// picked the primitive (design-backlog 0071). That is
     /// [`Scallop`](Motif::Scallop), a single closed chain rather than a ring of
     /// copies faking continuity. Reach for that when you want a boundary, and
     /// for this when you want an open arc.
@@ -814,8 +814,8 @@ impl Motif {
     /// a chevron are nothing but straight lines.
     ///
     /// [`outline`](Self::outline) still returns the sampled polyline for the two
-    /// that have one, and it is no longer what `build_rings` draws them with.
-    /// It is kept because it is the *reference* the arc is checked against —
+    /// that have one, and it is **not** what `build_rings` draws them with. It
+    /// is kept because it is the *reference* the arc is checked against —
     /// `renderer/tests.rs` compares the primitive to a densely sampled polyline
     /// of the same arc, and this is where that polyline's shape is defined.
     fn arc_shape(self) -> Option<ArcShape> {
@@ -1116,12 +1116,12 @@ fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
 ///
 /// **One pixel at 1080p, at the largest scale the roster is drawn at.** A motif
 /// is authored spanning roughly one unit and placed at a ring `scale`; the three
-/// retired mandalas this plan exists for used `0.13` to `0.46`, so a copy at the
-/// top of that range covers `0.46` of the renderer's world y — 248 px at 1080p —
-/// and one of those pixels is `1 / 248 = 4.0e-3` of the local frame. Everything
-/// smaller is drawn better than the budget promises; a preset reaching past
-/// `0.46` (the ceiling is [`MAX_RING_SCALE`]) trades this off linearly and is
-/// still bounded by a chain that is G1 whatever its scale.
+/// retired mandalas it was measured against use `0.13` to `0.46`, so a copy at
+/// the top of that range covers `0.46` of the renderer's world y — 248 px at
+/// 1080p — and one of those pixels is `1 / 248 = 4.0e-3` of the local frame.
+/// Everything smaller is drawn better than the budget promises; a preset
+/// reaching past `0.46` (the ceiling is [`MAX_RING_SCALE`]) trades this off
+/// linearly and is still bounded by a chain that is G1 whatever its scale.
 const MOTIF_FIT_BUDGET: f32 = 4.0e-3;
 
 /// Every fitted motif's chain, in [`Motif::fitted_index`] order — see
@@ -1412,8 +1412,8 @@ pub(crate) fn build_rings(
         }
 
         // A circular motif is one arc per copy, with no interior joint at any
-        // scale (ADR-0098) — where it used to be `SMOOTH_SAMPLES` segments and
-        // as many additive beads.
+        // scale (ADR-0098), rather than `SMOOTH_SAMPLES` segments and as many
+        // additive beads.
         if let Some(shape) = ring.motif.arc_shape() {
             for i in 0..count {
                 if out.len() + arcs.len() >= cap {

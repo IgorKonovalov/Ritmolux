@@ -686,8 +686,9 @@ impl Resources {
 /// parameters (ADR-0002 layer 2): `feed`/`kill` pick the regime, `flow` scales
 /// the diffusion, and a rising `inject` edge stamps a seeded blob of growth.
 pub struct ReactionDiffusionScene {
-    /// Cloned device handle (an `Arc` inside wgpu) used to build [`Resources`]
-    /// lazily on first render — see the module docs for why.
+    /// Cloned device handle (an `Arc` inside wgpu) that builds
+    /// [`Resources`] lazily on first render — see the module docs for
+    /// why.
     device: wgpu::Device,
     surface_format: wgpu::TextureFormat,
     res: Option<Resources>,

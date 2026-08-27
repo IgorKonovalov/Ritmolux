@@ -292,8 +292,8 @@ fn the_ground_is_sampled_once_for_the_whole_run() {
 ///
 /// This is the half of "the instrument overstates itself" that survives the
 /// memory fix: nothing in the render path is wrong, the run simply ends 15 s
-/// before the length its own header used to claim. `10 minutes / 45 s` is 13.33
-/// intervals, floored to 13, so the last row sits at 585 s.
+/// before the length a header stating the request would claim. `10 minutes /
+/// 45 s` is 13.33 intervals, floored to 13, so the last row sits at 585 s.
 #[test]
 fn a_horizon_the_interval_does_not_divide_reports_the_length_it_reached() {
     let frames = sample_frames(10.0, 45.0).expect("a 10-minute horizon at 45 s");
@@ -367,9 +367,9 @@ fn the_json_distinguishes_a_reached_length_from_a_requested_one() {
 }
 
 /// A run that dies before its requested length reports that **on stdout**, where
-/// the table would have been — not only as the stderr line it used to be
-/// (Plan 0099). The original ceiling was legible to nobody who did not count
-/// rows, and a result nobody reads is not a result.
+/// the table would have been, rather than only as a line on stderr (Plan 0099).
+/// A ceiling reported there is legible to nobody who does not count rows, and a
+/// result nobody reads is not a result.
 #[test]
 fn a_truncated_run_reports_itself_where_the_table_would_be() {
     // The numbers are the ones the defect actually produced, so the report is
@@ -400,7 +400,7 @@ fn a_truncated_run_reports_itself_where_the_table_would_be() {
         "the resident set it died at:\n{text}"
     );
     // The levers, and specifically NOT --interval: the capture path polls every
-    // frame since Plan 0099, so the interval no longer governs reclaim.
+    // frame since Plan 0099, so the interval does not govern reclaim.
     assert!(text.contains("--size"), "{text}");
     assert!(
         text.contains("--interval is NOT a lever"),

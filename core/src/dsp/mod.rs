@@ -57,12 +57,12 @@ const _: () = assert!(
     "the waveform is the tail of the short analysis window and cannot be longer      than it"
 );
 /// Second, longer FFT window feeding the bands below the crossover (~171 ms at
-/// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against the plan's rule
-/// — 4096 first, 8192 only if 4096 still leaves sub-bass bands bin-starved. Of
-/// the 20 bands below the crossover, 4096 leaves **all 20** still one bin wide
-/// and 8192 leaves 8, pulling the unresolved boundary down from 246 Hz to 76 Hz.
-/// See [`fft::BandLayout`] and ADR-0049;
-/// `the_long_window_was_chosen_by_measurement` pins all three candidates.
+/// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against one rule — 4096
+/// first, 8192 only if 4096 still leaves sub-bass bands bin-starved. Of the 20
+/// bands below the crossover, 4096 leaves **all 20** still one bin wide and 8192
+/// leaves 8, pulling the unresolved boundary down from 246 Hz to 76 Hz. See
+/// [`fft::BandLayout`] and ADR-0049; `the_long_window_was_chosen_by_measurement`
+/// pins all three candidates.
 pub const LOW_WINDOW_SIZE: usize = 8192;
 /// Samples between successive analysis hops (~10.7 ms at 48 kHz).
 pub const HOP_SIZE: usize = 512;

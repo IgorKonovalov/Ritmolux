@@ -107,7 +107,7 @@ pub fn emit(stage: Stage, unit: &Unit, tex_wrap: bool) -> Result<Translated, Sha
     };
 
     // Sampler declarations: a builtin is declared already; anything else is a
-    // disk texture, which is the deliberate exclusion this plan prices.
+    // disk texture, which is the deliberate exclusion ADR-0113 prices.
     for name in &unit.samplers {
         if e.sampler_pair(name).is_err() {
             return Err(disk_texture(name));

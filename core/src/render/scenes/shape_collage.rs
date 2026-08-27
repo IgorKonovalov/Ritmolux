@@ -58,7 +58,8 @@
 //!
 //! The draw is O(elements) per pixel and the bounding-box reject removes the
 //! distance evaluation but **not** the loop step, so a wavefront walks every
-//! element regardless. That is the plan's real risk, and the bound on it is
+//! element regardless. That is this scene's real cost risk, and the bound on it
+//! is
 //! [`TierConfig::collage_elements`](crate::render::TierConfig::collage_elements)
 //! — measured by `core/tests/collage_cost.rs`, not assumed.
 //!
@@ -145,8 +146,9 @@ const DEFAULT_SCALE: f32 = 1.0;
 /// Smallest `scale` the shader is handed. Not zero: the canvas transform divides
 /// by it.
 const MIN_SCALE: f32 = 0.05;
-/// Largest `scale`. Past this a single element fills the frame and the canvas is
-/// no longer a composition — the end of the useful range, not an arbitrary cap.
+/// Largest `scale`. Past this a single element fills the frame and the
+/// canvas stops being a composition — the end of the useful range, not
+/// an arbitrary cap.
 const MAX_SCALE: f32 = 20.0;
 
 /// Shared view transform (ADR-0018): `pan_*` moves the canvas.
@@ -774,7 +776,7 @@ const DEFAULT_PUMP: f32 = 0.0;
 /// flag must not re-run the generator every frame.
 const RECOMPOSE_THRESHOLD: f32 = 0.5;
 /// The longest crossfade `recompose_blend` may name, in seconds. Past this a
-/// recomposition is no longer an event.
+/// recomposition stops reading as an event.
 const MAX_BLEND_SECS: f32 = 10.0;
 /// How long an element takes to fade in or out when `density` moves it across
 /// the gate. Short enough to read as an arrival, long enough not to pop.

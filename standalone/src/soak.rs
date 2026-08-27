@@ -189,8 +189,9 @@ impl SoakLog {
         )
     }
 
-    /// Open (creating dirs and the file) for appending, writing the header if
-    /// the file is new. A failure is reported once and leaves the log dormant.
+    /// Open (creating dirs and the file) for appending, writing the
+    /// header when the file did not exist. A failure is reported once
+    /// and leaves the log dormant.
     fn open(&mut self) {
         let path: &Path = &self.path;
         if let Some(parent) = path.parent() {

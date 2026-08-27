@@ -32,9 +32,9 @@ fn core_src() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
 }
 
-/// The workspace root — the parent of the `core` crate this test lives in.
-/// Used to reach sibling crates (`lmv-ring`, `standalone`) whose manifests and
-/// hot-path source the guards below also cover.
+/// The workspace root — the parent of the `core` crate this test lives
+/// in. It reaches the sibling crates (`lmv-ring`, `standalone`) whose
+/// manifests and hot-path source the guards below also cover.
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -202,8 +202,8 @@ fn the_guard_resolves_a_path_declared_test_module() {
 }
 
 /// The hot-path set the pragma guards. Directories are scanned recursively;
-/// a new hot-path directory added by a later plan must be listed here (a
-/// Mode 4 review item — see the plan's Design-integrity note).
+/// a new hot-path directory added by a later plan must be listed here,
+/// which is a Mode 4 review item.
 #[test]
 fn hot_path_modules_carry_the_panic_pragma() {
     let src = core_src();

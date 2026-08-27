@@ -418,8 +418,8 @@ mod tests {
         let format = fmt();
         let groove = band_ranges(&dynamic_groove(110.0, 4.0, format), 4);
         // The liveliest existing kind, measured in the same run rather than
-        // quoted from memory: seeded noise, whose `max / mean` the plan records
-        // at 1.77 in bass where `bass:60` is exactly 1.000 and `chord` 1.017.
+        // quoted from memory: seeded noise, whose `max / mean` reads 1.77
+        // in bass where `bass:60` is exactly 1.000 and `chord` 1.017.
         let liveliest = band_ranges(&noise(7, 4.0, 0.8, format), 4);
         let names = ["bass", "mid", "treb"];
 

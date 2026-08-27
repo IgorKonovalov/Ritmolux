@@ -9,7 +9,7 @@
 //!
 //! Plan 0113 Phase 5 is a human gate that picks the composition from rendered
 //! samples, so this module's job is to make candidates **comparable**, not to
-//! make one of them good. Three are the plan's grammars:
+//! make one of them good. Three grammars are offered:
 //!
 //! - [`Grammar::AnchorSatellites`] — one or two dominant elements carry the
 //!   canvas and the rest cluster around them, so the picture has a subject.

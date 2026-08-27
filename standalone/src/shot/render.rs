@@ -62,9 +62,9 @@
 //!
 //! ## Surviving a whole track
 //!
-//! A four-minute render is 14,400 frames, and the thing that used to stop a run
-//! that long was not a frame count but memory pressure (Plan 0099): a capture
-//! path that submitted without ever polling retained **per pass**, so a
+//! A four-minute render is 14,400 frames, and what stops a run that long
+//! is not a frame count but memory pressure (Plan 0099): a capture path
+//! that submits without ever polling retains **per pass**, so a
 //! reaction-diffusion world at thirteen passes a frame held 950 KB a frame
 //! against a 36 KB captured frame and hit the allocator at ~4.4 GB.
 //!

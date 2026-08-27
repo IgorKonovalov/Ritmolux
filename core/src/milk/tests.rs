@@ -605,9 +605,10 @@ fn the_q_bridge_carries_per_frame_into_every_vertex() {
     assert!(c > a, "a larger `x` must give a larger zoom: {c} vs {a}");
 }
 
-/// **The rate conversion**, which is the plan's most consequential translation:
-/// MilkDrop's per-frame factors and rates become this engine's per-second ones,
-/// so a converted preset moves at the speed its author saw on any refresh.
+/// **The rate conversion**, the most consequential translation the
+/// converter does: MilkDrop's per-frame factors and rates become this
+/// engine's per-second, so a converted preset moves at the speed its
+/// author saw on any refresh.
 #[test]
 fn per_frame_rates_become_per_second_ones() {
     // per_frame: zoom = 1.01; rot = 0.02; dx = 0.003; cx = 0.25; decay = 0.98

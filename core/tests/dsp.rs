@@ -106,10 +106,10 @@ fn sine_energy_concentrates_in_expected_band() {
 /// **bit-exactly** — on x86_64, which is where they were measured.
 ///
 /// The four literals below are not a re-derivation of this build's own output —
-/// they were measured by running this exact fixture against `92579ef`, the commit
-/// before the plan started, where `bass` *was* the raw value. So the test states
-/// a fact about the old code that this code has to match, which is the only form
-/// of "unchanged" worth asserting.
+/// they were measured by running this exact fixture against `92579ef`, where
+/// `bass` *was* the raw value. So the test states a fact about the pre-ADR-0049
+/// code that this code has to match, which is the only form of "unchanged"
+/// worth asserting.
 ///
 /// Hop 200 is read deliberately: both builds have long since filled the short
 /// window there, and the raw levels come from the **short** window's magnitudes

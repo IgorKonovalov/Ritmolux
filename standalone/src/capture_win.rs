@@ -272,8 +272,9 @@ struct Stream {
     audio_client: IAudioClient,
     capture_client: IAudioCaptureClient,
     producer: SampleProducer,
-    // Interleaving width of the captured stream. The ring producer no longer
-    // exposes the format (Plan 0005), so carry the channel count here.
+    // Interleaving width of the captured stream. The ring producer does
+    // not expose the format (Plan 0005), so carry the channel count
+    // here.
     channels: usize,
 }
 

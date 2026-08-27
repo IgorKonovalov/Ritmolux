@@ -110,7 +110,7 @@ mod tests {
 
     /// Sizes whose quantized grid lands under **both** call sites' caps, so
     /// neither cap binds and the two wrappers are answering the same question.
-    /// These are the plan's motivating targets plus the degenerate ends.
+    /// These are the motivating targets plus the degenerate ends.
     const UNCAPPED: [(u32, u32); 8] = [
         (1, 1),
         (17, 3),

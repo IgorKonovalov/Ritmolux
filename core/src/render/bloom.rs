@@ -69,8 +69,8 @@
 //! binds none (see [`Resources`]). Every layout this stage adds is a shape no other
 //! live pipeline in the engine has — **asserted, not claimed**, by
 //! `the_bloom_layouts_are_four_shapes_nothing_else_shares` in `tonemap/tests.rs`
-//! (Plan 0053 Phase 2). This table used to make that claim in prose, which is the
-//! same thing the tonemap's comment did while the claim was false:
+//! (Plan 0053 Phase 2). A table making that claim in prose asserts nothing, which
+//! is what the tonemap's comment did while its own claim was false:
 //!
 //! | pass                     | layout                               |
 //! |--------------------------|--------------------------------------|

@@ -87,11 +87,10 @@ use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 ///
 /// The scene targets, both post stages, the transition blend's two sides and the
 /// tonemap's own input are all this — the surface format stops at the tonemap,
-/// which is where the frame becomes display-referred. Before this plan every one
-/// of those intermediates ran at the surface's 8 bits, so an additive
-/// accumulation clipped per channel at each hand-off: the "additive ceiling"
-/// ADR-0046's Context catalogues, and the reason a bright-pass had nothing
-/// correct to bloom from.
+/// which is where the frame becomes display-referred. Running those
+/// intermediates at the surface's 8 bits instead clips an additive accumulation
+/// per channel at each hand-off: the "additive ceiling" ADR-0046's Context
+/// catalogues, and the reason a bright-pass had nothing correct to bloom from.
 ///
 /// `Rgba16Float` rather than 32-bit because it is the format
 /// [`PingPongField`](feedback::PingPongField) has shipped on since Plan 0014 —

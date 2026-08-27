@@ -639,9 +639,9 @@ mod tests {
     // --- Banding (ADR-0078) ---------------------------------------------
 
     /// `palette_steps = N` leaves exactly `N` distinct palette coordinates over
-    /// the gradient's range — the plan's done-when, asserted on the CPU-side
-    /// expression rather than on a capture, because a pixel count would also see
-    /// the bloom, the backdrop and the 8-bit round-trip.
+    /// the gradient's range. Asserted on the CPU-side expression rather than on
+    /// a capture, because a pixel count would also see the bloom, the backdrop
+    /// and the 8-bit round-trip.
     #[test]
     fn six_steps_leave_exactly_six_palette_coordinates() {
         for n in [2.0f32, 4.0, 6.0, 8.0, 16.0] {

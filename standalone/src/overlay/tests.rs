@@ -77,9 +77,9 @@ fn the_capture_line_sits_below_the_core_diagnostics_panel() {
     }
 }
 
-/// **The numbers the plan pinned**, and they are this file's constants'
-/// arithmetic rather than an implementation's output: a change to `ROW_H` or
-/// `LIST_TOP` fails this deliberately.
+/// **The pinned numbers**, and they are this file's constants'
+/// arithmetic rather than an implementation's output: a change to
+/// `ROW_H` or `LIST_TOP` fails this deliberately.
 #[test]
 fn the_shipped_roster_flows_into_two_columns_at_1080p_and_one_at_1440p() {
     let (w, h) = HD;
@@ -95,7 +95,7 @@ fn the_shipped_roster_flows_into_two_columns_at_1080p_and_one_at_1440p() {
         "the whole roster must be on screen at once — that is the point"
     );
 
-    // The second column holds exactly the 2 rows that used to be past the fold.
+    // The second column holds exactly the 2 rows a single column cannot fit.
     assert_eq!(l.place(31), Some((0, 31)), "last row of column 1");
     assert_eq!(l.place(32), Some((1, 0)), "first row of column 2");
     assert_eq!(l.place(33), Some((1, 1)));
@@ -298,9 +298,9 @@ fn escape_closes_without_selecting() {
     assert!(!s.is_open());
 }
 
-/// **The browser opens where the show is** (Plan 0050 Phase 2). It used to
-/// open on row 0, which loses your place in a roster the size of the shipped
-/// one every time `Tab` is pressed.
+/// **The browser opens where the show is** (Plan 0050 Phase 2). Opening
+/// on row 0 instead would lose your place in a roster the size of the
+/// shipped one, every time `Tab` is pressed.
 ///
 /// The second half is the one that makes this a behaviour rather than a
 /// cursor position: `Enter` straight after opening must re-select the preset

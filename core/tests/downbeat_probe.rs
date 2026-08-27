@@ -521,8 +521,8 @@ fn crossing(rungs: &[Rung]) -> Option<f32> {
 
 /// Where the crossing *would* be if the noise correction were not applied. The
 /// gap between this and [`crossing`] is exactly how much of the shortfall the
-/// correction is responsible for, which is one of the plan's three suspects
-/// asked directly rather than inferred.
+/// correction is responsible for — one of the three suspects below, asked
+/// directly rather than inferred.
 fn crossing_uncorrected(rungs: &[Rung]) -> Option<f32> {
     crossing_by(rungs, |r| r.raw)
 }
@@ -541,7 +541,7 @@ fn first_sub_gate(rungs: &[Rung]) -> Option<&Rung> {
 /// confidence value at a rung is a measurement of this machine; "contrast is
 /// steeper than jitter" is a property of the estimator).
 ///
-/// How the reading separates the three suspects, per the plan:
+/// How the reading separates the three suspects:
 ///
 /// - collapse on **contrast loss** indicts the accent feature;
 /// - survival of contrast loss but collapse on **dropouts** indicts the fold's
@@ -706,7 +706,7 @@ fn the_degradation_ladder_says_which_axis_is_steep() {
     }
 
     // (4) **The fold still knows the answer at the rung where the gate shuts on
-    //     it.** This is the discriminator the plan asks for: an alignment that
+    //     it.** This is the discriminator: an alignment that
     //     is right while the confidence is under the gate says the fold found
     //     the downbeat and the confidence measure declined to publish it. Both
     //     numbers come from the same rung of the same run.

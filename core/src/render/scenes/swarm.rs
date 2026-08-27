@@ -29,11 +29,12 @@ const SEED: u64 = 0x4C4D_565F_5357_524D; // "LMV_SWRM"
 /// How far the toroidal domain extends past the visible frame (Plan 0043 Phase 1,
 /// ADR-0044).
 ///
-/// The world half-extents used to be `BOUND_X = 1.8` / `BOUND_Y = 1.0` — and
-/// `1.0` **is** the NDC frame edge. The wrap is toroidal, so that line was the one
-/// place on screen every wrapping particle was guaranteed to paint, and the
-/// feedback stage integrated it into a saturated bar across the top and bottom of
-/// every swarm preset within a few hundred frames.
+/// Half-extents of `BOUND_X = 1.8` / `BOUND_Y = 1.0` put the wrap seam
+/// on the NDC frame edge, which `1.0` **is**. The wrap is toroidal, so
+/// that line is the one place on screen every wrapping particle is
+/// guaranteed to paint, and the feedback stage integrates it into a
+/// saturated bar across the top and bottom of every swarm preset within
+/// a few hundred frames.
 ///
 /// The bounds now follow the render target (below) and carry this margin so the
 /// seam sits *outside* the frame. Chosen by measurement, not by rounding: the

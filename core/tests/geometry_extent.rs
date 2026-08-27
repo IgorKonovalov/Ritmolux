@@ -331,7 +331,7 @@ const OVER_SCALED: [(&str, &str, &str); 2] = [
 /// `0.80` on the loud/moderate coverage ratio would have sat `0.055` from De
 /// Jong, the lowest *legitimate* content in the library — and convicted none of
 /// the three known-defective configurations, which scored *above* it. It is the
-/// benchmark this plan exists to beat, and it is quoted rather than recomputed
+/// benchmark this instrument exists to beat, quoted rather than recomputed
 /// because it belongs to a measurement that has already been taken.
 const PIXEL_COVERAGE_MARGIN: f32 = 0.055;
 
@@ -341,11 +341,11 @@ const PIXEL_COVERAGE_MARGIN: f32 = 0.055;
 /// asserted, because they are measurements of specific presets and content is
 /// allowed to move.
 ///
-/// **Set at five times the benchmark, and the plan asked for ten. Measured, the
+/// **Set at five times the benchmark, against a target of ten. Measured, the
 /// two pairs read `9.0x` (comb) and `14.2x` (corona)** — so the corona clears
-/// the plan's bar and the comb does not, and the reason is geometry rather than
-/// tuning. A comb roots every bar on a shared baseline, so a fully-driven bar at
-/// `scale = 3.80` stands `3.97` world units tall from `-0.85` and keeps the
+/// that target and the comb does not, and the reason is geometry rather than
+/// tuning. A comb roots every bar on a shared baseline, so a fully-driven bar
+/// at `scale = 3.80` stands `3.97` world units tall from `-0.85` and keeps the
 /// `1.85` below the top edge **in frame whatever else is done to it**: about
 /// `0.47` of its own length, which bounds the achievable separation near `0.53`
 /// before the repaired preset's own losses are counted. That is the same

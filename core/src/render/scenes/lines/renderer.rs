@@ -159,7 +159,7 @@ struct Uniforms {
 /// Shared rather than written twice for the reason [`shader_source`] emits the
 /// join bits from the Rust constants: two copies of a profile is a divergence
 /// that compiles, and here it would mean a mandala whose circles and interlace
-/// no longer match.
+/// stop matching.
 ///
 /// **`fwidth` exists only in a fragment shader**, so each caller evaluates it at
 /// the fragment's top level and passes the result in — which also keeps the call
@@ -283,14 +283,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// The full WGSL, with the join bits **generated from the Rust constants**
 /// rather than restated as literals (Plan 0040 Phase 2).
 ///
-/// The shader used to test `(joined & 1u)` and `(joined & 2u)` against
-/// [`JOINED_A`] / [`JOINED_B`] defined here, with nothing tying the two together
-/// — a swap or a renumbering would have compiled, passed, and rendered wrongly.
-/// Emitting the WGSL `const`s from the Rust ones makes that divergence
-/// **unrepresentable** rather than merely detected: there is one definition, and
-/// the shader reads it by name. Prepending a generated prelude rather than
-/// `format!`-ing the whole body is deliberate — the body is full of braces, and
-/// every one would need escaping.
+/// A shader testing `(joined & 1u)` and `(joined & 2u)` against [`JOINED_A`] /
+/// [`JOINED_B`] defined here has nothing tying the two together — a swap or a
+/// renumbering would compile, pass, and render wrongly. Emitting the WGSL
+/// `const`s from the Rust ones makes that divergence **unrepresentable** rather
+/// than merely detected: there is one definition, and the shader reads it by
+/// name. Prepending a generated prelude rather than `format!`-ing the whole body
+/// is deliberate — the body is full of braces, and every one would need
+/// escaping.
 ///
 /// Runs once per [`LineRenderer::new`] (pipeline build, not the hot path).
 fn shader_source() -> String {
@@ -306,7 +306,7 @@ fn shader_source() -> String {
 /// construction rather than by convention** - the same reason [`shader_source`]
 /// emits the join bits from the Rust constants instead of restating them. Two
 /// hand-kept copies of the expression would compile, render, and give a mandala
-/// whose circles and interlace no longer match.
+/// whose circles and interlace stop matching.
 ///
 /// Runs once per [`LineRenderer::new_with_arcs`] (pipeline build, not the hot
 /// path).
@@ -563,7 +563,7 @@ thread_local! {
 }
 
 /// Turn the in-frame geometry diagnostic on or off for **this thread**, clearing
-/// any previously recorded measurement. Off by default; the shipped render path
+/// any measurement already recorded. Off by default; the shipped render path
 /// never calls this.
 pub fn set_extent_diagnostic(on: bool) {
     EXTENT_ON.with(|flag| flag.set(on));

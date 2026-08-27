@@ -5,12 +5,12 @@
 //!
 //! ## Preset-directory resolution
 //!
-//! The per-OS preset directory used to be hand-copied into `src/main.rs` and
-//! `examples/shot.rs`; the two copies could drift, which silently breaks the
-//! one invariant the `LMV_PRESET_DIR` override rests on — the app and `shot`
-//! must resolve the *same* directory (ADR-0014). This module is that single
-//! source. It is host-only by design: `%APPDATA%` / `HOME` / `XDG` conventions
-//! are a shell concern and never leak into the source-agnostic core.
+//! Hand-copying the per-OS preset directory into `src/main.rs` and
+//! `examples/shot.rs` lets the two copies drift, which silently breaks the one
+//! invariant the `LMV_PRESET_DIR` override rests on — the app and `shot` must
+//! resolve the *same* directory (ADR-0014). This module is that single source.
+//! It is host-only by design: `%APPDATA%` / `HOME` / `XDG` conventions are a
+//! shell concern and never leak into the source-agnostic core.
 //!
 //! Nothing here prints or panics — callers decide how to report an unresolved
 //! root, so the headless `shot` stays quiet where the app logs.

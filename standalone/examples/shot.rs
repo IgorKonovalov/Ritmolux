@@ -359,7 +359,8 @@ fn parse_system(name: &str) -> Result<SystemKind, String> {
     // shot's friendly error text here.
     SystemKind::from_name(name).ok_or_else(|| {
         // The list of legal names comes off the roster too, so a new system
-        // cannot ship missing from the error text (it used to be hand-written).
+        // cannot ship missing from the error text, as a hand-written list
+        // can.
         let known: Vec<&str> = SystemKind::ALL.iter().map(|k| k.as_str()).collect();
         format!("unknown family `{name}` ({})", known.join(" | "))
     })
@@ -746,8 +747,8 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
 ///
 /// `onset` sits in the table beside the three bands (Plan 0057 Phase 1) because
 /// every shipped attractor gates its `reseed` on it, and whether a given
-/// `--signal` kind ever crosses such a gate was previously unanswerable from a
-/// capture. The peak hop is printed with it so `--strip` can be aimed at the
+/// `--signal` kind ever crosses such a gate is unanswerable from a capture
+/// without it. The peak hop is printed with it so `--strip` can be aimed at the
 /// frame the gate fires on.
 fn print_band_levels(levels: &BandLevels) {
     println!(

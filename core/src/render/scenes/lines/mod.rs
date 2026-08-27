@@ -80,10 +80,10 @@ pub fn half_width(thickness: f32) -> f32 {
 ///
 /// **`0.25` — a solid stroke with a short shoulder — set by Plan 0114 Phase
 /// 4's look gate**, which judged the shipped presets side by side at 1920x1080
-/// and 1280x800 and then in the running app on real audio. It replaced `1.0`,
-/// the pure quadratic falloff every line scene drew from Plan 0010 until then,
-/// whose 4 px spine inside a 10 px gradient is the *blurred* verdict that
-/// opened the plan.
+/// and 1280x800 and then in the running app on real audio. `1.0` — the pure
+/// quadratic falloff every line scene drew from Plan 0010 — puts a 4 px spine
+/// inside a 10 px gradient, which is the *blurred* verdict that opened Plan
+/// 0114.
 ///
 /// **`1.0` remains reachable and is not dead surface.** The same gate returned
 /// `1.0` for the Maurer roses, `0` for `curve_ionwake` and `0.25` for

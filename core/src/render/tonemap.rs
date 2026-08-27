@@ -7,17 +7,15 @@
 //! is free to exceed 1.0 and nothing clips. This pass reads that unbounded frame,
 //! applies `exposure`, folds everything into `[0, 1)`, and writes the result at
 //! the **surface** format. Downstream of it the frame is display-referred, which
-//! is what [`Ink`](super::ink::Ink) has always assumed it was reading (ADR-0028 /
-//! ADR-0032 are unchanged by this plan — only the pass that hands ink its input
-//! is new).
+//! is what [`Ink`](super::ink::Ink) assumes it is reading (ADR-0028 / ADR-0032).
 //!
 //! # Not skippable
 //!
 //! Every other pass in `render/` skips when its amount param is off. This one
 //! cannot: it is not a look, it is the **format boundary**. Skipping it would
-//! present linear values above 1.0 into an 8-bit surface, which is the clipped
-//! composite this plan exists to retire. `exposure = 1.0` (the default) still
-//! runs the pass — it is a near-identity below the knee, not a no-op.
+//! present linear values above 1.0 into an 8-bit surface, and clip the
+//! composite. `exposure = 1.0` (the default) still runs the pass — it is a
+//! near-identity below the knee, not a no-op.
 //!
 //! # The curve
 //!
@@ -44,9 +42,9 @@
 //!
 //! Plain Reinhard (`x / (1 + x)`) was not an option despite being the obvious
 //! one: it maps 0.8 to 0.44, so every existing preset would have gone dark.
-//! ADR-0046's "near-identity below the mid-range" is what rules it out, and it is
-//! what keeps this plan's golden re-bless confined to the regions that were
-//! actually clipping.
+//! ADR-0046's "near-identity below the mid-range" is what rules it out, and
+//! it is what confined the golden re-bless to the regions that were actually
+//! clipping.
 //!
 //! # Why the output is 8-bit, not float
 //!
@@ -505,9 +503,8 @@ impl Tonemap {
     }
 
     /// The stop this pass will **actually apply** this frame: the bound value with
-    /// the two guards [`resolve`](Self::resolve) used to apply inline — negatives
-    /// floored (a negative stop would invert the frame) and a non-finite binding
-    /// replaced by the default.
+    /// its two guards applied — negatives floored (a negative stop would invert
+    /// the frame) and a non-finite binding replaced by the default.
     ///
     /// Extracted so the bloom stage can threshold against the same number rather
     /// than a second transcription of it (ADR-0080). It is a **one-way read**: the

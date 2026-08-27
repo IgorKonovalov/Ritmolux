@@ -487,7 +487,7 @@ impl Blend {
             // A size change mid-dissolve **discards the held snapshot** — the new
             // textures start cleared, so the rest of that dissolve mixes against
             // black and reads as a fade-up. That is deliberate, not a leak: the
-            // snapshot is a surface-sized image of a frame that no longer exists at
+            // snapshot is a surface-sized image of a frame that does not exist at
             // this size, and the alternative (rescaling a frozen frame) would blur
             // one side of a 1:1 mix. It lasts at most one dissolve, and only for a
             // resize that lands inside one.
@@ -749,7 +749,7 @@ impl Renderer {
     ///
     /// The outgoing index is read from the roster **after** settling any dissolve in
     /// flight, never passed in: a caller that resolved it earlier would name a
-    /// preset the snapshot is no longer going to hold.
+    /// preset the snapshot will not hold by the time it is taken.
     ///
     /// The roster is deliberately **not** flipped here: the dissolve's opening
     /// frame composites the still-active outgoing preset into the snapshot, and

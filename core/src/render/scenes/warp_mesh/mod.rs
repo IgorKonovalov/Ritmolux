@@ -1136,8 +1136,8 @@ impl WarpMeshScene {
     /// has built the GPU resources.
     ///
     /// **Test-only, and it is the seam-A tap** (Plan 0111 Phase 2): the field is
-    /// what the present pass reads and everything downstream is what this plan
-    /// bisects, so a probe needs the value *before* the present pass to have a
+    /// what the present pass reads and everything downstream is what the bisect
+    /// covers, so a probe needs the value *before* the present pass to have a
     /// baseline at all. `PingPongField` already carries `COPY_SRC` for Plan 0109
     /// Phase 4's probe; this only names it from outside the module, which is what
     /// lets a `Renderer`-level probe read the same quantity the scene-level one

@@ -5,18 +5,15 @@
 //! (`quadrant_spread`) — "not blank, not a dot".
 //!
 //! **Plan 0058 / ADR-0067: the capture measures the scene, not the backdrop.**
-//! This gate used to sample the background from pixel (0, 0) — the frame's own
-//! corner — on the Plan 0013 reasoning that a scene which clears to a dark blue
-//! would otherwise score as fully lit. That reasoning was correct for a
-//! per-scene clear and became wrong the day the backdrop moved into an engine
-//! pre-pass (ADR-0018): `bg_vignette` darkens the frame toward its edges, so on
-//! any preset that binds one **the corner is the darkest pixel in the image**
-//! and nearly every pixel toward the centre differs from it by more than
-//! [`EPS`]. The backdrop read as a large, well-spread, lit figure. 24 of the 35
-//! shipped presets bind `bg_vignette`, and the sparse-system floor is 0.01, so
-//! for most of the library the floor was satisfied by the backdrop alone
-//! whatever the scene did — an unfalsifiable gate, which `spectrum_ridge` proved
-//! by shipping a contour drawn 3.3 world units off the top of a frame of
+//! The frame's own corner is the tempting reference and it is the wrong one.
+//! `bg_vignette` darkens the frame toward its edges, so on any preset that
+//! binds one **pixel (0, 0) is the darkest pixel in the image** and nearly
+//! every pixel toward the centre differs from it by more than [`EPS`] — the
+//! backdrop reads as a large, well-spread, lit figure. 24 of the 35 shipped
+//! presets bind `bg_vignette` and the sparse-system floor is 0.01, so a corner
+//! reference satisfies the floor from the backdrop alone over most of the
+//! library, whatever the scene does. `spectrum_ridge` demonstrated it by
+//! shipping a contour drawn 3.3 world units off the top of a frame of
 //! half-height 1.0 and passing.
 //!
 //! So the roster this gate renders has its `bg_*` bindings **removed**
@@ -142,7 +139,7 @@ const MIN_QUADRANTS: u8 = 2;
 /// band (Plan 0056 Phase 5, backlog 0047) — the point past which the picture has
 /// no tonal structure left, only a mass of one tone.
 ///
-/// # It is one of two terms now, and no longer a verdict
+/// # It is one of two terms, not a verdict
 ///
 /// Plan 0119 Phase 3, implementing ADR-0128 as settled by ADR-0130. Everything
 /// below this heading argues, from the library's own distribution, that a
@@ -176,7 +173,7 @@ const MIN_QUADRANTS: u8 = 2;
 /// all — and it changed this statistic more than it changed any other:
 ///
 /// ```text
-///          this measurement        previously (corner-sampled)
+///          this measurement        corner-sampled
 /// 0.8839   Rose Web                0.8655  Spectrum Ridge
 /// 0.7211   Rose Trails             0.8300  Rose Trails
 /// 0.6755   Ink on Paper            0.7645  Rose Web
@@ -202,16 +199,15 @@ const MIN_QUADRANTS: u8 = 2;
 ///   near-equal-brightness strokes genuinely has very little tonal structure.
 ///   The number is worse because it is now honest.
 ///
-/// **So the plan's question — does re-measuring widen the `0.035` margin — is
-/// answered no, and it is a finding rather than a reason to move the constant.**
-/// The margin above the library is now **`0.0161`** (`0.90` over `Rose Web`'s
-/// `0.8839`), narrower than before. Below, the deliberately flattened fixture
-/// reads `0.9815`, so `0.90` still separates the library from the fixture, but it
-/// sits `0.0161` above one and `0.0915` below the other — not a midpoint.
-/// `0.90` is left where it is because the margin narrowed for a *real* reason:
-/// the top of the distribution is now an actual figure with an actual tonal
-/// problem, and a preset drifting over the ceiling is a preset to route, not a
-/// constant to nudge.
+/// **Re-measuring does not widen the `0.035` margin** — a finding rather than a
+/// reason to move the constant. The margin above the library is now **`0.0161`**
+/// (`0.90` over `Rose Web`'s `0.8839`), narrower than before. Below, the
+/// deliberately flattened fixture reads `0.9815`, so `0.90` still separates the
+/// library from the fixture, but it sits `0.0161` above one and `0.0915` below
+/// the other — not a midpoint. `0.90` is left where it is because the margin
+/// narrowed for a *real* reason: the top of the distribution is now an actual
+/// figure with an actual tonal problem, and a preset drifting over the ceiling is
+/// a preset to route, not a constant to nudge.
 ///
 /// The top three are structural rather than accidental — a trails-heavy line
 /// look is mostly faint tail at one level, a web is mostly stroke, and
@@ -359,7 +355,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// the modal band *is* the black it was already compared to, and the coverage
 /// comes back identical to the digit. So the families whose minimum moved are
 /// re-derived here, and the families whose minimum did not are left exactly as
-/// they were — there is nothing in them for this plan to re-measure.
+/// they were — there is nothing in them to re-measure.
 ///
 /// ```text
 /// system              floor          family minimum              why
@@ -377,8 +373,8 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 ///
 /// `shape_field` is in that first group for a different reason: its minimum did
 /// not move, but the arm claimed the family "has zero shipped members", and
-/// `Facet` and `Pulse` both ship. The claim was false before this plan and the
-/// floor is derived from the distribution for the first time here.
+/// `Facet` and `Pulse` both ship. That claim is false, and the floor here is
+/// derived from the distribution.
 ///
 /// Each floor is set at half its system's lowest shipped preset, so the gap is a
 /// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
@@ -444,7 +440,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 ///
 /// **Every attractor number above fell on 2026-08-04 (Plan 0059 Phase 1b) and the
 /// floor did not have to move.** ADR-0070 stopped the trail sampling its own
-/// target mirrored, so each figure is one copy where it used to be `figure ∪
+/// target mirrored, so each figure is one copy rather than `figure ∪
 /// mirror(figure)` — strictly less lit area, by 6-13 %. The family now reads
 /// `0.3442 Leviathan`, `0.4480 De Jong`, `0.5268 Lorenz`, `0.6831 Clifford`,
 /// `1.0000 Ink on Paper`, `1.0000 Thomas`, putting the slack at `1.91x`. It is
@@ -565,16 +561,16 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // barely moved (`De Jong Gallery` 0.2214 -> 0.2156), but the family's
         // *ink duotones* did: `Ink on Paper`, `Thomas` and `Valentine` came off
         // 1.0000 to 0.2167 / 0.2917 / 0.4389, which is the artifact the note
-        // below this table describes and no longer a live one. Half the new
+        // below this table describes, and it is not a live one. Half the new
         // minimum.
         SystemKind::Attractor => 0.11,
-        // The sparsest system in the library, and the one this plan exists
+        // The sparsest system in the library, and the one Plan 0058 exists
         // because of. Spectrum Ridge sets it at 0.1189 — *after* its repair; the
-        // version that shipped broken scores 0.0000 here.
-        // Raised from 0.06 when cohort four (Plan 0075) retired the three
-        // spectrum presets: the family minimum moved up to Halo at 0.5843
-        // (its lit violet atmosphere and thick spokes cover what the old
-        // thin combs did not), and the old floor sat 9.7x below it.
+        // version that shipped broken scores 0.0000 here. Raised from 0.06 when
+        // cohort four (Plan 0075) retired the three spectrum presets: the family
+        // minimum moved up to Halo at 0.5843 (its lit violet atmosphere and
+        // thick spokes cover what the old thin combs did not), and the old floor
+        // sat 9.7x below it.
         SystemKind::Spectrum => 0.28,
         // A shower of small marks over an otherwise empty frame — sparse by
         // idiom, like the spectrum readout and unlike the swarm's dense cloud.
@@ -604,13 +600,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // family minimum like every floor above.
         //
         // **Left at 0.50 on 2026-08-26 while `FragmentField` went to 0.08, so it
-        // no longer inherits anything** (Plan 0116 Phase 4). Two reasons, both
-        // recorded rather than resolved: the structural argument it rests on is
-        // the one Phase 3 falsified — a fullscreen field scores 1.0 because
-        // `coverage` was reading the ground it paints — and the number is
-        // duplicated in `core/tests/warp_mesh.rs`, which that phase is not
-        // scoped to touch and which asserts the two match. The first `warp_mesh`
-        // preset re-derives both together.
+        // inherits nothing** (Plan 0116 Phase 4). Two reasons, both recorded
+        // rather than resolved: the structural argument it rests on is the one
+        // Phase 3 falsified — a fullscreen field scores 1.0 because `coverage`
+        // was reading the ground it paints — and the number is duplicated in
+        // `core/tests/warp_mesh.rs`, which that phase is not scoped to touch and
+        // which asserts the two match. The first `warp_mesh` preset re-derives
+        // both together.
         SystemKind::WarpMesh => 0.50,
         // **Derived from the distribution on 2026-08-26** (Plan 0113 Phase 6b),
         // from an inherited `0.50`. Until then this arm read that a
@@ -1100,7 +1096,7 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
     // **is its own modal band**, so the derived ground lands on the blot itself
     // and the lit mask is what is left over — the figure's fringe. The fixture
     // is therefore convicted twice rather than once, which is a stronger
-    // verdict and a weaker demonstration: coverage no longer scores it healthy.
+    // verdict and a weaker demonstration: coverage does not score it healthy.
     let bg = ground(&img);
     let cov = coverage(&img, bg, EPS);
     let spread = quadrant_spread(&img, bg, EPS);
@@ -1830,8 +1826,9 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
 /// (`Spectrum Ridge`), so `0.04` sits a factor of `2.23` below it, matching
 /// [`MAX_FLOOR_SLACK`]'s ceremony.
 ///
-/// **Non-vacuous, and by the case that motivated the plan**: the pre-repair
-/// `spectrum_ridge` scores `0.0000` here as well as at `LOUD`, asserted in
+/// **Non-vacuous, and by the case that motivated the gate**: the
+/// pre-repair `spectrum_ridge` scores `0.0000` here as well as at `LOUD`,
+/// asserted in
 /// [`the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one`].
 ///
 /// It is not redundant with the `LOUD` floors, though the overlap is worth being
@@ -1854,8 +1851,8 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 ///
 /// # This ships as a report, not as a gate, and the measurement is why
 ///
-/// The plan authorized either outcome and left the choice to the numbers
-/// (Risks). They came back like this — the whole library, plus the pre-repair
+/// Either outcome was authorized and the choice left to the numbers.
+/// They came back like this — the whole library, plus the pre-repair
 /// ridge as a control:
 ///
 /// ```text
@@ -1876,8 +1873,8 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 /// defective configurations exist and the ratio reaches none of them:
 ///
 /// - **`Spectrum Comb` does not fail. It scores `1.0891` — it draws *more* when
-///   loud.** The plan named it the live candidate and asked for this stated
-///   plainly if it came back clean, so: a comb roots every bar on a shared
+///   loud.** It was the live candidate and it came back clean: a comb roots
+///   every bar on a shared
 ///   baseline, and clipping the tips off the tallest bars costs a rounding error
 ///   of coverage while the body of the figure stays exactly where it was. The
 ///   layout the check was designed around is the layout it cannot see.
@@ -1901,7 +1898,7 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 /// [`MODERATE_MIN_COVERAGE`], the one property the second capture supports: a
 /// preset must be a picture at a realistic level, not only when fully driven.
 ///
-/// **What this means for the class the plan was aiming at.** The over-scale
+/// **What this means for the class this instrument aims at.** The over-scale
 /// defect is real and this instrument does not reach it — pixel coverage is the
 /// wrong measure for a figure whose *tips* leave the frame, because tips are
 /// almost no pixels. ADR-0067 already names the successor: an in-frame **geometry
@@ -1975,8 +1972,9 @@ fn ratio_of(loud_cov: f32, mid_cov: f32) -> f32 {
 // A measurement harness and nothing else. Every statistic above still measures
 // against [`BLACK`]; this section adds no production behaviour and changes no
 // verdict. It exists to put a table in front of Plan 0116 Phase 2, which is a
-// **stop gate** — the plan may legitimately end there, and ADR-0126 deliberately
-// declines to name an estimator because the obvious one is already falsified.
+// **stop gate** — Plan 0116 may legitimately end there, and ADR-0126
+// deliberately declines to name an estimator because the obvious one is
+// already falsified.
 
 /// How far in from each edge [`ground_modal_border`] samples, as a divisor of
 /// the frame's shorter side. At this file's 96×96 capture that is a 6-pixel
@@ -1998,21 +1996,20 @@ const RGB_LEVELS: usize = 16;
 ///
 /// # Why it is frozen rather than read from the file
 ///
-/// It used to be `include_str!("../../presets/pending/fragment_tiledmono.toml")`,
-/// which was correct while the preset was held: it was outside the embedded set
+/// An `include_str!` of the preset file is correct only while the preset is
+/// held: under `presets/pending/` it is outside the embedded set
 /// (`core/build.rs` globs `presets/*.toml` non-recursively per ADR-0022, so a
-/// subdirectory is skipped by construction) and so unreachable from
-/// [`sanity_roster`], and it had to be in the table anyway as the false positive
-/// ADR-0126 was raised on and ADR-0128 was written about.
-///
-/// Plan 0119 Phase 4 ships it into `presets/`, and repointing the `include_str!`
-/// at the new path would be **worse than letting the move break the build**.
-/// This frame is the composition-side anchor of [`boundary_floor`]'s default
-/// arm: `0.31` is the midpoint of `0.2631` ([`blown_out`]) and this preset's
-/// `0.3602`. As ordinary editable content, a routine preset tweak could move a
-/// gate constant with nothing able to notice, because the constant would still
-/// read green. ADR-0130's Decision requires **both** anchors frozen, and this is
-/// the second one; `retired_mandalas` is the precedent for how.
+/// subdirectory is skipped by construction) and unreachable from
+/// [`sanity_roster`], while still belonging in the table as the false positive
+/// ADR-0126 was raised on and ADR-0128 was written about. Plan 0119 Phase 4
+/// ships it into `presets/`, and repointing an `include_str!` at the new path
+/// would be **worse than letting the move break the build**. This frame is the
+/// composition-side anchor of [`boundary_floor`]'s default arm: `0.31` is the
+/// midpoint of `0.2631` ([`blown_out`]) and this preset's `0.3602`. As ordinary
+/// editable content, a routine preset tweak could move a gate constant with
+/// nothing able to notice, because the constant would still read green.
+/// ADR-0130's Decision requires **both** anchors frozen, and this is the second
+/// one; `retired_mandalas` is the precedent for how.
 ///
 /// The shipped copy goes on being judged by the gate like any other preset, and
 /// the two are meant to agree. If they ever stop agreeing, the shipped preset
@@ -2490,7 +2487,7 @@ fn lit_mask(img: &CaptureImage) -> Vec<bool> {
 
 /// One candidate structural statistic. **The roster is the deliverable, not a
 /// choice** — the stop condition decides, from what these print, and it can end
-/// the plan.
+/// Plan 0116.
 struct StructureCandidate {
     /// Column name in the printed table.
     name: &'static str,
@@ -2797,8 +2794,8 @@ struct StructureRow {
 ///    *whose own `tonal_flatness` is above [`MAX_TONAL_FLATNESS`]* — no other
 ///    frame can reach a second term. Frames in the gap below the ceiling are
 ///    printed with their flatness, as reported and not disqualifying, so the
-///    reading is checkable rather than asserted. **This is the correction**: the
-///    same criterion was previously judged over the whole library.
+///    reading is checkable rather than asserted. The criterion is judged over
+///    the conditional population, never over the whole library.
 /// 3. **A threshold convicts the blot.** With two members in the conditional
 ///    population, *half the sparsest legitimate content* is not available — the
 ///    one legitimate member is the preset being admitted, so deriving from it
@@ -2807,7 +2804,7 @@ struct StructureRow {
 ///    legitimate spread beside it so "with margin" is judgeable rather than
 ///    declared.
 ///
-/// If no candidate passes all three, the plan stops: ADR-0129 gains a dated
+/// If no candidate passes all three, the search stops: ADR-0129 gains a dated
 /// `Outcome` and `fragment_tiledmono` stays held. The report prints that verdict
 /// per candidate rather than leaving it to be read off the rows.
 ///
