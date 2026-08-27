@@ -1,7 +1,8 @@
 # 0122 — Every rate integrates
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-27
+> **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0135](../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) (proposed),
 > [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted, Outcome — the rule this finishes)
