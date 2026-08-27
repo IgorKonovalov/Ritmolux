@@ -305,8 +305,8 @@ impl Phase {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `5c258d0` |
-| 2 — the two rates nothing binds | dev | done | committed with this row |
-| 3 — `swarm`'s field clock | dev | not started | |
+| 2 — the two rates nothing binds | dev | done | `b250d0d` |
+| 3 — `swarm`'s field clock | dev | done | committed with this row |
 | 4 — the guard | dev | not started | |
 | 5 — the swarm content pass | human | not started | |
 
@@ -324,6 +324,23 @@ impl Phase {
   shared clock's only reader in that scene, so the field would be written and never read.
 - Phase 2 also touched `warp_mesh/tests.rs` (the two new `deposit_spin` tests) and
   `presets/README.md`; the latter is named by the phase's last done-when but not in its file list.
+- Phase 3's `drive` / `rate` / `cover`, from `shot --report family=swarm` before and after the
+  correction, the three unaffected family neighbours included as the plan asks. `+` marks a
+  transient lower bound, carried through from the report:
+
+  | preset | binds `spin` | drive | rate | cover |
+  |---|---|---|---|---|
+  | Shatter | `mid`, tau 0.3 | 0.081 → 0.081 | 0.0327+ → 0.0329+ | 0.939 → 0.939 |
+  | Drift | `mid`, tau 1.30 | 0.136 → 0.136 | 0.0166+ → 0.0166+ | 0.954 → 0.954 |
+  | Dense | constant | 0.131 → 0.131 | 0.0199+ → 0.0199+ | 0.852 → 0.852 |
+  | Starfield | constant | 0.068 → 0.068 | 0.0068+ → 0.0068+ | 0.968 → 0.968 |
+  | Storm | gated on `tempo` | 0.110 → 0.110 | 0.0270+ → 0.0270+ | 0.951 → 0.951 |
+
+  `--report` holds one stimulus for every frame it renders, so `spin` is constant across each
+  probe and the integrated and multiplied forms agree there by construction.
+- `swarm`'s `advance` gained the non-finite/negative `dt` guard `fragment_field` and `warp_mesh`
+  carry; the plan does not name it. `field_phase` is the scene's first accumulator, so a bad frame
+  that previously cost only the damping `powf` can now corrupt state permanently.
 - The no-`Add` done-when is recorded here as tried-and-observed rather than as a `compile_fail`
   doctest: `Phase` is `pub(crate)`, so a doctest cannot name it and would fail on privacy instead of
   on arithmetic. Probe: `let _probe = self.fold_phase + self.fold_speed * self.time;` added to
