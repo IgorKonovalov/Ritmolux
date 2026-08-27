@@ -1,6 +1,6 @@
 # 0098 — The figure nests properly
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the shape field gains a scaled-copy coordinate)
@@ -270,3 +270,52 @@ flowchart TD
   reason ADR-0002 has declined it for the project's life.
 - **It does not address the occlusion half of design-backlog 0069.** Nothing here decides what is in
   front of what.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+
+**Lane:** `WORK/lmv-plan-0098` on `plan-0098-nested-figure`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The star's interior stops lying | dev | done | committed with this row |
+| 2 — The coordinate exists, and a polygon proves it | dev | not started | |
+| 3 — The heart and the star take the coordinate | dev | not started | |
+| 4 — `ring` gets an honest answer | dev | not started | |
+| 4b — The figure can turn | dev | not started | |
+| 5 — What it costs at the floor tier | dev | not started | |
+| 6 — The docs learn both coordinates | dev | not started | |
+| 7 — The look gate | human | not started | |
+
+### Notes
+
+- **Phase 1 took the first of the two repairs the phase named — the true reference, not the
+  clamp.** The curved branch divides by the distance from the origin to its own boundary polyline,
+  walked from the **unjittered** edge so the divisor stays a per-draw property of the figure rather
+  than of whichever spike a fragment folded onto. A `max(0, ·)` guard remains for the case the
+  angular fold cannot see: under `star_jitter` the reference is the unjittered figure's while the
+  measurement is the fragment's own spike's. Consequence, stated because it is a look change the
+  byte-identity contract does not cover: a curved star's **exterior** contour spacing moves too,
+  since the divisor moved — `presets/shape_facet.toml` is the shipped preset affected.
+- `no_arm_returns_a_negative_normalized_distance` prints `d(centre)` beside the value the
+  pre-repair reference gave, recovered from the same sample. It is `0.00000` for every
+  configuration except `curve +0.5 jitter 0.3` (`0.076`–`0.085`, positive).
+- `the_curved_star_exterior_is_re_measured`'s recorded table did not move: the arm and the harness
+  divide by the same reference, so it cancels out of the recovered signed distance.
+- **Two pre-existing defects surfaced while building the rendered `gamma` assertion.** Both
+  reproduce with this phase's change reverted **and** on the hardware adapter, so neither is
+  Phase 1's and neither is an adapter artifact:
+  - the palette LUT is sampled with linear filtering and **repeat** addressing, so a coordinate
+    within half a texel of `0` blends the gradient's last texel with its first. On `shape_field`
+    the figure's centre is `d = 0`, and `color_center` defaults to `0` — so every preset on this
+    scene with a non-cyclic palette has a speck of the gradient's far end at the figure's middle.
+  - `atan2(0, 0)` is undefined and the `star` and `polygon` arms fold on it, so a render target
+    whose pixel grid puts a fragment centre exactly on the figure's centre samples one garbage
+    fragment. Even-sized targets do not.
+- Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
+  `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
+  **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is
+  content.

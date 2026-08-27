@@ -57,10 +57,36 @@
 //!   infinite line. The clamp is the whole repair: it is what makes a point
 //!   beyond a vertex measure to the vertex.
 //!
-//! **`star`'s interior stays approximate, knowingly.** It measures against the
-//! edge plane rather than the figure, and the error grows with the point count —
-//! 0.00075 at 3 points, 0.066 at 5, 0.138 at 7, 0.248 at 12. Repairing it would
-//! move every shipped `shape = "3"` mark, so it is recorded rather than fixed.
+//! **`star`'s STRAIGHT-edge interior stays approximate, knowingly.** It measures
+//! against the edge plane rather than the figure, and the error grows with the
+//! point count — 0.00075 at 3 points, 0.066 at 5, 0.138 at 7, 0.248 at 12.
+//! Repairing it would move every shipped `shape = "3"` mark, so it is recorded
+//! rather than fixed.
+//!
+//! # The curved arm's reference was not approximate, it was signed wrong (Plan 0098 Phase 1)
+//!
+//! The same edge-plane perpendicular was also what the **curved / jittered**
+//! branch divided its true distance by, and there it does not merely round off —
+//! it inverts the sign. A perpendicular to a chord is never longer than either
+//! endpoint's radius, so that reference is always **shorter** than the figure's
+//! real deepest-point distance, and `1 + sd/R` at the centre is therefore always
+//! negative: measured `-0.23` to `-0.94` across the five configurations
+//! [design-backlog 0097](../../../../docs/design-backlog.md) reports. On a
+//! particle it only saturates the falloff brighter, which is why it shipped; on
+//! `shape_field` the palette repeat-addresses and it is a hard n-sided hole
+//! through the middle of the figure, and a bound `gamma` makes it a **NaN**
+//! (`pow` of a negative base).
+//!
+//! The repair is the **reference**, not a clamp on the result: that branch now
+//! divides by the distance from the origin to its own boundary polyline, walked
+//! from the **unjittered** edge so the divisor stays a property of the figure
+//! rather than of whichever spike a fragment folded onto. `d` is then exactly
+//! `0` at the centre for every curved configuration, and the interior is a
+//! metric field an author can put contours and a `gamma` on. It **changes what a
+//! curved star's interior and exterior look like** — the divisor moved, so the
+//! contour spacing did too — which the straight branch's byte-identity contract
+//! deliberately does not cover, because nothing shipped evaluates the curved one
+//! on the particle path.
 //!
 //! # What this deliberately is not
 //!
@@ -430,14 +456,16 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         let k = star.x;
         let curve = star.y;
         let jitter = star.z;
-        // The reference inradius: the perpendicular from the origin to the
-        // STRAIGHT, unjittered edge. Held fixed across all three params, so `d`
-        // stays exactly 1 on the outline whatever they do (the signed distance
-        // is 0 there either way) and the neutral configuration is bit-for-bit
-        // the arithmetic that shipped.
-        let b = (1.0 - k * cos(h)) / (k * sin(h));
-
         if (curve == 0.0 && jitter == 0.0) {
+            // The straight edge's plane, written as `x + b*y = 1`. Its
+            // perpendicular from the origin is what this branch normalizes by,
+            // and it is an APPROXIMATION of the figure's inradius rather than
+            // the thing itself — the perpendicular foot usually falls past the
+            // valley, so the true deepest-point distance is the valley's own
+            // radius. It stays because every shipped `shape = "3"` mark is this
+            // arithmetic; the curved branch below, which nothing shipped
+            // evaluates yet, takes the true one (Plan 0098 Phase 1).
+            let b = (1.0 - k * cos(h)) / (k * sin(h));
             // The straight-edge closed form. Writing the edge's plane as n.p = c
             // and dividing through by c leaves one multiply-add: the
             // normalization's 1/R and the normal's length cancel.
@@ -485,15 +513,29 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
         // straight-edged star provably cannot make at any valley radius — and
         // negative bows it out.
         let ctrl = 0.5 * (tip + valley) * (1.0 - curve);
+        // The UNJITTERED edge, walked alongside the real one. It is what the
+        // normalization divides by: an inradius is a property of the figure, so
+        // it must not depend on which spike a fragment folded onto, or the field
+        // would step across every spike seam (Plan 0098 Phase 1).
+        let tip0 = vec2<f32>(1.0, 0.0);
+        let ctrl0 = 0.5 * (tip0 + valley) * (1.0 - curve);
         let u = vec2<f32>(cos(f), sin(f));
         let q = r * u;
         var nearest = 1e9;
+        // The figure's OWN deepest-point distance, measured the same way from
+        // the origin. **The straight branch's `b` reference cannot serve here**:
+        // it is the perpendicular to the edge LINE, and a perpendicular to a
+        // chord is never longer than either endpoint's radius, so it is always
+        // SHORTER than this — which drove `d` negative at the centre for every
+        // configuration (design-backlog 0097).
+        var inradius = 1e9;
         // Where the ray from the origin along `u` crosses the boundary. The
         // region is star-shaped about the origin, so exactly one sub-segment
         // spans this angle, and comparing radii is the inside test — found in
         // the same loop as the distance rather than in a second pass.
         var boundary_r = 0.0;
         var prev = tip;
+        var prev0 = tip0;
         for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
             let t = f32(i) / f32(MARK_STAR_SEGMENTS);
             let s = 1.0 - t;
@@ -502,6 +544,14 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
             let w = q - prev;
             let along = clamp(dot(w, e) / max(dot(e, e), 1e-12), 0.0, 1.0);
             nearest = min(nearest, length(w - along * e));
+            // ...and the same point-to-segment measurement, from the origin to
+            // the unjittered edge. At `jitter == 0` the two polylines are the
+            // same expressions, so this is `nearest` evaluated at the origin —
+            // which is what makes `d` there exactly 0 rather than nearly 0.
+            let cur0 = s * s * tip0 + 2.0 * s * t * ctrl0 + t * t * valley;
+            let e0 = cur0 - prev0;
+            let along0 = clamp(dot(-prev0, e0) / max(dot(e0, e0), 1e-12), 0.0, 1.0);
+            inradius = min(inradius, length(-prev0 - along0 * e0));
             let denom = u.x * e.y - u.y * e.x;
             if (abs(denom) > 1e-9) {
                 let ts = -(u.x * prev.y - u.y * prev.x) / denom;
@@ -510,10 +560,15 @@ fn mark_distance(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) -> f32 
                 }
             }
             prev = cur;
+            prev0 = cur0;
         }
-        let inradius = inverseSqrt(1.0 + b * b);
         let sd = select(nearest, -nearest, r < boundary_r);
-        return 1.0 + sd / inradius;
+        // The `max` is a guard, not the repair. Under `star_jitter` the angular
+        // fold measures against the fragment's OWN spike while the reference is
+        // the unjittered figure's, so a spike with a longer tip can read a hair
+        // past its own centre. Everything outside the outline is >= 1 and never
+        // reaches it.
+        return max(0.0, 1.0 + sd / inradius);
     }
     // heart: recentred and scaled into the sprite quad. The scale cancels out of
     // 1 + sd/R, so the inradius below is the unscaled figure's.
