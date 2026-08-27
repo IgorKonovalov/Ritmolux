@@ -971,26 +971,14 @@ pub(super) const SPIN_RATE: f32 = 0.18;
 /// `spin`'s default: exactly today's rate.
 pub(super) const DEFAULT_SPIN: f32 = 1.0;
 
-/// One frame's contribution to the integrated spin, in **spin-scaled seconds**.
-///
-/// **The phase is integrated, and that is not a preference.** Computing it as
-/// `time · spin · SPIN_RATE` would let a `spin` bound to audio retroactively
-/// rescale *all* elapsed time on every frame: the figure would snap to a new
-/// angle whenever the binding moved, jerking rather than accelerating. A rate
-/// multiplier has to be integrated to be a rate at all.
-pub(super) fn advance_spin(spin_time: f32, spin: f32, dt: f32) -> f32 {
-    spin_time + spin * dt
-}
-
 /// The rotation angle, in radians, for an accumulated spin-time.
 ///
-/// **The multiply by [`SPIN_RATE`] is deferred to here rather than folded into
-/// [`advance_spin`], and the reason is arithmetic rather than taste.** At the
-/// default `spin = 1` the accumulator is then `Σ dt` term for term — bit-for-bit
-/// the same summation the renderer performs for its own clock — so `spin = 1`
-/// reproduces the pre-ADR-0076 `time * SPIN_RATE` *exactly*, and no golden
-/// baseline moves. Folding the rate in would sum `0.18 · dt` instead and drift
-/// in the last bits of every capture.
+/// The spin itself is accumulated by [`Phase`](crate::render::scenes::Phase),
+/// which every bindable rate in this engine advances through; **the multiply by
+/// [`SPIN_RATE`] is deferred to here rather than folded into that accumulation**,
+/// for the arithmetic reason the type's own header records: at the default
+/// `spin = 1` the accumulator is `Σ dt` term for term, so `spin = 1` reproduces
+/// the pre-ADR-0076 `time * SPIN_RATE` *exactly* and no golden baseline moves.
 pub(super) fn spin_phase(spin_time: f32) -> f32 {
     spin_time * SPIN_RATE
 }
