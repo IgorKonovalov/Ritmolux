@@ -287,7 +287,7 @@ flowchart TD
 | 4 — `ring` gets an honest answer | dev | done | `4257596` |
 | 4b — The figure can turn | dev | done | `01f3775` |
 | 5 — What it costs at the floor tier | dev | done | `255f386` |
-| 6 — The docs learn both coordinates | dev | done | committed with this row |
+| 6 — The docs learn both coordinates | dev | done | `de1df96` |
 | 7 — The look gate | human | not started | |
 
 ### Notes
@@ -331,17 +331,11 @@ flowchart TD
   particle scenes never call `mark_boundary_radius`.
 - `mark_boundary_radius` takes the point `p` rather than the diagram's `theta` and folds the angle
   itself, which is `mark_distance`'s own signature and keeps the two arms reading one fold.
-- The `disc` renders **0 of 40000 pixels** different between the two modes, which is the harness
-  check ADR-0111 predicts rather than a tolerance that happened to hold.
 - **Phase 3: the straight-edge `star`'s interior behaves like the regular polygon's** — both modes
   read `0.00000` deviation from a scaled copy at interior levels, because that branch returns the
   distance to the edge *plane*, which is linear in `p` and therefore has scaled-copy level sets.
   The arms separate outside the outline (`0.03`–`0.06`), and the **curved** star separates
   everywhere (`0.12`–`0.20`) because that branch computes a true distance.
-- The `heart` is where the plan's property lands as stated: over nine rings its distance-mode
-  deviation from a scaled copy runs `0.02286` at the outermost to `0.55202` at the innermost — it
-  **grows** inward, which is the notch filling in — while the radius mode reads `0.00000` at every
-  ring.
 - `mark_boundary_radius` is exact against the numerically sampled outline for every closed-form
   arm (`0.00000`, heart `0.00001` at the polyline's own resolution). The curved/jittered star
   carries `0.00472`, which is the 8-segment Bezier polyline's sagitta — the same residual
@@ -366,9 +360,6 @@ flowchart TD
   240 px frame: the figure's centre stays within 4 px of its unrotated position across four angles,
   where an orbit would move it 60 px. Radians, unclamped, non-finite falls back to the identity;
   `0` skips `cos`/`sin` entirely.
-- The shear check reads 12x12 px of extent at both `0` and a quarter turn on a 2:1 target, with
-  `frame_diff` `0.00071` between them against `0.19106` at an eighth turn — the eighth is the
-  control that the parameter reached the shader at all.
 - **Phase 5 added `core/tests/field_cost.rs`**, on the `mark_cost.rs` / `arc_cost.rs` precedent —
   the phase's file list says "none necessarily", and a measurement in a commit message is not
   re-runnable. `docs/nfr.md` did not move.
@@ -394,7 +385,23 @@ flowchart TD
   the **DO NOT BIND `gamma`** warning, the `gamma` row's "unusable on a curved or jittered star",
   and the `star_curve` bullet. They now record that the defect is fixed and that a `color_span`
   tuned against the old reference is out by roughly 1.1x-1.9x.
-- Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
-  `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
-  **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is
-  content.
+- Noticed and not acted on: `presets/shape_facet.toml` pins `gamma = "1.0"` and its header
+  explains the pin by design-backlog 0097, which Phase 1 closed. The pin is now unnecessary rather
+  than load-bearing, and the preset also carries a `color_span` tuned against the old reference.
+  No `.toml` was touched by this plan — that is `preset-author`'s lane and Phase 7's question.
+
+### Close triggers
+
+- **`presets/` touched:** yes — `presets/README.md` only. **No `.toml`**, so the shipped preset set
+  is unchanged and nothing was embedded or removed.
+- **Plan header `Closes:`** design-backlog 0096, design-backlog 0097.
+- **What shipped:** feature (one fix — Phase 1 — plus a new preset-facing parameter surface:
+  `coord_mode` and `rotation` on `shape_field`, a new load warning, and a new cost test).
+- **Operator docs touched:** `presets/README.md`, `docs/preset-palettes.md`. `docs/nfr.md` not
+  touched — Phase 5 measured no budget movement.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit `0`. Four entries print a
+  stamped-before-touch staleness notice because this plan edited files their probes name: `0096`
+  and `0097` (`shape_field.rs`, `marks.rs`) — the two this plan closes — plus `0128` and `0133`
+  (`schema.rs`, from Phase 4's warning). No probe failed.
+- **Outstanding `human` phases:** Phase 7, the look gate. It gates nothing below it, and the plan
+  says it may carry forward to `docs/content-brief.md`.
