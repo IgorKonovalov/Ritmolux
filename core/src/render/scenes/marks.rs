@@ -620,10 +620,88 @@ fn mark_boundary_radius(p: vec2<f32>, shape: f32, points: f32, star: vec3<f32>) 
         let f = a - seg * floor(a / seg) - h;
         return cos(h) / cos(f);
     }
-    // star and heart: Plan 0098 Phase 3. Both admit a closed form and neither is
-    // one line, so they land together with the tests that grade them against the
-    // numerically sampled outline.
-    return 1.0;
+    if (shape < 3.5) {
+        // star: a ray against the tip-valley edge the angular fold has already
+        // selected — the SAME fold `mark_distance` computes, so the two arms
+        // describe one outline rather than two.
+        let seg = MARK_TAU / points;
+        let h = 0.5 * seg;
+        let a = atan2(p.y, p.x);
+        let spike = floor((a + h) / seg);
+        let f = abs(a - seg * spike);
+        let k = star.x;
+        let curve = star.y;
+        let jitter = star.z;
+
+        if (curve == 0.0 && jitter == 0.0) {
+            // Solve the straight branch's own `r cos(f) + r sin(f) * B = 1`.
+            // The denominator cannot vanish: `f` is folded into `[0, h]`, so
+            // `cos(f) > 0`, and `B > 0` for every valley radius in range.
+            let b = (1.0 - k * cos(h)) / (k * sin(h));
+            return 1.0 / (cos(f) + b * sin(f));
+        }
+
+        // Curved and/or jittered: the boundary is the sampled Bezier, so this is
+        // the ray-versus-sub-segment crossing `mark_distance` already finds in
+        // its own loop. Only the crossing is computed here — no distance — which
+        // is what keeps this arm cheaper than the one beside it.
+        let n = max(points, 1.0);
+        let index = u32(max(spike - floor(spike / n) * n, 0.0));
+        let rt = 1.0 + jitter * (mark_spike_hash01(index) * 2.0 - 1.0);
+        let tip = vec2<f32>(rt, 0.0);
+        let valley = vec2<f32>(k * cos(h), k * sin(h));
+        let ctrl = 0.5 * (tip + valley) * (1.0 - curve);
+        let u = vec2<f32>(cos(f), sin(f));
+        var boundary_r = 0.0;
+        var prev = tip;
+        for (var i = 1; i <= MARK_STAR_SEGMENTS; i = i + 1) {
+            let t = f32(i) / f32(MARK_STAR_SEGMENTS);
+            let s = 1.0 - t;
+            let cur = s * s * tip + 2.0 * s * t * ctrl + t * t * valley;
+            let e = cur - prev;
+            let denom = u.x * e.y - u.y * e.x;
+            if (abs(denom) > 1e-9) {
+                let ts = -(u.x * prev.y - u.y * prev.x) / denom;
+                if (ts >= 0.0 && ts <= 1.0) {
+                    boundary_r = dot(prev + ts * e, u);
+                }
+            }
+            prev = cur;
+        }
+        return boundary_r;
+    }
+
+    // heart: a ray from the FIGURE's centre, which in heart space is
+    // `(0, MARK_HEART_CY)` rather than the origin — the sprite frame is the
+    // heart recentred, and `r / r_boundary` is measured about the figure's own
+    // middle. The map is a uniform scale plus a translation, so a direction is
+    // the same vector in both frames and only the radius needs dividing back.
+    //
+    // The outline is IQ's two pieces and this takes the SAME branch his distance
+    // does: the lobe circle above the diagonal, the 45-degree tangent ray below
+    // it. Mirrored to the right half first, since the figure is symmetric and
+    // the boundary radius is too.
+    let dir = normalize(vec2<f32>(abs(p.x), p.y) + vec2<f32>(1e-20, 0.0));
+    let centre = vec2<f32>(0.0, MARK_HEART_CY);
+    // Ray versus the right lobe. The figure's centre lies INSIDE that circle
+    // (0.319 from it against a radius of 0.354), so the crossing is the single
+    // positive root and no branch is needed to pick it.
+    let w = centre - vec2<f32>(0.25, 0.75);
+    let b_half = dot(dir, w);
+    let disc = max(b_half * b_half - dot(w, w) + MARK_HEART_LOBE_R * MARK_HEART_LOBE_R, 0.0);
+    let t_lobe = -b_half + sqrt(disc);
+    let hit = centre + t_lobe * dir;
+    if (hit.x + hit.y >= 1.0) {
+        // On the lobe's outer arc, which is where IQ's own branch sends it.
+        return t_lobe / MARK_HEART_SCALE;
+    }
+    // Below the diagonal: the boundary is the ray `y = x` from the origin out to
+    // the tangent point, so solve `centre + t*dir = s*(1, 1)`.
+    let denom = dir.x - dir.y;
+    if (abs(denom) < 1e-9) {
+        return t_lobe / MARK_HEART_SCALE;
+    }
+    return (MARK_HEART_CY / denom) / MARK_HEART_SCALE;
 }
 "#;
 

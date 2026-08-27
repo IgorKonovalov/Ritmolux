@@ -949,12 +949,23 @@ gamma         = "1.0"      # spacing only; it no longer decides notch sharpness
 > `r`. A preset that switches modes has to re-tune its span, and nothing warns.
 
 **`"0"` is the default and it is bit-for-bit the arithmetic that shipped**, so no
-existing preset moves. On a `disc` the two modes are the same picture by
-construction — its offsets and its scaled copies are the same circles — and on a
-**regular polygon** they are the same picture *inside* the figure too, since
-eroding a regular polygon moves every edge in by the same amount and rounds
-nothing. The two separate outside it, and on any shape with a reflex corner they
-separate everywhere.
+existing preset moves.
+
+**Which arms the mode actually changes**, measured as how far a contour deviates
+from a scaled copy of the outline (0 means it *is* one):
+
+| shape | inside the figure | outside it |
+|---|---|---|
+| `disc` | identical — its offsets and its scaled copies are the same circles | identical |
+| `polygon` | identical: eroding a **regular** polygon moves every edge in by the same amount, and erosion rounds only **reflex** corners | **differs** — outside, the distance rounds each vertex into an arc |
+| `star`, straight edge | identical, for the same reason | **differs**, `0.03`..`0.06` |
+| `star`, `star_curve` or `star_jitter` non-zero | **differs**, `0.12`..`0.20` | **differs** |
+| `heart` | **differs, and it is the whole point** — `0.02` at the outermost of nine rings and `0.55` at the innermost | **differs** |
+
+The heart row is the one to read. Its deviation under `"0"` **grows** as the
+rings move inward — that is the notch filling in, ring by ring — and under `"1"`
+it is `0.00000` at every ring. The `disc` is the control: an engine that drew
+those two differently would be broken.
 
 **There is no rotation on this scene**, and `kaleido_*` is not a substitute — it folds the finished
 frame about a screen-centred axis rather than turning the figure about its own, and it fights a
