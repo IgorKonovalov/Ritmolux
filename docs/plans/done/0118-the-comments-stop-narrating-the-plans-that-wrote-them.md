@@ -1,12 +1,12 @@
 # 0118 — the comments stop narrating the plans that wrote them
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+> **Related ADRs:** [ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
 > (proposed, and this plan is what accepts it),
-> [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
-> **Supersedes:** [design-backlog 0129](../design-backlog.md), which proposed guarding the links
+> [ADR-0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
+> **Supersedes:** [design-backlog 0129](../../design-backlog.md), which proposed guarding the links
 > this plan deletes
 
 ## TL;DR
@@ -395,3 +395,21 @@ after, compared against a detached worktree at `8848a12` rather than by recollec
   0129's own text says "**This entry closes when that plan closes**". The pre-push hook stops there
   until it does.
 - **Outstanding `human` phases:** none.
+
+### Close (2026-08-27)
+
+**Mode 4: no blockers, no majors, five minors, one nit.** Phases 1-7 landed at `37868d4`, `6ae4245`
+(+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, with the prior review's two
+majors repaired at `807b6ef`.
+
+Verified at the close rather than taken from the log: the diff over `37868d4^..HEAD` contains **no
+non-comment Rust line** outside the fixture, so "changes no behaviour" is mechanical rather than
+asserted; all **115 ADR** and **101 plan** bare numbers cited across the workspace's `.rs` files
+resolve to real documents, which is Phase 3's done-when and is gated by nothing; the fixture bite
+check exits 1 with exactly one finding per class; the corrected `tonemap.rs` citation is right —
+ADR-0046's Consequences carry the WARP pipeline-count sensitivity in the same words; and the
+deletion rule holds where it was probed — `tier.rs`'s deleted collage cost ladder is the *second*
+copy of a measurement that lives in `core/tests/collage_cost.rs`, which is the file the reading was
+taken in.
+
+Version **0.84.0** (minor — the plan arms a new gate at pre-push and in CI).
