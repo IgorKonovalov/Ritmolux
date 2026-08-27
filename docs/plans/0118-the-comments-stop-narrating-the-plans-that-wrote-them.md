@@ -251,7 +251,7 @@ flowchart TB
 | 1 — the gate exists, and it only reports | dev | done | `37868d4` |
 | 2 — the rule lands where authors read it | dev | done | `6ae4245` |
 | 3 — the 89 links go | dev | done | `0003f42` |
-| 4 — the 252 narration lines go | dev | done | committed with this row |
-| 5 — the gate is armed | dev | | |
+| 4 — the 252 narration lines go | dev | done | `add5710` |
+| 5 — the gate is armed | dev | done | committed with this row |
 | 6 — the long blocks come down, outside the contended trees | dev | | |
 | 7 — the long blocks come down, inside the contended trees | dev | | |

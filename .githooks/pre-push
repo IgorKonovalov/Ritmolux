@@ -51,7 +51,7 @@ run_step() {
     "$@" || fail "$label"
 }
 
-echo "pre-push: running the fast subset (doc links, backlog claims, sd-filter, fmt, clippy, tests)"
+echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, sd-filter, fmt, clippy, tests)"
 
 # Cheapest check first, so the cheapest failure is the fastest one. ~50 ms, which
 # is why it fits a gate ADR-0033 Alternative F otherwise keeps to the fast subset:
@@ -83,6 +83,15 @@ echo "pre-push: running the fast subset (doc links, backlog claims, sd-filter, f
 # duplicates do not EXIST rather than that they agree, because the copy that broke
 # it was the one outside the list anyone was checking.
 #
+# The comment-hygiene gate rides it too (Plan 0118 Phase 5, ADR-0127). It rejects
+# a relative link in a `.rs` comment and plan-relative narration - the two rot
+# classes a script can judge. The links are the reason it is here rather than in
+# the close ceremony alone: `check-doc-links.mjs` walks `.md` only, so eleven `.rs`
+# links were broken on main with every gate green, and they break at exactly the
+# moment a plan moves into docs/plans/done/. Same cost class as the three beside
+# it. It says nothing about how LONG a comment is - that judgement is the Mode 4
+# review's, per ADR-0127.
+#
 # The index-row gate rides it too (Plan 0105 Phase 5, ADR-0116). It holds every
 # row inside a marked roster region to 320 bytes, because the three index files
 # had grown rows that summarize the documents they point at — docs/adrs/README.md
@@ -97,8 +106,9 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
     run_step "node scripts/check-backlog-claims.mjs" node scripts/check-backlog-claims.mjs
     run_step "node scripts/check-filter-figures.mjs" node scripts/check-filter-figures.mjs
+    run_step "node scripts/check-comment-hygiene.mjs" node scripts/check-comment-hygiene.mjs
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim and filter-figure checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure and comment-hygiene checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in
