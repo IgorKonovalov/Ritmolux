@@ -395,14 +395,21 @@ flowchart TD
   fixed at the same four boundaries. The alternative — raising it to `0.85` to restore the old
   corner density — was rendered and rejected as a busier figure (seven boundaries inside instead of
   four). The surround consequently carries ~20 rings to the corner where it carried ~41.
-- Still noticed and not acted on: `presets/shape_facet.toml` pins `gamma = "1.0"` and its header
-  explains the pin by design-backlog 0097, which Phase 1 closed. The pin is now unnecessary rather
-  than load-bearing, and the preset also carries a `color_span` tuned against the old reference.
+- **`presets/shape_facet.toml` was re-scaled too** (`82a3211`), and it is the one shipped preset
+  Phase 1 changed without anyone touching it: it is the only world on the curved `star` arm. Its
+  reference moved `0.16253` to `0.20000` (x1.2306), which dropped the frame corner from band `19.7`
+  to `16.6` — the graded ground stopped reaching its dark end. `color_span` `0.04234` to `0.05210`
+  and `color_center` `0.01125` to `0.00149` restore the mapping exactly while preserving the
+  header's own invariant (`color_center + color_span` = 3/56, band 3's boundary on `d = 1`).
+  Measured head to head: `anim` `0.019` to `0.020`, `cover` `0.818` to `0.826`, bands and gates
+  unchanged. Its header's notes 1-3 are corrected; note 3 had said a bound `gamma` is unsafe on a
+  curved star "until Plan 0098 Phase 1 lands".
 
 ### Close triggers
 
-- **`presets/` touched:** yes — `presets/README.md`, and `presets/shape_pulse.toml` re-authored at
-  Phase 7 (`30b2bce`). Nothing embedded or removed: the shipped set is the same files.
+- **`presets/` touched:** yes — `presets/README.md`; `presets/shape_pulse.toml` re-authored at
+  Phase 7 (`30b2bce`); `presets/shape_facet.toml` re-scaled onto Phase 1's repaired star reference
+  (`82a3211`). Nothing embedded or removed: the shipped set is the same files.
 - **Plan header `Closes:`** design-backlog 0096, design-backlog 0097.
 - **What shipped:** feature (one fix — Phase 1 — plus a new preset-facing parameter surface:
   `coord_mode` and `rotation` on `shape_field`, a new load warning, and a new cost test).
