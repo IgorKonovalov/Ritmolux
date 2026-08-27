@@ -957,6 +957,7 @@ from a scaled copy of the outline (0 means it *is* one):
 | shape | inside the figure | outside it |
 |---|---|---|
 | `disc` | identical — its offsets and its scaled copies are the same circles | identical |
+| `ring` | **not available** — `"1"` is refused, with a load warning, and the distance is drawn. See below | not available |
 | `polygon` | identical: eroding a **regular** polygon moves every edge in by the same amount, and erosion rounds only **reflex** corners | **differs** — outside, the distance rounds each vertex into an arc |
 | `star`, straight edge | identical, for the same reason | **differs**, `0.03`..`0.06` |
 | `star`, `star_curve` or `star_jitter` non-zero | **differs**, `0.12`..`0.20` | **differs** |
@@ -966,6 +967,27 @@ The heart row is the one to read. Its deviation under `"0"` **grows** as the
 rings move inward — that is the notch filling in, ring by ring — and under `"1"`
 it is `0.00000` at every ring. The `disc` is the control: an engine that drew
 those two differently would be broken.
+
+> **`coord_mode = "1"` DOES NOTHING ON A `ring`, and it tells you so.** An
+> annulus's centre lies in its **hole**, so a ray from there crosses the outline
+> twice and `r / r_boundary` has no single value. The scene draws the distance
+> instead and warns at load:
+>
+> ```text
+> parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in its
+> hole, so a ray from there crosses the outline twice and the scaled-copy
+> coordinate has no single value. The figure is drawn with the distance instead.
+> ```
+>
+> The alternative was to define the boundary as the **outer rim**, and it was
+> rendered before being rejected: the coordinate then collapses to `length(p)`
+> and the ring comes out **byte-identical to a `disc`** — the hole simply stops
+> existing. Naming one shape and being shown another is worse than being told
+> no.
+>
+> The warning only fires on a `shape` that **rests** at `ring`. A binding that
+> animates through it rests nowhere, so nothing warns; the fallback still
+> applies, frame by frame.
 
 **There is no rotation on this scene**, and `kaleido_*` is not a substitute — it folds the finished
 frame about a screen-centred axis rather than turning the figure about its own, and it fights a

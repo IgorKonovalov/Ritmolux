@@ -2323,3 +2323,108 @@ thickness = "2.0 + clamp(bass * 0.9, 0, 0.8)"
         );
     }
 }
+
+/// Plan 0098 Phase 4, closing [ADR-0111]'s one open behavioural choice: a
+/// `ring` **resting** on the scaled-copy coordinate warns, in ADR-0020's shape
+/// and on the `thickness` dead-zone surface above.
+///
+/// An annulus is the single arm of the roster that is not star-shaped about its
+/// own centre — that centre lies in the hole, so a ray from it crosses the
+/// outline twice and `r / r_boundary` has no value there. The scene draws the
+/// distance instead, and this is what stops that from being silent.
+///
+/// The three defensible answers were rendered before one was chosen. The one
+/// that had to be seen is the outer-rim definition: it makes a `ring` come out
+/// **byte-identical to a `disc`**, because the coordinate collapses to
+/// `length(p)` and the hole stops existing — a preset naming one roster entry
+/// and being shown another, which is exactly the negative ADR-0111 predicted.
+/// The silent fallback renders the same pixels this does and differs only in
+/// whether anyone is told, which is ADR-0020's whole argument.
+///
+/// [ADR-0111]: ../../docs/adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md
+#[test]
+fn a_ring_resting_on_the_scaled_copy_coordinate_warns() {
+    let src = r#"
+system = "shape_field"
+name = "Annulus"
+
+[params]
+shape      = "1"
+coord_mode = "1"
+"#;
+    let preset = Preset::from_toml_str(src).expect("the combination still loads");
+    assert_eq!(
+        preset.warnings.len(),
+        1,
+        "one refused combination, one warning, got {:?}",
+        preset.warnings
+    );
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("coord_mode") && warning.contains("ring"),
+        "the warning names the parameter and the arm: {warning}"
+    );
+    assert!(
+        warning.contains("distance"),
+        "...and says what is drawn instead, which is the half an author acts on: {warning}"
+    );
+
+    // The binding survives — a warning must not silently drop what it warns
+    // about (ADR-0020).
+    assert!(
+        preset.params.iter().any(|b| b.name == "coord_mode"),
+        "the binding is kept"
+    );
+}
+
+/// The same check is silent on every combination that is not refused: the
+/// distance mode on a ring, the radius mode on an arm that has one, and a
+/// system with no `coord_mode` at all.
+///
+/// The last row is the one that keeps this honest — like the `thickness`
+/// dead-zone check, only a binding that **rests** on the combination can be seen
+/// from the load path, and a `shape` that animates through `ring` cannot. That
+/// is a stated limit rather than an oversight: the alternative is warning about
+/// a figure the preset may never draw.
+#[test]
+fn the_ring_coordinate_warning_is_silent_on_everything_else() {
+    let cases: [(&str, &str); 4] = [
+        (
+            "a ring on the distance",
+            "system = \"shape_field\"\nname = \"a\"\n[params]\nshape = \"1\"\ncoord_mode = \"0\"\n",
+        ),
+        (
+            "a heart on the radius",
+            "system = \"shape_field\"\nname = \"b\"\n[params]\nshape = \"4\"\ncoord_mode = \"1\"\n",
+        ),
+        (
+            "a ring with no mode bound",
+            "system = \"shape_field\"\nname = \"c\"\n[params]\nshape = \"1\"\n",
+        ),
+        (
+            "a system with no coord_mode",
+            "system = \"swarm\"\nname = \"d\"\n[params]\nshape = \"1\"\n",
+        ),
+    ];
+    for (label, src) in cases {
+        let preset = Preset::from_toml_str(src).unwrap_or_else(|e| panic!("{label}: {e}"));
+        assert!(
+            !preset.warnings.iter().any(|w| w.contains("coord_mode")),
+            "{label} must not warn: {:?}",
+            preset.warnings
+        );
+    }
+
+    // Animated through the refused combination: it rests nowhere, so the load
+    // path cannot see it and does not guess.
+    let animated = Preset::from_toml_str(
+        "system = \"shape_field\"\nname = \"e\"\n\
+         [params]\nshape = \"1 + floor(bass * 3)\"\ncoord_mode = \"1\"\n",
+    )
+    .expect("an animated shape loads");
+    assert!(
+        !animated.warnings.iter().any(|w| w.contains("coord_mode")),
+        "an animated `shape` rests nowhere, so this check stays quiet: {:?}",
+        animated.warnings
+    );
+}
