@@ -101,6 +101,17 @@ const MAX_SCALE: f32 = 20.0;
 /// Shared view transform (ADR-0018): `pan_*` moves the figure's centre.
 const DEFAULT_PAN: f32 = 0.0;
 
+/// `rotation` default — **0, and an exact arithmetic identity**: the shader
+/// tests for it and skips the rotation entirely, so every shipped preset and
+/// every golden baseline stays on the arithmetic it has today.
+///
+/// Radians, matching `lines/star.rs` and `lines/lsystem.rs` — the two other
+/// figure-drawing scenes that carry this name. Unclamped for the same reason
+/// they are: an angle wraps, so there is no end of the useful range to hold it
+/// inside; a non-finite binding falls back to the identity because `cos(NaN)`
+/// would take the whole frame with it.
+const DEFAULT_ROTATION: f32 = 0.0;
+
 /// `gamma` default — **the identity**, and it is exactly `1.0` on the way to the
 /// uniform because the shader's identity branch tests for it (`pow(x, 1.0)` is
 /// not bit-exact, ADR-0092's care).
@@ -150,7 +161,8 @@ struct Params {
     c: vec4<f32>,
     // x: occlude (ADR-0085), y: gamma (the response exponent on the distance,
     // exactly 1.0 for the identity), z: coord_mode (quantized CPU-side; 0 = the
-    // distance, 1 = the scaled-copy radius), w: reserved.
+    // distance, 1 = the scaled-copy radius), w: rotation in radians, exactly 0.0
+    // for the identity.
     d: vec4<f32>,
     // xyz: the star arm's shape params (valley, curve, jitter), conditioned
     // CPU-side. Inert on every other silhouette.
@@ -222,6 +234,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_contour = params.c.w;
     let gamma = params.d.y;
     let coord_mode = params.d.z;
+    let rotation = params.d.w;
     let star = params.e.xyz;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
@@ -231,7 +244,32 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     uv.x = uv.x * aspect;
 
     // The figure's own frame: `pan` moves its centre, `scale` sets its size.
-    let p = (uv - pan) / scale;
+    //
+    // **`rotation` is applied AFTER the pan, and that is a choice.** Turning the
+    // sample point before subtracting `pan` would swing the figure around the
+    // frame's centre — an orbit — and turning it after swings it about its own.
+    // Both are defensible and they look completely different; this scene draws
+    // ONE figure, and a figure that spins in place is what `rotation` means on
+    // `lines/star.rs` and `lines/lsystem.rs` too.
+    //
+    // It is done in `uv`, which is already SQUARE units (ADR-0037): x has been
+    // stretched by the render target's aspect, so one unit is the same length on
+    // both axes and this is a rotation. In raw NDC the same two lines would
+    // SHEAR — invisible at 16:9, where the stretch is nearly 1, and obvious at
+    // 2:1. `tests` renders a square at 2:1 and turns it a quarter turn.
+    //
+    // A branch rather than an unconditional multiply, so 0 is an exact identity
+    // and no shipped preset moves through `cos`/`sin` (ADR-0092's care, the same
+    // reason `gamma` has one).
+    var q = uv - pan;
+    if (rotation != 0.0) {
+        let cr = cos(rotation);
+        let sr = sin(rotation);
+        // The INVERSE rotation on the sample point, so a positive `rotation`
+        // turns the figure counter-clockwise on screen rather than the frame.
+        q = vec2<f32>(cr * q.x + sr * q.y, cr * q.y - sr * q.x);
+    }
+    let p = q / scale;
 
     // THE substitution this scene exists for: the palette coordinate is a
     // FIGURE coordinate rather than a level. Both modes are 0 at the figure's
@@ -329,6 +367,9 @@ pub struct ShapeFieldScene {
     /// [`applied_coord_mode`] quantizes it on the way to the uniform, which is
     /// where a selector's precondition belongs.
     coord_mode: f32,
+    /// The figure's own turn, in radians, raw as the preset bound it. Applied
+    /// about the figure's centre rather than the frame's — see the shader.
+    rotation: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame — **not** a named param, so
     /// it is not reset by `reset_params`.
@@ -439,6 +480,7 @@ impl ShapeFieldScene {
             palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             gamma: DEFAULT_GAMMA,
             coord_mode: DEFAULT_COORD_MODE,
+            rotation: DEFAULT_ROTATION,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -456,6 +498,21 @@ fn applied_scale(scale: f32) -> f32 {
         scale.clamp(MIN_SCALE, MAX_SCALE)
     } else {
         DEFAULT_SCALE
+    }
+}
+
+/// The `rotation` the shader is handed: passed through, with a non-finite
+/// binding falling back to the identity.
+///
+/// No clamp, because an angle wraps and there is no end of the range to hold it
+/// inside — the same treatment `lines/star.rs` gives the name. The finiteness
+/// guard is not decoration: `cos(NaN)` is `NaN`, and one `NaN` in the figure's
+/// own frame takes every pixel of the frame with it.
+fn applied_rotation(rotation: f32) -> f32 {
+    if rotation.is_finite() {
+        rotation
+    } else {
+        DEFAULT_ROTATION
     }
 }
 
@@ -546,6 +603,7 @@ pub const PARAMS: &[&str] = &[
     "palette_contour",
     "gamma",
     "coord_mode",
+    "rotation",
 ];
 
 impl Scene for ShapeFieldScene {
@@ -579,6 +637,7 @@ impl Scene for ShapeFieldScene {
         self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.gamma = DEFAULT_GAMMA;
         self.coord_mode = DEFAULT_COORD_MODE;
+        self.rotation = DEFAULT_ROTATION;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -599,6 +658,7 @@ impl Scene for ShapeFieldScene {
             "palette_contour" => self.palette_contour = value,
             "gamma" => self.gamma = value,
             "coord_mode" => self.coord_mode = value,
+            "rotation" => self.rotation = value,
             _ => {}
         }
     }
@@ -645,7 +705,7 @@ impl Scene for ShapeFieldScene {
                 self.occlude,
                 applied_gamma(self.gamma),
                 applied_coord_mode(self.coord_mode, shape),
-                0.0,
+                applied_rotation(self.rotation),
             ],
             e: [
                 marks::star_valley(self.star_valley),

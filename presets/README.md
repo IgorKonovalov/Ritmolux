@@ -321,7 +321,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` `coord_mode` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` `coord_mode` `rotation` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
@@ -904,6 +904,7 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params-plan-0091-phase-5). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
+| `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
 | `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20`. **Unusable on a curved or jittered star — see the warning below** |
 | `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 
@@ -989,10 +990,22 @@ those two differently would be broken.
 > animates through it rests nowhere, so nothing warns; the fallback still
 > applies, frame by frame.
 
-**There is no rotation on this scene**, and `kaleido_*` is not a substitute — it folds the finished
-frame about a screen-centred axis rather than turning the figure about its own, and it fights a
-translating `pan_*`. A turning figure is [Plan 0098](../docs/plans/0098-the-figure-nests-properly.md)
-Phase 4b.
+**`rotation` turns the figure about its own centre — and `kaleido_*` is not the same thing.** The
+screen-space fold folds the *finished frame* about a screen-centred axis; it does not turn the
+figure, it multiplies it, and it fights a translating `pan_*` (a panned figure comes out
+decentred in the rosette). If you want the figure to turn, reach for `rotation`.
+
+```toml
+[params]
+pan_x    = "0.35"
+rotation = "time * 0.4"      # a slow turn IN PLACE, not an orbit
+```
+
+The **after the pan** part is the choice worth knowing: the turn is applied to the figure's own
+frame, so a panned figure spins where it sits. Turning before the pan would swing it around the
+frame's middle on a circle of radius `|pan|`, which is a different look and is not what this does.
+The angle is in **radians**, matching `rotation` on `star_pattern` and `lsystem`, so multiply by
+`time` yourself.
 
 There is no `zoom` here and that is not an omission: `scale` **is** this scene's
 size lever, and a view zoom on top of it would be a second spelling of one idea.
