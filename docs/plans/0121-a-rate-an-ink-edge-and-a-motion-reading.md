@@ -343,7 +343,7 @@ fn band_contour(
 | 3 — `field_speed` and `fold_speed` | dev | done | `73d084c` |
 | 4 — `warp_speed` integrates too | dev | done | `4014682` |
 | 5 — the contour reads the LUT | dev | done | `324a30d` |
-| 6 — the content pass | human | not started | |
+| 6 — the content pass | preset-author | done | `d74fa37` |
 
 ### Notes
 
@@ -381,10 +381,75 @@ fn band_contour(
   risk list names this shape and the followup list already carries the question.
 - Phase 5's per-pixel cost was not measured against `docs/nfr.md`'s frame budget.
 
+**Phase 6 — the content pass (`preset-author`).** Both worlds moved onto the new surface, the
+suite is green (`cargo nextest run -p lmv-core`, **802 passed / 5 skipped**), and one done-when
+turned out to rest on a premise the tree does not carry.
+
+*`fragment_driftmono` — the rates, and the pan binding that was already free.* **The
+`-0.25 * time` cancellation the phase asks to remove was never shipped.** `d6ffa54` binds
+`pan_x`/`pan_y` to `noise` plus the mid surge and nothing else; what the file carried was the
+*derivation* — a header block presenting a symmetric pan as the scene's rate knob, ending "there
+is deliberately NO linear pan term". So the accident lived in the advice, not in the preset, and
+Phase 6 retired the advice: that block is now history, explicitly labelled as history, with
+`field_speed` substituted into the crawl-speed formula the world's four live verdicts fall out of.
+The tuning proper is `warp` 0.42 → **0.62** with `fold_speed` **0.45** — the amplitude the three
+calm passes had spent, bought back, with the fold's own clock holding the churn down instead:
+
+| | `drive` | `rate` | `cover` | `anim` |
+|---|---|---|---|---|
+| Drift Mono, `d6ffa54` | 0.455 | 0.0411 | 0.450 | 0.316 |
+| Drift Mono, **shipped** | **0.469** | **0.0370** | **0.659** | 0.264 |
+| Tiled Rosette Mono | 0.461 | 0.0392 | 0.576 | 0.523 |
+| Droste Mono | 0.393 | 0.0275 | 0.326 | 0.383 |
+| Supernova (family top on `rate`) | 0.280 | 0.0654 | 0.908 | 0.236 |
+| Tiled Rosette (family floor) | 0.072 | 0.0034 | 0.337 | 0.048 |
+
+`rate` 0.0411 → 0.0370 sits well inside the neighbourhood the phase asks for, and it moved
+**against** `cover` 0.450 → 0.659 — less churn per frame carrying half again as much structure,
+which is the one pair `warp` alone could not have produced in either direction. `drive` rose
+0.455 → 0.469 despite bass moving off `warp` onto the two rates: a rate change at a fixed capture
+depth lands the field at a different *phase*, not merely a different amplitude. Both rates are
+audio-bound (bass + onset on `fold_speed`, bass on `field_speed`, the latter straddling 1.0 at
+±15 % on a 1.2 s constant), so ADR-0132's integrated phase is exercised by shipped content rather
+than only by its unit test.
+
+*`shape_contourmono` — the contour is on at `1.0`, and the reason it is at the maximum is the
+finding.* The set of pixels the contour touches is fixed by geometry; `amount` only sets how dark
+they go. So a low value pays the whole cost and buys an invisible line. Measured at 640x360, loud,
+counting exact frame colours: `0` → **9** distinct colours, pure red 6.00 %; `0.25` → 80, 4.79 %,
+invisible; `0.5` → 179, 4.73 %, barely visible; `1.0` → 684, 4.69 %, a key. Only at `1.0` does
+about a sixth of the touched pixels reach true black — an ink core with the `fwidth` ramp either
+side — which is what makes it read as a key line rather than as a smudge. Readings: `drive`
+0.365 → **0.368**, `rate` 0.0034 → **0.0040**, `cover` 0.557 → 0.554, against family neighbours
+Facet (0.112 / 0.0016) and Pulse (0.296 / 0.0074) — the contour is a colour change, so it barely
+moves either motion column, which is the right outcome.
+
+*Filed rather than worked around: **design-backlog 0140**.* ADR-0133 fixed *which* edges the
+contour draws at and left *what* it draws untouched — a soft `smoothstep` darken toward black,
+with no colour of its own. On a palette whose every band edge is already hard by construction that
+makes the contour the only source of intermediate values in the frame. Priority **Low**: one
+preset wants it, the shipped workaround looks good, and the fix costs a parameter on a surface
+ADR-0133 deliberately kept parameterless.
+
+*Two more cohort files inspected, one edited.* `fragment_driftmono`'s own `palette_contour = "0"`
+carried the now-false plateau rationale, so it was **rewritten with a current, measured one** —
+the world's five run boundaries are already at full contrast and a darkening line only fattens the
+black, closing the white channels the flow reads through (56 → 741 exact frame colours at `1.0`).
+`fragment_tiledmono`'s rationale needed no change: it never claimed the plateau case, and its
+"the contour line is itself a gradient … the edges are already maximum contrast" is precisely what
+0140 now records. `fragment_drostemono` and `fragment_tiledmono` were **not** given the rates —
+both anchor their motion in a repeating structure and neither has asked, which is the followup
+list's curation question, not this phase's.
+
+*Pre-existing nit, not fixed here:* `fragment_drostemono:113` says "no contour - see the header"
+and its header carries no contour note. Predates this plan; left alone rather than widened into.
+
 ### Close triggers
 
-- **`presets/` touched:** `presets/README.md` only — no `.toml` changed
-  (`git diff --name-only 1af2e14..HEAD -- 'presets/*.toml'` is empty).
+- **`presets/` touched:** `presets/README.md`, plus **two `.toml` retuned by Phase 6** —
+  `fragment_driftmono.toml` (onto `field_speed` / `fold_speed`) and `shape_contourmono.toml`
+  (`palette_contour` 0 → 1.0). No preset added or removed, so the curated set is unchanged in
+  membership.
 - **Plan header `Closes:`** design-backlog 0131, 0137, 0138, 0139
 - **What shipped:** feature and fix. Feature: `field_speed` / `fold_speed` on `fragment_field`, and
   the `drive` / `rate` columns on `shot --report`. Fix: `warp_speed`'s teleport, the contour's
@@ -394,9 +459,9 @@ fn band_contour(
   **0131**, **0137**, **0138**, **0139** (the plan's four `Closes:` entries, each broken by its own
   fix landing) and **0132**, whose third probe pinned the report's exact header string that Phase 1
   widened. 0132's claim — *the report's column set carries no level column* — is unaffected:
-  neither `drive` nor `rate` is a level column.
-- **Outstanding `human` phases:** Phase 6, the `preset-author` content pass over
-  `fragment_driftmono` and `shape_contourmono`.
+  neither `drive` nor `rate` is a level column. **Phase 6 adds 0140** (a new live entry, probe
+  green), so the roster to re-read at close is those five plus the new one.
+- **Outstanding `human` phases:** none. Phase 6 landed as a `preset-author` session.
 
 ## Followups (after this lands)
 

@@ -3405,3 +3405,53 @@ accumulate.
 
 **Medium.** This lane's whole claim is that it verifies before showing; on motion it currently
 cannot, and the cost is live round trips with the user — four of them on one preset.
+
+## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
+
+[ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) fixed *which* edges
+`band_contour` draws at. It did not touch *what* it draws, and the remaining half is the one a
+limited-ink look runs into: the return is `1.0 - amount * (1.0 - smoothstep(0.0, w, d))`, a scalar
+**multiplied into the colour**, ramped over one `fwidth`. So the line is always (a) a darkening
+toward black rather than an ink, and (b) soft. On a palette quantized by `palette_steps` every band
+edge is already hard — `band_coord` snaps to band centres and there is no anti-aliasing anywhere in
+the frame — so the contour is the only source of intermediate values in the picture.
+
+- **Raised:** 2026-08-27, from Plan 0121 Phase 6, turning `palette_contour` on in
+  `shape_contourmono` now that ADR-0133 made it usable there. It **is** on and it **is** an
+  improvement — this is the residual, not a regression.
+- **Measured**, `shape_contourmono` at 640x360, fully driven, counting exact frame colours:
+
+  | `palette_contour` | distinct colours in frame | pure red | the line |
+  |---|---|---|---|
+  | `0` | **9** | 6.00 % | none |
+  | `0.25` | 80 | 4.79 % | invisible |
+  | `0.5` | 179 | 4.73 % | barely visible |
+  | `1.0` | 684 | 4.69 % | a key — shipped |
+
+- **The cost does not scale with `amount`, which is the surprising part and the reason a low value
+  is not a compromise.** The SET of pixels the contour touches is fixed by the geometry; `amount`
+  only sets how dark they go. So `0.25` already costs 20 % of the red's pure share and the full
+  jump from 9 colours to 80, and buys a line nobody can see. Only at `1.0` does about a sixth of
+  the touched pixels reach true black — an ink core with the ramp either side of it — which is why
+  the shipped value is the maximum rather than the usual `0.2`-`0.5`.
+- **What a fix looks like.** Either would do, and neither is obviously right:
+  - a **hard** contour — replace the `smoothstep` with a step at a width in band units, so on an
+    already-quantized palette the line is one more flat ink;
+  - a contour **colour** rather than a multiply toward black, so the key can be the palette's own
+    dark ink (or the red) instead of whatever `col * k` lands on.
+
+  The second subsumes the first only if it also gets a hardness; the first is much the smaller
+  change. Both are new parameters on a surface ADR-0133 deliberately kept parameterless, so the
+  question is whether one look justifies that — today it is one, `shape_contourmono`.
+- **Not urgent, and the reason is honest:** the soft grey sits *aligned with a hard edge*, so it
+  reads as an edge rather than as shading. That is exactly the distinction the plateau case failed
+  and is why the parameter is usable at all now. The complaint is that the frame stops being
+  literally two-ink at the pixel level, not that it looks wrong.
+- **Verified 2026-08-27** — the contour is still a soft scalar darken with no colour of its own:
+  `present: 1\.0 - clamp\(amount, 0\.0, 1\.0\) \* \(1\.0 - smoothstep\(0\.0, w, d\)\) in: core/src/render/palette.rs`
+
+### Priority
+
+**Low.** One preset wants it, the workaround (full strength, ink core, soft edges) is shipped and
+looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
+Revisit if a second limited-ink world lands on a contoured scene.
