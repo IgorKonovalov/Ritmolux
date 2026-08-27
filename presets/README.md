@@ -2824,7 +2824,7 @@ them to an existing preset is the only thing that changes it.
 | Param | Default | Range that reads | Accepted |
 |---|---|---|---|
 | `palette_steps` | `0` (off) | **`4`–`12`** | `0` = smooth, up to `64` |
-| `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1` |
+| `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1`. Draws **only where the two bands it separates are different colours** ([ADR-0133](../docs/adrs/0133-the-band-contour-fires-where-the-ink-changes.md)) — so it is silent inside a plateau and draws at each run boundary, which is what makes it usable on a limited-ink palette. Unchanged on a smooth one at any step count |
 
 Those two ranges are Plan 0064 Phase 4's, read off a rendered sweep rather than
 argued. Outside them nothing breaks — it just stops being the *graphic* look:
