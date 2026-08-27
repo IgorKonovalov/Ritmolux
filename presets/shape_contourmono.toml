@@ -13,16 +13,44 @@
 # untouched but for the contour term. No shoulder trick, no over-range, no
 # vignette. Flat colour in, flat colour out.
 #
-# `palette_contour` IS LIVE ON THIS SCENE AND IS STILL SET TO ZERO. It is inert
-# on the particle and line scenes for want of a fragment-stage derivative, and
-# this is one of the four scenes where it genuinely works - which makes it worth
-# saying why it is off rather than leaving it looking like an oversight. It
-# darkens a hairline at EVERY band edge, and twenty steps in five runs means most
-# of those edges fall INSIDE a plateau - white meeting white, black meeting
-# black. On those the hairline is a smoothstep grey line across flat colour,
-# which is precisely the shading a two-ink print is defined by not having. At the
-# five run boundaries it has nothing to add either: black already meets white
-# there, which is maximum contrast.
+# `palette_contour` IS ON, AND IT ONLY COULD BE AFTER ADR-0133. This world
+# shipped with it at zero and a paragraph here explaining why, and the reason was
+# structural rather than taste: the contour darkened a hairline at EVERY band
+# edge, and twenty steps in five runs means most of those edges fall INSIDE a
+# plateau - white meeting white, black meeting black. On those the hairline was a
+# grey line drawn across flat colour, which is precisely the shading a two-ink
+# print is defined by not having. Plan 0121 taught the shader to sample the two
+# band centres an edge separates and stay silent when they resolve to the same
+# ink, so the line now falls at the five RUN boundaries and nowhere else: the
+# black/white seams, and - the one that earns it - the white-to-red seam, which
+# is the only place in this palette where two inks meet with nothing between
+# them. A key line there is what makes a printed red read as registered rather
+# than as a fill.
+#
+# 1.0 AND NOT LESS, WHICH IS THE OPPOSITE OF THE USUAL ADVICE, and the reason is
+# measurable. The SET of pixels the contour touches does not depend on `amount` -
+# only how dark they go does - so a low value pays the full cost and buys nothing
+# visible. Rendered at 640x360, loud, counting exact frame colours:
+#
+#     contour 0     9 distinct colours    pure red 6.00 %   invisible line
+#     contour 0.25  80                    4.79 %            invisible line
+#     contour 0.5   179                   4.73 %            barely visible
+#     contour 1.0   684                   4.69 %            a key   <- shipped
+#
+# At 1.0 about a sixth of the touched pixels reach TRUE BLACK - the line has an
+# ink core, and the grey is only the one-pixel `fwidth` ramp either side of it.
+# Below 1.0 there is no core at all and the whole line is grey, which is the
+# thing this world objects to, paid for without the line.
+#
+# THE HONEST COST IS THE COLOUR COUNT: 9 exact values in the frame becomes 684.
+# The frame stops being literally two-ink-plus-red at the pixel level, and the
+# red's pure share drops from 6.00 % to 4.69 % as its two edges pick up the ramp.
+# What buys that back is where the grey sits: aligned with a hard edge it reads
+# as an edge, not as shading, which is exactly the distinction the plateau case
+# failed. FILED AS FEEDBACK all the same - the surface cannot draw a HARD
+# contour, or one in an ink colour rather than toward black, and on a palette
+# whose every band edge is already hard by construction that is the shape this
+# world actually wants.
 #
 # PALETTE SHARE IS PIXEL SHARE HERE, AND THAT INVERTS THE TILED SIBLING'S RULE.
 # That preset records a band taking about HALF the screen area its palette width
@@ -103,10 +131,11 @@ gamma       = "1.0"
 # figure grows honestly rather than pumping.
 scale       = "0.46 + clamp(bass * 0.176, 0, 0.15)"
 
-# THE INK COUNT. Twenty bands in five runs. Contour off - see the header, this
-# is the deliberate choice on this scene rather than the default one.
+# THE INK COUNT. Twenty bands in five runs, and the key line at the five run
+# boundaries - silent inside every plateau (ADR-0133). See the header for why it
+# is at full strength rather than at the usual 0.2-0.5.
 palette_steps   = "20"
-palette_contour = "0"
+palette_contour = "1.0"
 
 # THE RING SPACING. `color_span` scales the distance before it becomes a palette
 # coordinate, so it sets how many full cycles of the five-run palette fit between
