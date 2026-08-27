@@ -238,7 +238,7 @@ fn build_family_report(
     gates: &[(String, Vec<GateReport>)],
 ) -> Result<FamilyReport, String> {
     let silent = AnalysisFrame::default();
-    let loud = loud_frame();
+    let loud = AnalysisFrame::fully_driven();
     let bands = band_stimuli();
     let bands_low = band_stimuli_low();
 
@@ -799,17 +799,23 @@ fn gate_line(preset: &str, gate: &GateReport) -> String {
     }
 }
 
-/// The probe stimulus (Plan 0037): silence, a step up to [`loud_frame`], then a
-/// step back down. This is the whole reason the probe can see easing at all — a
-/// held stimulus converges every smoother before the pixels are read, so it
-/// reports the settled response and is identical for any `[smoothing]` constant.
+/// The probe stimulus (Plan 0037): silence, a step up to
+/// [`AnalysisFrame::fully_driven`], then a step back down. This is the whole
+/// reason the probe can see easing at all — a held stimulus converges every
+/// smoother before the pixels are read, so it reports the settled response and
+/// is identical for any `[smoothing]` constant.
 ///
-/// It steps to `loud_frame()` rather than to a hand-built frame precisely so the
-/// log-band array is lit on the same convention every other stimulus here uses.
+/// It steps to the shared fully-driven frame rather than to a hand-built one
+/// precisely so the log-band array is lit on the same convention every other
+/// stimulus here uses — and so this probe and the animation gate's driven branch
+/// (ADR-0136) cannot drift onto two different stimuli.
 fn step_stimulus() -> Vec<AnalysisFrame> {
     let silent = AnalysisFrame::default();
     let mut frames = vec![silent; PROBE_PRE];
-    frames.extend(std::iter::repeat_n(loud_frame(), PROBE_WINDOW));
+    frames.extend(std::iter::repeat_n(
+        AnalysisFrame::fully_driven(),
+        PROBE_WINDOW,
+    ));
     frames.extend(std::iter::repeat_n(silent, PROBE_WINDOW));
     frames
 }
@@ -985,21 +991,6 @@ fn is_dead_gate(gate: &GateReport) -> bool {
 /// bound (ADR-0062) — the finding `core/tests/saturation.rs` gates on.
 fn is_saturated(gate: &GateReport) -> bool {
     matches!(gate.flag.kind, GateKind::Saturated { .. })
-}
-
-fn loud_frame() -> AnalysisFrame {
-    AnalysisFrame {
-        bass: 1.0,
-        mid: 1.0,
-        treb: 1.0,
-        onset: 1.0,
-        beat: true,
-        bar: 0.5,
-        // "Every band up" includes the log-band array itself — see
-        // [`BASS_BANDS`].
-        spectrum: [1.0; SPECTRUM_BINS],
-        ..Default::default()
-    }
 }
 
 fn corner(img: &CaptureImage) -> [u8; 4] {

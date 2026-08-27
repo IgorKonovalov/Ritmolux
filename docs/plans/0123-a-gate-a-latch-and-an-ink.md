@@ -1,6 +1,6 @@
 # 0123 — A gate, a latch and an ink
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-27
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0136](../adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) (proposed), [0137](../adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) (proposed), [0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) (proposed)
@@ -315,11 +315,11 @@ struct LatchBank {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** branch `plan-0123-a-gate-a-latch-and-an-ink`, worktree `../lmv-plan-0123`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the gate asks both readings | dev | not started | |
+| 1 — the gate asks both readings | dev | done | committed with this row |
 | 2 — `collage_mono`'s sway comes back down | human | not started | |
 | 3 — `[latch]` parses and resolves to a slot | dev | not started | |
 | 4 — the latch bank runs | dev | not started | |
@@ -330,6 +330,38 @@ struct LatchBank {
 | 9 — a mono line world | human | not started | |
 
 ### Notes
+
+**Phase 1 — the driven floor's derivation, and the sweep it came off.**
+`DRIVEN_FLOOR = 0.017`. Shipped-library minimum on the driven statistic is
+**0.0345** (`Valentine`) over 53 presets, median 0.19, maximum 0.71 — measured
+2026-08-27, DX12 software adapter, backdrops suppressed. Half the minimum,
+rounded down; slack 2.03x against `ANIM_FLOOR`'s 2.05x. The noise ceiling is
+literally the same one (same statistic, same mask floor), so ADR-0091's
+`1/139 = 0.0072` sits under it with 2.4x margin.
+
+**Phase 1 — the driven branch carries nothing today.** Every one of the 53
+shipped presets passes on the *silent* branch, so the printed
+`still in silence, live on the music` roster is empty and the gate's strength is
+unchanged as it stands. The branch is exercised by
+`the_driven_branch_carries_the_world_that_is_still_by_design`, which rewrites
+`collage_mono`'s two rate lines out of the shipped file: at `0.07`/`0.09` it reads
+silent **0.0025** / driven **0.0621**. The roster becomes non-empty when Phase 2
+lands.
+
+**Phase 1 — a finding about `ANIM_FLOOR`, not acted on.** Its doc comment records
+the shipped library's silent minimum as `0.0205` (`Banded Mandala`). The sweep now
+reads **0.0143** — `Collage Mono`, whose sway was raised for this measurement — so
+that constant's stated 2.05x slack is really 1.43x as the library stands. The plan
+forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
+rates back down, `Collage Mono` leaves the silent branch and the silent minimum
+returns to `0.0201` (`On White`). Left for the close to decide whether the comment
+is re-derived.
+
+**Phase 1 — one deviation from ADR-0136's stated cost.** The ADR prices the second
+reading at "two more captures per preset"; it costs **one**. The driven
+differential is anchored at `FRAME_B` and shares that frame's silent capture with
+the autonomous reading, which also keeps both readings at the same point on the
+scene's own clock. Three captures per preset, not four.
 
 ### Close triggers
 
