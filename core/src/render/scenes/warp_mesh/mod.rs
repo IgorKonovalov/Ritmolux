@@ -226,6 +226,16 @@ pub const MILKDROP_SOFTNESS: f32 = 1.0;
 const DEFAULT_WARP_SCALE: f32 = 1.0;
 const DEFAULT_WARP_SPEED: f32 = 1.0;
 
+/// One frame of a bindable rate, as ADR-0132 requires every rate in this engine
+/// to be advanced: a phase accumulator plus `rate * dt`, never `time * rate`.
+///
+/// A free function so the property is testable on the CPU with no device and no
+/// rendering — which is the whole of this correction's evidence, since no
+/// shipped preset binds `warp_speed` and there is nothing here to regress.
+fn integrate_phase(phase: f32, rate: f32, dt: f32) -> f32 {
+    phase + rate * dt
+}
+
 /// Deposit defaults: a soft blob at the centre, bright enough to see and small
 /// enough to be dragged into structure rather than filling the frame.
 const DEFAULT_DEPOSIT: f32 = 1.6;
@@ -389,7 +399,9 @@ const WARP_SHADER: &str = r#"
 struct Warp {
     // x: render-target aspect, y: dt (s), z: scene time (s), w: warp_scale
     misc: vec4<f32>,
-    // x: decay^dt, y: warp_speed, z: wrap (0/1), w: darken_center amount
+    // x: decay^dt, y: WARP PHASE (not the rate - integrated CPU-side per
+    //    ADR-0132; see the note at its read below), z: wrap (0/1),
+    // w: darken_center amount
     misc2: vec4<f32>,
     // x: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D),
     // yzw: unused
@@ -442,7 +454,13 @@ fn vs_main(in: VsIn) -> VsOut {
     let dt     = wu.misc.y;
     let time   = wu.misc.z;
     let wscale = max(wu.misc.w, 1e-3);
-    let wspeed = wu.misc2.y;
+    // The warp's phase, ALREADY INTEGRATED (ADR-0132). This slot used to carry
+    // `warp_speed` and this stage computed `time * wspeed` — which meant that
+    // the first preset to bind the rate to audio would find that a swing from
+    // 1.0 to 1.5 at t = 100 s moves the phase fifty seconds in one frame. The
+    // picture did not speed up; it jumped. Nothing caught it because no shipped
+    // preset binds `warp_speed`.
+    let wphase = wu.misc2.y;
 
     // This vertex's own destination uv (texture space, y down).
     let uv = vec2<f32>(in.clip.x * 0.5 + 0.5, 0.5 - in.clip.y * 0.5);
@@ -483,7 +501,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // 3. the procedural warp, MilkDrop's four sinusoids: a wobble whose own
     //    frequencies drift, so it never settles into a visible standing pattern.
     //    Applied in uv, where the reference applies it.
-    let wt = time * wspeed;
+    let wt = wphase;
     let f0 = 11.68 + 4.0 * cos(wt * 1.413 + 10.0);
     let f1 =  8.77 + 3.0 * cos(wt * 1.113 +  7.0);
     let f2 = 10.54 + 3.0 * cos(wt * 1.233 +  3.0);
@@ -585,15 +603,60 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     return (floor(t * steps) + 0.5) / steps;
 }
 
-// Shared `palette_contour` (ADR-0078), copied verbatim at each fragment site.
-fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+// Shared `palette_contour` (ADR-0078 / ADR-0133; the WGSL is the implementation,
+// copied verbatim at each fragment-stage site — palette.rs has no CPU
+// counterpart to be canonical, since `fwidth` exists only here).
+//
+// Darkens within one PIXEL of a band edge, so the line has the same weight where
+// the field is shallow and where it is steep — AND ONLY WHERE THE INK ACTUALLY
+// CHANGES (ADR-0133). It samples the two band centres either side of the nearest
+// edge and returns unchanged when they resolve to the same colour within half a
+// code value, which is below the LUT's own 8-bit quantization. On a smooth
+// palette two distinct centres always differ by at least one code value, so
+// every edge draws exactly as it did at any `palette_steps`; inside a plateau
+// the LUT is literally constant and the samples are bit-equal, so the line
+// vanishes there and survives at the run boundaries. One rule, both behaviours,
+// no new parameter.
+//
+// The two LUTs, the sampler and `palette_mix` are EXPLICIT parameters rather
+// than module-scope globals this happens to find: all four sites name them the
+// same today, so implicit capture would compile — and would silently bind the
+// shared function to whatever a future site called its textures.
+//
+// `textureSampleLevel`, not `textureSample`: the LUT has one mip, and an
+// explicit LOD keeps these reads free of the uniformity requirement that a
+// sample after a conditional return would otherwise carry.
+fn band_contour(
+    t: f32,
+    steps: f32,
+    amount: f32,
+    lut_a: texture_2d<f32>,
+    lut_b: texture_2d<f32>,
+    lut_samp: sampler,
+    mix_ab: f32,
+) -> f32 {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
         return 1.0;
     }
-    let dd = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, dd));
+    let n = round(f);
+    let m = clamp(mix_ab, 0.0, 1.0);
+    let lo = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    let hi = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
+        return 1.0;
+    }
+    let d = min(fract(f), 1.0 - fract(f));
+    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
 }
 
 @fragment
@@ -628,7 +691,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let banded = band_coord(coord, dp.d.y);
     let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
-    let mixed = mix(ca, cb, clamp(dp.d.x, 0.0, 1.0)) * band_contour(coord, dp.d.y, dp.d.z);
+    let mixed = mix(ca, cb, clamp(dp.d.x, 0.0, 1.0)) * band_contour(coord, dp.d.y, dp.d.z, lut_a, lut_b, lut_samp, dp.d.x);
     let col = apply_saturation(mixed, dp.c.w);
 
     // Additive light with saturating coverage (ADR-0056): premultiplied colour,
@@ -999,6 +1062,11 @@ pub struct WarpMeshScene {
     scalars: [f32; OUTPUTS],
     warp_scale: f32,
     warp_speed: f32,
+    /// The integrated warp phase (ADR-0132): `+= warp_speed * dt` once per
+    /// frame, in `update`, after this frame's parameter values have landed. At a
+    /// constant rate it equals `warp_speed * time`, which is why the `1.0`
+    /// default renders exactly as the multiply it replaced.
+    warp_phase: f32,
     decay: f32,
     deposit: f32,
     deposit_x: f32,
@@ -1111,6 +1179,7 @@ impl WarpMeshScene {
             scalars: PER_VERTEX_DEFAULTS,
             warp_scale: DEFAULT_WARP_SCALE,
             warp_speed: DEFAULT_WARP_SPEED,
+            warp_phase: 0.0,
             decay: DEFAULT_DECAY,
             deposit: DEFAULT_DEPOSIT,
             deposit_x: DEFAULT_DEPOSIT_CENTRE,
@@ -1807,6 +1876,10 @@ impl Scene for WarpMeshScene {
     }
 
     fn update(&mut self, frame: &AnalysisFrame) {
+        // The warp phase integrates here rather than in `advance`, because
+        // `advance` runs before this frame's `set_param` calls and would
+        // therefore use the previous frame's rate (ADR-0132).
+        self.warp_phase = integrate_phase(self.warp_phase, self.warp_speed, self.dt);
         // Kept for `render`, which drives the per-vertex program and is the only
         // place the render target's aspect is known.
         self.frame = *frame;
@@ -1970,7 +2043,7 @@ impl Scene for WarpMeshScene {
                 misc: [aspect, dt, self.time, self.warp_scale],
                 misc2: [
                     decay,
-                    self.warp_speed,
+                    self.warp_phase,
                     f32::from(self.wrap >= 0.5),
                     self.darken_center.clamp(0.0, 1.0) * DARKEN_CENTER_STRENGTH,
                 ],

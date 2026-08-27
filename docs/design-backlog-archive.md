@@ -6038,3 +6038,217 @@ that reads as a curve — which is every future user of `star_pattern`'s motif r
   entry did not buy is the joined corner on the straight-line motifs** — see 0134, which is the
   same user sitting's other finding.
 
+
+---
+
+## 0131 — `shot --report` truncates preset names to 14 characters, and the library now has its first collision
+
+**Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
+Mode 4 review, 2026-08-26, while running the close ceremony's own curation sweep.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-08-26** — the truncating format, in all three of the report's per-preset tables:
+  `present: \{:<14\.14\} in: standalone/src/shot/report.rs`
+- **Verified 2026-08-26** — the pair that collides under it, one shipped by Plan 0119:
+  `present: name = "Tiled Rosette Mono" in: presets/fragment_tiledmono.toml`
+
+### The finding
+
+`report.rs` formats every per-preset row with `{:<14.14}`, which pads *and truncates* to fourteen
+characters. `Tiled Rosette` is thirteen; `Tiled Rosette Mono` truncates to `Tiled Rosette `. Since
+Plan 0119 shipped the second one, `cargo run -p standalone --example shot -- --presets presets
+--report family=fragment_field` prints two rows labelled `Tiled Rosette` in each of its three tables,
+with no way to tell which is which except row order:
+
+```text
+  Tiled Rosette    0.082   0.100   0.021   0.019   0.048   0.337   20+   43+
+  Tiled Rosette    0.347   0.000   0.119   0.000   0.523   0.576   15+   43+
+```
+
+It is the library's first collision at that width, so nothing has ever exercised it.
+
+### Why it matters more than a formatting nit
+
+This report **is** the instrument the architect close ceremony's preset-curation step reads — *"does
+the new content earn its place against what already ships, or did a family just converge?"* — and the
+two rows it cannot distinguish are precisely a base preset and its variant, which is the shape a
+convergence takes. The near-duplicate flag is computed on real names and is unaffected; the human
+reading of the table is what breaks.
+
+### What a fix looks like
+
+Widen the column to the longest name in the family being printed, or drop the `.14` precision and let
+the numeric columns align on their own `{:>7}` widths. Either is a one-line change; the second is
+closer to what the surrounding tables already do. A `shot_cli` assertion that no two rows in one
+family table carry the same label is the thing that would keep it from coming back.
+
+
+- **CLOSED 2026-08-27**, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+  Phase 2. The column did not widen: a name longer than fourteen characters is now elided in the
+  **middle** (`Tiled Rosette Mono` prints `Tiled R~e Mono`), because the distinguishing part of a
+  name in this library is its tail. Three tests carry it — the known pair constructed explicitly
+  rather than leaned on the shipped set, the fitter's head/tail behaviour, and a sweep asserting
+  every shipped name fits to a label no other name fits to. Its own probe went red on delivery: it
+  pinned the `{:<14.14}` truncation that was the defect.
+
+---
+
+## 0137 — `fragment_field` has three hardcoded animation rates and no parameter behind any of them, so "slow it down" and "flatten it out" are one knob
+
+The scene's three clocks are shader literals with no uniform behind them
+(`core/src/render/scenes/fragment_field.rs:137-142`): the two fold rates `t * 0.7` and `t * 0.6`
+inside the five-iteration sine fold, and the field sweep `t * 0.5` that indexes the palette. The
+only lever a preset has over the two fold rates is `warp`, because they are scaled by it — so
+asking for a calmer world and asking for a flatter one are the same request.
+
+- **Raised:** 2026-08-27, from the mono cohort (`fragment_drostemono`, `shape_contourmono`,
+  `fragment_driftmono`, committed `d6ffa54`), by `preset-author`.
+- **The field rate is reachable, but only by accident.** `pan` is added into the same sum the
+  field sine sees (`var p = uv * zoom + pan`, then `sin(p.x + p.y + t * 0.5)`), so a pan of
+  `r * time` on **both** axes leaves a residual sweep of `0.5 + 2r`, and `r = -0.25` cancels the
+  clock outright. That is what shipped as the basis for `fragment_driftmono`'s tuning. It works,
+  it is a coincidence of where `pan` lands in the expression, and it costs the pan binding, which
+  the preset then cannot use for anything else.
+- **The useful quantity is not the rate but the contour crawl**, `residual / (zoom * sqrt(2))`,
+  because `zoom` sets the spatial frequency the phase runs against. Every verdict the preset
+  collected fell out of that one line — which had to be derived by hand from the shader.
+- **Only one cancellation direction works, and the other one lies.** A symmetric pan (`+r` on both
+  axes) moves the field's phase and is visible. An ANTI-symmetric pan (`+a` on x, `-a` on y)
+  leaves the sum untouched, so it translates the sampled window at zero cost to the sweep — which
+  looks like free motion and is not, because that direction is the base field's own contour
+  direction. Measured: tripling the glide that way LOWERED frame-to-frame change (2.09 -> 1.51)
+  instead of raising it.
+- **Correction to the raising note.** It called this "the most-used scene in the library (12 of
+  46)". It is the **second** most-used: `attractor` has 19 of the 49 shipped presets and
+  `fragment_field` has 12. The impact argument survives the correction intact.
+- **What a fix is:** a rate parameter, or several. Whichever shape it takes, a rate binding that
+  multiplies **absolute** scene time teleports the picture the moment an audio-bound rate changes
+  — `warp_mesh` already does exactly that (`let wt = time * wspeed`, `warp_mesh/mod.rs:486`), and
+  no shipped preset has found it only because nothing binds `warp_speed` yet.
+- **Verified 2026-08-27** — the scene still exposes no rate parameter:
+  `absent: field_speed in: core/src/render/scenes/fragment_field.rs`
+
+### Priority
+
+**Medium.** Twelve presets on the affected system, and the workaround costs a binding and has to
+be rediscovered by every author who wants a calm version of this world.
+
+
+- **CLOSED 2026-08-27**, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+  Phase 3, on [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md). `fragment_field` gained
+  `field_speed` and `fold_speed`, both defaulting to `1.0` and both **integrating a phase** rather
+  than scaling the shared clock, so a rate bound to audio bends the motion instead of teleporting
+  it. The fold's designed 0.7 : 0.6 quadrature ratio stays welded inside `fold_speed`. Shipped
+  content exercises both: `fragment_driftmono` binds bass and onset to `fold_speed` and bass to
+  `field_speed`, and bought its intricacy back — `warp` 0.42 -> 0.62 with `fold_speed` 0.45, moving
+  `cover` 0.450 -> 0.659 while `rate` fell 0.0411 -> 0.0370. Its own probe went red on delivery.
+  **The rule the ADR states is engine-wide and its enumeration was not** — see 0141.
+
+---
+
+## 0138 — `palette_contour` keys on the band grid and never reads the LUT, so on any limited-ink palette its only usable value is zero
+
+`band_contour` is a pure function of position within the band grid
+(`core/src/render/palette.rs:742`, copied verbatim into `fragment_field.rs`,
+`reaction_diffusion.rs` and `shape_field.rs`): `let d = min(fract(f), 1.0 - fract(f))`, darkened
+by `amount`. It never consults the gradient LUT, so it draws a hairline at **every** band
+boundary whether or not the colour changes there.
+
+- **Raised:** 2026-08-27, from `shape_contourmono` — a two-ink-plus-accent distance-field print,
+  on one of the three scenes where this parameter is not inert.
+- **Why a limited-ink palette breaks it.** Flat ink out of `palette_steps` is written as
+  *plateaus* — runs of bands holding one colour — so most boundaries are white-meets-white and
+  black-meets-black. On those the contour is a `smoothstep` grey line drawn across flat colour,
+  which is precisely the shading a two-ink print is defined by not having. At the few real run
+  boundaries it has nothing to add either, because black already meets white there and that is
+  maximum contrast.
+- **The arithmetic, from the shipped preset:** 20 steps in 5 runs (black 5 / white 5 / black 4 /
+  white 4 / red 2) has 20 band edges, of which 5 are ink changes. `palette_contour` treats all 20
+  alike.
+- **It is set to zero in four of the nine presets that name it** — `fragment_driftmono`,
+  `fragment_drostemono`, `fragment_tiledmono` and `shape_contourmono`, the last of which carries a
+  header comment saying so outright.
+- **What a fix is:** fire only where the two band centres either side of the edge resolve to
+  different LUT colours. The scoping in ADR-0078 stays untouched — this is about *which* edges,
+  not about which stages have derivatives.
+- **Verified 2026-08-27** — the canonical WGSL still takes no LUT:
+  `present: fn band_contour\(t: f32, steps: f32, amount: f32\) in: core/src/render/palette.rs`
+
+### Priority
+
+**Medium.** Narrow but total: on a plateau palette the parameter has exactly one usable setting
+and it is off. Low frequency until 2026-08-27, when the count of limited-ink looks went from one
+to four.
+
+
+- **CLOSED 2026-08-27**, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+  Phase 5, on [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md). `band_contour`
+  now samples the two band centres either side of the nearest edge, from both LUTs and crossfaded by
+  `palette_mix` exactly as the main sample is, and suppresses the line when they agree to within
+  half an 8-bit code value. Equality is the test, which is why no new parameter was needed and why
+  no smooth palette moved at any step count. `shape_contourmono` turned the parameter on at `1.0`.
+  **The entry says the function is written three times; it is written four** — the fourth copy, in
+  `warp_mesh/mod.rs`, had already drifted (`dd` for `d`), which is precisely why the drift assertion
+  never caught it: that test iterated three sites and the one place drift had happened was not
+  among them. All four are canonical now and the assertion covers them. What the fix did **not**
+  touch is *what* the contour draws — a soft scalar darken toward black, with no colour of its own
+  — which is 0140.
+
+---
+
+## 0139 — nothing in the harness measures motion RATE or the silent-to-driven difference, so a preset can pass every gate and still be unwatchable in either direction
+
+Every statistic in `shot --report` is a **settled differential** — a driven frame against a quiet
+one, each captured after its own fixed frame count (`standalone/src/shot/report.rs:244`, where
+`anim = frame_diff(silent@24, silent@48)`). That answers "does this react", which is a different
+question from "does this react at a rate a person can watch", and it cannot see rate at all.
+`--horizon` measures the other end of the time axis and excludes any preset that does not
+accumulate.
+
+- **Raised:** 2026-08-27, after `fragment_driftmono` needed four live passes with the user and the
+  harness was green and unchanged through all of them:
+
+  | draft | the user's verdict | `--report` |
+  |---|---|---|
+  | v1 | "shaking way too much" | bass 0.465, anim 0.358, 13/13 pass |
+  | v2 | "not moving at all" | bass 0.182, anim 0.154, 13/13 pass |
+  | v3 | "still not moving enough" | bass 0.191, anim 0.324, 13/13 pass |
+  | v4 | "doesn't move to music" | bass 0.191, anim 0.324, 13/13 pass |
+
+  `anim` is the closest existing statistic and it moved in the **wrong direction** relative to the
+  verdicts.
+- **Two throwaway instruments made progress where the harness could not.** Frame-to-frame change
+  between consecutive analyzer hops (`--frame-at` at hops N, N+1, ...) catches frozen and catches
+  boiling; and the difference between a silent frame and a fully-driven one — music off against
+  music on — is the defect the user actually reported at v4, and no column looks at it. The second
+  reads 72.7 before the fix and 112.7 after, against 115.1 for `fragment_drostemono` and 119.6 for
+  `shape_contourmono`.
+- **A raw rate does not rank presets by watchability, and the raiser misread it twice before
+  noticing.** `fragment_tiledmono` measures 8.19 and `fragment_drostemono` 6.42 — both HIGHER than
+  the draft rejected for shaking, and both fine to watch. The difference is **anchoring**: those
+  two put their motion inside a repeating structure that holds still, so the eye reads a pattern
+  updating, while an unanchored world moves bodily and must be far quieter to read as equally
+  calm. So a threshold would be wrong; a printed column, read against family neighbours the way
+  `cover` and `anim` already are, would not.
+- **What a fix is:** printed columns, never a gate — the ADR-0083 shape.
+- **Verified 2026-08-27** — no such column exists:
+  `absent: "drive" in: standalone/src/shot/report.rs`
+
+### Priority
+
+**Medium.** This lane's whole claim is that it verifies before showing; on motion it currently
+cannot, and the cost is live round trips with the user — four of them on one preset.
+
+
+- **CLOSED 2026-08-27**, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+  Phase 1, on [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md).
+  `shot --report` gained `drive` (silence against full drive at the same depth) and `rate` (the mean
+  consecutive-frame difference over the settled tail of the probe's loud plateau). Both ride captures
+  the report already takes, so neither adds a render pass, a readback or a resize. **Both are printed
+  readings and neither is a gate**, on this entry's own evidence: a raw rate does not rank
+  watchability, because two comfortable presets measure higher than the draft rejected for shaking
+  and the difference is anchoring, which no statistic here models. `rate` is measured at `PROBE_SIZE`
+  (96x96) rather than `REPORT_SIZE` (192x192) and says so in the column note, in `docs/capturing.md`
+  and in the JSON's own `measured_at_px`. Its own probe went red on delivery. **Residual worth
+  watching:** a full-library run marks 48 of 49 `rate` cells, and a mark everyone ignores is not a
+  mark — carried on Plan 0121's followup list.

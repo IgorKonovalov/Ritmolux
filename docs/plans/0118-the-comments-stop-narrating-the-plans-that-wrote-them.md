@@ -1,6 +1,6 @@
 # 0118 — the comments stop narrating the plans that wrote them
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
@@ -244,10 +244,12 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
+**Lane:** `main` directly.
+
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the gate exists, and it only reports | dev | | |
-| 2 — the rule lands where authors read it | dev | | |
+| 1 — the gate exists, and it only reports | dev | done | `37868d4` |
+| 2 — the rule lands where authors read it | dev | done | committed with this row |
 | 3 — the 89 links go | dev | | |
 | 4 — the 252 narration lines go | dev | | |
 | 5 — the gate is armed | dev | | |

@@ -1,12 +1,13 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Four checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+Five checkers in `scripts/` take an optional `root` argument so they can be run against a tree
 other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written. `index-rows/` is the
 exception and inverts it — see its section below.
 
-`check-doc-links.mjs`, `check-index-rows.mjs` and `check-filter-figures.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs` and
+`check-comment-hygiene.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -69,6 +70,42 @@ so the run also asserts that the backlog and index-row fixtures' own markdown is
 it that way — a broken link seeded outside `doc-links/` would make the count above wrong for the
 wrong reason. That constraint is why `index-rows/` ships five one-line stub documents: its roster
 rows carry real relative links, and a row shaped like a real row has to point somewhere real.
+
+## `comment-hygiene/` — for `check-comment-hygiene.mjs`
+
+```
+node scripts/check-comment-hygiene.mjs scripts/fixtures
+```
+
+Expect **exit 1 and exactly two findings**, one per class the checker rejects. Note the root: like
+the two above, this checker is pointed at `scripts/fixtures` rather than at its own subdirectory,
+so the run also asserts that `backlog-claims/core/src/tier.rs` — the tree's other `.rs` file — is
+hygiene-clean. Keep it that way; a seeded finding outside `comment-hygiene/` would make the count
+below wrong for the wrong reason.
+
+| Class | Seeded as | Expected |
+|-------|-----------|----------|
+| 1 — a relative link in a `.rs` comment | a `[label]: ../../../docs/adrs/…` definition | reported, naming the target |
+| 2 — plan-relative narration | the phrase `this plan` in a doc comment | reported, naming the phrase |
+
+The four silences are the load-bearing half, because a gate that cries wolf gets escaped rather
+than obeyed ([ADR-0127](../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md),
+Negative 3):
+
+| Case | Seeded as | Expected |
+|------|-----------|----------|
+| a rustdoc intra-doc link | `[Seeded::render]` and `[the renderer](crate::render::Renderer)` | not reported — `rustc` resolves these, so they cannot rot silently |
+| a bare-number citation | `Plan 0045 Phase 3` in prose that also says "the plans README" | not reported — this is the form the links are replaced *with* |
+| an escaped false positive | `hygiene-allow: <reason>` above a line carrying two rejected phrases | not reported — the escape covers its own line and the next |
+| a comment marker inside a string | `"https://…/../not/a/link"`, a raw string, and an escaped `"` | not reported — the checker lexes Rust rather than grepping lines |
+
+The last of those is why this checker is a lexer and not a `grep`: `//` inside a URL literal and
+`"` inside a comment both defeat the line-oriented form, and the fixture pins all three spellings
+(ordinary, raw, and escape-carrying) so a future simplification back to `grep` fails here loudly.
+
+An escape with **no reason after the colon** is itself a finding. That is not seeded — it would
+make the count above three — but it is asserted by the checker's own header and is the reason an
+escape cannot silently become a silencer.
 
 ## `index-rows/` — for `check-index-rows.mjs`
 

@@ -253,6 +253,16 @@ The plan and relevant ADRs win on specifics. Defaults when the plan is silent:
   once where audio enters the core; the hot path downstream assumes them valid.
 - **Comments are for *why*, not *what*.** A name says what; a comment exists for a non-obvious
   why — a real-time invariant, an FFI lifetime, a workaround. Default to none.
+- **A comment carries the mechanism; the decision record stays in `docs/`** — [ADR-0127](../../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
+  You are the lane most exposed to this, because you write comments with a plan document open and
+  its reasoning leaks into them. Keep the mechanism, the invariant, the trap, and the formula or
+  constant a reader cannot re-derive. Send why-this-beat-the-alternative, what was measured, and
+  what the code did before to the ADR or plan, **cited by bare number** — `ADR-0046`,
+  `Plan 0045 Phase 3` — never by a relative link (it rots on the next `plans/done/` move; rustdoc
+  intra-doc links are fine and stay). **Write no plan-relative narration**: describe the code as it
+  is, not as a history — there is no "this plan" once the session closes.
+  `scripts/check-comment-hygiene.mjs` gates those two classes at pre-push; `hygiene-allow: <reason>`
+  escapes a false positive. Length is not gated, and it is a Mode 4 review lens.
 - **No secrets** in code, tests, or commit messages.
 - **Tests live where the plan says**, and test the behavior the plan's done-when names. No
   unrelated tests in the same phase — that's scope creep.

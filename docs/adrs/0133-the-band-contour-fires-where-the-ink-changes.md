@@ -1,8 +1,8 @@
 # ADR-0133 — The band contour fires where the ink changes, and equality is the test
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-27
-> **Related plan(s):** [0121](../plans/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+> **Related plan(s):** [0121](../plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
 > **Supplements:** [0078](0078-banding-is-a-palette-coordinate-operation.md), [0021](0021-shared-palette-system.md)
 
 ## Context
@@ -132,3 +132,31 @@ correct value the engine can read off the palette.
 `n = round(t * steps)` is the band edge nearest the sample, so `n - 1` and `n` are the bands it
 separates and their centres are `(n - 0.5) / steps` and `(n + 0.5) / steps`. The existing
 `steps < 1.5 || amount <= 0.0` early-out stays first, ahead of the samples.
+
+## Outcome — 2026-08-27, at Plan 0121's close
+
+Accepted as written; the rule, the equality test and the explicit-parameter discipline all landed
+unchanged, and no smooth-palette baseline moved. **What the implementation falsified is the count
+this ADR builds its cost and effort arguments on.**
+
+The Context calls `band_contour` *"one function written three times"*, and the Consequences price the
+change at *"four extra LUT samples per pixel at three sites"* and *"three edits where a self-contained
+function needed one"*. It is written **four** times: `warp_mesh/mod.rs` carries a fourth copy, and
+`docs/preset-palettes.md` already listed warp-mesh among the scenes where `palette_contour` is live.
+The fourth copy's text had *already drifted* (`dd` for `d`) before this plan touched it — which is
+exactly why `the_contour_reaches_the_fragment_sites_and_not_the_vertex_one` had never reported it:
+that test iterated three sites, and the one place drift had actually happened was the one place it
+could not look. All four copies are canonical now and the assertion covers them.
+
+Two things the numbers above should read as, with the correction applied: four sites, four edits, and
+the per-pixel cost paid on four scenes rather than three. Nothing else in the Consequences moves —
+the early-out still sits ahead of the samples, so a preset with the contour off pays nothing on any
+of them.
+
+**Coverage worth naming, because the count above is what hid the last gap.** Two of the four sites
+have no *rendered* evidence of this change: `core/tests/fixtures/reaction_diffusion.toml` and the
+`warp_mesh` fixtures set no `palette_contour`, and `core/tests/palette_contour.rs` drives
+`fragment_field` only. The smooth-palette regression evidence comes from
+`fixtures/composite_symmetry.toml` (`0.4`, fragment_field) and `fixtures/shape_field.toml` (`0.7`);
+the other two sites rest on the verbatim-text assertion alone, which is the guarantee that just
+failed for a whole plan cycle. Carried on Plan 0121's followup list.

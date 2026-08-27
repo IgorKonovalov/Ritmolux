@@ -205,14 +205,56 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     return (floor(t * steps) + 0.5) / steps;
 }
 
-// Shared `palette_contour` (ADR-0078; the WGSL is the implementation, copied
-// verbatim at each fragment-stage site). Darkens within one PIXEL of a band
-// edge, so the line has the same weight where the field is shallow and where it
-// is steep.
-fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+// Shared `palette_contour` (ADR-0078 / ADR-0133; the WGSL is the implementation,
+// copied verbatim at each fragment-stage site — palette.rs has no CPU
+// counterpart to be canonical, since `fwidth` exists only here).
+//
+// Darkens within one PIXEL of a band edge, so the line has the same weight where
+// the field is shallow and where it is steep — AND ONLY WHERE THE INK ACTUALLY
+// CHANGES (ADR-0133). It samples the two band centres either side of the nearest
+// edge and returns unchanged when they resolve to the same colour within half a
+// code value, which is below the LUT's own 8-bit quantization. On a smooth
+// palette two distinct centres always differ by at least one code value, so
+// every edge draws exactly as it did at any `palette_steps`; inside a plateau
+// the LUT is literally constant and the samples are bit-equal, so the line
+// vanishes there and survives at the run boundaries. One rule, both behaviours,
+// no new parameter.
+//
+// The two LUTs, the sampler and `palette_mix` are EXPLICIT parameters rather
+// than module-scope globals this happens to find: all four sites name them the
+// same today, so implicit capture would compile — and would silently bind the
+// shared function to whatever a future site called its textures.
+//
+// `textureSampleLevel`, not `textureSample`: the LUT has one mip, and an
+// explicit LOD keeps these reads free of the uniformity requirement that a
+// sample after a conditional return would otherwise carry.
+fn band_contour(
+    t: f32,
+    steps: f32,
+    amount: f32,
+    lut_a: texture_2d<f32>,
+    lut_b: texture_2d<f32>,
+    lut_samp: sampler,
+    mix_ab: f32,
+) -> f32 {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
+        return 1.0;
+    }
+    let n = round(f);
+    let m = clamp(mix_ab, 0.0, 1.0);
+    let lo = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    let hi = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
         return 1.0;
     }
     let d = min(fract(f), 1.0 - fract(f));
@@ -307,7 +349,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
-    col = col * band_contour(coord, palette_steps, palette_contour);
+    col = col * band_contour(
+        coord, palette_steps, palette_contour, lut_a, lut_b, lut_samp, palette_mix
+    );
     col = apply_saturation(col, saturation);
 
     // Alpha: this field covers every pixel, which is the coverage it honestly

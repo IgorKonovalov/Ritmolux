@@ -739,10 +739,33 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     /// The canonical WGSL contour function. **Fragment stage only** — it calls
     /// `fwidth`.
     const BAND_CONTOUR_WGSL: &str = "\
-fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
+fn band_contour(
+    t: f32,
+    steps: f32,
+    amount: f32,
+    lut_a: texture_2d<f32>,
+    lut_b: texture_2d<f32>,
+    lut_samp: sampler,
+    mix_ab: f32,
+) -> f32 {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
+        return 1.0;
+    }
+    let n = round(f);
+    let m = clamp(mix_ab, 0.0, 1.0);
+    let lo = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    let hi = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
         return 1.0;
     }
     let d = min(fract(f), 1.0 - fract(f));
@@ -753,6 +776,11 @@ fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
     const REACTION_DIFFUSION_SRC: &str = include_str!("scenes/reaction_diffusion.rs");
     const PARTICLE_SHADERS_SRC: &str = include_str!("scenes/particles/shaders.rs");
     const SHAPE_FIELD_SRC: &str = include_str!("scenes/shape_field.rs");
+    /// The **fourth** contour site. It was missing from the list below until Plan
+    /// 0121 Phase 5, and its copy had drifted (`dd` for `d`) — so the test that
+    /// exists to catch drift could not have caught this one, because the site it
+    /// lived at was never iterated.
+    const WARP_MESH_SRC: &str = include_str!("scenes/warp_mesh/mod.rs");
 
     #[test]
     fn every_wgsl_sample_site_carries_the_same_banding_expression() {
@@ -781,6 +809,7 @@ fn band_contour(t: f32, steps: f32, amount: f32) -> f32 {
             ("fragment_field.rs", FRAGMENT_FIELD_SRC),
             ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
             ("shape_field.rs", SHAPE_FIELD_SRC),
+            ("warp_mesh/mod.rs", WARP_MESH_SRC),
         ] {
             assert!(
                 src.contains(BAND_CONTOUR_WGSL),
