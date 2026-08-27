@@ -3206,6 +3206,14 @@ neighbour's direction, which is the whole point of *per-endpoint on the segment 
 designs are open and they differ in instance-buffer cost — a per-endpoint miter length carried on
 the instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex.
 
+**One unrelated nit to sweep while in these files**, recorded here because it is too small for its
+own entry and the close write-up is not loaded per session: in
+`core/src/render/scenes/lines/renderer/tests.rs` the doc block deriving the arc comparison's two
+tolerances from `golden.rs` runs into `SOFT_PROFILE`'s own block with no blank line between them,
+so both attach to `SOFT_PROFILE` and `ARC_MEAN_TOL` / `ARC_OUTLIER_TOL` are left undocumented.
+The numbers are right — `0.02` and `48` match `golden.rs` exactly — but their derivation
+now documents the wrong constant, which is the ADR-0071 failure one level down.
+
 ### Priority
 
 **Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
