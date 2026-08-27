@@ -52,7 +52,7 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
         let h = 0.5 * seg;
         let a = p[1].atan2(p[0]);
         let spike = ((a + h) / seg).floor();
-        let f = (a - seg * spike).abs();
+        let f = (a - seg * spike).abs().min(h);
         let k = star[0];
         let curve = star[1];
         let jitter = star[2];
@@ -89,7 +89,7 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
         let u = [f.cos(), f.sin()];
         let q = [len * u[0], len * u[1]];
         let mut nearest = f32::INFINITY;
-        let mut boundary_r = 0.0f32;
+        let mut boundary_r = valley[0] * u[0] + valley[1] * u[1];
         let mut prev = tip;
         for i in 1..=STAR_SEGMENTS {
             let t = i as f32 / STAR_SEGMENTS as f32;
@@ -145,7 +145,7 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [
         let h = 0.5 * seg;
         let a = p[1].atan2(p[0]);
         let spike = ((a + h) / seg).floor();
-        let f = (a - seg * spike).abs();
+        let f = (a - seg * spike).abs().min(h);
         let (k, curve, jitter) = (star[0], star[1], star[2]);
 
         if curve == 0.0 && jitter == 0.0 {
@@ -163,7 +163,7 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [
             0.5 * (tip[1] + valley[1]) * (1.0 - curve),
         ];
         let u = [f.cos(), f.sin()];
-        let mut boundary_r = 0.0f32;
+        let mut boundary_r = valley[0] * u[0] + valley[1] * u[1];
         let mut prev = tip;
         for i in 1..=STAR_SEGMENTS {
             let t = i as f32 / STAR_SEGMENTS as f32;
@@ -1768,6 +1768,66 @@ fn scaled_copy_error(level: f32, mode: usize, shape: f32, points: f32, star: [f3
     let mean = ratios.iter().sum::<f32>() / RAYS as f32;
     let var = ratios.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / RAYS as f32;
     var.sqrt() / mean
+}
+
+/// **The boundary radius is a function of direction alone, and never zero** —
+/// the invariant the curved arm's ray-versus-polyline crossing rests on.
+///
+/// `mark_boundary_radius` folds `atan2(p)` into one spike's wedge and marches
+/// the ray against that wedge's sub-segments, so scaling `p` along its own
+/// direction must not move the answer. In `f32` it can: the fold's `|a - seg *
+/// spike|` exceeds `h` by an ulp at the valley seam, the ray leaves the wedge,
+/// every sub-segment is missed, and the crossing falls through to its seed. A
+/// zero there is not a small error — every caller divides by it, so the radius
+/// palette coordinate blows up along that ray.
+///
+/// Swept over radii rather than at one, because the defect is invisible at
+/// `|p| = 1` and only some radii round into it: `curve = +0.55, points = 6`
+/// read 0 at `|p| = 0.157` while reading correctly at 1.0, 0.5 and 0.35.
+#[test]
+fn the_curved_star_boundary_radius_is_radius_invariant_and_positive() {
+    const RAYS: usize = 720;
+    const RADII: [f32; 9] = [1.0, 0.85, 0.5, 0.35, 0.15747389, 0.1, 0.05, 1.7, 2.5];
+    let cases: [(&str, f32, [f32; 3]); 5] = [
+        ("curve +0.55 p6", 6.0, [DEFAULT_STAR_VALLEY, 0.55, 0.0]),
+        (
+            "curve -0.55 jitter 0.3 p6",
+            6.0,
+            [DEFAULT_STAR_VALLEY, -0.55, 0.3],
+        ),
+        ("curve +0.2 p5", 5.0, [DEFAULT_STAR_VALLEY, 0.2, 0.0]),
+        ("jitter 0.4 p3", MIN_POINTS, [DEFAULT_STAR_VALLEY, 0.0, 0.4]),
+        ("curve +0.9 p12", MAX_POINTS, [0.18, 0.9, 0.0]),
+    ];
+    for (name, points, star) in cases {
+        // The seam angles themselves — an exact multiple of the half-wedge is
+        // where the fold rounds out of the wedge — plus a dense sweep for the
+        // rays in between.
+        let h = std::f32::consts::PI / points;
+        let seams: Vec<f32> = (0..(2.0 * points) as usize).map(|m| m as f32 * h).collect();
+        let sweep = (0..RAYS).map(|i| std::f32::consts::TAU * i as f32 / RAYS as f32);
+        for theta in seams.into_iter().chain(sweep) {
+            let reference = mark_boundary_radius([theta.cos(), theta.sin()], STAR, points, star);
+            for r in RADII {
+                let p = [theta.cos() * r, theta.sin() * r];
+                let b = mark_boundary_radius(p, STAR, points, star);
+                assert!(
+                    b > 0.0,
+                    "{name} at theta {theta} radius {r}: boundary radius {b} — \
+                     the ray missed every sub-segment and fell through to the \
+                     seed, so the radius coordinate divides by nothing"
+                );
+                let drift = (b - reference).abs() / reference;
+                assert!(
+                    drift < 1e-3,
+                    "{name} at theta {theta}: boundary radius {b} at |p| = {r} \
+                     against {reference} at |p| = 1 — it is a function of \
+                     DIRECTION, so scaling the point along its own ray must not \
+                     move it"
+                );
+            }
+        }
+    }
 }
 
 /// **Both new arms satisfy the constant-ratio property**, swept across the point
