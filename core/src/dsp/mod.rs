@@ -214,6 +214,46 @@ impl Default for AnalysisFrame {
     }
 }
 
+impl AnalysisFrame {
+    /// **The one definition of "fully driven"**: every headline level and the
+    /// whole log-band array at full scale, with the beat flag set.
+    ///
+    /// Two harnesses hold a differential against this frame — `--report`'s
+    /// `drive` column and its step stimulus (ADR-0134), and the animation gate's
+    /// driven branch (ADR-0136). A second construction site would let them
+    /// measure two different stimuli while reading as the same word, which is a
+    /// disagreement no capture could show.
+    ///
+    /// Three fields are deliberately not at full scale, and each for its own
+    /// mechanism:
+    ///
+    /// - The four `*_raw` levels stay `0`. The headline four are peak-normalized
+    ///   (ADR-0049), so `1.0` is the documented top of their range; a raw
+    ///   magnitude has no top to name, and any value picked for one would be a
+    ///   gain-staging assumption. A binding reading `bass_raw` sees silence here.
+    /// - `bpm` stays `0`, the tracker's own not-yet-warm value. There is no
+    ///   "full scale" tempo.
+    /// - `bar` is a **phase** in `[0, 1)`, not a level, so it takes `0.5` — the
+    ///   middle of a beat rather than either edge, so a `bar`-driven binding
+    ///   reads a typical position instead of sitting on the wrap.
+    pub fn fully_driven() -> Self {
+        Self {
+            bass: 1.0,
+            mid: 1.0,
+            treb: 1.0,
+            onset: 1.0,
+            beat: true,
+            bar: 0.5,
+            // "Every band up" includes the log-band array itself: `bin()` is the
+            // grammar's only reach into the spectrum (ADR-0036), so a frame that
+            // lit the four scalars alone would leave every `bin()` binding dark
+            // and read as unreactive.
+            spectrum: [1.0; SPECTRUM_BINS],
+            ..Default::default()
+        }
+    }
+}
+
 /// Stateful per-stream analyzer: accumulates interleaved samples into mono
 /// hops, runs FFT + onset detection each completed hop, and hands the latest
 /// frame to the render side. Deterministic for a given sample sequence.

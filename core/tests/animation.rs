@@ -18,6 +18,25 @@
 //! 65 % of the frame — the dilution this change exists to remove, back again
 //! by another door.
 //!
+//! **Plan 0123 Phase 1 / ADR-0136: the gate asks its question in both
+//! readings.** Autonomous motion and liveliness were the same property for
+//! every world the library held when this file was written, and they stopped
+//! being the same one for a poster built to sit still and do its moving in
+//! response to the music. So a preset passes on **either** reading: the silent
+//! motion above, or a silent-versus-driven differential — the same
+//! `footprint_diff`, over the silent capture and one taken against
+//! [`AnalysisFrame::fully_driven`] at the same frame count. A preset frozen in
+//! **both** still fails, which is the only sense in which this gate has ever
+//! meant frozen. The sweep prints which branch carried each pass, so
+//! "still in silence" is a visible roster rather than an invisible consequence
+//! of an `||`.
+//!
+//! Both branches score **this gate's own statistic**. The driven reading is not
+//! `reactivity.rs`'s: that gate measures `frame_diff` — a whole-frame mean — on
+//! real PCM through the real analyzer, and it stays the only gate that does.
+//! Disjoining two floors on two statistics in two units would be the ADR-0071 /
+//! ADR-0074 error with an `||` in front of it.
+//!
 //! Software adapter so it holds on any CI GPU.
 //!
 //! The resolution ladder at the bottom of this file (Plan 0067 Phase 1d) is a
@@ -68,6 +87,35 @@ const FRAME_B: u32 = 48;
 ///   a zero numerator, which no normalization can rescue (ADR-0091's safety
 ///   argument). The pair is pinned as a standing test below.
 const ANIM_FLOOR: f32 = 0.01;
+/// Minimum silent-versus-driven differential, in the same `footprint_diff`
+/// units as [`ANIM_FLOOR`] and over the same mask — the floor the **driven**
+/// branch clears (ADR-0136). A preset under both floors is frozen and fails.
+///
+/// **Derived from the sweep this file prints, on the convention
+/// [`ANIM_FLOOR`]'s own derivation uses**, per ADR-0071:
+///
+/// - The shipped library's minimum on this statistic is **0.0345**
+///   (`Valentine`), measured 2026-08-27, DX12 software adapter, backdrops
+///   suppressed, 53 presets; the median is 0.19 and the maximum 0.71. The floor
+///   sits at **half the shipped minimum**, rounded down — the same
+///   per-system-floor convention the silent floor applies to this gate's one
+///   floor. Slack 2.03x, which is the 2.05x [`ANIM_FLOOR`] carries. A new
+///   library minimum is re-derived off the printed numbers, not nudged until
+///   green.
+/// - The noise ceiling sits **below** it, and it is literally the same ceiling.
+///   This statistic is `footprint_diff` over a mask floored at
+///   [`MIN_FOOTPRINT_FRAC`], so ADR-0091's worst-case stray event — one pixel
+///   swinging full-scale on all three channels in an otherwise empty frame —
+///   reads `1/139 = 0.0072` here too, under this floor with 2.4x margin.
+/// - The non-vacuity pair brackets it, and its low end is the sharper half.
+///   `probe_collage_mono_calm` — the still-by-design world this branch exists
+///   for — reads **0.0621**, 3.7x the floor. `rosette_spin_only` reads
+///   **0.0000**: it turns steadily on its own clock and binds no band, so a
+///   figure that moves but not *with the music* has a zero numerator here,
+///   exactly as the static control does on both readings. Both are pinned as
+///   standing tests below.
+const DRIVEN_FLOOR: f32 = 0.017;
+
 /// A pixel counts as lit (in the footprint) if any RGB channel differs from
 /// [`BLACK`] by more than this — the sanity suite's convention, same value,
 /// same reason: shrugs off near-black dithering.
@@ -179,21 +227,65 @@ fn headless_at(size: u32) -> Option<Renderer> {
     }
 }
 
-/// Both statistics over one pair of captures at silent audio, as
-/// `(footprint, whole_frame)`: the gate's footprint difference (ADR-0091) and
-/// the pre-0077 whole-frame mean the ladder below stays pinned to.
-fn motions(renderer: &mut Renderer, name: &str) -> (f32, f32) {
-    let audio = AnalysisFrame::default();
+/// One preset's three readings (ADR-0136).
+#[derive(Clone, Copy)]
+struct Motion {
+    /// `footprint_diff` between frames [`FRAME_A`] and [`FRAME_B`] at silence:
+    /// the scene's own clock, which [`ANIM_FLOOR`] gates.
+    silent: f32,
+    /// `footprint_diff` between the silent and the fully-driven capture, **both
+    /// at [`FRAME_B`]**: the picture the music alone makes, which
+    /// [`DRIVEN_FLOOR`] gates.
+    driven: f32,
+    /// The pre-0077 whole-frame mean over the silent pair — printed, never
+    /// gated, and what the ladder at the bottom of this file stays pinned to.
+    whole: f32,
+}
+
+impl Motion {
+    /// Which branch carries this preset's pass, or `None` when it is frozen in
+    /// both readings — the one verdict this gate fails on.
+    ///
+    /// Silent is tested first so the label names the *stronger* property when a
+    /// preset has both: a world that moves on its own is reported as one even
+    /// when the music moves it too. That ordering is what makes the printed
+    /// `driven` roster mean "still in silence" rather than "happened to be
+    /// checked second".
+    fn branch(self) -> Option<&'static str> {
+        if self.silent >= ANIM_FLOOR {
+            Some("silent")
+        } else if self.driven >= DRIVEN_FLOOR {
+            Some("driven")
+        } else {
+            None
+        }
+    }
+}
+
+/// Every reading over one preset: two captures at silence, [`FRAME_A`] and
+/// [`FRAME_B`] apart, plus one at [`FRAME_B`] against
+/// [`AnalysisFrame::fully_driven`].
+///
+/// Three captures rather than four: the driven differential shares the silent
+/// [`FRAME_B`] capture with the autonomous one, so the second reading costs one
+/// capture per preset and both are anchored at the same point in the scene's
+/// own clock.
+fn motions(renderer: &mut Renderer, name: &str) -> Motion {
+    let silent_audio = AnalysisFrame::default();
     let early = renderer
-        .capture_preset(name, &audio, FRAME_A)
+        .capture_preset(name, &silent_audio, FRAME_A)
         .expect("capture early frame");
     let late = renderer
-        .capture_preset(name, &audio, FRAME_B)
+        .capture_preset(name, &silent_audio, FRAME_B)
         .expect("capture late frame");
-    (
-        footprint_diff(&early, &late, BLACK, EPS, MIN_FOOTPRINT_FRAC),
-        frame_diff(&early, &late),
-    )
+    let driven = renderer
+        .capture_preset(name, &AnalysisFrame::fully_driven(), FRAME_B)
+        .expect("capture driven frame");
+    Motion {
+        silent: footprint_diff(&early, &late, BLACK, EPS, MIN_FOOTPRINT_FRAC),
+        driven: footprint_diff(&late, &driven, BLACK, EPS, MIN_FOOTPRINT_FRAC),
+        whole: frame_diff(&early, &late),
+    }
 }
 
 #[test]
@@ -206,20 +298,40 @@ fn every_preset_animates_over_time() {
     renderer.set_presets(presets);
 
     let mut failures = Vec::new();
+    let mut driven_only = Vec::new();
     for (name, system) in meta {
-        let (motion, whole) = motions(&mut renderer, &name);
+        let m = motions(&mut renderer, &name);
+        let branch = m.branch();
         println!(
-            "[{}] {name:<12} frame {FRAME_A} vs {FRAME_B}: footprint {motion:.4} (whole-frame {whole:.4})",
+            "[{}] {name:<14} frames {FRAME_A}/{FRAME_B}: silent {:.4}  driven {:.4}  -> {:<6} (whole-frame {:.4})",
             system_name(system),
+            m.silent,
+            m.driven,
+            branch.unwrap_or("FROZEN"),
+            m.whole,
         );
-        if motion < ANIM_FLOOR {
-            failures.push(format!("{name} (motion {motion:.4})"));
+        match branch {
+            None => failures.push(format!(
+                "{name} (silent {:.4}, driven {:.4})",
+                m.silent, m.driven
+            )),
+            Some("driven") => driven_only.push(name.clone()),
+            Some(_) => {}
         }
     }
 
+    // The roster ADR-0136 trades for the weakening: every world that renders as
+    // a still image in silence, named. An unprinted property is one nobody
+    // re-reads, and this is the only place the set exists.
+    println!(
+        "\nstill in silence, live on the music ({} of them): {driven_only:?}",
+        driven_only.len()
+    );
+
     assert!(
         failures.is_empty(),
-        "these presets do not animate above {ANIM_FLOOR}: {failures:#?}"
+        "these presets animate on neither reading (silent floor {ANIM_FLOOR}, \
+         driven floor {DRIVEN_FLOOR}): {failures:#?}"
     );
 }
 
@@ -230,6 +342,12 @@ fn every_preset_animates_over_time() {
 /// Together they pin the change to exactly the class ADR-0091 claims it moves:
 /// if the draft ever fails, the statistic has regressed to scoring occupancy; if
 /// the control ever passes, the floor has stopped gating anything.
+///
+/// **The control is checked on both branches** (ADR-0136). It does not move in
+/// silence and it does not move under full drive — nothing in it reads `time` or
+/// any band — and that pair is what frozen has always meant here. A disjunction
+/// weakens a gate exactly as far as one branch and no further, so a control that
+/// had to fail only one of them would stop pinning the other.
 ///
 /// Runs at [`SIZE`] only — the ladder below already measured that resolution
 /// does not move either statistic.
@@ -253,11 +371,14 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
     let mut sparse = None;
     let mut frozen = None;
     for ((label, note, _), name) in probes.iter().zip(names.iter()) {
-        let (footprint, whole) = motions(&mut renderer, name);
-        println!("{label:<20} footprint {footprint:.4} (whole-frame {whole:.4})   {note}");
+        let m = motions(&mut renderer, name);
+        println!(
+            "{label:<20} silent {:.4}  driven {:.4} (whole-frame {:.4})   {note}",
+            m.silent, m.driven, m.whole,
+        );
         match *label {
-            "squall_sparse" => sparse = Some(footprint),
-            "star_frozen" => frozen = Some(footprint),
+            "squall_sparse" => sparse = Some(m),
+            "star_frozen" => frozen = Some(m),
             _ => {}
         }
     }
@@ -265,14 +386,80 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
         panic!("the probe roster no longer carries the two pinned probes");
     };
     assert!(
-        sparse >= ANIM_FLOOR,
-        "THE REJECTED DRAFT fails the footprint statistic ({sparse:.4} < {ANIM_FLOOR}) — \
-         it has regressed to scoring occupancy (ADR-0091)"
+        sparse.silent >= ANIM_FLOOR,
+        "THE REJECTED DRAFT fails the footprint statistic ({:.4} < {ANIM_FLOOR}) — \
+         it has regressed to scoring occupancy (ADR-0091)",
+        sparse.silent,
     );
     assert!(
-        frozen < ANIM_FLOOR,
-        "THE STATIC CONTROL passes the footprint statistic ({frozen:.4} >= {ANIM_FLOOR}) — \
-         the floor no longer gates anything"
+        frozen.silent < ANIM_FLOOR,
+        "THE STATIC CONTROL passes the SILENT branch ({:.4} >= {ANIM_FLOOR}) — \
+         the floor no longer gates anything",
+        frozen.silent,
+    );
+    assert!(
+        frozen.driven < DRIVEN_FLOOR,
+        "THE STATIC CONTROL passes the DRIVEN branch ({:.4} >= {DRIVEN_FLOOR}) — a \
+         figure with no audio binding is moving under full drive, so the driven \
+         floor is measuring something other than the music (ADR-0136)",
+        frozen.driven,
+    );
+}
+
+/// **The world the driven branch exists for, measured before anything depends on
+/// it** (Plan 0123 Phase 1): `collage_mono` at the `pan_x`/`pan_y` rates its
+/// composition asked for must fail the silent branch and pass the driven one.
+///
+/// The shipped file is read through [`include_str!`] and its two rate lines are
+/// rewritten here, so this measures the preset the content lane wants **without
+/// editing it**: the gate is shown to carry the case before the preset depends
+/// on it doing so. If the rates in the file come down to these, this probe
+/// measures the shipped preset and still asserts the same property.
+///
+/// The assertion on the *silent* branch is the load-bearing half. Without it a
+/// preset that started animating on its own would pass this test while the
+/// driven branch went unexercised, and the case ADR-0136 added it for would have
+/// quietly stopped being covered.
+#[test]
+fn the_driven_branch_carries_the_world_that_is_still_by_design() {
+    let Some(mut renderer) = headless_at(SIZE) else {
+        return;
+    };
+    let src = with_param(
+        &with_param(
+            &with_param(COLLAGE_MONO_SRC, "pan_x", "0.06 * sin(time * 0.07)"),
+            "pan_y",
+            "0.04 * sin(time * 0.09 + 1.1)",
+        ),
+        "name",
+        "probe_collage_mono_calm",
+    );
+    let preset = without_backdrop(
+        Preset::from_toml_str(&src).unwrap_or_else(|e| panic!("the calm probe parses: {e}")),
+    );
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let m = motions(&mut renderer, &name);
+    println!(
+        "{name:<24} silent {:.4}  driven {:.4}  -> {:<6} (whole-frame {:.4})",
+        m.silent,
+        m.driven,
+        m.branch().unwrap_or("FROZEN"),
+        m.whole,
+    );
+    assert!(
+        m.silent < ANIM_FLOOR,
+        "THE CALM PROBE clears the silent floor ({:.4} >= {ANIM_FLOOR}) — it is not \
+         the still-by-design case the driven branch was added for, so this test \
+         has stopped exercising that branch",
+        m.silent,
+    );
+    assert!(
+        m.driven >= DRIVEN_FLOOR,
+        "THE CALM PROBE fails the driven floor ({:.4} < {DRIVEN_FLOOR}) — the \
+         branch ADR-0136 added does not carry the preset it was added for",
+        m.driven,
     );
 }
 
@@ -283,6 +470,15 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
 /// Rungs of the ladder. 384 is 16x the pixels of 96, which is why this is not
 /// something the shipped-set sweep above can afford to run at.
 const LADDER: [u32; 3] = [96, 192, 384];
+
+/// **`collage_mono` as it ships**, read from the file rather than frozen into
+/// this one — the opposite choice from [`SQUALL_SRC`] and [`ROSETTE_SRC`] and for
+/// the opposite reason. Those two are *instruments* whose rungs must stay
+/// comparable across runs, so their subject is pinned. This one is a claim
+/// **about the shipped preset**, so it has to follow the file: a frozen copy
+/// would go on asserting that the driven branch carries a preset the library
+/// does not contain.
+const COLLAGE_MONO_SRC: &str = include_str!("../../presets/collage_mono.toml");
 
 /// **`Squall` exactly as it shipped**, frozen here when Plan 0075's cohort four
 /// retired the file (recover the commented original with
@@ -586,7 +782,7 @@ fn the_resolution_ladder_against_the_two_designs_it_penalizes() {
         let names: Vec<String> = presets.iter().map(|p| p.name.clone()).collect();
         renderer.set_presets(presets);
         for (row, name) in rows.iter_mut().zip(names.iter()) {
-            row.2.push(motions(&mut renderer, name).1);
+            row.2.push(motions(&mut renderer, name).whole);
         }
     }
 
