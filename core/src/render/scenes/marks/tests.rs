@@ -126,7 +126,7 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
 /// **The CPU mirror of `mark_boundary_radius`** (Plan 0098 Phase 2). Kept
 /// identical by inspection, the same arrangement [`mark_distance`]'s own mirror
 /// uses and for the same reason.
-pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, _star: [f32; 3]) -> f32 {
+pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
     if shape < 0.5 {
         return 1.0;
     }
@@ -140,8 +140,68 @@ pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, _star: 
         let f = a - seg * (a / seg).floor() - h;
         return h.cos() / f.cos();
     }
-    // star and heart: Phase 3.
-    1.0
+    if shape < 3.5 {
+        let seg = std::f32::consts::TAU / points;
+        let h = 0.5 * seg;
+        let a = p[1].atan2(p[0]);
+        let spike = ((a + h) / seg).floor();
+        let f = (a - seg * spike).abs();
+        let (k, curve, jitter) = (star[0], star[1], star[2]);
+
+        if curve == 0.0 && jitter == 0.0 {
+            let b = (1.0 - k * h.cos()) / (k * h.sin());
+            return 1.0 / (f.cos() + b * f.sin());
+        }
+
+        let n = points.max(1.0);
+        let index = (spike - (spike / n).floor() * n).max(0.0) as u32;
+        let rt = 1.0 + jitter * (spike_hash01(index) * 2.0 - 1.0);
+        let tip = [rt, 0.0f32];
+        let valley = [k * h.cos(), k * h.sin()];
+        let ctrl = [
+            0.5 * (tip[0] + valley[0]) * (1.0 - curve),
+            0.5 * (tip[1] + valley[1]) * (1.0 - curve),
+        ];
+        let u = [f.cos(), f.sin()];
+        let mut boundary_r = 0.0f32;
+        let mut prev = tip;
+        for i in 1..=STAR_SEGMENTS {
+            let t = i as f32 / STAR_SEGMENTS as f32;
+            let sm = 1.0 - t;
+            let cur = [
+                sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0],
+                sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1],
+            ];
+            let e = [cur[0] - prev[0], cur[1] - prev[1]];
+            let denom = u[0] * e[1] - u[1] * e[0];
+            if denom.abs() > 1e-9 {
+                let ts = -(u[0] * prev[1] - u[1] * prev[0]) / denom;
+                if (0.0..=1.0).contains(&ts) {
+                    let hit = [prev[0] + ts * e[0], prev[1] + ts * e[1]];
+                    boundary_r = hit[0] * u[0] + hit[1] * u[1];
+                }
+            }
+            prev = cur;
+        }
+        return boundary_r;
+    }
+    // heart, about the FIGURE's centre — `(0, HEART_CY)` in heart space.
+    let len = ((p[0] * p[0] + p[1] * p[1]).sqrt()).max(1e-20);
+    let dir = [p[0].abs() / len, p[1] / len];
+    let w = [-0.25f32, HEART_CY - 0.75];
+    let b_half = dir[0] * w[0] + dir[1] * w[1];
+    let disc =
+        (b_half * b_half - (w[0] * w[0] + w[1] * w[1]) + HEART_LOBE_R * HEART_LOBE_R).max(0.0);
+    let t_lobe = -b_half + disc.sqrt();
+    let hit = [t_lobe * dir[0], HEART_CY + t_lobe * dir[1]];
+    if hit[0] + hit[1] >= 1.0 {
+        return t_lobe / HEART_SCALE;
+    }
+    let denom = dir[0] - dir[1];
+    if denom.abs() < 1e-9 {
+        return t_lobe / HEART_SCALE;
+    }
+    (HEART_CY / denom) / HEART_SCALE
 }
 
 /// **The curved star arm's normalization reference**, mirroring the second
@@ -1514,5 +1574,308 @@ fn a_curved_star_on_the_field_has_no_hole_at_any_gamma() {
         "at the largest exponent the core reads {lo:.1} where the disc control \
          reads {want:.1}. `d^gamma` goes to 0 there, so the centre must converge \
          on the colour at `color_center` rather than on the gradient's far end"
+    );
+}
+
+// --- Phase 3: the star and the heart take the coordinate -----------------------
+//
+// Phase 2 wired the mode up and proved it on the two arms whose closed form is
+// one line. These are the two the reference images actually need, and neither is
+// one line: the star is a ray against the tip-valley edge the fold selected, and
+// the heart is a ray against a lobe circle or a tangent ray, chosen by the same
+// branch its SDF takes.
+//
+// The ground truth is the SAME numerically sampled outline the exterior section
+// above measures distance against, so `r_boundary` and `mark_distance` are
+// graded against one figure. A ratio that is beautifully constant against the
+// WRONG boundary is exactly the failure that would otherwise survive here.
+
+/// The boundary radius, found on the ground-truth polyline: bisect along the ray
+/// for the sign change in [`true_signed_distance`].
+///
+/// Deliberately not derived from `mark_boundary_radius` or from `mark_distance`
+/// — it reads the sampled outline directly, which is what makes it evidence
+/// about the closed forms rather than a restatement of them.
+fn true_boundary_radius(theta: f32, loops: &[Loop]) -> f32 {
+    let dir = [theta.cos(), theta.sin()];
+    let at = |r: f32| true_signed_distance([dir[0] * r, dir[1] * r], loops);
+    let (mut lo, mut hi) = (1e-4f32, 3.0f32);
+    for _ in 0..80 {
+        let mid = 0.5 * (lo + hi);
+        if at(mid) < 0.0 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// **`r_boundary` describes the outline the SDF describes** — checked against the
+/// numerically sampled boundary rather than against a second closed form.
+///
+/// Swept across the point counts and across the three `star_*` params, including
+/// the curved and jittered configurations, which move where the boundary is and
+/// are the arms Phase 1 repaired.
+///
+/// The `heart` is the one that could have gone wrong quietly: its outline is
+/// piecewise and the ray intersection has to take the *same* branch its distance
+/// does, or the two would describe different figures while each looked
+/// self-consistent.
+#[test]
+fn the_boundary_radius_agrees_with_the_sampled_outline() {
+    // The polyline's own resolution is the floor here: the star's boundary is
+    // sampled at 128 points per half-edge and the heart's arc at 360, so a
+    // bisection against it cannot be tighter than the chord it lands on. Every
+    // closed-form arm clears this by three orders — they read 0.00000.
+    const BAR: f32 = 2e-3;
+    // The curved and jittered star is the one arm with no closed form to be
+    // exact against: the shader samples the quadratic Bezier into
+    // [`STAR_SEGMENTS`] pieces where the ground truth uses 128 per half-edge, so
+    // what is left is the polyline's own sagitta. It is the same residual
+    // `the_curved_star_exterior_is_re_measured` records at 0.0032 for the
+    // distance; raising STAR_SEGMENTS is the lever, not raising this.
+    const SAMPLED_BAR: f32 = 0.01;
+    const RAYS: usize = 180;
+
+    let cases: [(&str, f32, f32, [f32; 3]); 12] = [
+        ("disc", DISC, DEFAULT_POINTS, NEUTRAL_STAR),
+        ("ring", RING, DEFAULT_POINTS, NEUTRAL_STAR),
+        ("polygon(3)", POLYGON, MIN_POINTS, NEUTRAL_STAR),
+        ("polygon(7)", POLYGON, 7.0, NEUTRAL_STAR),
+        ("polygon(12)", POLYGON, MAX_POINTS, NEUTRAL_STAR),
+        ("star(3)", STAR, MIN_POINTS, NEUTRAL_STAR),
+        ("star(5)", STAR, DEFAULT_POINTS, NEUTRAL_STAR),
+        ("star(12)", STAR, MAX_POINTS, NEUTRAL_STAR),
+        ("star valley 0.18", STAR, 7.0, [0.18, 0.0, 0.0]),
+        (
+            "star curve +0.55",
+            STAR,
+            6.0,
+            [DEFAULT_STAR_VALLEY, 0.55, 0.0],
+        ),
+        (
+            "star jitter 0.35",
+            STAR,
+            6.0,
+            [DEFAULT_STAR_VALLEY, 0.0, 0.35],
+        ),
+        ("heart", HEART, DEFAULT_POINTS, NEUTRAL_STAR),
+    ];
+
+    println!("{:<20} {:>12} {:>12}", "arm", "worst", "at theta");
+    for (name, shape, points, star) in cases {
+        // `ring` is the one arm whose centre is in its hole, so a ray from there
+        // crosses the boundary twice and the bisection below would find the
+        // INNER rim. Plan 0098 Phase 4 decides what the arm should answer;
+        // until then it is excluded from a check that assumes one crossing.
+        if shape == RING {
+            println!("{name:<20} {:>12} {:>12}", "skipped", "Phase 4");
+            continue;
+        }
+        let loops = boundary_loops_with(shape, points, star);
+        let mut worst = 0.0f32;
+        let mut worst_at = 0.0f32;
+        for i in 0..RAYS {
+            let theta = std::f32::consts::TAU * i as f32 / RAYS as f32;
+            let p = [theta.cos(), theta.sin()];
+            let claimed = mark_boundary_radius(p, shape, points, star);
+            let truth = true_boundary_radius(theta, &loops);
+            let err = (claimed - truth).abs();
+            if err > worst {
+                worst = err;
+                worst_at = theta;
+            }
+        }
+        let sampled = star[1] != 0.0 || star[2] != 0.0;
+        let bar = if sampled { SAMPLED_BAR } else { BAR };
+        println!(
+            "{name:<20} {worst:>12.5} {worst_at:>12.4}   bar {bar} {}",
+            if sampled {
+                "(sampled edge)"
+            } else {
+                "(closed form)"
+            }
+        );
+        assert!(
+            worst < bar,
+            "{name}: `mark_boundary_radius` is {worst:.5} from the sampled \
+             outline at theta = {worst_at:.4}. The ratio coordinate divides by \
+             this, so an arm that is wrong here draws a beautifully constant \
+             ratio against the WRONG figure"
+        );
+        if !sampled {
+            // The closed forms are not merely inside a tolerance, they are the
+            // outline: an arm that drifted to 0.001 would still pass the bar
+            // above and would mean the ray and the SDF had stopped agreeing.
+            assert!(
+                worst < 1e-4,
+                "{name} has a closed form and must be EXACT against its own \
+                 outline, not merely close ({worst:.6})"
+            );
+        }
+    }
+}
+
+/// The palette coordinate each mode hands the LUT, as a CPU mirror of the
+/// shader's branch — so the two constructions can be compared without a GPU.
+fn mode_coord(p: [f32; 2], mode: usize, shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    if mode == 0 {
+        return mark_distance(p, shape, points, star);
+    }
+    let r = (p[0] * p[0] + p[1] * p[1]).sqrt();
+    r / mark_boundary_radius(p, shape, points, star).max(1e-6)
+}
+
+/// Where the contour at coordinate `level` crosses the ray at `theta`.
+fn contour_radius(
+    theta: f32,
+    level: f32,
+    mode: usize,
+    shape: f32,
+    points: f32,
+    star: [f32; 3],
+) -> f32 {
+    let dir = [theta.cos(), theta.sin()];
+    let (mut lo, mut hi) = (1e-4f32, 3.0f32);
+    for _ in 0..80 {
+        let mid = 0.5 * (lo + hi);
+        if mode_coord([dir[0] * mid, dir[1] * mid], mode, shape, points, star) < level {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// The relative spread of `r_contour / r_boundary` around the figure — 0 exactly
+/// when the contour is a scaled copy of the outline.
+fn scaled_copy_error(level: f32, mode: usize, shape: f32, points: f32, star: [f32; 3]) -> f32 {
+    const RAYS: usize = 240;
+    let ratios: Vec<f32> = (0..RAYS)
+        .map(|i| {
+            let theta = std::f32::consts::TAU * i as f32 / RAYS as f32;
+            let p = [theta.cos(), theta.sin()];
+            contour_radius(theta, level, mode, shape, points, star)
+                / mark_boundary_radius(p, shape, points, star)
+        })
+        .collect();
+    let mean = ratios.iter().sum::<f32>() / RAYS as f32;
+    let var = ratios.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / RAYS as f32;
+    var.sqrt() / mean
+}
+
+/// **Both new arms satisfy the constant-ratio property**, swept across the point
+/// counts and across the three `star_*` params.
+///
+/// Stated on the contour rather than on the coordinate: for a band boundary at
+/// any level, `r_contour(theta) / r_boundary(theta)` is constant in theta under
+/// the radius mode, which is the definition of a scaled copy. The bisection is
+/// exact to 80 halvings, so what is left is the arms' own arithmetic.
+#[test]
+fn the_star_and_heart_contours_are_scaled_copies_under_the_radius_mode() {
+    const BAR: f32 = 1e-3;
+    let cases: [(&str, f32, f32, [f32; 3]); 9] = [
+        ("star(3)", STAR, MIN_POINTS, NEUTRAL_STAR),
+        ("star(5)", STAR, DEFAULT_POINTS, NEUTRAL_STAR),
+        ("star(7)", STAR, 7.0, NEUTRAL_STAR),
+        ("star(12)", STAR, MAX_POINTS, NEUTRAL_STAR),
+        ("star valley 0.18", STAR, 7.0, [0.18, 0.0, 0.0]),
+        ("star valley 0.85", STAR, 5.0, [0.85, 0.0, 0.0]),
+        (
+            "star curve +0.55",
+            STAR,
+            6.0,
+            [DEFAULT_STAR_VALLEY, 0.55, 0.0],
+        ),
+        (
+            "star curve -0.55 jitter 0.3",
+            STAR,
+            6.0,
+            [DEFAULT_STAR_VALLEY, -0.55, 0.3],
+        ),
+        ("heart", HEART, DEFAULT_POINTS, NEUTRAL_STAR),
+    ];
+    println!(
+        "{:<28} {:>10} {:>10} {:>10}",
+        "arm", "level", "radius", "distance"
+    );
+    for (name, shape, points, star) in cases {
+        for level in [0.35f32, 0.7, 1.4] {
+            let radius = scaled_copy_error(level, 1, shape, points, star);
+            let distance = scaled_copy_error(level, 0, shape, points, star);
+            println!("{name:<28} {level:>10.2} {radius:>10.5} {distance:>10.5}");
+            assert!(
+                radius < BAR,
+                "{name} at level {level}: the radius mode's contour deviates \
+                 {radius:.5} from a scaled copy of the outline — it must be \
+                 constant in theta, that is what the coordinate IS"
+            );
+        }
+    }
+}
+
+/// **The heart's notch is measurably sharper under the radius mode, and the gap
+/// GROWS as the contour moves inward** — the property this whole plan is for.
+///
+/// Stated as a comparison rather than an absolute, because "sharp" is not a
+/// number. An inward offset is an erosion, and erosion rounds a **reflex**
+/// corner while keeping convex ones sharp — so under the distance coordinate the
+/// heart's bottom point survives and its top notch fills in, further at every
+/// step inward. Under the radius coordinate the inner figure is the same figure,
+/// smaller, at every level.
+///
+/// Two claims, and the second is what makes it a property of the construction
+/// rather than of one tuning:
+///
+/// - at equal ring counts the radius mode's deviation from a scaled copy is far
+///   smaller than the distance mode's;
+/// - the distance mode's deviation **grows** as the contour moves inward, and
+///   the radius mode's does not.
+#[test]
+fn the_hearts_inner_contours_stay_scaled_copies_only_under_the_radius_mode() {
+    // Nine rings inside the figure, which is the count ADR-0111's own table was
+    // measured at.
+    let levels: Vec<f32> = (1..=8).map(|k| k as f32 / 9.0).collect();
+    println!("{:>8} {:>12} {:>12}", "level", "radius", "distance");
+    let mut radius_errs = Vec::new();
+    let mut distance_errs = Vec::new();
+    for &level in &levels {
+        let radius = scaled_copy_error(level, 1, HEART, DEFAULT_POINTS, NEUTRAL_STAR);
+        let distance = scaled_copy_error(level, 0, HEART, DEFAULT_POINTS, NEUTRAL_STAR);
+        println!("{level:>8.3} {radius:>12.5} {distance:>12.5}");
+        radius_errs.push(radius);
+        distance_errs.push(distance);
+    }
+
+    for (i, (&r, &d)) in radius_errs.iter().zip(distance_errs.iter()).enumerate() {
+        assert!(
+            d > 8.0 * r,
+            "at ring {} of 9 the distance mode deviates {d:.5} from a scaled copy \
+             and the radius mode {r:.5} — the whole point of the second \
+             coordinate is that the inner figures stay the SAME figure",
+            i + 1
+        );
+    }
+    // The innermost ring against the outermost, under each mode. The distance
+    // coordinate's error grows inward; the radius coordinate's does not.
+    let (d_inner, d_outer) = (distance_errs[0], distance_errs[levels.len() - 1]);
+    let (r_inner, r_outer) = (radius_errs[0], radius_errs[levels.len() - 1]);
+    println!(
+        "innermost vs outermost ring: distance {d_inner:.5} -> {d_outer:.5}, \
+         radius {r_inner:.5} -> {r_outer:.5}"
+    );
+    assert!(
+        d_inner > 2.0 * d_outer,
+        "the distance mode's deviation must GROW as the contour moves inward — \
+         that is the erosion rounding the notch off, and it is the mechanism \
+         ADR-0111 exists to escape ({d_inner:.5} innermost against {d_outer:.5} \
+         outermost)"
+    );
+    assert!(
+        r_inner < 4.0 * r_outer,
+        "the radius mode's deviation must NOT grow inward the way the distance \
+         mode's does ({r_inner:.5} innermost against {r_outer:.5} outermost)"
     );
 }

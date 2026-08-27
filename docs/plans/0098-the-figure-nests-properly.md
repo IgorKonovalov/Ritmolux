@@ -282,8 +282,8 @@ flowchart TD
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The star's interior stops lying | dev | done | `28336c3` |
-| 2 — The coordinate exists, and a polygon proves it | dev | done | committed with this row |
-| 3 — The heart and the star take the coordinate | dev | not started | |
+| 2 — The coordinate exists, and a polygon proves it | dev | done | `a6bb867` |
+| 3 — The heart and the star take the coordinate | dev | done | committed with this row |
 | 4 — `ring` gets an honest answer | dev | not started | |
 | 4b — The figure can turn | dev | not started | |
 | 5 — What it costs at the floor tier | dev | not started | |
@@ -333,6 +333,20 @@ flowchart TD
   itself, which is `mark_distance`'s own signature and keeps the two arms reading one fold.
 - The `disc` renders **0 of 40000 pixels** different between the two modes, which is the harness
   check ADR-0111 predicts rather than a tolerance that happened to hold.
+- **Phase 3: the straight-edge `star`'s interior behaves like the regular polygon's** — both modes
+  read `0.00000` deviation from a scaled copy at interior levels, because that branch returns the
+  distance to the edge *plane*, which is linear in `p` and therefore has scaled-copy level sets.
+  The arms separate outside the outline (`0.03`–`0.06`), and the **curved** star separates
+  everywhere (`0.12`–`0.20`) because that branch computes a true distance.
+- The `heart` is where the plan's property lands as stated: over nine rings its distance-mode
+  deviation from a scaled copy runs `0.02286` at the outermost to `0.55202` at the innermost — it
+  **grows** inward, which is the notch filling in — while the radius mode reads `0.00000` at every
+  ring.
+- `mark_boundary_radius` is exact against the numerically sampled outline for every closed-form
+  arm (`0.00000`, heart `0.00001` at the polyline's own resolution). The curved/jittered star
+  carries `0.00472`, which is the 8-segment Bezier polyline's sagitta — the same residual
+  `the_curved_star_exterior_is_re_measured` records at `0.0032` for the distance — so it is bounded
+  separately, at `0.01`.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is
