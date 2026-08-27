@@ -20,7 +20,7 @@
 > `v0.80.0` had been taken at a `dev`-arm close; it had not. That tag sits on `601293d`, Plan 0119's
 > release commit, and no part of this plan was on `main` until now. `dev`'s close block recorded the
 > discrepancy and correctly left it for this session.
-> **This merge also lands [Plan 0087](../0087-the-line-renderer-draws-a-curve.md) Phases 1-4** — the
+> **This merge also lands [Plan 0087](0087-the-line-renderer-draws-a-curve.md) Phases 1-4** — the
 > arc primitive — because this lane was branched off that one (Phase 2 needs the arc fragment).
 > 0087 stays open and parked at Phase 5, now resuming from `main`.
 > **Created:** 2026-08-25
@@ -28,7 +28,7 @@
 > **Related ADRs:** [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md),
 > supplementing [ADR-0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md),
 > [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)
-> **Blocks:** [Plan 0087](../0087-the-line-renderer-draws-a-curve.md) Phase 5 — parked at Phase 4 by
+> **Blocks:** [Plan 0087](0087-the-line-renderer-draws-a-curve.md) Phase 5 — parked at Phase 4 by
 > user decision 2026-08-25, so the biarc chain is judged on the final stroke rather than through
 > this defect
 > **Amended 2026-08-26, before Phase 1 started.** `dev` found a **fifth consumer** of the fragment:

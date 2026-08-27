@@ -340,7 +340,7 @@ pub struct MilkBundle {
 - **Contention:** Phase 1 edits `core/src/preset/schema.rs` and `core/src/render/scenes/mod.rs`,
   which nothing on the current roster touches. It does **not** contend with
   [0092](../0092-the-engine-draws-an-authored-path.md) or [0098](../0098-the-figure-nests-properly.md)
-  (both `shape_field.rs`) or [0087](../0087-the-line-renderer-draws-a-curve.md) (`lines/`). Phase 4
+  (both `shape_field.rs`) or [0087](0087-the-line-renderer-draws-a-curve.md) (`lines/`). Phase 4
   draws through the shared line renderer and **would** contend with 0087 — sequence them.
 
 ## What this plan does NOT do

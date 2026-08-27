@@ -5,7 +5,7 @@
 > **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) (an authored path is inline SVG data, and it morphs by resampling)
-> **Depends on:** [Plan 0091](done/0091-the-figure-fills-the-frame.md) (hard — the field scene this draws into). [Plan 0087](0087-the-line-renderer-draws-a-curve.md) is a **soft** dependency; see the sequencing note below.
+> **Depends on:** [Plan 0091](done/0091-the-figure-fills-the-frame.md) (hard — the field scene this draws into). [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) is a **soft** dependency; see the sequencing note below.
 
 ## TL;DR
 

@@ -19,7 +19,7 @@ Four forks were settled by interview, and the last of them changed the architect
 - **Morphing resamples both endpoints to a common arity automatically**, rather than requiring the
   author to hand-build correspondent shapes.
 - **Both filled and stroked.**
-- **Sequenced after [Plan 0087](../plans/0087-the-line-renderer-draws-a-curve.md)**, inheriting its
+- **Sequenced after [Plan 0087](../plans/done/0087-the-line-renderer-draws-a-curve.md)**, inheriting its
   arc primitive rather than inventing a second curve representation.
 
 **The fill route is the load-bearing engineering question, and the arithmetic settles it.** A

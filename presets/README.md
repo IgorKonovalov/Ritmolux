@@ -3065,8 +3065,9 @@ preset-side extension point:
 | `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
 | `scallop`  | the **scalloped boundary** — one closed chain of outward-bulging arcs meeting at cusps. Not a bead: see the key note above | **1 arc per lobe** |
 
-> **Five of the seven are drawn as real curves** (Plan 0087, [ADR-0098]), and
-> the two circular ones are the cheapest members of the roster. Every arc's
+> **Six of the eight are drawn as real curves** (Plan 0087, [ADR-0098]) — only
+> `diamond` and `chevron` are still sampled polylines — and the two circular ones
+> are the cheapest members of the roster. Every arc's
 > stroke is a distance evaluated **per pixel**, so it has no vertices at any
 > scale.
 >

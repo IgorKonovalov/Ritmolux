@@ -13,6 +13,88 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md)
+  — closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`3f9e828`, `b97ff64`,
+  `509eaff`, `82c031f`) in `lmv-plan-0087` on `plan-0087-arc-primitive`, which reached `main` inside
+  [0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s close merge; 5, 6 and the preset
+  (`af4f118`, `8179f25`, `a7d7cd0`) in `lmv-plan-0087-biarc`. Phases 4 and 7 are `human`. Review:
+  **no blockers, one major, five minors, two nits.** Version **0.82.0** (minor).
+
+  **What landed.** `LineRenderer` gained an `ArcInstance` drawn as one bounding quad whose stroke is
+  `abs(length(p - c) - r)` evaluated per pixel — exact, resolution-independent, no vertex at any
+  scale. Curves that are not circles became **G1 arc chains** fitted at rebuild time (`biarc.rs`):
+  `petal` 24 segments to 22 arcs, `teardrop` 24 to 16, `trefoil` 36 to 24, and the four-ring mandala
+  fixture from 1 092 instances to 492. `scallop` joined the roster as its eighth member and its only
+  chain, answering ADR-0079's open question with the real boundary curve the user chose at Plan 0065
+  Phase 2. Phase 1b closed a separate defect on the way past: a `thickness` below `0.167` rests in
+  the stroke floor's dead zone where every value renders identically, and now warns.
+
+  **What the plan predicted and got wrong, in both directions.** It said baselines drawing a
+  circular motif *would* move — **none did**, because no shipped preset and no golden fixture
+  declared a `rings` roster at all, so the re-bless procedure it specified was never exercised and
+  the first roster preset to ship still owes it. It expected a new bind-group layout for ADR-0058's
+  enumeration — the arc pipeline **shares** the segment pipelines' layout, group and pipeline
+  layout, so nothing was owed. It priced `over_pipeline`'s precedent that an unused pipeline moves
+  WARP baselines — nothing moved. And Phase 3's stop condition, the one that could have sent the
+  whole plan to ADR-0098's Alternative C, **did not fire**: +0.017 to +0.077 ms for a sparse
+  40-member arc ring against a 16.67 ms budget, which is inside the instrument's own spread, so the
+  honest claim is *no more expensive than what it replaces* rather than *cheaper*. That reading is
+  from a discrete laptop GPU and **can convict but cannot acquit** the NFR section 1 iGPU floor.
+
+  **What the fit taught that the design did not know.** A tangent budget alone does not terminate:
+  `petal` and `teardrop` carry a point of unbounded curvature at each tip, so a tangent-only
+  criterion subdivides without limit over a feature `7.6e-6` units wide. A **lateral** budget is what
+  actually bounds the piece count. And a per-corner rule alone does not preserve a Maurer chord web —
+  a `d = 29` walk is ~90 % corners and the fit turns the remaining tenth into arcs spanning two and
+  three chords, redrawing a figure whose chords *are* the figure. So the smooth/web decision is the
+  caller's, taken whole-figure from `corner_fraction` at a 25 % threshold against measured 15 % and
+  85 % for the two families. Every shipped `d` is a web and renders chord for chord as before. The
+  single-arc collapse was written against `TANGENT_BUDGET` first and left a 2.9-degree tangent break
+  at every collapsed joint — the exact defect ADR-0098 exists to remove, arrived at by way of an
+  optimization. It is an equality test at `1e-4` now, and it was caught only because the G1 property
+  is asserted directly rather than taken from the construction.
+
+  **The look gate, twice, and one defect it does not cover.** Phase 4 returned *"circles looks fine
+  but blurred"* — a yes on both its questions (reads as drawn curves, no bead reported), which
+  green-lit Phase 5. The blur was measured on the arc build's own frame with no bloom, no trails and
+  no glow: a ~14 px stroke with 4 px within 10 % of peak. That is ADR-0056's `(1 - d/w)^2` across the
+  whole half-width, identical either side of this plan by construction, and it became
+  [0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md) rather than a phase here. Phase 7 judged
+  the three retired mandalas at their honest tunings against the new primitive: *"looks much
+  better"*, and `star_mandala` returned as `presets/star_mandala_bordered.toml` — the roster and
+  tuning exactly as they were rejected, inside a 32-lobe `scallop`. `star_mandala_six` and
+  `star_weave` stay retired. **It also returned a finding this plan deliberately did not fix**: the
+  straight-line motifs' joined corners. `renderer.rs` extends a joined end by exactly `width` where a
+  corner of interior angle `theta` needs `width / sin(theta / 2)`, so a `diamond`'s 61.9-degree
+  vertex gets 15 px of the 26.3 it needs and truncates to a flat bevel, with the two quads summing to
+  1.38x the stroke on the inner side. ADR-0041 accepted that because the quadratic falloff blurred it
+  — and 0114 took `DEFAULT_SOFTNESS` to `0.25`, which is why it became visible now and not at Plan
+  0039. Filed as [backlog 0134](../design-backlog.md); it revises ADR-0041.
+
+  **The review's own findings.** The major: `docs/capturing.md` still described the in-frame geometry
+  measure as segments-only after Phase 2 widened it to arcs, and the close block affirmatively
+  reported that sweep as not owed — which is what would have kept it unexamined, given that since
+  Phase 3 a mandala's whole figure is arcs. Repaired here, along with `presets/README.md`'s "five of
+  the seven are drawn as real curves" three lines under a table the same plan grew to eight rows.
+  Three code minors were filed rather than fixed: `parametric_curve` eagerly commits ~6.5 MB of Rust
+  heap at Rich for five buffers every shipped preset leaves empty, where `star.rs` one file over
+  sizes its arc buffers at load from the declared roster ([backlog 0135](../design-backlog.md), which
+  also carries a one-element capacity shortfall on `points`); and a negative ring `scale` makes a
+  `scallop` lobe sweep the long way round and bulge outward instead of dimpling inward, its own
+  comment blaming the clamped bindable multiplier rather than the unclamped structural key
+  ([backlog 0136](../design-backlog.md)). The nits: the doc block deriving the arc test's tolerances
+  attaches to `SOFT_PROFILE` instead of the two constants it describes, and `scallop_lobe`'s "under
+  half a turn for any depth" is false past the same threshold as 0136.
+
+  **What outlived the plan.** The `--workspace` scope question, again. `dev`'s close block cited
+  `cargo nextest run -p lmv-core` at 794 tests; the review re-ran `--workspace` and got **1028
+  passed, 0 failed**, which is what actually confirms "no golden baseline moved" — the same asymmetry
+  that put a red `standalone` test on `main` after Plan 0095's close. A core edit's blast radius does
+  not stop at `core/`. Also standing: `star_mandala_bordered` is the **first preset in the library to
+  bind a `rings` roster**, which discharges ADR-0079's "accepted, delivered, and currently unused"
+  and makes the committed gallery re-render genuinely owed — still blocked on
+  [backlog 0133](../design-backlog.md), since `docs-shots.mjs` cannot run at all.
+
 - [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
   — closed 2026-08-26. Ten phases, `e2eb8fc`..`1d0185a`, in the `lmv-plan-0114` worktree on
   `plan-0114-line-stroke`. Review: **no blockers, one major, three minors** — no code finding; the major is the plan header's own false merge/version claim, repaired at the close. Version **0.81.0**
@@ -4881,7 +4963,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0078]: done/0078-the-ink-learns-to-bite.md
 [0082]: done/0082-the-gradient-stops-banding.md
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
-[0087]: 0087-the-line-renderer-draws-a-curve.md
+[0087]: done/0087-the-line-renderer-draws-a-curve.md
 
 ## 0109 — The MilkDrop import gets its geometry back
 
