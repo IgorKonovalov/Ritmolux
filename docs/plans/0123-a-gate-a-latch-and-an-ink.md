@@ -325,8 +325,8 @@ struct LatchBank {
 | 4 — the latch bank runs | dev | done | `696fca9` |
 | 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
 | 6 — `collage_mono` recomposes on the music | human | not started | |
-| 7 — the line family gets a seam | dev | done | committed with this row |
-| 8 — the class is written down | dev | not started | |
+| 7 — the line family gets a seam | dev | done | `e745c45` |
+| 8 — the class is written down | dev | done | committed with this row |
 | 9 — a mono line world | human | not started | |
 
 ### Notes
@@ -356,6 +356,37 @@ forbids touching `ANIM_FLOOR`, and Phase 2 restores the premise anyway: with the
 rates back down, `Collage Mono` leaves the silent branch and the silent minimum
 returns to `0.0201` (`On White`). Left for the close to decide whether the comment
 is re-derived.
+
+**Phase 8 — the done-when as worded is not achievable, and the measurement is
+why.** It asks that a reader following the list "arrive at a frame whose colours
+are the palette's". Rendered: `collage_mono` at 1280x720 with every enumerated
+mixer at its off value comes back with three flat regions and **none of the three
+is the palette's literal RGB** — `#ffffff` arrives as `#e7e7e7` and `#b00808` as
+`#d63131`. The page states the achievable claim instead, that three inks leave
+three plateaus, with the measurement printed under it.
+
+**Phase 8 — the sweep found four stages ADR-0138 does not name, and one of them
+has no off switch.** The ADR lists bloom, the tonemap, trails, kaleidoscope
+resampling and `palette_contour`. Also on the page, per the phase's instruction to
+add rather than omit: the **backdrop composite**, the **A/B palette crossfade**,
+the **duotone ink pass**, an **`over` layer join** (all four `LayerBlend` variants
+are mixers and there is no replacing blend — the off switch is `join = "under"`,
+where the layer draws through the same seam), and the **internal post grid**,
+whose linear resample mixes neighbours whenever any stage is active.
+
+The one with no switch is the **tonemap's display dither** (ADR-0096): a static
+±1-encoded-level triangular dither before the 8-bit store, with no parameter and
+no business having one. Its amplitude falls to zero at the rails, so pure black
+and pure white come through exact and only the inks between them speckle — which
+the `collage_mono` measurement confirms exactly (`#000000` exact over 86 007
+pixels; the paper and the red each ±1).
+
+**Phase 8 — one leak that is about the preset's numbers rather than a stage.** The
+palette bakes into a 256-entry LUT sampled with **linear** filtering, so a stop
+pair written to jump (`0.1249` then `0.1251`) is narrower than one texel and the
+whole transition sits inside it. A coordinate landing on that texel reads a blend.
+The fix is to sample at plateau centres, which `collage_mono`'s palette header
+already does; there is no switch and the page says so.
 
 **Phase 7 — the WARP hazard the plan and `renderer.rs` both predicted did not
 fire. No golden moved.** The shared line renderer now builds through
