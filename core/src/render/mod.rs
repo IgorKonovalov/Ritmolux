@@ -62,7 +62,9 @@ mod transition;
 use crate::audio::AudioFormat;
 use crate::diag::{AnalysisMetrics, Diag, Metrics};
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Expr, Layer, LayerJoin, Preset, SystemKind, Variables};
+use crate::preset::{
+    Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
+};
 use background::Background;
 pub use capture::CaptureImage;
 pub use capture_api::AudioCapture;
@@ -381,8 +383,9 @@ fn resolve_routes(presets: &[Preset]) -> Vec<Vec<ParamRoute>> {
 /// Plan 0018 Phase 5, widened by ADR-0035). Each active-preset binding gets
 /// optional exponential smoothing with a per-param [`Easing`] (seconds), applied
 /// on the injected real `dt` **between** `expr.eval` and `set_param`, so band-
-/// and beat-driven motion eases instead of snapping. The expression layer stays
-/// pure and allocation-free — the smoothing state lives only here.
+/// and beat-driven motion eases instead of snapping. The evaluator stays pure
+/// and allocation-free — the smoothing state lives here, beside the other
+/// per-frame state the expression path has, [`LatchBank`].
 ///
 /// With `attack != release` this is deliberately **not** a linear filter: a
 /// direction-dependent time constant rectifies, so a fast-attack parameter rides
@@ -425,6 +428,110 @@ impl ParamSmoother {
         // than growing a second easing vocabulary beside this one.
         *slot = tau.step(*slot, raw, dt);
         *slot
+    }
+}
+
+/// What a latch expression counts as true — the engine's edge-trigger level,
+/// the same `0.5` `shape_collage`'s `recompose` rises past.
+///
+/// One number for both `arm` and `fire` so an author writes one kind of
+/// condition. Every comparison in the grammar already yields exactly `0.0` or
+/// `1.0`, so the threshold only matters for an expression that hands over a
+/// continuous value, and there `0.5` is the midpoint.
+const LATCH_TRUE: f32 = 0.5;
+
+/// One latch's state between frames (ADR-0137).
+#[derive(Clone, Copy, Default)]
+struct LatchState {
+    /// Whether this latch may still fire in its current arming window. Cleared
+    /// by a fire; set again only by a **rising** edge of `arm`, which is what
+    /// makes "at most one rise per window" a property rather than a hope.
+    armed: bool,
+    /// Remaining hold, in seconds. Counted down on the injected real `dt`.
+    hold_left: f32,
+    /// Last frame's `arm` truth, for the window edge.
+    arm_last: bool,
+    /// Last frame's `fire` truth, for the trigger edge.
+    fire_last: bool,
+}
+
+/// Per-preset `[latch]` state (ADR-0137) — the one part of the expression path
+/// whose value depends on frame history.
+///
+/// **Held here, beside [`ParamSmoother`], for the reason easing is.** One
+/// compiled expression is evaluated many times per frame in this engine — once
+/// per mesh vertex for a `[per_vertex]` binding, once per element for one naming
+/// `index` — so state inside the compiled tree would need one copy *per
+/// evaluation* and there is no correct single answer for what the 400th vertex
+/// of a frame should see. The evaluator stays a pure function of its
+/// [`Variables`] and stays re-entrant; this writes the reserved variable slots
+/// once per frame, before the params that read them.
+///
+/// Fixed arrays, not a `Vec`: the reserved block is [`LATCH_CAP`] wide by
+/// construction and the loader rejects a preset asking for more, so a latch
+/// index is in range by that boundary check and nothing here allocates on the
+/// frame path. Reset on a preset switch alongside the smoothers, so no armed
+/// state crosses from the outgoing preset into the incoming one.
+#[derive(Default)]
+struct LatchBank {
+    state: [LatchState; LATCH_CAP],
+    /// This frame's outputs, contiguous so
+    /// [`Variables::with_latches`] takes a slice without a copy into scratch.
+    values: [f32; LATCH_CAP],
+}
+
+impl LatchBank {
+    /// Forget every window and hold, so the next frame starts disarmed and at
+    /// rest.
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Advance every latch of `latches` by `dt` against `vars`, and return
+    /// `vars` with the reserved slots bound to this frame's outputs.
+    ///
+    /// **Call this exactly once per preset per frame**, before anything that
+    /// evaluates that preset's bindings: it consumes the `fire` edge, so a
+    /// second call in the same frame would see `fire_last` already true and the
+    /// rise would be silently swallowed. A preset's main bindings, its
+    /// `[per_vertex]` table and its `[layer]` all read the returned bundle.
+    ///
+    /// A preset with no latches returns `vars` untouched and does no work, which
+    /// is every preset that declares no table.
+    fn advance<'v>(&mut self, latches: &[Latch], vars: Variables<'v>, dt: f32) -> Variables<'v> {
+        if latches.is_empty() {
+            return vars;
+        }
+        for ((latch, state), value) in latches
+            .iter()
+            .zip(self.state.iter_mut())
+            .zip(self.values.iter_mut())
+        {
+            // The elapsed time is consumed **before** the edges are read, so a
+            // hold that runs out does so at the top of the frame it runs out in
+            // and a fire in that same frame re-arms it to its full length rather
+            // than to what was left. `dt` is the injected real frame time
+            // (ADR-0014), which is the whole of `hold` being a duration rather
+            // than a frame count.
+            state.hold_left = (state.hold_left - dt.max(0.0)).max(0.0);
+
+            let arm_now = latch.arm.eval(&vars) > LATCH_TRUE;
+            let fire_now = latch.fire.eval(&vars) > LATCH_TRUE;
+            if arm_now && !state.arm_last {
+                state.armed = true;
+            }
+            let fired = state.armed && arm_now && fire_now && !state.fire_last;
+            if fired {
+                state.armed = false;
+                state.hold_left = latch.hold;
+            }
+            state.arm_last = arm_now;
+            state.fire_last = fire_now;
+            // The firing frame reads `1.0` whatever the hold is, so `hold = 0`
+            // is a one-frame pulse rather than a rise no binding could see.
+            *value = f32::from(fired || state.hold_left > 0.0);
+        }
+        vars.with_latches(self.values.get(..latches.len()).unwrap_or(&self.values))
     }
 }
 
@@ -646,7 +753,9 @@ fn evaluate_preset(
         // Ease the evaluated value on the injected real `dt` before applying it
         // (ADR-0019). `tau` came off the preset's `[smoothing]` table at load;
         // `0` (the default for an unlisted param) passes through instantly. The
-        // expression layer above stays pure and allocation-free.
+        // evaluation above is a pure function of `vars` and allocates nothing —
+        // including a latch, whose history was folded into `vars` before this
+        // loop opened (ADR-0137).
         let value = smoother.smooth(index, raw, binding.tau, dt);
         // Dispatch on the resolved destination — no map lookup, no walk over the
         // stages, no chained fallthrough. The owner was decided at load.
@@ -1040,6 +1149,17 @@ pub struct Renderer {
     /// prefix.
     vertex_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
+    /// The active preset's `[latch]` state (ADR-0137). Reset wherever
+    /// [`param_smoother`](Self::param_smoother) is, and handed to the outgoing
+    /// bank at the same roster flip — a latch mid-hold keeps reading through a
+    /// dual-live dissolve exactly as an eased param keeps easing.
+    ///
+    /// One bank per preset, not per surface: a latch is preset-level state and
+    /// its `[layer]` bindings read the same event the main scene does, so unlike
+    /// [`layer_smoother`](Self::layer_smoother) there is no second one.
+    latches: LatchBank,
+    /// The outgoing preset's `[latch]` state during a dual-live dissolve.
+    outgoing_latches: LatchBank,
     /// The active preset's **layer** easing state (Plan 0076 Phase 1) — its own
     /// smoother because layer bindings are indexed within the layer's `params`,
     /// which would collide with the main preset's indices in
@@ -1124,6 +1244,8 @@ impl Renderer {
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             vertex_scratch: vec![0.0; scenes::warp_mesh::vertex_count(scenes::warp_mesh::MAX_MESH)],
             param_smoother: ParamSmoother::default(),
+            latches: LatchBank::default(),
+            outgoing_latches: LatchBank::default(),
             layer_smoother: ParamSmoother::default(),
             outgoing_layer_smoother: ParamSmoother::default(),
             tier,
@@ -1578,8 +1700,12 @@ impl Renderer {
     fn configure_active_scene(&mut self) {
         // Snap the eased params to the incoming preset's first values — no
         // cross-preset bleed, and determinism across capture rebuilds (ADR-0019).
+        // The latch bank resets on the same beat and for the same two reasons:
+        // an armed window must not cross a preset switch, and a capture has to
+        // stay a pure function of its inputs (NFR 6).
         self.param_smoother.reset();
         self.layer_smoother.reset();
+        self.latches.reset();
         let Self {
             ctx,
             scenes,
@@ -1824,6 +1950,8 @@ impl Renderer {
             layer_smoother,
             outgoing_smoother,
             outgoing_layer_smoother,
+            latches,
+            outgoing_latches,
             // Resolved once at construction; the overlay names it (ADR-0045). The
             // capacity values themselves were consumed at construction time — the
             // frame path reads the tier only to print it.
@@ -1913,6 +2041,13 @@ impl Renderer {
                             buf: vertex_scratch.get_mut(..n)?,
                         })
                     });
+                // The outgoing preset's latches, advanced **once** for this
+                // frame and read by both its main bindings and its layer's.
+                let out_vars = outgoing_latches.advance(
+                    &outgoing.latches,
+                    vars.with_salt(salt.of(outgoing)),
+                    dt,
+                );
                 evaluate_preset(
                     outgoing,
                     out_routes,
@@ -1920,7 +2055,7 @@ impl Renderer {
                     side,
                     None,
                     outgoing_smoother,
-                    &vars.with_salt(salt.of(outgoing)),
+                    &out_vars,
                     frame,
                     *time,
                     dt,
@@ -1947,7 +2082,7 @@ impl Renderer {
                         layer_scene,
                         &mut side.chain,
                         outgoing_layer_smoother,
-                        &vars.with_salt(salt.of(outgoing)),
+                        &out_vars,
                         frame,
                         *time,
                         dt,
@@ -2006,6 +2141,9 @@ impl Renderer {
                 })
             },
         );
+        // The active preset's latches, advanced **once** for this frame — the
+        // `fire` edge is consumed here, so everything below reads one bundle.
+        let vars = latches.advance(&preset.latches, vars.with_salt(salt.of(preset)), dt);
         evaluate_preset(
             preset,
             routes,
@@ -2013,7 +2151,7 @@ impl Renderer {
             live_side,
             Some(Terminal { tonemap, ink }),
             param_smoother,
-            &vars.with_salt(salt.of(preset)),
+            &vars,
             frame,
             *time,
             dt,
@@ -2041,7 +2179,7 @@ impl Renderer {
                 layer_scene,
                 &mut live_side.chain,
                 layer_smoother,
-                &vars.with_salt(salt.of(preset)),
+                &vars,
                 frame,
                 *time,
                 dt,
@@ -2207,6 +2345,7 @@ impl Renderer {
                 // instead of snapping to raw values the frame it stops being active.
                 self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
                 self.outgoing_layer_smoother = std::mem::take(&mut self.layer_smoother);
+                self.outgoing_latches = std::mem::take(&mut self.latches);
                 self.roster.select(index);
                 self.configure_active_scene();
             }
