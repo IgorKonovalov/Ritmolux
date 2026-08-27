@@ -953,9 +953,11 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 > branch, which normalized a true distance by the *straight* edge plane's perpendicular — always
 > shorter than the figure's real deepest-point distance, so the coordinate came out **negative** at
 > the centre and `pow` of a negative base is NaN. The branch now divides by the figure's own
-> deepest-point distance and the coordinate is exactly `0` there, so `gamma` is an ordinary knob on
-> every star. **`presets/shape_facet.toml` still pins `gamma = "1.0"` and its header still explains
-> the pin by that defect** — the pin is now unnecessary rather than load-bearing.
+> deepest-point distance and the coordinate is `0` there — **exactly** `0` while the spikes are all
+> the same length, and within about `0.09` of it under `star_jitter`, where the divisor is the
+> unjittered figure's while the measurement is the fragment's own spike's. Either way `gamma` is an
+> ordinary knob on every star. **`presets/shape_facet.toml` is the worked example**: it pinned
+> `gamma = "1.0"` for exactly this defect, and now binds it to `treb`.
 
 #### Two coordinates — offsets and scaled copies
 

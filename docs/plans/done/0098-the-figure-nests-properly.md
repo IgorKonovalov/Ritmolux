@@ -1,9 +1,16 @@
 # 0098 — The figure nests properly
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-27. All eight phases landed on `plan-0098-nested-figure`
+> (`28336c3`..`7411663`); Mode 4 review: **no blockers, no majors**, five minors and two nits.
+> Verified on the merged lane: `fmt`, `clippy --workspace --all-targets`, and
+> `cargo nextest run --workspace` at **1060 passed / 0 failed** (goldens byte-identical), plus
+> the three doc gates. Two claims were falsified in build and corrected rather than worked
+> around — this plan's own Phase 2 mechanism (erosion rounds only *reflex* corners, so a convex
+> polygon's two coordinates coincide in its interior) and ADR-0111's `palette_contour`
+> consequence, now carried as that ADR's `Outcome`.
 > **Created:** 2026-08-16
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the shape field gains a scaled-copy coordinate)
+> **Related ADRs:** [0111](../../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the shape field gains a scaled-copy coordinate)
 > **Closes:** design-backlog 0096, design-backlog 0097
 
 ## TL;DR
@@ -17,7 +24,7 @@ today punches a hole through any curved or jittered star drawn on this scene.
 ## Context & problem
 
 Two findings from the content pass that authored the first `shape_field` world
-([Plan 0091](done/0091-the-figure-fills-the-frame.md) Phase 6), both verified against the code
+([Plan 0091](0091-the-figure-fills-the-frame.md) Phase 6), both verified against the code
 rather than taken on report.
 
 **The nesting is the wrong kind of nesting.** ADR-0105 chose offset contours and delivers them; the
@@ -26,7 +33,7 @@ while keeping convex ones sharp**, so a nested heart keeps its bottom point and 
 as the rings move inward. That is not tunable: the innermost band sits at
 `d = ((1/palette_steps)/color_span)^(1/gamma)`, so a sharp notch needs `palette_steps * color_span ~ 1`,
 which leaves **one** band inside the figure. The far end of that trade was rendered and the user
-rejected it. [ADR-0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) has the
+rejected it. [ADR-0111](../../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) has the
 derivation and the rejected alternatives.
 
 **The star arm's interior is not merely approximate, it is signed wrong.** The straight-edge branch
@@ -188,7 +195,7 @@ flowchart TD
   - **It is not `kaleido_*` and the docs say so.** The screen-space fold is not a substitute: it
     folds the finished frame about a screen-centred axis, and this project has already recorded that
     it fights a translating `pan_*`. A reader who wants a turning figure must not be sent there.
-  - **The aspect stays the render target's** ([ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+  - **The aspect stays the render target's** ([ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
     A rotation in a frame whose x has been stretched by the aspect **shears** rather than rotates
     unless the rotation is applied in square units — this is the exact configuration where a wrong
     source is invisible at 16:9 and obvious at 2:1, so the test renders at a non-16:9 target and
@@ -203,7 +210,7 @@ flowchart TD
 - **Files touched:** none necessarily — a measurement phase, plus `docs/nfr.md` if a budget moves.
 - **Done when:**
   - The radius mode's per-frame cost is measured against the distance mode's on the same preset and
-    the same figure, at the **floor tier** ([`docs/nfr.md`](../nfr.md) §1 is the reference), and the
+    the same figure, at the **floor tier** ([`docs/nfr.md`](../../nfr.md) §1 is the reference), and the
     reading is recorded with the machine it was taken on (ADR-0071).
   - **A negative result is a legitimate outcome and it does not sink the plan** — the mode would
     ship documented as the expensive coordinate, or gated to the tiers that can afford it. What is
@@ -240,7 +247,7 @@ flowchart TD
     better but the look was judged and approved on the old one, so this is a content call and not an
     automatic migration.
   - **This phase may carry forward.** If the user is not available the `dev` phases close the plan
-    and the item moves to [`docs/content-brief.md`](../content-brief.md), the rule Plan 0083, Plan
+    and the item moves to [`docs/content-brief.md`](../../content-brief.md), the rule Plan 0083, Plan
     0088 and Plan 0091 all followed. It gates nothing below it.
 
 ## Risks & open questions

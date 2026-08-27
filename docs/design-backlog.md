@@ -299,6 +299,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0137 | `fragment_field` has three hardcoded animation rates and no parameter behind any of them | [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 3; see 0141. **Closed 2026-08-27** |
 | 0138 | `palette_contour` keys on the band grid and never reads the LUT | [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 5; see 0140. **Closed 2026-08-27** |
 | 0139 | Nothing in the harness measures motion rate or the silent-to-driven difference | [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 1. **Closed 2026-08-27** |
+| 0096 | `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies | [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) + [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phases 2-4, as `coord_mode`. **Closed 2026-08-27** |
+| 0097 | A curved or jittered `star` returns a NEGATIVE normalized distance at its own centre | [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1. The reference was repaired, not the result clamped. **Closed 2026-08-27** |
 
 <!-- roster:end -->
 
@@ -1197,144 +1199,6 @@ user asked for twice and it shipped; the floor was asked for once, as one elemen
 this engine is not a collage tool. It becomes worth taking when someone authors a world that wants
 a vanishing point — at which point the two routes above should be judged by rendering, not by
 argument, which is what Phase 7's own first done-when said.
-
----
-
-## 0096 — `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies
-
-> **PROMOTED 2026-08-16** — [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)
-> (proposed) and [Plan 0098](plans/0098-the-figure-nests-properly.md) Phases 2-4. The entry stays
-> live until that plan lands, per this file's own lifecycle: a design that has not shipped is
-> still live.
-
-**Raised by:** `preset-author`, authoring `presets/shape_pulse.toml` against two user reference
-images at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6 (2026-08-16).
-**Owner if taken:** `architect` (it owes an ADR — see the routes below), then `dev`.
-
-- **Verified 2026-08-16** — the scene's scalar is a distance, so its level sets are offsets by
-  construction: `present: definition of an offset curve in: core/src/render/scenes/shape_field.rs`
-- **Verified 2026-08-16** — the normalization that makes it so:
-  `present: at that deepest point in: core/src/render/scenes/marks.rs`
-
-### The finding
-
-[ADR-0105](adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) chose "a band of the
-palette coordinate is a band of constant distance, **which is the definition of an offset curve**",
-and the scene delivers exactly that. The user's reference — nested heart contours, red on black —
-is **not** an offset family. Its inner rings stay sharply heart-shaped down to a small core, which
-only **self-similar scaled copies** do.
-
-The mechanism is geometry and it is not tunable. An inward offset is an erosion, and erosion
-**rounds a reflex corner while keeping convex ones sharp**. On the heart that means the bottom
-point stays crisp and the top notch fills in — which is precisely the artifact the user asked the
-content lane to fix and it could not.
-
-**The cost is a hard coupling, not a difficulty.** The core's inner boundary sits at
-`d = ((1/palette_steps) / color_span)^(1/gamma)`, so a notch sharp enough to read needs
-`palette_steps * color_span ~ 1` — which leaves **one** band inside the figure. Measured at 9
-steps on the heart:
-
-| core sits at | notch rounding | rings inside the figure |
-|---|---|---|
-| 0.48 | 0.33 | four — what ships |
-| 0.68 | 0.20 | two |
-| 0.81 | 0.12 | one |
-| 0.91 | 0.06 | none: a black heart with a red rim |
-
-The user judged the last one in the running app and **rejected it**; `shape_pulse` keeps the
-rounded core. So "many rings inside **and** a small sharp core" is unreachable today, and it is the
-reference's whole construction.
-
-### What a fix would be
-
-A second coordinate mode on the scene: a **shape-radius** rather than a distance — for a region
-star-shaped about its centre, `r / r_boundary(theta)`, which is `0` at the centre and `1` on the
-outline like the distance is, but whose level sets are *scaled copies*. It would decouple ring
-count from notch sharpness entirely, and both would then be free parameters.
-
-**It owes an ADR when taken**, and the rejected alternatives are already visible: reusing
-`kaleido_radial` (it nests shrinking copies periodic in `log r`, but it nests the **frame** about a
-screen point rather than the figure about its own centre, so it cannot follow `pan_*` or a shape);
-and doing it in the palette (what `shape_pulse` does today — stripes packed as gradient stops,
-which fakes the ring *count* but cannot change what the level sets are shaped like).
-
-### Priority
-
-**Medium.** Nothing ships broken and the first world landed without it. It is the difference
-between "the construction resembles the reference" and "the construction *is* the reference", on
-the one family this project has now had two batches of user reference images for.
-
----
-
-## 0097 — a curved or jittered `star` returns a NEGATIVE normalized distance at its own centre, and on `shape_field` that is a hole through the figure
-
-> **PROMOTED 2026-08-16** — [Plan 0098](plans/0098-the-figure-nests-properly.md) Phase 1, placed
-> first because it is on the file the rest of that plan extends.
-
-**Raised by:** `preset-author`, building the Phase 6 star probes for
-[Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) (2026-08-16).
-**Owner if taken:** `dev`.
-
-- **Verified 2026-08-16** — the branch that produces it:
-  `present: select\(nearest, -nearest in: core/src/render/scenes/marks.rs`
-
-### The finding
-
-`marks.rs` documents the roster's normalization as `0` at the shape's deepest interior point,
-exactly `1` on the outline. The `star` arm honours that on its **straight-edge** branch, which
-returns `r*cos(f) + r*sin(f)*B` and is therefore `0` at `r = 0`. Its **curved/jittered** branch —
-taken whenever `star_curve` or `star_jitter` is non-zero — returns `1 + sd/inradius` with `sd` the
-true nearest distance, so at the centre it returns `1 - k/inradius`, where `k` is the valley radius.
-
-**That is always negative, and provably so rather than incidentally.** `inradius` is the
-perpendicular from the origin to the edge *line*, and a perpendicular to a chord is never longer
-than either endpoint's radius — so `inradius <= k` for every configuration, hence `d(0) <= 0`
-always. Measured across the probe set: `-0.23` (valley 0.20, 4 points), `-0.30` (0.12, 4),
-`-0.30` (0.45, 6), `-0.75` (0.45, 9), `-0.94` (0.18, 7).
-
-**On `shape_field` it is visible and ugly.** The palette repeat-addresses, so a negative coordinate
-wraps to the gradient's far end and punches a hard n-sided dark hole through the middle of the
-figure — hexagonal on a six-pointer, nine-sided on a nine-pointer.
-
-**Nothing in the suite can see it.** On the particle path a negative `d` only makes
-`max(0, 1 - d)` exceed 1 and the falloff saturates brighter, so no golden baseline moves; and no
-shipped preset drives `shape_field` with a star.
-
-### Two consequences the entry did not state, added 2026-08-16 from the content lane
-
-Both surfaced while authoring `presets/shape_facet.toml`, and the first is the one that matters
-most because **it defeats this entry's own recommended workaround**.
-
-- **`gamma` becomes unusable, and `color_center` cannot rescue it.** The shader takes
-  `select(pow(d, gamma), d, gamma == 1.0)` (`shape_field.rs:202`), and `pow` of a negative base is
-  **NaN** — which lands as a hard artifact through the middle of the figure. The offset this entry
-  recommends is applied on the *next* line, `coord = shaped * color_span + color_center`
-  (`shape_field.rs:203`), so it arrives **after** the exponent and cannot repair a NaN that already
-  happened. On any curved or jittered star, `gamma` must therefore be pinned to exactly `1.0` — the
-  identity branch is the only escape. **A repair that only fixes the sign leaves this standing**, so
-  Plan 0098 Phase 1 is scoped against both.
-- **A binding that sweeps through `star_curve = 0` flips branches mid-morph.** The closed-form
-  straight branch and the sampled Bezier branch disagree by the polyline's sagitta — ~0.0032,
-  measured at Plan 0091 Phase 5 — so a param eased through zero crosses a small discontinuity at
-  exactly the point an author is most likely to animate through.
-
-### What a fix would be
-
-The disagreement is in the **reference** the two branches divide by, not in either distance. The
-straight branch's `inradius` is the edge-plane perpendicular — an approximation Plan 0091 Phase 2
-recorded and deliberately kept, because repairing it would move every shipped `shape = "3"` mark.
-The curved branch computes a true distance and then divides it by that same approximate reference.
-Either give the curved branch a reference equal to the figure's actual deepest-point distance, or
-clamp the normalized result at 0 and record that the interior is not metric there.
-
-**Whoever takes it should read Plan 0091 Phase 2 first** — the byte-identity contract on the
-particle path is the constraint that shaped the current arithmetic, and a naive repair breaks it.
-
-### Priority
-
-**Medium.** It is invisible until a preset puts a shaped star on the field scene, and the content
-lane already hit it on its first attempt — four probe presets carry a `color_center` offset whose
-only purpose is to dodge it.
 
 ---
 
@@ -3439,3 +3303,56 @@ is the transient — a scene that visibly quickens for the length of a crossfade
 reach — but it is now the shared failure mode of six rates rather than two, and every future
 `Scene::update` that grows state joins it silently. Revisit when a dissolve visibly misbehaves, or
 when someone needs the dual-live path testable for another reason.
+
+---
+
+## 0143 — the repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally
+
+[Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1 replaced the curved/jittered
+`star` arm's normalization reference and the interior contract came back with it — but only for a
+figure whose spikes are all the same length. Under `star_jitter` the divisor is the **unjittered**
+figure's while the measured distance is the fragment's own spike's, so the coordinate at the
+figure's centre is `0.076`-`0.085` rather than `0`, and a `max(0.0, ·)` guard sits in the shader for
+the case that asymmetry runs the other way. That is a large improvement on the `-0.23`..`-0.94` it
+replaced and it is not what the prose says.
+
+- **Raised:** 2026-08-27, at [Plan 0098](plans/done/0098-the-figure-nests-properly.md)'s close
+  review. **Owner if taken:** `dev`. Small, mechanical, and worth folding into whatever next opens
+  `marks.rs` rather than given a plan.
+- **Verified 2026-08-27** — the module header states the exactness for the whole branch:
+  `present: at the centre for every curved configuration in: core/src/render/scenes/marks.rs`
+- **Verified 2026-08-27** — and the guard that makes the `>= 0` sweep unfalsifiable on this arm is
+  right there: `present: return max\(0\.0, 1\.0 \+ sd / inradius\); in: core/src/render/scenes/marks.rs`
+- **Verified 2026-08-27** — the only assertion that pins the *reference* rather than the clamp is
+  gated to the unjittered case:
+  `present: if star\[2\] == 0\.0 && in: core/src/render/scenes/marks/tests.rs`
+
+### The finding, and the three other things it carries
+
+The review that raised this found five minors and two nits; four of them are one-line repairs and
+are collected here so none of them lives only in a review transcript.
+
+1. **The exactness claim**, above. The repair is either to qualify the header and the module
+   contract at `marks.rs`'s `mark_distance` doc block, or to make the jittered arm's divisor the
+   fragment's own spike's — which would make it exact and would also make the divisor depend on
+   which spike a fragment folded onto, the very thing Phase 1 walked the unjittered edge to avoid.
+   **Qualifying the prose is almost certainly right**; the entry says so rather than leaving it open,
+   because the alternative has a stated reason not to be taken.
+2. **`core/src/preset/schema.rs` hardcodes the `coord_mode` bounds** as `m.clamp(0.0, 1.0)` instead
+   of reading `shape_field`'s `COORD_MODES`. The predicate stays correct if a third mode is added,
+   so this is duplication rather than a latent bug.
+3. **The CPU mirror of `mark_boundary_radius` is not literally identical to the WGSL** it says it
+   mirrors "by inspection": the shader normalizes `abs(p.x) + 1e-20`, the mirror divides by
+   `max(len, 1e-20)`. They differ only at `p == (0,0)` and the resulting coordinate is `0` either
+   way, so nothing renders differently — but the comment promises identity and the next reader will
+   believe it.
+4. **A failure message names a pentagon on a test that renders a triangle**
+   (`the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets`). A message that names
+   the wrong figure sends the reader to the wrong place.
+
+### Priority
+
+**Low.** Nothing renders wrong and no gate is weakened in a way that hides a defect — the exactness
+claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
+reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
+has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
