@@ -1,7 +1,8 @@
 # 0121 — A rate, an ink edge, and a motion reading
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-27
+> **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) (proposed),
 > [0133](../adrs/0133-the-band-contour-fires-where-the-ink-changes.md) (proposed),
