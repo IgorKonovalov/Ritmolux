@@ -1,6 +1,6 @@
 # 0123 — A gate, a latch and an ink
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-27
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0136](../adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) (proposed), [0137](../adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) (proposed), [0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) (proposed)
