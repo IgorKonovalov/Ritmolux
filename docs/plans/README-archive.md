@@ -13,6 +13,47 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
+  — closed 2026-08-27. Seven phases on `main` directly, no worktree: `37868d4`, `6ae4245`
+  (+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, plus `807b6ef` repairing the
+  first review's two majors. Review: **no blockers, no majors, five minors, one nit.**
+  Version: **0.84.0** (minor). Closed [design-backlog 0129](../design-backlog-archive.md), whose
+  remedy this plan inverted — asked whether to guard the 89 relative links in `.rs` comments, the
+  answer was to stop writing them. Accepts [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
+
+  **What landed.** `scripts/check-comment-hygiene.mjs`, the repo's fifth Node gate, armed at
+  pre-push and in the CI `links` job. It lexes Rust rather than grepping it, so a `//` inside a
+  string literal is not a comment, and it rejects exactly two classes: a relative link in a `.rs`
+  comment, and plan-relative narration (`this plan`, `used to`, `no longer`). Length is deliberately
+  not gated — ADR-0127 Alternative B, because a blank line games any threshold. Then the sweep:
+  131 links became bare-number citations (the plan estimated 89), 309 narration lines were deleted
+  or restated as properties of the code (252), and 70 comment blocks of 40+ lines came down across
+  both the uncontended and contended trees.
+
+  **What the close verified rather than accepted.** The diff over the whole plan range contains no
+  non-comment Rust line outside the gate's own fixture, which makes "changes no behaviour"
+  mechanical rather than asserted. All **115 ADR** and **101 plan** bare numbers now cited in `.rs`
+  resolve to real documents — Phase 3's done-when, and the one property no gate can check, since a
+  bare number naming nothing is unfalsifiable where a broken link at least breaks. The deletion rule
+  held where probed: `tier.rs`'s deleted collage cost ladder was the *second* copy of a measurement
+  that lives in `core/tests/collage_cost.rs`, the file the reading was taken in.
+
+  **What was falsified.** ADR-0127's Risks assumed `cargo doc` might have been emitting broken
+  anchors for the 131 relative links all along. It was not: the same 62 (later 48) "links to private
+  item" warnings appear before and after, so rustdoc emitted those hrefs without complaint. The
+  cost of the links was rot and unresolvability, not a warning anyone was ignoring.
+
+  **What outlived the plan.** Three facts were kept rather than deleted because no document held
+  them, and they are the architect's to promote: `kaleidoscope.rs:1`'s argument for authoring
+  `kaleido_zoom` in rings rather than `log r`; `sanity.rs:209`'s two reasons for
+  `MIN_STRUCTURAL_SHELLS` taking the structural measure, which Plan 0075 Phase 1 explicitly
+  required to live in the test; and `tier.rs:241`'s tier rule *"lower if it does not measure
+  clean"*. Two files are held untouched for the live `plan-0098-nested-figure` lane
+  (`scenes/marks.rs`, `scenes/shape_field.rs`). The sweep also found three defects rather than
+  causing them, all repaired: a stray copy-paste line in `tier.rs`'s `mesh_grid`, an `ink.rs`
+  comment claiming a fixed 16:9 internal resolution that ADR-0034 retired, and the `tonemap.rs`
+  miscitation the first review caught.
+
 - [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md)
   — closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`3f9e828`, `b97ff64`,
   `509eaff`, `82c031f`) in `lmv-plan-0087` on `plan-0087-arc-primitive`, which reached `main` inside

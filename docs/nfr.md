@@ -193,8 +193,9 @@ contradicts this file is a plan bug — surface it, don't guess.
   the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
   ADR-0033's own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
-  see the README's developer section. All three Node doc steps (`check-doc-links.mjs` ~50 ms,
-  `check-index-rows.mjs`, `check-backlog-claims.mjs`) also run as the CI `links` job
+  see the README's developer section. All five Node steps (`check-doc-links.mjs` ~50 ms,
+  `check-index-rows.mjs`, `check-backlog-claims.mjs`, `check-filter-figures.mjs`,
+  `check-comment-hygiene.mjs`) also run as the CI `links` job
   (`ubuntu-latest`), so they are enforced for everyone rather than only where the hook is installed
   — and they skip together with a notice when `node` is absent, which is the [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)
   shape.
