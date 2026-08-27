@@ -1,0 +1,87 @@
+# Interference Mono - TWO banded pictures in one ink set, multiplied. A
+# domain-warp field is the ground; a concentric shape figure is the layer, and
+# `multiply` makes each one's BLACK runs cut holes in the other's white. Neither
+# picture is visible on its own terms: what you see is where their two band
+# ladders happen to agree, which is a moire that no single field can draw.
+system = "fragment_field"
+name = "Interference Mono"
+
+[palette]
+# 20 bands: black 5 / white 6 / black 4 / RED 2 / white 3. The red is placed in
+# the fast-crossing region, NOT at a dwell point of the `0.5 + 0.5*sin` field -
+# the two dwell points (about frac(hue) and frac(0.35+hue)) are given to black
+# and white, so the red draws as a thread and cannot pool into a slab.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.24, color = "#000000" },
+  { at = 0.26, color = "#ffffff" },
+  { at = 0.54, color = "#ffffff" },
+  { at = 0.56, color = "#000000" },
+  { at = 0.74, color = "#000000" },
+  { at = 0.76, color = "#b00808" },
+  { at = 0.84, color = "#b00808" },
+  { at = 0.86, color = "#ffffff" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+palette_steps   = "20"
+palette_contour = "0"
+
+warp  = "0.50 + noise(time * 0.007) * 0.05 + clamp(bass * 0.094, 0, 0.08)"
+zoom  = "1.60"
+field_speed = "0.16 + clamp(bass * 0.071, 0, 0.06)"
+fold_speed  = "0.09 + clamp(onset * 0.067, 0, 0.04)"
+pan_x = "0"
+pan_y = "0"
+glow  = "2.6"
+flash = "0"
+
+hue          = "0.08"
+color_span   = "1.35"
+color_center = "sin(time * 0.027) * 0.04"
+saturation   = "1.0"
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+warp = { attack = 0.90, release = 2.20 }
+field_speed = 3.00
+fold_speed  = { attack = 1.00, release = 2.50 }
+
+[layer]
+system = "shape_field"
+join   = "over"
+blend  = "multiply"
+mix    = "0.84 + clamp(mid * 0.141, 0, 0.12)"
+
+[layer.params]
+shape       = "3"
+points      = "8"
+star_valley = "0.70"
+star_curve  = "0"
+star_jitter = "0"
+gamma       = "1.0"
+scale       = "0.52 + clamp(bass * 0.071, 0, 0.06)"
+palette_steps   = "20"
+palette_contour = "0"
+color_span   = "0.70"
+# THE STAR'S OWN RATE, AND IT IS THE SLOWEST THING IN THE FILE ON PURPOSE.
+# `color_center` marches the figure's concentric bands through the palette, and
+# near the centre those bands CONVERGE - the same coordinate rate covers far more
+# spatial frequency there than at the rim, so the inner star reads several times
+# faster than the number suggests. At `time * 0.012` a band boundary crossed the
+# centre about every four seconds and that was the motion in the middle of the
+# frame.
+#
+# 0.0022 is a fifth of it: roughly one crossing every twenty seconds. The
+# ground's rates are UNTOUCHED - everything in the top-level [params] above is
+# exactly as it was.
+color_center = "time * 0.0022 + clamp(onset * 0.033, 0, 0.02)"
+saturation   = "1.0"
+
+# The layer's own easing, separate from the top-level table. Long constants here
+# are what stop an audio swing turning the slow rate above into a fast one.
+[layer.smoothing]
+color_center = { attack = 1.20, release = 3.00 }
+scale = 1.40
