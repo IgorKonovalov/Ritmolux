@@ -3354,3 +3354,87 @@ are collected here so none of them lives only in a review transcript.
 claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
 reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
 has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
+
+## 0145 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them
+
+[ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
+parameter in this engine integrates a phase**. [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
+and [Plan 0122](plans/0122-every-rate-integrates.md) delivered that for the six rates measured
+against `self.time`, and added a `hygiene.rs` guard that fails the build on
+`self.<field> * self.time`. **Three more rates multiply a per-element `age` instead**, which is the
+same defect against a different clock — and the guard matches the shared clock by name, so it passes
+all three.
+
+- **Raised:** 2026-08-27, at Plan 0122's Mode 4 close review, by grepping for the *mechanism*
+  (`* age`) rather than for the spelling the guard knows. **Owner if taken:** `architect` first — the
+  repair shape is a real design question (see below) — then `dev`, then `preset-author` for the three
+  affected worlds.
+- **Verified 2026-08-27** — the collage rotation multiplies the element's age:
+  `present: p\.spin \* spin \* age in: core/src/render/scenes/shape_collage.rs`
+- **Verified 2026-08-27** — and so does its translation:
+  `present: p\.vel\[0\] \* drift \* age in: core/src/render/scenes/shape_collage.rs`
+- **Verified 2026-08-27** — the emitter's sprite rotation, the latent third:
+  `present: base \+ rate \* age in: core/src/render/scenes/emitter.rs`
+- **Verified 2026-08-27** — and shipped content binds one of them to a band:
+  `present: clamp\(mid \* 0\.59, 0, 0\.5\) in: presets/collage_suprematist.toml`
+- **Verified 2026-08-27** — the operator doc still describes the defective form as the safe one:
+  `present: Integrated against real elapsed time in: presets/README.md`
+
+### The finding
+
+`shape_collage::apply_time` computes an element's placement from its age:
+
+    center:    p.spec.center + p.vel * drift * age      (shape_collage.rs:1320-1321)
+    angle_deg: p.spec.angle_deg + (p.spin * spin * age) (shape_collage.rs:1324)
+
+`drift` and `spin` are both in that scene's `PARAMS` roster, so both are bindable, and a binding that
+*moves* retroactively rescales every second of the element's life. `emitter::sprite_angle` has the
+same shape (`base + rate * age`, `emitter.rs:776`) with `spin` bound only to constants today —
+exactly the status `parametric_curve`'s `spin` and `warp_mesh`'s `deposit_spin` had when ADR-0132
+corrected them anyway rather than leave counterexamples.
+
+**Three shipped presets bind the collage pair to audio**, which is more content than the `swarm` pair
+Plan 0122 existed to fix:
+
+    collage_onwhite.toml:108-109      drift bass swing 0.4   spin mid swing 0.35   [smoothing] 0.6
+    collage_suprematist.toml:116-117  drift bass swing 0.6   spin mid swing 0.5    [smoothing] 0.6
+    collage_mono.toml:43-44           drift bass swing 0.60  spin mid swing 0.30   [smoothing] 0.60
+
+**Size, computed rather than measured.** A one-pole at `tau = 0.6` closes 2.74 % of its gap per 60 Hz
+frame, so `collage_suprematist`'s `spin` moves 0.0137 in a frame across its 0.5 swing. With
+`SPIN_SPEED = 0.07` the angle jumps `0.07 · 0.0137 · age` — at `age = 30 s` that is 0.029 rad in one
+frame against a nominal `0.07 · 0.5 / 60 = 0.00058`, about **49x**; `drift` is ~35x by the same
+route. **Milder than `swarm`'s 210x and bounded differently**: `age` resets on each `recompose`,
+where `swarm`'s `time` never resets, so in normal playback this stays a jitter rather than a
+teleport. The exception is the case with no onsets — `recompose` is gated on `hash(beat_index)`, so
+in a quiet passage it never fires, `age` grows unbounded, and the first bass hit after it lands the
+full accumulated swing.
+
+**`presets/README.md:1536` documents the defect as the safe form**, which is how three presets came
+to bind it: *"Integrated against real elapsed time, so the canvas moves identically at any refresh
+rate."* True about frame-rate independence, false about ADR-0132 — the rate scales the accumulation
+rather than being integrated into it — and the `pump_*` row three lines below says "drive the depth
+from the music". That row is load-bearing for the `preset-author` lane and should be corrected
+whether or not the engine repair is taken.
+
+- **What a fix looks like**, and it is **not** `scenes::Phase`:
+  - `Phase` is one accumulator per scene. These need **one per element**, advanced with the element
+    and reset when it is born or the canvas recomposes — a different shape, and the reason Plan 0122
+    scoped them out rather than folding them in.
+  - The cheap alternative is to bake the rate at spawn the way `emitter` already bakes `v0`, so a
+    moving binding affects new elements only. That changes what the parameter *means* (it stops
+    steering the live canvas), so it is a design call, not a refactor.
+  - The emitter's `spin` may be a third case again: sprites are short-lived, so `age` is small and
+    the defect may be unobservable. Worth measuring before spending anything on it.
+- **The guard question is the durable half.** ADR-0135's guard makes one spelling impossible and says
+  nothing about the rule; this entry is the proof. Whether it should reach `* age` is genuinely open
+  — `emitter.rs:375-376`'s `v0 * age` ballistics are legitimate (the velocity is baked at spawn), so
+  a naive widening false-positives on correct code.
+
+### Priority
+
+**Medium.** Three shipped presets carry it against `swarm`'s two, and the doc actively teaches the
+defective form — but the magnitude is 4-6x smaller than the defect Plan 0122 fixed and `age`'s reset
+bounds it in ordinary playback. The half worth doing immediately and cheaply is the
+`presets/README.md` correction, which costs one sentence and stops the content lane from writing more
+of these.

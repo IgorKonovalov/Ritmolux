@@ -13,8 +13,10 @@ in this engine integrates a phase** rather than scaling absolute scene time, the
 sites. The enumeration was wrong twice over, and both errors were found by grepping rather than by
 reading the list.
 
-Plan 0121's close review found a third site. Planning this correction found two more. The engine
-holds **six** bindable rates; three integrate and three multiply:
+Plan 0121's close review found a third site. Planning this correction found two more. **This plan's
+own close review then found three more again** — so the count below is the fourth attempt at it, and
+the honest lesson is in that sentence rather than in the table. The engine holds **nine** bindable
+rates; three integrate, three multiply the shared clock, and three multiply a per-element age:
 
 | site | rate | today | bound by shipped content |
 |---|---|---|---|
@@ -24,6 +26,15 @@ holds **six** bindable rates; three integrate and three multiply:
 | `swarm.rs:812` | `spin` | `self.time * self.spin` | **yes — `swarm_shatter`, `swarm_drift`** |
 | `lines/parametric.rs:410` | `spin` | `self.spin * self.time` | constants only |
 | `warp_mesh/mod.rs:2070` | `deposit_spin` | `self.deposit_spin * self.time` | no |
+| `shape_collage.rs:1320` | `drift` | `p.vel * drift * age` | **yes — three `collage_*`, to `bass`** |
+| `shape_collage.rs:1324` | `spin` | `p.spin * spin * age` | **yes — three `collage_*`, to `mid`** |
+| `emitter.rs:776` | `spin` | `rate * age` | constants only |
+
+**This decision corrects the first six and leaves the last three**, which is a deliberate scope call
+and not an oversight discovered later: `age` is a per-element quantity reset at spawn or at
+recomposition, so the repair is an accumulator per element rather than one `Phase` per scene, and
+that is a different shape. They are design-backlog 0145. What matters here is that the guard below
+**cannot see them** — see the Negative section.
 
 The three that are correct are **three separate implementations of the same three lines**, written
 by three different plans that never saw each other: `Phases::step`, `integrate_phase`, and
@@ -80,13 +91,16 @@ targets a *field* multiplying the clock, so the roughly ten legitimate `time * <
 
 ### Positive
 
-- **The rule becomes checkable instead of enumerated.** A fourth defective site fails the build on
-  the commit that writes it, which is the one thing neither ADR-0132's prose nor a reviewer's grep
-  can promise.
+- **The rule becomes checkable for the shape it matches.** A new site spelled
+  `self.<field> * self.time` fails the build on the commit that writes it, which is the one thing
+  neither ADR-0132's prose nor a reviewer's grep can promise. It is **not** a check on the rule
+  itself: the three `* age` sites in the table above pass it today.
 - **One doc comment instead of four.** The reason a rate must be integrated is stated once, at the
   type, where the next scene author meets it while writing the rate rather than after shipping it.
-- **`swarm_shatter` and `swarm_drift` stop lurching.** They are the only shipped presets binding a
-  multiplied rate to audio, and the correction is the whole visible payoff of this ADR.
+- **`swarm_shatter` and `swarm_drift` stop lurching**, and that is the whole visible payoff of this
+  ADR. They are the only presets binding a **clock**-multiplied rate to audio; `collage_onwhite`,
+  `collage_suprematist` and `collage_mono` bind two `age`-multiplied ones and are not fixed here
+  (backlog 0145).
 - **No golden may move, and that is arithmetic rather than hope.** Migrating the three correct sites
   preserves the summation term for term. Of the three defective sites, `swarm_shaped.toml`,
   `parametric_curve.toml` and `DEFAULT_DEPOSIT_SPIN` all sit at rate `0`, where the two forms are
@@ -95,12 +109,16 @@ targets a *field* multiplying the clock, so the roughly ten legitimate `time * <
 
 ### Negative
 
-- **The guard catches a shape, not a semantics, and it is evadable in one line.** Binding the clock
-  to a local first — `let time = self.time;` then `time * self.spin` — passes it. Both `swarm.rs` and
-  `emitter.rs` already bind that exact local for unrelated reasons, so the evasion is not
-  hypothetical; it is one edit away in two files that already have the first half. The guard raises
-  the cost of the mistake; it does not make it impossible, and its own doc comment has to say so
-  rather than letting a reader mistake it for a proof.
+- **The guard catches a shape, not a semantics, and three live sites already sit outside it.** It
+  matches the shared clock by name, so a rate multiplying any *other* elapsed-time quantity passes.
+  That is not a hypothetical: `shape_collage` and `emitter` multiply a per-element `age`, and this
+  ADR's own close review found them — after this section had been written naming a different evasion
+  (`let time = self.time;` then `time * self.spin`, which two files carry the first half of). The
+  predicted escape hatch was real and the one that actually bit was a third. **Take that as the
+  measure of what the guard is worth**: it makes the *known* spelling impossible and says nothing
+  about the rule. Its own doc comment has to say so rather than letting a reader mistake it for a
+  proof, and a future reader adding a tenth rate should grep for the parameter multiplying anything
+  time-like, not run the test and conclude.
 - **Three scenes' internals move in one plan**, and `particles/tests.rs` names `advance_spin` in five
   places. Those tests are the existing evidence for the integrated form and must survive as tests of
   the shared type rather than be deleted with the function.
@@ -162,9 +180,12 @@ correction with no mechanism behind it is the same bet a third time.
 
 ## Notes
 
-The six rates and their three current implementations are tabulated in the Context above rather than
-in the plan, because the plan will move to `plans/done/` and this table is the thing a future reader
-needs when they add a seventh.
+The nine rates are tabulated in the Context above rather than in the plan, because the plan will move
+to `plans/done/` and this table is the thing a future reader needs when they add a tenth. **Four
+attempts were needed to get that table right** — ADR-0132 named two sites, Plan 0121's close found a
+third, planning this found two more, and this ADR's own close review found three more. Every one was
+found by grepping for the *mechanism*; none by reading the previous list. Add a row here before
+writing the rate, not after.
 
 `swarm.rs`'s defect is the one with a measurable size: on `swarm_shatter` at t = 100 s, a one-pole at
 `tau = 0.3` closes about 5.4 % of its gap per 60 Hz frame, so `spin` moves ~0.04 in a frame across
