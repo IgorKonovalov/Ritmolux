@@ -284,8 +284,8 @@ flowchart TD
 | 1 — The star's interior stops lying | dev | done | `28336c3` |
 | 2 — The coordinate exists, and a polygon proves it | dev | done | `a6bb867` |
 | 3 — The heart and the star take the coordinate | dev | done | `43b269a` |
-| 4 — `ring` gets an honest answer | dev | done | committed with this row |
-| 4b — The figure can turn | dev | not started | |
+| 4 — `ring` gets an honest answer | dev | done | `4257596` |
+| 4b — The figure can turn | dev | done | committed with this row |
 | 5 — What it costs at the floor tier | dev | not started | |
 | 6 — The docs learn both coordinates | dev | not started | |
 | 7 — The look gate | human | not started | |
@@ -361,6 +361,14 @@ flowchart TD
 - The warning fires only on a `shape` that **rests** at `ring`, the same limit the `thickness`
   dead-zone check has. An animated `shape` sweeping through `ring` still falls back frame by frame
   and nothing warns.
+- **Phase 4b applies `rotation` after the pan**, so a panned figure spins in place; the alternative
+  swings it around the frame centre on a circle of radius `|pan|`. Measured at `pan_x = 0.5` on a
+  240 px frame: the figure's centre stays within 4 px of its unrotated position across four angles,
+  where an orbit would move it 60 px. Radians, unclamped, non-finite falls back to the identity;
+  `0` skips `cos`/`sin` entirely.
+- The shear check reads 12x12 px of extent at both `0` and a quarter turn on a 2:1 target, with
+  `frame_diff` `0.00071` between them against `0.19106` at an eighth turn — the eighth is the
+  control that the parameter reached the shader at all.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is

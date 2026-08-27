@@ -9,9 +9,9 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    COORD_MODES, DEFAULT_COORD_MODE, DEFAULT_GAMMA, DEFAULT_SCALE, MAX_COORD_MODE, MAX_GAMMA,
-    MAX_SCALE, MIN_COORD_MODE, MIN_GAMMA, MIN_SCALE, PARAMS, applied_coord_mode, applied_gamma,
-    applied_scale, coord,
+    COORD_MODES, DEFAULT_COORD_MODE, DEFAULT_GAMMA, DEFAULT_ROTATION, DEFAULT_SCALE,
+    MAX_COORD_MODE, MAX_GAMMA, MAX_SCALE, MIN_COORD_MODE, MIN_GAMMA, MIN_SCALE, PARAMS,
+    applied_coord_mode, applied_gamma, applied_rotation, applied_scale, coord,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
@@ -900,4 +900,249 @@ fn a_ring_renders_identically_under_both_modes_and_is_not_a_disc() {
          that is exactly the collapse Phase 4 refused, where the hole stops \
          existing and a preset is shown a shape it did not name"
     );
+}
+
+// --- Phase 4b: the figure can turn ---------------------------------------------
+//
+// This scene had no rotation lever at all, while every other figure-drawing
+// scene has one — `lines/star.rs` and `lines/lsystem.rs` carry `rotation`,
+// `lines/parametric.rs` carries `spin`. So a star here could breathe, drift and
+// morph, and could not turn, which for a star is the most obvious motion there
+// is.
+
+/// `rotation` is passed through, and **0 is an exact identity** — the shader
+/// tests for it and never enters `cos`/`sin`, which is what keeps every shipped
+/// preset and every golden baseline on the arithmetic it has today.
+///
+/// The finiteness guard is the load-bearing half of the rest: `cos(NaN)` is
+/// `NaN`, and one `NaN` in the figure's own frame takes every pixel with it.
+#[test]
+fn the_rotation_passes_through_and_zero_is_the_identity() {
+    assert_eq!(
+        applied_rotation(DEFAULT_ROTATION).to_bits(),
+        0.0f32.to_bits()
+    );
+    for v in [-9.0f32, -0.25, 0.5, 1.0, std::f32::consts::TAU, 400.0] {
+        assert_eq!(
+            applied_rotation(v).to_bits(),
+            v.to_bits(),
+            "an angle wraps, so `rotation` is unclamped: {v}"
+        );
+    }
+    assert_eq!(applied_rotation(f32::NAN), DEFAULT_ROTATION);
+    assert_eq!(applied_rotation(f32::INFINITY), DEFAULT_ROTATION);
+    assert_eq!(applied_rotation(f32::NEG_INFINITY), DEFAULT_ROTATION);
+    assert!(PARAMS.contains(&"rotation"));
+}
+
+/// **A quarter turn does not shear the figure at a 2:1 target**
+/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+///
+/// The rotation happens in `uv`, which has already had x stretched by the
+/// **render target's** aspect — so one unit is the same length on both axes and
+/// the two lines are a rotation. Done in raw NDC the identical two lines would
+/// **shear**, and this is the exact configuration where that is invisible at
+/// 16:9 (the stretch is nearly 1 there) and glaring at 2:1.
+///
+/// The subject is a **square**, because a square is carried onto itself by a
+/// quarter turn: its extent is unchanged, and so is every pixel. A sheared
+/// square is a rectangle, and at 2:1 it is a 4:1 one.
+///
+/// The non-vacuity is the eighth turn, in the same run: 45 degrees genuinely
+/// moves the picture, so "the frames match" is a statement about the quarter
+/// turn rather than about a parameter that never reached the shader.
+#[test]
+fn a_quarter_turn_neither_shears_nor_resizes_the_figure() {
+    use crate::render::metrics::frame_diff;
+
+    const W: u32 = 240;
+    const H: u32 = 120;
+    let Some(mut renderer) = headless(W, H) else {
+        return;
+    };
+    let square = |name: &str, rotation: &str| {
+        preset(
+            name,
+            &format!(
+                "shape = \"2\"\npoints = \"4\"\nscale = \"0.45\"\ncolor_span = \"1\"\n\
+                 palette_steps = \"2\"\nrotation = \"{rotation}\"\n"
+            ),
+        )
+    };
+    renderer.set_presets(vec![
+        square("rot0", "0"),
+        square("rot90", "1.5707963"),
+        square("rot45", "0.7853982"),
+    ]);
+
+    // Half-extent of the figure from the centre, across and down, in pixels —
+    // the same probe the aspect test uses.
+    let extent = |img: &CaptureImage| -> (u32, u32) {
+        let (cx, cy) = (W / 2, H / 2);
+        let centre = luma(img, cx, cy);
+        let differs = |v: f32| (v - centre).abs() > 8.0;
+        let mut half_w = 0u32;
+        while cx + half_w + 1 < W && !differs(luma(img, cx + half_w + 1, cy)) {
+            half_w += 1;
+        }
+        let mut half_h = 0u32;
+        while cy + half_h + 1 < H && !differs(luma(img, cx, cy + half_h + 1)) {
+            half_h += 1;
+        }
+        (half_w, half_h)
+    };
+
+    let shot = |renderer: &mut Renderer, name: &str| {
+        renderer
+            .capture_preset(name, &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"))
+    };
+    let rot0 = shot(&mut renderer, "rot0");
+    let rot90 = shot(&mut renderer, "rot90");
+    let rot45 = shot(&mut renderer, "rot45");
+
+    let (w0, h0) = extent(&rot0);
+    let (w90, h90) = extent(&rot90);
+    let (w45, h45) = extent(&rot45);
+    let quarter = frame_diff(&rot0, &rot90);
+    let eighth = frame_diff(&rot0, &rot45);
+    println!(
+        "square at {W}x{H}: extent {w0}x{h0} at 0, {w90}x{h90} at a quarter turn, \
+         {w45}x{h45} at an eighth; frame_diff {quarter:.5} / {eighth:.5}"
+    );
+
+    assert!(
+        w0 > 4 && h0 > 4,
+        "the figure has no measurable extent ({w0} x {h0}) — this test is \
+         measuring nothing"
+    );
+    // The claim: a quarter turn carries a square onto itself, in square units.
+    assert!(
+        w0.abs_diff(w90) <= 1 && h0.abs_diff(h90) <= 1,
+        "a quarter turn changed the square's extent from {w0}x{h0} to {w90}x{h90} \
+         — a rotation applied in a frame whose x has been stretched by the aspect \
+         SHEARS rather than rotates, and at 2:1 it does so by a factor of two"
+    );
+    assert!(
+        quarter < 0.02,
+        "the quarter-turn frame differs from the unrotated one by {quarter:.5} — a \
+         square is carried onto itself by 90 degrees, so the picture must not move"
+    );
+    // The control: the parameter really does reach the shader.
+    assert!(
+        eighth > 10.0 * quarter.max(1e-6),
+        "an eighth turn moved the picture {eighth:.5} against the quarter turn's \
+         {quarter:.5} — if these are comparable, `rotation` never reached the \
+         shader and the assertion above is about nothing"
+    );
+}
+
+/// **The figure spins in place rather than orbiting the frame centre** — the
+/// choice the plan required be stated, asserted where it is visible.
+///
+/// `rotation` is applied to `uv - pan`, i.e. **after** the pan. Applied before
+/// it, the same two lines would swing the figure around the frame's middle on a
+/// circle of radius `|pan|`. Both are defensible and they look completely
+/// different, so this pins which one shipped.
+///
+/// Measured as the position of the figure's own centre, which is where the
+/// coordinate is `0` and therefore the darkest point of a dark-to-light palette.
+/// With `pan_x` well off centre, an orbit moves it by hundreds of pixels.
+#[test]
+fn the_figure_turns_about_its_own_centre_and_does_not_orbit() {
+    const SIZE: u32 = 240;
+    const PAN_X: f32 = 0.5;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    // A heart, so the turn is unmistakable, and a monotone palette so the
+    // darkest pixels are the figure's middle.
+    //
+    // **`color_span` is small on purpose.** The coordinate keeps growing outside
+    // the figure and the LUT repeat-addresses, so at the default span the frame
+    // corners wrap past 1 and come back as BLACK — darker than the figure's own
+    // centre, which would put this centroid on a wrap ring rather than on the
+    // figure. At 0.08 the whole frame stays inside 0.1..0.82 and never wraps.
+    let turned = |name: &str, rotation: &str| -> Preset {
+        let toml = format!(
+            "name = \"{name}\"\nsystem = \"shape_field\"\n\
+             [palette]\nstops = [\n\
+             {{ at = 0.0, color = \"#000000\" }},\n\
+             {{ at = 1.0, color = \"#ffffff\" }},\n]\n\
+             [params]\nshape = \"4\"\nscale = \"0.3\"\ncolor_span = \"0.08\"\n\
+             color_center = \"0.1\"\npan_x = \"{PAN_X}\"\nrotation = \"{rotation}\"\n"
+        );
+        Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name}: {e}"))
+    };
+    let angles = ["0", "0.9", "2.4", "-1.7"];
+    renderer.set_presets(
+        angles
+            .iter()
+            .enumerate()
+            .map(|(i, a)| turned(&format!("r{i}"), a))
+            .collect(),
+    );
+
+    // The centroid of the darkest region, weighted by how dark it is.
+    let dark_centroid = |img: &CaptureImage| -> (f32, f32) {
+        let mut lo = f32::INFINITY;
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                lo = lo.min(luma(img, x, y));
+            }
+        }
+        let cut = lo + 6.0;
+        let (mut sx, mut sy, mut sw) = (0.0f32, 0.0f32, 0.0f32);
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                let v = luma(img, x, y);
+                if v <= cut {
+                    let w = cut - v + 1.0;
+                    sx += w * x as f32;
+                    sy += w * y as f32;
+                    sw += w;
+                }
+            }
+        }
+        (sx / sw, sy / sw)
+    };
+
+    // Where the figure's centre must be: `pan` in square units, and the target
+    // is square so `uv` is NDC.
+    let want_x = (PAN_X * 0.5 + 0.5) * SIZE as f32;
+    let want_y = 0.5 * SIZE as f32;
+
+    let mut frames = Vec::new();
+    for (i, a) in angles.iter().enumerate() {
+        let img = renderer
+            .capture_preset(&format!("r{i}"), &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture r{i}: {e}"));
+        let (cx, cy) = dark_centroid(&img);
+        println!(
+            "rotation {a:>5}: figure centre at ({cx:.1}, {cy:.1}) px, want ({want_x:.1}, {want_y:.1})"
+        );
+        assert!(
+            (cx - want_x).abs() < 6.0 && (cy - want_y).abs() < 6.0,
+            "at rotation {a} the figure's centre sits at ({cx:.1}, {cy:.1}) rather \
+             than at ({want_x:.1}, {want_y:.1}). `rotation` is applied AFTER the \
+             pan so the figure spins in place; applied before it, the figure \
+             orbits the frame centre on a circle of radius |pan|"
+        );
+        frames.push(img);
+    }
+
+    // ...and it really did turn: an asymmetric figure at four angles is four
+    // pictures, or `rotation` reached nothing.
+    use crate::render::metrics::frame_diff;
+    for (i, a) in frames.iter().enumerate() {
+        for (j, b) in frames.iter().enumerate().skip(i + 1) {
+            let diff = frame_diff(a, b);
+            assert!(
+                diff > 0.01,
+                "rotations {} and {} render indistinguishably (diff {diff:.5})",
+                angles[i],
+                angles[j]
+            );
+        }
+    }
 }
