@@ -56,9 +56,9 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
         let k = star[0];
         let curve = star[1];
         let jitter = star[2];
-        let b = (1.0 - k * h.cos()) / (k * h.sin());
 
         if curve == 0.0 && jitter == 0.0 {
+            let b = (1.0 - k * h.cos()) / (k * h.sin());
             let d_line = len * f.cos() + len * f.sin() * (1.0 - k * h.cos()) / (k * h.sin());
             if d_line <= 1.0 {
                 return d_line;
@@ -115,12 +115,49 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
             }
             prev = cur;
         }
-        let inradius = 1.0 / (1.0 + b * b).sqrt();
+        let inradius = curved_star_inradius(points, k, curve);
         let sd = if len < boundary_r { -nearest } else { nearest };
-        return 1.0 + sd / inradius;
+        return (1.0 + sd / inradius).max(0.0);
     }
     let q = [p[0] * HEART_SCALE, p[1] * HEART_SCALE + HEART_CY];
     1.0 + heart_sd(q) / HEART_INRADIUS
+}
+
+/// **The curved star arm's normalization reference**, mirroring the second
+/// polyline walked inside `mark_distance` above: the distance from the origin to
+/// the **unjittered** sampled boundary of one spike.
+///
+/// One function and not two spellings, because [`inradius_local`] has to divide
+/// by *exactly* what the arm divided by. A harness carrying its own copy of this
+/// would grade the curved star against a scale the shape does not have — which
+/// is the failure the whole ground-truth section below exists to avoid.
+pub(crate) fn curved_star_inradius(points: f32, k: f32, curve: f32) -> f32 {
+    let seg = std::f32::consts::TAU / points;
+    let h = 0.5 * seg;
+    let tip = [1.0f32, 0.0];
+    let valley = [k * h.cos(), k * h.sin()];
+    let ctrl = [
+        0.5 * (tip[0] + valley[0]) * (1.0 - curve),
+        0.5 * (tip[1] + valley[1]) * (1.0 - curve),
+    ];
+    let mut inradius = f32::INFINITY;
+    let mut prev = tip;
+    for i in 1..=STAR_SEGMENTS {
+        let t = i as f32 / STAR_SEGMENTS as f32;
+        let sm = 1.0 - t;
+        let cur = [
+            sm * sm * tip[0] + 2.0 * sm * t * ctrl[0] + t * t * valley[0],
+            sm * sm * tip[1] + 2.0 * sm * t * ctrl[1] + t * t * valley[1],
+        ];
+        let e = [cur[0] - prev[0], cur[1] - prev[1]];
+        let along = ((-prev[0] * e[0] + -prev[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-12))
+            .clamp(0.0, 1.0);
+        let dx = -prev[0] - along * e[0];
+        let dy = -prev[1] - along * e[1];
+        inradius = inradius.min((dx * dx + dy * dy).sqrt());
+        prev = cur;
+    }
+    inradius
 }
 
 /// The CPU mirror of `mark_heart_sd`.
@@ -638,12 +675,20 @@ pub(crate) fn inradius_local(shape: f32, points: f32, star: [f32; 3]) -> f32 {
         return h.cos();
     }
     if shape < 3.5 {
+        let k = star[0];
+        // The two star branches normalize by two different references, and this
+        // has to follow the arm rather than the shape's name (Plan 0098
+        // Phase 1). The curved one divides by the figure's own deepest-point
+        // distance; the straight one still divides by the edge plane's
+        // perpendicular.
+        if star[1] != 0.0 || star[2] != 0.0 {
+            return curved_star_inradius(points, k, star[1]);
+        }
         // d = x + B*y with B = (1 - k cos h) / (k sin h); the line d = 1 sits
         // 1 / sqrt(1 + B^2) from the origin. **`k` is the arm's own
         // `star_valley`, not the default** — the arm divides by this, so a
         // harness that assumed 0.45 would grade every other valley radius
         // against the wrong scale and report an error the shape does not have.
-        let k = star[0];
         let b = (1.0 - k * h.cos()) / (k * h.sin());
         return 1.0 / (1.0 + b * b).sqrt();
     }
@@ -1124,5 +1169,328 @@ fn the_curved_star_exterior_is_re_measured() {
         "the curved arm is now exact ({worst_curve_only:.5}) — good, but it means \
          the sampling changed, so re-read what STAR_SEGMENTS costs before \
          relaxing this"
+    );
+}
+
+// --- Phase 1: the star's interior stops lying (design-backlog 0097) ------------
+//
+// The section above grades every arm's *magnitude* against its own outline. This
+// one grades the **sign**, which nothing did — and which the curved star arm got
+// wrong for every configuration it can be given.
+//
+// The repair is the reference the curved branch divides by, not a clamp on its
+// result: `marks.rs`'s header states which of the two the phase took and what it
+// costs. What is asserted here is the property either repair owes.
+
+/// The star configurations this section sweeps: the neutral one that takes the
+/// straight branch, then the six that take the curved one.
+const STAR_CONFIGS: [(&str, [f32; 3]); 7] = [
+    ("neutral", NEUTRAL_STAR),
+    ("valley 0.18", [0.18, 0.0, 0.0]),
+    ("curve +0.55", [DEFAULT_STAR_VALLEY, 0.55, 0.0]),
+    ("curve -0.55", [DEFAULT_STAR_VALLEY, -0.55, 0.0]),
+    ("jitter 0.35", [DEFAULT_STAR_VALLEY, 0.0, 0.35]),
+    ("curve +0.5 jitter 0.3", [DEFAULT_STAR_VALLEY, 0.5, 0.3]),
+    ("valley 0.18 curve +0.5", [0.18, 0.5, 0.0]),
+];
+
+/// **No arm returns a negative normalized distance**, anywhere in the sampled
+/// region, at any point count, with the star's edge straight, bowed or jittered.
+///
+/// A property and not a threshold: `mark_distance` is documented as `0` at the
+/// shape's deepest interior point and `1` on its outline, so a negative reading
+/// is not a small error — it is that contract inverted. On the particle path it
+/// only saturates the falloff brighter, which is why it survived; on
+/// `shape_field` the palette repeat-addresses and it is a hole through the
+/// middle of the figure.
+///
+/// The report prints what each star configuration reads at its own centre **and
+/// what it read before the repair**, recovered from the same sample as
+/// `1 - (1 - d) * R_new / R_old` rather than quoted from the backlog entry. The
+/// five numbers that entry measured — `-0.23`, `-0.30`, `-0.30`, `-0.75`,
+/// `-0.94` — are of that column.
+#[test]
+fn no_arm_returns_a_negative_normalized_distance() {
+    let counts: [f32; 4] = [MIN_POINTS, DEFAULT_POINTS, 7.0, MAX_POINTS];
+    let arms: [(&str, f32); 5] = [
+        ("disc", DISC),
+        ("ring", RING),
+        ("polygon", POLYGON),
+        ("star", STAR),
+        ("heart", HEART),
+    ];
+
+    for (name, shape) in arms {
+        for points in counts {
+            for (label, star) in STAR_CONFIGS {
+                let mut worst = f32::INFINITY;
+                let mut worst_at = [0.0f32, 0.0];
+                for iy in 0..=PROBE_STEPS {
+                    for ix in 0..=PROBE_STEPS {
+                        let p = [
+                            -PROBE_HALF_SPAN
+                                + 2.0 * PROBE_HALF_SPAN * ix as f32 / PROBE_STEPS as f32,
+                            -PROBE_HALF_SPAN
+                                + 2.0 * PROBE_HALF_SPAN * iy as f32 / PROBE_STEPS as f32,
+                        ];
+                        let d = mark_distance(p, shape, points, star);
+                        if d < worst {
+                            worst = d;
+                            worst_at = p;
+                        }
+                    }
+                }
+                assert!(
+                    worst >= 0.0,
+                    "{name} at points = {points}, star {label}, reads {worst} at \
+                     ({:.2}, {:.2}) — the roster's normalization is 0 at the deepest \
+                     interior point and 1 on the outline, so a negative value is the \
+                     contract inverted and `shape_field` wraps it into a hole",
+                    worst_at[0],
+                    worst_at[1]
+                );
+            }
+        }
+    }
+
+    // The star arm's own centre, configuration by configuration: what it reads
+    // now, and what the edge-plane reference made it read before.
+    println!(
+        "{:<24} {:>6} {:>12} {:>12} {:>16}",
+        "star config", "points", "d(centre)", "was", "R new / R old"
+    );
+    for (label, star) in STAR_CONFIGS {
+        for points in [DEFAULT_POINTS, 6.0, 7.0, 9.0] {
+            let d = mark_distance([0.0, 0.0], STAR, points, star);
+            let h = std::f32::consts::PI / points;
+            let b = (1.0 - star[0] * h.cos()) / (star[0] * h.sin());
+            let r_old = 1.0 / (1.0 + b * b).sqrt();
+            let r_new = inradius_local(STAR, points, star);
+            // The distance the arm is measuring, recovered from `d`, then
+            // re-normalized by the reference this branch used before.
+            let was = 1.0 - (1.0 - d) * r_new / r_old;
+            println!(
+                "{label:<24} {points:>6} {d:>12.5} {was:>12.5} {:>16}",
+                format!("{r_new:.4} / {r_old:.4}")
+            );
+
+            // Every curved configuration whose spikes are all the same length is
+            // now EXACTLY zero at the centre — not nearly zero. That is the
+            // repair's own claim: the branch divides by the distance it measures
+            // there, so the two are the same arithmetic and cancel.
+            if star[2] == 0.0 && (star[1] != 0.0 || star[0] != DEFAULT_STAR_VALLEY) {
+                assert_eq!(
+                    d, 0.0,
+                    "the star's centre must be exactly 0 at {label}, {points} points \
+                     — the reference IS the distance measured there"
+                );
+            }
+        }
+    }
+}
+
+/// **A curved or jittered star on `shape_field` responds to `gamma` instead of
+/// tearing under it** — the second half of Phase 1's done-when, and a separate
+/// claim from the sign.
+///
+/// It is rendered rather than argued because the defect was only ever visible
+/// through this scene: the shader takes `select(pow(d, gamma), d, gamma == 1.0)`
+/// and `pow` of a negative base is NaN, so an author who bound the exponent got a
+/// hard artifact rather than a rounded one. `presets/shape_facet.toml` pins
+/// `gamma = "1.0"` today for exactly this reason.
+///
+/// # What is asserted, and why none of it is a brightness
+///
+/// The palette runs black to white with `palette_steps = 1`, so luma reads the
+/// palette coordinate — but every absolute value here would be a fact about
+/// sRGB's steepness near zero rather than about the field. The claims are
+/// relations instead, and each one is broken by the defect:
+///
+/// - **the core falls as `gamma` rises**, monotonically. `d` near the centre is
+///   well under 1, so `d^gamma` shrinks with the exponent and the middle
+///   converges on the colour at `color_center`. A NaN does not order itself, and
+///   a wrapped negative does not converge.
+/// - **it converges onto a `disc` control** rendered through the same palette at
+///   the same `color_center` — an arm this phase does not touch, taken in the
+///   same run on the same adapter, which is ADR-0071's shape rather than a frozen
+///   byte value.
+/// - **luma only ever rises walking outward**, on eight rays. The coordinate is
+///   `0` at the centre and grows with radius everywhere inside, so a fall is the
+///   wrap of a negative value — the hole — or a NaN.
+///
+/// # Two sampling traps this test is shaped around, both pre-existing
+///
+/// **`color_center` is deliberately not 0.** The palette LUT is sampled with
+/// linear filtering and **repeat** addressing, so a coordinate within half a
+/// texel of `0` blends the gradient's last texel with its first — on a
+/// non-cyclic palette, a bright speck exactly where this test looks. Reproduced
+/// identically on the hardware adapter, on WARP, and with this phase's change
+/// reverted; offsetting the centre moves the claim off that seam.
+///
+/// **The frame size is even.** `atan2(0, 0)` is undefined, and the star and
+/// polygon arms fold on it — so a target whose pixel grid puts a fragment centre
+/// exactly on the figure's centre samples that one singular fragment. At 240 no
+/// fragment lands there.
+///
+/// This lives here rather than in `shape_field`'s own tests because the defect is
+/// the arm's; the scene is only where it becomes visible.
+#[test]
+fn a_curved_star_on_the_field_has_no_hole_at_any_gamma() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+
+    const SIZE: u32 = 240;
+    // How far out the radial walk goes, in pixels, and its step. 36 px of a
+    // 120 px half-frame is `p = 0.3`, inside a figure whose valleys sit at 0.45 —
+    // so the coordinate is still rising there in every direction.
+    const WALK_PX: i32 = 36;
+    const STEP_PX: i32 = 3;
+    // Ascending on purpose: the core assertion is that the reading falls across
+    // this list.
+    const GAMMAS: [&str; 4] = ["0.5", "1.0", "1.6", "2.5"];
+    // Far enough from the LUT's wrap seam that half a texel of filtering cannot
+    // reach it; small enough that the ramp above it still has somewhere to go.
+    const CENTER: &str = "0.15";
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: true,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+
+    // Six points, the default valley, jitter and no curve: the configuration
+    // design-backlog 0097 measured at -0.30, i.e. a hexagonal hole.
+    let field = |name: &str, shape: &str, gamma: &str| -> Preset {
+        let toml = format!(
+            "name = \"{name}\"\nsystem = \"shape_field\"\n\
+             [palette]\nstops = [\n\
+             {{ at = 0.0, color = \"#000000\" }},\n\
+             {{ at = 1.0, color = \"#ffffff\" }},\n]\n\
+             [params]\nshape = \"{shape}\"\npoints = \"6\"\nstar_valley = \"0.45\"\n\
+             star_jitter = \"0.35\"\nscale = \"1.0\"\ncolor_span = \"0.5\"\n\
+             color_center = \"{CENTER}\"\npalette_steps = \"1\"\ngamma = \"{gamma}\"\n"
+        );
+        Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
+    };
+    let mut presets = vec![field("control", "0", "1.0")];
+    presets.extend(
+        GAMMAS
+            .iter()
+            .enumerate()
+            .map(|(i, g)| field(&format!("g{i}"), "3", g)),
+    );
+    renderer.set_presets(presets);
+
+    let luma = |img: &CaptureImage, x: u32, y: u32| -> f32 {
+        let i = ((y * img.width + x) * 4) as usize;
+        0.299 * f32::from(img.rgba[i])
+            + 0.587 * f32::from(img.rgba[i + 1])
+            + 0.114 * f32::from(img.rgba[i + 2])
+    };
+
+    let centre = (SIZE / 2) as i32;
+    let core_of = |img: &CaptureImage| -> f32 {
+        // The 2x2 straddling the middle, which is one derivative quad.
+        [(-1, -1), (0, -1), (-1, 0), (0, 0)]
+            .iter()
+            .map(|(dx, dy)| luma(img, (centre + dx) as u32, (centre + dy) as u32))
+            .sum::<f32>()
+            / 4.0
+    };
+
+    let control = renderer
+        .capture_preset("control", &AnalysisFrame::default(), 2)
+        .expect("capture the disc control");
+    let want = core_of(&control);
+    println!("disc control at color_center = {CENTER}: core luma {want:.2}");
+
+    let mut cores = Vec::new();
+    for (i, g) in GAMMAS.iter().enumerate() {
+        let img = renderer
+            .capture_preset(&format!("g{i}"), &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture g{i}: {e}"));
+
+        let core = core_of(&img);
+        let frame_max = (0..SIZE)
+            .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+            .map(|(x, y)| luma(&img, x, y))
+            .fold(0.0f32, f32::max);
+        println!("gamma {g:>4}: core {core:6.2}, frame max {frame_max:6.2}");
+
+        assert!(
+            frame_max > 200.0,
+            "at gamma = {g} nothing in the frame reaches the palette's bright end \
+             ({frame_max:.1}) — this test is measuring an empty picture"
+        );
+
+        const RAYS: usize = 8;
+        for ray in 0..RAYS {
+            let theta = std::f32::consts::TAU * ray as f32 / RAYS as f32;
+            let (dx, dy) = (theta.cos(), theta.sin());
+            let walk: Vec<f32> = (0..=WALK_PX / STEP_PX)
+                .map(|k| {
+                    let r = (k * STEP_PX) as f32;
+                    let x = (centre as f32 + dx * r).round() as u32;
+                    let y = (centre as f32 + dy * r).round() as u32;
+                    luma(&img, x, y)
+                })
+                .collect();
+            for w in walk.windows(2) {
+                assert!(
+                    w[1] >= w[0] - 1.0,
+                    "at gamma = {g}, ray {ray}: luma falls from {:.0} to {:.0} \
+                     walking OUT from the centre. The coordinate is 0 there and \
+                     rises with radius, so a fall is the wrap of a negative value \
+                     (the hole) or a NaN. Walk: {walk:?}",
+                    w[0],
+                    w[1]
+                );
+            }
+            let (first, last) = (walk[0], walk[walk.len() - 1]);
+            assert!(
+                last - first > 10.0,
+                "at gamma = {g}, ray {ray}: the first {WALK_PX} px only move luma \
+                 {first:.0} -> {last:.0}. The centre must be the foot of a ramp, \
+                 not a flat core. Walk: {walk:?}"
+            );
+        }
+        cores.push(core);
+    }
+
+    // The exponent orders the readings: `d` at the centre is well under 1, so a
+    // larger exponent shrinks it and the middle converges on `color_center`.
+    for (w, g) in cores.windows(2).zip(GAMMAS.windows(2)) {
+        assert!(
+            w[1] <= w[0] + 1.0,
+            "the core reads {:.1} at gamma = {} and {:.1} at gamma = {} — a larger \
+             exponent must not brighten a coordinate below 1. An unordered pair is \
+             a NaN through `pow`, which is what a negative `d` produced ({cores:?})",
+            w[0],
+            g[0],
+            w[1],
+            g[1]
+        );
+    }
+    let (lo, hi) = (cores[cores.len() - 1], cores[0]);
+    assert!(
+        hi - lo > 10.0,
+        "the exponent moves the core by only {:.1} counts across gammas \
+         {GAMMAS:?} ({cores:?}) — it must actually reshape the field, or this test \
+         would pass on a `gamma` that never reached the shader",
+        hi - lo
+    );
+    assert!(
+        (lo - want).abs() < 4.0,
+        "at the largest exponent the core reads {lo:.1} where the disc control \
+         reads {want:.1}. `d^gamma` goes to 0 there, so the centre must converge \
+         on the colour at `color_center` rather than on the gradient's far end"
     );
 }
