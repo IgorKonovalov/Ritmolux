@@ -84,32 +84,30 @@ function rustFiles(dir = REPO, found = []) {
  * Rust is lexed rather than grepped because `"https://x"` holds a `//` that is
  * not a comment and `// a "quote` holds a `"` that opens nothing. Block comments
  * nest in Rust, hence the depth counter; a raw string's terminator is its own
- * hash count, hence `hashes`; and `'` is a lifetime far more often than a char
- * literal, so it only opens one when a closing `'` sits where a char literal's
- * would.
+ * hash count, hence the hash group; and `'` is a lifetime far more often than a
+ * char literal, so it only opens one when a closing `'` sits where a char
+ * literal's would.
+ *
+ * The scanner emits character SPANS and the line number is derived afterwards
+ * from an index. Counting newlines as the scanner walks is the same computation
+ * in principle and wrong in practice: every branch that skips a region has to
+ * remember to count what it skipped, and one that forgets — `\` before a newline
+ * inside a string, consumed as an escape pair — misreports every line below it
+ * in the file.
  */
-function commentLines(source) {
-  const out = new Map();
-  const add = (line, text) => out.set(line, (out.get(line) ?? "") + text);
-
-  let line = 0;
+function commentSpans(source) {
+  const spans = [];
   let i = 0;
   const n = source.length;
 
   while (i < n) {
     const c = source[i];
 
-    if (c === "\n") {
-      line++;
-      i++;
-      continue;
-    }
-
     // Line comment: everything to the newline.
     if (c === "/" && source[i + 1] === "/") {
       let j = i;
       while (j < n && source[j] !== "\n") j++;
-      add(line, source.slice(i, j));
+      spans.push([i, j]);
       i = j;
       continue;
     }
@@ -118,7 +116,7 @@ function commentLines(source) {
     if (c === "/" && source[i + 1] === "*") {
       let depth = 1;
       let j = i + 2;
-      let start = j;
+      const start = j;
       while (j < n && depth > 0) {
         if (source[j] === "/" && source[j + 1] === "*") {
           depth++;
@@ -126,16 +124,11 @@ function commentLines(source) {
         } else if (source[j] === "*" && source[j + 1] === "/") {
           depth--;
           j += 2;
-        } else if (source[j] === "\n") {
-          add(line, source.slice(start, j));
-          line++;
-          j++;
-          start = j;
         } else {
           j++;
         }
       }
-      add(line, source.slice(start, j));
+      spans.push([start, Math.max(start, j - 2)]);
       i = j;
       continue;
     }
@@ -145,10 +138,7 @@ function commentLines(source) {
     if (raw && (i === 0 || !/[A-Za-z0-9_]/.test(source[i - 1]))) {
       const terminator = '"' + raw[1];
       let j = i + raw[0].length;
-      while (j < n && source.slice(j, j + terminator.length) !== terminator) {
-        if (source[j] === "\n") line++;
-        j++;
-      }
+      while (j < n && source.slice(j, j + terminator.length) !== terminator) j++;
       i = j + terminator.length;
       continue;
     }
@@ -162,7 +152,6 @@ function commentLines(source) {
           continue;
         }
         if (source[j] === '"') break;
-        if (source[j] === "\n") line++;
         j++;
       }
       i = j + 1;
@@ -186,6 +175,42 @@ function commentLines(source) {
     }
 
     i++;
+  }
+
+  return spans;
+}
+
+/** The comment text of each line, indexed by 0-based line number. */
+function commentLines(source) {
+  const out = new Map();
+  const add = (line, text) => out.set(line, (out.get(line) ?? "") + text);
+
+  // Line starts, so an index maps to a line by binary search.
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === "\n") starts.push(i + 1);
+  }
+  const lineOf = (idx) => {
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid] <= idx) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  for (const [start, end] of commentSpans(source)) {
+    let line = lineOf(start);
+    let from = start;
+    while (from < end) {
+      const lineEnd = line + 1 < starts.length ? starts[line + 1] - 1 : source.length;
+      add(line, source.slice(from, Math.min(end, lineEnd)));
+      from = lineEnd + 1;
+      line++;
+    }
+    if (start === end) add(lineOf(start), "");
   }
 
   return out;
