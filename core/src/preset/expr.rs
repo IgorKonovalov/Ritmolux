@@ -70,10 +70,14 @@ use std::fmt;
 /// always *something* sensible and never wrong about the music. Then
 /// `x`/`y`/`rad`/`ang`, the **vertex's own position** during a per-vertex
 /// evaluation (Plan 0100 Phase 1) — the same kind of thing as `index` one axis
-/// up, and `0` anywhere else. `index` stays **last** and is different in kind: it
-/// is not audio but the *element's own position* during a per-element evaluation
-/// (Plan 0034 Phase 4), and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 23] = [
+/// up, and `0` anywhere else. Then the reserved `[latch]` block (ADR-0137),
+/// [`LATCH_CAP`] slots an author never writes by these names: a preset's own
+/// latch names resolve **onto** them at load, and the placeholders are held out
+/// of the identifier lookup so `_latch0` is not a variable anybody can bind.
+/// `index` stays **last** and is different in kind: it is not audio but the
+/// *element's own position* during a per-element evaluation (Plan 0034 Phase 4),
+/// and it reads `0` anywhere else.
+pub const VAR_NAMES: [&str; 27] = [
     "bass",
     "mid",
     "treb",
@@ -96,6 +100,10 @@ pub const VAR_NAMES: [&str; 23] = [
     "y",
     "rad",
     "ang",
+    "_latch0",
+    "_latch1",
+    "_latch2",
+    "_latch3",
     "index",
 ];
 /// Number of expression variables.
@@ -139,6 +147,30 @@ const BAR_SLOT_BASE: usize = 15;
 /// `[per_vertex]` table.
 const VERTEX_SLOT_BASE: usize = 18;
 
+/// How many `[latch]` entries one preset may declare (ADR-0137).
+///
+/// **A chosen constant, and it is chosen rather than measured.** There is no
+/// experiment behind four: it is the number of independent armed-and-fired
+/// events a preset can hold in one reader's head at once, and every slot costs
+/// *every* preset — declared or not — a float in [`Variables`] and a bool plus a
+/// float in the render layer's bank, because the block is fixed and positional.
+/// A preset asking for more gets a load error naming this number, not a slower
+/// path; raising it is a recompile and nothing else.
+pub const LATCH_CAP: usize = 4;
+
+/// Slot of the first reserved latch variable; the block runs
+/// `LATCH_SLOT_BASE..LATCH_SLOT_BASE + LATCH_CAP` and sits immediately before
+/// `index`.
+///
+/// **Before `index` on purpose.** `INDEX_SLOT` is derived as `VAR_COUNT - 1`, so
+/// a block appended after it would silently re-point the one slot in this file
+/// whose position is computed rather than written down. Every other base
+/// (`RAW_`, `CLOCK_`, `BAR_`, `VERTEX_`) is a literal that sits *before* this
+/// one and is therefore unmoved by it — and `latch_slots_are_where_the_names_say`
+/// holds all of them to their names, so a reordered `VAR_NAMES` fails a test
+/// rather than binding `bar_phase` to `_latch1`.
+const LATCH_SLOT_BASE: usize = 22;
+
 // The five slot blocks must not overlap. Every bound here is a compile-time
 // constant, so this is checked at compile time: an overlapping base is a build
 // failure, not a test failure. `raw_slots_are_where_the_names_say` covers the
@@ -157,8 +189,12 @@ const _: () = assert!(
     "the bar block must end before the vertex block begins"
 );
 const _: () = assert!(
-    VERTEX_SLOT_BASE + 4 <= INDEX_SLOT,
-    "the vertex block must end before `index`"
+    VERTEX_SLOT_BASE + 4 <= LATCH_SLOT_BASE,
+    "the vertex block must end before the latch block begins"
+);
+const _: () = assert!(
+    LATCH_SLOT_BASE + LATCH_CAP <= INDEX_SLOT,
+    "the latch block must end before `index`"
 );
 
 /// A bound set of variable values for one evaluation. Field order matches
@@ -559,6 +595,30 @@ fn value_noise(x: f32, salt: u32) -> f32 {
 
 /// Bare identifiers that resolve to a literal. Resolved before the variable
 /// lookup so they cannot be shadowed; an unknown bare name still errors.
+/// Whether `name` is already resolved by the grammar — a built-in variable
+/// (the reserved `[latch]` placeholders included), a named constant, or a
+/// function.
+///
+/// The loader's guard against a `[latch]` name nothing could reach. Latch names
+/// resolve **last** in [`Parser::parse_primary`], so a latch called `bass` would
+/// silently be the band and one called `sin` would fail as a call — either way
+/// the author debugs a preset that is doing exactly what it was told. Rejecting
+/// the collision at load is what makes that resolution order unobservable.
+pub fn is_reserved_ident(name: &str) -> bool {
+    VAR_NAMES.contains(&name) || constant(name).is_some() || Func::from_name(name).is_some()
+}
+
+/// Whether `name` lexes as a single identifier — `[A-Za-z_][A-Za-z0-9_]*`, the
+/// rule [`tokenize`] applies.
+///
+/// A `[latch]` name failing this could never be written inside an expression, so
+/// the loader rejects it rather than admitting a latch no binding can read.
+pub fn is_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 fn constant(name: &str) -> Option<f32> {
     Some(match name {
         "pi" => std::f32::consts::PI,
@@ -989,6 +1049,16 @@ impl Expr {
     pub fn uses_vertex(&self) -> bool {
         self.uses_vertex
     }
+
+    /// Whether this expression reads the latch at `slot` in its preset's
+    /// `[latch]` order (ADR-0137).
+    ///
+    /// Not precomputed like the two above, because nothing routes on it: the
+    /// loader asks it once per latch per binding, to warn about a latch no
+    /// binding names. Never called per frame.
+    pub fn uses_latch(&self, slot: usize) -> bool {
+        slot < LATCH_CAP && self.root.references(LATCH_SLOT_BASE + slot)
+    }
 }
 
 /// Walk `node` (whose index is `index`) and report the gates `obs` never saw
@@ -1412,10 +1482,37 @@ impl fmt::Display for ExprError {
 
 impl std::error::Error for ExprError {}
 
-/// Compile a source expression into an evaluatable [`Expr`].
+/// Compile a source expression into an evaluatable [`Expr`], with no latch
+/// names in scope.
+///
+/// The entry point for every expression that is not a preset binding — probes,
+/// tests, and the two `[latch]` expressions themselves, which deliberately
+/// cannot read a latch (see [`compile_with_latches`]).
 pub fn compile(src: &str) -> Result<Expr, ExprError> {
+    compile_with_latches(src, &[])
+}
+
+/// [`compile`], with a preset's `[latch]` names in scope (ADR-0137).
+///
+/// `latches` is the preset's latch names **in slot order**: entry `i` resolves
+/// to `LATCH_SLOT_BASE + i`, which is the whole of the name-to-slot resolution
+/// and it happens once, here, at load — exactly as `Binding::tau` is read out of
+/// `[smoothing]` once. Nothing per-frame looks a latch name up. Entries past
+/// [`LATCH_CAP`] are unreachable; the loader rejects them before this is called,
+/// and the `take` below means a caller that did not would get an unknown
+/// identifier rather than a slot outside the block.
+///
+/// A latch name is resolved **after** the constants and the built-in variables,
+/// so nothing an author can declare shadows `bass` or `pi`. The loader also
+/// rejects a colliding name outright, which is what makes this ordering
+/// unobservable rather than a silently preferred one.
+pub fn compile_with_latches(src: &str, latches: &[String]) -> Result<Expr, ExprError> {
     let tokens = tokenize(src)?;
-    let mut parser = Parser { tokens, pos: 0 };
+    let mut parser = Parser {
+        tokens,
+        pos: 0,
+        latches,
+    };
     let root = parser.parse_expr()?;
     if parser.pos != parser.tokens.len() {
         return Err(ExprError::TrailingTokens);
@@ -1578,12 +1675,15 @@ fn tokenize(src: &str) -> Result<Vec<Token>, ExprError> {
     Ok(tokens)
 }
 
-struct Parser {
+struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
+    /// This preset's `[latch]` names in slot order — empty for every expression
+    /// compiled outside a preset's `[params]`.
+    latches: &'a [String],
 }
 
-impl Parser {
+impl Parser<'_> {
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.pos)
     }
@@ -1675,8 +1775,24 @@ impl Parser {
                     // Checked before the variable lookup, so a constant can
                     // never be shadowed by a future variable of the same name.
                     Ok(Node::Const(c))
-                } else if let Some(slot) = VAR_NAMES.iter().position(|&v| v == name) {
+                } else if let Some(slot) = VAR_NAMES
+                    .iter()
+                    .position(|&v| v == name)
+                    // The reserved latch placeholders are storage, not grammar:
+                    // they are in `VAR_NAMES` so the positional assertion can
+                    // see them, and held out here so an author reaches a latch
+                    // only through the name they declared for it (ADR-0137
+                    // Alternative B is the readability this protects).
+                    .filter(|slot| !(LATCH_SLOT_BASE..LATCH_SLOT_BASE + LATCH_CAP).contains(slot))
+                {
                     Ok(Node::Var(slot))
+                } else if let Some(slot) = self
+                    .latches
+                    .iter()
+                    .take(LATCH_CAP)
+                    .position(|declared| *declared == name)
+                {
+                    Ok(Node::Var(LATCH_SLOT_BASE + slot))
                 } else {
                     Err(ExprError::UnknownIdent(name))
                 }
@@ -1734,9 +1850,11 @@ mod tests {
     /// Without it, inserting a variable before `bass_raw` would leave
     /// [`Variables::with_raw`] writing four floats into `novelty` and the three
     /// slots after it, quietly, with every existing test still green: the raw
-    /// values would simply read as each other.
+    /// values would simply read as each other. The reserved `[latch]` block
+    /// (ADR-0137) is held to the same claim for the same reason — it is the
+    /// newest block and the one most likely to be moved.
     #[test]
-    fn raw_slots_are_where_the_names_say() {
+    fn latch_slots_are_where_the_names_say() {
         assert_eq!(
             VAR_NAMES.get(RAW_SLOT_BASE..RAW_SLOT_BASE + 4),
             Some(["bass_raw", "mid_raw", "treb_raw", "onset_raw"].as_slice()),
@@ -1763,6 +1881,11 @@ mod tests {
             VAR_NAMES.get(VERTEX_SLOT_BASE..VERTEX_SLOT_BASE + 4),
             Some(["x", "y", "rad", "ang"].as_slice()),
             "with_vertex writes four floats starting at VERTEX_SLOT_BASE"
+        );
+        assert_eq!(
+            VAR_NAMES.get(LATCH_SLOT_BASE..LATCH_SLOT_BASE + LATCH_CAP),
+            Some(["_latch0", "_latch1", "_latch2", "_latch3"].as_slice()),
+            "the latch bank writes LATCH_CAP floats starting at LATCH_SLOT_BASE"
         );
         assert_eq!(
             VAR_NAMES.get(INDEX_SLOT),
