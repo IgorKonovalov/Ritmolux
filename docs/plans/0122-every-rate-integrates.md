@@ -307,7 +307,7 @@ impl Phase {
 | 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `5c258d0` |
 | 2 — the two rates nothing binds | dev | done | `b250d0d` |
 | 3 — `swarm`'s field clock | dev | done | `254762c` |
-| 4 — the guard | dev | done | committed with this row |
+| 4 — the guard | dev | done | `228418a` |
 | 5 — the swarm content pass | human | not started | |
 
 ### Notes
@@ -352,3 +352,20 @@ impl Phase {
   `fragment_field::update`, `cargo check -p lmv-core` → `error[E0369]: cannot add f32 to Phase`;
   reverted.
 
+### Close triggers
+
+- **`presets/` touched:** yes — `presets/README.md` only (the `parametric_curve` `spin` prose and
+  the `deposit_spin` row). No `.toml` changed; the preset content pass is Phase 5.
+- **Plan header `Closes:`** design-backlog 0141.
+- **What shipped:** three defect fixes (`swarm` `spin`, `parametric_curve` `spin`, `warp_mesh`
+  `deposit_spin`), one refactor (four rate helpers collapsed into `scenes::Phase`), one new build
+  gate (`hygiene.rs`), and the operator-doc update above.
+- **Operator docs moved:** `presets/README.md`.
+- **`node scripts/check-backlog-claims.mjs`:** exit 1, **4 broken**. Three are entry 0141's own
+  probes — `let field_t = self.time * self.spin;`, `let rotation = self.spin * self.time;`,
+  `self.deposit_spin * self.time,` — which this plan removed. The fourth is entry **0142**'s probe
+  `self.spin_time = advance_spin(self.spin_time, self.spin, self.dt);`, anchored on the function
+  Phase 1 deleted; 0142's subject (the double-`update` on a same-system dissolve) is untouched by
+  this plan and the entry still stands.
+- **`human` phases remaining:** Phase 5 — the `swarm_shatter` / `swarm_drift` content pass and the
+  user's verdict in the running app.
