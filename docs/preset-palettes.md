@@ -597,6 +597,41 @@ you want drawn edges on a particle or line look, the mark's own geometry is wher
 they come from — the swarm's `shape`, a line scene's `thickness` — not from
 `palette_contour`.
 
+### `palette_contour` under `shape_field`'s two coordinates
+
+`shape_field` can hand the palette either of two figure coordinates
+([ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)): the
+normalized **distance** (`coord_mode = "0"`, the default), whose contours are
+offsets of the outline, or `r / r_boundary(theta)` (`"1"`), whose contours are
+**scaled copies** of it. Both are `0` at the figure's centre and `1` on its
+outline, and `palette_contour` works on both.
+
+**The hairline keeps its weight across the switch, and that is worth stating
+because the arithmetic suggests otherwise.** The two fields have genuinely
+different gradients — the distance rises at `1/inradius` everywhere, while the
+radius rises at `1/r_boundary(theta)`, which varies with direction by the shape's
+own circumradius-to-inradius ratio. What absorbs that is the contour's own
+construction: it is drawn within one **pixel** of a band edge, because the width
+comes from `fwidth` of the banded coordinate rather than from a fixed value in
+coordinate space. That normalization is exactly what a changing gradient runs
+into, so the line comes out the same. Measured on a nine-ring heart at
+`palette_contour = "0.75"`, as the darkening the parameter adds:
+
+| | inner rings | outer rings |
+|---|---|---|
+| `coord_mode = "0"` | 27.3 mean over 492 px | 32.6 mean over 2131 px |
+| `coord_mode = "1"` | 29.8 mean over 466 px | 31.3 mean over 1929 px |
+
+The two modes differ by less than the inner and outer rings differ *within*
+either one. So do not re-tune `palette_contour` when you switch modes.
+
+**What does change is where the rings are**, which is the whole point of the
+second coordinate. Under `"0"` they are evenly spaced in distance, so they hug
+the outline's offsets and the innermost ones round off any reflex corner; under
+`"1"` they are evenly spaced as fractions of the boundary radius, so they fan out
+in proportion — further apart toward a tip, closer toward a valley — and every
+one of them is the same figure at a smaller size.
+
 ### Banding fights bloom
 
 The bright pass blurs exactly the hard edges banding creates

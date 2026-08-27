@@ -814,8 +814,11 @@ Three things to know before binding them:
   the arm takes a closed-form straight-edge branch; either side of it takes a sampled one, and the
   two disagree by about `0.0032` (the polyline's sagitta). Small, but it sits in the middle of the
   range you are most likely to animate through — bias the range to one side if it shows.
-- **On a curved or jittered star, `gamma` must stay at exactly `1.0`.** See the warning under
-  `shape_field` below; this is a NaN, not a rounding artifact, and it is not optional.
+- **A curved or jittered star's interior moved at Plan 0098 Phase 1, and so did its contour
+  spacing.** That branch used to normalize by the straight edge plane's perpendicular; it now
+  divides by the figure's own deepest-point distance. `gamma` works on it again (it was a NaN
+  before), and a `color_span` tuned against the old scale is out by the ratio of the two references
+  — roughly 1.1x at a shallow curve and 1.9x at `star_valley = 0.18`.
 
 **Not in the roster and not a parameter: a star with *eyes*.** Composing two
 discs onto a silhouette is multi-shape composition, which is neither a knob nor
@@ -905,18 +908,17 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
-| `gamma` | the **response exponent** on the distance, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20`. **Unusable on a curved or jittered star — see the warning below** |
+| `gamma` | the **response exponent** on the figure coordinate, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
 | `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 
-> **DO NOT BIND `gamma` WHEN `star_curve` OR `star_jitter` IS NON-ZERO. It is a NaN, and the
-> `color_center` workaround does not save you.** Those two params take the star arm's curved branch,
-> which returns a **negative** normalized distance at the figure's centre
-> ([backlog 0097](../docs/design-backlog.md)). The shader evaluates
-> `select(pow(d, gamma), d, gamma == 1.0)` — and `pow` of a negative base is NaN, which lands as a
-> hard artifact through the middle of the figure. The `color_center` offset that entry recommends is
-> applied on the **next line**, after the exponent, so it cannot repair a NaN that has already
-> happened. **Only the exact identity `gamma = "1.0"` avoids it**, because that branch never calls
-> `pow`. `presets/shape_facet.toml` pins it for this reason and says so. Plan 0098 Phase 1 fixes it.
+> **`gamma` on a curved or jittered star used to be a NaN, and no longer is** (Plan 0098 Phase 1,
+> closing [backlog 0097](../docs/design-backlog.md)). Those two params take the star arm's curved
+> branch, which normalized a true distance by the *straight* edge plane's perpendicular — always
+> shorter than the figure's real deepest-point distance, so the coordinate came out **negative** at
+> the centre and `pow` of a negative base is NaN. The branch now divides by the figure's own
+> deepest-point distance and the coordinate is exactly `0` there, so `gamma` is an ordinary knob on
+> every star. **`presets/shape_facet.toml` still pins `gamma = "1.0"` and its header still explains
+> the pin by that defect** — the pin is now unnecessary rather than load-bearing.
 
 #### Two coordinates — offsets and scaled copies
 
@@ -1087,6 +1089,16 @@ that shows both.
 > ring count while it moves**, because both move the inradius. If you animate
 > either on `shape_field`, expect the banding to breathe with it — and if you
 > wanted only the silhouette to change, that is not currently separable.
+>
+> **AND IT DOES NOT TRANSFER BETWEEN `coord_mode` VALUES EITHER**, which is a
+> second, independent trap on the same parameter. Under `"0"` the exterior is
+> divided by the shape's inradius, so how far the coordinate reaches depends on
+> how thin the figure is; under `"1"` it grows **linearly in `r`** — the
+> coordinate is `2` at twice the boundary radius, on every shape, by
+> construction. So a span tuned in one mode is meaningless in the other, and
+> nothing warns. Switching modes means re-tuning `color_span`, and the good news
+> is that under `"1"` you only have to do it once: it is the same scale for
+> every silhouette, which is the trap above dissolving.
 
 **How far the coordinate reaches at the frame corner is worth one line of
 arithmetic before you ship.** The exterior is most of a 16:9 frame, and
@@ -1105,6 +1117,55 @@ texture in a still and shimmers the moment anything moves. `d` at the corner is
 > figure's own inradius is 1. The contours *outside* every shape are exact. So
 > a many-pointed star's inner rings will not sit where an offset curve should;
 > its outer ones will.
+
+#### The nested figure — the worked recipe
+
+This is the construction two batches of reference images have asked for: a
+figure nested inside itself, many rings deep, every ring still sharply the same
+shape. **It is three parameters, and `coord_mode = "1"` is the one that makes it
+possible.**
+
+```toml
+system = "shape_field"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#180a12" },
+  { at = 0.5, color = "#c02040" },
+  { at = 1.0, color = "#ffe0b0" },
+]
+
+[params]
+shape           = "4"        # the heart
+coord_mode      = "1"        # <- SCALED COPIES. Without this the notch rounds off.
+scale           = "0.62"
+palette_steps   = "9"        # THE RING COUNT, and nothing trades against it
+gamma           = "1.0"      # the SPACING only: below 1 crowds them inward
+color_span      = "0.42"     # how much gradient the figure's interior spans
+palette_contour = "0.75"     # a hairline at each ring
+```
+
+Read the three roles, because under the old coordinate they were not separable:
+
+- **`palette_steps` is the ring count.** Nine rings inside the figure, and the
+  innermost is still a heart.
+- **`gamma` is the spacing, and only the spacing.** Below 1 the rings crowd
+  toward the centre, above 1 toward the outline (the table above). Under
+  `coord_mode = "0"` it also decided how *rounded* the inner figure was, because
+  the innermost band's boundary sat at
+  `d = ((1/palette_steps)/color_span)^(1/gamma)` and a sharp notch needed
+  `palette_steps * color_span ~ 1` — which left **one** band inside the figure.
+  That trade is gone.
+- **`color_span` is the interior's share of the gradient**, and under `"1"` it
+  means the same thing on every shape.
+
+> **The old route was to fake it in the palette, and you should not.**
+> `presets/shape_pulse.toml` reaches the ring *count* by packing 18 stripes as
+> gradient stops below the outline's coordinate — a 76-stop palette that has to
+> be regenerated whenever the count changes, and one that cannot fix the real
+> defect: the level sets are still offsets, so the inner figure still rounds off.
+> It is a shipped, accepted look and nothing forces it to move, but
+> `coord_mode = "1"` is the documented route now.
 
 ### `warp_mesh` — the past, resampled through a per-vertex grid (Plan 0100)
 
