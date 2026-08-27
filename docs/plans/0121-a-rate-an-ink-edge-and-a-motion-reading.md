@@ -341,8 +341,8 @@ fn band_contour(
 | 1 — `--report` gains `drive` and `rate` | dev | done | `63461ee` |
 | 2 — preset names stop colliding | dev | done | `0f8fa98` |
 | 3 — `field_speed` and `fold_speed` | dev | done | `73d084c` |
-| 4 — `warp_speed` integrates too | dev | done | committed with this row |
-| 5 — the contour reads the LUT | dev | not started | |
+| 4 — `warp_speed` integrates too | dev | done | `4014682` |
+| 5 — the contour reads the LUT | dev | done | committed with this row |
 | 6 — the content pass | human | not started | |
 
 ### Notes
