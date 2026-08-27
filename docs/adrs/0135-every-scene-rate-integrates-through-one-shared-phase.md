@@ -1,8 +1,8 @@
 # ADR-0135 — Every scene rate integrates through one shared `Phase`, and a guard asserts it
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0122)
 > **Date:** 2026-08-27
-> **Related plan(s):** [0122](../plans/0122-every-rate-integrates.md)
+> **Related plan(s):** [0122](../plans/done/0122-every-rate-integrates.md)
 > **Supplements:** [0132](0132-a-rate-parameter-integrates-a-phase.md) (the rule this enforces),
 > [0076](0076-the-attractor-keeps-the-depth-it-already-computes.md) (the first integrated phase), [0002](0002-layered-preset-architecture.md) (the seam this does not widen)
 

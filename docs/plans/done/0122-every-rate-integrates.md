@@ -1,16 +1,28 @@
 # 0122 — Every rate integrates
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-27
 > **Approved:** 2026-08-27
+> **Closed:** 2026-08-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0135](../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) (proposed),
-> [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted, Outcome — the rule this finishes)
+> **Related ADRs:** [0135](../../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) (accepted),
+> [0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted, Outcome — the rule this finishes)
 > **Closes:** design-backlog 0141
+>
+> All five phases landed — `5c258d0`, `b250d0d`, `254762c`, `228418a`, `c2439b7` (+ `d22fff7`,
+> `e186bd2`, `7ac363f`). **Mode 4 review: no blockers, two majors both discharged before the close**
+> — ADR-0135's body was corrected while still `proposed` (six bindable rates counted, nine found),
+> and the three rates it leaves unfixed, all multiplying a per-element `age`, were filed as
+> design-backlog 0149. Verified at the close: the four rate helpers really do collapse to one
+> `scenes::Phase` with `step` its only mutator; `hygiene.rs` fails the build on either operand order,
+> inversion-probed by hand; no golden baseline moved and `LMV_BLESS` was never run; the swarm content
+> pass took its verdict in the running app. Two `minor` findings were recorded rather than left
+> unwritten — the duplicated `dt` sanitizer with none on the attractor as **design-backlog 0150**,
+> and the missing `swarm` `spin` note added to `presets/README.md` in the close commit.
 
 ## TL;DR
 
-[ADR-0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) decided that every bindable rate in
+[ADR-0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md) decided that every bindable rate in
 this engine integrates a phase, and shipped with three live counterexamples it had not looked for.
 This plan takes the rule from a claim to a property: one `Phase` type in `scenes/mod.rs`, the three
 correct implementations collapsed into it, the three defective sites moved onto it, and a hygiene
@@ -58,7 +70,7 @@ by a list of sites fails identically whether the list lives in a test or in an A
 
 ## Decision
 
-Take [ADR-0135](../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md): one `Phase`
+Take [ADR-0135](../../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md): one `Phase`
 type, every rate through it, and a text guard that fails the build on a fourth site.
 
 The type accumulates `rate · dt` and **nothing else** — no constant scale folded in — because
@@ -170,7 +182,7 @@ flowchart TB
     Phase 2.
   - **The two affected presets' `drive`, `rate` and `cover` are recorded before and after**, read
     against their family neighbours — using the columns Plan 0121 added for exactly this. Readings,
-    never thresholds ([ADR-0134](../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md)):
+    never thresholds ([ADR-0134](../../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md)):
     the claim is that the numbers are *reported*, not that they land anywhere in particular. What the
     correction does to the look is Phase 5's question and is not settled here.
   - **The two golden fixtures are the honest edge, and the plan states it rather than assuming it.**

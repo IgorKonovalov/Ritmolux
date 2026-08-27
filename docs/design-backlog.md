@@ -299,6 +299,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0137 | `fragment_field` has three hardcoded animation rates and no parameter behind any of them | [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 3; see 0141. **Closed 2026-08-27** |
 | 0138 | `palette_contour` keys on the band grid and never reads the LUT | [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 5; see 0140. **Closed 2026-08-27** |
 | 0139 | Nothing in the harness measures motion rate or the silent-to-driven difference | [ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) + [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) Phase 1. **Closed 2026-08-27** |
+| 0141 | ADR-0132's rule is engine-wide and its enumeration was not: three rates still multiplied the clock | [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) + [Plan 0122](plans/done/0122-every-rate-integrates.md); see 0149, 0150. **Closed 2026-08-28** |
 | 0129 | The doc-link gate walks `.md` only, so the same links in `.rs` comments rot unwatched | [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) + [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md). **Closed 2026-08-27** |
 | 0096 | `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies | [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) + [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phases 2-4, as `coord_mode`. **Closed 2026-08-27** |
 | 0097 | A curved or jittered `star` returns a NEGATIVE normalized distance at its own centre | [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1. The reference was repaired, not the result clamped. **Closed 2026-08-27** |
@@ -3119,79 +3120,6 @@ the frame — so the contour is the only source of intermediate values in the pi
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
 
-## 0141 — ADR-0132's rule is engine-wide and its enumeration was not: `swarm`'s field clock is still `time * spin`, and two shipped presets bind that rate to the music
-
-[ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
-parameter in this engine integrates a phase**, then enumerates two sites: the new `field_speed` /
-`fold_speed` on `fragment_field`, and `warp_speed` on `warp_mesh`, *"which is corrected to match
-rather than left as a counterexample"*. There is a third, and it is the only one of the three that
-shipped content actually binds.
-
-> **Corrected 2026-08-27, same day, while planning the fix — this entry's own count was wrong in the
-> same direction as the ADR's.** There are **three** uncorrected sites, not one. `swarm` is the only
-> one that moves a picture today, which is why it is still the title; the other two are
-> `lines/parametric.rs:410` (`self.spin * self.time` — bound only to constants, by `curve_ionwake`
-> and `curve_nightbloom`, where the two forms agree by construction) and `warp_mesh/mod.rs:2070`
-> (`self.deposit_spin * self.time` — nothing binds it, exactly the status `warp_speed` had). Finding
-> the entry about undercounting undercounted is the argument for the guard rather than a fourth list.
-> **PROMOTED** to [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) +
-> [Plan 0122](plans/0122-every-rate-integrates.md), which take all three plus a shared `Phase` type
-> and a hygiene assertion. Stays live until that plan closes.
-
-- **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
-  Mode 4 close review, by grepping for the pattern the ADR forbids rather than by reading the plan's
-  list. **Owner if taken:** `dev`; the correction is the same three lines Phase 4 applied to
-  `warp_mesh`.
-- **Verified 2026-08-27** — the swarm's field clock still multiplies absolute scene time:
-  `present: let field_t = self\.time \* self\.spin; in: core/src/render/scenes/swarm.rs`
-- **Verified 2026-08-27** — and a shipped preset binds that rate to a band:
-  `present: spin = "0\.4 \+ clamp\(mid \* 0\.9, 0, 0\.75\)" in: presets/swarm_shatter.toml`
-- **Verified 2026-08-27** — the second uncorrected site, found while planning:
-  `present: let rotation = self\.spin \* self\.time; in: core/src/render/scenes/lines/parametric.rs`
-- **Verified 2026-08-27** — and the third:
-  `present: self\.deposit_spin \* self\.time, in: core/src/render/scenes/warp_mesh/mod.rs`
-
-### The finding
-
-`core/src/render/scenes/swarm.rs` computes `let field_t = self.time * self.spin;`, four lines under
-its own comment *"Field evolves at `spin`"* — so `spin` is a rate, it is in the scene's `PARAMS`
-roster, and it is exactly the shape ADR-0132 exists to remove. Two shipped presets bind it:
-
-    presets/swarm_shatter.toml:34   spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"     [smoothing] 0.3
-    presets/swarm_drift.toml:96     spin = "0.040 + sin(time * 0.019) * 0.010
-                                            + clamp(mid * 0.041, 0, 0.035)"      [smoothing] 1.30
-
-**Size of it on `swarm_shatter`, arithmetic rather than measured.** A one-pole at `tau = 0.3`
-closes about 5.4 % of its gap per 60 Hz frame, so across the 0.75 swing `spin` moves ~0.04 in a
-frame. At t = 100 s that advances `field_t` by ~4.0 s of field time in one frame, against a nominal
-`1.15 / 60 = 0.019` s — roughly **210x**, on every loud passage, growing without bound as a set runs.
-
-**Why nobody has reported it, and why that is not reassurance.** Unlike `warp_mesh`, whose phase
-drives a vertex displacement and would visibly teleport the picture, `field_t` is the time
-coordinate of the curl-noise field the particles *steer* by. A jump re-rolls the flow rather than
-moving the particles, so it reads as the field losing its thread — which is a look, not obviously a
-bug, and is the kind of thing a viewer attributes to the music. Plan 0121's own Context asserts the
-opposite premise — *"the rate hazard already exists in the engine: `warp_mesh` … Nothing has found
-it because no preset binds it"* — and that framing is what stopped anyone grepping.
-
-- **What a fix looks like.** The `warp_mesh` correction, applied unchanged: store `dt` in `advance`,
-  accumulate `field_phase += spin * dt` in `update` (after `set_param`, so it uses this frame's
-  value), and read the phase where `field_t` is read now. At a constant `spin` the phase equals
-  `spin * time`, so `swarm_drift`'s slow constant term is unchanged and only the bound swing bends.
-  **Not free of visual consequence, unlike the other three:** both presets bind `spin`, so this one
-  *will* move their pictures, and it needs a `preset-author` look pass rather than an equivalence
-  assertion. That is the whole reason it is a separate entry and not a fifth phase.
-- **And the general repair is the sweep, not the site.** The enumeration failed once; the thing that
-  keeps it from failing again is a test, not a longer list — a hygiene-style assertion that no
-  `core/src/render/scenes/**` source multiplies `self.time` by a settable field. That is cheap, it
-  is text, and it would have caught this one.
-
-### Priority
-
-**Medium.** Live in shipped content on every loud passage, and it convicts a claim an accepted ADR
-makes about itself — but it is a look question rather than a crash, the two affected presets read
-acceptably today, and the fix cannot land without a content pass behind it.
-
 ## 0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration
 
 `scene_for_mut` resolves a scene by `SystemKind`, so when a dissolve crosses two presets of the
@@ -3201,13 +3129,16 @@ advances twice.
 
 - **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
   close review, and re-raised the same day while planning
-  [0122](plans/0122-every-rate-integrates.md) — which moves three more rates into the affected class.
+  [0122](plans/done/0122-every-rate-integrates.md) — which moves three more rates into the affected class.
   **Owner if taken:** `dev`, but the design question is `architect`'s: see below.
 - **Verified 2026-08-27** — the scene is resolved by system, so both sides of a same-system dissolve
   get one instance:
   `present: fn scene_for_mut\(scenes: &mut SceneRoster, system: SystemKind\) in: core/src/render/mod.rs`
-- **Verified 2026-08-27** — and `update` carries per-frame state that is not idempotent:
-  `present: self\.spin_time = advance_spin\(self\.spin_time, self\.spin, self\.dt\); in: core/src/render/scenes/particles/mod.rs`
+- **Verified 2026-08-28** — and `update` carries per-frame state that is not idempotent. Re-pointed
+  at [Plan 0122](plans/done/0122-every-rate-integrates.md)'s close: the accumulator survives
+  unchanged, `advance_spin` does not — it collapsed into the shared `scenes::Phase` and this probe
+  was anchored on the deleted function's name rather than on the claim:
+  `present: self\.spin_time\.step\(self\.spin, self\.dt\); in: core/src/render/scenes/particles/mod.rs`
 - **Verified 2026-08-27** — the third claim, that no test can observe this, does not reduce:
   `unprobeable: no test reaches the dual-live render path is a negative about the whole suite, not a
   match count. The mechanism is a cfg(test) escape hatch on the transition's fidelity governor - a
@@ -3565,7 +3496,7 @@ confined fraction grows on its own.
 
 [ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
 parameter in this engine integrates a phase**. [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
-and [Plan 0122](plans/0122-every-rate-integrates.md) delivered that for the six rates measured
+and [Plan 0122](plans/done/0122-every-rate-integrates.md) delivered that for the six rates measured
 against `self.time`, and added a `hygiene.rs` guard that fails the build on
 `self.<field> * self.time`. **Three more rates multiply a per-element `age` instead**, which is the
 same defect against a different clock — and the guard matches the shared clock by name, so it passes
@@ -3644,3 +3575,68 @@ defective form — but the magnitude is 4-6x smaller than the defect Plan 0122 f
 bounds it in ordinary playback. The half worth doing immediately and cheaply is the
 `presets/README.md` correction, which costs one sentence and stops the content lane from writing more
 of these.
+
+---
+
+## 0150 — `Phase::step` accepts any `dt`, so the guard against a poisoned accumulator is four copies in the callers and the attractor has none
+
+[ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) put every bindable
+rate behind one `scenes::Phase`, whose whole reason to exist is that `+= rate · dt` becomes the only
+way an accumulator moves. It does not constrain what `dt` may be. A single non-finite frame writes
+`NaN` into a `Phase` **permanently** — the type has no other mutator, so nothing can ever clear it —
+and the defence against that lives, byte-identical, in four separate `Scene::advance` impls. The one
+scene holding a `Phase` that does *not* carry it is `attractor`.
+
+- **Raised:** 2026-08-28, at Plan 0122's close, from the Mode 4 review's second `minor`. **Owner if
+  taken:** `architect` first — where the guard belongs is a real design call, see below — then `dev`.
+- **Verified 2026-08-28** — the shared type takes `dt` on trust:
+  `present: pub\(crate\) fn step\(&mut self, rate: f32, dt: f32\) in: core/src/render/scenes/mod.rs`
+- **Verified 2026-08-28** — and the attractor stores the frame's `dt` raw beside a `Phase`. The
+  probe discriminates: this spelling matches only the two unguarded scenes and none of the four
+  guarded ones, so it goes red on the repair rather than on decay:
+  `present: self\.dt = dt; in: core/src/render/scenes/particles/mod.rs`
+- **Verified 2026-08-28** — while four callers each re-derive the same three lines:
+  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/scenes/swarm.rs`
+
+### The finding
+
+`Phase::step` is `self.0 += rate * dt` with no precondition (`scenes/mod.rs:87`). Four scenes sanitize
+`dt` on the way in, with the same expression each time and four separately-written comments giving
+the same reason:
+
+    fragment_field.rs:446    dt.is_finite() && dt > 0.0 else FALLBACK_DT
+    lines/parametric.rs:330  dt.is_finite() && dt > 0.0 else FALLBACK_DT
+    swarm.rs:724             dt.is_finite() && dt > 0.0 else FALLBACK_DT
+    warp_mesh/mod.rs:1712    dt.is_finite() && dt > 0.0 else FALLBACK_DT
+
+`particles/mod.rs:1339` writes `self.dt = dt` unguarded, and `update` then runs
+`self.spin_time.step(self.spin, self.dt)`. `spin_time` is a `Phase`; a `NaN` or negative `dt` from
+the shell — a suspended window, a clock that jumps backwards, a `dt` computed across a device loss —
+lands in it and stays. Every attractor world's display rotation is dead for the rest of the process.
+`FixedStep::advance` on the line above **self-heals** (`accumulator.min(step)` returns `step` when
+one operand is `NaN`), which is exactly why the omission reads as safe on inspection.
+
+**This is the shape ADR-0135 was written against, one level down.** That ADR's own Context calls four
+copies of the same three lines *"a rule enforced by a list of sites"* and rejects Alternative A on the
+grounds that the duplication is how the defect returns. Four copies of the `dt` guard is that
+sentence again, and the site with no copy is the one it predicts.
+
+- **What a fix looks like**, and the choice is not obvious:
+  - **Sanitize inside `Phase::step`.** One line, kills all four copies, and the invariant sits on the
+    type that exists to hold invariants. But `self.dt` has readers that are **not** `Phase` —
+    `swarm`'s damping `powf`, `warp_mesh`'s `pow` — so the four callers would still want their own
+    guard and the duplication survives with a narrower job.
+  - **Sanitize at the trait seam**, in `draw_frame` before `Scene::advance` is called, so no scene
+    ever sees a bad `dt`. Fixes every reader at once and deletes all four copies. Widens what the
+    renderer promises about the argument, which is an ADR-0002 question rather than an edit.
+  - **A `Dt` newtype** that cannot be constructed non-finite, taken by `advance` and by `step`.
+    Strongest, and the largest diff.
+- **What it is not:** copying the fourth guard into `particles/mod.rs`. That closes the one live hole
+  and leaves five copies, which is the option ADR-0135 already rejected once by name.
+
+### Priority
+
+**Low-medium.** Nothing observed — the shells feed real elapsed time and no capture path produces a
+bad `dt`, which is why it survived a plan whose whole subject was these accumulators. It is filed at
+this size because the cost of the repair only grows: `Phase` is now the engine's one rate mechanism,
+so every rate added after this inherits whichever answer is not chosen.
