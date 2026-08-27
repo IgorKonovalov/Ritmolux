@@ -306,8 +306,8 @@ impl Phase {
 |---|---|---|---|
 | 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `5c258d0` |
 | 2 — the two rates nothing binds | dev | done | `b250d0d` |
-| 3 — `swarm`'s field clock | dev | done | committed with this row |
-| 4 — the guard | dev | not started | |
+| 3 — `swarm`'s field clock | dev | done | `254762c` |
+| 4 — the guard | dev | done | committed with this row |
 | 5 — the swarm content pass | human | not started | |
 
 ### Notes
@@ -341,6 +341,11 @@ impl Phase {
 - `swarm`'s `advance` gained the non-finite/negative `dt` guard `fragment_field` and `warp_mesh`
   carry; the plan does not name it. `field_phase` is the scene's first accumulator, so a bad frame
   that previously cost only the damping `powf` can now corrupt state permanently.
+- Phase 4's inversion probe, run by hand and reverted, both operand orders: restoring
+  `let field_t = self.time * self.spin;` in `swarm.rs` failed the guard naming
+  `self.time * self.spin`; restoring `self.deposit_spin * self.time` in `warp_mesh/mod.rs` failed
+  it naming `self.deposit_spin * self.time`. The same probe on `parametric.rs` cannot be run —
+  Phase 2 removed that scene's `time` field, so the multiply no longer compiles there.
 - The no-`Add` done-when is recorded here as tried-and-observed rather than as a `compile_fail`
   doctest: `Phase` is `pub(crate)`, so a doctest cannot name it and would fail on privacy instead of
   on arithmetic. Probe: `let _probe = self.fold_phase + self.fold_speed * self.time;` added to
