@@ -1,6 +1,6 @@
 # 0121 — A rate, an ink edge, and a motion reading
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-27
 > **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
@@ -334,11 +334,11 @@ fn band_contour(
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/lmv-plan-0121` on branch `plan-0121-rate-ink-motion`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--report` gains `drive` and `rate` | dev | not started | |
+| 1 — `--report` gains `drive` and `rate` | dev | done | committed with this row |
 | 2 — preset names stop colliding | dev | not started | |
 | 3 — `field_speed` and `fold_speed` | dev | not started | |
 | 4 — `warp_speed` integrates too | dev | not started | |
