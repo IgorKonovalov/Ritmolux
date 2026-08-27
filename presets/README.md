@@ -312,7 +312,7 @@ preset folder — so while you are editing a file it re-rolls on each save.
 
 | System            | Named `[params]`                                                         |
 |-------------------|--------------------------------------------------------------------------|
-| `fragment_field`  | `warp` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
+| `fragment_field`  | `warp` `field_speed` `fold_speed` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` `star_valley` `star_curve` `star_jitter` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
@@ -360,6 +360,43 @@ the whole-frame stop, it crossfades as a scalar across a preset dissolve, and
 [Linear light and `exposure`](#linear-light-and-exposure-plan-0045). `size` and
 `fade` also move the level, but they move the picture with it — a wider nib and a
 longer trail — so use them when that is what you want.
+
+### `fragment_field` animation rates — `field_speed` and `fold_speed` (Plan 0121)
+
+| param | default | what it scales |
+|---|---|---|
+| `fold_speed` | `1.0` | the **domain fold** — the five-iteration sine warp that reorganizes the picture in place. This is the component that boils |
+| `field_speed` | `1.0` | the **field sweep** — the sine that carries the bands across the frame |
+
+Both are **rates in units of the scene's own default speed**, so `1.0` is exactly
+what this scene has always animated at and a preset binding neither renders as it
+always did. `0.4` is 0.4x as fast; `0` freezes that component; `2` doubles it.
+
+**They exist because `warp` was the only lever and it is the wrong one.** `warp`
+is the fold's *amplitude*, so turning it down to calm a world does not slow the
+fold — it flattens it, and the eddies and closed loops that make a flow legible
+go with it. Measured on one preset at matched scene phase: `fold_speed`/
+`field_speed` at `0.4` reach the **same field** the default reaches, just later;
+`warp` dropped from `0.55` to `0.22` reaches a **different, flatter** field that
+the default never draws. Slow it with the rates; reshape it with `warp`.
+
+**A rate here integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
+which is what makes it safe to bind to audio:
+
+```toml
+field_speed = "0.2 + clamp(bass * 0.4, 0, 0.3)"   # quickens under bass, returns
+```
+
+The scene keeps an accumulator and adds `rate * dt` to it each frame, rather than
+multiplying the shared clock. The difference only shows once a binding *moves*:
+under a multiply, a rate swinging from `1.0` to `1.5` at t = 100 s would advance
+the phase by **fifty seconds in one frame** — a teleport, not an acceleration.
+Integrated, the same swing bends the motion. (`warp_speed` on `warp_mesh` is the
+same shape for the same reason.)
+
+**The two fold rates stay welded** in their designed 0.7 : 0.6 quadrature ratio
+under one `fold_speed`; they are a sine/cosine pair chosen not to beat against
+each other, and nothing has asked for them to diverge.
 
 ### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
 
