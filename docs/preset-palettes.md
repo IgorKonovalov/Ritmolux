@@ -131,7 +131,7 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
 | `palette_steps` | `0.0` (off) | Quantizes the gradient into that many hard bands — see [Hard bands](#hard-bands--palette_steps-and-palette_contour). |
-| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge. **Fragment-field, reaction-diffusion, shape-field and warp-mesh only**; inert elsewhere — same section. |
+| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge **where the ink actually changes**. **Fragment-field, reaction-diffusion, shape-field and warp-mesh only**; inert elsewhere — same section. |
 
 `saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
 background pre-pass. You write them once and the whole frame answers — see
@@ -559,6 +559,40 @@ rather than a soft one).
 
 **So tune `color_span` and `palette_steps` together.** If banding "isn't doing
 anything", the span is the first thing to check.
+
+### Where the contour falls — it reads the palette (Plan 0121)
+
+> [!IMPORTANT]
+> **The contour draws only where the two bands it separates are actually
+> different colours.** It samples the palette at the two band centres either side
+> of the nearest edge, and draws nothing when they come back the same
+> ([ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md)).
+
+This is what makes the parameter usable on a **limited-ink** look. A two-ink
+print is written as *plateaus* — runs of bands holding one colour, the only way
+to get flat ink out of `palette_steps` — and until Plan 0121 the contour drew at
+every boundary inside those runs, which is a grey hairline across flat colour:
+exactly the shading such a look is defined by not having. `shape_contourmono`'s
+twenty steps sit in five runs, so fifteen of its twenty band edges were
+white-meets-white or black-meets-black, and the only usable setting was `0`.
+
+**Nothing on a smooth palette changed.** The test is **equality**, not
+similarity: the line is suppressed only when the two samples agree to within half
+an 8-bit code value, which is below the LUT's own quantization. Two distinct band
+centres on a ramp always differ by at least one code value, so every edge draws
+exactly as it did before, at any `palette_steps` and any `color_span`.
+
+Two edges of the rule are worth knowing, because both will read as a surprise:
+
+- **A near-plateau is not a plateau.** A "flat" run built from two stops that
+  differ by one code value still contours inside the run. Correct by the stated
+  rule, and avoidable: write a plateau as the *same* colour on both stops.
+- **A run boundary that does not land on a band boundary still draws at the
+  nearest band edge, not at the stop.** The contour lives on the band grid; a
+  custom-stop palette whose hard transition falls mid-band gets its line at
+  whichever band edge is closest. Place a run boundary on a band edge — the way
+  the shipped mono presets write their stops wide of the seam — if you want the
+  line where you drew it.
 
 ### The scene scoping — banding reaches every scene, contours do not
 

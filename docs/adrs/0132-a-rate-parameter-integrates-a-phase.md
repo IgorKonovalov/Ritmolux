@@ -1,8 +1,8 @@
 # ADR-0132 — A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-27
-> **Related plan(s):** [0121](../plans/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+> **Related plan(s):** [0121](../plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
 > **Related:** [0013](0013-c-abi-v4-render-dt.md) (the injected `dt` this rests on), [0019](0019-eased-parameters.md) (the precedent for render-layer state driven by that `dt`)
 
 ## Context
@@ -130,3 +130,29 @@ The per-frame order this relies on is `set_time` → `advance` → `reset_params
 parameter values land, so a scene that integrates inside `advance` would use the previous frame's
 rate. The integration belongs in `update`, with `advance` storing `dt` — the same split
 `warp_mesh` already uses for its own `dt`.
+
+## Outcome — 2026-08-27, at Plan 0121's close
+
+Accepted as written; the decision holds and both enumerated sites landed. **What the implementation
+falsified is this ADR's own count of the sites it binds.**
+
+The Decision says *"every bindable rate parameter in this engine"* and then names two: `field_speed`
+/ `fold_speed` on `fragment_field`, and `warp_speed` on `warp_mesh`. A grep for the forbidden shape
+at the close review found a **third**, and it is the only one of the three that shipped content
+actually binds: `core/src/render/scenes/swarm.rs` computes `let field_t = self.time * self.spin;`
+four lines under its own comment *"Field evolves at `spin`"*. `presets/swarm_shatter.toml` binds
+`spin = "0.4 + clamp(mid * 0.9, 0, 0.75)"` and `presets/swarm_drift.toml` binds a smaller swing on
+the same band. On `swarm_shatter` at t = 100 s the eased swing advances `field_t` by roughly four
+seconds of field time in a single frame — about 210x its nominal rate — on every loud passage.
+
+The rule is unchanged and the third site should be corrected to match. It is **not** appended to
+this ADR as a fourth binding, for a reason the other three did not have: both affected presets bind
+`spin`, so the correction will move their pictures and needs a content pass behind it rather than
+the constant-rate equivalence assertion that carried Phase 4. It is filed as **design-backlog 0141**,
+which also carries the general repair — a text assertion that no scene source multiplies `self.time`
+by a settable field, since what failed here was an enumeration and the thing that keeps an
+enumeration honest is a test rather than a longer list.
+
+The plan's Context stated the opposite premise — *"the rate hazard already exists in the engine:
+`warp_mesh` … Nothing has found it because no preset binds it"* — and that framing is what stopped
+the sweep from being run before the phases were written.

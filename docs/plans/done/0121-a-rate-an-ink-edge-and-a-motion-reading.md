@@ -1,12 +1,12 @@
 # 0121 — A rate, an ink edge, and a motion reading
 
-> **Status:** approved
+> **Status:** done
 > **Created:** 2026-08-27
 > **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) (proposed),
-> [0133](../adrs/0133-the-band-contour-fires-where-the-ink-changes.md) (proposed),
-> [0134](../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) (proposed)
+> **Related ADRs:** [0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted),
+> [0133](../../adrs/0133-the-band-contour-fires-where-the-ink-changes.md) (accepted),
+> [0134](../../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) (accepted)
 > **Closes:** design-backlog 0131, 0137, 0138, 0139
 
 ## TL;DR
@@ -297,8 +297,8 @@ fn band_contour(
   texture already resident, and gated behind the early-out — but it is the one phase here with a
   per-pixel cost, and `docs/nfr.md`'s frame budget is the thing to watch if a Rich-tier preset on the
   affected scenes moves.
-- **Phase 5 contends with two approved plans on `shape_field.rs`** — [0098](0098-the-figure-nests-properly.md)
-  and [0092](0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
+- **Phase 5 contends with two approved plans on `shape_field.rs`** — [0098](../0098-the-figure-nests-properly.md)
+  and [0092](../0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
   those in sequence or in separate worktree lanes; the collision is in the shader's fragment body,
   which is where all three edit.
 - **Phase 4 has no regression evidence and cannot get any.** No shipped preset binds `warp_speed`, so
@@ -334,27 +334,134 @@ fn band_contour(
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/lmv-plan-0121` on branch `plan-0121-rate-ink-motion`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--report` gains `drive` and `rate` | dev | not started | |
-| 2 — preset names stop colliding | dev | not started | |
-| 3 — `field_speed` and `fold_speed` | dev | not started | |
-| 4 — `warp_speed` integrates too | dev | not started | |
-| 5 — the contour reads the LUT | dev | not started | |
-| 6 — the content pass | human | not started | |
+| 1 — `--report` gains `drive` and `rate` | dev | done | `63461ee` |
+| 2 — preset names stop colliding | dev | done | `0f8fa98` |
+| 3 — `field_speed` and `fold_speed` | dev | done | `73d084c` |
+| 4 — `warp_speed` integrates too | dev | done | `4014682` |
+| 5 — the contour reads the LUT | dev | done | `324a30d` |
+| 6 — the content pass | preset-author | done | `d74fa37` |
 
 ### Notes
 
+**Deviations from the plan.**
+
+- Phase 2 (`0f8fa98`) also touched `standalone/tests/shot_cli.rs`, which is not in its file list:
+  that test located the easing fixture's report row by a name prefix the middle-elision shortens.
+- Phase 5 (`324a30d`) also touched `core/src/render/scenes/warp_mesh/mod.rs`. `band_contour` is
+  written **four** times, not the three the phase lists, and the fourth copy's text had already
+  drifted (`dd` for `d`) — so `the_contour_reaches_the_fragment_sites_and_not_the_vertex_one` could
+  not have caught it: it iterated three sites, and the one place drift had happened was not among
+  them. The fourth copy is now canonical and the assertion covers it. `docs/preset-palettes.md`
+  documents `palette_contour` as live on warp-mesh. Scope put to the user before taking it.
+- Phase 5 (`324a30d`) added `core/tests/palette_contour.rs`. Its done-when requires assertions on
+  rendered output and names no test file.
+
+**Done-when criteria not satisfiable as stated.**
+
+- Phase 1, third bullet: *"the same sequence reversed or reordered does not [recover the step]"*.
+  `frame_diff` is symmetric, so a reversed sequence has the identical multiset of consecutive pairs
+  and a mean over them is reversal-invariant for **any** input. Asserted instead: **reordering**
+  changes `mean_consecutive_diff`, and **reversing** changes `probe_rate`, whose fixed window then
+  selects different frames. The invariance is stated in the test's own doc comment.
+- Phase 3, first bullet: the stated comparison holds — `rate` 0.0080 → 0.0063 at `fold_speed = 0.4`,
+  `cover` 0.994 → 0.988 — but `cover` sits near 1.0 on any fullscreen field and does not separate a
+  *slowed* fold from a *flattened* one: `warp` 0.55 → 0.22 moves it to 0.985. The
+  no-flattening claim rests instead on a matched-phase equivalence: at `fold_speed`/`field_speed`
+  0.4, frame 300 renders the picture the default renders at frame 120, while `warp` 0.22 at frame
+  300 renders a different, visibly flatter field. Both images are in the Phase 3 commit message's
+  numbers; the check was run by hand and is not in the suite.
+
+**Followups noticed, not acted on.**
+
+- A full-library `--report` marks **48 of 49** `rate` cells; only `Halo` reads unmarked. The plan's
+  risk list names this shape and the followup list already carries the question.
+- Phase 5's per-pixel cost was not measured against `docs/nfr.md`'s frame budget.
+
+**Phase 6 — the content pass (`preset-author`).** Both worlds moved onto the new surface, the
+suite is green (`cargo nextest run -p lmv-core`, **802 passed / 5 skipped**), and one done-when
+turned out to rest on a premise the tree does not carry.
+
+*`fragment_driftmono` — the rates, and the pan binding that was already free.* **The
+`-0.25 * time` cancellation the phase asks to remove was never shipped.** `d6ffa54` binds
+`pan_x`/`pan_y` to `noise` plus the mid surge and nothing else; what the file carried was the
+*derivation* — a header block presenting a symmetric pan as the scene's rate knob, ending "there
+is deliberately NO linear pan term". So the accident lived in the advice, not in the preset, and
+Phase 6 retired the advice: that block is now history, explicitly labelled as history, with
+`field_speed` substituted into the crawl-speed formula the world's four live verdicts fall out of.
+The tuning proper is `warp` 0.42 → **0.62** with `fold_speed` **0.45** — the amplitude the three
+calm passes had spent, bought back, with the fold's own clock holding the churn down instead:
+
+| | `drive` | `rate` | `cover` | `anim` |
+|---|---|---|---|---|
+| Drift Mono, `d6ffa54` | 0.455 | 0.0411 | 0.450 | 0.316 |
+| Drift Mono, **shipped** | **0.469** | **0.0370** | **0.659** | 0.264 |
+| Tiled Rosette Mono | 0.461 | 0.0392 | 0.576 | 0.523 |
+| Droste Mono | 0.393 | 0.0275 | 0.326 | 0.383 |
+| Supernova (family top on `rate`) | 0.280 | 0.0654 | 0.908 | 0.236 |
+| Tiled Rosette (family floor) | 0.072 | 0.0034 | 0.337 | 0.048 |
+
+`rate` 0.0411 → 0.0370 sits well inside the neighbourhood the phase asks for, and it moved
+**against** `cover` 0.450 → 0.659 — less churn per frame carrying half again as much structure,
+which is the one pair `warp` alone could not have produced in either direction. `drive` rose
+0.455 → 0.469 despite bass moving off `warp` onto the two rates: a rate change at a fixed capture
+depth lands the field at a different *phase*, not merely a different amplitude. Both rates are
+audio-bound (bass + onset on `fold_speed`, bass on `field_speed`, the latter straddling 1.0 at
+±15 % on a 1.2 s constant), so ADR-0132's integrated phase is exercised by shipped content rather
+than only by its unit test.
+
+*`shape_contourmono` — the contour is on at `1.0`, and the reason it is at the maximum is the
+finding.* The set of pixels the contour touches is fixed by geometry; `amount` only sets how dark
+they go. So a low value pays the whole cost and buys an invisible line. Measured at 640x360, loud,
+counting exact frame colours: `0` → **9** distinct colours, pure red 6.00 %; `0.25` → 80, 4.79 %,
+invisible; `0.5` → 179, 4.73 %, barely visible; `1.0` → 684, 4.69 %, a key. Only at `1.0` does
+about a sixth of the touched pixels reach true black — an ink core with the `fwidth` ramp either
+side — which is what makes it read as a key line rather than as a smudge. Readings: `drive`
+0.365 → **0.368**, `rate` 0.0034 → **0.0040**, `cover` 0.557 → 0.554, against family neighbours
+Facet (0.112 / 0.0016) and Pulse (0.296 / 0.0074) — the contour is a colour change, so it barely
+moves either motion column, which is the right outcome.
+
+*Filed rather than worked around: **design-backlog 0140**.* ADR-0133 fixed *which* edges the
+contour draws at and left *what* it draws untouched — a soft `smoothstep` darken toward black,
+with no colour of its own. On a palette whose every band edge is already hard by construction that
+makes the contour the only source of intermediate values in the frame. Priority **Low**: one
+preset wants it, the shipped workaround looks good, and the fix costs a parameter on a surface
+ADR-0133 deliberately kept parameterless.
+
+*Two more cohort files inspected, one edited.* `fragment_driftmono`'s own `palette_contour = "0"`
+carried the now-false plateau rationale, so it was **rewritten with a current, measured one** —
+the world's five run boundaries are already at full contrast and a darkening line only fattens the
+black, closing the white channels the flow reads through (56 → 741 exact frame colours at `1.0`).
+`fragment_tiledmono`'s rationale needed no change: it never claimed the plateau case, and its
+"the contour line is itself a gradient … the edges are already maximum contrast" is precisely what
+0140 now records. `fragment_drostemono` and `fragment_tiledmono` were **not** given the rates —
+both anchor their motion in a repeating structure and neither has asked, which is the followup
+list's curation question, not this phase's.
+
+*Pre-existing nit, not fixed here:* `fragment_drostemono:113` says "no contour - see the header"
+and its header carries no contour note. Predates this plan; left alone rather than widened into.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md`, plus **two `.toml` retuned by Phase 6** —
+  `fragment_driftmono.toml` (onto `field_speed` / `fold_speed`) and `shape_contourmono.toml`
+  (`palette_contour` 0 → 1.0). No preset added or removed, so the curated set is unchanged in
+  membership.
 - **Plan header `Closes:`** design-backlog 0131, 0137, 0138, 0139
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **What shipped:** feature and fix. Feature: `field_speed` / `fold_speed` on `fragment_field`, and
+  the `drive` / `rate` columns on `shot --report`. Fix: `warp_speed`'s teleport, the contour's
+  every-edge firing, and the report's name collision.
+- **Operator docs touched:** `docs/capturing.md`, `docs/preset-palettes.md`, `presets/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **1**, 5 broken —
+  **0131**, **0137**, **0138**, **0139** (the plan's four `Closes:` entries, each broken by its own
+  fix landing) and **0132**, whose third probe pinned the report's exact header string that Phase 1
+  widened. 0132's claim — *the report's column set carries no level column* — is unaffected:
+  neither `drive` nor `rate` is a level column. **Phase 6 adds 0140** (a new live entry, probe
+  green), so the roster to re-read at close is those five plus the new one.
+- **Outstanding `human` phases:** none. Phase 6 landed as a `preset-author` session.
 
 ## Followups (after this lands)
 
@@ -362,3 +469,57 @@ fn band_contour(
   question, not an engine one.
 - Whether a `rate` mark that appears on most rows is worth keeping in that shape.
 - The per-hop motion series (ADR-0134 Alternative C), if the two columns turn out to under-serve.
+
+## Close — 2026-08-27
+
+**Closed after a Mode 4 review: no blockers, one major, four minors and two nits.** All six phases
+landed as specified, every phase carries an in-vocabulary `**Owner skill:**` tag, and the gate is
+green on the branch — `fmt`, `clippy --workspace --all-targets -D warnings`, and
+`cargo nextest run --workspace` at **1044 passed / 5 skipped**, `golden` included, with no baseline
+under `core/tests/golden/` touched. `check-doc-links` and `check-index-rows` exit 0;
+`check-backlog-claims` exited 1 on exactly the five entries the log predicted.
+
+**The major is not a regression from this plan — it is a claim this plan made about the engine that
+turned out to be false.** ADR-0132's rule is stated engine-wide and its enumeration named two sites;
+`core/src/render/scenes/swarm.rs` carries a third, `let field_t = self.time * self.spin;`, and unlike
+`warp_speed` it is bound to `mid` by two shipped presets (`swarm_shatter`, `swarm_drift`). On
+`swarm_shatter` at t = 100 s the eased swing advances the field clock by ~4 s in one frame, ~210x
+nominal. The plan's Context asserted the opposite — *"Nothing has found it because no preset binds
+it"* — which is what stopped the sweep from being run. Filed as **design-backlog 0141** with a dated
+`Outcome` on ADR-0132; not folded into this plan, because both presets bind the parameter and the
+correction needs a content pass rather than an equivalence assertion.
+
+The minors, all recorded where they belong rather than fixed here:
+
+- **Phase 5's golden done-when names artifacts that do not exist.** `core/tests/golden.rs` renders
+  frozen per-system fixtures and its own module doc says *"they are deliberately not the shipped
+  presets"* — so `fragment_mandala`, `fragment_strata`, `fragment_tiled`, `fragment_vitrail` and
+  `shape_pulse` have no goldens. The claim is covered anyway, by `fixtures/composite_symmetry.toml`
+  (`palette_contour = 0.4`, fragment_field) and `fixtures/shape_field.toml` (`0.7`), neither of which
+  moved. The log repeats the plan's framing without noting the substitution.
+- **Two of the four contour sites have no rendered coverage** — `reaction_diffusion` and `warp_mesh`
+  fixtures set no `palette_contour`, and `core/tests/palette_contour.rs` drives `fragment_field`
+  only. Recorded in ADR-0133's `Outcome` and on the followup list below.
+- **`fragment_field.rs`'s `fs_main` still binds `let t = params.a.x;` and never reads it.** Both fold
+  rates and the sweep come from `params.e` now, so the scene's clock uniform is dead.
+- **Curation:** `presets/fragment_drostemono.toml:113` says *"no contour - see the header"* and the
+  header carries no contour note — a dangling rationale on the one parameter this plan changed, on
+  one of the four presets that set it to zero for the reason ADR-0133 retired.
+
+The nits: `presets/README.md`'s `palette_contour` row still reads *"Range that reads `0`-`0.5`"*
+while `shape_contourmono` now ships at `1.0` on a measured argument that low values are strictly
+worse on a limited-ink palette; and — pre-existing, widened here — `scene_for_mut` is keyed by
+`SystemKind`, so a **same-system dual-live dissolve** runs `Scene::update` twice in one frame and
+the new phases integrate at 2x for its duration. `particles::spin_time` and the emitter's field step
+already do this, and no test can see it: headless capture always answers `Freeze`.
+
+**Curation verdict (`presets/` touched).** No preset added or removed, so the set's membership is
+unchanged and the two retunes are the whole of it. `fragment_driftmono` and `shape_contourmono` both
+earn their place more clearly than before — the first because `cover` 0.450 -> 0.659 against `rate`
+0.0411 -> 0.0370 is a pair `warp` alone could not move in opposite directions, the second because it
+is now the library's only preset demonstrating the parameter ADR-0133 rescued. The stale-workaround
+grep found one live instance, `fragment_drostemono`'s dangling contour rationale above; the other
+three cohort headers were swept in Phase 6 and are current.
+
+**Version:** `0.82.0` -> `0.83.0` (minor — a feature plan: two scene parameters and two report
+columns, alongside three fixes).

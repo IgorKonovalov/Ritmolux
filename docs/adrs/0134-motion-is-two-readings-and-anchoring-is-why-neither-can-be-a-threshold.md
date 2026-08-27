@@ -1,8 +1,8 @@
 # ADR-0134 — Motion is two readings, and anchoring is why neither can be a threshold
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-27
-> **Related plan(s):** [0121](../plans/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
+> **Related plan(s):** [0121](../plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)
 > **Supplements:** [0083](0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md), [0042](0042-reachability-measured-on-the-expression-tree.md)
 
 ## Context

@@ -28,6 +28,12 @@
 #     red 2 bands at 0.66-0.74 (fast-crossing)  ->   4.42 % loud, 4.36 % quiet
 #     red 3 bands at 0.61-0.74 (fast-crossing)  ->   6.46 % loud, 6.34 % quiet  <- shipped
 #
+# Re-measured after Plan 0121 put the fold amplitude back up (`warp` 0.42 ->
+# 0.62): 5.81 % loud, 7.39 % quiet. The placement holds - still inside the
+# cohort's 5-10 % brief at both excitations - and the wider loud/quiet spread is
+# the deeper folding crossing the red run at more angles. `other` is still
+# 0.00 % of the frame at both, so nothing here is grey.
+#
 # So the arcsine halving the tiled sibling documents - a band taking about half
 # the screen area its palette width suggests - is not a property of the palette
 # at all. It is a property of WHERE in the palette the band sits. Three bands is
@@ -79,10 +85,11 @@ stops = [
 
 [params]
 # BAND MAP
-#   bass  -> `warp` (the ink is stirred harder)
-#   treb  -> `warp` (a smaller share of the same stir)
+#   bass  -> `fold_speed` and `field_speed` (the ink is stirred FASTER and the
+#            sheet travels further), plus a small share of `warp`
+#   treb  -> `warp` (finer, more intricate folding - brighter music, denser ink)
 #   mid   -> `pan`, symmetric, which SURGES the bands across the frame
-#   onset -> a short `warp` kick on the hit
+#   onset -> a short kick on `fold_speed`, and a smaller one on `warp`
 #
 # NOTHING drives luminance, and that is structural rather than taste: every band
 # is already pinned to black or driven into the tonemap shoulder, so a reactive
@@ -100,12 +107,25 @@ stops = [
 # is where it belonged all along.
 #
 # Measured as the frame difference between a silent frame and a fully-driven
-# one - literally music off against music on:
+# one - literally music off against music on. That hand measurement is now a
+# printed column: `shot --report` calls it `drive` (ADR-0134), on the same
+# captures, normalized to 0..1 instead of to 0..255. Both scales are kept here
+# because the first three rows predate the column:
 #
 #     before the rebuild   ->   72.7      (the reported defect)
 #     after                ->  112.7
 #     `fragment_drostemono` -> 115.1      for scale
 #     `shape_contourmono`   -> 119.6
+#
+#     this file, on the rates  ->  drive 0.469
+#     the same file before it   ->  drive 0.455
+#     `fragment_tiledmono`      ->  drive 0.461
+#     `fragment_drostemono`     ->  drive 0.393
+#
+# So moving the bass off `warp` and onto the two rates did not cost the world
+# its music: the combined differential went UP, because a rate change at a
+# fixed capture depth lands the field at a different phase, not merely at a
+# different amplitude.
 #
 # `zoom` IS DELIBERATELY A CONSTANT AND MUST STAY ONE. It was the obvious lever
 # for treble and it is the wrong one twice over: a zoom pump is a camera move
@@ -130,9 +150,22 @@ stops = [
 # `color_center` or `palette_steps` has the same defect for the same reason -
 # they all move the coordinate mapping the ink layout was measured against.
 
-# THE INK COUNT. Twenty bands in five runs, no contour. Contour is a smoothstep
-# at every band edge, most of which fall inside a plateau here - a grey hairline
-# across flat colour is exactly the shading this look is defined by not having.
+# THE INK COUNT. Twenty bands in five runs, and STILL no contour - but for a
+# different reason than the one that used to be written here. That reason was
+# "it fires at every band edge, most of which fall inside a plateau, so it draws
+# a grey hairline across flat colour", and ADR-0133 retired it: the contour now
+# reads the LUT and is silent unless the ink actually changes. `shape_contourmono`
+# turned it on for exactly that.
+#
+# WHAT KEEPS IT AT ZERO HERE IS THE FIVE RUN BOUNDARIES THEMSELVES. Every one of
+# them is already black-meets-white or white-meets-red at full contrast, and a
+# darkening line only FATTENS the black side - which on this world closes the
+# white channels the flow is read through. Measured at 640x360, loud: exact
+# frame colours 56 -> 741 at `palette_contour = 1.0`, for a picture whose seams
+# were already as hard as they can be. The contoured render is not bad; it is
+# heavier, and heavier is the wrong direction for a thread pulled through ink.
+# See `shape_contourmono`'s header for the case where it IS the right direction,
+# and design-backlog 0140 for the shape that would settle it either way.
 palette_steps   = "20"
 palette_contour = "0"
 
@@ -141,25 +174,41 @@ palette_contour = "0"
 # moving at all"; the third was still "not moving enough". All three verdicts
 # came from a person watching the running app, and the arithmetic below is what
 # finally made them predictable instead of guessed at. Gains are still sized off
-# their own caps - a clamped term reaches its ceiling at C/G, so bass tops out
-# at 0.15/0.176 = 0.85, treb at 0.10/0.167 = 0.60, mid at 0.10/0.118 = 0.85.
+# their own caps - a clamped term reaches its ceiling at C/G, so on `warp` bass
+# tops out at 0.18/0.212 = 0.85, treb at 0.12/0.200 = 0.60 and onset at
+# 0.10/0.167 = 0.60, and on `pan` mid tops out at 0.35/0.412 = 0.85.
 #
-# THE SETTLEMENT: THE CALM COMES FROM FEATURE SCALE AND FOLD AMPLITUDE, NOT FROM
-# SLOWING THE FIELD DOWN. The draft and this file run the field at exactly the
-# same rate. What changed is `warp` 1.05 -> 0.50 and `zoom` 1.15 -> 2.00, and
-# that alone is worth about 1.9x on frame-to-frame change (6.97 -> 3.64).
-# Everything spent trying to slow the CLOCK instead either barely moved the
-# needle or killed the world; see the drift note below, which is kept because
-# the lever it documents is real and someone will want it.
+# THE SETTLEMENT, AND THE ONE THING THAT CHANGED WHEN THE RATES ARRIVED. Three
+# passes settled on "calm comes from feature scale and FOLD AMPLITUDE", because
+# amplitude was the only lever there was: `warp` went 1.05 -> 0.42 and `zoom`
+# 1.15 -> 2.00, worth about 1.9x on frame-to-frame change. That worked, and it
+# cost the thing it was paying with. `warp` is the fold's amplitude, so turning
+# it down does not slow the boil - it FLATTENS it, and the eddies, the tight
+# concentric threads and the closed loops go flat with it.
 #
-# `warp` IS THE ONLY LEVER OVER THE FOLD'S OWN CHURN. The shader folds the
-# domain five times with `warp * sin(p.y * 1.5 + t * 0.7)` and
-# `warp * cos(p.x * 1.5 - t * 0.6)`, and those two rates are HARDCODED - there
-# is no speed parameter on this scene. The only way to quiet the folding is to
-# shrink its amplitude, and the folding is what BOILS: it reorganizes the
-# picture in place, which is the component that read as shake. Measured on warp
-# alone at the draft's other values: 1.05 -> 7.07, 0.80 -> 5.61, 0.60 -> 4.75,
-# 0.45 -> 4.11.
+# Plan 0121 split the two apart. `fold_speed` scales the fold's own clock and
+# `field_speed` the sweep's, both as integrated phases (ADR-0132), so the
+# amplitude is free to go back up. It has: `warp` 0.42 -> 0.62 at rest, with
+# `fold_speed` at 0.45 holding the churn below where it was anyway.
+#
+#     warp base   fold_speed        rate     cover    what it is
+#     0.42        1.0  (welded)     0.0411   0.450    the shipped compromise
+#     0.62        0.45              0.0295   0.654    amplitude back, half the boil
+#     0.62        0.45 + audio      0.0370   0.659    <- shipped
+#
+# `cover` 0.450 -> 0.659 is the intricacy the old compromise was paying with,
+# bought back; `rate` 0.0411 -> 0.0370 says the picture churns slightly LESS
+# per frame than before while carrying half again as much structure. That pair
+# moving in opposite directions is the whole argument for the two parameters,
+# and it is not something `warp` could have produced in either direction.
+#
+# THE FOLD IS WHAT BOILS, AND IT IS NOW THE THING BOUND TO THE MUSIC. It
+# reorganizes the picture in place - the component that read as shake when it
+# was welded on at full speed. At 0.45 it is a slow stir; bass and onset lift it
+# toward 0.95, so a loud passage genuinely stirs the ink faster instead of
+# merely folding it harder. This is the binding ADR-0132's integrated phase
+# exists to make safe: under the old `t * rate` shape the same swing would have
+# teleported the field by tens of seconds mid-passage.
 #
 # `zoom` SETS FEATURE SIZE, AND IT MUST BE SET FOR LOOKS, NOT FOR CALM. A higher
 # zoom does make a finer pattern whose contours crawl slower - true arithmetic,
@@ -168,37 +217,53 @@ palette_contour = "0"
 # LANDMARKS. A pattern with nothing trackable in it does not read as moving
 # slowly, it reads as not moving, however much it changes. 2.00 keeps the eddies
 # and closed loops that make the flow legible.
-warp  = "0.42 + noise(time * 0.02) * 0.08 + clamp(bass * 0.494, 0, 0.42) + clamp(treb * 0.250, 0, 0.15) + clamp(onset * 0.200, 0, 0.12)"
+warp  = "0.62 + noise(time * 0.02) * 0.08 + clamp(bass * 0.212, 0, 0.18) + clamp(treb * 0.200, 0, 0.12) + clamp(onset * 0.167, 0, 0.10)"
 zoom  = "2.00"
+# THE TWO CLOCKS. Rates in units of the scene's default speed, so 1.0 is what
+# this world ran at before Plan 0121 and 0.45 is a fold at not quite half that.
+# Gains sized off their caps as everywhere else: fold bass tops out at
+# 0.30/0.353 = 0.85, fold onset at 0.20/0.333 = 0.60, field bass at 0.85.
+#
+# `field_speed` STRADDLES 1.0 RATHER THAN SITTING UNDER IT, and that is
+# deliberate. The sweep is the only bulk motion this field has - the thing the
+# eye actually tracks - so it rests slightly slower than the shipped look
+# (0.85) and reaches slightly faster (1.15) at a peak. A +-15 % breath around a
+# speed three passes with the user already judged right, rather than a new one.
+fold_speed  = "0.45 + clamp(bass * 0.353, 0, 0.30) + clamp(onset * 0.333, 0, 0.20)"
+field_speed = "0.85 + clamp(bass * 0.353, 0, 0.30)"
 # THE DRIFT. Two bounded, slow `noise` wanders, offset by 50 on the second axis
-# so they do not trace the same path. There is deliberately NO linear pan term,
-# and the rest of this note is why - because two passes were spent putting one
-# here, and the lever is worth knowing about even though this preset does not
-# use it.
+# so they do not trace the same path, plus the mid surge. `pan` IS NOW ONLY A
+# PAN HERE, which it was not always going to be.
 #
-# THIS SCENE'S HARDCODED ANIMATION RATE IS AUTHORABLE THROUGH `pan`. The field
-# is `sin(p.x + p.y + t * 0.5)` and `p = uv * zoom + pan`, so the sum the sine
-# sees is `zoom * (ux + uy) + (pan.x + pan.y) + t * 0.5`. Pan enters on exactly
-# the same footing as the time term, so a pan of `r * time` on BOTH axes leaves
-# a residual sweep of `0.5 + 2r`. That is a continuous rate knob on a constant
-# the shader does not expose, and `r = -0.25` cancels the clock outright.
+# THE ACCIDENT THAT `field_speed` RETIRED, kept because it explains why two of
+# this preset's passes look the way they do in the history. The field is
+# `sin(p.x + p.y + phase * 0.5)` and `p = uv * zoom + pan`, so the sum the sine
+# sees is `zoom * (ux + uy) + (pan.x + pan.y) + phase * 0.5`: pan enters on
+# exactly the same footing as the clock, and a symmetric `r * time` on BOTH
+# axes leaves a residual sweep of `0.5 + 2r`. Passes 2 and 3 used that as a rate
+# knob - `r = -0.25` cancels the clock outright - and paid for it with the pan
+# binding, which is a real cost on a world whose only other bulk motion is a mid
+# surge on that same pair. `field_speed` does the same job by name and by the
+# front door, so the trick is filed here as history and not as advice.
 #
-# AND THE CONTOUR CRAWL IT BUYS IS THE THING TO PREDICT, not the rate itself:
+# THE CRAWL SPEED IS STILL THE THING TO PREDICT, and the arithmetic survives
+# intact with `field_speed` substituted for the residual:
 #
-#     crawl (NDC/s) = residual / (zoom * sqrt(2))
+#     crawl (NDC/s) = 0.5 * field_speed / (zoom * sqrt(2))
 #
 # because the phase gradient is `zoom` along each axis and the contours run
-# perpendicular to (1,1). Every verdict this preset collected falls straight out
-# of that one line, which is why it is written here rather than re-derived:
+# perpendicular to (1,1). Every verdict this preset collected falls out of that
+# one line, which is why it is written here rather than re-derived:
 #
-#     draft        residual 0.50, zoom 1.15  ->  0.307 NDC/s   6.5 s per frame
-#     pass 2       residual 0.00, zoom 5.00  ->  0.000         never  - DEAD
-#     pass 3       residual 0.03, zoom 2.00  ->  0.011       190   s  - too slow
-#     shipped      residual 0.50, zoom 2.00  ->  0.177        11.3 s
+#     draft        field 1.00, zoom 1.15  ->  0.307 NDC/s   6.5 s per frame
+#     pass 2       field 0.00, zoom 5.00  ->  0.000         never  - DEAD
+#     pass 3       field 0.06, zoom 2.00  ->  0.011       190   s  - too slow
+#     d6ffa54      field 1.00, zoom 2.00  ->  0.177        11.3 s
+#     shipped      field 0.85, zoom 2.00  ->  0.150        13.3 s at rest,
+#                                             0.203 / 9.8 s at a bass peak
 #
-# TO RETUNE THE SPEED, MOVE THE RESIDUAL AND LEAVE EVERYTHING ELSE ALONE. Add
-# `r * time` to both pan axes: r = -0.05 gives 0.141 NDC/s, r = -0.11 gives
-# 0.099, r = -0.16 gives 0.064. Nothing else in the file needs to move with it.
+# TO RETUNE THE SPEED, MOVE `field_speed` AND LEAVE EVERYTHING ELSE ALONE.
+# Nothing else in the file needs to move with it, and neither does the pan.
 #
 # WHAT DOES NOT WORK, MEASURED, SO NOBODY TRIES IT TWICE: an ANTI-symmetric pan
 # (`+a` on x, `-a` on y) leaves the sum untouched, so it translates the window
@@ -207,7 +272,7 @@ zoom  = "2.00"
 # along themselves and is very nearly invisible. Measured: tripling the glide
 # that way LOWERED frame-to-frame change (2.09 -> 1.51) instead of raising it.
 # The only visible bulk motion this field has is the perpendicular sweep, and
-# the residual is the only thing that sets it.
+# `field_speed` is now the only thing that sets it.
 #
 # THE REFERENCE FIGURES THAT MAKE ANY OF THIS READABLE, and the finding worth
 # keeping. On frame-to-frame change `fragment_tiledmono` reads 8.19 and
@@ -217,8 +282,15 @@ zoom  = "2.00"
 # still, so the eye has an anchor and reads the change as a pattern updating.
 # This world has no repeat anywhere in it, so its motion moves the whole sheet
 # bodily. What it needs is not less change but change that stays LEGIBLE:
-# landmarks that persist, travelling at a speed the eye can follow. No gate in
-# this repo measures that, in either direction.
+# landmarks that persist, travelling at a speed the eye can follow.
+#
+# THAT MEASUREMENT IS A COLUMN NOW, AND IT IS DELIBERATELY NOT A GATE. `--report`
+# prints `rate` on the same footing (this file 0.0370, `fragment_tiledmono`
+# 0.0392, `fragment_drostemono` 0.0275, and `Supernova` 0.0654 at the top of the
+# family) - so the number is readable without a throwaway rig. What it still
+# does not model is the anchoring in the paragraph above, which is why ADR-0134
+# forbids sorting on it and why the column's own footnote says so. Read it
+# against family neighbours; it does not rank watchability.
 pan_x = "noise(time * 0.015) * 0.05 + clamp(mid * 0.412, 0, 0.35)"
 pan_y = "noise(time * 0.015 + 50) * 0.05 + clamp(mid * 0.412, 0, 0.35)"
 
@@ -257,6 +329,16 @@ trails       = "0"
 # terms: a hit should arrive promptly and relax, and a symmetric constant long
 # enough to be calm on the way down is too sluggish on the way up.
 warp = { attack = 0.12, release = 0.55 }
+
+# The two clocks ease on different scales, which is the point of separating
+# them. `fold_speed` carries the onset kick, so it is asymmetric for the same
+# reason `warp` is: a hit stirs promptly and relaxes. `field_speed` eases LONG -
+# 1.2 s, the slowest constant in the file - because it moves the whole sheet and
+# wants to read as the piece breathing rather than as anything per-beat. An
+# integrated phase is what makes a long constant safe here: the rate bends, so
+# even a snapped change would only ever be an acceleration.
+fold_speed  = { attack = 0.15, release = 0.60 }
+field_speed = 1.20
 
 # The surge eases evenly - it translates the whole sheet, so it wants to read as
 # a swell rather than as a shove.
