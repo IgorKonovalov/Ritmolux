@@ -1,12 +1,10 @@
 //! **A particle mark's silhouette, as a signed-distance function**
 //! (ADR-0084, Plan 0070).
 //!
-//! Every mark this engine drew before Plan 0070 was a round additive blob. The
-//! swarm's fragment shader was three lines —
-//! `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff * falloff;`
-//! — with no shape input at all, and the emitter's sprite was the same idea with
-//! one axis scaled. This module is the shape vocabulary those two scenes share:
-//! one WGSL chunk, one roster, one quantizer, so the two cannot drift.
+//! This module is the shape vocabulary `swarm` and `emitter` share: one WGSL chunk, one
+//! roster, one quantizer, so the two cannot drift. Without it a mark is a round additive
+//! blob — `let d = length(in.local); let falloff = max(0.0, 1.0 - d); let g = falloff *
+//! falloff;` — with no shape input at all.
 //!
 //! # The normalization is one rule, and it is what keeps `disc` exact
 //!
@@ -26,9 +24,9 @@
 //!
 //! - **The `disc` arm is `length(p)` and nothing else.** A unit disc has
 //!   `sd = length(p) - 1` and `R = 1`, so the rule collapses to `length(p)` —
-//!   *literally* the line it replaces, not an approximation of it. That is why
-//!   every pre-existing golden baseline is byte-identical: no shipped preset
-//!   names a shape, so they all take this arm.
+//!   the unshaped blob's own expression, not an approximation of it. A preset
+//!   that names no shape takes this arm and is byte-identical to one drawn
+//!   without the roster.
 //! - **Only the interior matters — *to a particle*.** The falloff downstream is
 //!   unchanged — `g = max(0, 1 - d)^2` — so every fragment at `d >= 1` is
 //!   black. For `swarm` and `emitter` the lit region *is* the silhouette, and a

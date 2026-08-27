@@ -20,8 +20,8 @@
 //! is what keeps generator work off the hot path (ADR-0007) now that a bound
 //! param can reach it.
 //!
-//! **The step is measured, not assumed** (ADR-0060 leaves the number to the
-//! plan). At `0.1` degrees:
+//! **The step is measured, not assumed** (ADR-0060 leaves the number
+//! open). At `0.1` degrees:
 //!
 //! - *Invisible in motion.* The worst case is the sharpest reachable rosette:
 //!   a 12-fold star at an 11-degree contact angle moves a vertex 11.0 px per
@@ -74,14 +74,14 @@
 //!
 //! ## The interior: rings of motifs (ADR-0079)
 //!
-//! **That day arrived.** `[generator] rings` is an optional roster of concentric
-//! rings — `{ motif, count, radius, scale, phase }` each — drawn through the same
-//! [`LineRenderer`] alongside, or instead of, the interlace. It is the answer to
-//! design-backlog 0007's hollow-ring half, and it is *placement* rather than
-//! construction: copy `i` of a ring of `k` sits at `2*pi*i/k + phase`, scaled by
-//! `scale`, at distance `radius`, in the same fit-normalized world the rosette
-//! lands in (the rosette spans `+/- 0.9`, so a `radius` near `0.9` sits on its
-//! rim and anything smaller is genuinely interior).
+//! `[generator] rings` is an optional roster of concentric rings — `{ motif,
+//! count, radius, scale, phase }` each — drawn through the same [`LineRenderer`]
+//! alongside, or instead of, the interlace. It is the answer to design-backlog
+//! 0007's hollow-ring half, and it is *placement* rather than construction: copy
+//! `i` of a ring of `k` sits at `2*pi*i/k + phase`, scaled by `scale`, at
+//! distance `radius`, in the same fit-normalized world the rosette lands in (the
+//! rosette spans `+/- 0.9`, so a `radius` near `0.9` sits on its rim and
+//! anything smaller is genuinely interior).
 //!
 //! Two consequences worth stating where they can be read:
 //!
@@ -104,7 +104,7 @@
 //! directions**, `ring_spread` multiplies every radius about the centre, and
 //! `ring_scale` multiplies every motif's size. All three default to
 //! [`RingMotion::STATIC`], which is the exact identity (`+ 0`, `* 1`, `* 1`), so a
-//! preset that binds none of them draws Phase 1's figure bit for bit.
+//! preset that binds none of them draws the static ornament bit for bit.
 //!
 //! **The radial pair is not a garnish, and this is the one design note worth
 //! reading before authoring a mandala.** `core/tests/animation.rs` captures at
@@ -120,10 +120,9 @@
 //! Like the rosette, the ornament is **rebuilt under hysteresis**: a motion
 //! further than one step ([`RING_PHASE_STEP`] and friends) from what is held
 //! rebuilds, anything nearer reuses. A preset binding none of the three
-//! therefore never rebuilds after `configure`, which is the ADR-0007 property
-//! that made the roster structural in the first place — but a preset that
-//! *animates* a lever does re-place its ornament on most frames, and that is
-//! affordable rather than free. See [`RING_PHASE_STEP`] for the measurement.
+//! never rebuilds after `configure` — but one that *animates* a lever
+//! re-places its ornament on most frames, which is affordable rather than
+//! free. See [`RING_PHASE_STEP`] for the measurement.
 
 // Hot-path panic-denial pragma: `update`/`render` run every displayed frame.
 // `configure` (the Hankin construction) is build-time but colocated, so it

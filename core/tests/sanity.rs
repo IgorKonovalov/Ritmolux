@@ -48,11 +48,11 @@
 //! Coverage floors stay per-system, because the systems still differ by an order
 //! of magnitude in how much they paint — `fragment_field` fills the frame while
 //! `spectrum` draws a contour — so a single broad floor would be either
-//! tautological for one or impossible for the other. **The floors themselves were
-//! all re-derived in Plan 0058 Phase 2**, since every one of them had been
-//! measured through a backdrop. They are set at half each system's lowest shipped
-//! preset and [`MAX_FLOOR_SLACK`] keeps them there; the old note that the `swarm`
-//! is "sparse points" was measurement folklore, and it measures `0.84`.
+//! tautological for one or impossible for the other. **Every floor was
+//! re-derived in Plan 0058 Phase 2**, each of them having been measured through
+//! a backdrop until then. They sit at half each system's lowest shipped preset
+//! and [`MAX_FLOOR_SLACK`] keeps them there; the `swarm` is not "sparse points"
+//! — that was folklore, and it measures `0.84`.
 //!
 //! **Plan 0058 Phase 3 adds a second excitation.** Every question above is asked
 //! of one fully-driven frame, which cannot see a figure that is fine at rehearsal

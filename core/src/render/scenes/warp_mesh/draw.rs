@@ -49,12 +49,11 @@
 //!   dash; see [`dots`].
 //! - **`wave_mystery` means something different in every mode**, which is the
 //!   reference's own design rather than a simplification here.
-//! - **Mode 6 and 7's line does not drift.** Its angle is `wave_mystery` alone.
-//!   A `time * 0.05` term rotated it a full turn every ~126 s until Plan 0109
-//!   Phase 2 removed it, on a look gate that put *Blur Mix 3*'s horizontal
-//!   reference traces beside this engine's one steep diagonal. Listed here
-//!   because the reference's own mode 6 is documented only as "a line", and
-//!   "which line" is a reading of it — see the arm's comment.
+//! - **Mode 6 and 7's line does not drift.** Its angle is `wave_mystery` alone;
+//!   a `time * 0.05` term rotates it a full turn every ~126 s, which a Plan 0109
+//!   Phase 2 look gate rejected against *Blur Mix 3*'s horizontal reference
+//!   traces. Listed here because the reference's own mode 6 is documented only
+//!   as "a line", and "which line" is a reading of it — see the arm's comment.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). This builds geometry every displayed frame.

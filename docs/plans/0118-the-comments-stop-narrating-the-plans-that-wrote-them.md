@@ -253,5 +253,90 @@ flowchart TB
 | 3 — the 89 links go | dev | done | `0003f42` |
 | 4 — the 252 narration lines go | dev | done | `add5710` |
 | 5 — the gate is armed | dev | done | `29a0a9d` |
-| 6 — the long blocks come down, outside the contended trees | dev | done | committed with this row |
-| 7 — the long blocks come down, inside the contended trees | dev | | |
+| 6 — the long blocks come down, outside the contended trees | dev | done | `52c3bcb` |
+| 7 — the long blocks come down, inside the contended trees | dev | done | committed with this row |
+
+### Notes
+
+**Deviations.**
+
+- The gate walks the **whole workspace**, not the plan's six measured roots, so Phases 3 and 4 also
+  swept `core/build.rs`, `core-cabi/tests/ffi.rs`, `milkconv/**` and `standalone/examples/**` — 4
+  links and 17 narration lines outside the plan's file lists (`0003f42`, `add5710`).
+- Phase 5 also edited `README.md` and `docs/nfr.md`, which its file list does not name. Both
+  document the pre-push / CI gate roster that phase changes, and both were already one gate stale —
+  they said *three* Node gates where `check-filter-figures.mjs` had made it four (`29a0a9d`).
+- The vocabulary list was **narrowed rather than escaped**: `the plan` is exempt in front of a
+  number, since `the Plan 0045 Phase 4b defect` is the citation form ADR-0127 asks for (`add5710`).
+  The plan asked for the escape count after Phase 4 — it is **0**.
+- Phase 1's gate took a follow-up fix (`b4d0cba`): it counted newlines as it walked, so 10 of 441
+  findings named a line holding code. It now derives the line from an index.
+- Counts swept are the current tree's, not the plan's `e022a5d` snapshot: **131** links (plan: 89),
+  **309** narration lines (252), **70** blocks of 40+ lines over **4,621** (61 over 3,850).
+
+**Done-when criteria not satisfied as stated.**
+
+- Phase 5's "a seeded violation fails the hook locally" was verified against a copy of the hook with
+  the backlog step removed. On `main` the hook stops earlier, at `check-backlog-claims.mjs` — see
+  Close triggers.
+- Phases 6 and 7's "no block over 40 lines survives unless the log names it": **70 survive**, named
+  below.
+
+**Kept rather than deleted, per the Decision's rule — the fact is in no document.**
+
+- `core/src/render/kaleidoscope.rs:1` — the argument for authoring `kaleido_zoom` in **rings**
+  rather than in `log r` ("only one spelling survives re-tuning `kaleido_radial`"). Neither ADR-0077
+  nor Plan 0064 records it.
+- `core/src/render/tier.rs:241` — the quoted tier rule *"lower if it does not measure clean"* is in
+  no ADR or plan. The attribution was dropped and the fact kept as prose.
+
+**Three defects the sweep found rather than caused.**
+
+- `core/src/render/tier.rs`'s `mesh_grid` opened with a stray line describing the segment-count
+  ceiling — a copy-paste leftover from a different field. Removed (`52c3bcb`).
+- `core/src/render/ink.rs` described trails and kaleidoscope as running at "fixed 16:9 internal
+  resolution"; they have followed the render target since ADR-0034. Restated (`52c3bcb`).
+- `cargo doc --workspace --no-deps` emitted **no** warning about any of the 131 relative links,
+  before or after — the same 62 pre-existing "links to private item" both times, which answers
+  ADR-0127's Risks: rustdoc emits those hrefs without complaint.
+
+**The 40+-line blocks that survive, and what needs the length.** 70 blocks, 4,376 lines:
+
+- **A dated measurement with the machine it was taken on** — ADR-0071 puts the configuration beside
+  the number, so the table cannot move to a document without breaking that pairing (32):
+  `collage_cost.rs:1`, `arc_cost.rs:1`, `mark_cost.rs:1`, `animation.rs:489`, `dsp.rs:105`,
+  `fft.rs:455`, `geometry_extent.rs:393`, `milk_wash.rs:1`+`:190`, `render/tests.rs:1113`+`:1234`,
+  `tonemap/tests.rs:404`+`:572`, `shot/render.rs:1`, `shot/report.rs:452`,
+  `tier.rs:123`+`:241`+`:312`, `backdrop_ramp.rs:466`+`:656`, `milk/mod.rs:1112`,
+  `sanity.rs:138`+`:251`+`:347`+`:628`+`:1845`+`:2776`, `lines/star.rs:1`, `star/tests.rs:1643`,
+  `warp_mesh/tests.rs:885`+`:1312`, `lines/renderer/tests.rs:1041`.
+- **A derivation or formula a reader cannot redo from the code** (7): `tonemap.rs:1`, `bloom.rs:1`,
+  `metrics.rs:589`, `palette.rs:1`, `scenes/marks.rs:1`, `preset/expr.rs:1`, `milk/shader.rs:77`.
+- **An invariant, seam convention or adapter trap the code cannot state** — the aspect rule, the
+  premultiplied-alpha seams, the WARP bind-layout hazard, the sampler conventions (29):
+  `kaleidoscope.rs:1`, `tests/kaleidoscope.rs:1`, `background.rs:1`+`:584`, `post.rs:1`,
+  `trails.rs:1`, `layer_blend.rs:1`, `gpu.rs:1`+`:109`, `ink.rs:1`, `transition.rs:1`, `tier.rs:1`,
+  `line_joints.rs:1`, `attractor_trails.rs:1`, `composite.rs:1`, `downbeatlog.rs:39`,
+  `milk/mod.rs:1`, `scenes/emitter.rs:1`, `warp_mesh/mod.rs:1`+`draw.rs:1`+`tests.rs:183`,
+  `shape_field.rs:1`, `shape_collage.rs:1`+`layout.rs:1`, `lines/spectrum.rs:1`,
+  `lines/lsystem.rs:1`, `particles/mod.rs:1`, `lines/renderer/tests.rs:436`, `sanity.rs:1`.
+- **A roster whose per-entry rule governs adding the next entry** (2): `golden.rs:72`,
+  `composite.rs:74`. Both were compressed to one line per entry with that rule kept intact.
+
+**Followups noticed and not acted on.**
+
+- `check-backlog-claims.mjs`'s advisory names 41 probed paths as moved since their entries were
+  stamped, which is this sweep touching 130 files rather than any entry going stale.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none. The header carries `Supersedes: design-backlog 0129`.
+- **What shipped:** a feature (one new gate, armed at pre-push and in CI) plus a comment-only sweep.
+- **Operator docs touched:** `README.md` (the pre-push step table), `docs/nfr.md` (the CI gate
+  roster). Also `CLAUDE.md` and `.claude/skills/dev/SKILL.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, naming entry **0129** —
+  its `present: \]: \.\./\.\./docs/ in: core/src/render/tests.rs` probe is falsified by Phase 3.
+  0129's own text says "**This entry closes when that plan closes**". The pre-push hook stops there
+  until it does.
+- **Outstanding `human` phases:** none.

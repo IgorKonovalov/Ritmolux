@@ -1,9 +1,8 @@
 //! **The seeded layout grammar** — where a canvas's composition comes from
 //! (Plan 0113 Phase 4).
 //!
-//! Phase 1 drew one hand-authored canvas. This is the machinery that composes
-//! canvases instead: a pure function of `(grammar, seed, recomposition index,
-//! count, size hierarchy, angle bias)` onto an element list, in painter order.
+//! A pure function of `(grammar, seed, recomposition index, count, size
+//! hierarchy, angle bias)` onto an element list, in painter order.
 //!
 //! # Four options, and one of them is a control
 //!

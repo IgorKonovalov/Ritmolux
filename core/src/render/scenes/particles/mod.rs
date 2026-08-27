@@ -29,10 +29,11 @@
 //! unperturbed).
 //!
 //! The accumulation field is sized to the render target and capped (Plan 0027
-//! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at 640x360, so the
-//! present is close to 1:1 up to the cap instead of a soft upscale on a 1080p+
-//! display. That size is quantized to `TRAIL_GRID_STEP`, so a live window drag
-//! re-allocates the field a handful of times rather than once per frame.
+//! Phase 2, now the tier's `attractor_trail_cap`) rather than fixed at
+//! 640x360, so the present is close to 1:1 up to the cap instead of a soft
+//! upscale on a 1080p+ display. That size is quantized to `TRAIL_GRID_STEP`,
+//! so a live window drag re-allocates the field a handful of times rather
+//! than once per frame.
 //!
 //! **The field's own aspect is not the projection's** (Plan 0029 Phase 5). The
 //! present is a plain stretch (aspect ignored, as the reaction-diffusion present
