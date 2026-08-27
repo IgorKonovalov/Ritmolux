@@ -1,8 +1,8 @@
 # ADR-0111 — The shape field gains a scaled-copy coordinate beside its distance one
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-27 (Plan 0098) — with an `Outcome`
 > **Date:** 2026-08-16
-> **Related plan(s):** [0098](../plans/0098-the-figure-nests-properly.md)
+> **Related plan(s):** [0098](../plans/done/0098-the-figure-nests-properly.md)
 > **Closes:** [design-backlog 0096](../design-backlog.md)
 
 ## Context
@@ -161,3 +161,49 @@ rather than a quantity.
 The `ring` question above is the one thing this ADR deliberately leaves to the plan. It is a
 behavioural choice with three defensible answers, it is cheap to change, and it wants to be made
 against a rendered figure rather than in the abstract.
+
+## Outcome — 2026-08-27, at Plan 0098's close
+
+Appended rather than folded into the body above, which is append-only once accepted. The decision
+held; two of the things it *predicted* did not, and one open question closed against a rendered
+figure exactly as the Notes asked.
+
+**The `palette_contour` consequence above is falsified.** It books that "the hairline will not have
+the same weight it has today at the same `palette_contour` value", reasoning from the two fields'
+genuinely different gradients. The reasoning is right and the conclusion does not follow: the
+contour's width comes from `fwidth` of the **banded** coordinate, so the line is drawn within one
+*pixel* of a band edge, and that normalization is precisely what a changed gradient runs into.
+Measured at Plan 0098 Phase 6 on a nine-ring heart at `palette_contour = "0.75"`, as the darkening
+the parameter adds: distance mode `27.3` mean over 492 px (inner rings) and `32.6` over 2131 px
+(outer); radius mode `29.8` over 466 px and `31.3` over 1929 px. **The two modes differ by less than
+the inner and outer rings differ within either one.** `docs/preset-palettes.md` carries the table
+and now tells authors *not* to re-tune the parameter across the switch. What does move is where the
+rings sit, which is the decision working rather than a cost.
+
+**The `ring` question is answered: a load warning plus the distance, never a silent third figure.**
+All three candidates were rendered at 420x420 before one was picked. The two fallbacks — silent, and
+warned — draw the same annulus. The outer-rim definition renders a file **byte-identical to a
+`disc`** (md5 `6df825d9...` for both), because the coordinate collapses to `length(p)` and the hole
+stops existing: a preset would name one roster entry and be shown another. That is the negative this
+ADR predicted, reached in practice rather than argued. `core/src/preset/schema.rs` warns when a
+`shape` **rests** at `ring` with the mode bound; a binding that animates through `ring` rests
+nowhere, so it falls back frame by frame and nothing warns — a stated limit, on the `thickness`
+dead-zone precedent.
+
+**The cost claim held, and it is now a measurement.** "A handful of ALU ops, the same order as the
+SDF they sit beside" was an argument; `core/tests/field_cost.rs` prices it. On an AMD Radeon
+integrated adapter (DX12, driver 30.0.13002.1001), 1280x720, floor tier, median of three runs: the
+`disc` control `-1.1 %`, `heart` `-0.5 %`, straight `star(7)` `-4.7 %` — all inside the control's own
++-3 % spread — and the curved+jittered `star` **`-25.9 %`**, cheaper because the distance walks two
+sampled polylines there while the radius walks one and computes only the crossing. So the mode ships
+ungated and `docs/nfr.md` does not move. A negative result was a legitimate outcome of that phase and
+did not occur.
+
+**One thing the ADR did not anticipate, found by building it.** The Decision's polygon rationale
+holds only *outside* the outline. An erosion rounds a **reflex** corner, and a regular convex polygon
+has none — so eroding one moves every edge in by the same amount and yields a scaled copy, and the
+two coordinates are literally the same expression in a polygon's interior (measured on a pentagon at
+the first interior contour: mean `0.2513`, relative spread `0.0177` under both modes, agreeing to
+four figures). The straight-edge `star` behaves the same way for the same reason. The arms separate
+outside the outline, and the **curved** star and the **heart** separate everywhere — the heart being
+the arm the reference images are actually about. `presets/README.md` carries the per-arm table.

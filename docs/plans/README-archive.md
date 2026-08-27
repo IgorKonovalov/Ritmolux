@@ -13,6 +13,88 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0098 — The figure nests properly](done/0098-the-figure-nests-properly.md)
+  — closed 2026-08-27. Eight phases (1, 2, 3, 4, 4b, 5, 6, 7) on `plan-0098-nested-figure` in
+  `WORK/lmv-plan-0098`, `28336c3`..`7411663`. Review: **no blockers, no majors, five minors, two
+  nits.** Version **0.84.0** (minor). Closed [design-backlog 0096 + 0097](../design-backlog.md);
+  filed 0143.
+
+  **What landed.** `shape_field` gained a second palette coordinate. `coord_mode = "1"` hands the
+  palette `r / r_boundary(theta)` instead of the normalized distance, so a band of the coordinate is
+  a band of constant **scaling** and every contour is a scaled copy of the outline rather than an
+  offset of it — the construction two batches of reference images asked for and the one an offset
+  family provably cannot make. `r_boundary` is closed-form per arm (ADR-0111 Alternative A's
+  sphere-trace rejected at 10-20 SDF evaluations per fullscreen pixel), sharing the angular fold
+  `mark_distance` already computes so the two describe one outline. Phase 4b added `rotation`, which
+  this scene had never had while every other figure-drawing scene did.
+
+  **Phase 1 was an independent defect fix and it is the half that moved a shipped preset.** The
+  `star` arm's curved/jittered branch divided a true distance by the *straight* edge plane's
+  perpendicular — never longer than either endpoint's radius, so the normalized coordinate was
+  **always negative at the figure's centre** (`-0.23` to `-0.94` measured across five
+  configurations). On the particle path that only saturates a falloff brighter, which is why it
+  shipped; on `shape_field` it is a hard n-sided hole, and under a bound `gamma` a **NaN**. The
+  repair is the reference, not a clamp: the branch now divides by the distance from the origin to its
+  own boundary polyline, walked from the **unjittered** edge so the divisor stays a property of the
+  figure rather than of whichever spike a fragment folded onto.
+
+  **Two claims were falsified in build and corrected rather than worked around.** The plan's own
+  Phase 2 rationale — *"a scaled polygon keeps its corners, an eroded one rounds them"* — holds only
+  outside the outline: erosion rounds a **reflex** corner and a convex polygon has none, so the two
+  coordinates are literally the same expression in a regular polygon's interior (pentagon, first
+  interior contour: mean `0.2513`, relative spread `0.0177` under both modes, four figures). The test
+  moved outside the outline where the separation is real (triangle: `0.0027` radius against `0.0631`
+  distance, 23x). And ADR-0111's booked `palette_contour` consequence does not reproduce — the
+  contour's width comes from `fwidth` of the *banded* coordinate, so the line is drawn within one
+  pixel of a band edge and that normalization absorbs the changed gradient. Both are recorded in that
+  ADR's dated `Outcome`.
+
+  **`ring` was answered against rendered figures, not in the abstract**, which is the one thing
+  ADR-0111 left to the plan. All three candidates were rendered at 420x420 first: the two fallbacks
+  draw the same annulus, and the outer-rim definition renders a file **byte-identical to a `disc`**
+  (md5 `6df825d9...` for both) because the coordinate collapses to `length(p)` and the hole stops
+  existing. So the combination is refused and announced — a load warning when a `shape` **rests** at
+  `ring`, on the `thickness` dead-zone precedent. An animated `shape` rests nowhere and falls back
+  silently frame by frame, a stated limit.
+
+  **The cost claim became a measurement.** `core/tests/field_cost.rs` prices the mode at the floor
+  tier and names its machine (ADR-0071): on an AMD Radeon integrated adapter, DX12, driver
+  30.0.13002.1001, 1280x720, median of three runs — `disc` control `-1.1 %`, `heart` `-0.5 %`,
+  straight `star(7)` `-4.7 %`, all inside the control's own +-3 % spread, and the curved+jittered
+  `star` **`-25.9 %`** because the distance walks two sampled polylines there while the radius walks
+  one. The mode ships ungated; `docs/nfr.md` did not move. A negative result was a legitimate outcome
+  of that phase and did not occur.
+
+  **Phase 7 came back rather than carrying forward**, judged in the running app at 165 fps / p99
+  7.0 ms on an A/B differing only in `coord_mode`: the reference reproduces (under `"1"` every ring
+  keeps the notch where `"0"` rounds it into a blob by the third ring inward), and `shape_pulse` is
+  **re-authored** rather than left. That re-author is the single line `coord_mode = "1"`;
+  `color_span` was deliberately held at `0.45` because both coordinates put the outline at exactly
+  1, so holding it holds the same four interior boundaries. `shape_facet` — the library's only world
+  on the curved `star` arm — was then re-scaled onto Phase 1's repaired reference (`0.16253` to
+  `0.20000`, x1.2306) and given reactivity it could not previously have, since `rotation` moves the
+  sample point rather than the palette mapping and `gamma` became bindable: `mid`/`treb`/`onset`
+  `0.000 / 0.009 / 0.000` to `0.021 / 0.043 / 0.122`.
+
+  **Review residue.** Five minors, none in the mechanism: the module header states the repaired
+  interior is *exactly* `0` at the centre "for every curved configuration" when a **jittered** star
+  reads `0.076`-`0.085` there (the reference is the unjittered figure's, the measurement the
+  fragment's own spike's) and the exact-zero assert is gated to `jitter == 0`; `presets/README.md`
+  said `shape_facet` "still pins `gamma`" after two later commits unpinned it (repaired at close);
+  the lane adds ~11 relative links and ~9 narration lines to Rust comments that [Plan
+  0118](0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) is concurrently deleting;
+  `schema.rs` hardcodes the `coord_mode` bounds instead of reading `COORD_MODES`; and the CPU mirror
+  of `mark_boundary_radius` is not literally identical to the WGSL at `p == (0,0)` while its comment
+  says it is. Two nits: a failure message naming a pentagon on a test that renders a triangle, and an
+  implementation log at byte parity with the plan's own phase section. Filed as
+  [design-backlog 0143](../design-backlog.md).
+
+  **Curation verdict (ADR-0081).** The shipped set is the same files — nothing embedded, nothing
+  removed. One item the plan made stale that nobody has touched: `presets/shape_contourmono.toml`
+  (landed on `main` from Plan 0121 while this lane ran) says its star's *"offset contours round off
+  further with every ring outward"*, the exact property `coord_mode` now makes optional. Its header
+  frames that rounding as deliberate, so this is a `preset-author` question and not a defect.
+
 - [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md)
   — closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`3f9e828`, `b97ff64`,
   `509eaff`, `82c031f`) in `lmv-plan-0087` on `plan-0087-arc-primitive`, which reached `main` inside

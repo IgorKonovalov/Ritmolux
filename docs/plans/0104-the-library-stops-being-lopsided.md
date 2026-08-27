@@ -101,7 +101,7 @@ entries are seventeen worlds or a family that converged.
     [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md); a cohort
     authored now would be authored against a surface about to move. It gets its own phase, after.
   - `shape_field` shipped with **no world of its own** by design, and
-    [Plan 0098](0098-the-figure-nests-properly.md) is live on `shape_field.rs` — coordinate, or
+    [Plan 0098](done/0098-the-figure-nests-properly.md) is live on `shape_field.rs` — coordinate, or
     take this after it closes.
   - The reference surfaces are [`presets/README.md`](../../presets/README.md) (every parameter),
     [`docs/presets.md`](../presets.md) (the grammar) and
@@ -178,7 +178,7 @@ entries are seventeen worlds or a family that converged.
   adding `preset-author` to the vocabulary** — filed as a followup rather than resolved here,
   because changing the vocabulary changes what `dev` branches on.
 - **Phase 1 may invalidate the arithmetic**, and that is the point of putting it first.
-- **Two phases are blocked on live plans** — Phase 2 partly on [0098](0098-the-figure-nests-properly.md)
+- **Two phases are blocked on live plans** — Phase 2 partly on [0098](done/0098-the-figure-nests-properly.md)
   (`shape_field`), Phase 4 wholly on [0087](done/0087-the-line-renderer-draws-a-curve.md). Both are
   stated rather than sequenced, so a session can take whatever is free.
 - **The weak-family problem may not be a content problem.** If `swarm` cannot read as cohesive at

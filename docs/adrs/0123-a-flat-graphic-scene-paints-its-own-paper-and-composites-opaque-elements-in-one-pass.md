@@ -144,7 +144,7 @@ ask is about.
 like a smaller change than a twelfth system. Rejected because the two draw opposite pictures:
 `shape_field` renders one figure's **contour bands** as additive glow, and its
 `palette_steps`/`color_span` surface exists to control that banding — exactly the machinery a flat
-opaque element has to switch off. [Plan 0098](../plans/0098-the-figure-nests-properly.md) is
+opaque element has to switch off. [Plan 0098](../plans/done/0098-the-figure-nests-properly.md) is
 concurrently changing that file for nested contours, so the merge would also contend. Two systems
 with parallel names and opposite fill models is the honest shape.
 

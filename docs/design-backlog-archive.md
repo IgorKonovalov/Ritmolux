@@ -6252,3 +6252,162 @@ cannot, and the cost is live round trips with the user — four of them on one p
   and in the JSON's own `measured_at_px`. Its own probe went red on delivery. **Residual worth
   watching:** a full-library run marks 48 of 49 `rate` cells, and a mark everyone ignores is not a
   mark — carried on Plan 0121's followup list.
+
+---
+
+## 0096 — `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies
+
+> **CLOSED 2026-08-27** — [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)
+> (accepted, with an `Outcome`) and [Plan 0098](plans/done/0098-the-figure-nests-properly.md)
+> Phases 2-4. `shape_field` gained `coord_mode = "1"`, whose contours are scaled copies;
+> `presets/shape_pulse.toml` — the preset that raised this — was re-authored onto it at that plan's
+> Phase 7 look gate and the user judged the reference reproduced. **The entry's diagnosis was right
+> and its worked example was over-general:** an inward offset erodes and erosion rounds only a
+> **reflex** corner, so a convex figure's two coordinate families coincide in its interior — the
+> polygon and straight-edge `star` arms separate only outside the outline, while the heart (the arm
+> the reference images are about) separates everywhere.
+
+> **PROMOTED 2026-08-16** — [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md)
+> (proposed) and [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phases 2-4. The entry stays
+> live until that plan lands, per this file's own lifecycle: a design that has not shipped is
+> still live.
+
+**Raised by:** `preset-author`, authoring `presets/shape_pulse.toml` against two user reference
+images at [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) Phase 6 (2026-08-16).
+**Owner if taken:** `architect` (it owes an ADR — see the routes below), then `dev`.
+
+- **Verified 2026-08-16** — the scene's scalar is a distance, so its level sets are offsets by
+  construction: `present: definition of an offset curve in: core/src/render/scenes/shape_field.rs`
+- **Verified 2026-08-16** — the normalization that makes it so:
+  `present: at that deepest point in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+[ADR-0105](adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) chose "a band of the
+palette coordinate is a band of constant distance, **which is the definition of an offset curve**",
+and the scene delivers exactly that. The user's reference — nested heart contours, red on black —
+is **not** an offset family. Its inner rings stay sharply heart-shaped down to a small core, which
+only **self-similar scaled copies** do.
+
+The mechanism is geometry and it is not tunable. An inward offset is an erosion, and erosion
+**rounds a reflex corner while keeping convex ones sharp**. On the heart that means the bottom
+point stays crisp and the top notch fills in — which is precisely the artifact the user asked the
+content lane to fix and it could not.
+
+**The cost is a hard coupling, not a difficulty.** The core's inner boundary sits at
+`d = ((1/palette_steps) / color_span)^(1/gamma)`, so a notch sharp enough to read needs
+`palette_steps * color_span ~ 1` — which leaves **one** band inside the figure. Measured at 9
+steps on the heart:
+
+| core sits at | notch rounding | rings inside the figure |
+|---|---|---|
+| 0.48 | 0.33 | four — what ships |
+| 0.68 | 0.20 | two |
+| 0.81 | 0.12 | one |
+| 0.91 | 0.06 | none: a black heart with a red rim |
+
+The user judged the last one in the running app and **rejected it**; `shape_pulse` keeps the
+rounded core. So "many rings inside **and** a small sharp core" is unreachable today, and it is the
+reference's whole construction.
+
+### What a fix would be
+
+A second coordinate mode on the scene: a **shape-radius** rather than a distance — for a region
+star-shaped about its centre, `r / r_boundary(theta)`, which is `0` at the centre and `1` on the
+outline like the distance is, but whose level sets are *scaled copies*. It would decouple ring
+count from notch sharpness entirely, and both would then be free parameters.
+
+**It owes an ADR when taken**, and the rejected alternatives are already visible: reusing
+`kaleido_radial` (it nests shrinking copies periodic in `log r`, but it nests the **frame** about a
+screen point rather than the figure about its own centre, so it cannot follow `pan_*` or a shape);
+and doing it in the palette (what `shape_pulse` does today — stripes packed as gradient stops,
+which fakes the ring *count* but cannot change what the level sets are shaped like).
+
+### Priority
+
+**Medium.** Nothing ships broken and the first world landed without it. It is the difference
+between "the construction resembles the reference" and "the construction *is* the reference", on
+the one family this project has now had two batches of user reference images for.
+
+---
+
+## 0097 — a curved or jittered `star` returns a NEGATIVE normalized distance at its own centre, and on `shape_field` that is a hole through the figure
+
+> **CLOSED 2026-08-27** — [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1. The
+> curved/jittered branch now divides by the distance from the origin to its own boundary polyline,
+> walked from the **unjittered** edge, rather than by the straight edge plane's perpendicular. `d` at
+> the centre is exactly `0` when the spikes are all the same length, and within about `0.09` of it
+> under `star_jitter`, where the divisor is the figure's while the measurement is the fragment's own
+> spike's. **The `color_center` workaround this entry recommended was confirmed useless** — it is
+> added after the exponent, so it cannot repair a `pow` of a negative base. `gamma` is an ordinary
+> knob on every star, and `presets/shape_facet.toml`, which pinned it for this defect, now binds it.
+
+> **PROMOTED 2026-08-16** — [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1, placed
+> first because it is on the file the rest of that plan extends.
+
+**Raised by:** `preset-author`, building the Phase 6 star probes for
+[Plan 0091](plans/done/0091-the-figure-fills-the-frame.md) (2026-08-16).
+**Owner if taken:** `dev`.
+
+- **Verified 2026-08-16** — the branch that produces it:
+  `present: select\(nearest, -nearest in: core/src/render/scenes/marks.rs`
+
+### The finding
+
+`marks.rs` documents the roster's normalization as `0` at the shape's deepest interior point,
+exactly `1` on the outline. The `star` arm honours that on its **straight-edge** branch, which
+returns `r*cos(f) + r*sin(f)*B` and is therefore `0` at `r = 0`. Its **curved/jittered** branch —
+taken whenever `star_curve` or `star_jitter` is non-zero — returns `1 + sd/inradius` with `sd` the
+true nearest distance, so at the centre it returns `1 - k/inradius`, where `k` is the valley radius.
+
+**That is always negative, and provably so rather than incidentally.** `inradius` is the
+perpendicular from the origin to the edge *line*, and a perpendicular to a chord is never longer
+than either endpoint's radius — so `inradius <= k` for every configuration, hence `d(0) <= 0`
+always. Measured across the probe set: `-0.23` (valley 0.20, 4 points), `-0.30` (0.12, 4),
+`-0.30` (0.45, 6), `-0.75` (0.45, 9), `-0.94` (0.18, 7).
+
+**On `shape_field` it is visible and ugly.** The palette repeat-addresses, so a negative coordinate
+wraps to the gradient's far end and punches a hard n-sided dark hole through the middle of the
+figure — hexagonal on a six-pointer, nine-sided on a nine-pointer.
+
+**Nothing in the suite can see it.** On the particle path a negative `d` only makes
+`max(0, 1 - d)` exceed 1 and the falloff saturates brighter, so no golden baseline moves; and no
+shipped preset drives `shape_field` with a star.
+
+### Two consequences the entry did not state, added 2026-08-16 from the content lane
+
+Both surfaced while authoring `presets/shape_facet.toml`, and the first is the one that matters
+most because **it defeats this entry's own recommended workaround**.
+
+- **`gamma` becomes unusable, and `color_center` cannot rescue it.** The shader takes
+  `select(pow(d, gamma), d, gamma == 1.0)` (`shape_field.rs:202`), and `pow` of a negative base is
+  **NaN** — which lands as a hard artifact through the middle of the figure. The offset this entry
+  recommends is applied on the *next* line, `coord = shaped * color_span + color_center`
+  (`shape_field.rs:203`), so it arrives **after** the exponent and cannot repair a NaN that already
+  happened. On any curved or jittered star, `gamma` must therefore be pinned to exactly `1.0` — the
+  identity branch is the only escape. **A repair that only fixes the sign leaves this standing**, so
+  Plan 0098 Phase 1 is scoped against both.
+- **A binding that sweeps through `star_curve = 0` flips branches mid-morph.** The closed-form
+  straight branch and the sampled Bezier branch disagree by the polyline's sagitta — ~0.0032,
+  measured at Plan 0091 Phase 5 — so a param eased through zero crosses a small discontinuity at
+  exactly the point an author is most likely to animate through.
+
+### What a fix would be
+
+The disagreement is in the **reference** the two branches divide by, not in either distance. The
+straight branch's `inradius` is the edge-plane perpendicular — an approximation Plan 0091 Phase 2
+recorded and deliberately kept, because repairing it would move every shipped `shape = "3"` mark.
+The curved branch computes a true distance and then divides it by that same approximate reference.
+Either give the curved branch a reference equal to the figure's actual deepest-point distance, or
+clamp the normalized result at 0 and record that the interior is not metric there.
+
+**Whoever takes it should read Plan 0091 Phase 2 first** — the byte-identity contract on the
+particle path is the constraint that shaped the current arithmetic, and a naive repair breaks it.
+
+### Priority
+
+**Medium.** It is invisible until a preset puts a shaped star on the field scene, and the content
+lane already hit it on its first attempt — four probe presets carry a `color_center` offset whose
+only purpose is to dodge it.
+
+---
