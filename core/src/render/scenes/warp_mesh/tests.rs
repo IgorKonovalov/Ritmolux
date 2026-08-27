@@ -886,13 +886,13 @@ fn the_echo_orientation_quantizes_to_four_states() {
 // The field instrument (Plan 0109 Phase 4)
 // ---------------------------------------------------------------------------
 //
-// **Every observation of the wash before this was of the final picture**, where
+// **An observation of the wash taken from the final picture names nothing**:
 // `gamma`, `brightness`, the four remaps, the post chain and the tonemap all sit
-// downstream of the feedback field and any of them could be the whole story.
-// Two plans failed to find the cause with that instrument. What follows reads
-// the `Rgba16Float` field itself, frame by frame, in its own linear units:
-// `PingPongField::read_texture` is copied to a readback buffer after each frame
-// and decoded with `capture::read_back_linear`, which does not clamp at 1.
+// downstream of the feedback field, and any of them could be the whole story.
+// What follows reads the `Rgba16Float` field itself, frame by frame, in its own
+// linear units: `PingPongField::read_texture` is copied to a readback buffer
+// after each frame and decoded with `capture::read_back_linear`, which does not
+// clamp at 1.
 //
 // It is a GPU test, so it skips where there is no adapter (ADR-0016).
 //

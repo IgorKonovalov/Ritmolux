@@ -11,7 +11,7 @@
 //!
 //! # Why this needs no change to the composite
 //!
-//! Three facts, all measured before this scene existed (ADR-0123's Context):
+//! Three measured facts (ADR-0123's Context):
 //!
 //! - A fullscreen scene emitting alpha 1 **holds the backdrop out entirely** —
 //!   not darkened, absent (Plan 0091 Phase 1). So a scene that covers every

@@ -46,8 +46,8 @@
 //!   whole-figure like on the other three line scenes. Not a post bloom.
 //! - `softness` — the across-the-stroke profile (ADR-0124), whole-figure and
 //!   shared with the other three line scenes. Default `0.25`: a solid bar with
-//!   a short shoulder. `1.0` is the quadratic falloff these bars drew before
-//!   Plan 0114; `0` is solid with a one-pixel edge. A different quantity from
+//!   a short shoulder. `1.0` is the pure quadratic falloff; `0` is solid with a
+//!   one-pixel edge. A different quantity from
 //!   `glow`, which scales the light and never the coverage.
 //!
 //! Three parameters are **layout-specific**, and each is a no-op on the layouts
