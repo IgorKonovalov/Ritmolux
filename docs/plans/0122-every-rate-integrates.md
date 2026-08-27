@@ -308,7 +308,7 @@ impl Phase {
 | 2 — the two rates nothing binds | dev | done | `b250d0d` |
 | 3 — `swarm`'s field clock | dev | done | `254762c` |
 | 4 — the guard | dev | done | `228418a` |
-| 5 — the swarm content pass | human | not started | |
+| 5 — the swarm content pass | human | done | `c2439b7` |
 
 ### Notes
 
@@ -338,6 +338,15 @@ impl Phase {
 
   `--report` holds one stimulus for every frame it renders, so `spin` is constant across each
   probe and the integrated and multiplied forms agree there by construction.
+- **Correction at the Phase 5 close (2026-08-27): three of those five rows are presets that do not
+  exist.** `Dense`, `Starfield` and `Storm` were retired 2026-08-11 by `9bf2b23`, an ancestor of
+  `5c258d0` — never in the tree this plan ran against. The reading used `shot --report family=swarm`
+  with **no `--presets`**, which resolves to the seeded `%APPDATA%` copy, and seeding is
+  write-if-absent and never deletes. `Shatter` and `Drift` survive (both byte-identical there and in
+  the repo; Phase 5 reproduces 0.081 and 0.136 exactly), but *"read against their family
+  neighbours"* was satisfied against a family that no longer exists: **the swarm family is two
+  presets and both bind `spin`**, so no unaffected control exists and the criterion was
+  unsatisfiable as written. Measure a family with `--presets presets` or `--preset-file`.
 - `swarm`'s `advance` gained the non-finite/negative `dt` guard `fragment_field` and `warp_mesh`
   carry; the plan does not name it. `field_phase` is the scene's first accumulator, so a bad frame
   that previously cost only the damping `powf` can now corrupt state permanently.
@@ -352,14 +361,50 @@ impl Phase {
   `fragment_field::update`, `cargo check -p lmv-core` → `error[E0369]: cannot add f32 to Phase`;
   reverted.
 
+### Phase 5 — the content pass and the verdict
+
+- **Verdict: the retuned variants win on both presets.** Judged in the running app against a build of
+  `b250d0d` (this branch before the swarm fix) on the same track, both engines on one
+  `LMV_PRESET_DIR` library. The losers: on the **old** engine because the lurch
+  is the defect this plan removed; on the **corrected** because both files were
+  tuned against a clock that lurched, so neither range means what it meant.
+- **Drift's `spin` carries a `sin(time)` term, which the plan's analysis missed** — it treated both
+  presets as audio-driven only. Multiplied by elapsed time that term's derivative carried a
+  `0.00019 · t` piece, so by t = 300 s the field's rate swung ±0.057 against a nominal 0.040 and the
+  field periodically ran **backwards**, unbounded. That rewind is part of what the file means by
+  *"it evolves almost entirely on `time`"*. Corrected it never reverses and the cloud settles;
+  the retune (`sin` amplitude 0.010 → 0.060) swings the **rate** through zero instead. Numbers and
+  the `--horizon` readings behind them are in `swarm_drift.toml`'s header and `c2439b7`.
+- **Shatter's difference is invisible to every headless instrument here**, confirmed rather than
+  assumed: its `spin` has no `time` term, so the change needs a moving rate at large elapsed time,
+  and `--report`/`--horizon` hold one stimulus (`--horizon` rejects `--signal`/`--audio` outright),
+  the filmstrips vary it only across seconds, and `--render` needs an uncommitted WAV. The two
+  engines' `--report` differ only in the last digit of `rate`. The app was the only instrument.
+- **`points` pinned to `"4"` on Shatter is a user call in the same pass**, not a consequence of the
+  rate fix: `3 + floor(hash(beat_index) * 1.999)` read as flicker rather than a re-cut, because
+  `beat_index` counts onset **detections** at 1.2-2.3x per musical beat (ADR-0109). The engine side
+  is clean — `marks::mark_points` quantizes on the way in.
+- **`core/tests/sanity.rs`'s swarm coverage floor moved 0.28 → 0.33** — engine test code, outside a
+  content pass, so it is called out rather than folded in. `Shatter` still sets the family minimum
+  and it *moved*, 0.5553 → 0.6531, under the wider `spin`, convicting the old floor at 2.33x against
+  that file's 2.2x `MAX_FLOOR_SLACK`. Half the new minimum, which is that arm's stated rule.
+- **One stale workaround outside the two subjects:** `curve_nightbloom.toml`'s header justified its
+  constant `spin` with a constraint **Phase 2 removed** (`d22fff7`, value unchanged). The close
+  ceremony's stale-workaround grep could not have found it — it looks for `ADR-00NN` / `Plan 00NN` /
+  `backlog NNNN` and this header cites no number at all.
+- **No engine gap came back** — nothing new for the backlog from the content lane. `fmt`, `clippy`
+  and `nextest --workspace` (1067 passed) green after it.
+
 ### Close triggers
 
-- **`presets/` touched:** yes — `presets/README.md` only (the `parametric_curve` `spin` prose and
-  the `deposit_spin` row). No `.toml` changed; the preset content pass is Phase 5.
+- **`presets/` touched:** yes. `presets/README.md` (the `parametric_curve` `spin` prose and the
+  `deposit_spin` row) from Phase 2, and in Phase 5 `swarm_drift.toml`, `swarm_shatter.toml` and
+  `curve_nightbloom.toml`.
 - **Plan header `Closes:`** design-backlog 0141.
 - **What shipped:** three defect fixes (`swarm` `spin`, `parametric_curve` `spin`, `warp_mesh`
   `deposit_spin`), one refactor (four rate helpers collapsed into `scenes::Phase`), one new build
-  gate (`hygiene.rs`), and the operator-doc update above.
+  gate (`hygiene.rs`), the operator-doc update above, and Phase 5's content retune of the two
+  `swarm` worlds with the sanity floor re-derived under it.
 - **Operator docs moved:** `presets/README.md`.
 - **`node scripts/check-backlog-claims.mjs`:** exit 1, **4 broken**. Three are entry 0141's own
   probes — `let field_t = self.time * self.spin;`, `let rotation = self.spin * self.time;`,
@@ -367,5 +412,5 @@ impl Phase {
   `self.spin_time = advance_spin(self.spin_time, self.spin, self.dt);`, anchored on the function
   Phase 1 deleted; 0142's subject (the double-`update` on a same-system dissolve) is untouched by
   this plan and the entry still stands.
-- **`human` phases remaining:** Phase 5 — the `swarm_shatter` / `swarm_drift` content pass and the
-  user's verdict in the running app.
+- **`human` phases remaining:** none. Phase 5 landed 2026-08-27 (`c2439b7`, `d22fff7`); the verdict
+  was taken in the running app against a `b250d0d` build.
