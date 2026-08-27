@@ -6,22 +6,19 @@
 //!
 //! ## `variant` is a contact angle, not an index (ADR-0060)
 //!
-//! `variant` maps linearly onto a contact-angle offset rather than
-//! flooring into one of three precomputed rosettes — a floor throws
-//! every fractional value away, which spends `[smoothing]` on nothing
-//! and reads as a stutter (design-backlog 0007's "change between star
-//! rosette shapes should be smooth"). `0`, `1` and `2` land on exactly
-//! the `-24 / 0 / +24` degree offsets of those three rosettes, so **a
-//! preset binding integers draws the rosette it names**, while a
-//! fractional value is a real rosette in between.
+//! `variant` maps linearly onto a contact-angle offset rather than flooring into
+//! one of three precomputed rosettes. `0`, `1` and `2` land on exactly the
+//! `-24 / 0 / +24` degree offsets of those three, so **a preset binding integers
+//! draws the rosette it names**, while a fractional value is a real rosette in
+//! between and `[smoothing]` has something to interpolate.
 //!
 //! The cache stays, keyed on the built angle with **hysteresis**: a request more
 //! than [`STEP_DEG`] from the built angle rebuilds, anything nearer reuses. That
 //! is what keeps generator work off the hot path (ADR-0007) now that a bound
 //! param can reach it.
 //!
-//! **The step is measured, not assumed** (ADR-0060 leaves the number
-//! open). At `0.1` degrees:
+//! **The step is measured, not assumed** (ADR-0060 leaves the number open). At
+//! `0.1` degrees:
 //!
 //! - *Invisible in motion.* The worst case is the sharpest reachable rosette:
 //!   a 12-fold star at an 11-degree contact angle moves a vertex 11.0 px per
@@ -42,52 +39,47 @@
 //! ## The colour axis: **radius from the rosette centre** (ADR-0059)
 //!
 //! This scene honours `[palette]` / `[palette_b]` / `palette_mix` / `hue_spread`
-//! / `saturation` through the shared [`ColorRamp`]. Its declared axis is
-//! **normalized radius**: a Hankin rosette is rotationally symmetric about the
-//! frame centre, so a path-position axis would paint an arbitrary seam across a
-//! figure with no beginning, and radius is the only ordering the construction
-//! itself supplies.
+//! / `saturation` through the shared [`ColorRamp`], on a **normalized radius**
+//! axis: a Hankin rosette is rotationally symmetric about the frame centre, so
+//! radius is the only ordering the construction itself supplies.
 //!
-//! **And on the current construction that ramp is identically flat — measured,
-//! not estimated.** The rosette is `2n` *congruent* segments: each runs from a
+//! **On the bare rosette that ramp is identically flat — measured, not
+//! estimated.** The rosette is `2n` *congruent* segments: each runs from a
 //! contact point on the unit circle to a petal tip at radius
-//! `sin(a) / sin(pi/n + a)`, and every one of them is a rotation or reflection of
-//! every other about a centre that `normalize_fit` leaves at the origin (every
-//! tiling order the loader accepts — 4, 6, 8, 12 — is even, so the figure's
-//! bounding box is centred). So each segment's radial interval is the *same*
-//! interval, and one colour per segment has nothing to distinguish. Measured
-//! across both shipped presets and all three of their variants, the spread of
-//! segment radii is **1.2e-7**, which is f32 noise and not a range.
+//! `sin(a) / sin(pi/n + a)`, and every one is a rotation or reflection of every
+//! other about a centre that `normalize_fit` leaves at the origin (every tiling
+//! order the loader accepts — 4, 6, 8, 12 — is even, so the bounding box is
+//! centred). Each segment's radial interval is therefore the *same* interval, and
+//! one colour per segment has nothing to distinguish. Across both shipped presets
+//! and all three of their variants the spread of segment radii is **1.2e-7**,
+//! which is f32 noise and not a range.
 //!
-//! The *figure's* radial extent is a different quantity, and it is the one
-//! design-backlog 0007 reported as a "hollow ring": at `star_rosette`'s
-//! 12-fold / 20-degree rosette the strokes live between radius 0.54 and 0.90, so
-//! the inner **60%** of the disc is empty, and `star_lantern`'s 55-degree variant
-//! empties **87%** of it. That is real, and it is the interior question — not
-//! something a colour axis can answer.
+//! The *figure's* radial extent is a different quantity, and it is the "hollow
+//! ring" of design-backlog 0007: at `star_rosette`'s 12-fold / 20-degree rosette
+//! the strokes live between radius 0.54 and 0.90, so the inner **60%** of the
+//! disc is empty, and `star_lantern`'s 55-degree variant empties **87%**. That is
+//! the interior question, not something a colour axis can answer.
 //!
-//! `hue_spread` is therefore a **no-op on a rings-less preset**, and that is
-//! stated here and in `presets/README.md` rather than shipped as a lever that
-//! quietly does nothing. What such a preset does gain is `[palette]` itself: the
-//! rosette can finally be an ember or an ice figure instead of a point on the
-//! built-in cosine.
+//! `hue_spread` is therefore a **no-op on a rings-less preset**, stated here and
+//! in `presets/README.md` rather than shipped as a lever that quietly does
+//! nothing. What such a preset does gain is `[palette]` itself.
 //!
 //! ## The interior: rings of motifs (ADR-0079)
 //!
 //! `[generator] rings` is an optional roster of concentric rings — `{ motif,
 //! count, radius, scale, phase }` each — drawn through the same [`LineRenderer`]
-//! alongside, or instead of, the interlace. It is the answer to design-backlog
-//! 0007's hollow-ring half, and it is *placement* rather than construction: copy
-//! `i` of a ring of `k` sits at `2*pi*i/k + phase`, scaled by `scale`, at
-//! distance `radius`, in the same fit-normalized world the rosette lands in (the
-//! rosette spans `+/- 0.9`, so a `radius` near `0.9` sits on its rim and
-//! anything smaller is genuinely interior).
+//! alongside, or instead of, the interlace. It answers design-backlog 0007's
+//! hollow-ring half, and it is *placement* rather than construction: copy `i` of
+//! a ring of `k` sits at `2*pi*i/k + phase`, scaled by `scale`, at distance
+//! `radius`, in the same fit-normalized world the rosette lands in (the rosette
+//! spans `+/- 0.9`, so a `radius` near `0.9` sits on its rim and anything smaller
+//! is genuinely interior).
 //!
 //! Two consequences worth stating where they can be read:
 //!
 //! - **With `rings` absent nothing here runs at all**, and the scene draws the
-//!   Hankin path it drew before, segment for segment — the rings live in their
-//!   own buffer and the combined one is never even allocated.
+//!   Hankin path segment for segment — the rings live in their own buffer and the
+//!   combined one is never even allocated.
 //! - **With `rings` present the radial colour axis stops being degenerate.** The
 //!   ramp is computed over the *combined* figure, which really does span radii,
 //!   so `hue_spread` becomes a live lever on exactly the presets that have an
@@ -98,13 +90,12 @@
 //!
 //! ## The rings move: three levers, and why two of them are radial
 //!
-//! Plan 0065 Phase 4 puts the ornament on the param surface without making the
-//! roster bindable — the roster stays structural, and what moves is a
-//! [`RingMotion`] applied to it: `ring_phase` turns **alternate rings in opposite
-//! directions**, `ring_spread` multiplies every radius about the centre, and
-//! `ring_scale` multiplies every motif's size. All three default to
-//! [`RingMotion::STATIC`], which is the exact identity (`+ 0`, `* 1`, `* 1`), so a
-//! preset that binds none of them draws the static ornament bit for bit.
+//! The roster stays structural; what moves is a [`RingMotion`] applied to it.
+//! `ring_phase` turns **alternate rings in opposite directions**, `ring_spread`
+//! multiplies every radius about the centre, and `ring_scale` multiplies every
+//! motif's size. All three default to [`RingMotion::STATIC`], the exact identity
+//! (`+ 0`, `* 1`, `* 1`), so a preset that binds none of them draws the static
+//! ornament bit for bit.
 //!
 //! **The radial pair is not a garnish, and this is the one design note worth
 //! reading before authoring a mandala.** `core/tests/animation.rs` captures at
@@ -119,10 +110,10 @@
 //!
 //! Like the rosette, the ornament is **rebuilt under hysteresis**: a motion
 //! further than one step ([`RING_PHASE_STEP`] and friends) from what is held
-//! rebuilds, anything nearer reuses. A preset binding none of the three
-//! never rebuilds after `configure` — but one that *animates* a lever
-//! re-places its ornament on most frames, which is affordable rather than
-//! free. See [`RING_PHASE_STEP`] for the measurement.
+//! rebuilds, anything nearer reuses. A preset binding none of the three never
+//! rebuilds after `configure` — but one that *animates* a lever re-places its
+//! ornament on most frames, which is affordable rather than free. See
+//! [`RING_PHASE_STEP`] for the measurement.
 
 // Hot-path panic-denial pragma: `update`/`render` run every displayed frame.
 // `configure` (the Hankin construction) is build-time but colocated, so it
