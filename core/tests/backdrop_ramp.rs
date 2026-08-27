@@ -465,8 +465,7 @@ fn an_out_of_range_exponent_lands_on_its_rail() {
 
 /// **The ramp's angle is true in screen pixels, and the aspect it uses comes
 /// from the destination surface rather than the chain's internal grid** —
-/// [ADR-0037](../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
-/// trap, which has shipped twice and is worse than usual here.
+/// ADR-0037's trap, which has shipped twice and is worse than usual here.
 ///
 /// At `bg_angle = 0` the aspect term *provably* cancels (`d = (0, 1)`, so the
 /// denominator is `aspect * 0 + 1`), so no default-angle test anywhere in this
@@ -876,7 +875,7 @@ fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
 }
 
 /// **The bow is where the arithmetic puts it, and it is symmetric** — the arc
-/// (ADR-0095), and the *second* place [ADR-0037] applies in this pass.
+/// (ADR-0095), and the *second* place ADR-0037 applies in this pass.
 ///
 /// `centre = bg_band_pos + bg_band_curve * 4t(1-t)`, where `t` runs **along** the
 /// band. That form is zero at both ends and `1` in the middle, so `bg_band_curve`
@@ -903,16 +902,14 @@ fn centreline_row(image: &CaptureImage, col: u32) -> f32 {
 /// numerator) moves the edge columns' centrelines to rows 30.39 and 29.03 and
 /// shears the arc by 1.36 rows, failing on the first edge assertion.
 ///
-/// **What this does *not* catch is [ADR-0037]'s own trap, and that is fine.**
-/// The plan expected the along-axis aspect *not* to cancel at the default angle.
-/// It does: the denominator is `aspect` while the numerator carries
-/// `ndc.x * aspect`, so the two divide out exactly as they do on the ramp. It
-/// costs nothing, because all three axes read the single aspect the pass is
-/// handed — so where that number comes from is one property with one control,
-/// and [`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`] is
+/// **What this does *not* catch is ADR-0037's own trap, and that is fine.** The
+/// plan expected the along-axis aspect *not* to cancel at the default angle. It
+/// does: the denominator is `aspect` while the numerator carries `ndc.x *
+/// aspect`, so the two divide out exactly as they do on the ramp. It costs
+/// nothing, because all three axes read the single aspect the pass is handed —
+/// so where that number comes from is one property with one control, and
+/// [`the_ramp_angle_takes_the_surfaces_aspect_not_the_internal_grids`] is
 /// already it.
-///
-/// [ADR-0037]: ../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
 #[test]
 fn the_bands_centreline_bows_by_its_curve_and_stays_symmetric() {
     // Aspect 2.5, and 64 rows so the across-axis geometry is the one the 1/e

@@ -210,11 +210,11 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// least one **unlit** 4-neighbour (`0.0..=1.0`) — "is the lit set a solid mass,
 /// or does it have interior?"
 ///
-/// This is the second term of the flatness gate ([ADR-0128], settled by
-/// [ADR-0130]). [`tonal_flatness`] asks whether the figure has any *tonal*
-/// structure and convicts a two-ink print for having exactly two tones, which is
-/// what that idiom is; this asks the orthogonal question, and a picture is
-/// called a blot only when both say so.
+/// This is the second term of the flatness gate (ADR-0128, settled by ADR-0130).
+/// [`tonal_flatness`] asks whether the figure has any *tonal* structure and
+/// convicts a two-ink print for having exactly two tones, which is what that
+/// idiom is; this asks the orthogonal question, and a picture is called a blot
+/// only when both say so.
 ///
 /// A solid mass carries only its rim on the boundary and reads near zero however
 /// large it is; a hatched, stroked or tiled figure is almost all rim and reads
@@ -235,9 +235,6 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 ///
 /// `0.0` for a frame with no lit pixels — the convention [`tonal_flatness`]
 /// uses, and [`coverage`] is the metric that already convicts an empty picture.
-///
-/// [ADR-0128]: ../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md
-/// [ADR-0130]: ../../docs/adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md
 pub fn boundary_density(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
     let (w, h) = (img.width as usize, img.height as usize);
     if w == 0 || h == 0 {
@@ -601,8 +598,7 @@ pub fn frames_to_settle(segment: &[CaptureImage], settle_frac: f32) -> u32 {
 /// inside the segment. So `frames_to_settle(seg, f) < seg.len()` is a tautology,
 /// not a check, and a caller has no way to tell *settled at frame k* from *still
 /// moving at frame k*. Plan 0038 Phase 3 read a truncated window as a shape
-/// difference between two orderings on exactly this basis; see
-/// [ADR-0040](../../../../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md)'s
+/// difference between two orderings on exactly this basis; see ADR-0040's
 /// Outcome.
 ///
 /// **The rule.** A settling response's change per unit time decays

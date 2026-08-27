@@ -110,10 +110,9 @@ const DEFAULT_RADIUS: f32 = 0.35;
 ///
 /// It is a **world** quantity, not a screen one. The renderer divides x by the
 /// target aspect on the GPU, so this scene never sees an aspect and cannot take
-/// one from the wrong place ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
-/// The honest consequence: *"fill the width"* is aspect-dependent — `span ≈
-/// 1.78` fills a 16:9 frame and leaves an ultrawide short. There is
-/// deliberately no `fit` mode.
+/// one from the wrong place (ADR-0037). The honest consequence: *"fill the
+/// width"* is aspect-dependent — `span ≈ 1.78` fills a 16:9 frame and leaves an
+/// ultrawide short. There is deliberately no `fit` mode.
 ///
 /// Applies to [`SpectrumLayout::Bars`] and [`SpectrumLayout::Polyline`]; a
 /// **no-op on [`SpectrumLayout::RadialRing`]**, which is sized by `radius`
@@ -130,9 +129,9 @@ const DEFAULT_SPAN: f32 = 1.0;
 /// frame centre, while one standing at `-0.85` throws its copy against the top
 /// edge (design-backlog 0018).
 const DEFAULT_BASELINE: f32 = -0.85;
-/// Level-shaping exponent ([ADR-0040](../../../../../docs/adrs/0040-spectrum-level-curve-applies-before-the-easing.md)).
-/// `1.0` is exactly linear — `powf(x, 1.0) == x`, the map this scene had before
-/// Plan 0038 Phase 3 — `0.5` is a square root, and lower values compress harder.
+/// Level-shaping exponent (ADR-0040). `1.0` is exactly linear — `powf(x, 1.0) ==
+/// x`, the map this scene had before Plan 0038 Phase 3 — `0.5` is a square root,
+/// and lower values compress harder.
 ///
 /// It applies to the **downsampled level, before the per-element smoother**, so
 /// `[spectrum] smoothing` eases the displayed quantity the way meter ballistics

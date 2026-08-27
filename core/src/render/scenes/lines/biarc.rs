@@ -1,5 +1,5 @@
 //! Biarc fitting: a sampled outline in, a **G1-continuous chain of circular
-//! arcs** out ([ADR-0098]).
+//! arcs** out (ADR-0098).
 //!
 //! This is the half of ADR-0098 that makes the cheap primitive enough. A
 //! sampled polyline shows its joints because it is only **C0** — the tangent
@@ -27,8 +27,6 @@
 //! Pure: no clock, no randomness, no global state, so the same outline always
 //! yields the same chain (the determinism rule). Allocation-free into a
 //! caller-preallocated `out`, because `parametric_curve` resamples every frame.
-//!
-//! [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
 
 // Hot-path panic-denial pragma. The fit is build-time for the motif roster and
 // **per frame** for `parametric_curve`, whose build model is a resample every

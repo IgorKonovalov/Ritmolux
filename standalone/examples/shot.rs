@@ -128,12 +128,11 @@ struct Args {
     /// but runs under **silence**, so a band-driven preset photographs at its
     /// resting state; `--at <hop>` runs the real analyzer over real dynamics but
     /// tiles into a filmstrip, which scales every frame to [`STRIP_H`] and draws
-    /// a gutter around it. Neither produces a documentation image, and
-    /// [ADR-0100] needs one. The hop is the same index `--at` takes and the
-    /// level table reports.
+    /// a gutter around it. Neither produces a documentation image, and ADR-0100
+    /// needs one. The hop is the same index `--at` takes and the level table
+    /// reports.
     ///
     /// [`STRIP_H`]: standalone::shot::film::STRIP_H
-    /// [ADR-0100]: ../../docs/adrs/0100-documentation-images-are-committed-headless-renders.md
     frame_at: Option<u32>,
     /// `--tier floor|rich`: the quality tier to capture at. **Floor by default**
     /// — a capture is a pure function of its inputs (NFR §6) and every golden

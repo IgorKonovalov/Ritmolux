@@ -2233,9 +2233,9 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
     );
 }
 
-/// Plan 0087 Phase 1b, closing [design-backlog 0098]: a `thickness` **resting**
-/// inside the stroke floor's dead zone warns, in ADR-0020's shape and on its
-/// surface.
+/// Plan 0087 Phase 1b, closing design-backlog 0098: a `thickness`
+/// **resting** inside the stroke floor's dead zone warns, in ADR-0020's
+/// shape and on its surface.
 ///
 /// The floor maps every `thickness` below about `0.167` to the same NDC
 /// half-width — roughly 0.27 px at 1080p — so the whole range renders
@@ -2243,8 +2243,6 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
 /// shipped at `0.016`, and re-tuning it to `0.022` and `0.038` changed nothing
 /// at all, so the correct hypothesis was discarded as disproved. The value is
 /// in range, the preset loads clean, and before this nothing said so.
-///
-/// [design-backlog 0098]: ../../docs/design-backlog.md
 #[test]
 fn a_thickness_resting_in_the_dead_zone_warns() {
     let src = r#"

@@ -32,8 +32,7 @@
 //! `((p.y+1)/2)*H` while the fragment writes the opposite row, so the mirror is
 //! **complete within one pass**. It shipped in the attractor's decay pass, whose
 //! target the draw pass writes in clip space, and every attractor rendered as
-//! `figure ∪ mirror(figure)` for the life of the scene
-//! ([ADR-0070](../../../docs/adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)).
+//! `figure ∪ mirror(figure)` for the life of the scene (ADR-0070).
 //!
 //! The alternative to a round-tripping `uv` is to skip `uv` entirely and address
 //! by `@builtin(position)` through `textureLoad`, which is exact — that is what

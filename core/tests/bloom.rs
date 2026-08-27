@@ -1,4 +1,4 @@
-//! Pixel-level properties of the bloom stage (Plan 0045 Phase 4, [ADR-0046]):
+//! Pixel-level properties of the bloom stage (Plan 0045 Phase 4, ADR-0046):
 //! the halo's **energy** follows `bloom_amount`, its **extent** follows
 //! `bloom_radius`, it is **round**, and the tier's deeper pyramid reaches
 //! further.

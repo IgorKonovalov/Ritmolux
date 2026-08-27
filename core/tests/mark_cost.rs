@@ -1,5 +1,5 @@
 //! **What a shaped mark costs, per frame** (Plan 0070 Phase 4,
-//! [ADR-0084](../../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)).
+//! ADR-0084).
 //!
 //! The silhouette roster puts a branch in the hottest fragment shader in the
 //! engine: the swarm draws its whole tier of sprites every frame, and every
@@ -8,14 +8,13 @@
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
-//! on. A frame time is the second kind — it is a fact about a GPU, a driver and a
-//! window size, not about the code — so **there is no threshold here.** The test
-//! renders the cases, prints what it saw, and asserts only that it measured
-//! genuinely different shaders. Nothing about `main` being green depends on the
-//! numbers, which is exactly the point: a threshold on this would be a
-//! re-measurement waiting for the next runner image.
+//! Per ADR-0071 a numeric contract states a property or names the configuration
+//! it was taken on. A frame time is the second kind — it is a fact about a GPU, a
+//! driver and a window size, not about the code — so **there is no threshold
+//! here.** The test renders the cases, prints what it saw, and asserts only that
+//! it measured genuinely different shaders. Nothing about `main` being green
+//! depends on the numbers, which is exactly the point: a threshold on this would
+//! be a re-measurement waiting for the next runner image.
 //!
 //! It also skips on a software rasterizer, with a notice. WARP's frame time says
 //! nothing about the iGPU floor in `docs/nfr.md` §7, and a reading taken there

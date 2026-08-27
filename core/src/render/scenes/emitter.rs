@@ -1,14 +1,13 @@
 //! Emitter scene: objects that **spawn**, follow an **analytic** ballistic path,
 //! age, and are **retired** — the first scene in the engine whose population is
-//! not fixed ([ADR-0057](../../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+//! not fixed (ADR-0057).
 //!
 //! It exists beside the swarm rather than inside it. The swarm's world is a
-//! **torus** ([ADR-0044](../../../../docs/adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)):
-//! `bounds(aspect)` wraps every particle back into frame, deliberately, so the
-//! field stays populated with no respawn hitches. A cascade is the opposite
-//! requirement — a thing that falls out of shot and does not come back — so the
-//! two worlds cannot share one scene without a mode switch that changes the world
-//! topology.
+//! **torus** (ADR-0044): `bounds(aspect)` wraps every particle back into frame,
+//! deliberately, so the field stays populated with no respawn hitches. A cascade
+//! is the opposite requirement — a thing that falls out of shot and does not come
+//! back — so the two worlds cannot share one scene without a mode switch that
+//! changes the world topology.
 //!
 //! # Position is a closed form, not an accumulator
 //!
@@ -49,8 +48,7 @@
 //! Objects draw through the swarm's sprite idiom — `vec4(colour * g, g)` on
 //! [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`] — so this is the **third** pipeline
 //! that writes directly into the post chain's input and it owes the third
-//! lit-backdrop guard
-//! ([ADR-0056](../../../../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)).
+//! lit-backdrop guard (ADR-0056).
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2, extended to scenes by Plan
 // 0003 Phase 0). Runs every displayed frame.
@@ -161,7 +159,7 @@ const DEFAULT_SPIN: f32 = 0.0;
 const DEFAULT_TWINKLE: f32 = 0.0;
 // The source geometry (Plan 0090). Both defaults are the geometry this scene
 // shipped with, stated as values rather than as constants at the spawn site
-// ([ADR-0104](../../../../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)).
+// (ADR-0104).
 /// Where the source line sits, in world units. Just **below** the visible frame,
 /// so an upward-launched object rises into shot rather than appearing in it.
 ///

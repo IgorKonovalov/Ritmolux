@@ -1447,10 +1447,10 @@ fn half_slack(value: f32) -> f32 {
 }
 
 /// **Where the emitter drew no light, the backdrop arrives intact** — the
-/// third of the per-seam guards [ADR-0056] requires, and the reason this
-/// scene owed one at all: it inherits the swarm's sprite shader, which is the
-/// one that shipped `vec4(in.color * g, 1.0)` and held the backdrop out of
-/// the four corners of every square quad.
+/// third of the per-seam guards ADR-0056 requires, and the reason this scene
+/// owed one at all: it inherits the swarm's sprite shader, which is the one
+/// that shipped `vec4(in.color * g, 1.0)` and held the backdrop out of the
+/// four corners of every square quad.
 ///
 /// # Both directions, measured
 ///
@@ -1475,8 +1475,6 @@ fn half_slack(value: f32) -> f32 {
 /// premultiplied OVER — so the bound is **0** rather than a tolerance. That
 /// readback is `pub(crate)`, which is why this test lives here and not in
 /// `core/tests/`.
-///
-/// [ADR-0056]: ../../../../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md
 #[test]
 fn a_lit_backdrop_survives_where_the_emitter_drew_nothing() {
     use crate::dsp::AnalysisFrame;

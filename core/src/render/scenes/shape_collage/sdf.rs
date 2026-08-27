@@ -23,9 +23,8 @@
 //! closed-form distance and — worse for this scene — no closed-form *rotated
 //! bounding box*, and a loose box is a silent cost regression against Plan 0113
 //! Phase 2's measurement. A circular one has both, exactly. The references
-//! ([ADR-0123](../../../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)'s
-//! reading of *On White II*) want concentric rings and arcs, which are circular
-//! anyway.
+//! (ADR-0123's reading of *On White II*) want concentric rings and arcs, which
+//! are circular anyway.
 //!
 //! # `checker`'s distance is approximate, and it is the only one that is
 //!

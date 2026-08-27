@@ -1,12 +1,12 @@
 //! Plan 0095 Phase 1 — the tempo estimate, measured before it is touched.
 //!
-//! [ADR-0109] gives Layer 2 its own bar grid, built from the autocorrelated
-//! tempo. A grid is only as good as the rate under it, and the live captures
-//! ([Plan 0086] Phase 2) read a p10 of 64.0 against a 128.0 median and a p90 of
-//! 200.9 against a 100.2 median — both at the `MIN_BPM`/`MAX_BPM` search bounds.
-//! That is a *field* reading on material with no ground truth. This file is the
-//! bench reading: synthesized clips at **known** tempos through the real
-//! [`Analyzer`], printing the estimate against the truth.
+//! ADR-0109 gives Layer 2 its own bar grid, built from the autocorrelated tempo.
+//! A grid is only as good as the rate under it, and the live captures (Plan 0086
+//! Phase 2) read a p10 of 64.0 against a 128.0 median and a p90 of 200.9 against
+//! a 100.2 median — both at the `MIN_BPM`/`MAX_BPM` search bounds. That is a
+//! *field* reading on material with no ground truth. This file is the bench
+//! reading: synthesized clips at **known** tempos through the real [`Analyzer`],
+//! printing the estimate against the truth.
 //!
 //! **The deliverable is the printed table, not the pass/fail.** Phase 2 chooses
 //! its repair against these numbers, so what matters is which rungs are wrong
@@ -20,7 +20,7 @@
 //! (Unlike `downbeat_probe.rs` this file carries no `.config/nextest.toml`
 //! override, so a passing run hides the table unless it is asked for.)
 //!
-//! Per [ADR-0071] every number printed here is a **measurement** and every
+//! Per ADR-0071 every number printed here is a **measurement** and every
 //! number asserted is a **property**. The one absolute tolerance below is
 //! stated, not discovered: the plan's done-when asks for the estimate to land
 //! within a stated tolerance of the truth *or of an exact octave of it*, and
@@ -28,10 +28,6 @@
 //! estimator that reports half the true tempo is making a different mistake
 //! from one that reports 0.94x of it, and a single error column cannot say
 //! which.
-//!
-//! [ADR-0109]: ../../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md
-//! [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
-//! [Plan 0086]: ../../docs/plans/done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
 
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{Analyzer, HOP_SIZE};

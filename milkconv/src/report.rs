@@ -3,7 +3,7 @@
 //!
 //! # This is a measurement and it asserts no threshold
 //!
-//! Per [ADR-0071], a coverage percentage is a property of *one corpus* and *one
+//! Per ADR-0071, a coverage percentage is a property of *one corpus* and *one
 //! converter* at *one moment*, so it is recorded with both named and is never a
 //! gate. Nothing in this module fails, and nothing in the test suite reads its
 //! numbers. What it produces is a **work list**: the ranked failure reasons are
@@ -27,8 +27,6 @@
 //! converter rather than about the corpus. [`Report::render`] prints those
 //! predictions beside the measurement rather than leaving the comparison to
 //! whoever reads it.
-//!
-//! [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;

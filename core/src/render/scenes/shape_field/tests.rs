@@ -68,7 +68,7 @@ fn the_vocabulary_carries_the_shared_roster() {
 }
 
 /// **The aspect comes from the render target, and this test bites**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// A `disc` is rendered at 2:1 and at 1:2 and its own extent is measured in
 /// pixels. The figure must be **round** — the same number of frame-widths across
@@ -256,8 +256,7 @@ fn banding_the_distance_draws_offsets_of_the_shape() {
 // one thing built is the response exponent.
 
 /// The response exponent is conditioned CPU-side, and **`1.0` is the exact
-/// identity** ([ADR-0092](../../../../../docs/adrs/0092-the-ink-remap-is-a-gamma-on-the-key.md)'s
-/// care, because `pow(x, 1.0)` is not bit-exact).
+/// identity** (ADR-0092's care, because `pow(x, 1.0)` is not bit-exact).
 #[test]
 fn the_response_exponent_is_an_exact_identity_at_one() {
     assert_eq!(applied_gamma(DEFAULT_GAMMA), 1.0);

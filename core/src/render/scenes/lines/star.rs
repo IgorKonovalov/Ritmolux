@@ -839,7 +839,7 @@ impl Motif {
     }
 
     /// This motif as a **G1 chain of circular arcs**, when its outline is a
-    /// curve that no single arc carries ([ADR-0098], Plan 0087 Phase 5).
+    /// curve that no single arc carries (ADR-0098, Plan 0087 Phase 5).
     ///
     /// `None` for the two circular members, which are exact single arcs already
     /// ([`arc_shape`](Self::arc_shape)), and for the two polygonal ones, whose
@@ -853,8 +853,6 @@ impl Motif {
     /// frame can change one. `build_rings` runs on most frames of an animated
     /// mandala, and re-deriving a constant there would put a build-time
     /// algorithm on the hot path.
-    ///
-    /// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
     fn chain(self) -> Option<&'static [Piece]> {
         let index = self.fitted_index()?;
         CHAINS

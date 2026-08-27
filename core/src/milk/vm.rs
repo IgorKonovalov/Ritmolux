@@ -1,8 +1,7 @@
 //! The stack VM that executes an [`EelProgram`](super::bytecode::EelProgram).
 //!
 //! **The only half of the EEL2 machine that ships.** The compiler lives in
-//! `milkconv` and never enters `lmv.exe` or `foo_lmv.dll`
-//! ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! `milkconv` and never enters `lmv.exe` or `foo_lmv.dll` (ADR-0113).
 //!
 //! # The three properties this file exists to keep
 //!

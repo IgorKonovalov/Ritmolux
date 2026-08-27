@@ -84,14 +84,14 @@ pub struct SegmentInstance {
 /// coordinate system and stroke it to one profile.
 ///
 /// Expanded in the vertex shader to a single bounding quad and shaded by the
-/// **per-pixel distance to the arc** ([ADR-0098]) rather than by an
+/// **per-pixel distance to the arc** (ADR-0098) rather than by an
 /// interpolated across-the-stroke coordinate. So a `circle` is one instance
 /// with no vertices at any resolution, where the segment path needs one
 /// instance and one additive joint per sample.
 ///
 /// **No `joined` field: an arc has no interior joints**, which is the whole
 /// point of the primitive. Where two arcs in a chain meet they overlap by
-/// [ADR-0041]'s half-width as any two strokes do, and the additive composite
+/// ADR-0041's half-width as any two strokes do, and the additive composite
 /// sums that overlap exactly as it does for segments — the bead is reduced by
 /// there being fewer joints, not by a joint doing anything different.
 ///
@@ -105,9 +105,6 @@ pub struct SegmentInstance {
 /// same reason it is on [`SegmentInstance`]: `vertex_attr_array!` derives each
 /// attribute's byte offset from the order of the locations, so a field inserted
 /// anywhere but the end silently re-points every attribute after it.
-///
-/// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
-/// [ADR-0041]: ../../../../../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ArcInstance {
@@ -138,7 +135,7 @@ struct Uniforms {
 }
 
 /// The across-the-stroke profile, **one definition prepended to both fragment
-/// modules** ([ADR-0124]).
+/// modules** (ADR-0124).
 ///
 /// `u` runs 0 at the stroke edge to 1 at the centreline; `du` is that
 /// coordinate's change per pixel of the render target, from `fwidth` — so the
@@ -167,8 +164,6 @@ struct Uniforms {
 /// **`fwidth` exists only in a fragment shader**, so each caller evaluates it at
 /// the fragment's top level and passes the result in — which also keeps the call
 /// out of the arc fragment's non-uniform endpoint branch.
-///
-/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 const PROFILE_WGSL: &str = r#"
 fn stroke_coverage(u: f32, du: f32, softness: f32) -> f32 {
     let edge = clamp(du, 1e-6, 1.0);
@@ -347,13 +342,11 @@ fn arc_shader_source() -> String {
 /// distance is to the nearer endpoint, which is a point, so that arm
 /// approximates nothing.
 ///
-/// **The aspect is the render target's** ([ADR-0037]): it arrives in the
-/// uniform `draw` was handed, and there is no internal grid, texture or second
-/// size anywhere in this shader for another one to come from. This family has
+/// **The aspect is the render target's** (ADR-0037): it arrives in the uniform
+/// `draw` was handed, and there is no internal grid, texture or second size
+/// anywhere in this shader for another one to come from. This family has
 /// shipped that bug three times, which is why the control renders at a
 /// non-16:9 target where a grid-derived aspect and the target's disagree.
-///
-/// [ADR-0037]: ../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
 const ARC_SHADER: &str = r#"
 struct Uniforms {
     v: vec4<f32>,
@@ -514,7 +507,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 // ---------------------------------------------------------------------------
 
 /// How much of the drawn segment length landed inside the render target, summed
-/// over one [`LineRenderer::draw`] call (Plan 0069, [ADR-0083]).
+/// over one [`LineRenderer::draw`] call (Plan 0069, ADR-0083).
 ///
 /// Pixel coverage cannot see an over-scaled figure: a comb roots every bar on a
 /// shared baseline and a corona roots every spoke at a centre, so clipping the
@@ -532,8 +525,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// nothing would shrink the denominator, and every arc-drawing preset would
 /// read better-framed than it is — the more so as the primitive replaces whole
 /// motifs, where the missing length is most of the figure.
-///
-/// [ADR-0083]: ../../../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DrawExtent {
     /// World-space length of every segment actually drawn (post view transform).
@@ -702,10 +693,10 @@ fn measure_arc(arc: &ArcInstance, aspect: f32, xform: super::ViewTransform) -> (
 /// Measure `segments` against the frame — the diagnostic's whole computation.
 ///
 /// **The aspect is a parameter, and it is the only source of one in here**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)):
-/// this is a free function over the endpoints, so there is no internal grid, no
-/// texture and no `self` for a second aspect to come from. Its caller hands it
-/// the value `draw` was handed, which is the **render target's**.
+/// (ADR-0037): this is a free function over the endpoints, so there is no
+/// internal grid, no texture and no `self` for a second aspect to come from.
+/// Its caller hands it the value `draw` was handed, which is the **render
+/// target's**.
 ///
 /// The view transform is applied first, exactly as the vertex shader applies it
 /// (`a * zoom + pan`, before the aspect divide), because a figure pushed off the
@@ -763,7 +754,7 @@ pub struct LineRenderer {
     /// render differently.
     over_pipeline: Option<wgpu::RenderPipeline>,
     /// The [`ArcInstance`] pipeline, drawn in the same additive pass from its
-    /// own buffer — [`ARC_SHADER`] and [ADR-0098].
+    /// own buffer — [`ARC_SHADER`] and ADR-0098.
     ///
     /// **`None` unless the scene asked for it**
     /// ([`LineRenderer::new_with_arcs`]), for the reason
@@ -774,8 +765,6 @@ pub struct LineRenderer {
     /// the pipeline layout** with the segment pipelines — one uniform, one
     /// layout, so ADR-0058 has nothing new to separate. Only the vertex layout
     /// and the shader module differ.
-    ///
-    /// [ADR-0098]: ../../../../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md
     arc_pipeline: Option<wgpu::RenderPipeline>,
     instances: wgpu::Buffer,
     /// The arc instance buffer, `Some` exactly when

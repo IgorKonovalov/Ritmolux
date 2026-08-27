@@ -33,11 +33,10 @@ pub const ROWS_TOP: f32 = LIST_TOP + ROW_H;
 ///
 /// glyphon shapes a proportional system font and `core` exposes no
 /// text-measurement API; adding one to place a list is out of proportion to the
-/// problem ([ADR-0009](../../docs/adrs/0009-glyphon-text-rendering.md) would need
-/// a supplement). So the width is derived from the font size and a character
-/// budget, and [`fit`] truncates a name that overruns the budget — which makes an
-/// **under**estimate cosmetic rather than a collision, and an overestimate merely
-/// wasted horizontal space.
+/// problem (ADR-0009 would need a supplement). So the width is derived from the
+/// font size and a character budget, and [`fit`] truncates a name that overruns
+/// the budget — which makes an **under**estimate cosmetic rather than a
+/// collision, and an overestimate merely wasted horizontal space.
 ///
 /// `0.62` is a conservative advance-per-character ratio for a proportional face
 /// at this size: real lowercase Latin averages nearer `0.5`, and the roster's
