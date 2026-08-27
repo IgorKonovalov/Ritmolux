@@ -1,0 +1,77 @@
+# Flux Mono - the three-ink set on a GROWING field, run FAST. The churning twin
+# of `reaction_glaciermono.toml`: same regime, same fold, same inks, and the only
+# differences are the three rates below (`flow`, `inject`, and the `feed`
+# wander). Two files rather than one binding - see that file's header for why.
+system = "reaction_diffusion"
+name = "Flux Mono"
+
+[palette]
+# 20 bands: black 8 / RED 2 / white 9 / RED 1. Gray-Scott's level distribution is
+# BIMODAL - it dwells at the solvent floor and at the spot plateau - so the two
+# dwell points get the two grounds (black solvent, white coral) and the red sits
+# in the fast-crossing region between them, where it draws as an OUTLINE around
+# every form rather than pooling. One more red band at the very top marks only
+# the densest cores.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.39, color = "#000000" },
+  { at = 0.41, color = "#b00808" },
+  { at = 0.49, color = "#b00808" },
+  { at = 0.51, color = "#ffffff" },
+  { at = 0.94, color = "#ffffff" },
+  { at = 0.96, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+palette_steps   = "20"
+palette_contour = "0.45"
+
+# Coral regime. Tiny moves only - the F/K pair IS the pattern family.
+# THE SPARSE REGIME, AND IT IS ON A CLIFF. At F 0.0140 / k 0.0450 the reaction
+# only holds where it is seeded, so it leaves genuine black voids instead of
+# tiling the frame - which is the whole point of this world. Measured against the
+# neighbours at 30 s, kaleido 8, zoom 0.45: F 0.0180/k 0.0490 and F 0.0220/k
+# 0.0510 both FILL the canvas edge to edge, and F 0.0367/k 0.0649 is already
+# EXTINCT - a black frame, nothing running.
+#
+# So the audio terms here are deliberately an order smaller than a normal band
+# gain. `feed` is the axis that walks toward extinction, and a swing that would
+# be unremarkable anywhere else takes this regime off the cliff and the world
+# does not come back on its own. Nudge, never sweep: the total audio excursion
+# is 0.0006, about 4 % of the base.
+feed = "0.0140 + noise(time * 0.02) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
+kill = "0.0450"
+# The `max(0, ...)` term is a WARM-UP, not a look: this regime establishes
+# slowly, so the first five seconds run fast and it decays to nothing by t=5.
+# SETTLED RATE 0.85, and the audio swing is four times the slow twin's - this
+# world is the churn. The `max(0, ...)` term is a WARM-UP, not a look: the first
+# five seconds run fast and it decays to nothing by t=5.
+flow   = "0.85 + max(0, 1.0 - time * 0.2) + clamp(bass * 0.588, 0, 0.50) + clamp(onset * 0.333, 0, 0.20)"
+# 0.62 fires on most detections and each one stamps a fresh growth. That is the
+# point here: the seeding rate is half of why this reads fast. The slow twin runs
+# 0.88 and is a different picture for it.
+inject = "onset > 0.62"
+
+# Verdigris' plain 8-fold fold, and for its reason: the fold is what turns a
+# field into a FIGURE. It folds about a screen-centred axis, which is why this
+# preset binds no pan - a translating pan decentres the rosette.
+kaleido_order = "8"
+kaleido_angle = "0"
+contour = "0"
+hatch   = "0"
+glow    = "1.0"
+
+# RD's field only reaches ~0..0.4, so the span has to be ~2.4 to walk the palette.
+color_span   = "6.00"
+color_center = "sin(time * 0.031) * 0.02"
+saturation   = "1.0"
+
+zoom  = "0.45"
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+flow = { attack = 0.15, release = 0.70 }
+feed = 1.50
+color_center = 0.60
