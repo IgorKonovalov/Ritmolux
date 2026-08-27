@@ -5015,3 +5015,69 @@ observable, three hypotheses dead by measurement and the fourth corrected — th
 is downstream of the field. Backlog 0119 (the `ang` seam), 0120 (the oversized waveform figure) and
 0121 (the `decay` fallback) are new. The `preset-author` lane is unaffected: no shipped `.toml`
 references any defect this plan fixed.
+
+## 0121 — A rate, an ink edge, and a motion reading (closed 2026-08-27)
+
+Three walls the mono cohort hit in one session, taken down together with the instrument first.
+`fragment_field` gained `field_speed` and `fold_speed`; `palette_contour` learned to read the LUT so
+it fires at ink changes rather than at every band edge; `shot --report` gained `drive` and `rate`.
+Six phases, six commits, `63461ee` through `d74fa37`, on `plan-0121-rate-ink-motion`.
+
+**Review: no blockers, one major, four minors, two nits.** Gate green on the branch — `fmt`,
+`clippy --workspace --all-targets -D warnings`, `cargo nextest run --workspace` at **1044 passed /
+5 skipped** with `golden` included and no baseline touched. Version **0.82.0 -> 0.83.0** (minor).
+
+**The major is the shape this project keeps finding: a rule stated generally and enumerated
+partially.** ADR-0132 decides that *every* bindable rate in the engine integrates a phase, then names
+two sites. There is a third — `core/src/render/scenes/swarm.rs`'s `let field_t = self.time *
+self.spin;` — and it is the only one of the three that shipped content binds, `swarm_shatter` and
+`swarm_drift` both putting `mid` on it. On `swarm_shatter` at t = 100 s the eased swing advances the
+field clock by about four seconds in one frame, roughly 210x nominal, on every loud passage. The plan
+had asserted the opposite in its own Context — *"Nothing has found it because no preset binds it"* —
+which is precisely what stopped anyone grepping for the forbidden pattern. Filed as **backlog 0141**
+with a dated `Outcome` on ADR-0132, and deliberately not folded into this plan: both presets bind the
+parameter, so the correction moves their pictures and needs a content pass rather than the
+constant-rate equivalence assertion that carried Phase 4 on the unbound `warp_speed`. The entry
+carries the general repair too — a text assertion that no scene source multiplies `self.time` by a
+settable field, because what failed was an enumeration and a longer list is not what fixes that.
+
+**Phase 5 found the same failure one level down, and `dev` found it unprompted.** `band_contour` is
+written **four** times, not the three the plan and ADR-0133 both counted, and the fourth copy — in
+`warp_mesh/mod.rs` — had *already drifted* (`dd` for `d`). The drift assertion could not have caught
+it: that test iterated three sites, and the one place drift had happened was the one place it could
+not look. All four are canonical now and the assertion covers them. Recorded as ADR-0133's `Outcome`,
+along with the coverage gap the count concealed — `reaction_diffusion` and `warp_mesh` fixtures set
+no `palette_contour`, so two of the four sites still rest on text agreement alone.
+
+**Two done-when criteria did not survive contact, and both were reported rather than fudged.** Phase
+1's *"the same sequence reversed does not recover the step"* is unsatisfiable for **any** input:
+`frame_diff` is symmetric, so a reversed sequence has the identical multiset of consecutive pairs.
+`dev` substituted two checkable claims — reordering moves `mean_consecutive_diff`, reversal moves
+`probe_rate` through its fixed window — and wrote the invariance into the test's own doc comment.
+Phase 3's *"differs in `rate` and not in `cover`"* held numerically but proved not to separate a
+*slowed* fold from a *flattened* one, `cover` sitting near 1.0 on any fullscreen field; the
+no-flattening claim rests instead on a matched-phase equivalence, run by hand and not in the suite.
+
+**A third criterion turned out to rest on a premise the tree does not carry**, found by the content
+lane in Phase 6. The accidental `-0.25 * time` pan cancellation the phase asks to remove **was never
+shipped** — it lived in `fragment_driftmono`'s header as advice, not in its bindings. Phase 6 retired
+the advice instead, and the retune proper is the plan's real evidence: `warp` 0.42 -> 0.62 with
+`fold_speed` 0.45 moved `cover` 0.450 -> 0.659 while `rate` fell 0.0411 -> 0.0370. That pair moving
+in **opposite** directions is the whole argument for separating amplitude from rate, and `warp` alone
+could not have produced it in either direction.
+
+**What the review caught that the log did not claim.** Phase 5's golden done-when names the goldens
+of five shipped presets; `core/tests/golden.rs` renders frozen per-system fixtures and says in its
+own module doc that they are *"deliberately not the shipped presets"*, so those five have none. The
+claim is covered anyway — `fixtures/composite_symmetry.toml` (`0.4`) and `fixtures/shape_field.toml`
+(`0.7`) both exercise the changed function and neither moved — but the evidence on the record pointed
+at artifacts that do not exist, which is the case the close brief's own rule about silence is aimed
+at.
+
+**What outlived the plan.** Backlog 0140 (the contour can only be a soft grey darken, never an ink)
+was filed by Phase 6 rather than worked around, which is the failure mode the whole plan was
+repairing. Backlog 0141 is new. A full-library run marks **48 of 49** `rate` cells, which the plan's
+own risk list anticipated and which is now a followup — a mark everyone ignores is not a mark. Phase
+5's per-pixel cost was never measured against `docs/nfr.md`. And one curation item stands:
+`fragment_drostemono.toml:113` says *"no contour - see the header"* and the header carries no contour
+note — a dangling rationale on the one parameter this plan changed.

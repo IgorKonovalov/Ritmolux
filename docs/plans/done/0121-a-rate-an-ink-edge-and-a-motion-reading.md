@@ -1,12 +1,12 @@
 # 0121 — A rate, an ink edge, and a motion reading
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-27
 > **Approved:** 2026-08-27
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md) (proposed),
-> [0133](../adrs/0133-the-band-contour-fires-where-the-ink-changes.md) (proposed),
-> [0134](../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) (proposed)
+> **Related ADRs:** [0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted),
+> [0133](../../adrs/0133-the-band-contour-fires-where-the-ink-changes.md) (accepted),
+> [0134](../../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) (accepted)
 > **Closes:** design-backlog 0131, 0137, 0138, 0139
 
 ## TL;DR
@@ -297,8 +297,8 @@ fn band_contour(
   texture already resident, and gated behind the early-out — but it is the one phase here with a
   per-pixel cost, and `docs/nfr.md`'s frame budget is the thing to watch if a Rich-tier preset on the
   affected scenes moves.
-- **Phase 5 contends with two approved plans on `shape_field.rs`** — [0098](0098-the-figure-nests-properly.md)
-  and [0092](0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
+- **Phase 5 contends with two approved plans on `shape_field.rs`** — [0098](../0098-the-figure-nests-properly.md)
+  and [0092](../0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
   those in sequence or in separate worktree lanes; the collision is in the shader's fragment body,
   which is where all three edit.
 - **Phase 4 has no regression evidence and cannot get any.** No shipped preset binds `warp_speed`, so
@@ -469,3 +469,57 @@ and its header carries no contour note. Predates this plan; left alone rather th
   question, not an engine one.
 - Whether a `rate` mark that appears on most rows is worth keeping in that shape.
 - The per-hop motion series (ADR-0134 Alternative C), if the two columns turn out to under-serve.
+
+## Close — 2026-08-27
+
+**Closed after a Mode 4 review: no blockers, one major, four minors and two nits.** All six phases
+landed as specified, every phase carries an in-vocabulary `**Owner skill:**` tag, and the gate is
+green on the branch — `fmt`, `clippy --workspace --all-targets -D warnings`, and
+`cargo nextest run --workspace` at **1044 passed / 5 skipped**, `golden` included, with no baseline
+under `core/tests/golden/` touched. `check-doc-links` and `check-index-rows` exit 0;
+`check-backlog-claims` exited 1 on exactly the five entries the log predicted.
+
+**The major is not a regression from this plan — it is a claim this plan made about the engine that
+turned out to be false.** ADR-0132's rule is stated engine-wide and its enumeration named two sites;
+`core/src/render/scenes/swarm.rs` carries a third, `let field_t = self.time * self.spin;`, and unlike
+`warp_speed` it is bound to `mid` by two shipped presets (`swarm_shatter`, `swarm_drift`). On
+`swarm_shatter` at t = 100 s the eased swing advances the field clock by ~4 s in one frame, ~210x
+nominal. The plan's Context asserted the opposite — *"Nothing has found it because no preset binds
+it"* — which is what stopped the sweep from being run. Filed as **design-backlog 0141** with a dated
+`Outcome` on ADR-0132; not folded into this plan, because both presets bind the parameter and the
+correction needs a content pass rather than an equivalence assertion.
+
+The minors, all recorded where they belong rather than fixed here:
+
+- **Phase 5's golden done-when names artifacts that do not exist.** `core/tests/golden.rs` renders
+  frozen per-system fixtures and its own module doc says *"they are deliberately not the shipped
+  presets"* — so `fragment_mandala`, `fragment_strata`, `fragment_tiled`, `fragment_vitrail` and
+  `shape_pulse` have no goldens. The claim is covered anyway, by `fixtures/composite_symmetry.toml`
+  (`palette_contour = 0.4`, fragment_field) and `fixtures/shape_field.toml` (`0.7`), neither of which
+  moved. The log repeats the plan's framing without noting the substitution.
+- **Two of the four contour sites have no rendered coverage** — `reaction_diffusion` and `warp_mesh`
+  fixtures set no `palette_contour`, and `core/tests/palette_contour.rs` drives `fragment_field`
+  only. Recorded in ADR-0133's `Outcome` and on the followup list below.
+- **`fragment_field.rs`'s `fs_main` still binds `let t = params.a.x;` and never reads it.** Both fold
+  rates and the sweep come from `params.e` now, so the scene's clock uniform is dead.
+- **Curation:** `presets/fragment_drostemono.toml:113` says *"no contour - see the header"* and the
+  header carries no contour note — a dangling rationale on the one parameter this plan changed, on
+  one of the four presets that set it to zero for the reason ADR-0133 retired.
+
+The nits: `presets/README.md`'s `palette_contour` row still reads *"Range that reads `0`-`0.5`"*
+while `shape_contourmono` now ships at `1.0` on a measured argument that low values are strictly
+worse on a limited-ink palette; and — pre-existing, widened here — `scene_for_mut` is keyed by
+`SystemKind`, so a **same-system dual-live dissolve** runs `Scene::update` twice in one frame and
+the new phases integrate at 2x for its duration. `particles::spin_time` and the emitter's field step
+already do this, and no test can see it: headless capture always answers `Freeze`.
+
+**Curation verdict (`presets/` touched).** No preset added or removed, so the set's membership is
+unchanged and the two retunes are the whole of it. `fragment_driftmono` and `shape_contourmono` both
+earn their place more clearly than before — the first because `cover` 0.450 -> 0.659 against `rate`
+0.0411 -> 0.0370 is a pair `warp` alone could not move in opposite directions, the second because it
+is now the library's only preset demonstrating the parameter ADR-0133 rescued. The stale-workaround
+grep found one live instance, `fragment_drostemono`'s dangling contour rationale above; the other
+three cohort headers were swept in Phase 6 and are current.
+
+**Version:** `0.82.0` -> `0.83.0` (minor — a feature plan: two scene parameters and two report
+columns, alongside three fixes).
