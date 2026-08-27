@@ -116,14 +116,14 @@ fn sine_energy_concentrates_in_expected_band() {
 /// via `bands.rs`, which neither phase touched. The longer warm-up gate moves
 /// which hop publishes *first*, not what the window contains at hop 200.
 ///
-/// **This is a measurement, not a property** ([ADR-0071]). Those bits belong to
-/// one configuration and cannot reproduce on another: the fixture builds its own
+/// **This is a measurement, not a property** (ADR-0071). Those bits belong to one
+/// configuration and cannot reproduce on another: the fixture builds its own
 /// input with `f32::sin`, which lowers to the platform libm, and `rustfft`
 /// dispatches NEON on aarch64 where it dispatches AVX/SSE here — two sets of
 /// rounding applied to two slightly different inputs. On `macos-26-arm64`
 /// `bass_raw` lands about 71 ULP away and always has. So the comparison names the
 /// architecture it came from and does not run outside it; elsewhere it prints
-/// every observed level with its relative error, in the [ADR-0016] skip-with-notice
+/// every observed level with its relative error, in the ADR-0016 skip-with-notice
 /// shape, so the configuration it declines to gate is still visible in the log.
 ///
 /// The counter-assertion below — that normalization is not a no-op — needs no
@@ -147,9 +147,6 @@ fn sine_energy_concentrates_in_expected_band() {
 /// not — 2.2x `bass_raw`'s divergence, the same order. None of this argues for a
 /// cross-architecture tolerance; it is recorded so the next reader knows the size
 /// of what the pin hides instead of inferring it from a skip.
-///
-/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
-/// [ADR-0016]: ../../docs/adrs/0016-gpu-tests-opt-in-ci-scope.md
 #[test]
 fn raw_levels_are_bit_identical_to_the_pre_normalization_build() {
     let mut analyzer = mono_analyzer();

@@ -4,20 +4,20 @@
 //! fraction of the frame (`coverage`) and spreads across at least two quadrants
 //! (`quadrant_spread`) — "not blank, not a dot".
 //!
-//! **Plan 0058 / [ADR-0067]: the capture measures the scene, not the backdrop.**
+//! **Plan 0058 / ADR-0067: the capture measures the scene, not the backdrop.**
 //! This gate used to sample the background from pixel (0, 0) — the frame's own
 //! corner — on the Plan 0013 reasoning that a scene which clears to a dark blue
 //! would otherwise score as fully lit. That reasoning was correct for a
 //! per-scene clear and became wrong the day the backdrop moved into an engine
-//! pre-pass ([ADR-0018](../../docs/adrs/0018-background-pre-pass.md)):
-//! `bg_vignette` darkens the frame toward its edges, so on any preset that binds
-//! one **the corner is the darkest pixel in the image** and nearly every pixel
-//! toward the centre differs from it by more than [`EPS`]. The backdrop read as
-//! a large, well-spread, lit figure. 24 of the 35 shipped presets bind
-//! `bg_vignette`, and the sparse-system floor is 0.01, so for most of the
-//! library the floor was satisfied by the backdrop alone whatever the scene did
-//! — an unfalsifiable gate, which `spectrum_ridge` proved by shipping a contour
-//! drawn 3.3 world units off the top of a frame of half-height 1.0 and passing.
+//! pre-pass (ADR-0018): `bg_vignette` darkens the frame toward its edges, so on
+//! any preset that binds one **the corner is the darkest pixel in the image**
+//! and nearly every pixel toward the centre differs from it by more than
+//! [`EPS`]. The backdrop read as a large, well-spread, lit figure. 24 of the 35
+//! shipped presets bind `bg_vignette`, and the sparse-system floor is 0.01, so
+//! for most of the library the floor was satisfied by the backdrop alone
+//! whatever the scene did — an unfalsifiable gate, which `spectrum_ridge` proved
+//! by shipping a contour drawn 3.3 world units off the top of a frame of
+//! half-height 1.0 and passing.
 //!
 //! So the roster this gate renders has its `bg_*` bindings **removed**
 //! ([`without_backdrop`]). The background stage already defaults `bright` and
@@ -27,7 +27,7 @@
 //! Nothing outside this file changes — `golden`, `distinctness`, `reactivity`
 //! and `shot` all keep the shipped composite, backdrop included.
 //!
-//! **Plan 0116 / [ADR-0126]: the reference is derived from the frame, not fixed
+//! **Plan 0116 / ADR-0126: the reference is derived from the frame, not fixed
 //! at black.** Suppressing the backdrop answered *whose light is this* and left
 //! a second question standing: what a scene that paints **its own** ground is
 //! measured against. Against a constant black it is measured against nothing —
@@ -47,8 +47,6 @@
 //! estimator was measured against the whole library before it was threaded and
 //! moved no verdict. [`BLACK`] survives here as the historical reference the
 //! two-lens fixtures assert against, not as anything the gate reads.
-//!
-//! [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 //!
 //! Coverage floors stay per-system, because the systems still differ by an order
 //! of magnitude in how much they paint — `fragment_field` fills the frame while
@@ -78,8 +76,7 @@
 //! attractor-specific: any drive that stacks past the additive ceiling produces
 //! it. It is also the one statistic the derived ground could **not** repair: a
 //! duotone has two large populations, and removing whichever is the ground
-//! leaves the other holding nearly all of what remains either way
-//! ([ADR-0128](../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)).
+//! leaves the other holding nearly all of what remains either way (ADR-0128).
 
 use lmv_core::{
     dsp::AnalysisFrame,
@@ -113,7 +110,7 @@ const EPS: u8 = 10;
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
 /// The reference tone this gate hands `is_lit`, derived from the frame
-/// (**Plan 0116 Phase 3**, [ADR-0126]) rather than fixed at [`BLACK`].
+/// (**Plan 0116 Phase 3**, ADR-0126) rather than fixed at [`BLACK`].
 ///
 /// Every statistic below asks *how far does this pixel depart from the ground*,
 /// and a constant reference answers that question only in a world where the
@@ -128,8 +125,6 @@ const BLACK: [u8; 4] = [0, 0, 0, 255];
 /// re-bases 17 of 41 presets and moves **no verdict**, at either excitation.
 /// A dark-ground scene's modal band *is* the black it was already measured
 /// against, so the substitution is a no-op there and a repair everywhere else.
-///
-/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 fn ground(img: &CaptureImage) -> [u8; 4] {
     modal_ground(img)
 }
@@ -149,12 +144,12 @@ const MIN_QUADRANTS: u8 = 2;
 ///
 /// # It is one of two terms now, and no longer a verdict
 ///
-/// Plan 0119 Phase 3, implementing [ADR-0128] as settled by [ADR-0130].
-/// Everything below this heading argues, from the library's own distribution,
-/// that a frame over this line **is** a blot. That argument was wrong about an
-/// idiom rather than about a number: a two-ink print reads near `1.0` here
-/// because being tonally flat is what a two-ink print *is*, and no ground
-/// estimator repairs it (Plan 0116 Phase 1 measured all three).
+/// Plan 0119 Phase 3, implementing ADR-0128 as settled by ADR-0130. Everything
+/// below this heading argues, from the library's own distribution, that a
+/// frame over this line **is** a blot. That argument was wrong about an idiom
+/// rather than about a number: a two-ink print reads near `1.0` here because
+/// being tonally flat is what a two-ink print *is*, and no ground estimator
+/// repairs it (Plan 0116 Phase 1 measured all three).
 ///
 /// So crossing this ceiling convicts nothing on its own. A preset is failed
 /// only when it is **also** below [`boundary_floor`] on
@@ -166,9 +161,6 @@ const MIN_QUADRANTS: u8 = 2;
 ///
 /// The value is untouched by that change, which is deliberate — Plan 0119 moved
 /// the meaning of the check and not the constant in it.
-///
-/// [ADR-0128]: ../../docs/adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md
-/// [ADR-0130]: ../../docs/adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md
 ///
 /// # Where the number came from
 ///
@@ -249,9 +241,9 @@ const MAX_TONAL_FLATNESS: f32 = 0.90;
 /// tuned before ADR-0049 normalized the bands, put a driven element about 3.3
 /// world units up against a visible half-height of `1.0`. The contour was **off
 /// frame entirely**, and the `1.000` was the lit `bg_vignette` left behind, not
-/// the preset. See [design-backlog 0053](../../docs/design-backlog.md): neither
-/// `coverage` nor `quadrant_spread` can distinguish a vignette from a figure, so
-/// this statistic convicted the right preset for the wrong reason.
+/// the preset. See design-backlog 0053: neither `coverage` nor `quadrant_spread`
+/// can distinguish a vignette from a figure, so this statistic convicted the
+/// right preset for the wrong reason.
 ///
 /// Plan 0058 settled that reading with a number: under the ADR-0067 measurement
 /// the repaired `Spectrum Ridge` reads **`0.1916`**, not `0.8655`. Almost all of
@@ -358,7 +350,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 
 /// Per-system minimum lit fraction, **measured from the shipped library** under
 /// the ADR-0067 capture (backdrop suppressed) against the frame's own derived
-/// ground ([ADR-0126], Plan 0116 Phase 3) — not against [`BLACK`], which is what
+/// ground (ADR-0126, Plan 0116 Phase 3) — not against [`BLACK`], which is what
 /// every number below the 2026-08-26 block was measured against.
 ///
 /// **Five floors were re-derived on 2026-08-26 (Plan 0116 Phase 4) and six were
@@ -387,8 +379,6 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// not move, but the arm claimed the family "has zero shipped members", and
 /// `Facet` and `Pulse` both ship. The claim was false before this plan and the
 /// floor is derived from the distribution for the first time here.
-///
-/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 ///
 /// Each floor is set at half its system's lowest shipped preset, so the gap is a
 /// factor of ~2 everywhere and [`MAX_FLOOR_SLACK`] holds it there. The full
@@ -641,16 +631,16 @@ fn coverage_floor(system: SystemKind) -> f32 {
 
 /// Per-system minimum [`boundary_density`] — the **second term** of the flatness
 /// conjunction, below which a frame that is also over [`MAX_TONAL_FLATNESS`] is
-/// convicted as a blot (Plan 0119 Phase 3, [ADR-0130]).
+/// convicted as a blot (Plan 0119 Phase 3, ADR-0130).
 ///
 /// # Why it is per system, which is a measurement and not a convenience
 ///
 /// A single global number is provably impossible on this library. The floor must
 /// sit **above** the frozen `Blown Out` blot's `0.2631` to convict it, and
-/// **below** `Suprematist`'s `0.2565` to admit a mono conversion of a
-/// [ADR-0123] flat-graphic composition. `Suprematist` scores *under the
-/// purpose-built defect*, so no such number exists and the split is forced. The
-/// mechanism is the one [`coverage_floor`] already uses in this file.
+/// **below** `Suprematist`'s `0.2565` to admit a mono conversion of a ADR-0123
+/// flat-graphic composition. `Suprematist` scores *under the purpose-built
+/// defect*, so no such number exists and the split is forced. The mechanism is
+/// the one [`coverage_floor`] already uses in this file.
 ///
 /// # The two arms are different kinds of number, and say so (ADR-0071)
 ///
@@ -677,8 +667,8 @@ fn coverage_floor(system: SystemKind) -> f32 {
 ///
 /// # Why `shape_collage` earns an arm where an idiom flag would not
 ///
-/// Not a preference and not a style exemption. [ADR-0123] holds that family's
-/// whole canvas under [ADR-0046]'s tonemap knee, which gives up the engine's
+/// Not a preference and not a style exemption. ADR-0123 holds that family's
+/// whole canvas under ADR-0046's tonemap knee, which gives up the engine's
 /// entire over-range vocabulary — no bloom, no glow, no highlight modelling and
 /// no over-range path at all. **The additive stacking that produced `Blown Out`,
 /// and that put four attractor presets into the library flat, cannot occur
@@ -704,10 +694,6 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// derivation** before it can ship. That is a per-family decision, not a
 /// constant to nudge, and for `attractor` it is a real fork: the ceremony-derived
 /// number there is `0.0220`, `12x` below the blot and vacuous.
-///
-/// [ADR-0046]: ../../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md
-/// [ADR-0123]: ../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md
-/// [ADR-0130]: ../../docs/adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md
 fn boundary_floor(system: SystemKind) -> f32 {
     match system {
         // Half the sparsest legitimate member of the family (`Suprematist`,
@@ -1278,12 +1264,11 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
 /// binding byte-for-byte, comments stripped and the `name` suffixed so the
 /// output reads clearly. Nothing here is tunable: this is the defect, frozen.
 ///
-/// `scale = 3.20` is the whole of it. Tuned before
-/// [ADR-0049](../../docs/adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)
-/// normalized the bands to `0..1`, it afterwards multiplied a value roughly five
-/// times larger, putting a driven element about **3.3 world units** up against a
-/// visible half-height of `1.0`. Under [`loud`] the contour is off frame
-/// entirely and the composite comes back empty except for `bg_vignette`.
+/// `scale = 3.20` is the whole of it. Tuned before ADR-0049 normalized the bands
+/// to `0..1`, it afterwards multiplied a value roughly five times larger,
+/// putting a driven element about **3.3 world units** up against a visible
+/// half-height of `1.0`. Under [`loud`] the contour is off frame entirely and
+/// the composite comes back empty except for `bg_vignette`.
 fn pre_repair_spectrum_ridge() -> Preset {
     Preset::from_toml_str(
         r#"
@@ -1455,13 +1440,12 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
 /// preset — because what it stands for is a *defect*, and no shipped preset may
 /// hold one.
 ///
-/// [Plan 0113](../../docs/plans/0113-the-engine-paints-a-canvas.md) builds
-/// `shape_collage`, a scene whose element `density` falls with the level, so a
-/// quiet passage leaves bare paper. **An emptied canvas and a broken one are the
-/// same picture**, and against [`BLACK`] both read `coverage = 1.0000`: the
-/// paper is not black, so every pixel counts as lit and the frame scores as
-/// completely full. That is the false negative ADR-0126 was raised on, and it is
-/// designed-in rather than hypothetical.
+/// Plan 0113 builds `shape_collage`, a scene whose element `density` falls with
+/// the level, so a quiet passage leaves bare paper. **An emptied canvas and a
+/// broken one are the same picture**, and against [`BLACK`] both read `coverage
+/// = 1.0000`: the paper is not black, so every pixel counts as lit and the frame
+/// scores as completely full. That is the false negative ADR-0126 was raised on,
+/// and it is designed-in rather than hypothetical.
 ///
 /// **Plan 0116 Phase 6 wrote this fixture on the attractor's `ink_*` remap**,
 /// which reaches a paper-white frame the same way and was reachable while

@@ -149,12 +149,11 @@ pub struct AnalysisFrame {
     /// Too widely bound to rename (ADR-0050); `bar_phase` is the true quantity.
     pub bar: f32,
     /// Monotone count of **onset detections** since the stream started, 0 before
-    /// the first (ADR-0050 Layer 1, corrected by
-    /// [ADR-0109](../../../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)).
-    /// Unconditional and deterministic — no confidence gate. **Not a musical
-    /// period:** the detector fires 1.2x-2.3x per musical beat depending on the
-    /// material and wanders inside a single track, so no fixed multiplier
-    /// converts this to beats.
+    /// the first (ADR-0050 Layer 1, corrected by ADR-0109). Unconditional and
+    /// deterministic — no confidence gate. **Not a musical period:** the
+    /// detector fires 1.2x-2.3x per musical beat depending on the material and
+    /// wanders inside a single track, so no fixed multiplier converts this to
+    /// beats.
     pub beat_index: u32,
     /// Seconds since the last onset detection; exactly 0 on a detection hop.
     pub time_since_beat: f32,

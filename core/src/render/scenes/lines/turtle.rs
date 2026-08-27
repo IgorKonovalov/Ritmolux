@@ -38,10 +38,9 @@ pub fn walk(s: &str, angle: f32, max_segments: usize, out: &mut Vec<SegmentInsta
 
 /// [`walk`], plus the **generation depth** of every emitted segment written into
 /// `depths` (cleared first) — the branch-nesting level the turtle drew it at
-/// ([ADR-0059](../../../../../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)'s
-/// `lsystem` colour axis). Depth `0` is the trunk; each unclosed `[` is one more
-/// generation, so a segment's depth is how many branch pushes are still open
-/// above it.
+/// (ADR-0059's `lsystem` colour axis). Depth `0` is the trunk; each unclosed `[`
+/// is one more generation, so a segment's depth is how many branch pushes are
+/// still open above it.
 ///
 /// **`depths` is index-aligned with `out` by construction**, which is the whole
 /// reason it is produced here rather than by a second pass over the string: both

@@ -1,4 +1,4 @@
-//! The runtime tier switch (Plan 0050 Phase 1, [ADR-0054]): `Renderer::set_tier`
+//! The runtime tier switch (Plan 0050 Phase 1, ADR-0054): `Renderer::set_tier`
 //! rebuilds the tier-dependent GPU resources on the live context — and refuses to
 //! on a surface-less one.
 //!

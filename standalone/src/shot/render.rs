@@ -10,7 +10,7 @@
 //!
 //! **No encoder ships.** A 1080p RGBA frame is 8.29 MB and four minutes at 60 fps
 //! is 119 GB, so the frames can never touch disk before the encoder; and a static
-//! encoder is larger than this application's whole size budget ([NFR §4]). Frames
+//! encoder is larger than this application's whole size budget (NFR §4). Frames
 //! go out over a **pipe**, in a self-describing stream a user's own `ffmpeg`
 //! reads natively.
 //!
@@ -27,19 +27,19 @@
 //!
 //! **Y4M** (`ffmpeg -f yuv4mpegpipe`), chosen over NUT because its header is
 //! thirty lines to parse in any language and one non-`ffmpeg` consumer is already
-//! foreseen ([Plan 0106](../../../docs/plans/0106-the-frame-stream-passes-through-a-diffusion-model.md)).
-//! The cost is that Y4M cannot carry RGB — the muxer *errors* on `rgb24` — so
-//! this module owns an RGB→YUV conversion, at `C444` (no chroma subsampling) and
-//! full range, declared as `XCOLORRANGE=FULL`. That conversion is not bijective
-//! at 8 bits, which is why the tap-placement assertion is made on the RGB frame
-//! handed to [`write_y4m_frame`] and never on the wire bytes: a guard written
-//! against the wire would have to be loosened to a tolerance until it passed.
+//! foreseen (Plan 0106). The cost is that Y4M cannot carry RGB — the muxer
+//! *errors* on `rgb24` — so this module owns an RGB→YUV conversion, at `C444` (no
+//! chroma subsampling) and full range, declared as `XCOLORRANGE=FULL`. That
+//! conversion is not bijective at 8 bits, which is why the tap-placement
+//! assertion is made on the RGB frame handed to [`write_y4m_frame`] and never on
+//! the wire bytes: a guard written against the wire would have to be loosened to
+//! a tolerance until it passed.
 //!
 //! ## Where the tap sits
 //!
 //! Nowhere new — and that is the design, not an accident of reuse. The composite
-//! is linear-light `Rgba16Float` until the tonemap ([ADR-0046]) and the display
-//! write dithers in the **encoded** domain ([ADR-0096]), both inside the one
+//! is linear-light `Rgba16Float` until the tonemap (ADR-0046) and the display
+//! write dithers in the **encoded** domain (ADR-0096), both inside the one
 //! `draw_frame` the on-surface present path and every capture path share. The
 //! frame this module hands [`write_y4m_frame`] is a readback of exactly the
 //! texture the app would have presented, so an exported file cannot be washed
@@ -63,7 +63,7 @@
 //! ## Surviving a whole track
 //!
 //! A four-minute render is 14,400 frames, and the thing that used to stop a run
-//! that long was not a frame count but memory pressure ([Plan 0099]): a capture
+//! that long was not a frame count but memory pressure (Plan 0099): a capture
 //! path that submitted without ever polling retained **per pass**, so a
 //! reaction-diffusion world at thirteen passes a frame held 950 KB a frame
 //! against a 36 KB captured frame and hit the allocator at ~4.4 GB.
@@ -98,12 +98,6 @@
 //! in a 334-347 MB band with no trend — so the number is a property of the run
 //! and not of the instrument reading itself. Where 0099's retention would have
 //! put ~4.4 GB, the peak is 342 MB.
-//!
-//! [Plan 0099]: ../../../docs/plans/done/0099-the-horizon-reaches-its-own-length.md
-//! [NFR §12]: ../../../docs/nfr.md#12-runtime-memory
-//! [ADR-0046]: ../../../docs/adrs/0046-linear-light-hdr-composite-bloom-tonemap.md
-//! [ADR-0096]: ../../../docs/adrs/0096-the-display-write-dithers.md
-//! [NFR §4]: ../../../docs/nfr.md#4-size-and-dependencies
 
 use std::io::Write;
 
@@ -578,7 +572,7 @@ impl Encoder {
 /// The resident set sampled across a render (Plan 0101 Phase 4).
 ///
 /// **A render that leaks is the same defect as a live session that leaks**, so
-/// [NFR §12]'s no-session-growth requirement applies here and is measured the
+/// NFR §12's no-session-growth requirement applies here and is measured the
 /// same way — the working set the OS reports, read through the same
 /// [`crate::rss`] the diagnostics log and `--horizon`'s cost block read.
 ///
@@ -601,7 +595,7 @@ impl Encoder {
 ///
 /// **Reported, never asserted here** (ADR-0071, the same rule `--horizon`'s cost
 /// block follows): the absolute numbers are a property of the box's GPU driver
-/// stack — a ~327 MB vendor floor on the reference machine ([NFR §12]) — and do
+/// stack — a ~327 MB vendor floor on the reference machine (NFR §12) — and do
 /// not travel. The growth does, which is why that is what
 /// `standalone/tests/shot_cli.rs` puts a ceiling on.
 #[derive(Debug, Default, Clone)]

@@ -339,8 +339,8 @@ fn streak_flag(on: bool) -> f32 {
 ///
 /// **This value is set from rendered captures, and the first arithmetic argument
 /// for it was wrong.** The reasoning that picked `0.01` (500 particles) ran:
-/// [ADR-0065] holds total light invariant by weighting each particle
-/// `50 000 / active`, so a hundredth of the budget already concentrates a hundred
+/// ADR-0065 holds total light invariant by weighting each particle `50 000 /
+/// active`, so a hundredth of the budget already concentrates a hundred
 /// particles' worth of light into every point, and an order of magnitude below
 /// that must clip to white before it reads as a curve. Rendered at `fade = 0.95`,
 /// it does not. The banding first appears around `0.01`, and at `0.002` (100
@@ -355,8 +355,6 @@ fn streak_flag(on: bool) -> f32 {
 /// as the attractor; below it a preset is asking for single-digit trajectories,
 /// which is a few orbits rather than a figure. `active_particles` separately
 /// guarantees at least one particle, so nothing here can produce an empty draw.
-///
-/// [ADR-0065]: ../../../../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md
 pub const MIN_PARTICLE_DENSITY: f32 = 0.0005;
 
 /// Resolve a validated `density` against a tier's particle budget.

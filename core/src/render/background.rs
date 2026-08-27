@@ -86,9 +86,8 @@
 //! only shape.
 //!
 //! Every axis is the **same function** ([`axis_pos`] in the shader), called with
-//! a direction. One copy rather than three, precisely so
-//! [ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
-//! trap cannot be fixed in one axis and left in the other.
+//! a direction. One copy rather than three, precisely so ADR-0037's trap cannot
+//! be fixed in one axis and left in the other.
 //!
 //! **The band takes its own segment of the same `[palette]`.** `bg_band_hue` is
 //! an **absolute** coordinate in that gradient — not an offset from the ground's
@@ -853,12 +852,11 @@ impl Background {
     /// This pass paints `destination`, which `composite_into` sizes from the
     /// surface. The `target.size` sitting on the next line there is the post
     /// chain's quantized, capped internal grid — a *resolution, not a shape*
-    /// ([ADR-0037](../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)),
-    /// and at a 160x100 surface it is a square 256x256. Taking it would be that
-    /// defect for the third time, and it is invisible at `bg_angle = 0` where the
-    /// aspect term provably cancels — which is why `backdrop_ramp.rs` carries a
-    /// negative control at a non-zero angle *with a stage active*, where the two
-    /// sources disagree.
+    /// (ADR-0037), and at a 160x100 surface it is a square 256x256. Taking it
+    /// would be that defect for the third time, and it is invisible at `bg_angle
+    /// = 0` where the aspect term provably cancels — which is why
+    /// `backdrop_ramp.rs` carries a negative control at a non-zero angle *with a
+    /// stage active*, where the two sources disagree.
     pub fn render(
         &mut self,
         queue: &wgpu::Queue,

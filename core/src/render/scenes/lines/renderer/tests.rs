@@ -96,7 +96,7 @@ fn a_crossing_segment_contributes_its_clipped_share() {
 }
 
 /// **The rectangle follows the aspect the caller hands in, and only that**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// `measure_extent` is a free function over the endpoints: there is no
 /// `self`, no texture and no internal grid in scope, so the aspect parameter
@@ -1329,9 +1329,7 @@ fn a_renderer_without_the_arc_pipeline_draws_no_arcs() {
 ///
 /// The count is a ratio against the arc's own full circle rather than an
 /// absolute pixel number, so it stays a property of the geometry rather than a
-/// number recorded off this capture size ([ADR-0071]).
-///
-/// [ADR-0071]: ../../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
+/// number recorded off this capture size (ADR-0071).
 #[test]
 fn an_arcs_angular_span_is_what_it_draws() {
     const RADIUS: f32 = 0.6;
@@ -1627,8 +1625,7 @@ fn the_edge_term_never_exceeds_the_softness_term() {
 }
 
 /// **The edge is a width in pixels of the render target, not a fraction of the
-/// stroke** ([ADR-0124], the other side of
-/// [ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// stroke** (ADR-0124, the other side of ADR-0037).
 ///
 /// At `softness = 0` the ramp is the edge term alone, so the coverage a pixel
 /// carries is a function of **how many pixels inside the stroke edge it sits**
@@ -1647,8 +1644,6 @@ fn the_edge_term_never_exceeds_the_softness_term() {
 /// one-pixel ramp spans at most one row of pixel centres per side: counting rows
 /// would be a comparison of small integers that a broken implementation could
 /// pass, where matching `min(p, 1)²` across forty rows cannot be.
-///
-/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 #[test]
 fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
     /// Fat enough that a couple of dozen rows land across the half-width, so

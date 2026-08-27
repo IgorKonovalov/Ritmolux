@@ -349,7 +349,7 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 }
 
 /// **At full alpha the frame IS its own transformed copy** — Plan 0109 Phase 7,
-/// [ADR-0119], superseding the property Phase 3 shipped.
+/// ADR-0119, superseding the property Phase 3 shipped.
 ///
 /// # What the stage is
 ///
@@ -381,8 +381,6 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 /// This also still walks the converter, so it pins the half that is not the
 /// shader: three outputs once warned about as unconsumed are seeded into the
 /// bundle and read by the scene.
-///
-/// [ADR-0119]: ../../docs/adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md
 #[test]
 fn at_full_alpha_the_echo_is_the_mirror_of_the_control() {
     let Some(mut renderer) = headless() else {

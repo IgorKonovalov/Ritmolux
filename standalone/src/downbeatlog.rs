@@ -9,10 +9,10 @@
 //!
 //! `diagnostics.log` samples at 1 Hz and records the estimator's **outcome** —
 //! locked or not, and one confidence number. That is what measured the 6.0 %
-//! publish rate ([ADR-0082]), and it is also why the *cause* of that rate is still
+//! publish rate (ADR-0082), and it is also why the *cause* of that rate is still
 //! inferred: three different failures fit the same outcome, and telling them apart
 //! needs the terms, per beat, on real material. [`DownbeatTerms`] has existed
-//! since [Plan 0068] for exactly this and nothing outside the tests has read it.
+//! since Plan 0068 for exactly this and nothing outside the tests has read it.
 //!
 //! ## What it costs the estimator: nothing
 //!
@@ -26,9 +26,6 @@
 //!
 //! Rows are written from the frame path, so a **hidden window logs nothing** — the
 //! render loop returns before it takes a frame. A capture run wants the window up.
-//!
-//! [ADR-0082]: ../../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md
-//! [Plan 0068]: ../../docs/plans/done/0068-why-the-downbeat-rarely-locks.md
 
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
@@ -69,19 +66,17 @@ use lmv_core::dsp::AnalysisFrame;
 ///   fired on, and this column is the size of that gap rather than an assurance
 ///   there isn't one.
 ///
-/// Two more were appended by [Plan 0117], and they are the reason the `beat`
-/// column alone is not enough to read the alignment block against:
+/// Two more were appended by Plan 0117, and they are the reason the
+/// `beat` column alone is not enough to read the alignment block
+/// against:
 ///
 /// - **`fold_beat`** is the counter the fold actually buckets by. Since
-///   [Plan 0095] that is the grid's tempo-driven beat count, not `beat_index` —
+///   Plan 0095 that is the grid's tempo-driven beat count, not `beat_index` —
 ///   so `s0..s3`, `best` and `held` are indexed in `fold_beat % 4`, and were
 ///   read against `beat % 4` for as long as nothing published the difference.
 /// - **`grid_bar_phase`** is where that counter sits across the bar, ungated.
 ///   It is a *grid* reading only where `bpm > 0`; before the grid starts the
 ///   fold is handed the tempo tracker's onset-reset phase instead.
-///
-/// [Plan 0095]: ../../docs/plans/done/0095-the-downbeat-fold-gets-a-musical-beat.md
-/// [Plan 0117]: ../../docs/plans/done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md
 const HEADER: &str = "beat\ts0\ts1\ts2\ts3\tbest\theld\teffect_raw\tnull_share\t\
                       effect_corrected\tbeats_seen\tlocked\tbass\tmid\ttreb\tonset\t\
                       bpm\ttime_since_beat\tunix_ms\tfold_beat\tgrid_bar_phase\n";

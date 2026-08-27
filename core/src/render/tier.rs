@@ -217,8 +217,7 @@ pub struct TierConfig {
     /// floor value, and that routes back through `architect`.
     pub swarm_particles: usize,
 
-    /// How many objects the emitter's pool holds
-    /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
+    /// How many objects the emitter's pool holds (ADR-0057).
     ///
     /// Unlike every other count here this is a **ceiling on a varying
     /// population**, not the population: the emitter spawns and retires, so a
@@ -317,7 +316,7 @@ pub struct TierConfig {
     pub max_segments: usize,
 
     /// Cap on how many flat elements a `shape_collage` canvas may hold
-    /// ([ADR-0123](../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
+    /// (ADR-0123).
     ///
     /// **The one capacity here that bounds a per-pixel loop**, which is what
     /// makes it load-bearing rather than a memory number. Every other count in
@@ -569,8 +568,7 @@ pub fn should_demote(
 /// **Whether a runtime tier change is allowed at all** (ADR-0054): only on a
 /// context that has a surface.
 ///
-/// A surface-less context is exactly the headless capture path, and
-/// [ADR-0045](../../../docs/adrs/0045-quality-tiers-floor-and-rich.md)'s
+/// A surface-less context is exactly the headless capture path, and ADR-0045's
 /// guarantee is that a capture is `Tier::Floor` **by construction** —
 /// `Renderer::new_headless` takes no tier argument, so no baseline can be blessed
 /// at another tier by forgetting a field. `Renderer::set_tier` is a public

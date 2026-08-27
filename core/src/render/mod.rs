@@ -1552,10 +1552,10 @@ impl Renderer {
     /// The active adapter's description — name, backend, device type and driver.
     ///
     /// **For reports that have to name the machine they were taken on**
-    /// ([ADR-0071](../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)):
-    /// a frame time is a fact about a GPU and a driver rather than about the
-    /// code, so a cost instrument that prints one has to say which. Read by
-    /// `core/tests/collage_cost.rs`; nothing on a render path consults it.
+    /// (ADR-0071): a frame time is a fact about a GPU and a driver rather
+    /// than about the code, so a cost instrument that prints one has to say
+    /// which. Read by `core/tests/collage_cost.rs`; nothing on a render path
+    /// consults it.
     pub fn adapter_description(&self) -> &str {
         self.ctx.adapter()
     }

@@ -1,6 +1,5 @@
 //! **The mark roster, drawn at frame scale as a distance field**
-//! ([ADR-0105](../../../../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md),
-//! Plan 0091).
+//! (ADR-0105, Plan 0091).
 //!
 //! Every other scene here hands the palette a *level* — a noise field, a
 //! chemical concentration, a particle's depth. This one hands it a **distance**,
@@ -32,7 +31,7 @@
 //! and repaired the two arms that were wrong out there; see `marks.rs`'s own
 //! header for what it found and what it deliberately left approximate.
 //!
-//! # The aspect comes from the render target ([ADR-0037](../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md))
+//! # The aspect comes from the render target (ADR-0037)
 //!
 //! There is no internal grid here to take an aspect from by accident, which
 //! removes the usual mechanism for that bug but not the obligation. The figure

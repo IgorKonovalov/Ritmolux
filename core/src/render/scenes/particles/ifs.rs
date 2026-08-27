@@ -14,8 +14,7 @@
 //! anywhere; an IFS converges only while every map contracts, and one map past
 //! unit operator norm sends every position to infinity and then to `NaN`, killing
 //! the particle buffer for the rest of the session. Everything here is arranged
-//! so that cliff is **unreachable** rather than guarded against — see
-//! [ADR-0075](../../../../../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md).
+//! so that cliff is **unreachable** rather than guarded against — see ADR-0075.
 //!
 //! The mechanism is the parameterization. Every map is carried as the **singular
 //! value decomposition** of its linear part, `M = R(θ)·diag(sx, sy)·R(φ)` with

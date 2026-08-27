@@ -1,6 +1,6 @@
-//! **The in-frame geometry fraction** (Plan 0069, [ADR-0083]) — the share of
-//! drawn segment length that lands inside the render target, measured at
-//! `LineRenderer::draw` and covering the four line-family scenes
+//! **The in-frame geometry fraction** (Plan 0069, ADR-0083) — the share
+//! of drawn segment length that lands inside the render target, measured
+//! at `LineRenderer::draw` and covering the four line-family scenes
 //! (`parametric_curve`, `lsystem`, `star_pattern`, `spectrum`) with one
 //! implementation.
 //!
@@ -31,8 +31,6 @@
 //! `Renderer::new_headless` in this binary would be a second GPU resource build
 //! mid-run, which `composite.rs` documents as changing what the software adapter
 //! resolves.
-//!
-//! [ADR-0083]: ../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md
 
 use lmv_core::{
     dsp::{AnalysisFrame, SPECTRUM_BINS},
@@ -399,7 +397,7 @@ fn fraction_of(renderer: &mut Renderer, preset: Preset) -> Option<f32> {
 /// # What is asserted, and what is only printed
 ///
 /// The absolute fraction of any given preset is **printed, not asserted**
-/// ([ADR-0071]): those are measurements of specific content, and content is
+/// (ADR-0071): those are measurements of specific content, and content is
 /// allowed to move. What is asserted is a *relation* — that correcting the one
 /// binding that was wrong moves this measure decisively, in the right direction,
 /// on both known defects — plus the structural facts that keep the sweep from
@@ -442,8 +440,6 @@ fn fraction_of(renderer: &mut Renderer, preset: Preset) -> Option<f32> {
 /// actually asks. Anyone reaching for `assert!(fraction > 0.5)` over the library
 /// would fail two shipped presets that are working as authored — which is
 /// exactly the mistake ADR-0083 catalogues pixel coverage making, one axis over.
-///
-/// [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 #[test]
 fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
     let Some(mut renderer) = headless() else {

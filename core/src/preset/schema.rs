@@ -45,25 +45,21 @@ pub enum SystemKind {
     /// frame's log-spaced band array rather than by a generator.
     Spectrum,
     /// The mark roster drawn at frame scale as a signed-distance field —
-    /// [ADR-0105](../../../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md).
-    /// The one scene whose palette coordinate is a *distance*, which is what
-    /// makes `palette_steps` draw concentric offset contours of a shape.
+    /// ADR-0105. The one scene whose palette coordinate is a *distance*,
+    /// which is what makes `palette_steps` draw concentric offset contours
+    /// of a shape.
     ShapeField,
     /// The ballistic emitter — objects that spawn, fall on a parabola and die
-    /// ([ADR-0057](../../../docs/adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)).
-    /// The first scene whose population is not fixed.
+    /// (ADR-0057). The first scene whose population is not fixed.
     Emitter,
     /// The warp mesh — a per-vertex UV grid that resamples the previous frame
-    /// ([ADR-0113](../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
-    /// Generalizes [ADR-0048](../../../docs/adrs/0048-transformed-feedback.md)'s
-    /// single shared feedback transform to one transform *per vertex*, driven by
-    /// a `[per_vertex]` table.
+    /// (ADR-0113). Generalizes ADR-0048's single shared feedback transform to
+    /// one transform *per vertex*, driven by a `[per_vertex]` table.
     WarpMesh,
     /// Flat opaque elements painted on their own paper, composited in painter
-    /// order in one fullscreen distance-field pass
-    /// ([ADR-0123](../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md)).
-    /// The engine's first **graphic** world rather than a luminous one: the only
-    /// system in which one object is genuinely in front of another.
+    /// order in one fullscreen distance-field pass (ADR-0123). The engine's
+    /// first **graphic** world rather than a luminous one: the only system in
+    /// which one object is genuinely in front of another.
     ShapeCollage,
 }
 

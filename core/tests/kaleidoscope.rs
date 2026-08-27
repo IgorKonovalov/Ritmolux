@@ -1,7 +1,7 @@
 //! Pixel-level properties of the kaleidoscope fold: it does not tear at a
 //! fractional order (Plan 0049 Phase 1), it does not paint outside its disc
-//! (Plan 0045 Phase 1 / [ADR-0047], design-backlog 0010), and — Plan 0045 Phase
-//! 2b / [ADR-0055] — its falloff lands on the **backdrop** rather than on black,
+//! (Plan 0045 Phase 1 / ADR-0047, design-backlog 0010), and — Plan 0045 Phase
+//! 2b / ADR-0055 — its falloff lands on the **backdrop** rather than on black,
 //! while the backdrop itself stays out of the fold.
 //!
 //! The last two need a **lit** backdrop and say so in their own comments: every

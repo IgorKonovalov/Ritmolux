@@ -56,9 +56,8 @@ pub const WIDTH_SCALE: f32 = 0.003;
 /// The smallest half-width a stroke is drawn at, whatever `thickness` asks for.
 ///
 /// It exists to stop a zero or negative `thickness` degenerating the quad into
-/// a line of zero area, and it stays: the defect
-/// [design-backlog 0098](../../../../../docs/design-backlog.md) records is the
-/// **silence** around it, not the clamp.
+/// a line of zero area, and it stays: the defect design-backlog 0098 records
+/// is the **silence** around it, not the clamp.
 pub const MIN_HALF_WIDTH: f32 = 0.0005;
 
 /// The `thickness` at which [`MIN_HALF_WIDTH`] stops binding — about `0.167`.
@@ -77,7 +76,7 @@ pub fn half_width(thickness: f32) -> f32 {
 }
 
 /// The across-the-stroke profile the **four line families** draw at unless a
-/// preset binds `softness` itself ([ADR-0124]).
+/// preset binds `softness` itself (ADR-0124).
 ///
 /// **`0.25` — a solid stroke with a short shoulder — set by Plan 0114 Phase
 /// 4's look gate**, which judged the shipped presets side by side at 1920x1080
@@ -97,8 +96,6 @@ pub fn half_width(thickness: f32) -> f32 {
 /// that surface is judged against `foo_vis_milk2` rather than against this
 /// plan's gate and is pinned at `1.0`, so a reader of either call site can see
 /// which judge it serves without leaving the file.
-///
-/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
 pub const DEFAULT_SOFTNESS: f32 = 0.25;
 
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
@@ -163,11 +160,9 @@ impl CurveFamily {
     }
 }
 
-/// The colour surface every line scene shares
-/// ([ADR-0021](../../../../../docs/adrs/0021-shared-palette-system.md) /
-/// [ADR-0059](../../../../../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)):
-/// `hue` places the whole figure in the baked palette and `hue_spread` says how
-/// far the palette travels **across** it.
+/// The colour surface every line scene shares (ADR-0021 / ADR-0059): `hue`
+/// places the whole figure in the baked palette and `hue_spread` says how far
+/// the palette travels **across** it.
 ///
 /// The axis `u` walks is the one thing that differs per scene — generation depth
 /// on the L-system, path position on the parametric curve, radius on the star,

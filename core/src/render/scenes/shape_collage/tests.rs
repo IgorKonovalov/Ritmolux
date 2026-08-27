@@ -1098,7 +1098,7 @@ fn a_checkers_cell_count_is_even() {
 }
 
 /// **The aspect comes from the render target, and this test bites**
-/// ([ADR-0037](../../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
+/// (ADR-0037).
 ///
 /// A circle element is painted at **1280x800** and its own extent measured in
 /// pixels. It must be round — the same number of pixels across as down — which

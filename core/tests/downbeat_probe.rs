@@ -1,6 +1,6 @@
 //! Plan 0068 — the downbeat estimator's terms, made visible.
 //!
-//! The estimator locks on 3.1 % of audible time ([ADR-0082]), and the only
+//! The estimator locks on 3.1 % of audible time (ADR-0082), and the only
 //! instrument for that is a 1 Hz column printing the *outcome*. Three terms
 //! could be responsible — the accent feature, the 4/4 fold, the confidence
 //! measure — and an outcome cannot tell them apart. This file prints the terms.
@@ -18,13 +18,10 @@
 //! (`.config/nextest.toml` also keeps these two audible on a passing run, the
 //! same override the other two reporting tests carry.)
 //!
-//! Per [ADR-0071], every number printed here is a **measurement** and every
+//! Per ADR-0071, every number printed here is a **measurement** and every
 //! number asserted is a **property**: the assertions are comparisons between
 //! two readings taken in the same run, so the machine cancels. No absolute
 //! confidence value is asserted.
-//!
-//! [ADR-0082]: ../../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md
-//! [ADR-0071]: ../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 
 use lmv_core::dsp::downbeat::{BEATS_PER_BAR, BarClock, DownbeatTerms, DownbeatTracker};
 

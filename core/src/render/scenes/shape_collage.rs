@@ -1,6 +1,5 @@
-//! **Flat opaque elements painted on their own paper**
-//! ([ADR-0123](../../../../docs/adrs/0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md),
-//! Plan 0113).
+//! **Flat opaque elements painted on their own paper** (ADR-0123, Plan
+//! 0113).
 //!
 //! Every other scene in this engine draws **light**: premultiplied additive
 //! colour into a linear-light composite, where nothing is in front of anything
@@ -44,7 +43,7 @@
 //! and deliberately a **raw** one: `color_span` and `palette_shift` move the
 //! elements' colours and must not drag the ground along with them.
 //!
-//! # The aspect comes from the render target ([ADR-0037](../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md))
+//! # The aspect comes from the render target (ADR-0037)
 //!
 //! This scene computes screen-destined geometry from a normalized space, which
 //! is exactly the shape of the bug that has shipped three times in this repo.

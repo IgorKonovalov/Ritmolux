@@ -2491,7 +2491,7 @@ fn after_six_hundred_steps_the_population_holds_every_age() {
 /// **ceiling is therefore measured and printed, never asserted** — it is a
 /// property of each figure's invariant measure rather than of this code, and
 /// a threshold on it would be a frozen number asserted universally, the
-/// shape [ADR-0071] forbids. What *is* asserted is the property the claim was
+/// shape ADR-0071 forbids. What *is* asserted is the property the claim was
 /// reaching for and which holds on all five: the values reach an exact `0`
 /// and rise with **no gap wider than a decile of the occupied bulk**.
 ///
@@ -2502,8 +2502,6 @@ fn after_six_hundred_steps_the_population_holds_every_age() {
 ///
 /// The printed table is what the Phase 2 gate reads: it is the only place the
 /// per-figure ceilings are recorded from a live run.
-///
-/// [ADR-0071]: ../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md
 #[test]
 fn after_six_hundred_steps_the_root_channel_is_spread_on_every_figure() {
     const FRAMES: u32 = 600;

@@ -1,5 +1,5 @@
 //! **What an arc-drawn ring costs, per frame** (Plan 0087 Phase 3,
-//! [ADR-0098](../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)).
+//! ADR-0098).
 //!
 //! The arc primitive trades vertices for **fill**. A `circle` motif is one
 //! instance instead of `SMOOTH_SAMPLES`, but that instance rasterizes a bounding
@@ -11,16 +11,15 @@
 //!
 //! # This is a measurement, and it names its machine
 //!
-//! Per [ADR-0071](../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
-//! a numeric contract states a property or names the configuration it was taken
-//! on. A frame time is the second kind, so **there is no threshold here.** The
-//! test renders the cases, prints what it saw, and asserts only that it measured
-//! genuinely different figures. It skips on a software rasterizer: WARP's frame
-//! time says nothing about the iGPU floor in `docs/nfr.md` §1, and a reading
-//! taken there would be a number that looks like evidence and is not. Its shape
-//! is `mark_cost.rs`'s — interleaved cases, a two-length slope to subtract the
-//! fixed costs, the minimum of several repeats — and that file's header explains
-//! each of those choices.
+//! Per ADR-0071 a numeric contract states a property or names the configuration
+//! it was taken on. A frame time is the second kind, so **there is no threshold
+//! here.** The test renders the cases, prints what it saw, and asserts only that
+//! it measured genuinely different figures. It skips on a software rasterizer:
+//! WARP's frame time says nothing about the iGPU floor in `docs/nfr.md` §1, and
+//! a reading taken there would be a number that looks like evidence and is not.
+//! Its shape is `mark_cost.rs`'s — interleaved cases, a two-length slope to
+//! subtract the fixed costs, the minimum of several repeats — and that file's
+//! header explains each of those choices.
 //!
 //! # Four probes, because the ring's cost is not one number
 //!
@@ -32,7 +31,7 @@
 //!   ring, and the figure the plan exists to make shippable. At this scale the
 //!   forty boxes barely touch.
 //! - `arcs x40` at motif scale 0.46 — the top of the range
-//!   [ADR-0098](../../docs/adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)
+//!   ADR-0098
 //!   quotes, where the boxes overlap heavily. This is the fill-rate case, and it
 //!   is here because a measurement taken only at 0.13 would price the primitive
 //!   at its cheapest and call it priced.

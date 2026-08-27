@@ -758,9 +758,8 @@ fn the_over_blend_alpha_is_frame_rate_independent() {
 }
 
 /// **The ladder [`TierConfig::mesh_grid`] is set from** — a measurement, not a
-/// gate ([ADR-0071](../../../../docs/adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md):
-/// a cost in milliseconds is a property of one machine at one moment, so it is
-/// recorded with the machine named and never asserted).
+/// gate (ADR-0071: a cost in milliseconds is a property of one machine at one
+/// moment, so it is recorded with the machine named and never asserted).
 ///
 /// `#[ignore]`d and run explicitly:
 ///

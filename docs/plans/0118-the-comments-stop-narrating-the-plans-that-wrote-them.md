@@ -249,8 +249,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the gate exists, and it only reports | dev | done | `37868d4` |
-| 2 — the rule lands where authors read it | dev | done | committed with this row |
-| 3 — the 89 links go | dev | | |
+| 2 — the rule lands where authors read it | dev | done | `6ae4245` |
+| 3 — the 89 links go | dev | done | committed with this row |
 | 4 — the 252 narration lines go | dev | | |
 | 5 — the gate is armed | dev | | |
 | 6 — the long blocks come down, outside the contended trees | dev | | |

@@ -1,6 +1,5 @@
 //! **A particle mark's silhouette, as a signed-distance function**
-//! ([ADR-0084](../../../../docs/adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md),
-//! Plan 0070).
+//! (ADR-0084, Plan 0070).
 //!
 //! Every mark this engine drew before Plan 0070 was a round additive blob. The
 //! swarm's fragment shader was three lines —
@@ -246,13 +245,10 @@ pub(crate) fn mark_shape(v: f32) -> f32 {
 /// integer. At a fractional count the mark tears along one ray.
 ///
 /// So an eased `points` **steps**. That is the opposite of what the surrounding
-/// vocabulary teaches — `variant` interpolates
-/// ([ADR-0060](../../../../docs/adrs/0060-star-pattern-variants-interpolate.md)),
-/// the IFS morphs
-/// ([ADR-0075](../../../../docs/adrs/0075-ifs-family-morphs-in-singular-value-space.md))
-/// — which is exactly why it is stated at the parameter rather than assumed.
-/// A star's angle fold is periodic in the count: a fractional count is a
-/// discontinuity, not an intermediate figure.
+/// vocabulary teaches — `variant` interpolates (ADR-0060), the IFS morphs
+/// (ADR-0075) — which is exactly why it is stated at the parameter rather than
+/// assumed. A star's angle fold is periodic in the count: a fractional count is
+/// a discontinuity, not an intermediate figure.
 pub(crate) fn mark_points(v: f32) -> f32 {
     if v.is_finite() {
         v.clamp(MIN_POINTS, MAX_POINTS).round()
@@ -322,8 +318,7 @@ pub(crate) fn spike_hash01(index: u32) -> f32 {
 /// **same** `mark_distance` and a roster change reaches both at once. It defines
 /// no bindings and no entry points — it is arithmetic — so splicing it in
 /// changes neither scene's bind-group layout (which on the DX12 WARP adapter is
-/// not a free thing to change; see `emitter.rs`'s layout comment and
-/// [ADR-0058](../../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md)).
+/// not a free thing to change; see `emitter.rs`'s layout comment and ADR-0058).
 pub(crate) fn sdf_wgsl() -> String {
     SDF_WGSL
         .replace("%RING_MID%", &format!("{RING_MID:?}"))

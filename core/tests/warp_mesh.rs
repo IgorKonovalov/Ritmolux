@@ -1,5 +1,5 @@
 //! **The warp mesh renders, moves, and reacts** (Plan 0100 Phase 1's done-when,
-//! [ADR-0113](../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! ADR-0113).
 //!
 //! # Why this file exists at all
 //!
@@ -55,15 +55,13 @@ const SIZE: u32 = 96;
 ///
 /// **Audited at Plan 0116 Phase 3: `BLACK` stayed, and it is now a divergence
 /// rather than a restatement.** `sanity.rs` derives its reference from each
-/// capture ([ADR-0126]); this file does not. Every floor below was measured
+/// capture (ADR-0126); this file does not. Every floor below was measured
 /// against the constant, and re-basing the predicate without re-deriving them
 /// would move this file's verdicts on a plan that measured none — Plan 0116
 /// Phase 4 re-derives `sanity.rs`'s own floors and is scoped to that file. The
 /// `warp_mesh` presets are lit-on-dark, so the two lenses agree on them today;
 /// the day one paints its own ground, these floors need the same re-derivation
 /// and this comment is the pointer to it.
-///
-/// [ADR-0126]: ../../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md
 const EPS: u8 = 10;
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 const MIN_QUADRANTS: u8 = 2;

@@ -27,7 +27,7 @@ use crate::render::palette::{self, Palette};
 const SEED: u64 = 0x4C4D_565F_5357_524D; // "LMV_SWRM"
 
 /// How far the toroidal domain extends past the visible frame (Plan 0043 Phase 1,
-/// [ADR-0044](../../../../docs/adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md)).
+/// ADR-0044).
 ///
 /// The world half-extents used to be `BOUND_X = 1.8` / `BOUND_Y = 1.0` — and
 /// `1.0` **is** the NDC frame edge. The wrap is toroidal, so that line was the one
@@ -185,10 +185,9 @@ const DEFAULT_STAR_JITTER: f32 = marks::DEFAULT_STAR_JITTER;
 /// fragment stage cannot see this scene's uniform without widening the bind
 /// layout's visibility to `VERTEX_FRAGMENT` — which would make this descriptor
 /// byte-identical to the line renderer's (`{uniform, VERTEX_FRAGMENT,
-/// min_binding_size: None}`), the exact collision shape
-/// [ADR-0058](../../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md)
-/// records and the one the emitter's layout comment says not to tidy back in. A
-/// flat varying carries a per-draw value with no descriptor change at all.
+/// min_binding_size: None}`), the exact collision shape ADR-0058 records and the
+/// one the emitter's layout comment says not to tidy back in. A flat varying
+/// carries a per-draw value with no descriptor change at all.
 const SHADER: &str = r#"
 struct Misc {
     // x: aspect, y: zoom, zw: pan (the shared ViewTransform, ADR-0018)

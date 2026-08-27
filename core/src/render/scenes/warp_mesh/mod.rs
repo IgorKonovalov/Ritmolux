@@ -1,16 +1,15 @@
 //! Warp mesh: a per-vertex UV grid that resamples the previous frame
-//! ([ADR-0113](../../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! (ADR-0113).
 //!
 //! # What it generalizes
 //!
-//! [ADR-0048](../../../../docs/adrs/0048-transformed-feedback.md) gave the engine
-//! *one* affine transform through which an accumulation reads its own past: a
-//! single zoom, rotation and translation applied identically to every texel. This
-//! scene is that transform **per vertex**. The frame is covered by a grid of
-//! cells; each of its vertices carries its own `zoom`/`rot`/`cx`/`cy`/`dx`/`dy`/
-//! `sx`/`sy`/`warp`, and the rasterizer interpolates between them — so the past
-//! can spiral in one corner and drift in another, which no single affine can
-//! express.
+//! ADR-0048 gave the engine *one* affine transform through which an accumulation
+//! reads its own past: a single zoom, rotation and translation applied
+//! identically to every texel. This scene is that transform **per vertex**. The
+//! frame is covered by a grid of cells; each of its vertices carries its own
+//! `zoom`/`rot`/`cx`/`cy`/`dx`/`dy`/ `sx`/`sy`/`warp`, and the rasterizer
+//! interpolates between them — so the past can spiral in one corner and drift in
+//! another, which no single affine can express.
 //!
 //! Those nine outputs come from a preset's `[per_vertex]` table, whose bindings
 //! are evaluated once per vertex per frame with `x`, `y`, `rad` and `ang` bound
@@ -20,15 +19,15 @@
 //!
 //! # The grid is a resolution, not a shape
 //!
-//! [ADR-0037](../../../../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md),
-//! and this is the most likely place in the engine to get it wrong, because here
-//! the grid is *user-visible*: a preset names `[mesh] x` and `[mesh] y`, and they
-//! are quantized and clamped to a tier capacity. **Every screen-destined
-//! coordinate here takes its aspect from the render target** — the `rad`/`ang` the
-//! per-vertex program reads (computed in `vertex_position`), and the isotropic
-//! space the source-uv transform works in (computed in the vertex shader from a
-//! uniform the CPU fills with the *target's* aspect). `meshx`/`meshy` appear in
-//! neither. A `f32` aspect derived from the mesh size would be the bug.
+//! ADR-0037, and this is the most likely place in the engine to get it wrong,
+//! because here the grid is *user-visible*: a preset names `[mesh] x` and `[mesh]
+//! y`, and they are quantized and clamped to a tier capacity. **Every
+//! screen-destined coordinate here takes its aspect from the render target** — the
+//! `rad`/`ang` the per-vertex program reads (computed in `vertex_position`), and
+//! the isotropic space the source-uv transform works in (computed in the vertex
+//! shader from a uniform the CPU fills with the *target's* aspect).
+//! `meshx`/`meshy` appear in neither. A `f32` aspect derived from the mesh size
+//! would be the bug.
 //!
 //! # Three passes
 //!
@@ -197,14 +196,14 @@ const MAX_DECAY: f32 = 0.995;
 /// call.
 ///
 /// **Pinned at `1.0` — the pre-Plan-0114 profile — and it does NOT follow**
-/// [`lines::DEFAULT_SOFTNESS`], which Plan 0114 Phase 5 moves ([ADR-0124],
+/// [`lines::DEFAULT_SOFTNESS`], which Plan 0114 Phase 5 moves (ADR-0124,
 /// Alternative D0). The two constants exist because there are two judges: the
 /// four line families answer to that plan's look gate, and this surface answers
-/// to **`foo_vis_milk2`**, [ADR-0113]'s fidelity reference, against which the
+/// to **`foo_vis_milk2`**, ADR-0113's fidelity reference, against which the
 /// conversion has already been judged side by side. `draw.rs`'s stroke widths
 /// were chosen *through* this profile — a thick MilkDrop line, drawn there as two
-/// or four offset passes, reproduced here as one stroke of twice the width — so
-/// a number picked by that gate answers a question nobody asked of this surface.
+/// or four offset passes, reproduced here as one stroke of twice the width — so a
+/// number picked by that gate answers a question nobody asked of this surface.
 ///
 /// It is also the regime where the profile's `fwidth` term stops describing a
 /// real gradient: `draw.rs`'s `THIN` is a **1.35 px** half-width at 1080p and
@@ -216,9 +215,6 @@ const MAX_DECAY: f32 = 0.995;
 /// stands — is a legitimate outcome that closes the question rather than a null
 /// result. Until it runs, the pin holds the profile the conversion was judged
 /// under.
-///
-/// [ADR-0124]: ../../../../../docs/adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md
-/// [ADR-0113]: ../../../../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md
 pub const MILKDROP_SOFTNESS: f32 = 1.0;
 
 /// Procedural-warp defaults — the spatial scale of the four sinusoids and how

@@ -2,7 +2,7 @@
 //!
 //! **This never ships.** It parses the imperative program text a `.milk` file
 //! carries and emits the [`EelProgram`] `lmv-core`'s VM executes, ahead of time
-//! ([ADR-0113](../../docs/adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
+//! (ADR-0113).
 //!
 //! # The language, as MilkDrop uses it
 //!
