@@ -69,11 +69,11 @@ recompose_blend = "0.90"
 pump_size  = "clamp(bass * 0.141, 0, 0.12)"
 pump_alpha = "0"
 
-# THE SWAY IS WHAT MAKES THIS WORLD PASS `animation`, AND THE RATE IS THE WHOLE
-# POINT OF IT. That gate captures frames 24 and 48 - 0.4 s apart - AT SILENCE, so
-# it sees only a preset's autonomous motion. This canvas is a poster: it is meant
-# to sit still, and nearly all its liveliness is audio-driven, which the gate
-# cannot see.
+# THE SWAY IS WHAT MAKES THIS WORLD PASS `animation` (backlog 0145), AND THE RATE
+# IS THE WHOLE POINT OF IT. That gate captures frames 24 and 48 - 0.4 s apart -
+# AT SILENCE, so it sees only a preset's autonomous motion. This canvas is a
+# poster: it is meant to sit still, and nearly all its liveliness is audio-
+# driven, which the gate cannot see.
 #
 # Measured, because the obvious lever is the wrong one: raising `drift` 0.55 ->
 # 1.60 -> 2.50 and `spin` 0.30 -> 1.00 -> 1.60 leaves the statistic at 0.002,
