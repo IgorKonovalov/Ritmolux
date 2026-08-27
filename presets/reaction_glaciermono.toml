@@ -1,0 +1,99 @@
+# Glacier Mono - the three-ink set on a GROWING field, run SLOW. The sparse
+# twin of `reaction_fluxmono.toml`: same regime, same fold, same inks, and the
+# only differences are the three rates below. Two files rather than one binding
+# because the fast and the slow reading are different WORLDS, not two settings of
+# one - the fast one churns and the slow one barely moves, and no single
+# audio-driven `flow` reaches both without spending the whole set in between.
+system = "reaction_diffusion"
+name = "Glacier Mono"
+
+[palette]
+# 20 bands: black 8 / RED 2 / white 9 / RED 1. Gray-Scott's level distribution is
+# BIMODAL - it dwells at the solvent floor and at the spot plateau - so the two
+# dwell points get the two grounds (black solvent, white coral) and the red sits
+# in the fast-crossing region between them, where it draws as an OUTLINE around
+# every form rather than pooling. One more red band at the very top marks only
+# the densest cores.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.39, color = "#000000" },
+  { at = 0.41, color = "#b00808" },
+  { at = 0.49, color = "#b00808" },
+  { at = 0.51, color = "#ffffff" },
+  { at = 0.94, color = "#ffffff" },
+  { at = 0.96, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+palette_steps   = "20"
+palette_contour = "0.45"
+
+# Coral regime. Tiny moves only - the F/K pair IS the pattern family.
+# THE SPARSE REGIME, AND IT IS ON A CLIFF. At F 0.0140 / k 0.0450 the reaction
+# only holds where it is seeded, so it leaves genuine black voids instead of
+# tiling the frame - which is the whole point of this world. Measured against the
+# neighbours at 30 s, kaleido 8, zoom 0.45: F 0.0180/k 0.0490 and F 0.0220/k
+# 0.0510 both FILL the canvas edge to edge, and F 0.0367/k 0.0649 is already
+# EXTINCT - a black frame, nothing running.
+#
+# So the audio terms here are deliberately an order smaller than a normal band
+# gain. `feed` is the axis that walks toward extinction, and a swing that would
+# be unremarkable anywhere else takes this regime off the cliff and the world
+# does not come back on its own. Nudge, never sweep: the total audio excursion
+# is 0.0006, about 4 % of the base.
+feed = "0.0140 + noise(time * 0.008) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
+kill = "0.0450"
+# The `max(0, ...)` term is a WARM-UP, not a look: this regime establishes
+# slowly, so the first five seconds run fast and it decays to nothing by t=5.
+# SETTLED RATE 0.22, ABOUT A QUARTER OF THE FAST TWIN'S. Three separate things
+# set how fast this world reads and `flow` is only one of them - the other two
+# are `inject` and the `feed` wander below. Slowing `flow` alone leaves a calm
+# simulation still being pelted with new blobs, which is why all three moved.
+#
+# The warm-up now decays over ~17 s rather than 5. It has to: at a settled 0.22
+# this regime establishes slowly, and the boost is what buys the pattern its
+# first minute without making the rest of the set run at that speed.
+flow   = "0.22 + max(0, 1.0 - time * 0.06) + clamp(bass * 0.165, 0, 0.14) + clamp(onset * 0.100, 0, 0.06)"
+# 0.62 fired on most detections, and every one stamps a fresh growth - which is
+# what made a slow simulation still look busy. At 0.88 only the hardest hits seed.
+inject = "onset > 0.88"
+
+# Verdigris' plain 8-fold fold, and for its reason: the fold is what turns a
+# field into a FIGURE. It folds about a screen-centred axis, which is why this
+# preset binds no pan - a translating pan decentres the rosette.
+kaleido_order = "8"
+kaleido_angle = "0"
+contour = "0"
+hatch   = "0"
+glow    = "1.0"
+
+# RD's field only reaches ~0..0.4, so the span has to be ~2.4 to walk the palette.
+color_span   = "6.00"
+color_center = "sin(time * 0.013) * 0.02"
+saturation   = "1.0"
+
+# SPARSITY IS MAGNIFICATION HERE, NOT REGIME. The obvious move - push `feed`
+# down and `kill` up, further toward extinction - was measured and does the
+# opposite: F 0.0120/k 0.0450, F 0.0140/k 0.0475, F 0.0100/k 0.0430 and
+# F 0.0125/k 0.0465 all FRAGMENT the pattern into a fine stipple that tiles the
+# whole frame. Nearer the cliff means smaller features, not emptier ones.
+#
+# Zoom is the lever that works, and on this system a LOWER zoom shows LESS field
+# (it is inverted against the line scenes). Measured at 60 s, same regime:
+# 0.45 dense all over, 0.30 busy, 0.20 open, 0.12 half empty with the voids
+# reading as ground rather than as gaps. 0.12 ships.
+#
+# Worth knowing before retuning: this world FILLS IN with time. The same regime
+# reads far sparser at 30 s than at 60 s, so sparseness here is partly a
+# transient. Magnifying is what keeps it legible as it fills - it does not stop
+# it filling. A `--horizon` run is the thing that would put a number on that, and
+# it has not been done.
+zoom  = "0.12"
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+flow = { attack = 0.80, release = 2.50 }
+feed = 1.50
+color_center = 0.60
