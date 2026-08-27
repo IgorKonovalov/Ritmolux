@@ -790,7 +790,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) — closed 2026-08-27. Review: **no blockers, no majors, five minors.** Version: **0.84.0** (minor). Closed [backlog 0129](../design-backlog.md). [Write-up](README-archive.md).
+- [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) — closed 2026-08-27. Review: **no blockers, no majors, five minors.** Version: **0.85.0** (minor). Closed [backlog 0129](../design-backlog.md). [Write-up](README-archive.md).
 - [0121 — A rate, an ink edge, and a motion reading](done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) — closed 2026-08-27. Review: **no blockers, one major, four minors.** Version: **0.83.0** (minor). Closed [backlog 0131 + 0137-0139](../design-backlog.md), filed 0140-0141. [Write-up](README-archive.md).
 - [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md) — closed 2026-08-27. Review: **no blockers, one major, five minors.** Version: **0.82.0** (minor). Closed [backlog 0071 + 0073](../design-backlog.md), filed 0134-0136. [Write-up](README-archive.md).
 - [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md) — closed 2026-08-26. Review: **no blockers, one major, three minors** (none in code). Version: **0.81.0** (minor). Filed [design-backlog 0133](../design-backlog.md). [Write-up](README-archive.md).

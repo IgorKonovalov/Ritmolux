@@ -412,4 +412,8 @@ deletion rule holds where it was probed — `tier.rs`'s deleted collage cost lad
 copy of a measurement that lives in `core/tests/collage_cost.rs`, which is the file the reading was
 taken in.
 
-Version **0.84.0** (minor — the plan arms a new gate at pre-push and in CI).
+Version **0.85.0** (minor — the plan arms a new gate at pre-push and in CI). The minor skips
+**0.84.0**, which the unmerged `plan-0098-nested-figure` lane had already tagged on its own
+branch; `main` cannot take a tag that exists, and reaching into another lane to move it is not
+a close's business. Plan 0098's close picks its version against what `main` reached, as it
+would have anyway.
