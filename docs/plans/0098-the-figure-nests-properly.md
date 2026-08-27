@@ -285,8 +285,8 @@ flowchart TD
 | 2 — The coordinate exists, and a polygon proves it | dev | done | `a6bb867` |
 | 3 — The heart and the star take the coordinate | dev | done | `43b269a` |
 | 4 — `ring` gets an honest answer | dev | done | `4257596` |
-| 4b — The figure can turn | dev | done | committed with this row |
-| 5 — What it costs at the floor tier | dev | not started | |
+| 4b — The figure can turn | dev | done | `01f3775` |
+| 5 — What it costs at the floor tier | dev | done | committed with this row |
 | 6 — The docs learn both coordinates | dev | not started | |
 | 7 — The look gate | human | not started | |
 
@@ -369,6 +369,16 @@ flowchart TD
 - The shear check reads 12x12 px of extent at both `0` and a quarter turn on a 2:1 target, with
   `frame_diff` `0.00071` between them against `0.19106` at an eighth turn — the eighth is the
   control that the parameter reached the shader at all.
+- **Phase 5 added `core/tests/field_cost.rs`**, on the `mark_cost.rs` / `arc_cost.rs` precedent —
+  the phase's file list says "none necessarily", and a measurement in a commit message is not
+  re-runnable. `docs/nfr.md` did not move.
+- The reading, median of three runs on the adapter `wgpu` selects here (AMD Radeon integrated,
+  DX12, driver 30.0.13002.1001), 1280x720, floor tier: `disc` control `-1.1 %`, `heart` `-0.5 %`,
+  straight `star(7)` `-4.7 %`, curved+jittered `star` **`-25.9 %`**. The control's own spread across
+  the three runs was `-1.1 %`/`-2.2 %`/`+3.4 %` on identical arithmetic, so the noise floor is
+  about ±3 % and the two closed-form arms are inside it. The curved star is cheaper because the
+  distance walks two sampled polylines there (the edge plus the unjittered reference Phase 1 added)
+  while the radius walks one and computes only the crossing.
 - Not acted on, and not in this phase's file list: `presets/shape_facet.toml`'s header pins
   `gamma = "1.0"` and explains the pin by design-backlog 0097, and `presets/README.md` carries a
   **DO NOT BIND `gamma`** warning for the same reason. Phase 6 owns the README; the preset is
