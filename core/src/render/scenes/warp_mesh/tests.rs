@@ -1433,3 +1433,60 @@ fn the_decay_domain_is_not_the_wash() {
          hypothesis is alive again — Plan 0109 Phase 4 recorded it as dead"
     );
 }
+
+/// ADR-0132's correction, and the whole of its evidence: no shipped preset binds
+/// `warp_speed`, so there is nothing here to regress and the constant-rate
+/// equivalence is the only claim with anything behind it.
+///
+/// At a constant rate the integrated phase equals `rate * time`, which is why
+/// `DEFAULT_WARP_SPEED = 1.0` renders exactly what `time * wspeed` rendered.
+#[test]
+fn a_constant_warp_speed_integrates_to_the_multiply_it_replaced() {
+    let dt = super::super::FALLBACK_DT;
+    for rate in [1.0f32, 0.25, 3.0] {
+        let mut phase = 0.0f32;
+        let mut time = 0.0f32;
+        for _ in 0..600 {
+            phase = integrate_phase(phase, rate, dt);
+            time += dt;
+        }
+        assert!(
+            (phase - rate * time).abs() < 1e-3,
+            "rate {rate}: integrated {phase} against the multiply's {}",
+            rate * time
+        );
+    }
+}
+
+/// ...and the property the multiply failed: a rate that MOVES advances the phase
+/// by `rate * dt` whatever the elapsed time. Under `time * wspeed`, a swing from
+/// `1.0` to `1.5` at t = 100 s moved the phase by fifty seconds in one frame —
+/// the picture jumped rather than quickening, which is what an audio-bound rate
+/// does on every beat.
+#[test]
+fn a_warp_speed_change_bends_the_phase_instead_of_teleporting_it() {
+    let dt = super::super::FALLBACK_DT;
+    let mut phase = 0.0f32;
+    let mut time = 0.0f32;
+    for _ in 0..6_000 {
+        phase = integrate_phase(phase, 1.0, dt);
+        time += dt;
+    }
+    assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
+
+    let before = phase;
+    phase = integrate_phase(phase, 1.5, dt);
+    let step = phase - before;
+    assert!(
+        (step - 1.5 * dt).abs() < 1e-4,
+        "the phase advanced {step}, not {}",
+        1.5 * dt
+    );
+    // What the multiply would have done, stated so the size of the defect is on
+    // the record rather than only described.
+    let teleport = (1.5 * time) - (1.0 * time);
+    assert!(
+        teleport > 40.0,
+        "the multiply's one-frame jump at this elapsed time was {teleport} s"
+    );
+}

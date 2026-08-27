@@ -226,6 +226,16 @@ pub const MILKDROP_SOFTNESS: f32 = 1.0;
 const DEFAULT_WARP_SCALE: f32 = 1.0;
 const DEFAULT_WARP_SPEED: f32 = 1.0;
 
+/// One frame of a bindable rate, as ADR-0132 requires every rate in this engine
+/// to be advanced: a phase accumulator plus `rate * dt`, never `time * rate`.
+///
+/// A free function so the property is testable on the CPU with no device and no
+/// rendering — which is the whole of this correction's evidence, since no
+/// shipped preset binds `warp_speed` and there is nothing here to regress.
+fn integrate_phase(phase: f32, rate: f32, dt: f32) -> f32 {
+    phase + rate * dt
+}
+
 /// Deposit defaults: a soft blob at the centre, bright enough to see and small
 /// enough to be dragged into structure rather than filling the frame.
 const DEFAULT_DEPOSIT: f32 = 1.6;
@@ -389,7 +399,9 @@ const WARP_SHADER: &str = r#"
 struct Warp {
     // x: render-target aspect, y: dt (s), z: scene time (s), w: warp_scale
     misc: vec4<f32>,
-    // x: decay^dt, y: warp_speed, z: wrap (0/1), w: darken_center amount
+    // x: decay^dt, y: WARP PHASE (not the rate - integrated CPU-side per
+    //    ADR-0132; see the note at its read below), z: wrap (0/1),
+    // w: darken_center amount
     misc2: vec4<f32>,
     // x: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D),
     // yzw: unused
@@ -442,7 +454,13 @@ fn vs_main(in: VsIn) -> VsOut {
     let dt     = wu.misc.y;
     let time   = wu.misc.z;
     let wscale = max(wu.misc.w, 1e-3);
-    let wspeed = wu.misc2.y;
+    // The warp's phase, ALREADY INTEGRATED (ADR-0132). This slot used to carry
+    // `warp_speed` and this stage computed `time * wspeed` — which meant that
+    // the first preset to bind the rate to audio would find that a swing from
+    // 1.0 to 1.5 at t = 100 s moves the phase fifty seconds in one frame. The
+    // picture did not speed up; it jumped. Nothing caught it because no shipped
+    // preset binds `warp_speed`.
+    let wphase = wu.misc2.y;
 
     // This vertex's own destination uv (texture space, y down).
     let uv = vec2<f32>(in.clip.x * 0.5 + 0.5, 0.5 - in.clip.y * 0.5);
@@ -483,7 +501,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // 3. the procedural warp, MilkDrop's four sinusoids: a wobble whose own
     //    frequencies drift, so it never settles into a visible standing pattern.
     //    Applied in uv, where the reference applies it.
-    let wt = time * wspeed;
+    let wt = wphase;
     let f0 = 11.68 + 4.0 * cos(wt * 1.413 + 10.0);
     let f1 =  8.77 + 3.0 * cos(wt * 1.113 +  7.0);
     let f2 = 10.54 + 3.0 * cos(wt * 1.233 +  3.0);
@@ -999,6 +1017,11 @@ pub struct WarpMeshScene {
     scalars: [f32; OUTPUTS],
     warp_scale: f32,
     warp_speed: f32,
+    /// The integrated warp phase (ADR-0132): `+= warp_speed * dt` once per
+    /// frame, in `update`, after this frame's parameter values have landed. At a
+    /// constant rate it equals `warp_speed * time`, which is why the `1.0`
+    /// default renders exactly as the multiply it replaced.
+    warp_phase: f32,
     decay: f32,
     deposit: f32,
     deposit_x: f32,
@@ -1111,6 +1134,7 @@ impl WarpMeshScene {
             scalars: PER_VERTEX_DEFAULTS,
             warp_scale: DEFAULT_WARP_SCALE,
             warp_speed: DEFAULT_WARP_SPEED,
+            warp_phase: 0.0,
             decay: DEFAULT_DECAY,
             deposit: DEFAULT_DEPOSIT,
             deposit_x: DEFAULT_DEPOSIT_CENTRE,
@@ -1807,6 +1831,10 @@ impl Scene for WarpMeshScene {
     }
 
     fn update(&mut self, frame: &AnalysisFrame) {
+        // The warp phase integrates here rather than in `advance`, because
+        // `advance` runs before this frame's `set_param` calls and would
+        // therefore use the previous frame's rate (ADR-0132).
+        self.warp_phase = integrate_phase(self.warp_phase, self.warp_speed, self.dt);
         // Kept for `render`, which drives the per-vertex program and is the only
         // place the render target's aspect is known.
         self.frame = *frame;
@@ -1970,7 +1998,7 @@ impl Scene for WarpMeshScene {
                 misc: [aspect, dt, self.time, self.warp_scale],
                 misc2: [
                     decay,
-                    self.warp_speed,
+                    self.warp_phase,
                     f32::from(self.wrap >= 0.5),
                     self.darken_center.clamp(0.0, 1.0) * DARKEN_CENTER_STRENGTH,
                 ],
