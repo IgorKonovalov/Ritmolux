@@ -1,8 +1,10 @@
 # ADR-0144 — The lighting feed is a resolved NDI sender and a fixed OSC telemetry set
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-29 — see the dated `Outcome` below; superseded in part by
+> [0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md)
 > **Date:** 2026-08-28
-> **Related plan(s):** [0132](../plans/0132-the-lighting-rig-follows-the-visuals.md)
+> **Related plan(s):** [0132](../plans/done/0132-the-lighting-rig-follows-the-visuals.md),
+> [0133](../plans/0133-the-engine-drives-the-lights.md)
 
 ## Context
 
@@ -256,3 +258,60 @@ and the 225x readback reduction are **arithmetic** from the frame size. The part
 quoted for the small-render argument are **measurements from Plan 0128 Phase 1**, and that plan is
 draft — if its numbers move, the direction of the argument does not, because it holds under both
 the pre- and post-ADR-0140 behaviour.
+
+## Outcome (added at Plan 0132's close, 2026-08-29)
+
+**The OSC half shipped and stands. The NDI half was never built, and its premise was rejected
+rather than falsified** — which is a different verdict from the one this ADR prepared for, and the
+distinction is the whole of what this section records.
+
+### What shipped
+
+`standalone/src/osc.rs` publishes the fixed `/lmv/v1` set over UDP, off by default, behind `--osc`
+and an `[osc]` config section. The encoder is hand-rolled, as this ADR argued, and adds no crate.
+Two shapes this ADR left open were decided in the plan and are now the contract:
+
+- **`rms` had no source.** This ADR names it in the fixed set and the engine computes no such value.
+  It is computed in the shell from `AnalysisFrame::waveform` and is therefore **un-normalized**,
+  unlike the four levels beside it — an operator mapping it needs a console-side gain.
+- **"The beat counter" is two addresses**, `beat/trigger` and `beat/index`, because `/lmv/v1/beat`
+  would have been a *prefix* of `/lmv/v1/beat/phase` and an OSC pattern match treats a prefix and a
+  sibling differently.
+
+**The send path was decided by measurement and the inline exit was taken**, per this ADR's own
+"both exits are stated" clause. Plan 0132's Phase 3 log carries the distributions, the machine and
+the honest reading: sink-on sits inside sink-off's own run-to-run spread on every metric, but the
+send itself costs ~0.169 ms mean against a 10.875 ms frame, so the inline exit is earned by GPU-wait
+slack that happened to exist on that machine rather than by the send being free. A CPU-bound
+configuration would show more of it. That is a re-measure trigger, not a defect.
+
+### What was rejected, and why that is not a falsification
+
+A live set on 2026-08-29 ran the whole chain with **no Arena, no second machine and no NDI**:
+`lmv --osc 127.0.0.1` into a Python bridge on the same host, emitting Art-Net straight to the
+fixtures. The user then rejected the second machine outright and for all future work.
+
+That removes the **receiver** every NDI argument here was built to feed. Nothing in the video
+half was measured and found wrong; the room it was designed for stopped existing. So:
+
+- **The NDI licence gate is moot, not resolved.** It was never read. Plan 0132 Phase 1b did not run.
+  Anyone reaching for NDI later starts that question from zero — this ADR's silence on it is an
+  absence of evidence, not evidence.
+- **The resolve-in-linear-light argument survives its transport.** It was never about NDI; it is
+  about what a lighting sample of an HDR composite must average, and it moves to
+  [Plan 0133](../plans/0133-the-engine-drives-the-lights.md) Phase 8 to resolve onto the rig's own
+  24 x 170 raster instead of onto an NDI frame.
+- **Alternative D — OSC only, no video at all — is what actually ran**, alone, exactly as this ADR
+  said it might. It was listed as the degenerate fallback and it turned out to be the product.
+- **Alternative E — Art-Net emitted directly by this app — was refused here on a premise that is
+  now false.** This ADR rejected it because *"it makes us a lighting console"* and Arena already was
+  one. The rig has no console. [ADR-0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md)
+  reopens it on that corrected premise and supersedes this ADR's transport half.
+- **Alternative F — preset-declared OSC channels — is still open and now has evidence pointing at
+  it.** The fixed set's first real consumer wanted the bar grid the engine already computes and did
+  not publish, filed as design-backlog 0157, and hit the unsettled tempo octave, filed as 0158.
+  Both are additive under `/lmv/v1` and neither requires F.
+
+**What is *not* superseded:** the fixed-vocabulary decision, the `/lmv/v1` versioning-in-the-address
+scheme, the drop-and-report-the-edge failure behaviour, and the off-by-default posture. ADR-0145
+retains the sink as built.

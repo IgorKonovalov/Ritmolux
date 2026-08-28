@@ -1,13 +1,36 @@
 # 0132 — The lighting rig follows the visuals
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-29
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) (proposed),
-> [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
-> [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md),
-> [0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed),
-> [0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (proposed)
+> **Related ADRs:** [0144](../../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
+> (**accepted 2026-08-29 with a dated `Outcome`** — its premise was rejected, not falsified),
+> [0125](../../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
+> [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md),
+> [0140](../../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed),
+> [0142](../../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (proposed)
+
+> **Close note, 2026-08-29.** Phases 2 and 3 shipped and are what the rig ran on; Phases 1b, 5, 6 and
+> 7 were retired mid-plan when a live set removed the receiver they fed, and
+> [ADR-0145](../../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) +
+> [Plan 0133](../0133-the-engine-drives-the-lights.md) carry the replacement architecture. Mode 4
+> verdict: **no blockers, one major, three minors, two nits.** The major was Phase 8's shipping half — `--osc`
+> and `[osc]` shipped with no document naming either — and it was written at this close (`e8e3a9b`,
+> `README.md`'s *Flags & environment*), with the `/lmv/v1` table transcribed from
+> `Telemetry::messages` and diffed against it address for address.
+>
+> **The log's phase table and the retirement note disagree about Phase 4, and the retirement note is
+> right.** The table row was written before the live set happened. Phase 4's walking-skeleton
+> done-when — *a fixture visibly changes on the beat, driven by our telemetry* — **was met**, through
+> a Python Art-Net bridge rather than through Arena, and its *"which addresses were useful"* finding
+> is real and filed as design-backlog 0157 and 0158. What was **not** met is Phase 1a's own roster
+> (whether a hand-moved Arena parameter changes a fixture, Arena's OSC port, its edition), and it
+> never will be: there is no Arena in the architecture any more.
+>
+> Verified at the close on the post-merge tree: `cargo fmt --check`, `clippy --workspace
+> --all-targets` and **`cargo nextest run --workspace` green (1,122 passed, 5 skipped)**, all five
+> `scripts/` gates exit 0, and **no golden baseline moved** — the working tree was clean after the
+> full suite, which is Phase 2's own done-when.
 
 ## TL;DR
 
@@ -30,7 +53,7 @@ joined by **switched Ethernet**, and Art-Net out of Arena to real fixtures. Aren
 patch, the zoning and the dimming. What it has no source for is a signal that moves the way the
 music does — which is exactly what this engine already computes and already draws.
 
-[ADR-0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
+[ADR-0144](../../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
 is the decision: two sinks, Arena owns the mapping, the transport set is constrained by what Arena
 can natively ingest across machines. It also lists **six facts it rests on that are unverified in
 this repo** — the NDI licence chief among them. Phases 1a and 1b establish them, split so the
@@ -38,7 +61,7 @@ NDI ones gate only the NDI phases.
 
 **The two halves have very different dependency weight, and the phase order is built on that.** The
 OSC half is a UDP socket and a message encoder in the shell. The NDI half needs
-[Plan 0115](0115-the-engine-becomes-a-live-video-source.md)'s frame tap, which is **approved and not
+[Plan 0115](../0115-the-engine-becomes-a-live-video-source.md)'s frame tap, which is **approved and not
 started**, plus a third-party SDK whose licence terms nobody here has read. Interleaving them would
 put the cheap, certain half behind the expensive, uncertain one.
 
@@ -86,8 +109,8 @@ flowchart LR
 > user has since rejected the second machine outright and for all future work, which removes the
 > receiver every one of those phases was built to feed.
 >
-> [ADR-0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) and
-> [Plan 0133](0133-the-engine-drives-the-lights.md) carry the replacement. **The NDI licence gate is
+> [ADR-0145](../../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) and
+> [Plan 0133](../0133-the-engine-drives-the-lights.md) carry the replacement. **The NDI licence gate is
 > moot rather than resolved** — it was never read and no longer needs to be.
 >
 > **Phases 2 and 3 stand and their work ships.** The `/lmv/v1` OSC sink is what the live set ran on;
@@ -164,7 +187,7 @@ flowchart LR
 - **How:**
   - **Hand-roll the OSC 1.0 encoder; add no crate.** A message is an address string, a type-tag
     string and the arguments, each padded to a 4-byte boundary — on the order of a hundred lines for
-    the `f`, `i` and `s` types this needs. [NFR section 4](../nfr.md)'s dependency gate asks for a
+    the `f`, `i` and `s` types this needs. [NFR section 4](../../nfr.md)'s dependency gate asks for a
     justification for any crate pulling a large transitive graph, and the honest answer here is that
     the encoder is smaller than the justification would be. `std::net::UdpSocket` is the transport.
   - **The address space is versioned in the addresses themselves** — `/lmv/v1/...` — so a later
@@ -174,7 +197,7 @@ flowchart LR
     under its true name**, since nothing outside this repo inherits that naming debt.
   - **Config and CLI:** `[osc]` in `config.toml` (enabled, target `host:port`, send rate) plus an
     `--osc <host:port>` override, following the `[input]` precedent
-    ([ADR-0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md)).
+    ([ADR-0142](../../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md)).
     **Off by default.**
   - **Decide the failure behaviour deliberately.** A send error must not propagate with `?` into the
     frame loop and must not spam a log every frame. Whatever it does — drop silently, back off,
@@ -208,7 +231,7 @@ flowchart LR
     here rather than earned, and it would not survive a different machine — whereas "smaller than
     this configuration's own noise" is checkable anywhere and means the same thing everywhere.
   - The log names the machine and the link the measurement was taken on, per
-    [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).
+    [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).
 
 ### Phase 4 — Human: the OSC half against real fixtures
 
@@ -226,11 +249,11 @@ flowchart LR
 ### Phase 5 — The frame tap grows a linear resolve stage
 
 > **RETIRED 2026-08-29 as written; the idea survives.** The linear resolve is the right thing and
-> moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 8, which resolves onto the rig's
+> moves to [Plan 0133](../0133-the-engine-drives-the-lights.md) Phase 8, which resolves onto the rig's
 > own 24 x 170 raster instead of onto an NDI frame.
 
 - **Owner skill:** dev
-- **Depends on:** [Plan 0115](0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
+- **Depends on:** [Plan 0115](../0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
   the frame tap. **This plan does not build that tap.** If 0115 has not reached Phase 2 when this
   plan is taken up, this phase and the two after it wait; Phases 1 to 4 do not.
 - **What:** add a GPU-side reduction to the tap that resolves the show-size render down to the
@@ -263,7 +286,7 @@ flowchart LR
 - **Files touched:** new `standalone/src/ndi.rs`, `standalone/Cargo.toml`, `standalone/src/main.rs`,
   the SDK staging script, CI's release job.
 - **How:** stage the SDK by **pinned fetch, never committed**, exactly as
-  [ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)
+  [ADR-0115](../../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)
   already stages the foobar2000 SDK and as ADR-0125 plans to stage Spout — one pattern, third use.
   The feature being off by default is what keeps an ordinary `cargo build`, CI's default job and the
   macOS target untouched.
@@ -279,7 +302,7 @@ flowchart LR
 
 ### Phase 7 — Human: the whole rig, and the question this plan cannot answer
 
-> **RETIRED 2026-08-29.** Its legibility question is real and moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 8.
+> **RETIRED 2026-08-29.** Its legibility question is real and moves to [Plan 0133](../0133-the-engine-drives-the-lights.md) Phase 8.
 
 - **Owner skill:** human
 - **What:** run the full path — audio to visuals to NDI to Arena to Art-Net to fixtures — for a real
@@ -299,7 +322,7 @@ flowchart LR
 ### Phase 8 — The operator documentation
 
 > **NARROWED 2026-08-29, not retired — and the first draft of this note got it wrong.** It moved the
-> whole phase to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 9, which would have shipped
+> whole phase to [Plan 0133](../0133-the-engine-drives-the-lights.md) Phase 9, which would have shipped
 > `--osc` and `[osc]` with **no document anywhere naming either** — `README.md`'s
 > *Flags & environment* section lists `--device`, `--audio`, `--fps` and `--ffmpeg` and does not
 > list `--osc`.
