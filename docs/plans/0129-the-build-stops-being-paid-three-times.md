@@ -1,6 +1,6 @@
 # 0129 — The build stops being paid three times
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) (proposed)

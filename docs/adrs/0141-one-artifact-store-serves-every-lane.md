@@ -2,6 +2,7 @@
 
 > **Status:** proposed
 > **Date:** 2026-08-28
+> **Amends:** [ADR-0053](0053-plan-lanes-run-in-git-worktrees.md)
 > **Related plan(s):** [0129](../plans/0129-the-build-stops-being-paid-three-times.md)
 
 ## Context
@@ -59,8 +60,18 @@ so reaching it means naming a sysroot path that is specific to one machine. Setu
 [ADR-0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) already uses for
 `git config core.hooksPath .githooks`.
 
-This revokes exactly one of ADR-0053's stated positives. The worktree layout, the merge direction,
-the shared stash hazard and the close ceremony are all unchanged.
+This **amends ADR-0053 in both directions**, and the second direction is the stronger one. It revokes
+exactly one of that ADR's stated positives — *"parallel lanes do not share a `target/` directory, so
+two sessions building at once do not thrash one cargo lock"* — which is the price named above. But it
+also **discharges the first of its Negatives**: *"Disk cost is severe and recurring. Each worktree
+carries its own `target/`; the Plan 0049 lane held ~8 GB in `target/debug/incremental` alone and the
+disk reached zero bytes mid-session, breaking a build."* That is not a cost this ADR pays around; it
+is a premise this ADR removes. ADR-0053 recorded it as the standing consequence of a design choice,
+and it stopped being one the moment the artifact store stopped being per-worktree.
+
+Everything else in ADR-0053 stands untouched: the worktree layout, the merge direction, the
+five-step close, the shared stash hazard, and the Windows `git worktree remove` trap. Worktrees are
+not in question here — only what they each compile into.
 
 ## Consequences
 
