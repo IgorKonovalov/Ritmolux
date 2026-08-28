@@ -1,0 +1,92 @@
+# Broadside - a Maurer rose printed rather than lit. Two opaque inks, bone and
+# red, on the black ground the engine clears to. The whole look rests on one
+# switch: a stroke crossing another REPLACES it instead of adding to it, so the
+# web reads as two press passes over one plate and not as a glowing wireframe.
+system = "parametric_curve"
+name = "Broadside"
+
+[curve]
+family = "maurer_rose"
+
+[palette]
+# TWO PLATEAUS, AND THE STOPS JUMP. A ramp between the inks is not limited ink -
+# every intermediate value it produces is a third colour. `palette_steps = "2"`
+# below quantizes the coordinate to each band's CENTRE (0.25 and 0.75), which is
+# what keeps the sample off the one-texel transition the 256-entry LUT bakes a
+# jump like this into.
+#
+# THESE TWO STOPS ARE WRITTEN IN LINEAR LIGHT, NOT IN sRGB, AND THAT IS WHY THEY
+# LOOK WRONG IN A COLOUR PICKER. The LUT is Rgba8Unorm and its entries are used
+# as colour directly, so what a stop names is a LINEAR value that the display
+# encode then lifts. Written as plain sRGB, the red #c81423 renders #dd4c64 - its
+# green channel almost quadrupled and the ink arrives coral. Pre-converted, the
+# same ink renders #c81622, within 2/255 of the colour it names.
+#
+#   #930204 renders #c81622   the poster red
+#   #e2d6c0 renders #e3ddd3   the bone, rolled off because it sits above the
+#                             tonemap knee at 0.6, where the correction stops
+#                             being exact and only gets close
+stops = [
+  { at = 0.0000, color = "#e2d6c0" },
+  { at = 0.4999, color = "#e2d6c0" },
+  { at = 0.5001, color = "#930204" },
+  { at = 1.0000, color = "#930204" },
+]
+
+[params]
+# THE SEAM IS THE PRESET. At the default `0` this scene draws additive light and
+# bone over red is pink; at `1` the whole batch composites OVER, so the ink laid
+# last owns the pixel. Everything below is chosen to keep that true.
+stroke_blend = "1"
+softness = "0"
+
+# THE SPREAD IS SIX BECAUSE OPAQUE STROKES ARE ORDERED. The colour axis is
+# position along the walk, so at a spread of 1 the second half of the path is one
+# flat ink drawn entirely ON TOP of the first - measured, and it buries the bone
+# almost completely. Six sends the coordinate through the two-band palette six
+# times, so the passes alternate along the walk and neither can bury the other.
+hue = "0"
+hue_spread = "6.0"
+palette_steps = "2"
+saturation = "1.0"
+
+n = "4"
+d = "97"
+samples = "361"
+scale = "0.92"
+spin = "0.08"
+phase = "sin(time * 0.06) * 0.10"
+
+# THE PLATE BUILDS WITH THE MUSIC, AND THAT IS THE ONLY HONEST "MORE" THIS SEAM
+# HAS. Under additive light a loud passage answers by getting brighter; under
+# OVER it cannot, and a thicker stroke only covers more sheet - at a heavy hand
+# the web closes into a solid mass and loud reads FLATTER than quiet. So the
+# energy goes on `draw_progress`, which is a reveal: quiet shows about half the
+# walk, loud the whole plate. With `d = 97` consecutive chords land on opposite
+# sides of the figure, so a prefix is spread over the whole rose and reads as
+# density rather than as a half-drawn shape.
+draw_progress = "0.48 + clamp(bass * 0.61, 0, 0.52)"
+# Ink weight takes the transient only, and a small one: half a unit of stroke is
+# a press that bites, two would be a plate that floods.
+thickness = "2.1 + clamp(onset * 0.83, 0, 0.5)"
+# The rose breathes outward on the mids - `radial_offset` adds to the radius, so
+# the lobes open without the figure changing size.
+radial_offset = "clamp(mid * 0.098, 0, 0.083)"
+brightness = "1.0"
+glow = "1.0"
+
+# EVERY ENUMERATED MIXER IS OFF, and each is written out rather than left to its
+# default so that turning one on is a visible edit rather than a silent one. No
+# `bg_*`, no `[palette_b]`, no `[layer]`, no `kaleido_*`: those are off by
+# absence, and each would put a fourth colour in the frame.
+trails = "0"
+bloom_amount = "0"
+ink_amount = "0"
+palette_contour = "0"
+
+[smoothing]
+# The reveal is eased so the plate grows into the frame instead of flickering
+# chord counts; the transient on `thickness` is left fast on purpose.
+draw_progress = 0.30
+thickness = 0.18
+radial_offset = 0.40
