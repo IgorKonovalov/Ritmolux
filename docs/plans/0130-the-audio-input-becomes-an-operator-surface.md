@@ -363,7 +363,7 @@ struct CaptureHandle {
 | 3 — the shell swaps capture live | dev | done | `dd8fbf3` |
 | 4 — a dead input reports itself | dev | done | `5e29453` |
 | 4b — the review fixes | dev | done | `85bd59b` |
-| 5 — on-device gate | human | not started | |
+| 5 — on-device gate | human | partial — bullets 1 and 2 run 2026-08-28 | |
 
 ### Notes
 
@@ -397,7 +397,38 @@ struct CaptureHandle {
 - Those two forced three files no phase lists: `standalone/src/diaglog.rs` (its live-capture test
   asserts the token verbatim), `docs/on-device-validation.md` and both
   `packaging/*/READ-ME-FIRST.md`, which quote the old token to a tester.
-- Phase 5's on-device gate is untouched and none of its four bullets is covered here.
+- Phase 5, bullets 1 and 2, run live 2026-08-28 on the development box. **No ZOOM interface was
+  available**, so the roster was one endpoint per dataflow — `Speakers (Realtek(R) Audio)` and
+  `Microphone Array (Realtek(R) Audio)` — and the `Input device` row could only cycle `default`
+  against the single real name. The `Input mode` row was the real swap.
+  - 22 swaps. The two modes negotiate **different channel counts** here, `48000/2` against
+    `48000/4`, so every mode swap took the `Analyzer` rebuild rather than the unchanged-format path.
+  - The operator confirmed by eye that the picture follows the source: reaction present on one mode
+    and absent on the other. The perceived hitch was not separately timed.
+  - `config.toml` after a clean quit read `mode = "loopback"`, `device = "default"`, matching the
+    last swap in the run.
+- **One swap of the 22 failed**, with `REGDB_E_CLASSNOTREG (0x80040154)` out of
+  `CoCreateInstance(MMDeviceEnumerator)` on the freshly spawned capture thread. The shell degraded
+  as Phase 3's done-when specifies — the reason printed, the verdict read
+  `failed WASAPI ... Class not registered`, rendering continued, and the next swap came back live —
+  so that criterion now has a real failure behind it rather than a synthetic one.
+
+  What is new is the exposure. Before this plan `capture_win::start` ran once per process; a swap
+  now spawns a thread that runs `CoInitializeEx(MULTITHREADED)`, `CoCreateInstance`,
+  `CoUninitialize`, and exits. The observed rate was 1 in 22 under menu-speed churn. **No mechanism
+  is claimed here** — the apartment-churn reading is untested, and one run on one box is not
+  evidence for a cause.
+
+  The reason it is a finding rather than a note: `poll_input_lost` reopens up to
+  `INPUT_RECOVERY_ATTEMPTS` times on consecutive frames, which is the fastest churn the design
+  produces. A loss whose reopens drew this error would spend the budget on it instead of on the
+  device's actual state. Phase 4b's settle window does not bear on that, and neither does anything
+  else in this plan.
+- Phase 5 bullets 3 (unplug and recover) and 4 (96 kHz) did **not** run: no removable interface was
+  available. The open risk the plan names — whether a real loss even reports
+  `AUDCLNT_E_DEVICE_INVALIDATED` — is therefore still open, and no code path added by Phase 4 has
+  been exercised against a live device loss. Disabling an endpoint from the Windows Sound panel was
+  proposed as a substitute and not taken up.
 - Phase 4b also touched `README.md`, which its file list omits. Two of its done-whens change what an
   operator observes: a valueless `--device` now exits non-zero, and a recovery no longer writes
   `config.toml`. The `--device` bullet and a new paragraph under it carry both.
@@ -426,4 +457,5 @@ struct CaptureHandle {
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 101 reductions hold across
   51 live entries. Advisory only: entry 0032, which Phase 5's fourth bullet is the stated trigger
   for, is among the 49 whose probed paths moved since their stamp.
-- **Outstanding `human` phases:** Phase 5 — swap it, unplug it, plug it back, and the 96 kHz read.
+- **Outstanding `human` phases:** Phase 5, bullets 3 and 4 — the unplug/recover cycle and the 96 kHz
+  read. Bullets 1 and 2 ran 2026-08-28; see the notes above, including the one failed swap.
