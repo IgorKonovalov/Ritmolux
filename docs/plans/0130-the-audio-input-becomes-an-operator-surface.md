@@ -317,7 +317,7 @@ struct CaptureHandle {
 | 1 — endpoint roster as a value, flags over config | dev | done | `9005a8d` |
 | 2 — the two rows in the pure state machine | dev | done | `7eee5f0` |
 | 3 — the shell swaps capture live | dev | done | `dd8fbf3` |
-| 4 — a dead input reports itself | dev | done | committed with this row |
+| 4 — a dead input reports itself | dev | done | `5e29453` |
 | 5 — on-device gate | human | not started | |
 
 ### Notes
