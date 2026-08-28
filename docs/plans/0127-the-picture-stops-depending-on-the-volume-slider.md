@@ -275,8 +275,8 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 |---|---|---|---|
 | 1 — The analyzer levels the trace | dev | done | `afd8aa5` |
 | 2 — The trace spans the width | dev | done | `3560eed` |
-| 3 — One reference capture | human | **stop gate — waiting on the user** | |
-| 4 — The base amplitude constant | dev | not started | |
+| 3 — One reference capture | human | done — both readings taken | |
+| 4 — The base amplitude constant | dev | **skipped — see notes** | |
 | 5 — The docs say what the contract is | dev | not started | |
 
 ### Notes
@@ -293,6 +293,45 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
   that sweep, and `mode_6_at_zero_mystery_is_the_mode_2_scope` pins the coincidence directly.
 - Phase 2 golden run: no baseline moved on the hardware adapter, nothing blessed
   (`cargo nextest run --workspace`, 1077 passed).
+- Phase 3 ran 2026-08-28 on the development box. **Our half was measured headlessly, not through
+  the component the phase names.** The phase's *How* specifies `foo_lmv.dll` so both sides read the
+  same pre-volume stream; `shot --audio` reads the WAV file directly, so there is no loopback tap
+  and no OS volume anywhere in the path at all, and the capture is reproducible rather than a
+  screenshot of a live window. The component was rebuilt from this branch and installed regardless
+  — the installed DLL was from 2026-08-24, predating Phase 1 — so the live cross-check is available
+  to anyone who wants it.
+- Phase 3 stimulus, authored for the gate and living outside the repo in `WORK/lmv-0127-gate/`:
+  two `.milk` presets at `nWaveMode = 6`, `fWaveScale = 1.0`, `fWaveSmoothing = 0`,
+  `fWaveParam = 0`, warp/zoom/rot/echo neutral, thin opaque white line on black — `A-crisp` at
+  `fDecay = 0.5` for the single-frame read, `B-hold` at `fDecay = 1.0` for a max-hold envelope.
+  Audio was a 60 s 48 kHz stereo sine at 200 Hz, verified 0.0 dBFS peak / -3.0 dB RMS; 200 Hz puts
+  ~2 cycles across MilkDrop's 512-sample window. The directory also holds the reference
+  screenshots, the our-side renders and the measurement scripts.
+- **Phase 3 reading (a) — reference peak-to-peak at `fWaveScale = 1.0`, full-scale input:
+  0.316 frame heights.** Read from `A-crisp` at 2000x1125 (aspect 1.7778), rows 384..739 =
+  355-356 px, unchanged at every threshold from 20 to 180, trace centre row 562.0 against a frame
+  centre of 562.0. `B-hold` corroborates loosely — its envelope converges to 0.320 H at high
+  threshold, but its edges are soft and threshold-dependent (0.351 -> 0.320), so `A-crisp` is the
+  reading of record.
+- **Phase 3 reading (b) — reference x-extent at 16:9: 1.000 of frame width.** Columns 0..1999, at
+  every threshold.
+- Phase 3, our side, same stimulus at 1920x1080 via `--frame-at 2000`: peak-to-peak per unit
+  `wave_scale` is 0.3037 H at scale 0.5, 0.3019 H at 1.0, 0.3009 H at 2.0 — linear to within 0.9 %
+  across a 4x range, so the reference-to-ours ratio is a single number, **1.047**. The mode-6/7
+  factor of `0.15` in `draw.rs` implies MilkDrop's is ~0.157.
+- **Phase 4 was skipped, and not by the condition the plan names for skipping it.** Phase 4's
+  done-when skips the phase if Phase 3 returned *not obtainable*; Phase 3 returned both numbers.
+  What decided it is Phase 4's own second criterion — that the corpus `p90 = 3.235` stays inside
+  the frame. Measured at 1920x1080 on the trace geometry: `p10 = 0.01` draws 5 px (0.0046 H), a
+  visible flat line; `p90 = 3.235` draws 0.9722 H, rows 15..1064, inside the frame with 15 px of
+  margin; `p90` scaled by the measured 1.047 draws 1.0000 H, rows 0..1079, **clipped at the frame
+  edge**. Applying the constant therefore fails the criterion the phase was written to satisfy.
+  The user's decision on that evidence was to skip. 1.047 is recorded here so it is not re-derived.
+- Phase 3 reading (b) is the reference-side check on Phase 2: design-backlog 0122 held that the
+  mode-6 trace covered `1/aspect` of the width, and the reference spans the full width, which is
+  what Phase 2 changed the trace to do. Until now that fix rested on a reading of `draw.rs`.
+- The plan header makes `Closes:` design-backlog 0120 conditional on Phase 3. Phase 3 produced the
+  measurement; no constant was applied. The disposition of 0120 is architect's call at close.
 
 ### Close triggers
 
