@@ -5404,3 +5404,76 @@ is what needed correcting.
 `## Implementation phases`, so the report outweighs the contract. It is an unusually good log — the
 measurements in it are why several of the checks above could be aimed rather than swept — but the
 proportion is the thing nothing else gates.
+
+
+### 0127 — The picture stops depending on the volume slider (closed 2026-08-28)
+
+**Review: no blockers, no majors, four minors, two nits.** Three `dev` phases landed (`afd8aa5`,
+`3560eed`, `e606889`), the `human` stop gate ran and returned both readings, and Phase 4 was
+skipped. Verified on the merged tree rather than from the log: `fmt` and
+`clippy --workspace --all-targets` clean, `cargo nextest run --workspace` **1109 passed / 0 failed**,
+doc-links, comment-hygiene and index-rows green, and `check-backlog-claims` red on exactly the one
+on-delivery probe the log predicted (0123's `present: Raw amplitude in roughly`), repaired here.
+
+**What the level contract bought.** `AnalysisFrame::waveform` now divides by one slowly-released
+running peak of its own magnitude and publishes the divisor as `waveform_gain`. The scale invariance
+is asserted as the property rather than as a tolerance — *exact* equality for a power-of-two gain
+change, and a full `dynamic_groove` run through the real analyzer at 1.0x and 0.18x agreeing
+sample-for-sample. `WAVE_FLOOR = 1e-3` is derived in amplitude units rather than copied from
+`BAND_FLOOR`, with the reason stated: a band mean spreads a signal across bins, a time-domain peak
+does not, so `BAND_FLOOR` here would sit exactly at a -80 dBFS room and amplify it to a full-scale
+trace. The margin, not the value, is what the test asserts. The trace has exactly one consumer
+(`warp_mesh`'s `wave_mode` draw), so the blast radius was as small as ADR-0139 predicted.
+
+**Phase 3 is the reason this plan is worth more than its diff.** Two purpose-authored `.milk`
+presets and a verified full-scale sine, run through `foo_vis_milk2` and through this engine, produced
+two numbers nothing in this repo had: the reference draws a unit-scale mode-6 trace at **0.316 frame
+heights** and spans **1.000 of frame width** at 16:9. Ours draws 0.3019 H, linear to within 0.9 %
+across a 4x `wave_scale` sweep — **4.7 % smaller than the reference, not larger**. That reading does
+two things. It is the reference-side check on Phase 2, which until then rested on a reading of
+`draw.rs`. And it **falsifies the title of design-backlog 0120** — "renders larger than the
+reference's" — which stays live with the measurement and a dropped priority rather than being closed.
+
+**Phase 4 was skipped, and not by the condition the plan named.** The plan's skip clause fires when
+Phase 3 returns "not obtainable"; it returned both numbers. What actually decided it was Phase 4's
+own second criterion: the corpus `p90 = 3.235` draws 0.9722 H today with 15 px of margin, and 1.0000 H
+— clipped at the frame edge — once the measured 1.047 is applied. The phase could not satisfy the
+criterion it was written to satisfy, for 4.7 %. `dev` surfaced that rather than tuning past it, the
+user decided on the evidence, and the constant is recorded so it is not re-derived.
+
+**Phase 2's coincidence, surfaced rather than papered over.** Width-normalizing mode 6 made it
+byte-identical to mode 2 at `wave_mystery = 0` — the `1/aspect` compression had been the only thing
+separating that pair, and `every_wave_mode_builds_a_different_figure` (a Plan 0100 done-when) went
+red. The right reading, taken: the separation the defect bought was not a property to keep, the
+sweep now builds modes 6 and 7 at the angle they exist for, and
+`mode_6_at_zero_mystery_is_the_mode_2_scope` pins the coincidence directly so a future change that
+re-separates the pair has to say so. Phase 3's reading (b) then confirmed the reference's mode-6 at
+that setting is itself a full-width horizontal scope.
+
+**The four minors.** (1) Phase 2's golden report states the result and not the reason: **no golden
+PNG fixture draws `wave_mode` 6 or 7** — `warp_mesh_stroke` is mode 2, the others mode 0, and no
+shipped preset sets `wave_mode` at all. The only mode-6 fixture in the tree,
+`core/tests/fixtures/milk_wash_blur_mix_3.toml`, feeds `milk_wash.rs`'s statistics rather than a
+baseline image. The geometry change shipped with zero rendered-pixel coverage; the three geometry
+property tests plus reading (b) are adequate evidence, but "the suite is clean" and "the suite is
+blind here" read identically in a log. (2) `draw.rs`'s new comment and one test doc block attribute
+the rotated trace's aspect-dependent amplitude to "what the reference does", where Phase 3 measured
+the reference only at `wave_mystery = 0` — ADR-0071's prose corollary, one clause from correct.
+(3) The two-frontend claim now appears in three doc surfaces and has never been observed: Phase 3
+deliberately read our side through `shot --audio`, which is right for the constant and means no
+loopback tap was in the path. The rebuilt component is installed on the box. (4) The Phase 4 skip
+and its consequence for 0120's disposition, handled here.
+
+**Two nits.** `the_trace_is_portable_across_absolute_gain` asserts `1e-4` beside a sibling asserting
+`1e-6` plus exact equality; the gap is legitimate — the unit test runs one hop, the integration test
+a whole release chain — but nothing says so. And `core/tests/dsp.rs:850` describes the code as a
+history ("the dynamics the un-normalized trace was defended for"), which the mechanical gate cannot
+see because it only catches the `Plan NNNN` form.
+
+**Kept, unprompted and out of scope:** Phase 5's edit to `docs/specs/0002-ring-determinism.md` goes
+one clause past the waveform and moves `spectrum` off the "resolves from its window" side, where it
+had been wrong since Plan 0048 gave it a `BandNormalizer`.
+
+**Curation:** `presets/` untouched, so no sweep was owed. The stale-workaround grep over
+`presets/*.toml` is clean for this plan's defects — nothing in the shipped set cites 0120, 0122,
+0123 or the waveform level as a constraint it was authored around.

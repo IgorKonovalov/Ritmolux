@@ -1,10 +1,19 @@
 # 0127 — The picture stops depending on the volume slider
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-28. Phases 1, 2 and 5 landed (`afd8aa5`, `3560eed`, `e606889`);
+> Phase 3's human capture returned both readings; Phase 4 was skipped on that measurement, by the
+> user's call, because applying the derived 1.047 pushes the corpus `p90` to exactly the frame edge.
+> Mode 4 review: **no blockers, no majors, four minors, two nits** — the merged workspace is green
+> (1109 tests), the gain cancels exactly and is floored on a derived margin, the trace spans the
+> frame width as a property over three aspects, and Phase 3 reading (b) checks that against the
+> reference. Backlog 0123 and 0122 archived; **0120 stays live**, its "renders larger" half
+> falsified by the reading.
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (proposed — the level contract this builds), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the normalizer it reuses), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect habit Phase 2 applies one level down), [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the idiom the trace draws into)
-> **Closes:** design-backlog 0123, design-backlog 0122, design-backlog 0120 (conditionally — see Phase 3)
+> **Related ADRs:** [ADR-0139](../../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (accepted — the level contract this builds), [ADR-0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the normalizer it reuses), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect habit Phase 2 applies one level down), [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the idiom the trace draws into)
+> **Closes:** design-backlog 0123, design-backlog 0122. **Not** design-backlog 0120 — Phase 3
+> produced its measurement and Phase 4 declined to apply it, so the entry stays live with a dated
+> update.
 
 ## TL;DR
 
@@ -22,7 +31,7 @@ at any volume, on either frontend.
 
 Three filed entries, one subsystem, one file at the consuming end.
 
-- **[design-backlog 0123](../design-backlog.md) — the volume slider changes the picture.** Measured
+- **[design-backlog 0123](../../design-backlog.md) — the volume slider changes the picture.** Measured
   on the development box: one `lmv.exe`, one preset (`nWaveMode = 6`, `fWaveScale = 3.266`), one clip
   looping, two captures ten seconds apart with the Windows master volume as the only variable — 18 %
   gives a thin near-flat ribbon, 60 % gives a violently active trace at roughly ±40 % of frame height
@@ -32,7 +41,7 @@ Three filed entries, one subsystem, one file at the consuming end.
   normalization, which is not what a slow running peak does. The two frontends then disagree by
   construction — `plugin-foobar/foo_lmv.cpp` pulls `visualisation_stream` (pre-volume), the
   standalone pulls loopback (post-volume) — and nothing levels them.
-- **[design-backlog 0122](../design-backlog.md) — the mode-6/7 trace covers `1/aspect` of the
+- **[design-backlog 0122](../../design-backlog.md) — the mode-6/7 trace covers `1/aspect` of the
   width.** `draw.rs`'s arm places points at `t = i/(count-1) - 0.5` and divides x by `aspect`;
   `uv_to_world` multiplies x **by** `aspect`. The two cancel exactly, so the trace's world length is
   `2.0` whatever the target's shape while the frame is `2 * aspect` wide — 56.25 % at 16:9, which is
@@ -40,7 +49,7 @@ Three filed entries, one subsystem, one file at the consuming end.
   to the frame's **height**. At aspect 1 it is full width, which is why nothing caught it — ADR-0037's
   coincidence, one level down. `a_straight_wave_trace_spans_one_over_aspect_of_the_width` pins the
   defect as a property over three aspects.
-- **[design-backlog 0120](../design-backlog.md) — `wave_scale` is applied raw.** `*slot = held *
+- **[design-backlog 0120](../../design-backlog.md) — `wave_scale` is applied raw.** `*slot = held *
   scale`, straight from `fWaveScale`, onto a trace already in `-1..1`, with no base amplitude
   constant. The corpus settles the shape of the missing piece: across the 552 presets in
   `milkdrop-original` that set `fWaveScale`, the median is **0.9724** — authored about unity — so

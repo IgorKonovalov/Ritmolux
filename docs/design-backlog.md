@@ -307,6 +307,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0145 | The `animation` gate thresholds silent motion only, so a world alive only on the music fails it | [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 1-2; see 0152. **Closed 2026-08-28** |
 | 0147 | No latch: a gate cannot be armed on time and fired on the music (2nd instance) | [ADR-0137](adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 3-6, as `[latch]`. **Closed 2026-08-28** |
 | 0148 | A hard-ink palette cannot reach any additive scene, confining limited ink to 4 of 12 systems | [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, as `stroke_blend`; see 0153. **Closed 2026-08-28** |
+| 0122 | A mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width | [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) Phase 2. **Closed 2026-08-28** |
+| 0123 | The waveform is the one un-normalized output, so the volume slider changes the picture | [ADR-0139](adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) + [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) Phase 1; see 0120. **Closed 2026-08-28** |
 <!-- roster:end -->
 
 ## Open entries
@@ -2238,7 +2240,7 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
-### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
 
 **The amplitude half stopped, on the branch the phase was given for it.** The reference's
 normalization is not derivable from any source available in this environment: there is no MilkDrop
@@ -2264,123 +2266,44 @@ Any candidate constant must keep both ends of that distribution usable. Whoever 
 of: MilkDrop 2's waveform draw, its authoring documentation, or a reference capture of a preset built
 to be amplitude-revealing.
 
+
+### Update 2026-08-28 — [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) took the measurement this entry stopped for, and it **falsifies the entry's title**. Phase 4 was written to apply a base amplitude constant and was **skipped** on the reading; nothing in `draw.rs` changed, so this stays live.
+
+**The reference capture happened.** Phase 3 built two purpose-authored `.milk` presets
+(`nWaveMode = 6`, `fWaveScale = 1.0`, `fWaveSmoothing = 0`, `fWaveParam = 0`, warp/zoom/rot/echo
+neutral, a thin opaque white line on black) and drove both `foo_vis_milk2` 0.2.0.0 and this engine
+from one 60 s 48 kHz full-scale 200 Hz sine, verified 0.0 dBFS peak. Two readings, each with the
+screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
+
+| | reference (`foo_vis_milk2`) | ours |
+|---|---|---|
+| peak-to-peak at `fWaveScale = 1`, full-scale input | **0.316** frame heights | **0.3019** frame heights |
+| x-extent at 16:9 | **1.000** of frame width | 1.000 (after Plan 0127 Phase 2) |
+
+**So we render 4.7 % SMALLER than the reference at unit scale, not larger.** The ratio is a single
+number — ours is linear to within 0.9 % across a 4x sweep of `wave_scale` (0.3037 / 0.3019 / 0.3009
+at 0.5 / 1.0 / 2.0) — so `draw.rs`'s mode-6/7 factor of `0.15` implies MilkDrop's is ~`0.157`.
+**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md#0123--the-waveform-is-the-one-un-normalized-analysis-output-so-the-os-volume-slider-changes-the-picture--and-the-two-frontends-disagree)**,
+the volume dependence, which is now closed — not a missing base amplitude. This entry's own reading
+of that interaction ("an un-normalized trace times an un-normalized `wave_scale` is hypersensitive")
+was right; the half it attributed to `wave_scale` was not there.
+
+**Why the constant was not applied anyway.** Phase 4's second done-when required both ends of the
+corpus distribution to stay usable. Measured at 1920x1080 on the geometry the draw layer builds:
+`p10 = 0.01` draws 5 px (0.0046 H), a visible flat line; `p90 = 3.235` draws 0.9722 H — inside the
+frame with 15 px of margin; `p90` scaled by 1.047 draws exactly 1.0000 H, rows 0..1079, **clipped at
+the frame edge**. Applying the constant fails the criterion the phase existed to satisfy, for 4.7 %.
+
+**What is left of this entry, and it is much less than its title claims.** The base amplitude is
+measured and it is very nearly right; whether the last 4.7 % is worth a change that re-blesses the
+converted goldens and pushes the top decile of the corpus to the frame edge is a judgement nobody
+has needed to make. **Priority drops to low.** Whoever picks it up starts from `1.047` and does not
+re-derive it.
+
 - **Verified 2026-08-19** — the scale is still a bare multiply with no normalization constant:
   `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
-
----
-
-## 0122 — a mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width
-
-**Raised by:** `dev`, from [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
-(2026-08-19), splitting the x-extent half out of [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
-**Owner if taken:** `dev`.
-
-- **Verified 2026-08-19** — the cancelling pair is still both halves, one at the point and one on
-  the way out: `present: fn uv_to_world in: core/src/render/scenes/warp_mesh/draw.rs`
-
-### The finding
-
-`draw.rs`'s mode 6/7 arm places points at `t = i/(count-1) - 0.5` and divides the x component by
-`aspect`; `uv_to_world` then multiplies x **by** `aspect`. The two cancel exactly, so the trace's
-world-space length is `2t = 2.0` **whatever the target's shape**, while the frame is `2 * aspect`
-wide in those units. The trace therefore covers `1/aspect` of the width — `0.5625` at 16:9, which is
-the "roughly the middle 57 %" Plan 0109's Phase 5 gate reported for *Blur Mix 3*. The reference draws
-these full-width.
-
-Said plainly: **the trace is normalized to the frame's height rather than its width.** At aspect 1 it
-is full-width, which is why nothing caught it — the same coincidence
-[ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) exists for, one level down.
-
-**It is independent of `wave_scale`,** which scales only the amplitude term, so 0120's constant
-cannot fix this and this cannot fix 0120. That independence is why the two were split.
-`a_straight_wave_trace_spans_one_over_aspect_of_the_width` pins it as a property over three aspects.
-
-### What a fix would be
-
-Almost certainly dropping the `/aspect` at the point, so the length is width-normalized and the
-`uv_to_world` multiply is the only aspect term. **Unverified against the reference** — whether
-MilkDrop's mode 6 spans the full width at every aspect or is itself height-normalized is the same
-class of question as 0120's constant and 0119's handedness, and it wants the same source.
-
-### Priority
-
-**Medium.** Visible on every mode-6/7 preset on any non-square display, which is every display; but
-like 0120 it makes a preset look mis-tuned rather than unrecognisable.
-
----
-
-## 0123 — the waveform is the one un-normalized analysis output, so the OS volume slider changes the picture — and the two frontends disagree
-
-**Raised by:** `dev`, from a live-app check during [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md)
-(2026-08-19). **Owner if taken:** `architect` — this is a boundary-contract question, not a defect
-with an obvious fix. **Out of that plan's scope; nothing in it was changed for this.**
-
-- **Verified 2026-08-19** — the waveform is still documented and shipped un-normalized, alone among
-  the analysis outputs: `present: Raw amplitude in roughly in: core/src/dsp/mod.rs`
-
-### The finding, measured
-
-One `lmv.exe` instance, one preset (*Geiss - Blur Mix 3*, `nWaveMode = 6`, `fWaveScale = 3.266`), one
-clip looping, two captures ten seconds apart. **The only variable changed was the Windows master
-volume slider:**
-
-| master volume | the trace |
-|---|---|
-| 18 % | a thin near-flat ribbon with small ripple |
-| 60 % | violently active, roughly `±40 %` of frame height, halo filling the frame |
-
-Measured on the development box (Windows 10, WASAPI loopback, DX12). **That the endpoint volume is
-applied before the loopback tap is a fact about this machine's audio stack**, not a claim about
-Windows in general — ADR-0071's prose rule, and the reason it is stated this way.
-
-The same preset through `shot --audio` on a file — which reads samples at full digital scale, no
-endpoint volume anywhere — saturates the frame. So the engine's response is not weak at any point;
-only the absolute level arriving from loopback is.
-
-### Why it is a contract question rather than a bug
-
-[`core/src/dsp/mod.rs`](../core/src/dsp/mod.rs)'s `waveform` is deliberately un-normalized, and says
-so: *"normalizing it would make a quiet passage draw the same trace as a loud one — which is the
-opposite of what a scope is for."* Every other analysis output is peak-normalized under
-[ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md).
-
-**That reason conflates two different things.** A volume *knob* is not musical dynamics. A slow
-normalization against a recent peak — what ADR-0049 already does for the four bands — cancels the
-knob while leaving a quiet passage genuinely quieter than a loud one. The stated objection argues
-against *instantaneous* normalization, and nobody is proposing that.
-
-**And the two frontends disagree, which is the part that raises the stakes.** The foobar plugin pulls
-from `visualisation_stream` (`plugin-foobar/foo_lmv.cpp:3`) — the **decoded stream, before the output
-volume**. The standalone pulls **post-volume** loopback. So one core, one preset and one track give
-two different pictures depending on which frontend is running, and nothing levels them. The core is
-source-agnostic as [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) requires; what leaks is
-the *level*, and `CLAUDE.md`'s "validate at the boundary" list — sample rate, channel count, buffer
-size — does not include amplitude.
-
-### Why it surfaced now, and what it reconciles
-
-It explains a standing contradiction. [0120](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
-reports the waveform figure rendering **larger** than the reference's; the live app at 18 % shows it
-nearly flat. Both are true. An un-normalized trace times an un-normalized `wave_scale` is
-**hypersensitive** — blown out at full scale, dead at listening volume. So 0120's missing base
-amplitude constant **cannot be the whole fix**: lowering the gain moves the entire curve down and
-makes the quiet case worse. The question is dynamic range, and 0120 should be read with this entry
-beside it.
-
-### What a fix would be
-
-Unknown, and there are at least three shapes, which is why this wants an interview rather than a
-phase. Normalize the waveform against a recent peak at the analyzer, as ADR-0049 does for the bands;
-or level at the **boundary** where audio enters the core, so both frontends deliver the same
-vocabulary and the standalone's loopback stops being the odd one out; or leave the analyzer alone and
-give the converted-preset path its own conditioning, on the argument that a native scene may
-legitimately want a true scope. The middle option is the one that matches the existing boundary rule.
-
-### Priority
-
-**Medium-high.** It makes every waveform-led converted preset look broken at ordinary listening
-volume, which is most of the MilkDrop corpus's light source, and it silently invalidates any look
-gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
+- **Verified 2026-08-28** — still true after Plan 0127, which measured the constant and did not
+  apply it: `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
 
 ---
 

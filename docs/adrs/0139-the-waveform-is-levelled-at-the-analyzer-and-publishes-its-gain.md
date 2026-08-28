@@ -1,8 +1,8 @@
 # ADR-0139 — The waveform is levelled at the analyzer, and it publishes the gain it removed
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0127)
 > **Date:** 2026-08-28
-> **Related plan(s):** [0127](../plans/0127-the-picture-stops-depending-on-the-volume-slider.md)
+> **Related plan(s):** [0127](../plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md)
 
 ## Context
 
