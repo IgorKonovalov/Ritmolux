@@ -84,6 +84,11 @@ stops = [
   { at = 1.0000, color = "#d9d5c8" },
 ]
 
+[latch]
+# Armed for the last thirty seconds of each 130 s cycle; spent by the first
+# onset past 0.75 inside that window. See the note on `recompose` below.
+recut = { arm = "mod(time, 130) > 100", fire = "onset > 0.75", hold = 0 }
+
 [params]
 # A RAW palette coordinate, and pinned. `color_span` and `palette_shift` move the
 # elements' colours; the ground must not travel with them, so this number is not
@@ -104,14 +109,20 @@ scale = "1.00 + 0.045 * sin(time * 0.135) + clamp(bass * 0.1176, 0, 0.10)"
 # across. Each element's direction and turn are drawn from the seed at
 # generation, so this is reproducible rather than random.
 #
-# The pan rates are not taste. A `shape_collage` canvas covers EVERY pixel - the
-# paper is the ground - so the whole frame is its footprint, and the motion gate
-# measures a mean over all of it rather than over a sparse figure's own lit
-# pixels. Motion here therefore has to come from element EDGES sweeping, which is
-# a small share of the frame, and a 46 s breath alone moved 0.0006 against the
-# gate's 0.01 floor.
-pan_x = "0.15 * sin(time * 0.62)"
-pan_y = "0.10 * sin(time * 0.81 + 1.1)"
+# THE PAN IS A DRIFT, NOT A SWAY. A 78 s horizontal travel against a 57 s
+# vertical one, at 15 % and 10 % of the frame - large amplitude, very low rate,
+# so the composition is somewhere different every half minute without ever
+# reading as a camera move.
+#
+# THE RATES USED TO BE 0.62/0.81 AND THAT WAS BOUGHT, NOT CHOSEN. A
+# `shape_collage` canvas covers EVERY pixel, so the motion gate's mean is taken
+# over the whole frame rather than over a sparse figure, and only element edges
+# sweeping move it - a slow breath alone read 0.0006 against a 0.01 floor. The
+# gate now asks its question against full drive as well, so a canvas that is
+# still by design and alive on the music no longer has to buy motion it does not
+# want. Do not raise these to make a measurement pass.
+pan_x = "0.15 * sin(time * 0.08)"
+pan_y = "0.10 * sin(time * 0.11 + 1.1)"
 
 drift = "0.85 + clamp(bass * 0.71, 0, 0.6)"
 spin  = "0.5 + clamp(mid * 0.59, 0, 0.5)"
@@ -125,28 +136,28 @@ spin  = "0.5 + clamp(mid * 0.59, 0, 0.5)"
 count   = "14"
 density = "0.72 + clamp(mid * 0.33, 0, 0.28)"
 
-# THE CANVAS RECOMPOSES ON ROUGHLY ONE BEAT IN EIGHT, AND THE RATE IS THE WHOLE
-# OF THE TUNING HERE. The scene is edge-triggered, so this is a level that goes
-# high for one beat and low again; `hash` is seeded and pure, so the sequence is
-# reproducible run to run rather than random, and irregular rather than periodic
-# - the canvas does not recompose on a metronome.
+# THE CANVAS RECOMPOSES ONCE PER CYCLE AT MOST, AND THE MOMENT IS THE MUSIC'S.
+# The `recut` latch above is armed for the last thirty seconds of each 130 s
+# cycle and spent by the first onset past 0.75 inside it, so the interval between
+# two recompositions is 100-160 s: the ceiling is the clock's and the moment
+# inside it is not. `hold = 0` because `recompose` is edge-triggered and ignores
+# every frame after the rise.
 #
-# THE FIRST DRAFT GATED ON `onset > 0.82` AND THAT WAS THE DEFECT. Under a click
-# track `onset` normalizes against its own recent peak (ADR-0049) and reaches
-# 1.0 on every click, so the canvas recomposed several times a second and spent
-# almost all of its time mid-blend. A filmstrip showed it: every frame pale,
-# because a crossfade in flight is two canvases sharing one frame. A canvas needs
-# to be still long enough to be read as a composition.
+# WHAT THIS REPLACED, AND WHY THE OBVIOUS BINDING IS THE WRONG ONE. This read
+# `select(hash(beat_index) > 0.88, 1, 0)` - a 12 % gate on `beat_index`, which
+# counts ONSET DETECTIONS and not beats (ADR-0109). At 2-4 detections a second
+# that is a recomposition every few seconds, and a canvas has to be still long
+# enough to be read as a composition. The header called it "one beat in eight";
+# it was never a beat count, because no fixed multiplier converts.
 #
-# `beat_index` counts ONSET DETECTIONS, not beats, and no fixed multiplier
-# converts (ADR-0109) - so one in eight of these is somewhere between one in four
-# and one in seven real beats, and the ratio moves inside a track. That is fine
-# for what this clause IS: `hash(beat_index)` is activity-gating, a re-roll on a
-# hit, and it claims no period. Do not read the 0.88 as a beat count.
-recompose       = "select(hash(beat_index) > 0.88, 1, 0)"
-# Short and non-zero: at 0 the cut is violent, and a canvas is a slower thing
-# than a strobe.
-recompose_blend = "0.35"
+# A SILENT WINDOW COSTS A CYCLE. If nothing crosses 0.75 in those thirty seconds
+# the permission is never spent and the canvas holds for another 130 s. Note that
+# "quiet" is not "silent": `onset` is a fraction of its own decaying peak, so a
+# pad in a breakdown crosses 0.75 once a loud passage is a few seconds behind.
+recompose       = "recut"
+# Raised from 0.35 with the rate: at one cut per ~130 s the change is an EVENT,
+# and a near-cut reads as a glitch where a dissolve reads as a decision.
+recompose_blend = "0.80"
 
 # INDIVIDUAL ELEMENTS SWELL, THE CANVAS DOES NOT. Each element carries its own
 # phase, drawn at generation, so they breathe past each other rather than
