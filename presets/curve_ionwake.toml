@@ -37,7 +37,19 @@ stops = [
 ]
 
 [params]
-n = "5"
+# EIGHT PETALS, AND `n` IS THE ONLY FORM LEVER ON THIS FILE. `sin(n*theta)`
+# gives n petals for odd n and 2n for even, so `4` is an eight-petal rose - full
+# and symmetric, while still leaving dark water between the echoes so the rings
+# the beat stamps stay countable as they travel. That is the constraint the
+# deposit note below is about, and it is what rules out a denser rose: measured
+# at `n = 6` the twelve petals start merging the rings into a sheet.
+#
+# `d` IS VERY NEARLY INERT HERE, which is worth knowing before reaching for it.
+# At `samples = 240` inside the feedback, `d = 3` renders indistinguishably from
+# `d = 2` and `d = 7` differs only in how soft the lobes read. The Maurer chord
+# web that `d` buys on a bare curve does not survive the accumulation, so tune
+# the figure with `n`.
+n = "4"
 d = "2"
 samples = "240"
 spin    = "0.25"
