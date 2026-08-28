@@ -205,6 +205,50 @@ flowchart TB
   - The flag and the bounded-retry decision are unit-testable as values without WASAPI: the retry
     policy is a small state machine over (lost, attempts) and is tested as one.
 
+### Phase 4b — The review fixes: recovery stops rewriting the operator's config
+
+- **Owner skill:** dev
+- **Why this phase exists:** the Mode 4 review of Phases 1-4 (2026-08-28) found one major and four
+  minors, all in the swap/recovery path and all cheap. They land *before* Phase 5, because the
+  major is precisely what Phase 5's unplug bullet would otherwise exercise in its broken form.
+- **Files touched:** `standalone/src/main.rs`, and its `mod tests`.
+- **Done when:**
+  - **A recovery no longer persists its fallback.** `restart_capture` writes `config.input` and
+    calls `save_config` only for the two settings-row call sites; the `poll_input_lost` path moves
+    `self.input` and re-renders the verdict and leaves the file holding what the operator chose.
+    Both the plan's Phase 3 done-when and ADR-0142 scope persistence to the menu rows, and today an
+    unplug overwrites `[input] device` with `default` three times over — once per retry frame, and
+    also on a reopen that *failed*. Since re-plugging deliberately does not restore the device
+    (ADR-0142 Alternative D), the config was the only record that the rig wants that endpoint.
+  - **The row's device matcher and `pick_device` cannot disagree.** `input_device_index` resolves
+    against the endpoint the handle reports actually running (`CaptureHandle::device()`), not by
+    re-deriving the match from the configured name. Its current rule is exact-or-substring per
+    element in order, where `pick_device` is exact across all endpoints and *then* substring across
+    all: a roster of `["Headphones (2- USB Audio)", "Headphones"]` with `device = "Headphones"`
+    opens the second and highlights the first, and the next `CycleInputDevice` advances from the
+    wrong place. The doc comment on `input_device_index` asserts the two agree, so today the code
+    contradicts its own header. The two endpoints on the development box share no substring, which
+    is why nothing here can see it.
+  - **The retry bound survives a flapping endpoint.** `RecoveryPolicy::poll(false)` restores the
+    whole budget after a *single* live frame, so a stream that opens and dies immediately reopens
+    forever — the per-frame COM activation the bound exists to prevent, reached by a different
+    road. Restoring the budget takes sustained liveness rather than one frame; the threshold is a
+    named constant with its reasoning in the comment, and the flap is a case in the policy's tests
+    beside the existing three.
+  - **A flag that this platform ignores does not claim to have been applied.** `--input` /
+    `--device` are Windows-only in substance — `start_capture`'s macOS arm takes no selection — but
+    the startup line prints `audio input … by --input/--device` on every platform. Either the line
+    or the flags say so.
+  - **A trailing `--device` with no value is a usage error**, as a trailing `--input` already is.
+    `flag_value` currently yields `Some("")` for it, which `start_capture` reads as `default`, so
+    the flag silently means the opposite of a selection. Asserted beside
+    `parse_input_args_from(["--input"]).is_err()`, which covers only the half that already works.
+  - `poll_input_lost`'s header says that it observes the flag from `redraw`, so a loss while the
+    window is occluded or minimized is not seen until the window comes back. Comment only — the
+    behavior is accepted.
+  - `cargo nextest run --workspace`, `cargo clippy --workspace --all-targets` and `cargo fmt` stay
+    clean. The review ran all three on `72a96c5`: 1097 passed, 5 skipped, no warnings.
+
 ### Phase 5 — On-device gate: swap it, unplug it, plug it back
 
 - **Owner skill:** human
