@@ -3,6 +3,10 @@
 //! here so `cargo test` actually runs their tests — an `examples/` target's
 //! `#[test]` does not).
 //!
+//! [`osc`] is here for the second half of that same reason: it is the binary's
+//! alone, but its encoder is a pure function with an exact contract, and a
+//! library module is where those tests run.
+//!
 //! ## Preset-directory resolution
 //!
 //! Hand-copying the per-OS preset directory into `src/main.rs` and
@@ -24,6 +28,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+pub mod osc;
 pub mod rss;
 pub mod shot;
 

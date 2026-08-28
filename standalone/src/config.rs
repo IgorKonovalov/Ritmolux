@@ -9,7 +9,8 @@
 //! Every field is `#[serde(default)]`, so a missing file, a missing section, or
 //! an unknown extra key all degrade to the built-in defaults rather than crash
 //! (NFR section 10 "degrade, never crash"). Later phases grow this schema
-//! (`[input]`, `[rotate]`); keep additions default-able for the same reason.
+//! (`[input]`, `[rotate]`, `[osc]`); keep additions default-able for the same
+//! reason.
 
 use std::path::Path;
 
@@ -25,6 +26,40 @@ pub struct Config {
     pub rotate: Rotate,
     pub quality: Quality,
     pub hud: Hud,
+    pub osc: Osc,
+}
+
+/// `[osc]` — the lighting telemetry sink (ADR-0144).
+///
+/// **Off by default**, like every optional sink: a user who runs no lighting rig
+/// must not have a socket bound or a datagram leaving their machine because they
+/// installed the app. `--osc <host:port>` overrides the target *and* turns the
+/// sink on for that run without writing itself into the file, the same shape
+/// `--input` / `--device` follow (ADR-0142).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Osc {
+    /// Publish telemetry. False out of the box.
+    pub enabled: bool,
+    /// Where to send, as `host:port`. The default names localhost so that the
+    /// key is a usable example rather than a blank an operator has to guess the
+    /// shape of; it is inert until `enabled` (or `--osc`) turns the sink on.
+    pub target: String,
+    /// Datagram sets per second. 60 tracks a 60 Hz display closely enough that
+    /// the cadence is invisible; 0 means every rendered frame, whatever the
+    /// frame rate. A console that throttles its own OSC input wants this lower,
+    /// which is the reason it is a key rather than a constant.
+    pub rate_hz: u32,
+}
+
+impl Default for Osc {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            target: "127.0.0.1:9000".to_owned(),
+            rate_hz: 60,
+        }
+    }
 }
 
 /// `[hud]` — the on-canvas furniture the shell draws over the show (Plan 0096).
@@ -299,6 +334,39 @@ mod tests {
             !back.hud.preset_name,
             "the off choice did not survive a save"
         );
+    }
+
+    /// **Every existing `config.toml` predates `[osc]`**, and the sink sends to
+    /// the network — so the section missing has to mean *off*, not "the
+    /// default target". A default that turned it on would put a datagram on the
+    /// wire of every machine that upgraded.
+    #[test]
+    fn a_config_without_an_osc_section_leaves_the_sink_off() {
+        let config: Config = toml::from_str(
+            "[output]
+fullscreen = true
+",
+        )
+        .expect("a config with no [osc] section must still parse");
+        assert!(!config.osc.enabled, "an absent section enabled the sink");
+        assert_eq!(config.osc.rate_hz, 60);
+    }
+
+    /// A half-written `[osc]` section — the operator set a target and never
+    /// touched the cadence — keeps the key it has and defaults the one it does
+    /// not, rather than failing the section outright.
+    #[test]
+    fn a_partial_osc_section_defaults_the_rest() {
+        let config: Config = toml::from_str(
+            "[osc]
+enabled = true
+target = \"10.0.0.4:7700\"
+",
+        )
+        .expect("a partial [osc] section must still parse");
+        assert!(config.osc.enabled);
+        assert_eq!(config.osc.target, "10.0.0.4:7700");
+        assert_eq!(config.osc.rate_hz, 60, "the absent key did not default");
     }
 
     /// The same guarantee for the banner: the settings row is only "survives a
