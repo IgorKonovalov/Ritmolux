@@ -98,7 +98,7 @@ which this project has shipped wrong twice.
   width rather than measuring it. The console inherits that estimate and its truncation rule. A
   console that grows past a few rows and a thumbnail will feel the absence.
 - **`main.rs` learns that windows are plural.** `window_event` currently ignores its `WindowId`.
-  Routing by id is mechanical, but it touches the file Plan 0126 Phase 5 is already splitting.
+  Routing by id is mechanical, but it touches the file Plan 0126 Phase 7 is already splitting.
 
 ### Neutral
 - The console is standalone-only and the C ABI does not move. foobar2000 owns its own windows and

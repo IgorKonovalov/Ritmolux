@@ -35,8 +35,8 @@ Phase 2 frame tap was what the preview would consume. Reading that phase shows i
 frame double-steps every crossfade — and then reads the result back to the CPU through
 `map_async` + `poll(Wait)`, which Plan 0115's own Risks section names as forbidden in the live
 display loop. That tap is right for `--stream` and unusable here. **The dependency on Plan 0115 is
-therefore withdrawn; only the Plan 0126 Phase 5 dependency is real** (that phase splits
-`standalone/src/main.rs`, which this plan edits heavily). The user's sequencing answer was given on
+therefore withdrawn; only the Plan 0126 Phase 7 dependency is real** (that phase turns
+`standalone/src/main.rs` into shell glue, and this plan edits that file heavily). The user's sequencing answer was given on
 the wrong premise and should be re-confirmed — the correction only ever loosens the order.
 
 ## Decision
@@ -284,7 +284,8 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
   How much a second swapchain costs the output depends on the swapchain image count, the driver and
   the two refresh rates. Phase 6 measures it on a named machine; nothing asserts a frame-rate
   threshold anywhere in this plan.
-- **`main.rs` is contended.** Plan 0126 Phase 5 splits it. Taking this plan first guarantees a merge
+- **`main.rs` is contended.** Plan 0126 Phase 7 splits it, and Plan 0130 is rewriting
+  `settings.rs` and `main.rs` in a live lane right now. Taking this plan first guarantees a merge
   fight in the largest file in the shell; the recommended order is 0126 first. This is a scheduling
   risk, not a design one.
 - **The console inherits `overlay.rs`'s text-metric estimate.** Core exposes no text-measurement API
