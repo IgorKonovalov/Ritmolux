@@ -1,6 +1,6 @@
 # 0132 — The lighting rig follows the visuals
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) (proposed),
