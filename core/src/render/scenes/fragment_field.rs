@@ -27,7 +27,7 @@
 
 use crate::render::gpu;
 
-use super::Scene;
+use super::{Phase, Scene};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
@@ -240,31 +240,6 @@ struct Params {
     e: [f32; 4],
 }
 
-/// The scene's two integrated phases (ADR-0132).
-///
-/// Its own type, and unit-tested without a device, because the property that
-/// matters here is arithmetic rather than visual: a phase must advance by
-/// `rate * dt` **whatever the elapsed scene time**, which is exactly what
-/// `time * rate` fails to do the moment a preset binds the rate to audio.
-#[derive(Clone, Copy, Default)]
-struct Phases {
-    fold: f32,
-    field: f32,
-}
-
-impl Phases {
-    /// One frame's integration, at *this* frame's rates.
-    ///
-    /// Called from [`Scene::update`], never from `advance` — the per-frame order
-    /// is `set_time` → `advance` → `reset_params` → `set_param` → `update`
-    /// (`core/src/render/mod.rs`), so integrating in `advance` would use the
-    /// previous frame's rate values.
-    fn step(&mut self, fold_speed: f32, field_speed: f32, dt: f32) {
-        self.fold += fold_speed * dt;
-        self.field += field_speed * dt;
-    }
-}
-
 /// Fullscreen domain-warped fragment field, driven by named preset parameters.
 pub struct FragmentFieldScene {
     pipeline: wgpu::RenderPipeline,
@@ -287,11 +262,16 @@ pub struct FragmentFieldScene {
     /// `update` — the split ADR-0132 requires, since `advance` runs before this
     /// frame's parameter values land.
     dt: f32,
-    /// The integrated fold and field phases. **This is the scene's only state**:
-    /// everything else here is derived from `time` and the parameters, so a
-    /// capture's reproducibility now depends on the scene being rebuilt with the
-    /// preset as well as on the clock resetting (`reset_for_capture` does both).
-    phases: Phases,
+    /// The integrated fold and field phases ([`Phase`]). **These are the scene's
+    /// only state**: everything else here is derived from `time` and the
+    /// parameters, so a capture's reproducibility now depends on the scene being
+    /// rebuilt with the preset as well as on the clock resetting
+    /// (`reset_for_capture` does both).
+    ///
+    /// They stay two accumulators rather than one, because each follows its own
+    /// rate: `fold_speed` and `field_speed` are separately bindable.
+    fold_phase: Phase,
+    field_phase: Phase,
     /// Animation rates, in units of the scene's default speed (ADR-0132).
     field_speed: f32,
     fold_speed: f32,
@@ -404,7 +384,8 @@ impl FragmentFieldScene {
             palette_dirty: true,
             time: 0.0,
             dt: crate::render::scenes::FALLBACK_DT,
-            phases: Phases::default(),
+            fold_phase: Phase::default(),
+            field_phase: Phase::default(),
             field_speed: DEFAULT_FIELD_SPEED,
             fold_speed: DEFAULT_FOLD_SPEED,
             warp: DEFAULT_WARP,
@@ -527,7 +508,8 @@ impl Scene for FragmentFieldScene {
         // the preset expressions bound to its parameters. The one thing that
         // happens here is the phase integration, which runs after `set_param`
         // so it uses this frame's rates (ADR-0132).
-        self.phases.step(self.fold_speed, self.field_speed, self.dt);
+        self.fold_phase.step(self.fold_speed, self.dt);
+        self.field_phase.step(self.field_speed, self.dt);
     }
 
     fn render(
@@ -555,7 +537,7 @@ impl Scene for FragmentFieldScene {
                 palette::band_steps(self.palette_steps),
                 palette::band_contour(self.palette_contour),
             ],
-            e: [self.phases.fold, self.phases.field, 0.0, 0.0],
+            e: [self.fold_phase.get(), self.field_phase.get(), 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
@@ -588,45 +570,45 @@ impl Scene for FragmentFieldScene {
 mod tests {
     use super::*;
 
-    /// The property ADR-0132 exists for, and the one `warp_mesh`'s `time *
-    /// wspeed` fails: a rate change moves the phase by `rate * dt` **whatever
-    /// the elapsed scene time**. Under a multiply the same change at t = 100 s
+    /// The property ADR-0132 exists for, and the one a `time * rate` multiply
+    /// fails: a rate change moves the phase by `rate * dt` **whatever the
+    /// elapsed scene time**. Under a multiply the same change at t = 100 s
     /// would move the picture fifty seconds in one frame — a teleport, on a lane
     /// whose whole method is binding parameters to audio.
     #[test]
     fn a_rate_change_advances_the_phase_by_rate_times_dt_at_any_elapsed_time() {
         let dt = 1.0 / 60.0;
-        let mut phases = Phases::default();
+        let (mut fold, mut field) = (Phase::default(), Phase::default());
         // Run a long way out, so a multiply-by-elapsed-time would be obvious.
         for _ in 0..6_000 {
-            phases.step(1.0, 1.0, dt);
+            fold.step(1.0, dt);
+            field.step(1.0, dt);
         }
-        let elapsed = phases.fold;
+        let elapsed = fold.get();
         assert!(
             elapsed > 99.0,
             "the fixture must be far from t = 0: {elapsed}"
         );
 
         // Now the preset's binding moves, as an audio-bound rate does.
-        let before = phases.fold;
-        phases.step(1.5, 0.25, dt);
-        let fold_step = phases.fold - before;
+        let before = fold.get();
+        fold.step(1.5, dt);
+        let fold_step = fold.get() - before;
         assert!(
             (fold_step - 1.5 * dt).abs() < 1e-4,
-            "the fold advanced {fold_step}, not {} — a phase that scales with \
-             elapsed time is the defect",
+            "the fold advanced {fold_step}, not {} — scaling with elapsed time is the defect",
             1.5 * dt
         );
 
         // And each accumulator carries its own rate: the pair is not welded.
-        let field_before = phases.field;
-        phases.step(1.5, 0.25, dt);
+        let field_before = field.get();
+        field.step(0.25, dt);
         // Tolerance is above the f32 ulp at this magnitude (~7.6e-6 near 100),
         // which is the accumulation cost ADR-0132 accepts.
         assert!(
-            (phases.field - field_before - 0.25 * dt).abs() < 1e-4,
+            (field.get() - field_before - 0.25 * dt).abs() < 1e-4,
             "the field phase must follow field_speed alone: moved {}",
-            phases.field - field_before
+            field.get() - field_before
         );
     }
 
@@ -638,16 +620,16 @@ mod tests {
     fn a_constant_rate_integrates_to_rate_times_elapsed_time() {
         let dt = 1.0 / 60.0;
         for rate in [1.0f32, 0.4, 2.5] {
-            let mut phases = Phases::default();
+            let mut phase = Phase::default();
             let mut clock = 0.0f32;
             for _ in 0..600 {
-                phases.step(rate, rate, dt);
+                phase.step(rate, dt);
                 clock += dt;
             }
             assert!(
-                (phases.fold - rate * clock).abs() < 1e-3,
+                (phase.get() - rate * clock).abs() < 1e-3,
                 "rate {rate}: integrated {} against {}",
-                phases.fold,
+                phase.get(),
                 rate * clock
             );
         }
@@ -662,16 +644,18 @@ mod tests {
         assert_eq!(DEFAULT_FOLD_SPEED, 1.0);
 
         let dt = crate::render::scenes::FALLBACK_DT;
-        let mut phases = Phases::default();
+        let (mut fold, mut field) = (Phase::default(), Phase::default());
         let mut clock = 0.0f32;
         for _ in 0..240 {
-            phases.step(DEFAULT_FOLD_SPEED, DEFAULT_FIELD_SPEED, dt);
+            fold.step(DEFAULT_FOLD_SPEED, dt);
+            field.step(DEFAULT_FIELD_SPEED, dt);
             clock += dt;
         }
         assert_eq!(
-            phases.fold, clock,
+            fold.get(),
+            clock,
             "at rate 1.0 the accumulation must be bit-identical to the clock's"
         );
-        assert_eq!(phases.field, clock);
+        assert_eq!(field.get(), clock);
     }
 }

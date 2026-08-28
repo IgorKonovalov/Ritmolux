@@ -1442,18 +1442,82 @@ fn the_decay_domain_is_not_the_wash() {
 fn a_constant_warp_speed_integrates_to_the_multiply_it_replaced() {
     let dt = super::super::FALLBACK_DT;
     for rate in [1.0f32, 0.25, 3.0] {
-        let mut phase = 0.0f32;
+        let mut phase = Phase::default();
         let mut time = 0.0f32;
         for _ in 0..600 {
-            phase = integrate_phase(phase, rate, dt);
+            phase.step(rate, dt);
             time += dt;
         }
         assert!(
-            (phase - rate * time).abs() < 1e-3,
-            "rate {rate}: integrated {phase} against the multiply's {}",
+            (phase.get() - rate * time).abs() < 1e-3,
+            "rate {rate}: integrated {} against the multiply's {}",
+            phase.get(),
             rate * time
         );
     }
+}
+
+/// `deposit_spin` takes the same treatment as `warp_speed` (ADR-0135), and at a
+/// constant rate the integrated phase equals the `deposit_spin * time` it
+/// replaced. `DEFAULT_DEPOSIT_SPIN` is `0.0` and no preset binds it, so the
+/// golden fixtures sit at exactly zero, where the two forms agree bit for bit.
+#[test]
+fn a_constant_deposit_spin_integrates_to_the_multiply_it_replaced() {
+    let dt = super::super::FALLBACK_DT;
+
+    let mut zero = Phase::default();
+    for _ in 0..600 {
+        zero.step(DEFAULT_DEPOSIT_SPIN, dt);
+    }
+    assert_eq!(DEFAULT_DEPOSIT_SPIN, 0.0);
+    assert_eq!(
+        zero.get(),
+        0.0,
+        "at the default rate the arm angle must be exactly the zero it was"
+    );
+
+    for rate in [0.5f32, 2.0, -1.25] {
+        let mut phase = Phase::default();
+        let mut time = 0.0f32;
+        for _ in 0..600 {
+            phase.step(rate, dt);
+            time += dt;
+        }
+        assert!(
+            (phase.get() - rate * time).abs() < 1e-3,
+            "rate {rate}: integrated {} against the multiply's {}",
+            phase.get(),
+            rate * time
+        );
+    }
+}
+
+/// ...and a `deposit_spin` that MOVES advances the arms by `rate * dt` whatever
+/// the elapsed time, rather than swinging them through every second already run.
+#[test]
+fn a_deposit_spin_change_bends_the_arms_instead_of_teleporting_them() {
+    let dt = super::super::FALLBACK_DT;
+    let mut phase = Phase::default();
+    let mut time = 0.0f32;
+    for _ in 0..6_000 {
+        phase.step(0.5, dt);
+        time += dt;
+    }
+    assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
+
+    let before = phase.get();
+    phase.step(1.5, dt);
+    let step = phase.get() - before;
+    assert!(
+        (step - 1.5 * dt).abs() < 1e-4,
+        "the arms advanced {step}, not {}",
+        1.5 * dt
+    );
+    let teleport = (1.5 - 0.5) * time;
+    assert!(
+        teleport > 90.0,
+        "the multiply's one-frame jump at this elapsed time was {teleport} rad"
+    );
 }
 
 /// ...and the property the multiply failed: a rate that MOVES advances the phase
@@ -1464,17 +1528,17 @@ fn a_constant_warp_speed_integrates_to_the_multiply_it_replaced() {
 #[test]
 fn a_warp_speed_change_bends_the_phase_instead_of_teleporting_it() {
     let dt = super::super::FALLBACK_DT;
-    let mut phase = 0.0f32;
+    let mut phase = Phase::default();
     let mut time = 0.0f32;
     for _ in 0..6_000 {
-        phase = integrate_phase(phase, 1.0, dt);
+        phase.step(1.0, dt);
         time += dt;
     }
     assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
 
-    let before = phase;
-    phase = integrate_phase(phase, 1.5, dt);
-    let step = phase - before;
+    let before = phase.get();
+    phase.step(1.5, dt);
+    let step = phase.get() - before;
     assert!(
         (step - 1.5 * dt).abs() < 1e-4,
         "the phase advanced {step}, not {}",

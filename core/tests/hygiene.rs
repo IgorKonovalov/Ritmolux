@@ -5,6 +5,8 @@
 //!     added hot module can't silently ship without it.
 //! (b) Every direct dependency in a workspace member manifest is exact-pinned
 //!     (`=x.y.z`), per CLAUDE.md ("pin direct dependencies to exact versions").
+//! (c) No scene multiplies the shared clock by a settable field — every bindable
+//!     rate integrates a phase instead (ADR-0132, ADR-0135).
 
 use std::path::{Path, PathBuf};
 
@@ -365,4 +367,151 @@ fn first_quoted(s: &str) -> Option<&str> {
     let rest = s.get(start + 1..)?;
     let end = rest.find('"')?;
     rest.get(..end)
+}
+
+// -----------------------------------------------------------------------
+// (c) Every bindable rate integrates a phase (ADR-0132, ADR-0135)
+// -----------------------------------------------------------------------
+
+/// **No scene source multiplies the shared clock by one of its own fields.**
+///
+/// A rate parameter has to be *integrated* to be a rate: a phase computed as
+/// `self.time * self.<rate>` lets a rate bound to audio retroactively rescale
+/// all elapsed time, so at t = 100 s a small swing moves the picture by tens of
+/// seconds in a single frame. `scenes::Phase` is the one way to accumulate one.
+///
+/// This exists because the rule was enumerated twice and was wrong both times:
+/// ADR-0132 named two sites and shipped with three live counterexamples, all of
+/// which were found by grepping rather than by reading the list. A list of sites
+/// fails the same way whether it lives in a test or in a document, so this scans
+/// **every** `.rs` under `scenes/` — a new scene directory is covered without
+/// anyone remembering to add it.
+///
+/// # What it cannot see, and the evasion is one line away
+///
+/// It matches a *shape*, not a semantics. Binding the clock to a local first —
+/// `let time = self.time;` and then `time * self.spin` — passes, and this is not
+/// hypothetical: `swarm.rs` and `emitter.rs` both already bind that exact local
+/// for unrelated reasons, so in two files the evasion is a single edit. The
+/// guard raises the cost of the mistake; **it is not a proof that no scene makes
+/// it.**
+///
+/// # Two deliberate exclusions
+///
+/// **Line comments are stripped before matching.** Documenting the rejected form
+/// is exactly what the type's own doc comment in `scenes/mod.rs` does, and a
+/// guard that fails the build on its own explanation would be paid for by
+/// deleting the explanation.
+///
+/// **`warp_mesh/shader.rs` is scanned and passes**, and that is not an accident
+/// of scoping: its roughly ten `time * <rate>` uses take the clock as a function
+/// parameter and multiply it by locals holding the MilkDrop reference's own
+/// fixed frequencies. None has a `self.` receiver because none is a field, and
+/// none is settable from a preset — which is the whole of what ADR-0132 forbids.
+#[test]
+fn no_scene_multiplies_the_clock_by_a_field() {
+    let scenes = core_src().join("render").join("scenes");
+    let mut files = Vec::new();
+    collect_rs_files(&scenes, &mut files);
+    assert!(!files.is_empty(), "found no scene source files to check");
+
+    // The scan reaches the file that motivated the exclusion note above, and the
+    // file that carried the largest of the three defects. Named so that a change
+    // to `collect_rs_files` cannot quietly narrow what this guard sees.
+    for must_scan in ["shader.rs", "swarm.rs"] {
+        assert!(
+            files.iter().any(|f| f.ends_with(must_scan)),
+            "the scan no longer reaches `{must_scan}`, so it is guarding less than it reads"
+        );
+    }
+
+    for file in &files {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        if let Some(hit) = clock_multiplied_by_field(&text) {
+            panic!(
+                "scene `{}` computes `{hit}`. A bindable rate integrates a phase (ADR-0132): store `dt` in `advance`, keep a `scenes::Phase`, and `step(rate, dt)` it in `update`.",
+                file.display(),
+            );
+        }
+    }
+}
+
+/// The first `self.<field> * self.time` or `self.time * self.<field>` in `text`,
+/// rendered back for the failure message, or `None` if it holds the rule.
+///
+/// Whitespace is collapsed first, so an expression rustfmt broke across lines is
+/// matched as readily as one on a single line.
+fn clock_multiplied_by_field(text: &str) -> Option<String> {
+    let flat = collapse_whitespace(&strip_line_comments(text));
+
+    let lead = "self.time * self.";
+    let mut from = 0;
+    while let Some(rel) = flat.get(from..)?.find(lead) {
+        let at = from + rel;
+        let field = leading_ident(flat.get(at + lead.len()..)?);
+        if !field.is_empty() && field != "time" {
+            return Some(format!("self.time * self.{field}"));
+        }
+        from = at + lead.len();
+    }
+
+    let tail = " * self.time";
+    let mut from = 0;
+    while let Some(rel) = flat.get(from..)?.find(tail) {
+        let at = from + rel;
+        let before = flat.get(..at)?;
+        let head = before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
+        let field = before.get(head.len()..)?;
+        if !field.is_empty() && field != "time" && head.ends_with("self.") {
+            return Some(format!("self.{field} * self.time"));
+        }
+        from = at + tail.len();
+    }
+
+    None
+}
+
+/// The identifier `s` starts with, or `""` if it does not start with one.
+fn leading_ident(s: &str) -> String {
+    s.chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
+}
+
+/// `text` with every `//`-to-end-of-line run removed.
+///
+/// Crude on purpose: a `//` inside a string literal truncates that line early,
+/// which can only ever *shrink* what is matched, and no scene's string literals
+/// hold the forbidden shape. The alternative is a Rust lexer in a test whose
+/// whole premise is that it has no dependencies.
+fn strip_line_comments(text: &str) -> String {
+    text.lines()
+        .map(|line| match line.find("//") {
+            Some(at) => line.get(..at).unwrap_or(""),
+            None => line,
+        })
+        .collect::<Vec<_>>()
+        .join(
+            "
+",
+        )
+}
+
+/// `text` with every run of whitespace collapsed to a single space.
+fn collapse_whitespace(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut pending = false;
+    for c in text.chars() {
+        if c.is_whitespace() {
+            pending = !out.is_empty();
+        } else {
+            if pending {
+                out.push(' ');
+            }
+            pending = false;
+            out.push(c);
+        }
+    }
+    out
 }

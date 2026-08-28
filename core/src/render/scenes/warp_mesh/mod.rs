@@ -65,7 +65,7 @@ use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
-use super::{Scene, lines};
+use super::{Phase, Scene, lines};
 
 /// The smallest grid a `[mesh]` table may name, in cells. Below two the mesh is
 /// a single quad and the per-vertex program has no interior to interpolate.
@@ -221,16 +221,6 @@ pub const MILKDROP_SOFTNESS: f32 = 1.0;
 /// fast they animate. `1.0` is MilkDrop's own unit scale.
 const DEFAULT_WARP_SCALE: f32 = 1.0;
 const DEFAULT_WARP_SPEED: f32 = 1.0;
-
-/// One frame of a bindable rate, as ADR-0132 requires every rate in this engine
-/// to be advanced: a phase accumulator plus `rate * dt`, never `time * rate`.
-///
-/// A free function so the property is testable on the CPU with no device and no
-/// rendering — which is the whole of this correction's evidence, since no
-/// shipped preset binds `warp_speed` and there is nothing here to regress.
-fn integrate_phase(phase: f32, rate: f32, dt: f32) -> f32 {
-    phase + rate * dt
-}
 
 /// Deposit defaults: a soft blob at the centre, bright enough to see and small
 /// enough to be dragged into structure rather than filling the frame.
@@ -1058,11 +1048,11 @@ pub struct WarpMeshScene {
     scalars: [f32; OUTPUTS],
     warp_scale: f32,
     warp_speed: f32,
-    /// The integrated warp phase (ADR-0132): `+= warp_speed * dt` once per
+    /// The integrated warp phase ([`Phase`]): `+= warp_speed * dt` once per
     /// frame, in `update`, after this frame's parameter values have landed. At a
     /// constant rate it equals `warp_speed * time`, which is why the `1.0`
     /// default renders exactly as the multiply it replaced.
-    warp_phase: f32,
+    warp_phase: Phase,
     decay: f32,
     deposit: f32,
     deposit_x: f32,
@@ -1072,6 +1062,10 @@ pub struct WarpMeshScene {
     deposit_arms: f32,
     deposit_twist: f32,
     deposit_spin: f32,
+    /// The integrated deposit-arm rotation ([`Phase`]), beside `warp_phase` and
+    /// for the same reason (ADR-0135): a rate multiplying the shared clock lets
+    /// a binding that moves rescale all elapsed time in one frame.
+    deposit_phase: Phase,
     gamma: f32,
     wrap: f32,
     darken_center: f32,
@@ -1175,7 +1169,7 @@ impl WarpMeshScene {
             scalars: PER_VERTEX_DEFAULTS,
             warp_scale: DEFAULT_WARP_SCALE,
             warp_speed: DEFAULT_WARP_SPEED,
-            warp_phase: 0.0,
+            warp_phase: Phase::default(),
             decay: DEFAULT_DECAY,
             deposit: DEFAULT_DEPOSIT,
             deposit_x: DEFAULT_DEPOSIT_CENTRE,
@@ -1185,6 +1179,7 @@ impl WarpMeshScene {
             deposit_arms: DEFAULT_DEPOSIT_ARMS,
             deposit_twist: DEFAULT_DEPOSIT_TWIST,
             deposit_spin: DEFAULT_DEPOSIT_SPIN,
+            deposit_phase: Phase::default(),
             gamma: DEFAULT_GAMMA,
             wrap: DEFAULT_COMPOSITE_FLAG,
             darken_center: DEFAULT_COMPOSITE_FLAG,
@@ -1875,7 +1870,8 @@ impl Scene for WarpMeshScene {
         // The warp phase integrates here rather than in `advance`, because
         // `advance` runs before this frame's `set_param` calls and would
         // therefore use the previous frame's rate (ADR-0132).
-        self.warp_phase = integrate_phase(self.warp_phase, self.warp_speed, self.dt);
+        self.warp_phase.step(self.warp_speed, self.dt);
+        self.deposit_phase.step(self.deposit_spin, self.dt);
         // Kept for `render`, which drives the per-vertex program and is the only
         // place the render target's aspect is known.
         self.frame = *frame;
@@ -2039,7 +2035,7 @@ impl Scene for WarpMeshScene {
                 misc: [aspect, dt, self.time, self.warp_scale],
                 misc2: [
                     decay,
-                    self.warp_phase,
+                    self.warp_phase.get(),
                     f32::from(self.wrap >= 0.5),
                     self.darken_center.clamp(0.0, 1.0) * DARKEN_CENTER_STRENGTH,
                 ],
@@ -2063,7 +2059,7 @@ impl Scene for WarpMeshScene {
                     self.deposit_twist,
                 ],
                 c: [
-                    self.deposit_spin * self.time,
+                    self.deposit_phase.get(),
                     self.hue + self.color_center,
                     self.color_span,
                     self.saturation,
