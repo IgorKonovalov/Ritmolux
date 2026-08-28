@@ -1,6 +1,6 @@
 # 0127 — The picture stops depending on the volume slider
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (proposed — the level contract this builds), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the normalizer it reuses), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect habit Phase 2 applies one level down), [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the idiom the trace draws into)
