@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0144.** *(0120 was reserved for
+**Next free number: 0145.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -165,4 +165,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | proposed 2026-08-28 (Plan 0129) |
 | [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | proposed 2026-08-28 (Plan 0130) |
 | [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | proposed 2026-08-28 (Plan 0131) |
+| [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | proposed 2026-08-28 (Plan 0132) |
 <!-- roster:end -->
