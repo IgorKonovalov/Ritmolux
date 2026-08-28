@@ -422,8 +422,8 @@ fn waveform_only() -> crate::milk::outputs::FrameOutputs {
 /// which is what mode 2 is by definition — the two coincide exactly, and
 /// [`mode_6_at_zero_mystery_is_the_mode_2_scope`] pins that rather than leaving
 /// it implicit. Each mode is therefore built with the parameter that makes it
-/// its own figure, which is what "distinct figures" can mean once the aspect
-/// divide that used to separate this pair is gone (design-backlog 0122).
+/// its own figure, which is what "distinct figures" has to mean when no aspect
+/// divide separates this pair (design-backlog 0122).
 #[test]
 fn every_wave_mode_builds_a_different_figure() {
     let out = waveform_only();

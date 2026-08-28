@@ -277,7 +277,7 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 | 2 — The trace spans the width | dev | done | `3560eed` |
 | 3 — One reference capture | human | done — both readings taken | |
 | 4 — The base amplitude constant | dev | **skipped — see notes** | |
-| 5 — The docs say what the contract is | dev | not started | |
+| 5 — The docs say what the contract is | dev | done | committed with this row |
 
 ### Notes
 
@@ -332,6 +332,31 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
   what Phase 2 changed the trace to do. Until now that fix rested on a reading of `draw.rs`.
 - The plan header makes `Closes:` design-backlog 0120 conditional on Phase 3. Phase 3 produced the
   measurement; no constant was applied. The disposition of 0120 is architect's call at close.
+- Phase 5 found `core/src/dsp/` already clean: Phase 1 had rewritten the `waveform` doc block and
+  written `WAVE_FLOOR` and `TraceNormalizer` as it went, so nothing there still described the trace
+  as un-normalized before this phase started. What it added to `gain.rs` is the module header's
+  **inventory** of what the module levels, which listed the bands and the onset envelope but not
+  the trace.
+- Phase 5 did **not** touch `CLAUDE.md`. Its file list makes that conditional on amplitude being
+  named in the "validate at the boundary" line; that line names sample rate, channel count and
+  buffer size only, so the condition is unmet.
+- Phase 5 touched `core/src/render/scenes/warp_mesh/tests.rs`, which its file list does not name.
+  `check-comment-hygiene.mjs` failed at line 426 on plan-relative narration (`the aspect divide
+  that used to separate this pair`), introduced by Phase 2 in `3560eed`; the phase's done-when
+  requires that gate to exit 0, so the sentence was restated as a property of the code.
+- Phase 5's edit to `docs/specs/0002-ring-determinism.md` goes one clause beyond the waveform. The
+  "unit of determinism" bullet listed the `spectrum` among what "still resolve[s] from their
+  window", but the spectrum divides by a running peak through `BandNormalizer`. It is now on the
+  running-peak side with the trace.
+- **`node scripts/check-backlog-claims.mjs` exits 1, so Phase 5's third done-when is not met as
+  stated.** One entry is broken: 0123's `present: Raw amplitude in roughly in:
+  core/src/dsp/mod.rs`, falsified by Phase 1 rewriting that doc block — the on-delivery red the
+  phase anticipates. Only 0123 went red; **0120's probe still passes**. Reported, not edited:
+  repairing an entry is architect's call.
+- Phase 5 ran no golden work — it changes only doc comments and markdown.
+  `cargo fmt --all --check` and `cargo clippy --all-targets -- -D warnings` are clean, and a
+  narrowed `cargo nextest run -p lmv-core` over the wave/gain/analysis/normalization tests passed
+  44 of 44.
 
 ### Close triggers
 

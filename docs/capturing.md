@@ -1115,6 +1115,17 @@ slowly-moving peak, so a clip's dynamics survive while its absolute level does
 not. Note every variable reaches `1.000`: full scale is a state real material
 visits, not a corner.
 
+The `waveform` trace is levelled the same way
+([ADR-0139](adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md))
+and is absent from the table above for a different reason than the `*_raw` twins
+are: it is not reachable from a preset expression at all, because the grammar is
+scalar. What it has instead is an escape hatch the band variables lack —
+`waveform_gain` is the divisor, so `waveform[i] * waveform_gain` is the amplitude
+the analyzer actually read. That is what makes a capture of a `wave_mode` figure
+independent of the fader it was taken at, and it is why the foobar component and
+the standalone draw one picture from one track while tapping their streams on
+opposite sides of the output volume.
+
 > **It exercises dynamics. It is not evidence about real loopback levels.** A
 > preset that looks right under `dynamic:110` is a preset that survives material
 > which rises and falls — that is all this says. Nothing synthesized can tell you

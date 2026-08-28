@@ -21,6 +21,18 @@
 //! and every step is arithmetic on the input, so the same sequence always yields
 //! the same output (NFR section 6).
 //!
+//! **What is levelled here**, each against its own running peak: the 64-band
+//! `spectrum` array ([`BandNormalizer`], one shared peak so the array's internal
+//! ratios survive), the `bass`/`mid`/`treb` scalars and the `onset` envelope
+//! ([`PeakNormalizer`]), and the `waveform` trace ([`TraceNormalizer`],
+//! ADR-0139). The trace is the odd one of the set on two counts: it is a signal
+//! rather than a magnitude, so it is divided rather than rectified and clamps to
+//! `-1..=1`; and its divisor is **published** as `AnalysisFrame::waveform_gain`
+//! rather than discarded, making it the one levelled output whose raw amplitude
+//! a consumer can reconstruct. Levelling it is what makes the two frontends
+//! agree, since the plugin taps its stream before the output volume and the
+//! standalone taps loopback after it.
+//!
 //! **Where this sits matters.** Normalization is applied at the *published*
 //! frame boundary only. The onset detector, the tempo tracker and the novelty
 //! detector all keep reading raw values, because each is tuned against raw
