@@ -79,7 +79,7 @@ use crate::render::gpu;
 
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
-use super::{Scene, SeededRng};
+use super::{Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
@@ -651,10 +651,10 @@ pub struct AttractorScene {
     /// **This scene does not read the shared clock at all**, and has no
     /// `set_time`: the display rotation was its only reader, and a rate
     /// multiplier has to be integrated rather than multiplied against elapsed
-    /// time (see [`advance_spin`]). Determinism is unaffected — the phase is a
-    /// pure function of the injected `dt` sequence, which captures pin at 1/60
-    /// s, and it starts at zero on every rebuild.
-    spin_time: f32,
+    /// time (see [`Phase`]). Determinism is unaffected — the phase is a pure
+    /// function of the injected `dt` sequence, which captures pin at 1/60 s, and
+    /// it starts at zero on every rebuild.
+    spin_time: Phase,
     /// The active attractor map, selected data-driven via `[particles]`
     /// (ADR-0007 `configure`); its default coefficients seed `a`..`d`.
     family: AttractorFamily,
@@ -880,7 +880,7 @@ impl AttractorScene {
             pending_steps: 0,
             step_index: 0,
             dt: FIXED_STEP,
-            spin_time: 0.0,
+            spin_time: Phase::default(),
             family,
             roster: family::resolve_roster(family),
             tuple_walk: None,
@@ -1483,7 +1483,7 @@ impl Scene for AttractorScene {
         // last frame's value there and this frame's here. `self.dt` is the real
         // elapsed seconds `advance` recorded, so the phase stays a pure function
         // of the injected `dt` sequence.
-        self.spin_time = advance_spin(self.spin_time, self.spin, self.dt);
+        self.spin_time.step(self.spin, self.dt);
 
         // Rising-edge detect on `reseed` (a beat/onset expression): **disturb** the
         // cloud once, where it is (ADR-0066). Edge-triggered so a sustained flag
@@ -1707,7 +1707,7 @@ impl Scene for AttractorScene {
                 coeffs: [*a, *b, *c, *d],
                 family: *family,
                 framing,
-                spin_time: *spin_time,
+                spin_time: spin_time.get(),
                 dt: *dt,
                 pending_steps: *pending_steps,
                 step_index: *step_index,

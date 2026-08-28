@@ -9,9 +9,14 @@
 # WHAT DRIVES WHAT. phase = slow morph + bass lean (petals twist toward the
 # low end); radial_offset = breath + bass opening; d = hash-latched per 4
 # detections across {27,29,31,33,35} - five genuinely different chord figures;
-# treb tips the stroke; beat ticks it. spin stays a small CONSTANT: on this
-# scene rotation = spin * time, so an audio-driven spin multiplies absolute
-# time and jerks - the morph carries the motion instead.
+# treb tips the stroke; beat ticks it. spin stays a small CONSTANT, and since
+# Plan 0122 that is a COMPOSITION choice rather than a constraint: the morph is
+# meant to carry the motion, so the figure turns at a steady rate under it. The
+# reason recorded here before was that `rotation = spin * time` made an
+# audio-driven spin multiply absolute time and jerk. That defect is gone - the
+# scene integrates a phase now - so binding `spin` is available to whoever wants
+# the flower to turn on the music. Nobody has asked; this is the note that says
+# the door is open rather than locked.
 system = "parametric_curve"
 name   = "Nightbloom"
 

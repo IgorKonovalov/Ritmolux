@@ -317,7 +317,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// system              floor          family minimum              why
 /// fragment_field      0.50 -> 0.08   1.0000 -> 0.1645 Tiled Rosette   all eight came off 1.0000
 /// lsystem             0.50 -> 0.19   1.0000 -> 0.3704 Vellum          the only member
-/// swarm               0.42 -> 0.28   0.5701 -> 0.5553 Shatter         marginal
+/// swarm               0.28 -> 0.33   0.5553 -> 0.6531 Shatter         spin widened
 /// attractor           0.18 -> 0.11   0.2214 -> 0.2156 De Jong Gallery marginal
 /// shape_field         0.50 -> 0.22   0.4312 Pulse (unmoved)           the arm's text was false
 /// parametric_curve    0.33           0.2273 Ion Wake (unmoved)        lit-on-dark
@@ -381,10 +381,16 @@ fn coverage_floor(system: SystemKind) -> f32 {
         SystemKind::FragmentField => 0.08,
         // A dense point cloud that fills the frame far more than "sparse points"
         // suggested — the old 0.01 was 84x below the thinnest of the three.
-        // Re-derived 2026-08-26 (Plan 0116 Phase 4) from 0.42: the derived
-        // ground moved `Shatter` 0.5701 -> 0.5553, marginally, and this is half
-        // of the new minimum.
-        SystemKind::Swarm => 0.28,
+        // Re-derived 2026-08-27 (Plan 0122 Phase 5) from 0.28, which the slack
+        // gate convicted at 2.33x: `Shatter` still sets the family minimum and
+        // it MOVED, 0.5553 -> 0.6531, when its `spin` swing widened from 0.75 to
+        // 2.2. That widening is the content half of the rate correction — `spin`
+        // integrates a phase now, so the range is an honest rate rather than a
+        // multiplier on elapsed time — and a faster-churning field spreads the
+        // cloud. Half the new minimum, as every floor here is. The family is two
+        // presets and both bind `spin`, so there is no unaffected member to hold
+        // this number still: expect to re-derive it whenever either is retuned.
+        SystemKind::Swarm => 0.33,
         // Line art. The trails-heavy looks score lowest because a faint tail is
         // still lit; Rose Trails at 0.6722 sets this one.
         SystemKind::ParametricCurve => 0.33,

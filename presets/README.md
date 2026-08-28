@@ -538,6 +538,18 @@ from neighbours falling onto the *same* streamline and travelling together — s
 coarse field (low `field_freq`) with a near-frozen one (low `spin`) is the
 formation-holding end, and raising either dissolves the flock toward shimmer.
 
+`spin` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
+the same shape `fragment_field`'s
+[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121),
+`warp_mesh`'s `warp_speed` and `parametric_curve`'s `spin` take — so it is safe to
+bind to audio. Until Plan 0122 it multiplied the shared clock, and of those four it is
+the one shipped content had already found: `swarm_shatter` and `swarm_drift` both bind
+it to `mid`, and across a `0.75` swing a hundred seconds into a set the field clock
+advanced about **four seconds in one frame** against a nominal `0.019` — a re-roll of
+the whole field, growing without bound as a set runs. Both worlds were retuned onto the
+corrected clock at that plan's close, so a `spin` range lifted from either file is a
+range for the integrated form.
+
 Since Plan 0077 the swarm's marks individuate the way the emitter's do —
 same names, same semantics (see [Individuation](#individuation--the-distribution-params)).
 `size_spread` widens the per-mark size as a fraction either side of `size`; the
@@ -1312,7 +1324,7 @@ instead, or ease something the expression reads.
 | `deposit_width` | the ring's gaussian sigma, in frame-heights. Default `0.11` |
 | `deposit_arms` | angular lobes around the ring. Below `0.5` the modulation is off entirely rather than a degenerate single lobe. Default `0` |
 | `deposit_twist` | how much the arms spiral with radius. Default `0` |
-| `deposit_spin` | how fast they turn, radians per second of scene time. Default `0` |
+| `deposit_spin` | how fast they turn, in radians a second. **Integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)), like `warp_speed` above and for the same reason, so binding it to audio bends the arms' rotation instead of teleporting it. Default `0` |
 
 The deposit is coloured **by angle** through the shared palette, so the shared
 colour vocabulary applies as it does everywhere else: `hue`, `color_span`,
@@ -1706,8 +1718,14 @@ wrong one is the trap the `glow` entry below records.
 - `scale` — overall size in the frame; `draw_progress` in `0..1` reveals the
   figure from the start (a line-draw-on; ride it on `bar` for a per-beat redraw).
 - `parametric_curve`: `n`/`d` are the rose parameters, `spin` is angular velocity
-  (rotation = `spin * time`), `samples` the chord count (clamped to the segment
-  cap). Two **shape** params morph the curve itself (default `0.0`, a no-op):
+  in radians a second, `samples` the chord count (clamped to the segment cap).
+  `spin` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
+  the same shape `fragment_field`'s
+  [`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121)
+  and `warp_mesh`'s `warp_speed` take — so it is safe to bind to audio. Until
+  Plan 0122 it multiplied the shared clock, where a swing from `0.1` to `1.5` a
+  hundred seconds into a set would have turned the figure through a hundred and
+  forty radians in one frame: a teleport, not an acceleration. Two **shape** params morph the curve itself (default `0.0`, a no-op):
   `phase` (radians added *inside* the sine, `r = sin(n*theta + phase) + radial_offset`)
   reshapes the petals as it advances — distinct from `spin`, which rotates the
   finished figure; `radial_offset` adds to the radius, opening the rose off-origin

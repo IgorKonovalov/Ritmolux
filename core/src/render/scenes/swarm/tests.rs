@@ -3,9 +3,10 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEPTH_PARALLAX_FAR, DEPTH_PARALLAX_NEAR,
-    DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, MARGIN, SEED, Scene, SwarmScene, TWINKLE_FREQ_HI,
-    TWINKLE_FREQ_LO, bounds, channel, hue_coord, size_factor, twinkle_factor, unit,
+    DEFAULT_HUE, DEFAULT_HUE_CENTER, DEFAULT_HUE_SPREAD, DEFAULT_SPIN, DEPTH_PARALLAX_FAR,
+    DEPTH_PARALLAX_NEAR, DEPTH_SCALE_FAR, DEPTH_SCALE_NEAR, FALLBACK_DT, MARGIN, Phase, SEED,
+    Scene, SwarmScene, TWINKLE_FREQ_HI, TWINKLE_FREQ_LO, bounds, channel, hue_coord, size_factor,
+    twinkle_factor, unit,
 };
 use crate::render::palette::Palette;
 use crate::render::scenes::SeededRng;
@@ -1433,5 +1434,62 @@ fn a_lit_backdrop_survives_where_the_swarm_drew_nothing() {
          coverage in alpha (ADR-0056); a constant alpha 1 punches the backdrop \
          out of every quad's corners. The exact arm moved {violations} channels \
          on the same run"
+    );
+}
+
+/// The field clock integrates at `spin` rather than multiplying the shared clock
+/// (ADR-0135), and at a constant rate the two agree — which is why the two
+/// `swarm` golden fixtures, both of which bind a constant, do not move.
+#[test]
+fn a_constant_spin_integrates_to_the_multiply_it_replaced() {
+    let dt = FALLBACK_DT;
+    for rate in [DEFAULT_SPIN, 0.0, 0.1, 1.15] {
+        let mut phase = Phase::default();
+        let mut time = 0.0f32;
+        for _ in 0..600 {
+            phase.step(rate, dt);
+            time += dt;
+        }
+        assert!(
+            (phase.get() - rate * time).abs() < 1e-3,
+            "rate {rate}: integrated {} against the multiply's {}",
+            phase.get(),
+            rate * time
+        );
+    }
+}
+
+/// ...and the property the multiply failed, which on this scene is the whole
+/// point of the correction: `swarm_shatter` binds `spin` to `mid` through a
+/// `tau = 0.3` one-pole, so the rate moves ~0.04 in a frame across its 0.75
+/// swing. Integrated, the field clock advances one frame's worth whatever the
+/// elapsed time; multiplied, it advanced ~4 s at t = 100 s against a nominal
+/// 0.019 s and the flow re-rolled on every loud passage.
+#[test]
+fn a_spin_change_bends_the_field_clock_instead_of_re_rolling_it() {
+    let dt = FALLBACK_DT;
+    let mut phase = Phase::default();
+    let mut time = 0.0f32;
+    for _ in 0..6_000 {
+        phase.step(1.15, dt);
+        time += dt;
+    }
+    assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
+
+    let before = phase.get();
+    phase.step(1.19, dt);
+    let step = phase.get() - before;
+    assert!(
+        (step - 1.19 * dt).abs() < 1e-4,
+        "the field clock advanced {step}, not {}",
+        1.19 * dt
+    );
+    // The size of the defect, computed rather than described: what `time * spin`
+    // would have delivered for the same 0.04 swing, against one nominal frame.
+    let multiplied_jump = 0.04 * time;
+    let nominal = 1.19 * dt;
+    assert!(
+        multiplied_jump > 100.0 * nominal,
+        "the multiply's one-frame jump was {multiplied_jump} s against a nominal {nominal} s"
     );
 }

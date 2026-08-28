@@ -57,9 +57,27 @@ stops = [
 # real mix, which is the numeric form of "does not react to music".
 #
 # `spin` IS NOT VORTICITY - it is the flow field's RATE OF CHANGE. The scene
-# integrates `field_t = time * spin`, so `spin` says how fast the streamlines
-# themselves are rewritten, and this is the single parameter that decides
-# whether the swarm reads as a flock or as noise.
+# accumulates `field_phase += spin * dt` and samples the field at that phase, so
+# `spin` says how fast the streamlines themselves are rewritten, and this is the
+# single parameter that decides whether the swarm reads as a flock or as noise.
+#
+# THE SIN AMPLITUDE WENT 0.010 -> 0.060 (Plan 0122), and that is a REPAIR, not a
+# new idea. Until that plan the scene computed `field_t = time * spin`, which
+# multiplied this wobble by elapsed time: the term contributed `t * 0.010 *
+# sin(0.019t)`, whose derivative carries a `0.00019 * t` piece, so by t = 300 s
+# the field's rate swung +/-0.057 against a nominal 0.040 and the field
+# periodically ran BACKWARDS at up to 1.4x the forward rate - with the swing
+# growing without bound as a set ran. That rewind is a real part of what this
+# file's opening line means by "it evolves almost entirely on `time`". Once
+# `spin` integrates honestly, a 0.010 wobble is a +/-0.5-unit ripple on a steady
+# advance and the field stops reversing at all, which measured as the cloud
+# settling: over ten simulated minutes at a constant mid, coverage fell 0.60 ->
+# 0.52 with peak/mean above 18 on four rows of ten - the piling-onto-attractors
+# signature `swarm_shatter.toml` records from Plan 0075's three live failures.
+# At 0.060 the rate itself swings through zero, so the field genuinely advances
+# and rewinds, bounded and independent of elapsed time: same run reads coverage
+# 0.60 -> 0.81 and peak/mean 5.29 -> 3.26. Image-domain proxies at 96x96 from
+# one stimulus, not a gate (ADR-0099); the verdict was the app, 2026-08-27.
 #
 # At the old values (0.07 up to 0.35) the field was being redrawn faster than a
 # particle could traverse it. Every frame each particle was steered somewhere
@@ -93,7 +111,7 @@ stops = [
 # 20 % of each other on every lever, so they read as one preset regardless of
 # which band drove them. Drift takes the large-sprite, near-frozen end.
 force = "1.20 + sin(time * 0.037) * 0.16 + cos(time * 0.023) * 0.10 + clamp(mid * 0.47, 0, 0.40)"
-spin  = "0.040 + sin(time * 0.019) * 0.010 + clamp(mid * 0.041, 0, 0.035)"
+spin  = "0.040 + sin(time * 0.019) * 0.060 + clamp(mid * 0.041, 0, 0.035)"
 
 # STRUCTURE - `field_freq` is new in Plan 0043 and it is the lever this preset
 # had been missing. `spin` says how fast the streamlines are rewritten and Drift

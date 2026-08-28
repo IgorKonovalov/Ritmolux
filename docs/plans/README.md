@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0124** (ADRs are a separate sequence — next free there is **0139**.)
+**Next free number: 0129** (ADRs are a separate sequence — next free there is **0141**.)
 
 ## Active roster
 
@@ -22,7 +22,11 @@ someone who picked it up is reading.
 | [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and ~~its four wait on [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1~~ — **that wait is discharged: 0108 Phase 1 landed 2026-08-17, so the four `warp_mesh` worlds are authorable now.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](done/0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](done/0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
 | [0115](0115-the-engine-becomes-a-live-video-source.md) | The engine becomes a live video source | approved | dev, human | **Approved 2026-08-25. Phase 1 is a `human` stop gate and it runs BEFORE `dev` starts** — the transport was decided twice, and the first answer was wrong. `lmv --stream` becomes a headless **Spout** source that TouchDesigner picks up with a Spout In TOP on the same machine; carries [ADR-0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed). **The transport was re-decided mid-interview**: NDI lost on WiFi bandwidth, then the machine turned out to be the same one, which voided that argument and left Spout — BSD, no codec, no runtime install — against NDI, TD's Shared Mem In TOP, and ADR-0114's `ffmpeg` pipe. **Phase 1 is a human stop gate that writes no code**: it stages the SDK and puts Spout's own demo sender into a TOP, checking the licence, the `SpoutDX` CPU entry point and the colour handling that ADR-0125 flags as the likeliest way this ships looking wrong. **Phase 2 — a transport-agnostic frame tap in `core` — survives a Phase 1 that kills the rest**, and is what the deferred remote sink attaches to. Spout stays behind a default-off cargo feature so CI, macOS and every ordinary `cargo build` need no SDK and no C++ step. Windows-only by construction. |
 | [0123](0123-a-gate-a-latch-and-an-ink.md) | A gate, a latch and an ink | approved | dev, human | Three walls from one `preset-author` note (backlog 0145/0147/0148), packaged as one plan at the user's request. Carries [ADR-0136](../adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md), [ADR-0137](../adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) and [ADR-0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md), all proposed. **Three groups sharing no files and no risk** - the `animation` gate learns a driven branch, a `[latch]` table gives the grammar armed-and-fired state, and the line family gets the premultiplied-OVER seam that already exists with one caller. **Group A (phases 1-2) is independently valuable and lands first**; a stall in any group holds the close for the other two. Three of nine phases are `human` (`preset-author` sessions). Phase 1's driven floor is a **derivation, not a number** - the plan states the method and refuses one chosen to make `collage_mono` pass. Phase 3 moves `VAR_NAMES` slot arithmetic and Phase 7 turns on a pipeline sharing a live bind layout, which is the WARP aliasing hazard. |
-| [0122](0122-every-rate-integrates.md) | Every rate integrates | approved | dev, human | **Finishes [ADR-0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md), which decided a rule engine-wide, enumerated two sites and shipped with three live counterexamples.** Carries [ADR-0135](../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) (proposed): one `scenes::Phase`, the three private copies collapsed into it, and a hygiene assertion that fails the build on a fourth site. **Only `swarm` moves a picture** — `swarm_shatter` and `swarm_drift` bind `spin` to `mid` through `self.time * self.spin`, ~210x and ~67x one-frame field jumps at t = 100 s; the other two sites are bound to constants or to nothing. **Phase 5 is a `preset-author` session ending in a user verdict in the running app** — whether the lurch was a defect or the look is not a question any statistic here answers. Contends with nothing on the roster. |
+| [0124](0124-the-review-fixes-that-move-no-pixels.md) | The review fixes that move no pixels | approved | dev | First of three from the 2026-08-28 whole-codebase review; **drafted without an interview**. Six mechanical, golden-neutral fixes: a shared `core/tests/common/` harness (27 copies of `headless()`), four mangled warning strings, a misattached `#[allow]`, the comment-hygiene gate widened to `before/until Plan NNNN` and to `.cpp`, `milkconv/` mapped in `CLAUDE.md` + both skill contexts, the ABI spec's compatibility clause reconciled with the shim. **Goes first** — 0125/0126 write tests against its harness. Parks one ADR question (comment weight, 37 % of `core/src`). |
+| [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three; **drafted without an interview**. Five shared helpers (`gpu::color_pass`, `palette::LutPair`, `scenes::common::PaletteParams`, `gpu::FullscreenScene`, `marks::InstancedQuads`) retiring ~800-1000 pasted lines across the 12 scenes, one helper per phase, **golden-identical unblessed on both adapters at every commit**. **The constraint is [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)**: a helper takes the layout shape as input and never adds an allowlist row. Runs after 0124, before 0126. |
+| [0127](0127-the-picture-stops-depending-on-the-volume-slider.md) | The picture stops depending on the volume slider | approved | dev, human | Takes backlog 0123 + 0122 + 0120 (the last **conditionally**). Carries [ADR-0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (proposed): the trace is peak-normalized at the analyzer and publishes `waveform_gain`, so the OS volume slider stops being a visual parameter and the plugin's pre-volume tap and the standalone's post-volume tap stop drawing two pictures. **Phase 3 is a `human` stop gate on the `foo_vis_milk2` rig** — judged with the foobar *component*, not the standalone, so both sides read the same pre-volume stream; a "not obtainable" there is a valid end and 0120 stays filed. Order matters inside the plan: the amplitude constant cannot be derived while the level is unpinned. |
+| [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | draft | dev, human | Takes backlog 0110 + 0130, and probes 0125. Carries [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed): the attractor's drawn count becomes a density against the render target — 0.651 particles/px at 640x360 against 0.072 at 1080p is the whole "looks like Leviathan upscaled" verdict. **Anchored so it can only ever add samples**, which is what keeps the 128x128 goldens byte-identical and unblessed; any baseline that moves is a finding. `REFERENCE_PX` and both ceilings are **Phase 1 measurements, not values the plan chose**. Two `human` phases (the 1080p look gate and 0125's `fast`-vs-`quality` side-by-side) are best run in one sitting. **Gates [0103](0103-the-project-gets-an-audience.md)'s demo material.** |
+| [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three; **drafted without an interview**. One phase per file — `warp_mesh` (two 400-line fns), `render/mod.rs` (429-line `draw_frame`), `schema.rs` (five parallel `SystemKind` tables become one), `star.rs`, `standalone/main.rs`, `foo_lmv.cpp` — every phase a pure move gated on golden. Also closes the one OCP hole (`GeneratorConfig` matched in four scenes) and moves two leaked seams home (`new_from_win32_hwnd` to `core-cabi`, the `shot` thread-local to `metrics`). **Phase 3 contends with [0123](0123-a-gate-a-latch-and-an-ink.md) on `schema.rs`** — start after 0123 closes. |
 
 **Added 2026-08-19, from a MilkDrop backlog round after
 [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
@@ -132,6 +136,26 @@ down is history.** Four calls set it: the next stretch is **engine and visual ri
 in **two lanes**, [0103] waits for [0104], and [0087] goes **early to de-risk** rather than late
 because it is large.
 
+**Added 2026-08-28, from a "what next, functionally" round after the whole-codebase review's three
+plans ([0124]/[0125]/[0126], which move no pixels): [0127](0127-the-picture-stops-depending-on-the-volume-slider.md)
+and [0128](0128-the-rendered-file-stops-looking-upscaled.md).** Both take defects in already-shipped
+output rather than adding capability, which is why they were picked ahead of the four other
+functional candidates the round surfaced (backlog 0042's bar gate, 0126's per-track variety, 0142's
+2x dissolve, and the limited-ink cohort behind [0123]). Sequencing:
+
+- **They contend with nothing on the current roster** and share no files with each other — 0127 is
+  `core/src/dsp/` plus `warp_mesh`'s draw layer, 0128 is `tier.rs` plus the particles scene. Either
+  can be taken by a free session, and they can run in parallel lanes.
+- **[0128] goes before [0103]'s outreach phases.** Demo material made before the density law lands
+  shows the engine at its grainiest, which is the same dependency [backlog 0110](../design-backlog.md)
+  states in its own priority line.
+- **[0127] is the one to take first if only one is taken**, on breadth: it is every waveform-led
+  converted preset at every listening volume on both frontends, against one scene family's grain at
+  large render sizes.
+- **Neither waits on [0124]/[0125]/[0126].** 0125 retires GPU boilerplate across the 12 scenes and
+  0126 splits large files; if those are in flight, expect merge contention in
+  `core/src/render/scenes/particles/` (0128) and none in `core/src/dsp/` (0127).
+
 ### The two lanes, now
 
 - **Lane A — [0110](done/0110-the-shader-surface-stops-being-invisible.md) is closed
@@ -198,6 +222,18 @@ would revert most quietly.
    where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
    demo material, a 1080p render still reading as an upscale
    ([backlog 0110](../design-backlog.md)).
+
+**Added 2026-08-28, from a whole-codebase review (layering, god modules, hot-path safety, doc
+drift): [0124](0124-the-review-fixes-that-move-no-pixels.md) →
+[0125](0125-the-scenes-share-their-gpu-boilerplate.md) →
+[0126](0126-the-large-files-split-along-their-seams.md), in that order and not in parallel.** The
+review found no blocker — layering, the audio callbacks, the C ABI and determinism all came back
+clean — so these are a maintenance lane, not a feature one, and they **interleave with the roster
+above rather than displacing it**: 0124 is a day and can go any time; 0125 and 0126 rewrite the
+scene files and must not run alongside a plan that also touches them (0092 on `shape_field`, 0123
+Phase 3 on `schema.rs`). The three are ordered so each inherits the previous one's instrument —
+0124's harness and widened gate, then 0125's helpers, then 0126's splits of the now-smaller files.
+Every phase in all three is golden-identical unblessed; a bless anywhere in this lane is a finding.
 
 ### What this sequence assumes
 
@@ -792,6 +828,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0122 — Every rate integrates](done/0122-every-rate-integrates.md) — closed 2026-08-28. Review: **no blockers, two majors** (both discharged), **two minors.** Version: **0.87.0** (minor). Closed [backlog 0141](../design-backlog.md), filed 0149-0150. [Write-up](README-archive.md).
 - [0098 — The figure nests properly](done/0098-the-figure-nests-properly.md) — closed 2026-08-27. Review: **no blockers, no majors, five minors, two nits.** Version: **0.86.0** (minor). Closed [backlog 0096 + 0097](../design-backlog.md), filed 0144. [Write-up](README-archive.md).
 - [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md) — closed 2026-08-27. Review: **no blockers, no majors, five minors.** Version: **0.85.0** (minor). Closed [backlog 0129](../design-backlog.md). [Write-up](README-archive.md).
 - [0121 — A rate, an ink edge, and a motion reading](done/0121-a-rate-an-ink-edge-and-a-motion-reading.md) — closed 2026-08-27. Review: **no blockers, one major, four minors.** Version: **0.83.0** (minor). Closed [backlog 0131 + 0137-0139](../design-backlog.md), filed 0140-0141. [Write-up](README-archive.md).
@@ -972,3 +1009,9 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md
 [0104]: 0104-the-library-stops-being-lopsided.md
+[0123]: 0123-a-gate-a-latch-and-an-ink.md
+[0124]: 0124-the-review-fixes-that-move-no-pixels.md
+[0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
+[0126]: 0126-the-large-files-split-along-their-seams.md
+[0127]: 0127-the-picture-stops-depending-on-the-volume-slider.md
+[0128]: 0128-the-rendered-file-stops-looking-upscaled.md

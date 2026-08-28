@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0139.** *(0120 was reserved for
+**Next free number: 0141.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -156,8 +156,10 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | accepted 2026-08-27 (Plan 0121) |
-| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | proposed 2026-08-27 (Plan 0122) |
+| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | accepted 2026-08-28 (Plan 0122) |
 | [0136](0136-the-animation-gate-asks-its-question-in-both-readings.md) | The animation gate asks its question in both readings | proposed 2026-08-27 (Plan 0123) |
 | [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | proposed 2026-08-27 (Plan 0123) |
 | [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | proposed 2026-08-27 (Plan 0123) |
+| [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) | The waveform is levelled at the analyzer, and it publishes the gain it removed | proposed 2026-08-28 (Plan 0127) |
+| [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | proposed 2026-08-28 (Plan 0128) |
 <!-- roster:end -->

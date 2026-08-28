@@ -35,7 +35,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::super::Scene;
+use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
 use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
@@ -115,8 +115,16 @@ pub struct ParametricCurveScene {
     mirror_overflow: Option<CapOverflow>,
     /// Which curve family to sample, chosen at preset load via `configure`.
     family: CurveFamily,
-    /// Shared scene clock (seconds), set by the renderer each frame.
-    time: f32,
+    /// This frame's elapsed real time, stored by [`advance`](Scene::advance) and
+    /// consumed by [`update`](Scene::update) — `advance` runs before this
+    /// frame's parameter values land, so the rate it would integrate against is
+    /// the previous frame's.
+    dt: f32,
+    /// The integrated rotation ([`Phase`]). **This scene does not read the
+    /// shared clock at all**, and has no `set_time`: the figure's rotation was
+    /// the clock's only reader here, and a rate has to be integrated rather than
+    /// multiplied against elapsed time (ADR-0135).
+    spin_phase: Phase,
     /// The preset's baked colour LUT (ADR-0021), sampled on the CPU per chord.
     /// Defaults to the engine cosine, which is the ramp this scene coloured
     /// through before the palette reached it.
@@ -174,7 +182,8 @@ impl ParametricCurveScene {
             max_segments,
             mirror_overflow: None,
             family: CurveFamily::MaurerRose,
-            time: 0.0,
+            dt: FALLBACK_DT,
+            spin_phase: Phase::default(),
             // Replaced by the preset's palette on the next switch; the default
             // is the engine cosine, so an unconfigured scene still colours.
             palette: Palette::default_spectrum(),
@@ -324,8 +333,16 @@ impl Scene for ParametricCurveScene {
         "parametric curve"
     }
 
-    fn set_time(&mut self, time: f32) {
-        self.time = time;
+    fn advance(&mut self, dt: f32) {
+        // Stored, not integrated: the `spin` this frame will use has not been
+        // set yet. A non-finite or negative `dt` degrades to the capture step
+        // rather than poisoning the accumulator, which is the one piece of state
+        // here a bad frame could corrupt permanently.
+        self.dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            FALLBACK_DT
+        };
     }
 
     fn reset_params(&mut self) {
@@ -420,7 +437,8 @@ impl Scene for ParametricCurveScene {
         // sane curve preset (samples in the hundreds) never approaches the cap —
         // the clamp is a safety backstop, not a structural cut worth reporting.
         let samples = (self.samples.max(0.0) as usize).min(self.max_segments);
-        let rotation = self.spin * self.time;
+        self.spin_phase.step(self.spin, self.dt);
+        let rotation = self.spin_phase.get();
         let ramp = ColorRamp {
             hue: self.hue,
             hue_spread: self.hue_spread,
@@ -560,6 +578,60 @@ mod tests {
     use super::*;
 
     const SAMPLES: usize = 240;
+
+    /// `spin` integrates rather than multiplying the clock (ADR-0135), and at a
+    /// constant rate the two agree — which is what makes "no golden moves" a
+    /// property of the arithmetic rather than of the tolerance. Every fixture
+    /// binding this scene's `spin` binds a constant.
+    #[test]
+    fn a_constant_spin_integrates_to_the_multiply_it_replaced() {
+        let dt = FALLBACK_DT;
+        for rate in [DEFAULT_SPIN, 0.0, 0.4, -0.25] {
+            let mut phase = Phase::default();
+            let mut time = 0.0f32;
+            for _ in 0..600 {
+                phase.step(rate, dt);
+                time += dt;
+            }
+            assert!(
+                (phase.get() - rate * time).abs() < 1e-3,
+                "rate {rate}: integrated {} against the multiply's {}",
+                phase.get(),
+                rate * time
+            );
+        }
+    }
+
+    /// ...and the property the multiply failed: a `spin` that MOVES advances the
+    /// rotation by `spin * dt` whatever the elapsed time. Under `spin * time` the
+    /// same change at t = 100 s swings the figure through fifty seconds of
+    /// rotation in one frame.
+    #[test]
+    fn a_spin_change_bends_the_rotation_instead_of_teleporting_it() {
+        let dt = FALLBACK_DT;
+        let mut phase = Phase::default();
+        let mut time = 0.0f32;
+        for _ in 0..6_000 {
+            phase.step(DEFAULT_SPIN, dt);
+            time += dt;
+        }
+        assert!(time > 99.0, "the fixture must be far from t = 0: {time}");
+
+        let before = phase.get();
+        phase.step(1.5, dt);
+        let step = phase.get() - before;
+        assert!(
+            (step - 1.5 * dt).abs() < 1e-4,
+            "the rotation advanced {step}, not {}",
+            1.5 * dt
+        );
+        // What the multiply would have done, on the record rather than described.
+        let teleport = (1.5 - DEFAULT_SPIN) * time;
+        assert!(
+            teleport > 100.0,
+            "the multiply's one-frame jump at this elapsed time was {teleport} rad"
+        );
+    }
 
     fn ramp(hue_spread: f32) -> ColorRamp {
         ColorRamp {
