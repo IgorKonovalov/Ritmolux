@@ -1,9 +1,17 @@
 # 0130 — The audio input becomes an operator surface
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-28. Phases 1-4b landed as `9005a8d`, `7eee5f0`,
+> `dd8fbf3`, `5e29453`, `85bd59b`; Phase 5 (`human`) ran bullets 1 and 2 only. Mode 4 review:
+> **no blockers, two majors, two minors, two nits.** Verified on the merged lane — `cargo fmt
+> --check` clean, `cargo clippy --workspace --all-targets` clean, `cargo nextest run --workspace`
+> 1100 passed / 5 skipped — and the five doc gates green. Both majors were about what the close
+> would strand, and both are discharged rather than fixed here: Phase 5 bullets 3 and 4 are
+> extracted into [`docs/on-device-validation.md`](../../on-device-validation.md), and the
+> `REGDB_E_CLASSNOTREG` observation is filed as design-backlog 0154. The two minors and the two
+> nits are design-backlog 0155 and 0156, for `dev`.
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (proposed)
+> **Related ADRs:** [0142](../../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (accepted 2026-08-28)
 
 ## TL;DR
 
@@ -60,7 +68,7 @@ restart to find out will keep editing TOML. We rejected **a supervisor thread** 
 frame during a keypress at the price of a permanent second concurrency seam. We rejected **recovery
 inside the capture thread** on NFR §5, and **`IMMNotificationClient` hot-plug** as an upgrade path
 rather than on merit — it is a second reporting seam built before the first has shipped. All four
-are recorded in [ADR-0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md).
+are recorded in [ADR-0142](../../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md).
 
 ## Architecture diagram
 

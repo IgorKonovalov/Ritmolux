@@ -13,6 +13,61 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0130 — The audio input becomes an operator surface](done/0130-the-audio-input-becomes-an-operator-surface.md)
+  — closed 2026-08-28. Six phases on `plan-0130-the-audio-input-becomes-an-operator-surface` in
+  `WORK/lmv-plan-0130`, `9005a8d`..`85bd59b` plus the Phase 5 log commits. Review: **no blockers,
+  two majors** (both about what the close would strand, both discharged here), **two minors, two
+  nits.** Version **0.89.0** (minor). Closed no backlog entry; filed 0154, 0155 and 0156.
+
+  **The plan shipped its feature and left its evidence behind.** Phases 1-4 gave `[input]` the two
+  surfaces every other operator choice already had — `--input`/`--device` over `config.toml`, and
+  two live `S`-menu rows — by making the capture stream restartable with the shell owning every
+  policy decision and the capture thread gaining one `AtomicBool` store. That half is done and
+  well-tested: the resolver, the row roster, the device-row rule and the whole bounded-retry policy
+  are pure values with real assertions over them, including the `["Headphones (2- USB Audio)",
+  "Headphones"]` substring pair that no roster on the development box could have exposed.
+
+  **The half that is not done is the half the plan named as its own biggest risk.** Phase 5's
+  unplug and 96 kHz bullets did not run for want of a removable interface, so `is_device_lost`, the
+  three `lost.store` sites, `poll_input_lost`'s `Reopen`/`GiveUp` arms and the `Lost` verdict have
+  **never executed against a real device loss**. The open question is not whether the recovery works
+  but whether it fires at all: a real unplug that returns zero frames forever instead of
+  `AUDCLNT_E_DEVICE_INVALIDATED` would defeat every line of it, and that case is indistinguishable
+  from silence. Both bullets are extracted into
+  [`docs/on-device-validation.md`](../on-device-validation.md), which is where a check gated on
+  hardware the box does not have belongs — the same treatment Plan 0012 Phase 3 and Plan 0082
+  Phase 5 got.
+
+  **The one thing Phase 5 did find is a defect nothing in this repo can see.** Of 22 live mode
+  swaps, one failed at `CoCreateInstance(MMDeviceEnumerator)` with `REGDB_E_CLASSNOTREG`. The shell
+  degraded exactly as Phase 3's done-when specifies, so the criterion now has a real failure behind
+  it rather than a synthetic one — but the exposure is new, because `capture_win::start` used to
+  run once per process and now runs per swap and per recovery attempt. It matters where the design
+  churns fastest: `poll_input_lost` reopens on **consecutive frames**, and the bounded budget counts
+  statements about the endpoint without being able to tell this failure from one, so a real loss
+  whose reopens drew this error would write a `lost …` verdict about a device that was fine. Filed
+  as backlog 0154 with no mechanism claimed — one run on one box, and 1-in-22 is a sample, not a
+  rate.
+
+  **A mid-plan review had already caught the persistence bug, which is why Phase 4b exists.** The
+  first implementation had recovery write its fallback to `config.toml`, so one unplug overwrote
+  `[input] device` with `default` three times over — and since a re-plug deliberately does not
+  restore the device (ADR-0142 Alternative D), the file was the only record of which endpoint the
+  rig wants. That review also found the row matcher disagreeing with `pick_device`'s rule, a retry
+  bound a single live frame could reset, a flag claiming to have been applied on platforms that
+  ignore it, and a valueless `--device` meaning the opposite of a selection. All five landed in
+  `85bd59b` before this close.
+
+  **What outlived the plan.** `CaptureVerdict` is current state rather than a startup fact, and the
+  live token now carries the endpoint (`live WASAPI 48000/2 Speakers (Realtek(R) Audio)`) — a format
+  change to `diagnostics.log`'s `capture` column that both `READ-ME-FIRST.md` files and
+  `docs/on-device-validation.md` were swept for. Two findings went to `dev` rather than being fixed
+  here: the recovery settle window is counted in **frames**, so the flap it guards against is
+  bounded at 60 Hz and not at 240 Hz — the question Plan 0014 already settled for animation when it
+  retired `SCENE_DT` (backlog 0155); and after a give-up, a loss inside that window rewrites no
+  surface, so the verdict reads `live` while nothing is delivering, which is the one path where the
+  `Lost` variant's whole reason for existing is defeated (backlog 0156).
+
 - [0122 — Every rate integrates](done/0122-every-rate-integrates.md)
   — closed 2026-08-28. Five phases on `plan-0122-every-rate-integrates` in `WORK/lmv-plan-0122`,
   `5c258d0`..`7ac363f`. Review: **no blockers, two majors** (both discharged before the close),

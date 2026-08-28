@@ -1,8 +1,8 @@
 # ADR-0142 — The audio input is switched live, and the shell owns the policy
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0130)
 > **Date:** 2026-08-28
-> **Related plan(s):** [0130](../plans/0130-the-audio-input-becomes-an-operator-surface.md)
+> **Related plan(s):** [0130](../plans/done/0130-the-audio-input-becomes-an-operator-surface.md)
 
 ## Context
 
@@ -171,3 +171,30 @@ on merit.
   edge case, and it is why the swap path cannot assume the format is stable.
 - ADR-0045 is the precedent for the launch precedence chain and for a menu row that writes back what
   it changed; Plan 0083 is the premise this supersedes on its "once" half.
+
+## Outcome (2026-08-28, at Plan 0130's close)
+
+Accepted as designed. Three things the implementation settled that this ADR did not say, recorded
+here rather than by editing the body above.
+
+**A recovery does not persist its fallback.** The Decision scopes persistence to the settings rows
+and is silent about the recovery path; the first implementation wrote `config.toml` on every reopen,
+so one unplug overwrote `[input] device` with `default` three times over. Since Alternative D is
+deliberately unbuilt and a re-plug therefore does not restore the device, the file was the *only*
+record of which endpoint the rig wants. The rule is now explicit: an operator's swap is a choice the
+file records, a recovery is not.
+
+**The swap path is exposed to a COM failure the recovery budget cannot read.** `capture_win::start`
+used to run once per process and now runs per swap, spawning a thread that creates an
+`MMDeviceEnumerator` and exits. One activation in 22 failed with `REGDB_E_CLASSNOTREG` under
+menu-speed churn on the development box. The shell degraded correctly, so this is not a defect in
+the design — but the bounded retry counts *statements about the endpoint*, and it cannot tell this
+failure from one. Filed as design-backlog 0154; no mechanism is claimed on one run on one box.
+
+**The device-loss half has never run.** Phase 5's unplug and 96 kHz bullets did not execute for want
+of a removable interface, so the flag store, the bounded reopen and the `Lost` verdict are pinned
+only by unit tests over a synthesized flag. The open question this ADR's Negative section did not
+raise — whether a real unplug reports `AUDCLNT_E_DEVICE_INVALIDATED` at all, or simply returns zero
+frames forever and never sets the flag — is still open, and is now a checklist item in
+[`docs/on-device-validation.md`](../on-device-validation.md). If it turns out to be the zero-frames
+case, the fix is a silence-duration heuristic and that is a worse mechanism owed its own ADR.
