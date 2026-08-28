@@ -522,3 +522,50 @@ unsafe fn parse_mix_format(fmt: *const WAVEFORMATEX) -> Result<MixFormat, Captur
         channels,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use windows::Win32::System::Com::COINIT_APARTMENTTHREADED;
+
+    use super::*;
+
+    /// **Enumeration has to work from a thread that is already in an STA**, and
+    /// leave that apartment standing.
+    ///
+    /// The render/UI thread is an STA (winit initializes one), and the settings
+    /// menu enumerates from there. `CoInitializeEx(MULTITHREADED)` answers
+    /// `RPC_E_CHANGED_MODE` on such a thread: treating that as a failure empties
+    /// the roster on exactly the thread that needs it, and pairing it with a
+    /// `CoUninitialize` releases a reference the call never took — which tears
+    /// the caller's apartment down, so the *next* COM call fails instead of this
+    /// one. Hence two enumerations and then a plain object creation: the damage
+    /// this guards against is always visible one call late.
+    #[test]
+    fn enumerating_from_an_sta_leaves_the_apartment_intact() {
+        let hr = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+        assert!(hr.is_ok(), "the test could not enter an STA: {hr:?}");
+
+        let first = endpoints(CaptureMode::Loopback);
+        let second = endpoints(CaptureMode::LineIn);
+        let after: Result<IMMDeviceEnumerator, _> =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) };
+        unsafe { CoUninitialize() };
+
+        // A machine with no endpoints at all is allowed (a headless runner has
+        // none); being told the apartment is wrong is not.
+        for result in [&first, &second] {
+            if let Err(CaptureError::Windows(e)) = result {
+                assert_ne!(
+                    e.code(),
+                    RPC_E_CHANGED_MODE,
+                    "an STA caller was reported as a failure: {e}"
+                );
+            }
+        }
+        assert!(
+            after.is_ok(),
+            "the caller's apartment did not survive the enumeration: {:?}",
+            after.err()
+        );
+    }
+}
