@@ -325,8 +325,8 @@ flowchart LR
 |-------|-------|-------|--------|
 | 1a | human | partly answered by Phase 2's probe — see Notes | — |
 | 1b | human | not started | — |
-| 2 | dev | done | committed with this row |
-| 3 | dev | not started | — |
+| 2 | dev | done | c8bdcd5 |
+| 3 | dev | done — inline send ships, no code change | committed with this row |
 | 4 | human | not started | — |
 | 5 | dev | not started | — |
 | 6 | dev | not started | — |
@@ -388,3 +388,69 @@ a sibling.
 **One observation outside this phase's scope:** the tempo estimate settled at
 **59.84 BPM against a signal built at 120 BPM** — a half-tempo lock. The sink
 publishes what the analyzer reports; nothing here touches the estimator.
+
+**Phase 3 — the inline send ships; `standalone/src/osc.rs` and
+`standalone/src/main.rs` were not modified.** The criterion is met on all three
+metrics, so the phase's conditional work (the dedicated sender thread) did not
+land and this row's commit carries only the measurement.
+
+*Machine and link* (ADR-0071): AMD Ryzen 9 5900HS, NVIDIA RTX 3080 Laptop +
+Radeon iGPU, Windows 10 19045, display 2560x1440 @ **165 Hz**, app windowed at
+1920x1080. Release build. Link: **Wi-Fi 6 (MediaTek MT7921), 144.4 Mbps
+negotiated** — *not* the gigabit Ethernet ADR-0144 specifies, and *not* the
+Arena machine; see the deviation below.
+
+*Method.* Twelve runs, **alternating off/on** so drift falls on both
+configurations equally: `--soak` sampling every 5 s over 24 s of playback, the
+preset pinned to a single-preset `LMV_PRESET_DIR` (`attractor_clifford`) so
+every run draws the same scene, the same synthesized 120 BPM signal played
+through loopback each time, and each run's first soak sample dropped as startup.
+Sink-on target `192.168.0.1:9000`.
+
+*Frame-time distributions*, per-run means across 6 runs each:
+
+| metric | sink off (mean, sd, range) | sink on (mean) | verdict |
+|---|---|---|---|
+| fps | 92.008, sd 0.330, [91.600, 92.400] | 91.850 | inside |
+| mean frame ms | 10.8753, sd 0.0395, [10.8289, 10.9259] | 10.8941 | inside |
+| `frame_ms_p99_steady` | 14.0096, sd 0.489, [13.4150, 14.5328] | 13.7199 | inside |
+
+**Sink-on's mean sits inside sink-off's own run-to-run range on every metric.**
+The mean-frame-time delta is **+0.0188 ms (+0.2%)**, under half of sink-off's own
+standard deviation against itself; the p99 delta is *negative* (-0.29 ms), which
+is noise rather than an improvement.
+
+*The send cost itself was measured separately*, because a distribution that does
+not move says nothing about how much headroom is left. A throwaway instrument
+(scratchpad, not in the repo) replicated the per-frame work exactly — fourteen
+non-blocking `send_to` calls totalling 392 bytes — over 1,200 paced frames
+after a 200-frame warmup:
+
+| target | mean | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|
+| `192.168.0.1` (LAN) | 0.1691 ms | 0.1531 | 0.2256 | 0.3003 | 0.6794 |
+| `127.0.0.1` (control) | 0.1052 ms | 0.0898 | 0.1580 | 0.2224 | 0.3104 |
+
+The LAN target costs **~1.6x** localhost, which is the plan's reason for
+refusing the localhost measurement.
+
+**The two numbers disagree, and the reason matters more than either.** A 0.169 ms
+mean send against a 10.875 ms frame should have moved the mean frame time by
+~1.5%; it moved it by 0.2%. The app ran at ~92 fps against a **165 Hz** display,
+so it was **not** vsync-clamped — it was bound waiting on the GPU, and the
+send overlaps that wait. So the inline exit is earned on this machine by
+**slack that happens to exist**, not by the send being free. A CPU-bound
+configuration would show more of the 0.169 ms, and the p99 send of 0.30 ms is
+4.9% of a 165 Hz frame budget and 1.8% of a 60 Hz one.
+
+**Two deviations from the phase as written.**
+
+- **The measurement is against the local gateway over Wi-Fi, not the Arena
+  machine over gigabit Ethernet** (user's instruction, 2026-08-28, after the
+  rig was found unreachable — see the Phase 2 note). It satisfies "a LAN
+  target rather than localhost": the datagrams leave the NIC and traverse the
+  switch. It does not measure the rig's own path, and the 0.169 ms figure is
+  the one to re-take on the show network.
+- **The soak log has no mean-frame-time column.** Its columns are `fps`,
+  `frame_ms_p99` and `frame_ms_p99_steady`, so the mean frame time above is
+  `1000 / fps` rather than a directly logged statistic.
