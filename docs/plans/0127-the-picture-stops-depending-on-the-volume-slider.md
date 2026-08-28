@@ -277,7 +277,7 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 | 2 — The trace spans the width | dev | done | `3560eed` |
 | 3 — One reference capture | human | done — both readings taken | |
 | 4 — The base amplitude constant | dev | **skipped — see notes** | |
-| 5 — The docs say what the contract is | dev | done | committed with this row |
+| 5 — The docs say what the contract is | dev | done | `e606889` |
 
 ### Notes
 
@@ -360,12 +360,21 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0123, 0122, 0120 (0120 conditional on Phase 3)
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0123, 0122, 0120 (0120 conditional on Phase 3). 0123 and
+  0122 are delivered. **0120 is not**: Phase 3 produced its measurement and Phase 4 declined to
+  apply it, so the entry's question is answered but its stated fix did not ship.
+- **What shipped:** feature + fix. Phase 1 adds a field to `AnalysisFrame` (`waveform_gain`) and
+  changes what `waveform` carries; Phase 2 changes the geometry of every mode-6/7 trace. Phase 5 is
+  docs-only. No C ABI change — `LMV_ABI_VERSION` stays at 6.
+- **Operator docs touched:** `docs/capturing.md` (why the trace is absent from the normalized level
+  table, and what `waveform_gain` buys). Also `docs/specs/0002-ring-determinism.md`, reconciled
+  through this plan. No `packaging/*/READ-ME-FIRST.md` or `README.md` change.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exits 1.** One broken entry —
+  0123's `present: Raw amplitude in roughly in: core/src/dsp/mod.rs`, falsified by Phase 1
+  rewriting that doc block. 0120's probe still passes. Not repaired here; that is architect's call.
+- **Outstanding `human` phases:** none. Phase 3 ran 2026-08-28; its readings are in the notes above,
+  and its artifacts sit outside the repo in `WORK/lmv-0127-gate/`.
 
 ## Followups (after this lands)
 
