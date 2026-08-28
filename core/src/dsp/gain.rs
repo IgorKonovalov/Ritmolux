@@ -38,7 +38,7 @@
     clippy::unreachable
 )]
 
-use super::{HOP_SIZE, SPECTRUM_BINS};
+use super::{HOP_SIZE, SPECTRUM_BINS, WAVE_SAMPLES};
 
 /// Release time constant of the running peak, in seconds.
 ///
@@ -193,8 +193,87 @@ fn step(peak: &mut f32, raw: f32, release: f32, floor: f32) -> f32 {
     }
 }
 
+/// Silence floor for the waveform trace, in **signal amplitude** — a different
+/// quantity from [`BAND_FLOOR`], which is a band mean, and deliberately an order
+/// of magnitude above it.
+///
+/// A band mean spreads a signal's energy across bins, so a -80 dBFS room lands
+/// well under `1e-4` there. A time-domain peak does no such spreading: -80 dBFS
+/// **is** an amplitude of `1e-4`, so `BAND_FLOOR` copied here would sit exactly
+/// at room noise and amplify it to a full-scale trace — the one failure a floor
+/// exists to prevent.
+///
+/// Measured against `signal::dynamic_groove` at 48 kHz, per 120 bpm beat: the
+/// trace peaks at `0.900` through the loud phrase and at `0.206` in the two
+/// resting beats, whose `0.04` phrase scale is the quietest material the
+/// stimulus contains. So `1e-3` (-60 dBFS) leaves the quietest real material
+/// **206x** clear of the floor, and the same material a decade down the fader
+/// still **21x** clear — levelled rather than zeroed. Downward it suppresses a
+/// -80 dBFS room by a decade and 16-bit dither (LSB `3e-5`) by two.
+///
+/// `the_floor_clears_real_material_by_two_orders_of_magnitude` is the margin,
+/// asserted as a ratio rather than as this paragraph's readings.
+pub const WAVE_FLOOR: f32 = 1e-3;
+
+/// The waveform's normalizer: **one** running peak of the trace's magnitude,
+/// applied as a uniform gain to the whole trace.
+///
+/// One shared peak for the same reason [`BandNormalizer`] uses one — the samples
+/// of a trace only mean anything relative to each other, and a per-sample gain
+/// would erase the shape the trace exists to show. Two differences from that
+/// type, both forced by the quantity:
+///
+/// - **The peak tracks `|x|` and the output stays signed.** A trace is a signal,
+///   not a magnitude, so it is divided rather than rectified and clamps to
+///   `-1..=1` instead of `0..=1`.
+/// - **The divisor is returned rather than discarded**, because it is published
+///   as `AnalysisFrame::waveform_gain` (ADR-0139): the raw amplitude is
+///   `waveform[i] * waveform_gain`, which is the escape hatch a consumer that
+///   genuinely wants absolute level reaches for.
+pub struct TraceNormalizer {
+    peak: f32,
+    release: f32,
+    floor: f32,
+}
+
+impl TraceNormalizer {
+    /// A normalizer for the trace at `sample_rate`.
+    pub fn new(sample_rate: u32) -> Self {
+        Self {
+            peak: 0.0,
+            release: release_per_hop(sample_rate),
+            floor: WAVE_FLOOR,
+        }
+    }
+
+    /// Advance one hop, normalizing `trace` in place, and return the divisor
+    /// removed — `0.0` while the tracked peak sits under the floor, where the
+    /// trace is zeroed rather than amplified.
+    pub fn normalize(&mut self, trace: &mut [f32; WAVE_SAMPLES]) -> f32 {
+        let loudest = trace
+            .iter()
+            .copied()
+            .filter(|v| v.is_finite())
+            .fold(0.0f32, |m, v| m.max(v.abs()));
+        match advance(&mut self.peak, loudest, self.release, self.floor) {
+            Some(peak) => {
+                for sample in trace.iter_mut() {
+                    let raw = if sample.is_finite() { *sample } else { 0.0 };
+                    *sample = (raw / peak).clamp(-1.0, 1.0);
+                }
+                peak
+            }
+            None => {
+                *trace = [0.0; WAVE_SAMPLES];
+                0.0
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     const SR: u32 = 48_000;
@@ -387,5 +466,127 @@ mod tests {
         // Recovery is the real claim: a poisoned peak would leave every later
         // hop dead for the rest of the run.
         assert_eq!(n.normalize(0.5), 1.0);
+    }
+
+    /// A trace of `WAVE_SAMPLES` at `peak`, shaped so it has both signs and a
+    /// structure a uniform gain must preserve.
+    fn trace_at(peak: f32) -> [f32; WAVE_SAMPLES] {
+        std::array::from_fn(|i| {
+            let t = i as f32 / WAVE_SAMPLES as f32;
+            peak * (std::f32::consts::TAU * 3.0 * t).sin() * (0.4 + 0.6 * t)
+        })
+    }
+
+    /// The floor is an **amplitude**, so the margin that matters is against the
+    /// quietest passage of real material rather than against a band mean.
+    ///
+    /// `dynamic_groove`'s resting beats are its `0.04` phrase scale — the
+    /// quietest thing it contains — and they must stay far enough over the floor
+    /// that the same material a decade down the fader is still levelled instead
+    /// of zeroed. Asserted as ratios; the readings themselves are in
+    /// [`WAVE_FLOOR`]'s derivation.
+    #[test]
+    fn the_floor_clears_real_material_by_two_orders_of_magnitude() {
+        let format = crate::audio::AudioFormat {
+            sample_rate: SR,
+            channels: 1,
+        };
+        let pcm = crate::signal::dynamic_groove(120.0, 8.0, format);
+        let beat = SR as usize / 2;
+        let quietest = pcm
+            .chunks(beat)
+            .map(|c| c.iter().fold(0.0f32, |m, v| m.max(v.abs())))
+            .fold(f32::INFINITY, f32::min);
+        assert!(
+            quietest > 100.0 * WAVE_FLOOR,
+            "the quietest beat peaks at {quietest}, only {}x the floor",
+            quietest / WAVE_FLOOR
+        );
+        // ...and a decade down the fader it is still material, not silence.
+        assert!(
+            quietest * 0.1 > 10.0 * WAVE_FLOOR,
+            "a decade down, the quietest beat is {}x the floor",
+            quietest * 0.1 / WAVE_FLOOR
+        );
+    }
+
+    /// The whole point: the input gain cancels.
+    ///
+    /// The normalizer divides by a peak that scales with its input, so it is
+    /// homogeneous of degree zero above the floor — the same signal at any
+    /// fader position produces the same trace. Not bit-exact for an arbitrary
+    /// `k`, because `(k*x)/(k*p)` rounds differently from `x/p`; exact for a
+    /// power of two, which is asserted separately.
+    #[test]
+    fn a_trace_normalizes_to_the_same_shape_at_any_input_gain() {
+        let reference = {
+            let mut t = trace_at(0.9);
+            TraceNormalizer::new(SR).normalize(&mut t);
+            t
+        };
+        for k in [0.18f32, 0.4, 3.0] {
+            let mut scaled = trace_at(0.9 * k);
+            let gain = TraceNormalizer::new(SR).normalize(&mut scaled);
+            assert!(
+                gain > 0.0,
+                "gain 0 at k={k}: the stimulus fell under the floor"
+            );
+            let worst = reference
+                .iter()
+                .zip(scaled.iter())
+                .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()));
+            assert!(worst < 1e-6, "k={k} moved the trace by {worst}");
+        }
+        let mut halved = trace_at(0.45);
+        TraceNormalizer::new(SR).normalize(&mut halved);
+        assert_eq!(
+            halved, reference,
+            "a power-of-two gain change must cancel exactly"
+        );
+    }
+
+    /// Silence is reported as silence rather than amplified into a full-scale
+    /// display of a quiet room — the same rule [`BAND_FLOOR`] holds for the band
+    /// array, at an amplitude the floor's own derivation names.
+    #[test]
+    fn a_sub_floor_trace_reads_as_silence_and_publishes_no_gain() {
+        let mut silent = [0.0f32; WAVE_SAMPLES];
+        assert_eq!(TraceNormalizer::new(SR).normalize(&mut silent), 0.0);
+        assert!(silent.iter().all(|v| *v == 0.0));
+
+        let mut whisper = trace_at(WAVE_FLOOR * 0.5);
+        assert_eq!(TraceNormalizer::new(SR).normalize(&mut whisper), 0.0);
+        assert!(
+            whisper.iter().all(|v| *v == 0.0),
+            "a sub-floor trace must be zeroed, not scaled up"
+        );
+    }
+
+    /// The published divisor is a real escape hatch: multiplying it back gives
+    /// the amplitude the analyzer read (ADR-0139).
+    #[test]
+    fn the_published_gain_reconstructs_the_raw_trace() {
+        let raw = trace_at(0.62);
+        let mut normalized = raw;
+        let gain = TraceNormalizer::new(SR).normalize(&mut normalized);
+        let worst = raw
+            .iter()
+            .zip(normalized.iter())
+            .fold(0.0f32, |m, (r, n)| m.max((r - n * gain).abs()));
+        assert!(worst < 1e-6, "reconstruction is off by {worst}");
+    }
+
+    /// A NaN sample must not become an absorbing peak — the trap `advance`'s
+    /// doc names, reached here through the trace's own magnitude scan.
+    #[test]
+    fn a_non_finite_sample_does_not_poison_the_running_peak() {
+        let mut n = TraceNormalizer::new(SR);
+        let mut poisoned = trace_at(0.5);
+        poisoned[7] = f32::NAN;
+        let gain = n.normalize(&mut poisoned);
+        assert!(gain.is_finite() && gain > 0.0, "gain went bad: {gain}");
+        assert!(poisoned.iter().all(|v| v.is_finite()));
+        let mut after = trace_at(0.5);
+        assert!(n.normalize(&mut after) > 0.0, "the peak never recovered");
     }
 }

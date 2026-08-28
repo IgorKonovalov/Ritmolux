@@ -109,20 +109,33 @@ pub struct AnalysisFrame {
     /// warp mesh's `wave_mode` draw, which is what MilkDrop's presets use as
     /// their light source, and which no amount of spectrum can reconstruct.
     ///
-    /// Raw amplitude in roughly `-1..1`, un-normalized. The four headline levels
-    /// are peak-normalized (ADR-0049) because a *threshold* on them has to be
-    /// portable; a waveform is a picture of the signal, and normalizing it would
-    /// make a quiet passage draw the same trace as a loud one — which is the
-    /// opposite of what a scope is for. The consumer scales it (MilkDrop's
-    /// `wave_scale` does exactly that).
+    /// **Levelled against its own recent peak** (ADR-0139), like every other
+    /// headline value on this struct: the whole trace is divided by one
+    /// slowly-released running peak of its magnitude, so it reads `-1..=1` at any
+    /// fader position. That is what makes the two frontends agree — the plugin
+    /// taps the decoded stream *before* the output volume, the standalone taps
+    /// loopback *after* it, and only the absolute level differs between them.
+    /// Dynamics *within* a track survive the seconds-scale release; a quiet
+    /// **track** reads like a loud one, which is the price of cancelling a volume
+    /// knob nothing else can see. The consumer still scales what it gets
+    /// (MilkDrop's `wave_scale` does exactly that).
     ///
-    /// **This is the one array on this struct that is not normalized and the one
-    /// that made it big.** `AnalysisFrame` is `Copy` and copied per frame, and 512
-    /// floats take it from ~340 bytes to ~2.4 kB — about 100 ns of memcpy at
-    /// 60 Hz, which is why it was acceptable. It is deliberately **not** in
-    /// [`Variables`](crate::preset::Variables), which carries the band array by
-    /// borrow for precisely this reason.
+    /// [`waveform_gain`](Self::waveform_gain) is the divisor, so an absolute
+    /// amplitude is one multiply away and a true oscilloscope stays reachable.
+    ///
+    /// **This is the array that made this struct big.** `AnalysisFrame` is `Copy`
+    /// and copied per frame, and 512 floats take it from ~340 bytes to ~2.4 kB —
+    /// about 100 ns of memcpy at 60 Hz, which is why it was acceptable. It is
+    /// deliberately **not** in [`Variables`](crate::preset::Variables), which
+    /// carries the band array by borrow for precisely this reason.
     pub waveform: [f32; WAVE_SAMPLES],
+    /// The divisor [`waveform`](Self::waveform) was levelled by: `waveform[i] *
+    /// waveform_gain` is the raw amplitude the analyzer read.
+    ///
+    /// `0.0` while the tracked peak sits under [`gain::WAVE_FLOOR`], where the
+    /// trace is zeroed rather than amplified — so reconstructing from a silent
+    /// frame gives silence rather than noise.
+    pub waveform_gain: f32,
     /// Spectral-flux onset envelope, normalized against its recent peak.
     pub onset: f32,
     /// Whether a beat (onset event) fired this hop.
@@ -191,6 +204,7 @@ impl Default for AnalysisFrame {
         Self {
             spectrum: [0.0; SPECTRUM_BINS],
             waveform: [0.0; WAVE_SAMPLES],
+            waveform_gain: 0.0,
             onset: 0.0,
             beat: false,
             bass: 0.0,
@@ -260,6 +274,7 @@ pub struct Analyzer {
     mid_gain: gain::PeakNormalizer,
     treb_gain: gain::PeakNormalizer,
     onset_gain: gain::PeakNormalizer,
+    wave_gain: gain::TraceNormalizer,
     window: [f32; WINDOW_SIZE],
     /// The long window feeding the sub-crossover bands (ADR-0049). Heap-held:
     /// 32 KB, and `Analyzer` is moved by value.
@@ -302,6 +317,7 @@ impl Analyzer {
             mid_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
             treb_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
             onset_gain: gain::PeakNormalizer::new(format.sample_rate, gain::ONSET_FLOOR),
+            wave_gain: gain::TraceNormalizer::new(format.sample_rate),
             window: [0.0; WINDOW_SIZE],
             low_window: vec![0.0; LOW_WINDOW_SIZE],
             filled: 0,
@@ -408,18 +424,24 @@ impl Analyzer {
                         .process(beat, fold_count, bass, onset, fold_phase);
 
                     // The oscilloscope trace: the most recent `WAVE_SAMPLES` of
-                    // the window, consecutive and un-normalized (Plan 0100
-                    // Phase 4). A slice of a buffer the analyzer already holds —
-                    // no extra state, no extra pass, and nothing here reads a
-                    // clock, so the frame stays a pure function of its window.
+                    // the window, consecutive (Plan 0100 Phase 4). A slice of a
+                    // buffer the analyzer already holds — no extra state, no
+                    // extra pass, and nothing here reads a clock.
+                    //
+                    // Levelled here, on the way out, for the same reason the
+                    // bands are and in the same place: the internal consumers
+                    // above have already read raw. The divisor is published
+                    // beside the trace (ADR-0139).
                     let mut waveform = [0.0f32; WAVE_SAMPLES];
                     if let Some(tail) = self.window.get(WINDOW_SIZE - WAVE_SAMPLES..) {
                         waveform.copy_from_slice(tail);
                     }
+                    let waveform_gain = self.wave_gain.normalize(&mut waveform);
 
                     self.latest = AnalysisFrame {
                         spectrum,
                         waveform,
+                        waveform_gain,
                         onset,
                         beat,
                         bass,
