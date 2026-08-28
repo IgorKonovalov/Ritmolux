@@ -62,6 +62,13 @@ byte-identical to what it would have been with the console closed. The console t
 same intermediate with a scaled, letterboxed draw. One render, one frame, two destinations. The
 intermediate exists only while the console is open; with it closed the present path is unchanged.
 
+**The console is off by default, and it is opened from the settings menu.** That is not a
+packaging detail — it is what makes the cost analysis above hold. Every price this decision pays
+(a second swapchain, a full-resolution intermediate, one copy per frame) is paid only while the
+console is open, so an operator who never opens one runs the app that exists today. A console
+built the other way — a surface allocated at startup and merely left unread — would look
+identical on screen and forfeit exactly that property.
+
 Two rules ride along. The console's swapchain is **not** paced with the output's: it requests a
 non-blocking present mode where one is available and presents on a decimated cadence, so a slower
 operator display cannot become the output's frame clock. And the preview's aspect comes from the
@@ -92,7 +99,9 @@ which this project has shipped wrong twice.
   second-class mode that only a two-GPU machine can exercise, and CI has one adapter.
 - **The output pays one full-resolution texture and one exact copy per frame while the console is
   open.** The copy is a DMA-class operation and the texture is transient, but it is not nothing at
-  1080p, and it is paid by the display loop this project protects hardest.
+  1080p, and it is paid by the display loop this project protects hardest. It is bounded by being
+  opt-in — closed is free, and asserted so — which means the cost lands on exactly the operator
+  who asked for it, and never on a show nobody is driving.
 - **We hand-draw every widget.** There are no buttons, no scrollbars and no text metrics — ADR-0009
   records that core exposes no text-measurement API, and `overlay.rs` already estimates its column
   width rather than measuring it. The console inherits that estimate and its truncation rule. A
