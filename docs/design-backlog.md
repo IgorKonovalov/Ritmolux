@@ -3740,3 +3740,46 @@ the grid.
 
 - **Verified 2026-08-29** - the search range is still 60-200 with no octave resolution: `present: const MAX_BPM: f32 = 200.0 in: core/src/dsp/tempo.rs`
 - **Verified 2026-08-29** - and the estimator still declines to settle the octave: `present: does not settle the octave in: core/src/dsp/tempo.rs`
+
+## 0159 - an unrecognized flag is silently ignored and there is no `--help`, so a typo on a show night is indistinguishable from a network fault
+
+> **Filed 2026-08-29** while hardening the live lighting path, from a guard that was written wrong
+> and hung on the way to finding this.
+
+Each CLI flag is parsed by its own scanner that walks the whole argument list looking for the one
+shape it cares about - `parse_soak_arg`, `parse_tier_arg`, `parse_input_args_from` and their siblings, each a
+`while let Some(arg) = args.next()` over a fresh iterator. **Nothing anywhere holds the set of
+recognized flags**, so nothing can notice an argument that no scanner claimed.
+
+**Measured on the pinned 2026-08-29 show build**, both starting the app normally rather than
+exiting:
+
+- `lmv --definitely-not-a-flag` - starts, draws, no diagnostic.
+- `lmv --ocs 127.0.0.1:9000` - starts, draws, **publishes no telemetry**, no diagnostic.
+
+The second is the one that matters. A misspelt `--osc` is a running visualizer with a dark rig, and
+on a show floor that presents exactly as a cable, a subnet or a controller fault - the three things
+an operator will check first, none of which is wrong. The individual scanners *are* strict about
+their own values (`--osc=` and a bare `--osc` are both refused, with tests), which makes the outcome
+sharper rather than softer: the app is careful about the flags it recognizes and silent about the
+ones it does not.
+
+**There is also no `--help`.** `lmv --help` does not print usage and does not exit; it falls through
+every scanner unclaimed and starts the visualizer, so there is no way to check a flag's spelling
+short of reading `README.md` or the source. A guard written for the lighting runner tried to probe
+the flag list by shelling out to `--help` and **hung the runner instead**, which is how this was
+found; it now reads the binary image for the string.
+
+**Impact.** Low for a desktop user who sees a window and can retype. High for exactly the case this
+project has been building toward for four plans - a headless or long-running show configuration
+where the only evidence a flag took effect is a physical thing in the room being lit.
+
+**What a fix looks like:** one scanner-agnostic pass that collects every `--`-prefixed argument no
+scanner consumed and refuses to start, or warns loudly, naming them. That needs the scanners to
+report what they claimed, which they currently do not - the smaller version is a single list of
+recognized flag names checked before the scanners run, which duplicates a roster and can drift, and
+is still strictly better than silence. A `--help` that prints the same roster and exits falls out of
+either shape and is the part an operator actually reaches for.
+
+- **Verified 2026-08-29** - flags are still scanned one at a time with no roster: `present: fn parse_soak_arg() in: standalone/src/main.rs`
+- `unprobeable:` that no unclaimed argument is rejected is a negative about the whole of `main`'s argument handling, not a match countable in one file; the two commands above are the reduction, and they are re-runnable against any build.
