@@ -1,6 +1,6 @@
 # 0130 — The audio input becomes an operator surface
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (proposed)
@@ -309,3 +309,24 @@ struct CaptureHandle {
 
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0130` on `plan-0130-the-audio-input-becomes-an-operator-surface`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — endpoint roster as a value, flags over config | dev | done | committed with this row |
+| 2 — the two rows in the pure state machine | dev | not started | |
+| 3 — the shell swaps capture live | dev | not started | |
+| 4 — a dead input reports itself | dev | not started | |
+| 5 — on-device gate | human | not started | |
+
+### Notes
+
+- Phase 1 touched `standalone/src/config.rs`, which no phase lists: `InputMode::as_str` /
+  `from_name` (the kebab word) are needed by the startup line here and by the settings row in
+  Phase 2, and the `rename_all = "kebab-case"` they must agree with lives in that file.
+- The resolver and its tests went in `main.rs`, not `lib.rs`: `mod config` is a binary module, so
+  `Input`/`InputMode` are not visible from the lib crate.
+- `--input` and `--device` override **field by field** (`--device` alone keeps the configured
+  mode). The plan's done-when pins only the both-flags case; the per-field rule is documented in
+  `README.md` and asserted in `the_flags_override_the_config_field_by_field`.

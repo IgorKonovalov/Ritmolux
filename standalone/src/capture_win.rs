@@ -18,6 +18,7 @@ use std::time::Duration;
 
 use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
     DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient, IAudioClient, IMMDevice,
@@ -241,28 +242,81 @@ fn flow_label(dataflow: EDataFlow) -> &'static str {
     }
 }
 
-/// Print the active render and capture endpoints by friendly name — the
-/// `--list-devices` startup aid (Plan 0009 Phase 2). Initializes COM on the
-/// calling thread for the enumeration and tears it down before returning.
-pub fn list_devices() -> Result<(), CaptureError> {
-    let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    com.ok()?;
-    let result = (|| unsafe {
+/// The endpoint dataflow a capture mode reads from: loopback taps a render
+/// endpoint, line-in captures an input endpoint.
+fn dataflow(mode: CaptureMode) -> EDataFlow {
+    match mode {
+        CaptureMode::Loopback => eRender,
+        CaptureMode::LineIn => eCapture,
+    }
+}
+
+/// A `CoInitializeEx` whose matching `CoUninitialize` is tied to the scope.
+///
+/// `CoInitializeEx` is per-thread and reference-counted: `S_OK` and `S_FALSE`
+/// (already initialized, same apartment) each take a reference that must be
+/// released, while `RPC_E_CHANGED_MODE` means the thread is already in the
+/// *other* apartment and no reference was taken — so uninitializing then would
+/// release someone else's. That last case is the render/UI thread, which winit
+/// has already put in an STA; `MMDeviceEnumerator` is a Both-model object, so
+/// enumerating from there is still valid.
+struct ComScope {
+    /// Whether this scope took the reference it must release.
+    owned: bool,
+}
+
+impl ComScope {
+    /// # Safety
+    /// The returned scope must be dropped on the thread that created it.
+    unsafe fn enter() -> Result<Self, CaptureError> {
+        let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        if hr == RPC_E_CHANGED_MODE {
+            return Ok(Self { owned: false });
+        }
+        hr.ok()?;
+        Ok(Self { owned: true })
+    }
+}
+
+impl Drop for ComScope {
+    fn drop(&mut self) {
+        if self.owned {
+            unsafe { CoUninitialize() };
+        }
+    }
+}
+
+/// The active endpoints a capture mode can run on, by friendly name, in the
+/// order Windows enumerates them.
+///
+/// Enumeration is COM: it allocates and blocks, so this is a **setup-time**
+/// call and never reaches the capture thread's real-time loop (NFR section 5).
+/// The shell caches what it returns rather than calling it per frame.
+pub fn endpoints(mode: CaptureMode) -> Result<Vec<String>, CaptureError> {
+    let _com = unsafe { ComScope::enter()? };
+    unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-        let render = enumerate_endpoints(&enumerator, eRender)?;
-        let capture = enumerate_endpoints(&enumerator, eCapture)?;
-        Ok::<_, CaptureError>((render, capture))
-    })();
-    unsafe { CoUninitialize() };
+        Ok(enumerate_endpoints(&enumerator, dataflow(mode))?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect())
+    }
+}
 
-    let (render, capture) = result?;
+/// Print the active render and capture endpoints by friendly name — the
+/// `--list-devices` startup aid (Plan 0009 Phase 2). Prints exactly what
+/// [`endpoints`] returns, so the roster the operator reads and the roster the
+/// settings menu cycles cannot come from two different enumerations.
+pub fn list_devices() -> Result<(), CaptureError> {
+    let render = endpoints(CaptureMode::Loopback)?;
+    let capture = endpoints(CaptureMode::LineIn)?;
     println!("Render devices (mode = \"loopback\"):");
-    for (name, _) in &render {
+    for name in &render {
         println!("  {name}");
     }
     println!("Capture devices (mode = \"line-in\"):");
-    for (name, _) in &capture {
+    for name in &capture {
         println!("  {name}");
     }
     Ok(())
@@ -311,14 +365,15 @@ fn setup_stream(
 ) -> Result<(Stream, AudioFormat, SampleConsumer), CaptureError> {
     // Loopback taps a render endpoint with the loopback stream flag; line-in
     // captures an input endpoint with no extra flags.
-    let (dataflow, stream_flags) = match selector.mode {
-        CaptureMode::Loopback => (eRender, AUDCLNT_STREAMFLAGS_LOOPBACK),
-        CaptureMode::LineIn => (eCapture, 0u32),
+    let stream_flags = match selector.mode {
+        CaptureMode::Loopback => AUDCLNT_STREAMFLAGS_LOOPBACK,
+        CaptureMode::LineIn => 0u32,
     };
+    let flow = dataflow(selector.mode);
     unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-        let device = pick_device(&enumerator, dataflow, selector.device.as_deref())?;
+        let device = pick_device(&enumerator, flow, selector.device.as_deref())?;
         let audio_client: IAudioClient = device.Activate(CLSCTX_ALL, None)?;
 
         let mix_format = audio_client.GetMixFormat()?;
