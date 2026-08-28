@@ -1,9 +1,18 @@
 # 0123 — A gate, a latch and an ink
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-27
+> **Closed:** 2026-08-28 - all nine phases landed (`c96f0fa`, `77dadd9`, `ba9c042`, `696fca9`,
+> `96d88b9`, `60b3508`, `e745c45`, `a9a16b9`, `687d0c1`). Mode 4 review: **no blockers, two
+> majors, three minors.** Verified on the merged tree: `fmt` + `clippy --workspace --all-targets`
+> clean, `cargo nextest run --workspace` **1084 passed / 0 failed**, doc-links and index-rows
+> green. The gate, the latch and the seam were each re-measured rather than taken from the log -
+> the driven roster is the two presets the log names, `DRIVEN_FLOOR`'s stated library minimum
+> (0.0345, Valentine) still holds over all 54 presets, and the OVER seam's overlap property and
+> the latch's one-rise-per-window property are both asserted with non-vacuous controls. The two
+> majors are recorded as design-backlog 0151 and 0152; neither blocks the close.
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0136](../adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) (proposed), [0137](../adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) (proposed), [0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) (proposed)
+> **Related ADRs:** [0136](../../adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) (accepted), [0137](../../adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) (accepted), [0138](../../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) (accepted)
 > **Closes:** design-backlog 0145, design-backlog 0147, design-backlog 0148
 
 ## TL;DR
@@ -21,7 +30,7 @@ capability back into the preset that motivated it.
 Three entries came out of one `preset-author` note on 2026-08-27, all verified against the tree
 before filing.
 
-**[0145](../design-backlog.md) — the gate.** `core/tests/animation.rs` captures frames 24 and 48
+**[0145](../../design-backlog.md) — the gate.** `core/tests/animation.rs` captures frames 24 and 48
 against `AnalysisFrame::default()` and fails anything under `ANIM_FLOOR = 0.01`. `collage_mono` is a
 poster: it sits still by design and does nearly all its moving in response to the music. It measures
 `0.0025` while passing `reactivity` comfortably. What shipped is autonomous motion added for the
@@ -29,13 +38,13 @@ measurement — the `pan_x`/`pan_y` rates went `0.07`/`0.09` to `0.70`/`0.78` �
 that the obvious levers are duds, because `drift` and `spin` multiply each element's own seeded
 velocity and 0.4 s of that is nothing.
 
-**[0147](../design-backlog.md) — the latch.** The evaluator is pure by hard invariant and
+**[0147](../../design-backlog.md) — the latch.** The evaluator is pure by hard invariant and
 `[smoothing]` eases without holding, so there is no way to arm a gate on time and fire it on the
 music. `collage_mono` wanted to recompose on the first strong onset after ninety seconds; it ships
 as `mod(time + 50, 100) < 50`, one rise per hundred seconds, metronomic by construction. Second
 independent instance of a gap first felt in archived 0034.
 
-**[0148](../design-backlog.md) — the ink.** Every line and particle scene draws additively and
+**[0148](../../design-backlog.md) — the ink.** Every line and particle scene draws additively and
 overlaps itself, so white over red sums to pink and a quantized palette's plateaus are gone. The
 limited-ink class reaches 4 of 12 systems, by accident rather than by decision. `LineRenderer`
 already carries a premultiplied-OVER pipeline built at Plan 0100 Phase 4, with one caller and no
@@ -296,13 +305,13 @@ struct LatchBank {
 
 ## What this plan does NOT do
 
-- **It does not touch [backlog 0146](../design-backlog.md)** — `warp_mesh` colouring its light at
+- **It does not touch [backlog 0146](../../design-backlog.md)** — `warp_mesh` colouring its light at
   deposit time, so the palette cannot band the accumulated field. That entry stays captured with its
   probes. It is a second colour path on a scene that already has one, which is its own design
   question and is not folded in here.
 - **It does not extend the ink class to particles or compute.** ADR-0138 names them as outside;
   nothing equivalent to the OVER pipeline exists in that renderer.
-- **It does not repair `palette_contour`** ([backlog 0140](../design-backlog.md)). ADR-0138 gives that
+- **It does not repair `palette_contour`** ([backlog 0140](../../design-backlog.md)). ADR-0138 gives that
   entry a contract to be repaired against and Phase 8 names the contour as an enumerated leak; the
   fix itself is untouched.
 - **It adds no gate for the ink class**, and no colour-counting statistic.
