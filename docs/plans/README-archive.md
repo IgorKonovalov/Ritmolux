@@ -13,6 +13,79 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md)
+  — closed 2026-08-29. Two phases of eight on `plan-0132-the-lighting-rig-follows-the-visuals` in
+  `WORK/lmv-plan-0132`, `c8bdcd5`..`36c1cdf` plus the close's `e8e3a9b`. Review: **no blockers, one
+  major** (discharged at the close), **three minors, two nits.** Version **0.91.0** (minor). Closed
+  no backlog entry; converted 0157's `unprobeable:` opt-out into a real probe, which this merge is
+  what made possible.
+
+  **The plan shipped a quarter of itself and that is the right outcome, not a shortfall.** Phases 2
+  and 3 built `standalone/src/osc.rs` — the fixed `/lmv/v1` telemetry set over UDP, off by default,
+  behind `--osc` and an `[osc]` config section, hand-rolled encoder, no new crate, no `core` change
+  at all. Phases 1b, 5, 6 and 7 were retired mid-plan when a live set on 2026-08-29 ran the whole
+  chain with **no Arena, no second machine and no NDI**, and the user then rejected the second
+  machine outright. That removed the receiver those phases were built to feed.
+
+  **The distinction the close insisted on: the NDI premise was *rejected*, not *falsified*.** Nothing
+  in the video half was measured and found wrong; the room it was designed for stopped existing. The
+  licence gate is therefore **moot rather than resolved** — it was never read, and ADR-0144's silence
+  on it is an absence of evidence rather than evidence. Anyone reaching for NDI later starts that
+  question from zero. ADR-0144 was accepted with a dated `Outcome` saying exactly that, alongside the
+  two shapes the plan decided for it (`rms` has no source in `AnalysisFrame` and is computed
+  un-normalized in the shell; "the beat counter" is two addresses, because `/lmv/v1/beat` would have
+  been a *prefix* of `/lmv/v1/beat/phase` and OSC pattern matching treats a prefix and a sibling
+  differently).
+
+  **The one major was the plan predicting its own miss and the miss happening anyway.** Phase 8 was
+  narrowed rather than retired precisely because `--osc` and `[osc]` are user-facing, and the
+  narrowing note said in as many words that deferring them to Plan 0133 would ship a flag with no
+  document naming it. It then shipped with no document naming it. Written at the close: `README.md`'s
+  *Flags & environment* gains the flag, the three config keys, and the full 14-row address table,
+  transcribed from `Telemetry::messages` and diffed against it address for address rather than
+  against the plan's prose.
+
+  **Phase 3's measurement is the part worth quoting, because `dev` refused the comfortable reading.**
+  The criterion was a property — enabling the sink must not move the frame-time distribution outside
+  what the same configuration shows against itself — and it was met on all three metrics, so the
+  inline send shipped. But a separate instrument put the send at **0.169 ms mean against a 10.875 ms
+  frame**, which should have moved the mean by ~1.5 % and moved it by 0.2 %. The log says why: the app
+  ran at ~92 fps against a **165 Hz** display, so it was GPU-bound and the send overlapped the wait.
+  **The inline exit is earned by slack that happened to exist on that machine, not by the send being
+  free**, and a CPU-bound configuration would show more of it. That is a re-measure trigger recorded
+  as one, and it is the honest version of a green result.
+
+  **Two claims the log made and then retracted, both correctly.** A 59.84 BPM reading against a
+  120 BPM signal looked like a half-tempo lock; a 45-second run on the same signal settled at
+  127.84, so it was the estimator warming and there is no tempo finding. And the Phase 3 measurement
+  is against the local gateway over **Wi-Fi**, not the rig over gigabit Ethernet — named as a
+  deviation rather than glossed, because the rig was unreachable from the dev box for three
+  independently established reasons (wrong subnet, an APIPA address on the Ethernet adapter, and a
+  VPN tunnel swallowing the route).
+
+  **Phase 4's verdict needed reconciling and the close did it.** The log's phase table says "not
+  started" and the retirement note says it was met in a form the plan did not anticipate; the note is
+  right and the table row predates the live set. The walking-skeleton done-when — *a fixture visibly
+  changes on the beat, driven by our telemetry* — **was met**, through a Python Art-Net bridge rather
+  than through Arena, and its *"which addresses were useful"* finding is real: it is design-backlog
+  0157 (the set publishes the transient counter and withholds the bar grid the engine already
+  computes) and 0158 (the tempo octave is unsettled, so every consumer folds it, and the rig saw the
+  fold running opposite to the documented bias). **Phase 1a's own roster is the half that will never
+  be met** — Arena's OSC port, its address strings, its edition — because there is no Arena in the
+  architecture any more.
+
+  **What outlived the plan.** The fixed-vocabulary decision, the versioning-in-the-address scheme,
+  the drop-and-report-the-edge failure behaviour and the off-by-default posture are all retained by
+  [ADR-0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md); the sink ships as
+  built and Plan 0133 starts from it rather than from zero. The linear-resolve argument was never
+  about NDI — it is about what a lighting sample of an HDR composite must average — and moves to Plan
+  0133 Phase 8 to resolve onto the rig's own 24 x 170 raster. ADR-0144's **Alternative D** (OSC only,
+  no video) was listed as the degenerate fallback and turned out to be the product; its
+  **Alternative E** (Art-Net direct) was refused on the premise that Arena owned the patch, and this
+  rig has no console, so ADR-0145 reopens it on the corrected premise. Also surviving: the
+  out-of-repo probe folder `WORK/lmv-lighting-probes`, kept deliberately — it is the bridge and the
+  probes that actually ran the show.
+
 - [0130 — The audio input becomes an operator surface](done/0130-the-audio-input-becomes-an-operator-surface.md)
   — closed 2026-08-28. Six phases on `plan-0130-the-audio-input-becomes-an-operator-surface` in
   `WORK/lmv-plan-0130`, `9005a8d`..`85bd59b` plus the Phase 5 log commits. Review: **no blockers,

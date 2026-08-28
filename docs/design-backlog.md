@@ -3700,7 +3700,7 @@ guess, which is what the 85 % window was.
 
 - **Verified 2026-08-29** - the grid the set omits is still computed and still public: `present: pub bar_index in: core/src/dsp/mod.rs`
 - **Verified 2026-08-29** - and the frame still carries the lock flag a consumer would need: `present: pub downbeat_locked in: core/src/dsp/mod.rs`
-- `unprobeable:` that the *published* set omits them - `standalone/src/osc.rs` lives on the unmerged `plan-0132-the-lighting-rig-follows-the-visuals` branch, so no probe against it resolves on `main` until that lane merges.
+- **Verified 2026-08-29** - and the published set still omits every one of them, which is the claim itself: `absent: bar_index|beat_in_bar|bar_phase|downbeat_locked in: standalone/src/osc.rs`. **This bullet was an `unprobeable:` opt-out until Plan 0132 closed**, on the reasoning that the sink lived on an unmerged lane and no probe against it resolved on `main`. That lane merged, so the opt-out expired and the reduction is a real one: it goes red the day the grid is published, which is the day this entry is discharged.
 
 ## 0158 - the tempo octave is unsettled by design, so every consumer folds it, and the rig observed the fold running the opposite way from the documented bias
 
