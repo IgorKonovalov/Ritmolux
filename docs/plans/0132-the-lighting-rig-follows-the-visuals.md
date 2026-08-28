@@ -80,6 +80,27 @@ flowchart LR
 
 ## Implementation phases
 
+> **RETIRED 2026-08-29 — Phases 1b, 5, 6 and 7 will not run, and the architecture they serve is
+> superseded.** A live set on 2026-08-29 ran the whole chain with **no Arena, no second machine and
+> no NDI**: `lmv --osc 127.0.0.1` into a bridge that emitted Art-Net straight to the fixtures. The
+> user has since rejected the second machine outright and for all future work, which removes the
+> receiver every one of those phases was built to feed.
+>
+> [ADR-0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) and
+> [Plan 0133](0133-the-engine-drives-the-lights.md) carry the replacement. **The NDI licence gate is
+> moot rather than resolved** — it was never read and no longer needs to be.
+>
+> **Phases 2 and 3 stand and their work ships.** The `/lmv/v1` OSC sink is what the live set ran on;
+> ADR-0145 retains it. Phase 1a's questions are answered by the rig probes, and Phase 4 was met in a
+> form the plan did not anticipate — a fixture moved on the beat, driven by this telemetry, through
+> a bridge rather than through Arena. This is ADR-0144's own Alternative D surviving alone, exactly
+> as that ADR said it might.
+>
+> **What this plan still owes at close:** ADR-0144 accepted with a dated `Outcome` recording that
+> its premise was rejected rather than falsified, and Phase 4's *"which addresses were useful"*
+> finding, which is real and is filed as design-backlog 0157.
+
+
 > **Amended 2026-08-28, on a show date of 2026-08-29.** Phase 1 was originally one human stop gate
 > covering both transports and running before `dev` started. That is wrong under a deadline: it puts
 > the cheap, certain OSC half behind an NDI licence read that cannot help tomorrow's show. It is
@@ -109,6 +130,8 @@ flowchart LR
   spec's padding rules anyway.
 
 ### Phase 1b — The NDI probe and the licence read
+
+> **RETIRED 2026-08-29.** No NDI receiver exists in the architecture. The licence was never read.
 
 - **Owner skill:** human
 - **What:** settle ADR-0144's remaining unverified facts for the video half. **This is a stop gate
@@ -201,6 +224,10 @@ flowchart LR
 
 ### Phase 5 — The frame tap grows a linear resolve stage
 
+> **RETIRED 2026-08-29 as written; the idea survives.** The linear resolve is the right thing and
+> moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 8, which resolves onto the rig's
+> own 24 x 170 raster instead of onto an NDI frame.
+
 - **Owner skill:** dev
 - **Depends on:** [Plan 0115](0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
   the frame tap. **This plan does not build that tap.** If 0115 has not reached Phase 2 when this
@@ -226,6 +253,8 @@ flowchart LR
 
 ### Phase 6 — The NDI sender in the standalone
 
+> **RETIRED 2026-08-29.** No NDI, no SDK staging, no licence obligation.
+
 - **Owner skill:** dev
 - **Depends on:** Phase 1b outcome (a), and Phase 5.
 - **What:** publish each resolved frame as an NDI source, behind a cargo feature that is **off by
@@ -249,6 +278,8 @@ flowchart LR
 
 ### Phase 7 — Human: the whole rig, and the question this plan cannot answer
 
+> **RETIRED 2026-08-29.** Its legibility question is real and moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 8.
+
 - **Owner skill:** human
 - **What:** run the full path — audio to visuals to NDI to Arena to Art-Net to fixtures — for a real
   set, and judge whether the lamps **read**.
@@ -265,6 +296,9 @@ flowchart LR
   - Session behaviour over the set: whether either sink degraded, stalled or dropped.
 
 ### Phase 8 — The operator documentation
+
+> **RETIRED 2026-08-29.** Documentation moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 9, which
+> also brings the rig facts in from the out-of-repo probe folder.
 
 - **Owner skill:** dev
 - **What:** write the operator guide and sweep the docs a new surface makes stale.
@@ -324,14 +358,14 @@ flowchart LR
 | phase | owner | state | commit |
 |-------|-------|-------|--------|
 | 1a | human | partly answered by Phase 2's probe — see Notes | — |
-| 1b | human | not started | — |
+| 1b | human | RETIRED — no NDI receiver | — |
 | 2 | dev | done | c8bdcd5 |
 | 3 | dev | done — inline send ships, no code change | committed with this row |
 | 4 | human | not started | — |
-| 5 | dev | not started | — |
-| 6 | dev | not started | — |
-| 7 | human | not started | — |
-| 8 | dev | not started | — |
+| 5 | dev | RETIRED — moves to Plan 0133 Phase 8 | — |
+| 6 | dev | RETIRED — no NDI | — |
+| 7 | human | RETIRED — moves to Plan 0133 Phase 8 | — |
+| 8 | dev | RETIRED — moves to Plan 0133 Phase 9 | — |
 
 ### Notes
 
