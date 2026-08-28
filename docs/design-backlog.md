@@ -3663,3 +3663,80 @@ config key happens to name.
 
 - **Verified 2026-08-28** — the give-up latch is still what silences the arm: `present: self.announced in: standalone/src/main.rs`
 - **Verified 2026-08-28** — and the operator-initiated restart still does not reset the policy: `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`
+
+## 0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand
+
+> **Filed 2026-08-29** from the live lighting rig, after the 2026-08-29 set.
+
+ADR-0144 chose a fixed OSC vocabulary and listed it as *"the four normalized levels, the raw levels,
+onset, the beat counter, beat phase, tempo, and the preset name."* The beat counter it means is
+`beat_index`, which counts **onset detections** at 1.35x-2.10x per musical beat (ADR-0109). Nothing
+in the published set is a musical beat.
+
+**But `AnalysisFrame` carries one.** Plan 0095 built `BarGrid`, and the frame exposes `beat_in_bar`,
+`bar_index`, `bar_phase`, `downbeat_confidence` and `downbeat_locked` - a tempo-locked grid with a
+lock flag. `core/src/dsp/downbeat.rs` says so in as many words: the fold is driven *"by the grid's
+beat count, which is driven by the tempo estimate; `beat_index` counts transients."* The telemetry
+set publishes the transient counter and withholds the grid.
+
+**What that cost downstream, measured.** The lighting bridge needed one white flash per musical
+beat. Given only `beat_index` it fired **3.6 times a second**, which read as frantic rather than
+dramatic. The workaround was to gate a `beat_index` increase against a locally folded tempo and
+suppress anything inside 85 % of a beat period - **a beat detector rebuilt in the consumer, from
+strictly less information than the engine already had**, with no access to the lock flag that would
+have said whether the grid was even tracking.
+
+**Why this is the interesting class.** It is not a defect in the analyzer; the signal exists and is
+correct. It is that a *fixed* vocabulary chose its members before there was a consumer, and the
+first real consumer wanted a member that was not on the list. ADR-0144 named exactly this risk -
+*"the fixed OSC set may prove too narrow"* - and asked for the evidence an operator would produce.
+This is that evidence, arriving from the first set played.
+
+**What a fix looks like:** publish the grid. `bar_index`, `beat_in_bar`, `bar_phase` and
+`downbeat_locked` under the existing `/lmv/v1` prefix, which is additive by construction - the
+prefix is versioned precisely so a later signal does not break a console mapping. The lock flag
+matters as much as the count: a consumer that cannot tell a locked grid from a warming one has to
+guess, which is what the 85 % window was.
+
+- **Verified 2026-08-29** - the grid the set omits is still computed and still public: `present: pub bar_index in: core/src/dsp/mod.rs`
+- **Verified 2026-08-29** - and the frame still carries the lock flag a consumer would need: `present: pub downbeat_locked in: core/src/dsp/mod.rs`
+- `unprobeable:` that the *published* set omits them - `standalone/src/osc.rs` lives on the unmerged `plan-0132-the-lighting-rig-follows-the-visuals` branch, so no probe against it resolves on `main` until that lane merges.
+
+## 0158 - the tempo octave is unsettled by design, so every consumer folds it, and the rig observed the fold running the opposite way from the documented bias
+
+> **Filed 2026-08-29** from the live lighting rig, after the 2026-08-29 set.
+
+`core/src/dsp/tempo.rs` searches lags between `MIN_BPM = 60.0` and `MAX_BPM = 200.0` and states
+plainly that it **does not settle the octave and is not trying to** (Plan 0095). That is a defensible
+position for an engine: a preset binding a rate to `tempo` mostly wants a period, not a musical
+claim.
+
+**It stops being free the moment something derives timing from it.** The lighting bridge derives
+every timing from the tempo - one structural climb per eight beats - so an unfolded estimate made
+the whole rig climb at twice the asked rate. The remedy was three lines, halving above 140 and
+doubling below 70, and **every future consumer of `/lmv/v1/tempo` will write those same three
+lines**, each choosing its own window, none of them recorded anywhere.
+
+**The direction of the error is the part worth flagging, because it does not match the record.**
+`tempo.rs` documents the ambiguity as **one-sided**, with `the_octave_ambiguity_is_one_sided` in
+`core/tests/tempo_probe.rs` printing that *the slower reading dragged the 140, 165 and 200 BPM rungs
+down an octave* - the estimator reading **low**. On the rig it read **high**: 200.9 BPM reported for
+material plainly at half that. One of three things is true and nothing here decides which - the
+one-sidedness does not hold on real music, the rig's material sits where the bias inverts, or the
+`200.9` reading was the estimator still warming and was never a settled lock. Plan 0132's own log
+records a warming artefact of exactly this shape being retracted once already (59.84 BPM at 13 s
+becoming 127.84 BPM at 45 s on the same signal), which makes the third possibility live.
+
+**Note the probe that would have caught it prints rather than asserts.** That is deliberate and
+correct - it is a measurement, not a property, and ADR-0071 is why it is not an assertion. It does
+mean nothing fails when the behaviour changes.
+
+**What a fix looks like:** publish a folded tempo beside the raw one rather than replacing it -
+presets and the OSC contract are bound to `bpm` as it is. The fold window is the design question and
+it is not obviously 70-140. **Before any of that, establish which of the three explanations is
+true**, because if the high reading was a warming artefact then the fold is solving a problem that
+does not exist and the real answer is a lock flag on the tempo, which 0157 shows already exists for
+the grid.
+
+- **Verified 2026-08-29** - the search range is still 60-200 with no octave resolution: `present: const MAX_BPM: f32 = 200.0 in: core/src/dsp/tempo.rs`
+- **Verified 2026-08-29** - and the estimator still declines to settle the octave: `present: does not settle the octave in: core/src/dsp/tempo.rs`
