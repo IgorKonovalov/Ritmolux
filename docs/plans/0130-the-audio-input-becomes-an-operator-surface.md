@@ -1,6 +1,6 @@
 # 0130 — The audio input becomes an operator surface
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0142](../adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) (proposed)
