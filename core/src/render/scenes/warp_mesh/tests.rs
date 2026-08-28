@@ -415,6 +415,15 @@ fn waveform_only() -> crate::milk::outputs::FrameOutputs {
 /// The comparison is on the endpoints alone. Colour and width are the same for
 /// every mode under one set of outputs, so including them would let a mode pass
 /// by being differently *coloured*, which is not what the done-when asks.
+///
+/// **Modes 6 and 7 are built at a non-zero `wave_mystery`, and that is not a
+/// concession to make the test pass.** Their construction is *a line at an angle
+/// `wave_mystery` sets*; at angle zero mode 6 is a full-width horizontal trace,
+/// which is what mode 2 is by definition — the two coincide exactly, and
+/// [`mode_6_at_zero_mystery_is_the_mode_2_scope`] pins that rather than leaving
+/// it implicit. Each mode is therefore built with the parameter that makes it
+/// its own figure, which is what "distinct figures" can mean once the aspect
+/// divide that used to separate this pair is gone (design-backlog 0122).
 #[test]
 fn every_wave_mode_builds_a_different_figure() {
     let out = waveform_only();
@@ -426,6 +435,10 @@ fn every_wave_mode_builds_a_different_figure() {
         let mut geometry = draw::DrawGeometry::default();
         let out = crate::milk::outputs::FrameOutputs {
             wave_mode: mode as f32,
+            // The angle modes 6 and 7 exist for. `wave_mystery` also widens the
+            // rings in modes 0 and 1, so it is applied only where it is the
+            // defining parameter and the other six keep the shared outputs.
+            wave_mystery: if mode >= 6 { 0.25 } else { out.wave_mystery },
             ..out
         };
         draw::build(
@@ -456,33 +469,76 @@ fn every_wave_mode_builds_a_different_figure() {
     }
 }
 
-/// **A mode-6 trace covers `1/aspect` of the frame's width** — Plan 0111 Phase 5,
-/// and the arithmetic behind design-backlog 0120's *second* symptom.
+/// **At `wave_mystery = 0`, mode 6 IS mode 2** — the same full-width horizontal
+/// trace, point for point.
 ///
-/// The entry reported two things together: an oversized waveform figure, and
-/// *Blur Mix 3*'s crisp trace spanning "roughly the middle 57 %" of the frame
-/// where the reference draws full-width traces. **They are separate defects**,
-/// and this one is provable without a capture.
+/// Mode 6 is a line at an angle `wave_mystery` sets, and mode 2 is the
+/// horizontal scope; at angle zero those are one figure, and both are built in
+/// uv across the frame's full width. The engine told them apart until
+/// design-backlog 0122 was fixed, but only because mode 6's x was compressed by
+/// `1/aspect` — a defect, so the separation it bought was not a property to
+/// keep.
 ///
-/// Modes 6 and 7 lay their points on `t = i/(count-1) - 0.5` and divide the x
-/// component by `aspect` — but [`draw::uv_to_world`] multiplies x *by* aspect on
-/// the way out, so the two cancel exactly and the trace's world-space length is
-/// `2t = 2.0` **whatever the target's shape**. The frame is `2 * aspect` wide in
-/// those units, so the trace covers `1/aspect` of the width: `1/(16/9) = 0.5625`,
-/// the reported 57 %.
+/// Pinned because it is the reason
+/// [`every_wave_mode_builds_a_different_figure`] gives modes 6 and 7 their own
+/// angle: a future change that separates this pair again should have to say so
+/// here, rather than quietly restoring an aspect term.
+#[test]
+fn mode_6_at_zero_mystery_is_the_mode_2_scope() {
+    let waveform = trace();
+    let mut runtime = bare_runtime();
+    let figure = |mode: f32, runtime: &mut crate::milk::MilkRuntime| {
+        let mut geometry = draw::DrawGeometry::default();
+        let out = crate::milk::outputs::FrameOutputs {
+            wave_mode: mode,
+            wave_mystery: 0.0,
+            ..waveform_only()
+        };
+        draw::build(
+            &mut geometry,
+            Some(runtime),
+            &out,
+            &waveform,
+            0.0,
+            1.0 / 60.0,
+            16.0 / 9.0,
+        );
+        geometry
+            .segments
+            .iter()
+            .map(|s| s.a)
+            .collect::<Vec<[f32; 2]>>()
+    };
+    let scope = figure(2.0, &mut runtime);
+    let angled = figure(6.0, &mut runtime);
+    assert!(!scope.is_empty(), "mode 2 drew nothing");
+    assert_eq!(
+        scope, angled,
+        "mode 6 at zero mystery must be the mode-2 scope; if these differ, an \
+         aspect term has come back into one of them"
+    );
+}
+
+/// **A mode-6 trace spans the frame's full width, at every aspect.**
 ///
-/// Stated the other way round, which is the useful way: **the trace is normalized
-/// to the frame's height, not its width.** On a square target that is full width,
-/// which is why nothing caught it at aspect 1 — the same coincidence ADR-0037
-/// exists for, one level down.
+/// Modes 6 and 7 lay their points on `t = i/(count-1) - 0.5` in uv, and
+/// [`draw::uv_to_world`] supplies the one aspect term on the way out — so the
+/// world-space length is `2 * aspect`, which is the frame's own width. A second
+/// aspect term at the point would cancel that multiply and leave the length at a
+/// constant `2.0`: the trace would be normalized to the frame's **height**,
+/// covering `1/aspect` of its width — `0.5625` at 16:9, the "roughly the middle
+/// 57 %" a look gate reported against a reference that draws these full-width
+/// (design-backlog 0122).
+///
+/// On a square target the two readings coincide, which is why nothing caught the
+/// cancelling pair at aspect 1 — the same coincidence ADR-0037 exists for, one
+/// level down. Hence a **property over three aspects** rather than one frozen
+/// number (ADR-0071).
 ///
 /// It is independent of `wave_scale`, which scales only the amplitude term, so a
-/// corrected scale constant cannot fix it and this test keeps passing if one
-/// lands. Asserted as a **property over three aspects** rather than as one frozen
-/// number, so it states the relationship and not this box's reading of it
-/// (ADR-0071).
+/// corrected scale constant neither fixes nor breaks this.
 #[test]
-fn a_straight_wave_trace_spans_one_over_aspect_of_the_width() {
+fn a_straight_wave_trace_spans_the_full_width_at_every_aspect() {
     let waveform = trace();
     let mut runtime = bare_runtime();
     for aspect in [1.0f32, 4.0 / 3.0, 16.0 / 9.0] {
@@ -515,26 +571,78 @@ fn a_straight_wave_trace_spans_one_over_aspect_of_the_width() {
         let lo = xs.iter().copied().fold(f32::INFINITY, f32::min);
         let hi = xs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let span = hi - lo;
-        // The defect, stated directly: the length does not depend on the target's
-        // shape, because the `/aspect` at the point and the `*aspect` in
-        // `uv_to_world` cancel.
+        // The property, stated directly: the length tracks the target's shape,
+        // because `uv_to_world`'s multiply is the only aspect term.
         assert!(
-            (span - 2.0).abs() < 0.02,
+            (span - 2.0 * aspect).abs() < 0.02,
             "at aspect {aspect} a horizontal mode-6 trace has world length \
-             {span:.4}; it must be 2.0 at every aspect, because that constancy \
-             IS design-backlog 0120's second symptom"
+             {span:.4}; it must be the frame's own width, {:.4}",
+            2.0 * aspect
         );
-        // ...and the consequence, in the units the defect was reported in. The
-        // frame is `2 * aspect` wide in world units.
+        // ...and the consequence, in the units the defect was reported in.
         let fraction = span / (2.0 * aspect);
-        let expected = 1.0 / aspect;
         assert!(
-            (fraction - expected).abs() < 0.01,
-            "at aspect {aspect} the trace covers {fraction:.4} of the frame width \
-             where `1/aspect` predicts {expected:.4}; the reference draws these \
-             full-width at every aspect"
+            (fraction - 1.0).abs() < 0.01,
+            "at aspect {aspect} the trace covers {fraction:.4} of the frame width; \
+             the reference draws these full-width at every aspect"
         );
     }
+}
+
+/// **The amplitude of an un-rotated trace does not depend on the target's
+/// shape** — the other half of the width fix, and the reason it is not a
+/// regression.
+///
+/// At `wave_mystery = 0` the excursion is pure `y`, and `uv_to_world` applies no
+/// aspect term there, so the same `wave_scale` draws the same height on any
+/// display. (A *rotated* trace does pick up the aspect in its amplitude, because
+/// the figure is constructed in uv and stretched to the frame — that is what the
+/// reference does, and it is deliberately not asserted away here.)
+#[test]
+fn an_unrotated_traces_amplitude_is_the_same_at_every_aspect() {
+    let waveform = trace();
+    let mut runtime = bare_runtime();
+    let mut heights = Vec::new();
+    for aspect in [1.0f32, 4.0 / 3.0, 16.0 / 9.0] {
+        let mut geometry = draw::DrawGeometry::default();
+        let out = crate::milk::outputs::FrameOutputs {
+            wave_mode: 6.0,
+            wave_mystery: 0.0,
+            wave_scale: 1.0,
+            ..waveform_only()
+        };
+        draw::build(
+            &mut geometry,
+            Some(&mut runtime),
+            &out,
+            &waveform,
+            0.0,
+            1.0 / 60.0,
+            aspect,
+        );
+        let ys: Vec<f32> = geometry
+            .segments
+            .iter()
+            .flat_map(|s| [s.a[1], s.b[1]])
+            .collect();
+        assert!(!ys.is_empty(), "mode 6 drew nothing at aspect {aspect}");
+        let lo = ys.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = ys.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        heights.push(hi - lo);
+    }
+    let worst = heights
+        .iter()
+        .fold(0.0f32, |m, h| m.max((h - heights[0]).abs()));
+    assert!(
+        worst < 1e-4,
+        "the trace's height moved by {worst} across aspects: {heights:?}"
+    );
+    assert!(
+        heights[0] > 0.01,
+        "the probe drew a flat line, so the invariance is the invariance of \
+         nothing: height {}",
+        heights[0]
+    );
 }
 
 /// **A preset that asks for borders and motion vectors gets both** — Phase 4's

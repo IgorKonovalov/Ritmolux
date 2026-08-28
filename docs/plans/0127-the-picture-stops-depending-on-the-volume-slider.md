@@ -273,8 +273,8 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The analyzer levels the trace | dev | done | committed with this row |
-| 2 — The trace spans the width | dev | not started | |
+| 1 — The analyzer levels the trace | dev | done | `afd8aa5` |
+| 2 — The trace spans the width | dev | done | committed with this row |
 | 3 — One reference capture | human | not started | |
 | 4 — The base amplitude constant | dev | not started | |
 | 5 — The docs say what the contract is | dev | not started | |
@@ -286,6 +286,13 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
   destructures it exhaustively so a new field cannot escape the bit-exact hash. Covered in both.
 - `WAVE_FLOOR = 1e-3`, derived rather than copied from `BAND_FLOOR`: measured against
   `dynamic_groove` at 48 kHz, trace peak 0.900 loud / 0.206 in the resting beats.
+- Phase 2 broke `every_wave_mode_builds_a_different_figure` (a Plan 0100 Phase 4 done-when):
+  width-normalized, mode 6 at `wave_mystery = 0` is byte-identical to mode 2, and the
+  `1/aspect` compression was the only thing separating that pair. Surfaced; the user chose to
+  land the fix and restate the invariant. Modes 6/7 are now built at `wave_mystery = 0.25` in
+  that sweep, and `mode_6_at_zero_mystery_is_the_mode_2_scope` pins the coincidence directly.
+- Phase 2 golden run: no baseline moved on the hardware adapter, nothing blessed
+  (`cargo nextest run --workspace`, 1077 passed).
 
 ### Close triggers
 

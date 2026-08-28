@@ -645,8 +645,20 @@ fn waveform_figure(
                 for i in 0..count {
                     let t = i as f32 / (count - 1).max(1) as f32 - 0.5;
                     let n = sample(i) * 0.15 + offset;
+                    // Built in uv and stretched by the target on the way out, so
+                    // `t` spans the frame's **width**: `uv_to_world` is the only
+                    // aspect term, exactly as this module's one-conversion rule
+                    // says. Dividing x by the aspect here would cancel that
+                    // multiply and normalize the trace to the frame's *height*
+                    // instead, which is 56 % of the width at 16:9 and full width
+                    // only on a square target (design-backlog 0122).
+                    //
+                    // A rotated trace therefore picks up the target's shape in
+                    // its amplitude — a uv-space construction is stretched, which
+                    // is what the reference does and not a defect to correct. At
+                    // `wave_mystery = 0` the amplitude is pure y and aspect-free.
                     push(
-                        (cx + (t * c - n * s) / aspect.max(0.1), cy + (t * s + n * c)),
+                        (cx + t * c - n * s, cy + t * s + n * c),
                         &mut points,
                         &mut used,
                     );
