@@ -528,7 +528,12 @@ pub(crate) fn create_all(
     // `max_segments` because the two kinds share **one** budget — everything
     // that passes `build_rings`'s cap check must reach the GPU, or a cap would
     // be silently cutting geometry, which ADR-0007 forbids.
-    let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new_with_arcs(
+    // `new_split_with_arcs`: any of the four line systems may ask for the
+    // opacity-preserving seam through `stroke_blend` (ADR-0138), and the
+    // pipelines are built here rather than when a preset first selects one —
+    // building a GPU resource mid-run changes what a later pass resolves to on
+    // the DX12 software adapter.
+    let line_renderer = Rc::new(RefCell::new(lines::LineRenderer::new_split_with_arcs(
         device,
         surface_format,
         tier.max_segments,
@@ -592,7 +597,7 @@ pub(crate) fn create_layer_scene(
             // Arcs too — a `[layer]` may be a `star_pattern`, and a layer that
             // could not draw them would render a mandala with its circles
             // missing rather than fail.
-            Rc::new(RefCell::new(lines::LineRenderer::new_with_arcs(
+            Rc::new(RefCell::new(lines::LineRenderer::new_split_with_arcs(
                 device,
                 surface_format,
                 tier.max_segments,

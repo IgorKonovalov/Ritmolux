@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0141.** *(0120 was reserved for
+**Next free number: 0145.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -73,7 +73,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) | Downbeat and phrase tracking: bar-aware time variables, gated by a measured confidence with a deterministic counter fallback | accepted (Plan 0048; Outcome) |
 | [0051](0051-seeded-grammar-randomness-with-per-run-opt-in.md) | `hash(x)` and `noise(x)` in the grammar, seeded per preset; an opt-in per-run seed that capture paths always pin | accepted |
 | [0052](0052-analysis-diagnostics-are-native-only.md) | The analysis diagnostics surface is native-only and does not cross the C ABI | accepted (Plan 0049; Outcome) |
-| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted |
+| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 |
 | [0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md) | A runtime quality-tier change rebuilds the engine's GPU resources on the live context | accepted 2026-08-04 (Plan 0050; Outcome) |
 | [0055](0055-backdrop-leaves-the-post-chain.md) | The backdrop leaves the post chain: the composite carries premultiplied alpha and the backdrop is composited underneath | accepted 2026-07-31 (Plan 0045) |
 | [0056](0056-additive-scenes-emit-premultiplied-alpha.md) | A scene that draws into the chain emits premultiplied alpha equal to its own coverage, and the alpha blend saturates rather than sums | accepted 2026-08-01 (Plan 0051; Outcome) |
@@ -157,9 +157,13 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | accepted 2026-08-27 (Plan 0121) |
 | [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | accepted 2026-08-28 (Plan 0122) |
-| [0136](0136-the-animation-gate-asks-its-question-in-both-readings.md) | The animation gate asks its question in both readings | proposed 2026-08-27 (Plan 0123) |
-| [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | proposed 2026-08-27 (Plan 0123) |
-| [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | proposed 2026-08-27 (Plan 0123) |
+| [0136](0136-the-animation-gate-asks-its-question-in-both-readings.md) | The animation gate asks its question in both readings | accepted 2026-08-28 (Plan 0123), Outcome |
+| [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | accepted 2026-08-28 (Plan 0123) |
+| [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | accepted 2026-08-28 (Plan 0123), Outcome |
 | [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) | The waveform is levelled at the analyzer, and it publishes the gain it removed | proposed 2026-08-28 (Plan 0127) |
 | [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | proposed 2026-08-28 (Plan 0128) |
+| [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | proposed 2026-08-28 (Plan 0129) |
+| [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | accepted 2026-08-28 (Plan 0130), Outcome |
+| [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | proposed 2026-08-28 (Plan 0131) |
+| [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | proposed 2026-08-28 (Plan 0132) |
 <!-- roster:end -->

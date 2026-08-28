@@ -13,6 +13,61 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0130 — The audio input becomes an operator surface](done/0130-the-audio-input-becomes-an-operator-surface.md)
+  — closed 2026-08-28. Six phases on `plan-0130-the-audio-input-becomes-an-operator-surface` in
+  `WORK/lmv-plan-0130`, `9005a8d`..`85bd59b` plus the Phase 5 log commits. Review: **no blockers,
+  two majors** (both about what the close would strand, both discharged here), **two minors, two
+  nits.** Version **0.89.0** (minor). Closed no backlog entry; filed 0154, 0155 and 0156.
+
+  **The plan shipped its feature and left its evidence behind.** Phases 1-4 gave `[input]` the two
+  surfaces every other operator choice already had — `--input`/`--device` over `config.toml`, and
+  two live `S`-menu rows — by making the capture stream restartable with the shell owning every
+  policy decision and the capture thread gaining one `AtomicBool` store. That half is done and
+  well-tested: the resolver, the row roster, the device-row rule and the whole bounded-retry policy
+  are pure values with real assertions over them, including the `["Headphones (2- USB Audio)",
+  "Headphones"]` substring pair that no roster on the development box could have exposed.
+
+  **The half that is not done is the half the plan named as its own biggest risk.** Phase 5's
+  unplug and 96 kHz bullets did not run for want of a removable interface, so `is_device_lost`, the
+  three `lost.store` sites, `poll_input_lost`'s `Reopen`/`GiveUp` arms and the `Lost` verdict have
+  **never executed against a real device loss**. The open question is not whether the recovery works
+  but whether it fires at all: a real unplug that returns zero frames forever instead of
+  `AUDCLNT_E_DEVICE_INVALIDATED` would defeat every line of it, and that case is indistinguishable
+  from silence. Both bullets are extracted into
+  [`docs/on-device-validation.md`](../on-device-validation.md), which is where a check gated on
+  hardware the box does not have belongs — the same treatment Plan 0012 Phase 3 and Plan 0082
+  Phase 5 got.
+
+  **The one thing Phase 5 did find is a defect nothing in this repo can see.** Of 22 live mode
+  swaps, one failed at `CoCreateInstance(MMDeviceEnumerator)` with `REGDB_E_CLASSNOTREG`. The shell
+  degraded exactly as Phase 3's done-when specifies, so the criterion now has a real failure behind
+  it rather than a synthetic one — but the exposure is new, because `capture_win::start` used to
+  run once per process and now runs per swap and per recovery attempt. It matters where the design
+  churns fastest: `poll_input_lost` reopens on **consecutive frames**, and the bounded budget counts
+  statements about the endpoint without being able to tell this failure from one, so a real loss
+  whose reopens drew this error would write a `lost …` verdict about a device that was fine. Filed
+  as backlog 0154 with no mechanism claimed — one run on one box, and 1-in-22 is a sample, not a
+  rate.
+
+  **A mid-plan review had already caught the persistence bug, which is why Phase 4b exists.** The
+  first implementation had recovery write its fallback to `config.toml`, so one unplug overwrote
+  `[input] device` with `default` three times over — and since a re-plug deliberately does not
+  restore the device (ADR-0142 Alternative D), the file was the only record of which endpoint the
+  rig wants. That review also found the row matcher disagreeing with `pick_device`'s rule, a retry
+  bound a single live frame could reset, a flag claiming to have been applied on platforms that
+  ignore it, and a valueless `--device` meaning the opposite of a selection. All five landed in
+  `85bd59b` before this close.
+
+  **What outlived the plan.** `CaptureVerdict` is current state rather than a startup fact, and the
+  live token now carries the endpoint (`live WASAPI 48000/2 Speakers (Realtek(R) Audio)`) — a format
+  change to `diagnostics.log`'s `capture` column that both `READ-ME-FIRST.md` files and
+  `docs/on-device-validation.md` were swept for. Two findings went to `dev` rather than being fixed
+  here: the recovery settle window is counted in **frames**, so the flap it guards against is
+  bounded at 60 Hz and not at 240 Hz — the question Plan 0014 already settled for animation when it
+  retired `SCENE_DT` (backlog 0155); and after a give-up, a loss inside that window rewrites no
+  surface, so the verdict reads `live` while nothing is delivering, which is the one path where the
+  `Lost` variant's whole reason for existing is defeated (backlog 0156).
+
 - [0122 — Every rate integrates](done/0122-every-rate-integrates.md)
   — closed 2026-08-28. Five phases on `plan-0122-every-rate-integrates` in `WORK/lmv-plan-0122`,
   `5c258d0`..`7ac363f`. Review: **no blockers, two majors** (both discharged before the close),
@@ -5267,3 +5322,85 @@ own risk list anticipated and which is now a followup — a mark everyone ignore
 5's per-pixel cost was never measured against `docs/nfr.md`. And one curation item stands:
 `fragment_drostemono.toml:113` says *"no contour - see the header"* and the header carries no contour
 note — a dangling rationale on the one parameter this plan changed.
+
+### 0123 — A gate, a latch and an ink (closed 2026-08-28)
+
+**Review: no blockers, two majors, three minors.** Nine phases in three groups sharing no files,
+packaged together at the user's request; all nine landed and the packaging risk the plan named — a
+stall in one group holding the other two — never materialized. Verified on the merged tree rather
+than from the log: `fmt` and `clippy --workspace --all-targets` clean, `cargo nextest run
+--workspace` **1084 passed / 0 failed**, doc-links and index-rows green.
+
+**What the three ADRs bought.** ADR-0136's disjunction is over *this gate's own statistic* in both
+readings, which is the part that keeps it out of the ADR-0071/0074 error — `reactivity.rs` is
+untouched and remains the only gate driving PCM through the real analyzer. `DRIVEN_FLOOR = 0.017` is
+half the library's driven minimum rounded down, and that minimum (**0.0345**, `Valentine`) was
+re-measured at the close over all 54 presets and is unmoved by the preset the plan added
+(`Broadside` reads driven 0.4042). The printed roster is exactly two worlds — `Collage Mono`
+(0.0025 / 0.0621) and `Suprematist` (0.0082 / 0.0627) — so ADR-0136's premise that more than one
+world wanted this is now measured, on a second preset chosen by the user's eye rather than by the
+plan. ADR-0137's `[latch]` keeps the evaluator pure by putting state in the render layer beside
+`ParamSmoother`; the reserved slot block sits before `index` and
+`latch_slots_are_where_the_names_say` extends the name-to-slot assertions over it, which is what
+stands between this and the positional-offset defect the plan's own risk list named. ADR-0138's
+limited-ink class is defined at the draw seam and its first instalment is `stroke_blend` on the four
+line systems.
+
+**The tests were opened and read, not trusted.** The three properties the plan stated as
+behavioral are each asserted with a non-vacuous control: the OVER overlap test asserts the interior
+is the later stroke's red (1.0) *and* that the additive control sums past it, so it separates two
+seams rather than measuring one; `a_latch_rises_once_per_arming_window` drives five fire edges
+through one window and asserts exactly one rise, with `an_arming_window_with_no_fire_edge_never_rises`
+covering the half a fire-on-arm bug would otherwise pass; `hold` is asserted frame-rate independent
+at 60, 30 and 144 Hz with the float slack argued from the accumulation rather than chosen. The
+static control is now checked on **both** branches, which is what stops a disjunction weakening the
+gate further than one branch.
+
+**The WARP hazard the plan flagged did not fire, and the check was real.** `golden.rs` runs
+`prefer_software: true`, so "byte-identical, nothing blessed" is a WARP measurement and not a
+hardware one — the distinction that has cost this project a bad bless before. No golden moved.
+
+**Two majors, both about statements rather than behavior, both filed.** `DRIVEN_FLOOR`'s derivation
+closes with *"Both are pinned as standing tests below"* and only one of the two is:
+`rosette_spin_only` is printed and never asserted, and it is the single probe that separates "the
+driven reading measures the music" from "measures nothing at all", since it reads silent **0.4167** /
+driven **0.0000** where the pinned `star_frozen` reads 0.0000 on both (design-backlog 0151). And
+adding a second branch made *"the shipped library's minimum"* ambiguous in `ANIM_FLOOR`'s own
+derivation, which predates the disjunction: over 54 presets the phrase now reads 0.0025 literally,
+0.0201 among silent-branch passers, or the 0.0205 the comment names, which is neither — so a reader
+following the comment's own re-derivation instruction off the printed sweep would halve the floor to
+0.00125 and admit the one-pixel flicker its noise-ceiling paragraph exists to exclude
+(design-backlog 0152). `dev` raised the second as staleness and left it for the close; re-measuring
+turned it into an ambiguity, which is a different and more durable repair.
+
+**What the plan itself falsified, recorded as dated `Outcome` sections rather than edits.**
+ADR-0138's *"the scene's own output contains only colours the palette names"* is true of the baked
+LUT and not of the hex an author writes: `Rgba8Unorm` stops are consumed as linear light, so
+`#c81423` renders `#dd4c64` and the sRGB-to-linear `#930204` renders `#c81622` — meaning below the
+tonemap knee the shift is **exactly correctable**, which `docs/preset-palettes.md` still presents as
+unavoidable (design-backlog 0153). And "a strictly N-colour frame" is a claim about *plateaus*, not a
+colour count: `collage_mono` with every enumerated mixer off gives three flat regions and 615
+distinct colours, the residue being ADR-0096's dither, correctly listed as the one leak with no off
+switch. Phase 8's own done-when was reported unachievable as worded and the page states the
+achievable claim instead — the right call, and the deviation was recorded rather than tuned away.
+
+**Curation verdict (53 → 54, nothing retired).** `Broadside` earns its place: it is the first world
+on the new seam and the measurement that justifies it is a switch-flip on one file — OVER gives 6 066
+distinct colours with 92.1 % in the top 8 and the three inks as plateaus, additive gives 12 466 with
+75.6 % and the pinks backlog 0148 predicted. The stale-workaround grep is clean for the defects this
+plan fixed: the only two files that cited the motion gate as a *constraint* are the two it repaired.
+`attractor_dragon` and `attractor_volute` cite the gate but as design notes on motion wanted for the
+eye anyway — checked and cleared, no re-tune owed.
+
+**Two presets landed outside the plan's phases**, both user-directed during the post-plan smoke and
+both kept on this lane: `collage_suprematist` (its `recompose` off an ADR-0109 `hash(beat_index)`
+trap onto a latch, pan rates 0.62/0.81 → 0.08/0.11) genuinely could not exist without this plan's
+latch and driven branch. `curve_ionwake` (`n` 5 → 4, plus a recorded finding that `d` is nearly inert
+under the feedback) depends on nothing this plan shipped — the log's blanket justification covers one
+of the two, not both. Kept anyway: a fresh worktree for a two-line tune buys nothing, and the record
+is what needed correcting.
+
+**One more minor:** the implementation log runs 241 lines against the plan's own 146-line
+`## Implementation phases`, so the report outweighs the contract. It is an unusually good log — the
+measurements in it are why several of the checks above could be aimed rather than swept — but the
+proportion is the thing nothing else gates.

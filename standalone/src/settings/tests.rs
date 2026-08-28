@@ -1,5 +1,5 @@
 use super::{
-    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, SettingsAction, SettingsKey, SettingsRow,
+    DWELL_CEILING, DWELL_FLOOR, DWELL_STEP, InputMode, SettingsAction, SettingsKey, SettingsRow,
     SettingsState, SettingsView, Tier, TierState,
 };
 
@@ -15,6 +15,11 @@ fn view() -> SettingsView {
         display_count: 3,
         display_name: "DELL U2720Q".to_owned(),
         diagnostics: false,
+        input_mode: InputMode::LineIn,
+        input_device_index: 1,
+        input_device_count: 2,
+        input_device_name: "Line (ZOOM AMS-22 Audio)".to_owned(),
+        input_editable: true,
         preset_name: true,
         now_playing: true,
         preset_dir: r"C:\Users\x\AppData\Roaming\light-music-visualizer\presets".to_owned(),
@@ -88,7 +93,21 @@ fn each_row_emits_the_action_its_table_row_names() {
             edit_at(SettingsRow::NowPlaying, right, &v),
             SettingsAction::ToggleNowPlaying
         );
+        assert_eq!(
+            edit_at(SettingsRow::InputDevice, right, &v),
+            SettingsAction::CycleInputDevice
+        );
     }
+    // The mode row is a switch, not a toggle: each direction names one value,
+    // so a held key settles rather than oscillating.
+    assert_eq!(
+        edit_at(SettingsRow::InputMode, false, &v),
+        SettingsAction::SetInputMode(InputMode::Loopback)
+    );
+    assert_eq!(
+        edit_at(SettingsRow::InputMode, true, &v),
+        SettingsAction::SetInputMode(InputMode::LineIn)
+    );
     assert_eq!(
         edit_at(SettingsRow::MinDwell, true, &v),
         SettingsAction::SetDwell {
@@ -118,6 +137,124 @@ fn the_presets_row_emits_nothing() {
         edit_at(SettingsRow::Presets, true, &v),
         SettingsAction::None
     );
+}
+
+/// **The row roster is the contract**, so it is asserted as a list rather than
+/// as a count: every other test here reaches its row through `ALL`, which means
+/// a reordering would move them all in step and go unnoticed.
+#[test]
+fn the_rows_are_the_twelve_the_menu_promises_in_order() {
+    assert_eq!(
+        SettingsRow::ALL,
+        [
+            SettingsRow::Quality,
+            SettingsRow::AutoRotate,
+            SettingsRow::MinDwell,
+            SettingsRow::MaxDwell,
+            SettingsRow::Fullscreen,
+            SettingsRow::Display,
+            SettingsRow::Diagnostics,
+            SettingsRow::InputMode,
+            SettingsRow::InputDevice,
+            SettingsRow::PresetName,
+            SettingsRow::NowPlaying,
+            SettingsRow::Presets,
+        ]
+    );
+    // The read-only row stays last, which is what keeps a menu lap from ending
+    // on a key that does nothing.
+    assert_eq!(SettingsRow::ALL.last(), Some(&SettingsRow::Presets));
+}
+
+/// **The input rows are read-only where capture takes no selection.** They
+/// still *render* — the menu keeps one shape on every platform, and a Mac user
+/// sees what the app is listening to rather than finding a row missing — but
+/// neither key moves them.
+#[test]
+fn the_input_rows_render_but_do_not_move_when_they_are_not_editable() {
+    let mut v = view();
+    v.input_editable = false;
+
+    for right in [false, true] {
+        assert_eq!(
+            edit_at(SettingsRow::InputMode, right, &v),
+            SettingsAction::None,
+            "an uneditable input mode moved"
+        );
+        assert_eq!(
+            edit_at(SettingsRow::InputDevice, right, &v),
+            SettingsAction::None,
+            "an uneditable input device moved"
+        );
+    }
+
+    // Still drawn, and still carrying their values.
+    let lines = opened().lines(&v);
+    let find = |label: &str| -> String {
+        lines
+            .iter()
+            .find(|(l, _)| *l == label)
+            .map(|(_, val)| val.clone())
+            .unwrap_or_else(|| panic!("no {label} row"))
+    };
+    assert_eq!(find("Input mode"), "line-in");
+    assert_eq!(find("Input device"), "2 of 2 - Line (ZOOM AMS-22 Audio)");
+}
+
+/// **An empty roster is a live-show state, not a crash.** A failed enumeration
+/// and a dataflow with no active endpoint reach this module identically, and a
+/// modal that panicked on either would take the show down with it.
+#[test]
+fn an_empty_device_roster_renders_and_yields_nothing() {
+    let mut v = view();
+    v.input_device_count = 0;
+    v.input_device_index = 0;
+
+    for right in [false, true] {
+        assert_eq!(
+            edit_at(SettingsRow::InputDevice, right, &v),
+            SettingsAction::None,
+            "the device row advanced into an empty roster"
+        );
+        // The mode row is *not* gated on the roster: switching mode is what
+        // makes the shell go and enumerate the other dataflow.
+        assert!(matches!(
+            edit_at(SettingsRow::InputMode, right, &v),
+            SettingsAction::SetInputMode(_)
+        ));
+    }
+
+    let s = opened();
+    let value = |v: &SettingsView| -> String {
+        s.lines(v)
+            .iter()
+            .find(|(l, _)| *l == "Input device")
+            .map(|(_, val)| val.clone())
+            .expect("no Input device row")
+    };
+    // With a name it says what is running; with nothing at all it still says
+    // something, rather than reading as a truncated `1 of 1 - `.
+    assert_eq!(value(&v), "Line (ZOOM AMS-22 Audio)");
+    v.input_device_name = String::new();
+    assert_eq!(value(&v), "none");
+}
+
+/// The mode row shows the **kebab word the config file holds**, both ways round,
+/// so an operator comparing the menu against `config.toml` reads one string.
+#[test]
+fn the_input_mode_row_shows_the_config_word() {
+    let mut v = view();
+    let s = opened();
+    let value = |v: &SettingsView| -> String {
+        s.lines(v)
+            .iter()
+            .find(|(l, _)| *l == "Input mode")
+            .map(|(_, val)| val.clone())
+            .expect("no Input mode row")
+    };
+    assert_eq!(value(&v), "line-in");
+    v.input_mode = InputMode::Loopback;
+    assert_eq!(value(&v), "loopback");
 }
 
 /// **The dwell clamp holds from both sides**, which is the property that

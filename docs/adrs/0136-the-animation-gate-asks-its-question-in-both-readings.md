@@ -1,8 +1,8 @@
 # ADR-0136 — The animation gate asks its question in both readings
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0123)
 > **Date:** 2026-08-27
-> **Related plan(s):** [0123](../plans/0123-a-gate-a-latch-and-an-ink.md)
+> **Related plan(s):** [0123](../plans/done/0123-a-gate-a-latch-and-an-ink.md)
 > **Supplements:** [0091](0091-the-animation-gate-scores-motion-against-the-figures-footprint.md), [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md)
 
 ## Context
@@ -136,3 +136,23 @@ readings — the one question about motion this project has always been willing 
 it with the gate's own statistic rather than with `--report`'s. What is rejected here is the literal
 form: `animation.rs` does not read `--report`'s column, does not adopt its size, and introduces no
 threshold on a rate.
+
+## Outcome (2026-08-28, Plan 0123 close)
+
+Accepted as decided. `DRIVEN_FLOOR` landed at **0.017**, half the shipped library's minimum on the
+driven statistic rounded down; that minimum is **0.0345** (`Valentine`), re-measured at this close
+over all **54** presets and unmoved by the preset the plan added (`Broadside` reads driven 0.4042).
+The printed roster is the two worlds the disjunction exists for — `Collage Mono` (silent 0.0025 /
+driven 0.0621) and `Suprematist` (0.0082 / 0.0627) — so the premise that **more than one world wanted
+this** is now measured rather than argued, and on a second preset chosen by eye and not by the plan.
+
+**One consequence this ADR did not anticipate, and it is the reason a re-derivation is owed.** Adding
+a second branch changed what the phrase *"the shipped library's minimum"* means in `ANIM_FLOOR`'s own
+recorded derivation, which predates this decision and still reads as though the gate had one
+population. Over the 54 shipped presets there are now three defensible readings of it — the literal
+minimum **0.0025** (`Collage Mono`, which passes on the other branch), the minimum among presets that
+pass the **silent** branch **0.0201** (`On White`), and the **0.0205** (`Banded Mandala`) the comment
+names, which is no longer the minimum of either population. The floor itself is unharmed: `0.01` sits
+under 0.0201 with 2.01x slack, which is the 2.05x it claims to within the rounding. What needs
+repair is the *statement* — a derivation under a disjunctive gate has to name its population.
+Filed as design-backlog 0152.

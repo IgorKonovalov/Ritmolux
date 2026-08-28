@@ -6552,3 +6552,161 @@ acceptably today, and the fix cannot land without a content pass behind it.
   cannot see: 0149. All four of its probes went red on delivery, which is what they were written to
   do. The `dt` sanitizer the fix left duplicated across four callers, with none on the attractor, is
   0150.
+
+## 0145 — the `animation` gate thresholds silent motion only, so a world whose liveliness is audio-driven fails it however alive it is
+
+> **CLOSED 2026-08-28** (was promoted 2026-08-27) to [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) +
+> [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 1-2, which take the disjunction over this
+> gate's own statistic, the printed branch, and `collage_mono`'s sway back down. That plan closed 2026-08-28; the entry is discharged in both halves.
+
+`core/tests/animation.rs` captures frames 24 and 48 against `AnalysisFrame::default()` and fails
+anything under `ANIM_FLOOR = 0.01`. That is deliberate and the module header says so — *"Silent
+audio is used deliberately, the motion under test is the shared scene clock, not an audio edge"* —
+and it was correct for every world the library held when it was written, because autonomous motion
+and liveliness were the same property in all of them. They are not the same property any more.
+
+`collage_mono` is the counterexample: a poster that sits still on purpose and does nearly all its
+moving in response to the music. It measured **0.0025**, a quarter of the floor, while passing
+`reactivity` — the one gate that drives real PCM through the real analyzer (Plan 0067 Phase 1) —
+without trouble. The gate is not reading the preset as broken; it is reading a question the preset
+deliberately answers no to.
+
+- **Raised:** 2026-08-27, by the content lane, shipping `collage_mono`. **Impact: structural** —
+  every future preset whose liveliness is audio-driven has to add motion it does not want.
+- **What actually shipped is the workaround.** `pan_x`/`pan_y` rates went `0.07/0.09` -> `0.70/0.78`,
+  an 11 s sway in place of a 90 s one, added for the measurement rather than for the picture. The
+  preset header states this in full.
+- **The obvious lever is a dud, and the lane measured it rather than assuming.** `drift`
+  `0.55 -> 1.60 -> 2.50` and `spin` `0.30 -> 1.00 -> 1.60` leave the statistic at `0.002`,
+  unchanged, because both multiply each element's own seeded velocity and 0.4 s of that is nothing.
+  Only a whole-canvas motion moves the number. A scale breath reaches `0.009`-`0.011` but pulses the
+  composition's size; the pan sway reaches `0.012` without touching it.
+- **Verified 2026-08-27** — the capture is at silence:
+  `present: let audio = AnalysisFrame::default\(\); in: core/tests/animation.rs`
+- **Verified 2026-08-27** — and the floor it is thresholded against:
+  `present: const ANIM_FLOOR: f32 = 0\.01; in: core/tests/animation.rs`
+- **Verified 2026-08-27** — the shipped workaround names the gate it is paying:
+  `present: THE SWAY IS WHAT MAKES THIS WORLD PASS in: presets/collage_mono.toml`
+
+### What a fix looks like, and why it is cheaper than it sounds
+
+**The driven half already exists and is already thresholded.** `reactivity.rs` runs four PCM stimuli
+through the analyzer and fails a preset whose best band moves less than `REACTIVITY_FLOOR = 0.02`.
+So the question *"is this preset dead"* is already answered twice, once per half, and the two gates
+disagree about `collage_mono` only because `animation` asks its half in isolation. The candidate
+repair is to make `animation`'s verdict a disjunction — clears the silent floor **or** clears the
+driven one — which needs no new capture, no new statistic and no new threshold.
+
+**[ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) is
+adjacent and does not forbid this**, but the reader has to see why. That ADR landed `drive` and
+`rate` as printed readings and said explicitly that neither may be a gate. Its argument is about
+**ordering** — anchoring means a higher `rate` does not mean a worse preset, so no threshold on it
+ranks the library. A disjunction does not order anything; it asks whether a preset is frozen in
+*both* readings, which is the one question about motion this project has always been willing to
+gate. That distinction is exactly what an ADR would have to state, because the surface reading of
+0134 is that the driven column is off limits.
+
+**The counter-argument is real and belongs in the same ADR.** A world that moves only on audio
+renders as a still image in silence, and the gate as written is the only thing that says so. The
+honest form of the disjunction probably keeps that visible — a preset passing on the driven branch
+alone is a *category*, not an exemption, and should print as one.
+
+### Priority
+
+**Medium-high**, and higher than its one motivating preset suggests. The cohort this came from is
+built on stillness, so the next presets of the same family hit the same wall, and the cost of not
+fixing it is paid in motion nobody wanted rather than in a red gate anyone would notice.
+
+---
+
+## 0147 — no latch: a gate cannot be armed on time and fired on the music (re-raise, second independent instance)
+
+> **CLOSED 2026-08-28** (was promoted 2026-08-27) to [ADR-0137](adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) +
+> [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 3-6, which take the `[latch]` table with
+> render-layer state and load-time slot resolution. That plan closed 2026-08-28; the entry is discharged in both halves.
+
+The expression evaluator is pure by hard invariant and `[smoothing]` eases without holding, so there
+is no way to say *"fire once per window, on the music."* `min(mod(time, 100) > 60, onset > 0.6)` is
+an AND, and an edge-triggered binding re-fires on every onset inside the window rather than on the
+first one.
+
+- **Raised:** 2026-08-27, wanting `collage_mono` to recompose on the first strong onset after ~90 s
+  — rare, but landing on a musical moment. **This is a re-raise, not a new gap**, and it is filed
+  because the demand is now measured twice: the standing entry lives in the `preset-author` skill's
+  own `references/api-feedback.md`, and the first instance was the per-object state in archived 0034.
+- **What shipped instead:** `recompose = "mod(time + 50, 100) < 50"` — exactly one rise per 100 s,
+  deliberately metronomic and disconnected from the music. The preset header argues the choice
+  honestly (a `hash(beat_index) > 0.9` gate fires every 3-10 s, because `beat_index` counts onset
+  detections rather than musical beats), which is why the wall clock won; it does not make the wall
+  clock what the look wanted.
+- **Why it is filed here rather than left in the skill's list.** That list is the content lane's
+  private reference; nothing re-runs it, nothing indexes it, and the lane's own instructions send a
+  raiser to *this* file first. A gap that has now been felt twice belongs where the close ceremony
+  will keep tripping over it.
+- **Verified 2026-08-27** — the purity invariant that forbids it is stated in the evaluator:
+  `present: expressions are pure in: core/src/preset/expr.rs`
+- **Verified 2026-08-27** — the metronomic workaround is what shipped:
+  `present: "mod\(time \+ 50, 100\) < 50" in: presets/collage_mono.toml`
+
+### Priority
+
+**Medium, and the design cost is the whole of it.** The feature is one accumulator; the decision is
+whether per-frame state may exist in a grammar whose purity is load-bearing for determinism
+(`CLAUDE.md`, NFR section 6). A latch seeded only by analysis variables and the frame clock is still
+reproducible frame-for-frame from the same input window, so the invariant may survive a narrow
+version of this — but "may" is exactly the kind of claim that wants an ADR rather than a commit.
+
+---
+
+## 0148 — a hard-ink palette cannot reach any additive scene, so the limited-ink class is confined to 4 of 12 systems
+
+> **CLOSED 2026-08-28** (was promoted 2026-08-27) to [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) +
+> [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, which take the class at the draw seam,
+> the line family's blend selector and the enumeration of intermediate-value stages. That plan closed 2026-08-28; the entry is discharged in both halves.
+
+Every line and particle scene draws additively and overlaps itself, so white over red sums to pink
+and a palette's flat plateaus are gone before the frame is composited. The mono ink set survives
+only where colour is resolved per-pixel each frame (`fragment_field`, `shape_field`,
+`reaction_diffusion`) or painted opaque (`shape_collage`) — four of the twelve systems.
+
+- **Raised:** 2026-08-27, wanting the mono ink set on a line world (a Maurer rose in black, white
+  and red). **Impact:** structural confinement of a whole palette class, not a defect in any
+  preset.
+- **Same family as 0140, one level up.** That entry is about `palette_contour` being the only source
+  of intermediate values in a two-ink print; this is the broader version, where the blend mode is.
+- **Verified 2026-08-27** — the shared line renderer's default seam is additive:
+  `present: crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE in: core/src/render/scenes/lines/renderer.rs`
+- **Verified 2026-08-27** — `unprobeable: "the mono set survives on exactly these four systems" is a
+  judgement about rendered colour, not a claim about repo contents.`
+
+### The mechanism is already built for the line family, and that changes the cost
+
+`LineRenderer` already carries **two** pipelines differing in exactly one field, and `draw_split`
+already composites its second range as premultiplied OVER rather than additive — built at Plan 0100
+Phase 4 so a MilkDrop waveform at `wave_a = 0.1` replaces a tenth of what is under it. It has
+exactly one caller, `warp_mesh`, and no preset-reachable selector. So for the four line systems the
+question is not *"can this engine draw an opaque stroke"* — it can, today — but whether a per-scene
+blend selector is a supported parameter. That is much the smaller half of this entry.
+
+- **Verified 2026-08-27** — the OVER pipeline exists and has one caller:
+  `present: res\.lines\.draw_split\( in: core/src/render/scenes/warp_mesh/mod.rs`
+
+The particle and compute systems are a separate problem with a separate renderer, and nothing
+comparable is already sitting there.
+
+### The decision this is really asking for
+
+Whether **limited-ink is a supported palette class with an invariant** ("a preset declaring N inks
+renders in exactly N colours") or an emergent trick that happens to work on four scenes. Today it is
+the second, and the whole mono cohort is built on it. The first would be a real contract with a real
+gate behind it and would tell every future scene what it owes; it would also convict
+`palette_contour` (0140) immediately, which is a feature of the question rather than an objection
+to it.
+
+### Priority
+
+**Medium.** The cohort ships and looks right on the four systems it reaches, so nothing is blocked
+today. What is being spent is optionality: every new scene is built additive by default, so the
+confined fraction grows on its own.
+
+---

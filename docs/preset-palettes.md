@@ -682,6 +682,138 @@ edge** between one cycle's colours and the next.
 
 ---
 
+## Limited ink — a supported palette class, at the draw seam
+
+A palette quantized into flat plateaus — black, white and one red; two inks on a
+cream ground; any set you can count — is a **supported class**, not a trick that
+happens to work on some scenes
+([ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)).
+The guarantee is:
+
+> On a scene drawing through an **opacity-preserving seam**, with a fully
+> quantized palette, the **scene's own output** contains only colours the palette
+> names. Every later stage that introduces intermediate values is enumerated
+> below, and each one names the parameter that disables it.
+
+**The guarantee is at the seam and not over the finished frame, and that is not a
+hedge.** A seam is a property of a draw call and the engine decides it. The
+finished frame is the product of a post chain *you* compose, and a guarantee over
+it would have to encode the exemption list as tolerances — a colour count "near
+enough" to N, which is a number with no mechanism behind it. Follow the list below
+and you get a frame whose colours are the palette's; keep a stage on it and you
+know exactly what you traded.
+
+### What the class needs
+
+1. **A fully quantized palette.** Either `palette_steps` on a scene that supports
+   it, or `stops` written as pairs that jump — `{ at = 0.1249, … }` then
+   `{ at = 0.1251, … }` — so there is no ramp between two inks. A continuous
+   gradient is not limited ink and nothing here applies to it.
+2. **A scene drawing through an opacity-preserving seam.** These are in the class:
+
+   | system | how it holds the ink |
+   |---|---|
+   | `fragment_field`, `shape_field`, `reaction_diffusion` | colour is resolved per pixel per frame, so nothing overlaps itself |
+   | `shape_collage` | forms are painted **opaque**: one is in front of another rather than added to it |
+   | `parametric_curve`, `lsystem`, `star_pattern`, `spectrum` | **only with `stroke_blend = "1"`** — see [`presets/README.md`](../presets/README.md). At the default `0` these draw additively and white over red is pink |
+
+   These are **outside** it. `swarm`, `attractor` and `emitter` are a different
+   renderer with nothing equivalent sitting in it. `warp_mesh` colours its light
+   at deposit time, so the palette never bands the accumulated field at all
+   ([backlog 0146](design-backlog.md)).
+3. **A coordinate that lands inside a plateau, not on its edge** — see the LUT
+   entry in the table below, which is the one leak that is about *your* numbers
+   rather than about a stage you can switch off.
+
+### Every stage that puts a colour in the frame the palette did not name
+
+Two kinds, and the difference decides whether you care. A **mixer** produces a
+colour *between* two of the frame's — that is what destroys a plateau and turns
+white-over-red into pink. A **remap** moves every colour somewhere else but maps
+one to one, so a three-ink frame is still three flat regions; they will not be the
+palette's literal RGB, and they will still read as a limited-ink print.
+
+**Mixers — each with its off switch:**
+
+| stage | what it mixes | off |
+|---|---|---|
+| the backdrop | the scene composites over it with premultiplied alpha, so anything short of full coverage lands between the ink and the backdrop's colour | bind no `bg_*` (the default ground is a black clear); `occlude = 1` is already the default |
+| trails | this frame lerped onto the decayed past, so a moving edge leaves a ramp of every value between two inks | `trails = "0"` (the default) |
+| kaleidoscope | resampling through the fold, with **linear** filtering, so a texel straddling two plateaus comes back as their average | bind no `kaleido_*` (the stage is inactive without a fold, a radial term or a tile) |
+| bloom | a blurred bright-pass added back over the frame — a blur is a mixer by definition | `bloom_amount = "0"` (the default) |
+| the internal post grid | **any** active post stage routes the frame through a capped internal grid and presents it with a linear stretch, so the resample mixes neighbours even where the stage itself would not | the same switches as the three stages above: with none active there is no internal grid and no resample |
+| `palette_contour` | a soft scalar darken toward black at each band edge — it has no ink of its own, which is exactly [backlog 0140](design-backlog.md)'s subject. Measured there: `shape_contourmono` goes from 9 distinct colours to 684 | `palette_contour = "0"` (the default) |
+| the A/B palette crossfade | `palette_mix` between two palettes samples a value in neither of them | declare no `[palette_b]`, or pin `palette_mix` to exactly `0` or `1` |
+| the duotone ink pass | every pixel lerped along the paper→ink axis by its luminance, which is a continuum by construction | `ink_amount = "0"` (the default; the pass is not even built) |
+| an `over` layer join | the layer is blended into the main scene's composite at `mix`, through `add`, `screen`, `multiply` or `overlay` — **every one of the four is a mixer**, and there is no replacing blend | use `join = "under"` instead, where the layer draws into the *same scene target* through the same seam and stays in the class if it too draws opaque; or declare no `[layer]` |
+| a preset dissolve | two whole frames crossfaded while a transition runs | not preset-controllable, and **transient** — it ends when the dissolve does |
+
+**Remaps — they move the colours but do not mix them.** There is no switch list
+here, and you do not want one: **a limited-ink frame's plateaus almost never carry
+the palette's literal RGB**, and that is fine. What matters is that three inks
+leave three flat regions.
+
+| stage | what it does |
+|---|---|
+| the tonemap's curve | below the knee at `0.6` it is **exactly the identity**; above it, all three channels scale by one factor, so hue and saturation survive and a plateau stays a plateau |
+| `brightness`, `glow` | scale the ink's colour |
+| `saturation` | pulls each colour toward its own luminance |
+| a scene's own opacity and ground terms | `shape_collage`'s `paper` and `opacity`, a field's `brightness` — each moves where a plateau sits without splitting it |
+
+**And one with no off switch at all, which is the honest end of this list:**
+
+- **The display dither.** The tonemap adds a static triangular dither of at most
+  **one encoded level** to each channel before the 8-bit store
+  ([ADR-0096](adrs/0096-the-display-write-dithers.md)). It is a pure function of
+  pixel coordinates, so it does not shimmer — but a flat mid-tone plateau is
+  stored as a ±1/255 speckle rather than as one value, and a colour count over a
+  captured PNG will say so. **It vanishes at the rails**: the dither amplitude is
+  scaled by the distance to black and to white, so pure `#000000` and pure
+  `#ffffff` come through exact and only the inks between them are speckled. There
+  is no parameter for it, and there should not be — it is what keeps every
+  gradient in the engine from banding.
+
+### The leak that is about your numbers
+
+The palette is baked into a **256-entry LUT sampled with linear filtering**. A
+stop pair written to jump — `0.1249` then `0.1251` — is narrower than one LUT
+texel, so the whole transition lands *inside* a single texel and any coordinate
+falling on that texel reads a blend of the two inks.
+
+That is not a bug and there is no switch for it; it is the reason a quantized
+palette wants its **sample coordinate placed at a plateau's centre**. With eight
+plateaus, sample at `k/8 + 1/16` rather than at `k/8`. `collage_mono` says exactly
+this in its palette header, and it is the one item on this page you fix by writing
+better numbers rather than by turning something off.
+
+### Reading the result — measured on the shipped `collage_mono`
+
+There is **no gate** for any of this — no test counts colours in a frame, and
+ADR-0138 says why: a count with an exemption list is a tolerance with no mechanism
+behind it. Check it by rendering:
+
+```sh
+cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --out a.png
+```
+
+`collage_mono` at 1280x720, three inks, every mixer above at its off value, comes
+back with **615 distinct colours** — and the shape of that number is the whole
+point:
+
+| what | in the PNG | why |
+|---|---|---|
+| the black | `#000000`, exact, 86 007 px | a rail: the dither's amplitude falls to zero at black and at white |
+| the paper | `#e7e7e7`, with `#e6e6e6`/`#e8e8e8` beside it | one plateau, speckled by the display dither |
+| the red | `#d63131`, with its ±1 neighbours | one plateau, speckled by the display dither |
+| everything else | ~600 values, tens of pixels each | the forms' anti-aliased edges — the coverage ramp the class excludes by construction |
+
+**So count plateaus, not values.** Three inks gave three flat regions, which is
+what the class promises. None of the three is the palette's literal RGB —
+`#ffffff` arrives as `#e7e7e7` and `#b00808` as `#d63131` — because the remaps
+above moved them without mixing them, and a raw colour count folds the dither and
+the edges in with the inks. A histogram sorted by pixel count separates all three
+in one look.
+
 ## The line scenes' cosine ramp — what `hue` actually looks like
 
 This is the **default** palette — what a line scene colours through when its

@@ -1,8 +1,8 @@
 # ADR-0138 — Limited ink is a supported palette class, defined at the draw seam
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0123)
 > **Date:** 2026-08-27
-> **Related plan(s):** [0123](../plans/0123-a-gate-a-latch-and-an-ink.md)
+> **Related plan(s):** [0123](../plans/done/0123-a-gate-a-latch-and-an-ink.md)
 > **Supplements:** [0056](0056-additive-scenes-emit-premultiplied-alpha.md), [0133](0133-the-band-contour-fires-where-the-ink-changes.md)
 
 ## Context
@@ -134,3 +134,26 @@ The clean-sheet answer, and it would make the class universal. Rejected outright
 what the luminous worlds *are*, ADR-0056 built the premultiplied contract around it, and every scene
 but `shape_collage` is designed against it. This would not be a palette decision, it would be a
 different engine.
+
+## Outcome (2026-08-28, Plan 0123 close)
+
+Accepted as decided — the seam shipped, the enumeration shipped, and the class is reachable. Two
+claims above are narrower in practice than they read, both measured at Plan 0123 Phases 8-9 and
+recorded here rather than edited into the body.
+
+- **"The scene's own output contains only colours the palette names" is true of the baked LUT, not
+  of the hex an author writes.** `LUT_TEXTURE_FORMAT` is `Rgba8Unorm` and the entries are consumed
+  as **linear** light (ADR-0021 Alt E's deferral), so a stop written as ordinary sRGB is lifted by
+  the display encode: `#c81423` renders `#dd4c64`, and `collage_mono`'s `#b00808` arrives as
+  `#d63131`. Writing the sRGB-to-linear value `#930204` instead renders `#c81622`, within 2/255 of
+  the colour named — so **below the tonemap knee the shift is exactly correctable by the author**,
+  which `docs/preset-palettes.md` does not yet say. Filed as design-backlog 0153.
+- **"An author who wants a strictly N-colour frame follows the enumerated list and gets one" is a
+  claim about plateaus, not about a colour count.** With every enumerated mixer off, `collage_mono`
+  at 1280x720 comes back with three flat regions and **615 distinct colours** — the residue is
+  ADR-0096's static display dither, one encoded level, which the enumeration correctly lists as the
+  one leak with no off switch. Three plateaus is the deliverable and the count is not.
+- The enumeration was **incomplete as drafted** and was completed during the sweep, as the phase
+  required: the backdrop composite, the A/B palette crossfade, the duotone ink pass, an `over` layer
+  join (all four `LayerBlend` variants mix; `join = "under"` is the off switch) and the internal post
+  grid's linear resample are mixers this ADR does not name.

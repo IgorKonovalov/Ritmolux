@@ -98,6 +98,22 @@ pub fn half_width(thickness: f32) -> f32 {
 /// which judge it serves without leaving the file.
 pub const DEFAULT_SOFTNESS: f32 = 0.25;
 
+/// The `stroke_blend` level at or above which a line scene draws through the
+/// opacity-preserving seam (ADR-0138). Below it the batch is additive light.
+///
+/// A midpoint threshold on a continuous param, for the reason every other
+/// quantized param in this engine carries one: `[smoothing]` eases a value
+/// through everything between its endpoints, so a binding that steps `0 -> 1`
+/// is `0.37` for a frame or two on the way. The seam has no state to interpolate
+/// — a draw call has one blend mode — so the decision is taken CPU-side, once
+/// per frame, at the midpoint.
+pub const OPAQUE_BLEND: f32 = 0.5;
+
+/// The `stroke_blend` a line scene draws at when its preset binds nothing —
+/// additive light, ADR-0056's seam, and what every line scene drew before the
+/// selector existed.
+pub const ADDITIVE_BLEND: f32 = 0.0;
+
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset
 /// switch and blow the segment cap (ADR-0007 Risks). Curated presets stay well

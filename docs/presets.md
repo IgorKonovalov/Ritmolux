@@ -114,19 +114,27 @@ sample density),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
-easing), `[palette]` / `[palette_b]` (colour), and `[layer]` (a second scene
+easing), `[latch]` (an event armed on one condition and fired by another —
+[below](#the-latch-table--arm-on-one-thing-fire-on-another)),
+`[palette]` / `[palette_b]` (colour), and `[layer]` (a second scene
 composed under or over the main one — ADR-0090; the expression language inside
 `[layer.params]` is exactly this document's). All are documented in
 [`presets/README.md`](../presets/README.md) and
 [`docs/preset-palettes.md`](preset-palettes.md).
 
 Every `[params]` value is evaluated **once per frame** and applied to the system
-before it renders. There is no per-frame state you can accumulate in a preset —
-an expression is a pure function of the current analysis frame plus the clock.
+before it renders. An expression is a pure function of the variables it is handed
+— you cannot accumulate a running total, integrate, or remember the last frame
+inside one.
 
-The one exception is a binding that names [`index`](#index--one-binding-evaluated-once-per-element),
-which the `spectrum` system evaluates once *per element*. Nothing else changes:
-it is still the same pure expression over the same frame.
+Two things bend that sentence without breaking it. A binding naming
+[`index`](#index--one-binding-evaluated-once-per-element) is evaluated once *per
+element* by the `spectrum` system rather than once per frame; it is still the same
+pure expression over the same frame. And a
+[`[latch]`](#the-latch-table--arm-on-one-thing-fire-on-another) variable is the
+**one part of the preset surface whose value depends on the frames before this
+one** — the state lives in the engine, not in the expression, and the expression
+still just reads a variable.
 
 ---
 
@@ -1107,9 +1115,10 @@ already name.
 ### What an expression cannot do: shape a value *over time*
 
 `smoothstep` eases a **value** as its input crosses a threshold. It cannot ease a
-**trajectory**, because expressions are pure and stateless by hard invariant —
-there is no previous frame to ease away from. Anything time-shaped therefore
-lives in `[smoothing]`, not in the expression:
+**trajectory**, because an expression is a pure function of the variables it is
+handed — there is no previous frame inside it to ease away from. Anything
+time-shaped therefore lives in a table beside `[params]`, not in the expression.
+For a trajectory that is `[smoothing]`:
 
 ```toml
 [params]
@@ -1135,6 +1144,72 @@ so there is no value that gives both.
 
 ---
 
+### The `[latch]` table — arm on one thing, fire on another
+
+`[smoothing]` shapes a value over time but never *holds* one, so there is a thing
+the two of them together still cannot say: **fire once inside a window, on the
+music.** `min(mod(time, 100) > 90, onset > 0.6)` is an `and` over two
+instantaneous readings — it goes true on every onset inside the window, not on the
+first — and an edge-triggered parameter reading it re-fires each time.
+
+A `[latch]` says it:
+
+```toml
+[latch]
+# armed while `arm` holds; on the first rise of `fire` inside that window it
+# reads 1.0 for `hold` seconds, and does not read 1.0 again until `arm` has
+# fallen and risen
+recut = { arm = "mod(time, 100) > 90", fire = "onset > 0.6", hold = 0.5 }
+
+[params]
+recompose = "recut"
+```
+
+The name is yours. It becomes an ordinary variable in every expression of the
+preset — `[params]`, `[per_vertex]` and `[layer.params]` alike — so it composes
+with everything else: multiply it, gate on it, ease it through `[smoothing]`, read
+it from several bindings at once.
+
+**The three keys.**
+
+| key | what it is |
+|---|---|
+| `arm` | an expression. While it reads above `0.5` the latch is in an **arming window**. Its fall closes the window; its next rise opens a new one. |
+| `fire` | an expression. The latch fires on its **rising edge** — a value that was already above `0.5` when the window opened is not an edge. |
+| `hold` | seconds the fired latch reads `1.0`, a bare number rather than an expression. Optional; `0` means a single frame, which is the right answer for a parameter that acts on the rise and ignores the rest. |
+
+**One rise per arming window.** However many `fire` edges a window contains, the
+latch rises on the first and on no other. The next rise requires `arm` to have
+fallen and risen again. A window with no `fire` edge in it produces no rise at
+all — a latch is not a timer with a jitter, it is a permission that gets spent.
+
+`hold` is a **duration**, measured on real elapsed time like `[smoothing]`, so it
+is the same length at any refresh rate.
+
+**A preset may declare up to four latches.** Asking for more is a load error
+naming the cap; the storage is a fixed block resolved at load, so this is a wall
+rather than a slower path. A latch name may not be one the grammar already
+resolves (`bass`, `time`, `pi`, `sin`, …) — that is a load error too, because a
+binding naming it would silently read the built-in. And a latch's own `arm` and
+`fire` cannot name another latch.
+
+> **A latch is the one part of the preset surface that depends on frame
+> history**, and two consequences follow that nothing else here has.
+>
+> **A single-frame probe reads it at rest.** Anything that evaluates one frame in
+> isolation sees `0.0` for every latch and cannot tell a latch that can never fire
+> from one that simply has not. `shot --report` drives a frame sequence, so its
+> reachability walk does see a latch; a static reading of one frame does not.
+>
+> **It resets on a preset switch.** An arming window does not survive the preset
+> that opened it, and a hold in progress is dropped — the same rule
+> `[smoothing]`'s state follows, for the same reason.
+
+Full reference, including where the cap comes from:
+[`presets/README.md`](../presets/README.md).
+
+---
+
 ## When a preset is wrong
 
 The engine distinguishes mistakes that make a preset meaningless from mistakes
@@ -1147,7 +1222,7 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`,
-  `[spectrum]`, `[palette]`, `[smoothing]`).
+  `[spectrum]`, `[palette]`, `[smoothing]`, `[latch]`).
 
 **Warnings — the preset still loads and renders:**
 
@@ -1308,7 +1383,7 @@ vocabulary here.
 - [ADR-0020 — Preset expression grammar v2](adrs/0020-preset-grammar-v2-branching-functions-tempo.md):
   the math functions, branching, `tempo`/`novelty`, and warn-but-load typo handling.
 - [`presets/README.md`](../presets/README.md): the per-system parameter tables,
-  engine-wide controls, structural config, and `[smoothing]`.
+  engine-wide controls, structural config, `[smoothing]` and `[latch]`.
 - [`docs/preset-palettes.md`](preset-palettes.md): the palette surface — built-in
   names, custom stops, and the A/B crossfade.
 - [ADR-0006 — C ABI v2 preset loading](adrs/0006-c-abi-v2-preset-loading.md):
