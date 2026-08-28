@@ -327,7 +327,7 @@ struct LatchBank {
 | 6 — `collage_mono` recomposes on the music | human | done | `60b3508` |
 | 7 — the line family gets a seam | dev | done | `e745c45` |
 | 8 — the class is written down | dev | done | `a9a16b9` |
-| 9 — a mono line world | human | not started | |
+| 9 — a mono line world | human | done | `687d0c1` |
 
 ### Notes
 
@@ -368,6 +368,24 @@ struct LatchBank {
   carrying the palette's literal RGB** (`#ffffff` → `#e7e7e7`, `#b00808` →
   `#d63131`).
 
+- **The seam is what buys the class, measured on one file with one switch**
+  (Phase 9), `Broadside` fully driven at 1280x720:
+
+  | `stroke_blend` | distinct | top-8 share | plateaus |
+  |---|---|---|---|
+  | `"1"` (OVER) | 6 066 | **92.1 %** | `#000000` exact, red `#c81622`, bone `#e3ddd3`, each with its ±1 dither neighbours |
+  | `"0"` (additive) | 12 466 | 75.6 % | none — the histogram's top is `#f0bcb4` and `#f5a6a0`, the pinks backlog 0148 predicted from bone summing onto red, and each ink's own value has fallen below 1 % |
+
+  (The Phase 9 commit body mistypes the OVER count as 6 466; **6 066** is the
+  measurement.)
+- **Two authoring constraints the seam imposes that ADR-0138 does not name**
+  (Phase 9). **Opaque strokes are ordered**, so at `hue_spread = 1` the second
+  half of the walk is one flat ink laid entirely on top of the first and it
+  buries the other — the spread is `6` so the two passes alternate along the
+  path. And **under OVER a loud passage cannot answer with brightness**: a
+  thicker stroke only closes the web, so the loud frame reads *flatter* than the
+  quiet one. The music therefore goes on `draw_progress` — the plate builds — and
+  not on coverage. Both are properties of the seam, not of this preset.
 **Findings**
 
 - **`ANIM_FLOOR`'s recorded derivation is stale** (Phase 1). Its comment names the
@@ -400,6 +418,20 @@ struct LatchBank {
   (`...(x/y/rad/ang), which                      reads 0...`). On `main` since
   `4bd33fd`; cosmetic, and outside the phase.
 
+- **The palette bakes its stops as LINEAR light, and a limited-ink author must
+  pre-convert** (Phase 9). `LUT_TEXTURE_FORMAT` is `Rgba8Unorm` and
+  `core/src/render/palette.rs:78` says the entries are used as colour directly,
+  "no perceptual/gamma management; that is deferred, ADR-0021 Alt E" — so a stop
+  written as ordinary sRGB is consumed as linear and the display encode lifts it.
+  Measured: `#c81423` renders **`#dd4c64`**, its green channel nearly quadrupled
+  and the ink arriving coral. Writing the sRGB→linear value `#930204` instead
+  renders **`#c81622`**, within 2/255 of the colour named. **This is why
+  `collage_mono`'s `#b00808` arrives as `#d63131`** — the Phase 8 measurement
+  recorded the shift without naming its cause. `docs/preset-palettes.md` presents
+  the shift as an unavoidable remap; it is unavoidable only *above* the tonemap
+  knee at `0.6`, and below the knee it is exactly correctable by the author.
+  **A backlog entry is architect's to write** — the lane does not edit
+  `docs/design-backlog.md`.
 **Unmet done-whens and deviations**
 
 - **Phase 8's done-when is not achievable as worded.** It asks that following the
@@ -434,12 +466,14 @@ struct LatchBank {
 
 ### Close triggers
 
-- **`presets/` touched:** one `.toml` edited — `collage_mono.toml`, in Phase 2.
-  No preset added or retired yet; Phase 9 is what would add one. `presets/README.md`
-  in Phases 7 and 8.
-- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **0145 and 0147 are
-  complete — both halves.** For 0148 the **engine half** shipped and the content
-  half is Phase 9.
+- **`presets/` touched:** one `.toml` edited — `collage_mono.toml`, in Phases 2
+  and 6 — and **one added**, `curve_broadside.toml` (`Broadside`), in Phase 9.
+  Nothing retired, so the shipped set goes 53 → 54 and **`architect` owes the set
+  a curation pass** under ADR-0089's cohort rules. `presets/README.md` in Phases
+  7 and 8.
+- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **All three are
+  complete in both halves** — each entry's engine half shipped in a `dev` phase
+  and its content half in the `preset-author` phase that follows it.
 - **What shipped:** feature. A `[latch]` grammar table with render-layer state, a
   preset-reachable `stroke_blend` on the four line systems, a disjunctive
   `animation` gate with a second derived floor, and `AnalysisFrame::fully_driven`
@@ -460,8 +494,8 @@ struct LatchBank {
   not a defect: each one now reads as evidence the content half landed. **The
   tree's tip is red on this gate and `pre-push` runs it.** Nothing here edited
   `docs/design-backlog.md` — the backlog is architect's lane.
-- **Outstanding `human` phases:** 9 (a mono line world on the new seam), a
-  `preset-author` session. Phases 2 and 6 landed as `77dadd9` and `60b3508`.
+- **Outstanding `human` phases:** none. All nine phases have landed; Phases 2, 6
+  and 9 were `preset-author` sessions and are `77dadd9`, `60b3508` and `687d0c1`.
 
 ## Followups (after this lands)
 
@@ -469,3 +503,10 @@ struct LatchBank {
 - Backlog 0140 (`palette_contour` has no ink of its own) gains a contract from ADR-0138 and should be
   re-read against it at this plan's close.
 - Whether the limited-ink class extends to the particle renderer.
+- **A backlog entry for the palette's stop colour space**, from Phase 9's finding
+  above — the entry is architect's to write. Two parts, and they are separable:
+  whether `Rgba8Unorm` stops consumed as linear is still the right deferral
+  (ADR-0021 Alt E), and — whatever that answers — that
+  `docs/preset-palettes.md` currently presents the shift as an unavoidable remap
+  when below the tonemap knee it is exactly correctable by pre-converting the
+  stop. The second half is a documentation fix worth having either way.
