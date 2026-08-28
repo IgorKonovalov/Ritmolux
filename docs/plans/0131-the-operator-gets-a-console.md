@@ -14,6 +14,11 @@ console is a second `wgpu::Surface` on the renderer's existing device, not a sec
 frame is drawn once, copied exactly to the output swapchain, and blitted scaled into the console.
 No new dependency, no C ABI change, no cue monitor.
 
+**The console is off by default and opened from the settings menu.** While it is closed the app
+is the app it is today: one window, one surface, no intermediate texture and no extra copy. That
+is asserted (Phase 2), not argued — the whole per-frame cost of this feature is paid only while
+someone is looking at it.
+
 ## Context & problem
 
 Multi-display targeting already works. `[output] display_name` picks the show's monitor, `D`
@@ -144,6 +149,14 @@ flowchart TB
     frames with the console open allocate no per-frame GPU resource**, stated against what is
     observable exactly as Plan 0115 Phase 2 states it — the resident set does not grow across them
     beyond the sampling noise `ResidentSet` already reports. Reuse that helper.
+  - **With the console closed, the renderer costs exactly what it costs today.** The intermediate
+    is not allocated, no copy is encoded, and the per-frame draw-call count `Metrics` already
+    reports is unchanged from before this plan. This is the claim that makes the feature free
+    when unused, so it is asserted rather than argued — and the natural way to get it wrong is
+    to build the intermediate once at startup and merely stop reading it.
+  - Closing the console **releases** the intermediate and the second surface: the resident set
+    returns to its console-closed baseline rather than holding at the open one. Same
+    `ResidentSet` instrument as the criterion above, read across an open/close cycle.
   - The golden suite is **unblessed and unchanged**. Goldens run the headless path, which this phase
     does not touch; a baseline that moves is a finding, not a bless.
 
@@ -193,22 +206,34 @@ flowchart TB
   - A rotation-transport row and the equivalent S-menu row produce the **same** action value for the
     same change — asserted directly, so the two surfaces cannot drift into two behaviours.
 
-### Phase 5 — Persistence, the flag, and the docs
+### Phase 5 — The settings row, persistence, and the docs
 
 - **Owner skill:** dev
-- **What:** a `[console]` config section, a `--console` launch flag, and the operator-doc sweep.
-- **Files touched:** `standalone/src/config.rs`, `standalone/src/main.rs`, `README.md`,
-  `docs/on-device-validation.md`.
+- **What:** an S-menu row that opens and closes the console, a `[console]` config section that
+  defaults to **off**, a `--console` launch flag, and the operator-doc sweep.
+- **Files touched:** `standalone/src/settings.rs`, `standalone/src/settings/tests.rs`,
+  `standalone/src/config.rs`, `standalone/src/main.rs`, `README.md`,
+  `docs/on-device-validation.md`. **`settings.rs` is the file Plan 0130 is adding two input rows
+  to** — take that lane's merge before starting here.
 - **Done when:**
+  - The S-menu carries a console row that opens and closes the second window, reached as an ordinary
+    `SettingsAction` like every other row. The state machine stays window-free and renderer-free —
+    it says *what changed*, the shell opens the window.
+  - **`[console] enabled` defaults to `false`.** A config that has never heard of a console produces
+    exactly today's app. Asserted on the `Default` impl, not merely observed in a fresh file.
+  - **Toggling the console off from the console's own S-menu leaves that menu drawn on the output.**
+    Phase 3 moved the modals to the console; this is the one interaction where the move has to
+    reverse mid-keystroke, and the obvious implementation loses the menu along with the window.
   - `[console] enabled` and `[console] display_name` round-trip through `config.toml`, and a console
     opened on a named display reopens on that display after a restart.
   - Display resolution **reuses `resolve_monitor`'s existing name-over-index rule** rather than
     reimplementing it — winit's monitor ordering is not stable across boot or hotplug, and the
     console must not learn a second answer to a question the output already answers.
-  - `--console` opens it at launch; the flag, the config key and the `C` hotkey are one path, so the
-    persisted value cannot disagree with what the key does.
-  - `README.md`'s Controls table lists `C`, and `docs/on-device-validation.md` gains the two-display
-    console check. Prefer count-free phrasing over hard numbers.
+  - `--console` opens it at launch; the flag, the config key, the S-menu row and the `C` hotkey are
+    **one path**, so no two of them can disagree about whether the console is open.
+  - `README.md`'s Controls table lists `C`, the S-menu row is named wherever the menu's rows are
+    documented, and `docs/on-device-validation.md` gains the two-display console check. Prefer
+    count-free phrasing over hard numbers.
 
 ### Phase 6 — The on-device gate
 
