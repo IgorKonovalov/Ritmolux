@@ -1,6 +1,6 @@
 # 0129 — The build stops being paid three times
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) (proposed)
@@ -244,11 +244,13 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly, worktree
+`C:/Users/Igor Konovalov/WORK/light-music-visualizer`, at `35fd027` (after Plan
+0132's close).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Take the baseline | dev | not started | |
+| 1 — Take the baseline | dev | done | committed with this row |
 | 2 — Point the MSVC target at `rust-lld` | dev | not started | |
 | 3 — One artifact store for every lane | dev | not started | |
 | 4 — Prove nothing about the tests changed | dev | not started | |
@@ -257,6 +259,52 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | 7 — Write down what a machine has to do | dev | not started | |
 
 ### Notes
+
+**Phase 1 — the baseline.** Machine (ADR-0071): AMD Ryzen 9 5900HS, Windows 10
+19045, rustc 1.97.1, cargo-nextest 0.9.140, on AC with standby disabled. Nothing
+else ran during the timings. Baseline commit `35fd027`.
+
+| measurement | value |
+|---|---|
+| cold `cargo build`, fresh worktree | **105 s** (129 crates compiled) |
+| cold `cargo nextest run --workspace --no-run` after it | **66 s** (16 further crates, then the test-binary links) |
+| cold, from nothing to all test binaries | **171 s** |
+| warm one-file-edit rebuild (`touch core/src/lib.rs`, then `--no-run`) | **28 s** |
+| cold `target/` after both builds | **4,504 MB** |
+
+**Three premises in the plan and ADR-0141 do not match the machine as measured.**
+Recorded as measurements; what follows from them is not this lane's call.
+
+- **Worktree count.** The plan and ADR open on *"three worktrees hold 23.2 GB"*.
+  `git worktree list` returns **one** — the main checkout — because the Plan 0123
+  and 0127 lanes were removed and Plan 0132's closed the same night this ran. The
+  remaining lane's `target/` measures **15,002 MB**, against the 2.4 GB the ADR
+  recorded for it. So the disk figure is now one lane at 14.65 GB rather than
+  three summing to 23.2 GB, and the growth is within a lane, not across lanes.
+- **Crate count.** Both documents say the dependency graph is **305 crates**.
+  That is the count of `[[package]]` entries in `Cargo.lock`; a default
+  `cargo build` compiles **129**, because `default-members` excludes `core-cabi`
+  and `milkconv` (ADR-0072, ADR-0113). `--no-run` adds 16 more for dev-
+  dependencies. 305 is reachable only by `--workspace` with every feature.
+- **Magnitude.** ADR-0141 cites `cargo build` on a warm `main` at **2m12s**. The
+  cold build measured here — a worktree with no `target/` at all — is **105 s**,
+  faster than the figure the ADR gives for a warm one. The user report the plan
+  quotes (*"small change is taking hours"*) is not reproduced by any number in
+  the table above; the warm inner-loop edit is 28 s. These timings cover compile
+  and link only. `--no-run` was used throughout, so no suite was executed, and
+  Phase 6 is where run time gets measured.
+
+**Deviation — `git worktree add ../lmv-measure-0129 main` cannot run as written.**
+`main` is checked out in the primary worktree, so git refuses to check it out
+again. Used `git worktree add --detach ../lmv-measure-0129 main`, which lands the
+same commit. The scratch worktree was removed after measuring, per the phase.
+
+**Noted while reading, for Phase 4.** `standalone/tests/shot_cli.rs` has two
+target-directory dependencies, and the phase's done-when names one. `shot_exe()`
+walks ancestors from the test binary and is `CARGO_TARGET_DIR`-safe as its
+comment claims. `scratch()` (line 115) builds its path as
+`repo_root().join("target")`, which is repo-relative and unaffected by a
+redirect. Not yet exercised under the store.
 
 ### Close triggers
 
