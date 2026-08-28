@@ -363,6 +363,37 @@ struct LatchBank {
   re-cuts once per window with the `recompose_blend` dissolve visible mid-hop.
   The shipped file, whose window opens at `t > 90 s`, is composition-static
   across a whole 4 s filmstrip. `--report` flags nothing.
+- **The shipped latch verified end to end under real PCM** (post-Phase 6 smoke).
+  The probe above shortened the window to make it observable; this runs the
+  **shipped** `mod(time, 100) > 90` against a synthesized 115 s 16-bit clip
+  through `--audio`, which is the real analyzer. Capture dt is `1/60` per
+  analysis hop, so the clip's 115 s spans 165 s of scene time and the window is
+  hops 5400-6000. With the preset's movers pinned, so any difference between two
+  captures **is** a recomposition:
+
+  | hops | scene time | result |
+  |---|---|---|
+  | 3000, 4500, 5200, 5390 | 50.0 - 89.83 s | pixel-identical — the window is shut |
+  | 5500 | 91.67 s | recomposed |
+  | 5700, 6000, 6600, 7500, 9000 | 95.0 - 150.0 s | pixel-identical again — one fire per window |
+
+  Both branches, on the shipped file: with hits in the window it re-cuts once at
+  `t = 90`; with the same clip zeroed across those ten seconds it does not re-cut
+  at any hop through `t = 150 s`.
+- **"A quiet window costs a cycle" was overstated, and the header is corrected**
+  (`17ff0ba`). The clip's breakdown — chords and hats, no kick — sits across the
+  arm window and the latch **fired in it anyway**. `onset` is a fraction of its
+  own *decaying* recent peak, so a few seconds after a loud passage a pad crosses
+  `0.6` as readily as a kick did. Only **near-silence** skips a window. The
+  mechanism is unchanged and the plan's done-when still holds; what was wrong was
+  a gloss an author would have relied on.
+- **The sway measured in pixels** (post-Phase 2 smoke). Isolated by holding time
+  fixed and varying only the pan constant, so the ink count is identical
+  (95 977 vs 95 978) and the delta is pure translation: `pan_x = 0.06` moves the
+  canvas **21.6 px at 1280 wide**, 1.68 % of frame width, so the sway is **43 px
+  peak-to-peak over its 90 s period** — a top speed of **0.96 px/s**. At the
+  `0.70` rate it had been raised to, the same 43 px took 4.5 s, about 9.6 px/s.
+  An order of magnitude is what separates a settle from a wobble here.
 - **`collage_mono` measured with every enumerated mixer off** (Phase 8), 1280x720:
   three flat regions, `#000000` exact over 86 007 px, and **none of the three
   carrying the palette's literal RGB** (`#ffffff` → `#e7e7e7`, `#b00808` →
