@@ -361,8 +361,10 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 - **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout, and
   below them the analysis block: `BASS` / `MID` / `TREB` / `ONSET` as meters with their numbers,
   plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049). Under the
-  panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2`, or `failed …` with
-  the platform error (Plan 0083). **The corner preset name steps aside while the overlay is up**
+  panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2 <endpoint>`,
+  `failed …` with the platform error, or `lost …` when the input went away and did not come back.
+  It is current state, so it follows an input swapped from the `S` menu rather than naming what the
+  run started on. **The corner preset name steps aside while the overlay is up**
   (Plan 0096) — the panel composites after the text layer and used to paint straight over it — so
   where a step below asks you to record *which* preset something happened on, read it from the
   browser (`Tab`) or the window title, not from the corner.
