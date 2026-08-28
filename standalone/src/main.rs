@@ -205,6 +205,7 @@ impl AppState {
         soak_path: Option<PathBuf>,
         downbeat_log_path: Option<PathBuf>,
         tier: Option<Tier>,
+        input: config::Input,
     ) -> Self {
         let size = window.inner_size();
         let mut renderer = Renderer::new(
@@ -242,7 +243,7 @@ impl AppState {
         // shows live fps/p99 (the overlay itself stays off until F3 — Plan 0011).
         renderer.enable_diagnostics(true);
 
-        let capture = start_capture(&config.input);
+        let capture = start_capture(&input);
         // Rendered once, here, and only borrowed afterwards: the log's row builder
         // runs every frame and the overlay every frame it is up (Plan 0083).
         let capture_token = capture.verdict.token();
@@ -1241,6 +1242,10 @@ struct App {
     /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     tier: Option<Tier>,
+    /// The capture selection, already resolved across `--input` / `--device` /
+    /// `[input]` (Plan 0130). Held beside `config` rather than written into it,
+    /// so a flag pins this launch without persisting itself on the next save.
+    input: config::Input,
     state: Option<AppState>,
 }
 
@@ -1279,6 +1284,7 @@ impl ApplicationHandler for App {
                         self.soak_path.take(),
                         self.downbeat_log_path.take(),
                         self.tier,
+                        std::mem::take(&mut self.input),
                     );
                     state.window.request_redraw();
                     self.state = Some(state);
@@ -1460,6 +1466,109 @@ fn parse_tier_arg() -> Result<Option<Tier>, String> {
         }
     }
     Ok(None)
+}
+
+/// The value of `--name value` / `--name=value` when `arg` is that flag, else
+/// `None`. The spaced spelling consumes the next argument, which is why the
+/// iterator is threaded through rather than re-scanned.
+fn flag_value(arg: &str, name: &str, args: &mut impl Iterator<Item = String>) -> Option<String> {
+    if let Some(inline) = arg
+        .strip_prefix(name)
+        .and_then(|rest| rest.strip_prefix('='))
+    {
+        return Some(inline.to_owned());
+    }
+    (arg == name).then(|| args.next().unwrap_or_default())
+}
+
+/// The `--input <mode>` / `--device <name>` overrides, in both the spaced and
+/// the `=` spelling `--soak` and `--tier` already accept.
+///
+/// `Err` on an `--input` value that names no mode. Like `--tier` and unlike
+/// `LMV_TIER`, a bad flag is a **usage error** rather than something to degrade
+/// past: it was typed for this run, so starting on another input would answer
+/// the wrong question. A `--device` naming an absent endpoint is *not* an error
+/// — the capture layer degrades to the mode's default endpoint and says so, and
+/// a flag must not be stricter about the world than about its own spelling.
+fn parse_input_args() -> Result<(Option<config::InputMode>, Option<String>), String> {
+    parse_input_args_from(std::env::args().skip(1))
+}
+
+/// [`parse_input_args`]'s rule as a pure function of the argument list, so both
+/// spellings are testable without a process.
+fn parse_input_args_from(
+    args: impl Iterator<Item = String>,
+) -> Result<(Option<config::InputMode>, Option<String>), String> {
+    let mut args = args.peekable();
+    let mut mode = None;
+    let mut device = None;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--input", &mut args) {
+            mode =
+                Some(config::InputMode::from_name(&value).ok_or_else(|| {
+                    format!("--input `{value}`: expected `loopback` or `line-in`")
+                })?);
+        } else if let Some(value) = flag_value(&arg, "--device", &mut args) {
+            device = Some(value);
+        }
+    }
+    Ok((mode, device))
+}
+
+/// Which source decided the capture selection, so a surprising input is
+/// traceable to what set it — the tier-source shape ADR-0045 established, minus
+/// the environment level (Plan 0130 says why there is no `LMV_INPUT`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputSource {
+    /// `--input` / `--device` on the command line.
+    Flag,
+    /// `config.toml`'s `[input]` section moved it off the built-in.
+    Config,
+    /// Nothing chose it: loopback of the default render endpoint.
+    Default,
+}
+
+impl InputSource {
+    /// How to name this source in a log line.
+    fn as_str(self) -> &'static str {
+        match self {
+            InputSource::Flag => "--input/--device",
+            InputSource::Config => "config.toml",
+            InputSource::Default => "default",
+        }
+    }
+}
+
+/// Resolve the capture selection: `--input` / `--device` over `[input]`.
+///
+/// **Each flag overrides its own field**, so `--device` alone keeps the
+/// configured mode and `--input` alone keeps the configured device name. A name
+/// that belongs to the other dataflow then matches nothing and degrades to that
+/// mode's default endpoint with a stderr note — announced and self-correcting,
+/// which is a better answer than silently discarding what the operator
+/// configured.
+///
+/// Pure: every source arrives already parsed, so the precedence rule is testable
+/// without touching the process environment.
+fn resolve_input(
+    mode: Option<config::InputMode>,
+    device: Option<String>,
+    config: &config::Input,
+) -> (config::Input, InputSource) {
+    let from_flag = mode.is_some() || device.is_some();
+    let resolved = config::Input {
+        mode: mode.unwrap_or(config.mode),
+        device: device.unwrap_or_else(|| config.device.clone()),
+    };
+    let built_in = config::Input::default();
+    let source = if from_flag {
+        InputSource::Flag
+    } else if resolved.mode == built_in.mode && resolved.device == built_in.device {
+        InputSource::Default
+    } else {
+        InputSource::Config
+    };
+    (resolved, source)
 }
 
 /// Default soak-log location: under the per-user app dir, or `soak.log` in the
@@ -1646,12 +1755,32 @@ fn main() {
         );
     }
 
+    // Audio input, flags over config (Plan 0130 / ADR-0142). A bad `--input`
+    // exits for the same reason a bad `--tier` does — it was typed for this run.
+    let (input_mode_flag, input_device_flag) = match parse_input_args() {
+        Ok(flags) => flags,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let (input, input_source) = resolve_input(input_mode_flag, input_device_flag, &config.input);
+    if input_source != InputSource::Default {
+        eprintln!(
+            "audio input {} on '{}' by {}",
+            input.mode.as_str(),
+            input.device,
+            input_source.as_str()
+        );
+    }
+
     let mut app = App {
         config,
         config_path,
         soak_path,
         downbeat_log_path,
         tier,
+        input,
         state: None,
     };
     if let Err(err) = event_loop.run_app(&mut app) {
@@ -1662,7 +1791,142 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Modal, preset_name_visible};
+    use super::{
+        InputSource, Modal, config, parse_input_args_from, preset_name_visible, resolve_input,
+    };
+
+    /// Both spellings of both flags, and the fact that an absent flag stays
+    /// absent rather than resolving to a default value here — the resolver, not
+    /// the parser, is what decides what an absent flag means.
+    #[test]
+    fn both_flag_spellings_parse() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+
+        assert_eq!(
+            parse_input_args_from(
+                argv(&["--input", "line-in", "--device", "ZOOM AMS-22"]).into_iter()
+            ),
+            Ok((
+                Some(config::InputMode::LineIn),
+                Some("ZOOM AMS-22".to_owned())
+            ))
+        );
+        assert_eq!(
+            parse_input_args_from(argv(&["--input=line-in", "--device=ZOOM AMS-22"]).into_iter()),
+            Ok((
+                Some(config::InputMode::LineIn),
+                Some("ZOOM AMS-22".to_owned())
+            ))
+        );
+        // Case-insensitive, like `--tier`, and unaccompanied flags stay `None`.
+        assert_eq!(
+            parse_input_args_from(argv(&["--soak", "--input", "LOOPBACK"]).into_iter()),
+            Ok((Some(config::InputMode::Loopback), None))
+        );
+        assert_eq!(
+            parse_input_args_from(argv(&["--device=default"]).into_iter()),
+            Ok((None, Some("default".to_owned())))
+        );
+        assert_eq!(
+            parse_input_args_from(argv(&["--fullscreen"]).into_iter()),
+            Ok((None, None))
+        );
+
+        // A value that names no mode is a usage error naming what it saw, not a
+        // silent fall-through to loopback.
+        let err = parse_input_args_from(argv(&["--input", "lineout"]).into_iter())
+            .expect_err("`lineout` is not an input mode");
+        assert!(err.contains("--input") && err.contains("lineout"), "{err}");
+        // Including the spelling that swallows the next argument when there is
+        // none to swallow: an empty value is still a value that named no mode.
+        assert!(parse_input_args_from(argv(&["--input"]).into_iter()).is_err());
+    }
+
+    /// **The flags win over `config.toml`, one field at a time.** This is the
+    /// precedence ADR-0142 mirrors off `--tier`, and the per-field half is what
+    /// lets `--device` alone keep the configured mode.
+    #[test]
+    fn the_flags_override_the_config_field_by_field() {
+        let configured = config::Input {
+            mode: config::InputMode::Loopback,
+            device: "Speakers (Realtek)".to_owned(),
+        };
+
+        // Both flags: neither configured field survives, and the flag is named
+        // as the source.
+        let (input, source) = resolve_input(
+            Some(config::InputMode::LineIn),
+            Some("Line (ZOOM AMS-22 Audio)".to_owned()),
+            &configured,
+        );
+        assert_eq!(input.mode, config::InputMode::LineIn);
+        assert_eq!(input.device, "Line (ZOOM AMS-22 Audio)");
+        assert_eq!(source, InputSource::Flag);
+
+        // `--input` alone keeps the configured device name; `--device` alone
+        // keeps the configured mode.
+        let (input, source) = resolve_input(Some(config::InputMode::LineIn), None, &configured);
+        assert_eq!(input.mode, config::InputMode::LineIn);
+        assert_eq!(
+            input.device, configured.device,
+            "the config device was lost"
+        );
+        assert_eq!(source, InputSource::Flag);
+
+        let (input, source) = resolve_input(None, Some("Line (ZOOM)".to_owned()), &configured);
+        assert_eq!(input.mode, configured.mode, "the config mode was lost");
+        assert_eq!(input.device, "Line (ZOOM)");
+        assert_eq!(source, InputSource::Flag);
+    }
+
+    /// With no flags the config decides, and the source distinguishes a config
+    /// that moved the selection from one that merely restates the built-in —
+    /// which is what keeps the startup line off a run nothing chose.
+    #[test]
+    fn without_flags_the_config_decides_and_the_built_in_is_named_as_such() {
+        let configured = config::Input {
+            mode: config::InputMode::LineIn,
+            device: "Line (ZOOM AMS-22 Audio)".to_owned(),
+        };
+        let (input, source) = resolve_input(None, None, &configured);
+        assert_eq!(input.mode, config::InputMode::LineIn);
+        assert_eq!(input.device, configured.device);
+        assert_eq!(source, InputSource::Config);
+
+        let (input, source) = resolve_input(None, None, &config::Input::default());
+        assert_eq!(input.mode, config::InputMode::Loopback);
+        assert_eq!(input.device, "default");
+        assert_eq!(source, InputSource::Default);
+
+        // A config that spells out the built-in is the same selection, so it is
+        // reported the same way rather than as a choice someone made.
+        let spelled_out = config::Input {
+            mode: config::InputMode::Loopback,
+            device: "default".to_owned(),
+        };
+        assert_eq!(
+            resolve_input(None, None, &spelled_out).1,
+            InputSource::Default
+        );
+    }
+
+    /// Every source renders to a distinct, non-empty name: the startup line
+    /// exists to say *what* set a surprising input, so two sources that print
+    /// the same word would defeat it.
+    #[test]
+    fn the_three_input_sources_are_distinguishable() {
+        let names = [
+            InputSource::Flag.as_str(),
+            InputSource::Config.as_str(),
+            InputSource::Default.as_str(),
+        ];
+        for name in names {
+            assert!(!name.is_empty());
+        }
+        assert_ne!(names[0], names[1]);
+        assert_ne!(names[1], names[2]);
+        assert_ne!(names[0], names[2]);
+    }
 
     #[test]
     fn name_shows_when_nothing_covers_it() {

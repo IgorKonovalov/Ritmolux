@@ -132,6 +132,27 @@ pub enum InputMode {
     LineIn,
 }
 
+impl InputMode {
+    /// The kebab-case word this mode serializes as. One source for the config
+    /// file, the `--input` flag, the startup line and the settings row, so what
+    /// the operator reads and what the file holds are the same string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            InputMode::Loopback => "loopback",
+            InputMode::LineIn => "line-in",
+        }
+    }
+
+    /// Parse the kebab-case word, or `None` when it names no mode.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "loopback" => Some(InputMode::Loopback),
+            "line-in" => Some(InputMode::LineIn),
+            _ => None,
+        }
+    }
+}
+
 /// `[rotate]` — the scene director's auto-rotate policy (Plan 0009 Phase 3;
 /// defaults revised by ADR-0027 / Plan 0026).
 ///

@@ -223,6 +223,18 @@ restart. Off means no track ever reaches the visualizer.
 ### Flags & environment
 
 - `--list-devices` — enumerate audio capture devices (Windows-only).
+- `--input loopback|line-in` — where audio comes from, overriding `config.toml`'s `[input] mode`.
+  `loopback` taps whatever the system is playing; `line-in` captures an input endpoint (an audio
+  interface, a mixer feed). Windows-only. A value that is neither is a usage error and the app
+  exits, the same way a bad `--tier` does.
+- `--device "<friendly name>"` — which endpoint to capture, overriding `config.toml`'s
+  `[input] device`. Copy a name out of `--list-devices`; a substring is enough. **The two flags
+  override independently** — `--device` alone keeps the configured mode, `--input` alone keeps the
+  configured device name. A name that matches no active endpoint of the selected mode is *not* an
+  error: capture falls back to that mode's default endpoint and says so on stderr, because the
+  interface being unplugged is a fact about the world rather than a typo in the flag. Precedence is
+  `--input`/`--device` > `config.toml`'s `[input]`; there is no environment variable, because an
+  input selection is a property of a rig and already persists to the config.
 - `--soak [path]` — write a long-run instrumentation trace (frame-time stats) for stability
   testing; a bare `--soak` logs to a default path under the per-user data dir.
 - `--tier floor|rich` — pin the quality tier instead of letting the engine pick. Unpinned, the app
