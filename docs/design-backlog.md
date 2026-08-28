@@ -3607,3 +3607,136 @@ Alt E with this cost written down or supersedes it with a migration for the ship
 
 - **Verified 2026-08-28** — the deferral is still recorded in the code: `present: no perceptual/gamma management in: core/src/render/palette.rs`
 - **Verified 2026-08-28** — and the page still tells the author it is unavoidable: `present: plateaus almost never carry in: docs/preset-palettes.md`
+
+## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review, from that plan's own Phase 5 log — an
+> observation the plan reported honestly, claimed no mechanism for, and had nowhere to leave.
+
+Before Plan 0130 `capture_win::start` ran **once per process**. It now runs on every input swap and
+on every recovery attempt, and each run spawns a thread that does `CoInitializeEx(MULTITHREADED)`,
+`CoCreateInstance(MMDeviceEnumerator)`, `CoUninitialize`, and exits. Under menu-speed churn on the
+development box, **one swap in 22 failed** at that `CoCreateInstance` with
+`REGDB_E_CLASSNOTREG (0x80040154)`.
+
+**What is and is not claimed.** The shell degraded exactly as designed — the reason printed, the
+verdict read `failed WASAPI … Class not registered`, rendering continued, and the next swap came
+back live. No mechanism is claimed: the apartment-churn reading is untested, one run on one box is
+not evidence for a cause, and 1-in-22 is a single sample, not a rate.
+
+**Why it is worth an entry rather than a note.** `poll_input_lost` reopens up to
+`INPUT_RECOVERY_ATTEMPTS` times on **consecutive frames** — the fastest thread-spawn churn the design
+can produce, and faster than the churn that drew the error. The budget exists to bound COM
+activations against a device that is not coming back; it cannot distinguish an activation that
+failed *for its own reasons* from one that failed *because the endpoint is gone*, so a real loss
+whose reopens drew this error would spend all three attempts on the wrong failure and write a
+`lost …` verdict about a device that was fine. That is the one path where this turns a transient
+into a wrong answer, and it is also the path
+[`docs/on-device-validation.md`](on-device-validation.md)'s unplug item says has never run.
+
+**Impact:** low frequency, narrow blast radius, and invisible while swaps stay operator-paced. It
+matters only where the design already churns fastest, which is the recovery path.
+
+**What a fix looks like** — three shapes, cheapest first, and picking between them wants the unplug
+evidence rather than more reasoning:
+
+1. **Retry the activation once, in place**, before charging the attempt to the recovery budget. A
+   class-registration failure is not a statement about the endpoint, so it should not spend a
+   budget that is counting statements about the endpoint.
+2. **Keep one long-lived enumerator on the render thread** rather than creating one per stream
+   start. `MMDeviceEnumerator` is a Both-model object and `ComScope` already handles the STA the
+   render thread lives in, so `endpoints()` has the pattern; `setup_stream` creates its own because
+   it runs on the capture thread.
+3. **Separate the two failure classes in the verdict**, so `failed … Class not registered` and
+   `lost …` never read as the same conclusion about the device.
+
+- **Verified 2026-08-28** — a fresh COM object is still created per stream start, on the capture
+  thread: `present: CoCreateInstance in: standalone/src/capture_win.rs`
+- **Verified 2026-08-28** — and nothing anywhere distinguishes this failure class from a dead
+  endpoint: `absent: REGDB in: standalone/src`
+- **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
+  `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/main.rs`
+
+## 0155 — the input-recovery settle window is counted in frames, so the flap it guards against is bounded on a 60 Hz display and unbounded on a 240 Hz one
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`INPUT_RECOVERY_SETTLE_FRAMES = 60` (`standalone/src/main.rs`) decides when a recovered input has
+proved it is delivering and may have its retry budget back. The property it buys is real and its
+own tests pin it: a stream that opens and dies immediately must not restore three attempts every
+cycle and reopen for the rest of the show, because that is the per-frame blocking device activation
+`INPUT_RECOVERY_ATTEMPTS` exists to prevent, reached by a different road.
+
+The property is stated in **frames**, and this app does not run at a fixed frame rate. The window it
+actually buys spans
+
+| refresh | window |
+|---|---|
+| 30 Hz | ~2 s |
+| 60 Hz | ~1 s |
+| 165 Hz (the dev box's own reference baseline) | ~360 ms |
+| 240 Hz | ~250 ms |
+
+so a flapping endpoint whose open-to-death cycle lands between those figures is bounded on one
+display and unbounded on another — and the machine the constant was written on is at the fast end,
+where a reader assuming "about a second" is wrong by nearly 3x.
+
+**This project already decided this question once.** Plan 0014 retired `SCENE_DT` for an injected
+real `dt` precisely so behaviour would be identical on every device, and the standalone's `redraw`
+computes that `dt` eleven lines below the `poll_input_lost()` call that runs the policy. A seconds
+window is available at the call site for the cost of threading one `f32` into `RecoveryPolicy::poll`.
+
+**Impact:** low. The comment's own floor argument — an invalidated endpoint reports itself on the
+first packet call after start, well inside any of these windows — means the margin is generous
+everywhere; what is wrong is that the guarantee is not the same guarantee on two machines.
+
+**What a fix looks like:** `poll(lost, dt)` accumulating seconds against an
+`INPUT_RECOVERY_SETTLE_SECS`, and the existing settle test asserting the window from both sides in
+seconds. If a frame count is deliberate instead, the comment should say the window is
+refresh-rate-dependent and name the range, so the next reader is not misled by the round number.
+
+- **Verified 2026-08-28** — the window is still a frame count: `present: INPUT_RECOVERY_SETTLE_FRAMES in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and it is still described as one, with no refresh-rate caveat: `present: Consecutive live frames in: standalone/src/main.rs`
+
+## 0156 — after a give-up, a fresh loss inside the settle window rewrites no surface, so the capture verdict says `live` while nothing is delivering
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`RecoveryPolicy` keeps `announced` and a spent `attempts` for `INPUT_RECOVERY_SETTLE_FRAMES` frames
+after a recovery, which is deliberate and named in that constant's comment: *"a genuine second
+unplug within the window inherits the first incident's remaining budget instead of a full one."*
+What the comment does not name is that the inherited state also silences the **verdict**.
+
+The sequence: three failed reopens spend the budget, `Recovery::GiveUp` writes `CaptureVerdict::Lost`
+and sets `announced`. The operator picks a working input from the `S` menu; `restart_capture` clears
+`self.input_lost` and writes a `live …` token, but leaves the policy spent. If that stream dies
+inside the window, `poll(true)` finds `attempts` at the bound and `announced` already true, and
+returns `Recovery::Hold` — no reopen, which is the accepted half, **and no token rewrite**, which is
+not. `diagnostics.log`'s `capture` column and the F3 overlay both keep reading `live WASAPI …`.
+
+**Why that is the wrong half to inherit.** The `Lost` variant was added by Plan 0130 for exactly one
+job: distinguishing a run that had audio and lost it from a start that never worked, so a remote
+tester's log cannot read silence as success. This is the single path where the verdict states the
+opposite of what is happening, and it is reachable only after the recovery has already proved the
+input is unreliable — the run most likely to be the one someone is reading the log about.
+
+**Impact:** narrow (it needs a give-up, then a successful manual swap, then a death inside the
+window) but the failure is a surface that lies, which is the class Plan 0083 built `CaptureVerdict`
+to prevent.
+
+**What a fix looks like:** either reset the policy on a `Persist::Yes` restart — an operator
+choosing an input is a new incident by definition, and it is the one restart that carries an
+explicit human judgement that the situation changed — or have the `Hold`-while-lost arm still write
+the `Lost` token once. The first is one line and also removes the surprise that a manual swap does
+not restore the retry budget.
+
+**Two comment corrections in the same file, cheap enough to ride along.** Neither is behavioural.
+`restart_capture`'s *"it is what was asked for, so the row shows it"* is true of the `Input mode`
+row and false of `Input device`: a failed start leaves `capture_endpoint` as `None`, so
+`device_row_index` returns the roster's leading slot and the row reads `default` while
+`self.input.device` still holds the endpoint the operator picked. And `settings.rs`'s new header
+calls `Tier` and `InputMode` *"two config enums"*; `Tier` is `lmv_core::render::Tier`, a core type a
+config key happens to name.
+
+- **Verified 2026-08-28** — the give-up latch is still what silences the arm: `present: self.announced in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and the operator-initiated restart still does not reset the policy: `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`
