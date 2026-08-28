@@ -31,10 +31,26 @@ use lmv_core::audio::AudioFormat;
 /// log says *which* route was tried, not merely that one failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CaptureVerdict {
-    /// Capture started, and `format` is what it negotiated.
+    /// Capture started, `format` is what it negotiated, and `endpoint` is the
+    /// friendly name of the device it actually opened.
+    ///
+    /// The endpoint is the *resolved* one, not the configured one: a selection
+    /// that named an absent interface degrades to the default, and a log that
+    /// echoed the request would say the opposite of what is happening.
     Live {
         backend: &'static str,
         format: AudioFormat,
+        endpoint: String,
+    },
+    /// A stream that *was* delivering reported itself gone, and the bounded
+    /// recovery did not get another one.
+    ///
+    /// Distinct from [`Failed`](Self::Failed), which is a start that never
+    /// worked: this run had audio and lost it, and a log showing only the last
+    /// reopen's error would not say that.
+    Lost {
+        backend: &'static str,
+        attempts: u32,
     },
     /// The platform capture path failed; `reason` is the error's `Display`.
     ///
@@ -63,6 +79,17 @@ pub enum CaptureVerdict {
 }
 
 impl CaptureVerdict {
+    /// A live verdict, with the endpoint name sanitized on the way in — a
+    /// friendly name comes from a driver and is not under our control, and the
+    /// log is one tab-separated row per line.
+    pub fn live(backend: &'static str, format: AudioFormat, endpoint: &str) -> Self {
+        Self::Live {
+            backend,
+            format,
+            endpoint: sanitize(endpoint),
+        }
+    }
+
     /// A failed verdict from a platform error, sanitized on the way in.
     pub fn failed(backend: &'static str, err: impl fmt::Display) -> Self {
         Self::Failed {
@@ -78,8 +105,16 @@ impl CaptureVerdict {
     /// frame and borrows this rather than formatting it again.
     pub fn token(&self) -> String {
         match self {
-            Self::Live { backend, format } => {
-                format!("live {backend} {}/{}", format.sample_rate, format.channels)
+            Self::Live {
+                backend,
+                format,
+                endpoint,
+            } => format!(
+                "live {backend} {}/{} {endpoint}",
+                format.sample_rate, format.channels
+            ),
+            Self::Lost { backend, attempts } => {
+                format!("lost {backend} not recovered in {attempts} attempts")
             }
             Self::Failed { backend, reason } => format!("failed {backend} {reason}"),
             Self::Unsupported => "unsupported".to_owned(),
@@ -130,24 +165,37 @@ mod tests {
     /// success, which is the exact failure this type exists to prevent.
     #[test]
     fn the_three_verdicts_are_distinguishable_non_empty_strings() {
-        let live = CaptureVerdict::Live {
+        let live = CaptureVerdict::live(SCK, FORMAT, "MacBook Pro Speakers").token();
+        let failed = CaptureVerdict::failed(SCK, "screen recording permission denied").token();
+        let lost = CaptureVerdict::Lost {
             backend: SCK,
-            format: FORMAT,
+            attempts: 3,
         }
         .token();
-        let failed = CaptureVerdict::failed(SCK, "screen recording permission denied").token();
         let unsupported = CaptureVerdict::Unsupported.token();
 
-        for token in [&live, &failed, &unsupported] {
+        for token in [&live, &failed, &lost, &unsupported] {
             assert!(!token.is_empty(), "an empty token says nothing: {token:?}");
         }
         assert_ne!(live, failed, "a failed capture reads as a live one");
         assert_ne!(live, unsupported);
         assert_ne!(failed, unsupported);
+        // The one this distinction is for: a run that had audio and lost it must
+        // not read as a run that never started.
+        assert_ne!(
+            lost, failed,
+            "a lost input reads as a start that never worked"
+        );
+        assert_ne!(lost, live);
+        assert_ne!(lost, unsupported);
 
-        // The live token carries the negotiated format, which is what a tester's
-        // "does it hear anything" question actually turns on.
-        assert_eq!(live, "live SCK 48000/2");
+        // The live token carries the negotiated format *and* the endpoint, which
+        // is what a tester's "what is it listening to" question turns on.
+        assert_eq!(live, "live SCK 48000/2 MacBook Pro Speakers");
+        assert!(
+            lost.contains('3'),
+            "the lost token drops how hard it tried: {lost:?}"
+        );
         assert!(
             failed.starts_with("failed SCK ") && failed.contains("permission denied"),
             "the failed token drops the reason: {failed:?}"
@@ -166,6 +214,19 @@ mod tests {
             "the token can corrupt a tab-separated row: {token:?}"
         );
         assert_eq!(token, "failed SCK start failed: code -3801 at SCStream");
+    }
+
+    /// **An endpoint name is driver-supplied**, so it goes through the same
+    /// sanitizer the error reason does — otherwise a device whose friendly name
+    /// carried a tab would widen the row rather than the field.
+    #[test]
+    fn an_endpoint_name_cannot_break_a_row_either() {
+        let token = CaptureVerdict::live(WASAPI, FORMAT, "Line\t(ZOOM\nAMS-22)").token();
+        assert!(
+            !token.contains('\t') && !token.contains('\n'),
+            "the endpoint can corrupt a tab-separated row: {token:?}"
+        );
+        assert_eq!(token, "live WASAPI 48000/2 Line (ZOOM AMS-22)");
     }
 
     /// An error that renders to nothing still names a failure, rather than

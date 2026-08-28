@@ -139,6 +139,17 @@ struct AppState {
     /// Held apart from `config.input` because a launch flag pins the run
     /// without writing itself into the file the operator keeps.
     input: config::Input,
+    /// Whether the running capture stream has reported itself dead and has not
+    /// been replaced by a live one since.
+    ///
+    /// Sticky across a failed reopen on purpose: the capture thread's flag goes
+    /// away with the handle, so a recovery attempt that fails would otherwise
+    /// read as "nothing wrong" on the next frame and spend the whole retry
+    /// budget on its first attempt.
+    input_lost: bool,
+    /// How many reopens the lost input has already cost, and whether the bound
+    /// has been announced.
+    input_recovery: RecoveryPolicy,
     /// The active endpoints of [`Self::input`]'s mode, `default` first, as the
     /// `Input device` row cycles them.
     ///
@@ -316,6 +327,8 @@ impl AppState {
             config,
             config_path,
             input,
+            input_lost: false,
+            input_recovery: RecoveryPolicy::default(),
             // Left empty until the settings modal is opened: a roster nothing is
             // reading is a COM enumeration paid for nothing, and every reader of
             // it is behind a keypress.
@@ -490,6 +503,7 @@ impl AppState {
     }
 
     fn redraw(&mut self) {
+        self.poll_input_lost();
         self.pump_audio();
 
         // Measure wall-clock dt for the scene director (shell frame pacing;
@@ -739,6 +753,12 @@ impl AppState {
         }
         self.consumer = started.consumer;
         self._capture = started.handle;
+        // A stream that is running is not a lost one, whoever asked for it. A
+        // start that *failed* leaves the flag as it was, so a recovery keeps its
+        // budget and a manual swap does not acquire one.
+        if self._capture.is_some() {
+            self.input_lost = false;
+        }
 
         // The selection is recorded even when the start failed: it is what the
         // operator asked for, so the row shows it and the next launch retries
@@ -748,6 +768,43 @@ impl AppState {
         self.save_config();
         eprintln!("audio input: {}", self.capture_token);
         self.window.request_redraw();
+    }
+
+    /// Observe the capture thread's lost flag and act on the recovery policy.
+    ///
+    /// One relaxed atomic load per frame in the common case, which is what buys
+    /// the whole mechanism. Recovery reopens the mode's **default** endpoint
+    /// rather than the named one: the named one is the device that just went
+    /// away, and asking for it again is the one request guaranteed to fail.
+    fn poll_input_lost(&mut self) {
+        if capture_lost(self._capture.as_ref()) {
+            self.input_lost = true;
+        }
+        match self.input_recovery.poll(self.input_lost) {
+            Recovery::Hold => {}
+            Recovery::Reopen(attempt) => {
+                eprintln!(
+                    "audio input lost; reopening the default {} endpoint \
+                     (attempt {attempt} of {INPUT_RECOVERY_ATTEMPTS})",
+                    self.input.mode.as_str()
+                );
+                self.restart_capture(&config::Input {
+                    mode: self.input.mode,
+                    device: DEFAULT_ENDPOINT.to_owned(),
+                });
+            }
+            Recovery::GiveUp => {
+                self.capture_token = CaptureVerdict::Lost {
+                    backend: CAPTURE_BACKEND,
+                    attempts: INPUT_RECOVERY_ATTEMPTS,
+                }
+                .token();
+                eprintln!(
+                    "audio input not recovered after {INPUT_RECOVERY_ATTEMPTS} attempts; \
+                     rendering without audio until the input is set again"
+                );
+            }
+        }
     }
 
     /// Switch the capture path (the `Input mode` row).
@@ -1317,6 +1374,85 @@ struct CaptureStart {
     verdict: CaptureVerdict,
 }
 
+/// How many times a lost input is reopened before the shell stops trying.
+///
+/// Each attempt is a synchronous WASAPI activation on the render thread — a
+/// visible hitch — and what is being guarded against is one of those per frame
+/// against an audio subsystem that is not coming back. Three covers the case the
+/// recovery exists for, a device that returns within a moment of a driver reset,
+/// without letting a permanently removed interface stutter the show for longer
+/// than the silence would have.
+const INPUT_RECOVERY_ATTEMPTS: u32 = 3;
+
+/// What the shell should do about the capture stream this frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Recovery {
+    /// Nothing: the stream is alive, or the bound is already spent and said so.
+    Hold,
+    /// Reopen on the mode's default endpoint; the payload is the 1-based attempt.
+    Reopen(u32),
+    /// The bound is spent. Emitted **once**, on the frame it runs out, so the
+    /// verdict is rewritten and the operator told exactly one time.
+    GiveUp,
+}
+
+/// The bounded-retry rule, as a value.
+///
+/// Pure and WASAPI-free: the shell hands it whether the input is lost and does
+/// what it says, which is what makes the bound assertable without an audio
+/// device to unplug.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct RecoveryPolicy {
+    attempts: u32,
+    announced: bool,
+}
+
+impl RecoveryPolicy {
+    /// Advance one frame.
+    fn poll(&mut self, lost: bool) -> Recovery {
+        if !lost {
+            // A live stream restores the full budget, so a device lost twice in
+            // one show gets a real second chance rather than the remainder of
+            // the first.
+            *self = Self::default();
+            return Recovery::Hold;
+        }
+        if self.attempts < INPUT_RECOVERY_ATTEMPTS {
+            self.attempts += 1;
+            return Recovery::Reopen(self.attempts);
+        }
+        if self.announced {
+            return Recovery::Hold;
+        }
+        self.announced = true;
+        Recovery::GiveUp
+    }
+}
+
+/// Whether the running capture stream has reported itself dead.
+///
+/// Only the Windows path reports it; elsewhere a stream is either running or was
+/// never started, and there is nothing to observe.
+#[cfg(windows)]
+fn capture_lost(handle: Option<&capture_handle::Handle>) -> bool {
+    handle.is_some_and(capture_win::CaptureHandle::lost)
+}
+
+#[cfg(not(windows))]
+fn capture_lost(_handle: Option<&capture_handle::Handle>) -> bool {
+    false
+}
+
+/// The short name of this platform's capture path, as the verdict token carries
+/// it. One constant so the live, failed and lost tokens of a run cannot name
+/// three different backends.
+#[cfg(windows)]
+const CAPTURE_BACKEND: &str = "WASAPI";
+#[cfg(target_os = "macos")]
+const CAPTURE_BACKEND: &str = "SCK";
+#[cfg(not(any(windows, target_os = "macos")))]
+const CAPTURE_BACKEND: &str = "none";
+
 /// The device name that means "the mode's default endpoint" — the value
 /// `config.toml` ships with, the word `pick_device` treats as "no name to
 /// match", and the leading entry of the settings menu's endpoint roster.
@@ -1363,14 +1499,12 @@ fn start_capture(input: &config::Input) -> CaptureStart {
     match capture_win::start(&selector) {
         Ok((handle, consumer)) => {
             let format = handle.format();
+            let verdict = CaptureVerdict::live(CAPTURE_BACKEND, format, handle.device());
             CaptureStart {
                 handle: Some(handle),
                 consumer: Some(consumer),
                 format,
-                verdict: CaptureVerdict::Live {
-                    backend: "WASAPI",
-                    format,
-                },
+                verdict,
             }
         }
         Err(err) => {
@@ -1381,7 +1515,7 @@ fn start_capture(input: &config::Input) -> CaptureStart {
                 handle: None,
                 consumer: None,
                 format: FALLBACK_FORMAT,
-                verdict: CaptureVerdict::failed("WASAPI", err),
+                verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
             }
         }
     }
@@ -1392,14 +1526,14 @@ fn start_capture(_input: &config::Input) -> CaptureStart {
     match capture_mac::start() {
         Ok((handle, consumer)) => {
             let format = handle.format();
+            // ScreenCaptureKit taps the system mix rather than an endpoint the
+            // caller picks, so there is no device name to report.
+            let verdict = CaptureVerdict::live(CAPTURE_BACKEND, format, "system audio");
             CaptureStart {
                 handle: Some(handle),
                 consumer: Some(consumer),
                 format,
-                verdict: CaptureVerdict::Live {
-                    backend: "SCK",
-                    format,
-                },
+                verdict,
             }
         }
         Err(err) => {
@@ -1408,7 +1542,7 @@ fn start_capture(_input: &config::Input) -> CaptureStart {
                 handle: None,
                 consumer: None,
                 format: FALLBACK_FORMAT,
-                verdict: CaptureVerdict::failed("SCK", err),
+                verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
             }
         }
     }
@@ -1988,8 +2122,62 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        InputSource, Modal, config, parse_input_args_from, preset_name_visible, resolve_input,
+        INPUT_RECOVERY_ATTEMPTS, InputSource, Modal, Recovery, RecoveryPolicy, config,
+        parse_input_args_from, preset_name_visible, resolve_input,
     };
+
+    /// **A live input costs nothing and never reopens.** The policy runs every
+    /// frame of every show, so the overwhelmingly common answer has to be `Hold`.
+    #[test]
+    fn a_live_input_is_never_reopened() {
+        let mut policy = RecoveryPolicy::default();
+        for _ in 0..1000 {
+            assert_eq!(policy.poll(false), Recovery::Hold);
+        }
+        assert_eq!(policy, RecoveryPolicy::default(), "a live input kept state");
+    }
+
+    /// **The retry is bounded and then silent.** An unbounded retry is a
+    /// blocking device activation per frame against a subsystem that is not
+    /// coming back, which stutters the show worse than the silence does — and
+    /// `GiveUp` arrives exactly once, so neither the operator nor the verdict is
+    /// told the same thing on every subsequent frame.
+    #[test]
+    fn a_lost_input_reopens_a_bounded_number_of_times_then_gives_up_once() {
+        let mut policy = RecoveryPolicy::default();
+        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+            assert_eq!(
+                policy.poll(true),
+                Recovery::Reopen(attempt),
+                "attempt {attempt} did not reopen"
+            );
+        }
+        assert_eq!(policy.poll(true), Recovery::GiveUp);
+        for _ in 0..500 {
+            assert_eq!(
+                policy.poll(true),
+                Recovery::Hold,
+                "the policy kept talking after it gave up"
+            );
+        }
+    }
+
+    /// **A recovered input gets its whole budget back.** An interface unplugged
+    /// twice in one show is two incidents, not one long one, so the second must
+    /// not inherit the remainder of the first.
+    #[test]
+    fn a_recovery_restores_the_full_budget() {
+        let mut policy = RecoveryPolicy::default();
+        assert_eq!(policy.poll(true), Recovery::Reopen(1));
+        assert_eq!(policy.poll(true), Recovery::Reopen(2));
+        // The reopen worked: the next frame sees a live stream.
+        assert_eq!(policy.poll(false), Recovery::Hold);
+
+        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+            assert_eq!(policy.poll(true), Recovery::Reopen(attempt));
+        }
+        assert_eq!(policy.poll(true), Recovery::GiveUp);
+    }
 
     /// Both spellings of both flags, and the fact that an absent flag stays
     /// absent rather than resolving to a default value here — the resolver, not

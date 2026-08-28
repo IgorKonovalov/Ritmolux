@@ -316,8 +316,8 @@ struct CaptureHandle {
 |---|---|---|---|
 | 1 — endpoint roster as a value, flags over config | dev | done | `9005a8d` |
 | 2 — the two rows in the pure state machine | dev | done | `7eee5f0` |
-| 3 — the shell swaps capture live | dev | done | committed with this row |
-| 4 — a dead input reports itself | dev | not started | |
+| 3 — the shell swaps capture live | dev | done | `dd8fbf3` |
+| 4 — a dead input reports itself | dev | done | committed with this row |
 | 5 — on-device gate | human | not started | |
 
 ### Notes
@@ -343,3 +343,26 @@ struct CaptureHandle {
 - `--input` and `--device` override **field by field** (`--device` alone keeps the configured
   mode). The plan's done-when pins only the both-flags case; the per-field rule is documented in
   `README.md` and asserted in `the_flags_override_the_config_field_by_field`.
+- Phase 4 widened the capture token to satisfy "the token names the endpoint actually running":
+  `CaptureVerdict::Live` gained an `endpoint` field, fed by a friendly name `capture_win` now reads
+  at setup and carries on the handle, so a row reads `live WASAPI 48000/2 Speakers (Realtek(R)
+  Audio)`. That is a format change to the `diagnostics.log` `capture` column.
+- Phase 4 added a fourth verdict, `CaptureVerdict::Lost`, for "lost and not recovered" — `Failed`
+  is a start that never worked, and the done-when distinguishes them.
+- Those two forced three files no phase lists: `standalone/src/diaglog.rs` (its live-capture test
+  asserts the token verbatim), `docs/on-device-validation.md` and both
+  `packaging/*/READ-ME-FIRST.md`, which quote the old token to a tester.
+- Phase 5's on-device gate is untouched and none of its four bullets is covered here.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none — the header carries no `Closes:` line.
+- **What shipped:** feature.
+- **Operator docs touched:** `README.md` (the `S` row, and `--input` / `--device` beside `--tier`),
+  `docs/on-device-validation.md` (the F3 `audio` line), plus `packaging/windows/READ-ME-FIRST.md`
+  and `packaging/macos/READ-ME-FIRST.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 101 reductions hold across
+  51 live entries. Advisory only: entry 0032, which Phase 5's fourth bullet is the stated trigger
+  for, is among the 49 whose probed paths moved since their stamp.
+- **Outstanding `human` phases:** Phase 5 — swap it, unplug it, plug it back, and the 96 kHz read.

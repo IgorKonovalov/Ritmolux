@@ -27,10 +27,12 @@ If the visuals move but never react to the beat, they are running on the idle
 animation because no audio reached the app. The app says why:
 
   - Press F3. Under the diagnostics panel there is a line starting with
-    "audio". If it reads "live WASAPI 48000/2" then sound is reaching the app,
-    so check that something is playing and that it is playing out of the device
-    Windows has selected as default output. If it reads "failed WASAPI ..."
-    then the rest of that line is the reason.
+    "audio". If it starts with "live WASAPI" then sound is reaching the app -
+    the rest of the line is the format and the device it is listening to, so
+    check that something is playing and that it is playing out of that device.
+    If it reads "failed WASAPI ..." then the rest of that line is the reason.
+    If it reads "lost WASAPI ..." the input went away mid-run and could not be
+    reopened; pick one again from the S menu's Input rows.
 
   - Or open diagnostics.log (section 4, below). Its last column is named
     "capture" and carries the same sentence on every row.
