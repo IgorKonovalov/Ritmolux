@@ -304,6 +304,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0096 | `shape_field` draws offset contours, and the reference construction everyone reaches for is scaled copies | [ADR-0111](adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md) + [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phases 2-4, as `coord_mode`. **Closed 2026-08-27** |
 | 0097 | A curved or jittered `star` returns a NEGATIVE normalized distance at its own centre | [Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1. The reference was repaired, not the result clamped. **Closed 2026-08-27** |
 
+| 0145 | The `animation` gate thresholds silent motion only, so a world alive only on the music fails it | [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 1-2; see 0152. **Closed 2026-08-28** |
+| 0147 | No latch: a gate cannot be armed on time and fired on the music (2nd instance) | [ADR-0137](adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 3-6, as `[latch]`. **Closed 2026-08-28** |
+| 0148 | A hard-ink palette cannot reach any additive scene, confining limited ink to 4 of 12 systems | [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, as `stroke_blend`; see 0153. **Closed 2026-08-28** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3288,73 +3291,6 @@ has already spent a plan on an arm whose stated contract and actual behaviour di
 
 ---
 
-## 0145 — the `animation` gate thresholds silent motion only, so a world whose liveliness is audio-driven fails it however alive it is
-
-> **PROMOTED 2026-08-27** to [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md) +
-> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 1-2, which take the disjunction over this
-> gate's own statistic, the printed branch, and `collage_mono`'s sway back down. Stays live until that
-> plan closes.
-
-`core/tests/animation.rs` captures frames 24 and 48 against `AnalysisFrame::default()` and fails
-anything under `ANIM_FLOOR = 0.01`. That is deliberate and the module header says so — *"Silent
-audio is used deliberately, the motion under test is the shared scene clock, not an audio edge"* —
-and it was correct for every world the library held when it was written, because autonomous motion
-and liveliness were the same property in all of them. They are not the same property any more.
-
-`collage_mono` is the counterexample: a poster that sits still on purpose and does nearly all its
-moving in response to the music. It measured **0.0025**, a quarter of the floor, while passing
-`reactivity` — the one gate that drives real PCM through the real analyzer (Plan 0067 Phase 1) —
-without trouble. The gate is not reading the preset as broken; it is reading a question the preset
-deliberately answers no to.
-
-- **Raised:** 2026-08-27, by the content lane, shipping `collage_mono`. **Impact: structural** —
-  every future preset whose liveliness is audio-driven has to add motion it does not want.
-- **What actually shipped is the workaround.** `pan_x`/`pan_y` rates went `0.07/0.09` -> `0.70/0.78`,
-  an 11 s sway in place of a 90 s one, added for the measurement rather than for the picture. The
-  preset header states this in full.
-- **The obvious lever is a dud, and the lane measured it rather than assuming.** `drift`
-  `0.55 -> 1.60 -> 2.50` and `spin` `0.30 -> 1.00 -> 1.60` leave the statistic at `0.002`,
-  unchanged, because both multiply each element's own seeded velocity and 0.4 s of that is nothing.
-  Only a whole-canvas motion moves the number. A scale breath reaches `0.009`-`0.011` but pulses the
-  composition's size; the pan sway reaches `0.012` without touching it.
-- **Verified 2026-08-27** — the capture is at silence:
-  `present: let audio = AnalysisFrame::default\(\); in: core/tests/animation.rs`
-- **Verified 2026-08-27** — and the floor it is thresholded against:
-  `present: const ANIM_FLOOR: f32 = 0\.01; in: core/tests/animation.rs`
-- **Verified 2026-08-27** — the shipped workaround names the gate it is paying:
-  `present: THE SWAY IS WHAT MAKES THIS WORLD PASS in: presets/collage_mono.toml`
-
-### What a fix looks like, and why it is cheaper than it sounds
-
-**The driven half already exists and is already thresholded.** `reactivity.rs` runs four PCM stimuli
-through the analyzer and fails a preset whose best band moves less than `REACTIVITY_FLOOR = 0.02`.
-So the question *"is this preset dead"* is already answered twice, once per half, and the two gates
-disagree about `collage_mono` only because `animation` asks its half in isolation. The candidate
-repair is to make `animation`'s verdict a disjunction — clears the silent floor **or** clears the
-driven one — which needs no new capture, no new statistic and no new threshold.
-
-**[ADR-0134](adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) is
-adjacent and does not forbid this**, but the reader has to see why. That ADR landed `drive` and
-`rate` as printed readings and said explicitly that neither may be a gate. Its argument is about
-**ordering** — anchoring means a higher `rate` does not mean a worse preset, so no threshold on it
-ranks the library. A disjunction does not order anything; it asks whether a preset is frozen in
-*both* readings, which is the one question about motion this project has always been willing to
-gate. That distinction is exactly what an ADR would have to state, because the surface reading of
-0134 is that the driven column is off limits.
-
-**The counter-argument is real and belongs in the same ADR.** A world that moves only on audio
-renders as a still image in silence, and the gate as written is the only thing that says so. The
-honest form of the disjunction probably keeps that visible — a preset passing on the driven branch
-alone is a *category*, not an exemption, and should print as one.
-
-### Priority
-
-**Medium-high**, and higher than its one motivating preset suggests. The cohort this came from is
-built on stillness, so the next presets of the same family hit the same wall, and the cost of not
-fixing it is paid in motion nobody wanted rather than in a red gate anyone would notice.
-
----
-
 ## 0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field
 
 The palette coordinate in `warp_mesh` is the **deposit angle**: the deposit shader computes
@@ -3396,99 +3332,6 @@ small enough to fold into someone else's plan.
 **Medium.** It closes a system to a palette class rather than breaking anything that ships, and the
 cohort has four systems that do work. It rises if `warp_mesh` is wanted for a limited-ink world
 specifically, because nothing else in the engine makes a decay contour.
-
----
-
-## 0147 — no latch: a gate cannot be armed on time and fired on the music (re-raise, second independent instance)
-
-> **PROMOTED 2026-08-27** to [ADR-0137](adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) +
-> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 3-6, which take the `[latch]` table with
-> render-layer state and load-time slot resolution. Stays live until that plan closes.
-
-The expression evaluator is pure by hard invariant and `[smoothing]` eases without holding, so there
-is no way to say *"fire once per window, on the music."* `min(mod(time, 100) > 60, onset > 0.6)` is
-an AND, and an edge-triggered binding re-fires on every onset inside the window rather than on the
-first one.
-
-- **Raised:** 2026-08-27, wanting `collage_mono` to recompose on the first strong onset after ~90 s
-  — rare, but landing on a musical moment. **This is a re-raise, not a new gap**, and it is filed
-  because the demand is now measured twice: the standing entry lives in the `preset-author` skill's
-  own `references/api-feedback.md`, and the first instance was the per-object state in archived 0034.
-- **What shipped instead:** `recompose = "mod(time + 50, 100) < 50"` — exactly one rise per 100 s,
-  deliberately metronomic and disconnected from the music. The preset header argues the choice
-  honestly (a `hash(beat_index) > 0.9` gate fires every 3-10 s, because `beat_index` counts onset
-  detections rather than musical beats), which is why the wall clock won; it does not make the wall
-  clock what the look wanted.
-- **Why it is filed here rather than left in the skill's list.** That list is the content lane's
-  private reference; nothing re-runs it, nothing indexes it, and the lane's own instructions send a
-  raiser to *this* file first. A gap that has now been felt twice belongs where the close ceremony
-  will keep tripping over it.
-- **Verified 2026-08-27** — the purity invariant that forbids it is stated in the evaluator:
-  `present: expressions are pure in: core/src/preset/expr.rs`
-- **Verified 2026-08-27** — the metronomic workaround is what shipped:
-  `present: "mod\(time \+ 50, 100\) < 50" in: presets/collage_mono.toml`
-
-### Priority
-
-**Medium, and the design cost is the whole of it.** The feature is one accumulator; the decision is
-whether per-frame state may exist in a grammar whose purity is load-bearing for determinism
-(`CLAUDE.md`, NFR section 6). A latch seeded only by analysis variables and the frame clock is still
-reproducible frame-for-frame from the same input window, so the invariant may survive a narrow
-version of this — but "may" is exactly the kind of claim that wants an ADR rather than a commit.
-
----
-
-## 0148 — a hard-ink palette cannot reach any additive scene, so the limited-ink class is confined to 4 of 12 systems
-
-> **PROMOTED 2026-08-27** to [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) +
-> [Plan 0123](plans/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, which take the class at the draw seam,
-> the line family's blend selector and the enumeration of intermediate-value stages. Stays live until that
-> plan closes.
-
-Every line and particle scene draws additively and overlaps itself, so white over red sums to pink
-and a palette's flat plateaus are gone before the frame is composited. The mono ink set survives
-only where colour is resolved per-pixel each frame (`fragment_field`, `shape_field`,
-`reaction_diffusion`) or painted opaque (`shape_collage`) — four of the twelve systems.
-
-- **Raised:** 2026-08-27, wanting the mono ink set on a line world (a Maurer rose in black, white
-  and red). **Impact:** structural confinement of a whole palette class, not a defect in any
-  preset.
-- **Same family as 0140, one level up.** That entry is about `palette_contour` being the only source
-  of intermediate values in a two-ink print; this is the broader version, where the blend mode is.
-- **Verified 2026-08-27** — the shared line renderer's default seam is additive:
-  `present: crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE in: core/src/render/scenes/lines/renderer.rs`
-- **Verified 2026-08-27** — `unprobeable: "the mono set survives on exactly these four systems" is a
-  judgement about rendered colour, not a claim about repo contents.`
-
-### The mechanism is already built for the line family, and that changes the cost
-
-`LineRenderer` already carries **two** pipelines differing in exactly one field, and `draw_split`
-already composites its second range as premultiplied OVER rather than additive — built at Plan 0100
-Phase 4 so a MilkDrop waveform at `wave_a = 0.1` replaces a tenth of what is under it. It has
-exactly one caller, `warp_mesh`, and no preset-reachable selector. So for the four line systems the
-question is not *"can this engine draw an opaque stroke"* — it can, today — but whether a per-scene
-blend selector is a supported parameter. That is much the smaller half of this entry.
-
-- **Verified 2026-08-27** — the OVER pipeline exists and has one caller:
-  `present: res\.lines\.draw_split\( in: core/src/render/scenes/warp_mesh/mod.rs`
-
-The particle and compute systems are a separate problem with a separate renderer, and nothing
-comparable is already sitting there.
-
-### The decision this is really asking for
-
-Whether **limited-ink is a supported palette class with an invariant** ("a preset declaring N inks
-renders in exactly N colours") or an emergent trick that happens to work on four scenes. Today it is
-the second, and the whole mono cohort is built on it. The first would be a real contract with a real
-gate behind it and would tell every future scene what it owes; it would also convict
-`palette_contour` (0140) immediately, which is a feature of the question rather than an objection
-to it.
-
-### Priority
-
-**Medium.** The cohort ships and looks right on the four systems it reaches, so nothing is blocked
-today. What is being spent is optionality: every new scene is built additive by default, so the
-confined fraction grows on its own.
 
 ---
 
@@ -3640,3 +3483,260 @@ sentence again, and the site with no copy is the one it predicts.
 bad `dt`, which is why it survived a plan whose whole subject was these accumulators. It is filed at
 this size because the cost of the repair only grows: `Phase` is now the engine's one rate mechanism,
 so every rate added after this inherits whichever answer is not chosen.
+
+## 0151 — the driven floor's sharpest non-vacuity probe is printed and never asserted, and it is the only one that separates "measures the music" from "measures nothing"
+
+> **Filed 2026-08-28** at the Plan 0123 Mode 4 review, from reading `DRIVEN_FLOOR`'s own derivation
+> against the test file under it.
+
+`core/tests/animation.rs`'s `DRIVEN_FLOOR` doc comment closes its derivation with a non-vacuity pair
+and the sentence *"Both are pinned as standing tests below."* One of the two is pinned.
+`probe_collage_mono_calm` has its own test — `the_driven_branch_carries_the_world_that_is_still_by_design`
+asserts it fails the silent floor and clears the driven one. `rosette_spin_only` has nothing:
+`the_footprint_statistic_separates_the_rejected_draft_from_the_static_control` matches only
+`squall_sparse` and `star_frozen` in its `match *label`, so the rosette's readings are **printed and
+discarded**.
+
+**Why this is the probe that matters, and not an interchangeable second zero.** Measured 2026-08-28
+on the DX12 software adapter:
+
+| probe | silent | driven |
+|---|---|---|
+| `star_frozen` (the pinned control) | 0.0000 | 0.0000 |
+| `rosette_spin_only` (unpinned) | **0.4167** | **0.0000** |
+
+`star_frozen` is frozen in both readings, so its driven zero is consistent with *any* broken driven
+statistic — one that measures nothing at all would satisfy it exactly as well as the correct one
+does. `rosette_spin_only` turns steadily on its own clock and binds no band, so it is the single
+probe in the file that says the driven reading responds to **the music** rather than to motion: a
+figure moving hard at 0.4167 silent must still read 0.0000 driven. If a future edit let autonomous
+motion leak into the driven differential, `star_frozen` would not notice and this one would.
+
+**Impact:** low blast radius, high value per line. The gate is currently correct — this is a missing
+assertion behind a comment that claims it exists, which is the shape that survives review precisely
+because the comment reads like coverage.
+
+**What a fix looks like:** one `match` arm and one assertion, beside the two already there —
+`rosette.driven < DRIVEN_FLOOR` with a message naming what a failure would mean. The silent half
+wants asserting too (`>= ANIM_FLOOR`), so the probe cannot quietly stop moving and make the driven
+zero vacuous. Then the comment's "both" is true.
+
+- **Verified 2026-08-28** — the probe is in the roster: `present: rosette_spin_only in: core/tests/animation.rs`
+- **Verified 2026-08-28** — and nothing asserts on it: `absent: rosette\.driven in: core/tests/animation.rs`
+
+## 0152 — a disjunctive gate made "the shipped library's minimum" ambiguous, and `ANIM_FLOOR`'s recorded derivation still reads as though there were one population
+
+> **Filed 2026-08-28** at the Plan 0123 Mode 4 review. Raised by `dev` in that plan's implementation
+> log as a stale number and left for the close; re-measured here, where it turns out to be an
+> ambiguity rather than staleness. See archived 0145 and
+> [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md)'s Outcome.
+
+`ANIM_FLOOR`'s doc comment in `core/tests/animation.rs` derives the floor per ADR-0071: *"The shipped
+library's minimum under the new statistic is 0.0205 (`Banded Mandala`) ... The floor sits at half the
+shipped minimum ... Slack 2.05x."* That derivation was written when the gate had one branch, and
+ADR-0136 gave it two without revisiting it. The phrase now has three defensible readings, measured
+2026-08-28 over all 54 shipped presets on the DX12 software adapter, backdrops suppressed:
+
+| reading | value | preset |
+|---|---|---|
+| the literal library minimum | **0.0025** | `Collage Mono` — passes on the driven branch |
+| the minimum among presets that pass the **silent** branch | **0.0201** | `On White` |
+| what the comment names | 0.0205 | `Banded Mandala` — no longer the minimum of either |
+
+**The floor is not wrong and this is not a correctness bug.** `0.01` sits under 0.0201 with 2.01x
+slack, which is the 2.05x the comment claims to within the rounding. What is wrong is the
+*statement*: a reader re-deriving from the printed sweep — which is exactly what the comment
+instructs, *"a new library minimum is re-derived from the printed numbers, not nudged until green"* —
+now reads 0.0025 off the top of the sorted output and would halve the floor to 0.00125, admitting
+ADR-0091's `1/139 = 0.0072` one-pixel flicker that the same comment's noise-ceiling paragraph exists
+to exclude. The instruction and the arithmetic disagree, and only prose stands between them.
+
+**Impact:** the failure is a future floor derived correctly by procedure and wrong by two orders of
+magnitude, on the gate whose whole job is catching frozen scenes. It also generalizes: `DRIVEN_FLOOR`
+inherited the same phrasing and is currently unambiguous only by luck, because no shipped preset yet
+sits below it on the branch it gates.
+
+**What a fix looks like:** name the population in both derivations — *"the minimum among presets that
+pass this branch"* — and say why the other branch's presets are excluded from it. One sentence each,
+plus the re-measured number and preset. No constant moves.
+
+- **Verified 2026-08-28** — the stale number is still the one the comment names: `present: 0\.0205 in: core/tests/animation.rs`
+- **Verified 2026-08-28** — and no derivation names its population: `absent: minimum among presets that pass in: core/tests/animation.rs`
+
+## 0153 — the palette consumes its stops as linear light, and `preset-palettes.md` presents the resulting shift as unavoidable when below the tonemap knee the author can correct it exactly
+
+> **Filed 2026-08-28** at the Plan 0123 Mode 4 review, from the `preset-author` finding in that
+> plan's implementation log (Phase 9), which routes the entry here because the content lane does not
+> edit this file. See [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)'s
+> Outcome and archived 0148.
+
+`LUT_TEXTURE_FORMAT` is `Rgba8Unorm` and `core/src/render/palette.rs` records that the entries are
+used as colour directly, *"no perceptual/gamma management; that is deferred, ADR-0021 Alt E"*. So a
+stop written as ordinary sRGB hex is consumed as **linear** light and the display encode lifts it.
+Measured at Plan 0123 Phase 9:
+
+| stop written | renders as |
+|---|---|
+| `#c81423` | `#dd4c64` — green channel nearly quadrupled, the ink arrives coral |
+| `#930204` (the sRGB-to-linear value of `#c81423`) | `#c81622` — within 2/255 of the colour named |
+
+This is also why `collage_mono`'s `#b00808` arrives as `#d63131`; Phase 8's measurement recorded that
+shift without naming its cause.
+
+**Two separable halves, and the second is worth having whatever the first decides.**
+
+1. **Is the deferral still right?** ADR-0021 Alt E deferred perceptual/gamma management deliberately,
+   and reversing it re-bases every shipped palette in the library — the same class of change
+   ADR-0126 and Plan 0116 had to absorb. That is a real design question and is **not** being asserted
+   here as a defect.
+2. **The page is wrong either way.** `docs/preset-palettes.md`'s Remaps section tells a limited-ink
+   author that *"a limited-ink frame's plateaus almost never carry the palette's literal RGB, and
+   that is fine."* Below the tonemap knee at linear `0.6` the curve is exactly the identity, so the
+   shift there is **not** unavoidable — it is exactly correctable by pre-converting the stop, as the
+   measurement above shows. The page as written tells an author to give up on something they can
+   fix, in the one section aimed at authors who care about exact inks.
+
+**Impact:** the second half misleads precisely the audience the limited-ink class was added for, and
+it shipped in the same plan that added the class. The first half is a standing question about a
+deferral, not a bug.
+
+**What a fix looks like:** for the second half, one paragraph in the Remaps section giving the
+mechanism and the recipe (pre-convert the stop; valid below the knee; above it the channels scale
+together and the plateau survives anyway). For the first, an ADR that either re-affirms ADR-0021
+Alt E with this cost written down or supersedes it with a migration for the shipped palettes.
+
+- **Verified 2026-08-28** — the deferral is still recorded in the code: `present: no perceptual/gamma management in: core/src/render/palette.rs`
+- **Verified 2026-08-28** — and the page still tells the author it is unavoidable: `present: plateaus almost never carry in: docs/preset-palettes.md`
+
+## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review, from that plan's own Phase 5 log — an
+> observation the plan reported honestly, claimed no mechanism for, and had nowhere to leave.
+
+Before Plan 0130 `capture_win::start` ran **once per process**. It now runs on every input swap and
+on every recovery attempt, and each run spawns a thread that does `CoInitializeEx(MULTITHREADED)`,
+`CoCreateInstance(MMDeviceEnumerator)`, `CoUninitialize`, and exits. Under menu-speed churn on the
+development box, **one swap in 22 failed** at that `CoCreateInstance` with
+`REGDB_E_CLASSNOTREG (0x80040154)`.
+
+**What is and is not claimed.** The shell degraded exactly as designed — the reason printed, the
+verdict read `failed WASAPI … Class not registered`, rendering continued, and the next swap came
+back live. No mechanism is claimed: the apartment-churn reading is untested, one run on one box is
+not evidence for a cause, and 1-in-22 is a single sample, not a rate.
+
+**Why it is worth an entry rather than a note.** `poll_input_lost` reopens up to
+`INPUT_RECOVERY_ATTEMPTS` times on **consecutive frames** — the fastest thread-spawn churn the design
+can produce, and faster than the churn that drew the error. The budget exists to bound COM
+activations against a device that is not coming back; it cannot distinguish an activation that
+failed *for its own reasons* from one that failed *because the endpoint is gone*, so a real loss
+whose reopens drew this error would spend all three attempts on the wrong failure and write a
+`lost …` verdict about a device that was fine. That is the one path where this turns a transient
+into a wrong answer, and it is also the path
+[`docs/on-device-validation.md`](on-device-validation.md)'s unplug item says has never run.
+
+**Impact:** low frequency, narrow blast radius, and invisible while swaps stay operator-paced. It
+matters only where the design already churns fastest, which is the recovery path.
+
+**What a fix looks like** — three shapes, cheapest first, and picking between them wants the unplug
+evidence rather than more reasoning:
+
+1. **Retry the activation once, in place**, before charging the attempt to the recovery budget. A
+   class-registration failure is not a statement about the endpoint, so it should not spend a
+   budget that is counting statements about the endpoint.
+2. **Keep one long-lived enumerator on the render thread** rather than creating one per stream
+   start. `MMDeviceEnumerator` is a Both-model object and `ComScope` already handles the STA the
+   render thread lives in, so `endpoints()` has the pattern; `setup_stream` creates its own because
+   it runs on the capture thread.
+3. **Separate the two failure classes in the verdict**, so `failed … Class not registered` and
+   `lost …` never read as the same conclusion about the device.
+
+- **Verified 2026-08-28** — a fresh COM object is still created per stream start, on the capture
+  thread: `present: CoCreateInstance in: standalone/src/capture_win.rs`
+- **Verified 2026-08-28** — and nothing anywhere distinguishes this failure class from a dead
+  endpoint: `absent: REGDB in: standalone/src`
+- **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
+  `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/main.rs`
+
+## 0155 — the input-recovery settle window is counted in frames, so the flap it guards against is bounded on a 60 Hz display and unbounded on a 240 Hz one
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`INPUT_RECOVERY_SETTLE_FRAMES = 60` (`standalone/src/main.rs`) decides when a recovered input has
+proved it is delivering and may have its retry budget back. The property it buys is real and its
+own tests pin it: a stream that opens and dies immediately must not restore three attempts every
+cycle and reopen for the rest of the show, because that is the per-frame blocking device activation
+`INPUT_RECOVERY_ATTEMPTS` exists to prevent, reached by a different road.
+
+The property is stated in **frames**, and this app does not run at a fixed frame rate. The window it
+actually buys spans
+
+| refresh | window |
+|---|---|
+| 30 Hz | ~2 s |
+| 60 Hz | ~1 s |
+| 165 Hz (the dev box's own reference baseline) | ~360 ms |
+| 240 Hz | ~250 ms |
+
+so a flapping endpoint whose open-to-death cycle lands between those figures is bounded on one
+display and unbounded on another — and the machine the constant was written on is at the fast end,
+where a reader assuming "about a second" is wrong by nearly 3x.
+
+**This project already decided this question once.** Plan 0014 retired `SCENE_DT` for an injected
+real `dt` precisely so behaviour would be identical on every device, and the standalone's `redraw`
+computes that `dt` eleven lines below the `poll_input_lost()` call that runs the policy. A seconds
+window is available at the call site for the cost of threading one `f32` into `RecoveryPolicy::poll`.
+
+**Impact:** low. The comment's own floor argument — an invalidated endpoint reports itself on the
+first packet call after start, well inside any of these windows — means the margin is generous
+everywhere; what is wrong is that the guarantee is not the same guarantee on two machines.
+
+**What a fix looks like:** `poll(lost, dt)` accumulating seconds against an
+`INPUT_RECOVERY_SETTLE_SECS`, and the existing settle test asserting the window from both sides in
+seconds. If a frame count is deliberate instead, the comment should say the window is
+refresh-rate-dependent and name the range, so the next reader is not misled by the round number.
+
+- **Verified 2026-08-28** — the window is still a frame count: `present: INPUT_RECOVERY_SETTLE_FRAMES in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and it is still described as one, with no refresh-rate caveat: `present: Consecutive live frames in: standalone/src/main.rs`
+
+## 0156 — after a give-up, a fresh loss inside the settle window rewrites no surface, so the capture verdict says `live` while nothing is delivering
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`RecoveryPolicy` keeps `announced` and a spent `attempts` for `INPUT_RECOVERY_SETTLE_FRAMES` frames
+after a recovery, which is deliberate and named in that constant's comment: *"a genuine second
+unplug within the window inherits the first incident's remaining budget instead of a full one."*
+What the comment does not name is that the inherited state also silences the **verdict**.
+
+The sequence: three failed reopens spend the budget, `Recovery::GiveUp` writes `CaptureVerdict::Lost`
+and sets `announced`. The operator picks a working input from the `S` menu; `restart_capture` clears
+`self.input_lost` and writes a `live …` token, but leaves the policy spent. If that stream dies
+inside the window, `poll(true)` finds `attempts` at the bound and `announced` already true, and
+returns `Recovery::Hold` — no reopen, which is the accepted half, **and no token rewrite**, which is
+not. `diagnostics.log`'s `capture` column and the F3 overlay both keep reading `live WASAPI …`.
+
+**Why that is the wrong half to inherit.** The `Lost` variant was added by Plan 0130 for exactly one
+job: distinguishing a run that had audio and lost it from a start that never worked, so a remote
+tester's log cannot read silence as success. This is the single path where the verdict states the
+opposite of what is happening, and it is reachable only after the recovery has already proved the
+input is unreliable — the run most likely to be the one someone is reading the log about.
+
+**Impact:** narrow (it needs a give-up, then a successful manual swap, then a death inside the
+window) but the failure is a surface that lies, which is the class Plan 0083 built `CaptureVerdict`
+to prevent.
+
+**What a fix looks like:** either reset the policy on a `Persist::Yes` restart — an operator
+choosing an input is a new incident by definition, and it is the one restart that carries an
+explicit human judgement that the situation changed — or have the `Hold`-while-lost arm still write
+the `Lost` token once. The first is one line and also removes the surprise that a manual swap does
+not restore the retry budget.
+
+**Two comment corrections in the same file, cheap enough to ride along.** Neither is behavioural.
+`restart_capture`'s *"it is what was asked for, so the row shows it"* is true of the `Input mode`
+row and false of `Input device`: a failed start leaves `capture_endpoint` as `None`, so
+`device_row_index` returns the roster's leading slot and the row reads `default` while
+`self.input.device` still holds the endpoint the operator picked. And `settings.rs`'s new header
+calls `Tier` and `InputMode` *"two config enums"*; `Tier` is `lmv_core::render::Tier`, a core type a
+config key happens to name.
+
+- **Verified 2026-08-28** — the give-up latch is still what silences the arm: `present: self.announced in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and the operator-initiated restart still does not reset the policy: `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`

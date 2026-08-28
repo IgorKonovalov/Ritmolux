@@ -314,12 +314,12 @@ preset folder — so while you are editing a file it re-rolls on each save.
 |-------------------|--------------------------------------------------------------------------|
 | `fragment_field`  | `warp` `field_speed` `fold_speed` `hue` `zoom` `glow` `flash` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `swarm`           | `force` `spin` `burst` `reseed` `field_freq` `hue` `brightness` `size` `size_spread` `twinkle` `shape` `points` `star_valley` `star_curve` `star_jitter` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
-| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `softness` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `parametric_curve`| `n` `d` `phase` `samples` `thickness` `softness` `stroke_blend` `hue` `spin` `scale` `radial_offset` `brightness` `glow` `draw_progress` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `lsystem`         | `visible_depth` `rotation` `hue` `draw_progress` `thickness` `softness` `stroke_blend` `scale` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `star_pattern`    | `variant` `rotation` `hue` `draw_progress` `thickness` `softness` `stroke_blend` `scale` `brightness` `glow` `ring_phase` `ring_spread` `ring_scale` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `reaction_diffusion` | `feed` `kill` `flow` `inject` `hue` `contour` `hatch` `glow` · `zoom` `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `attractor`       | `a` `b` `c` `d` `tuple` `size` `hue` `brightness` `fade` `reseed` `spin` `perspective` `depth_fade` `depth_hue` `morph` `curl` `vigor` `lean` `bias` `map_tint` `map_hue` `root_tint` `root_hue` `emergence` · `zoom` `pan_x` `pan_y` · `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
-| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
+| `spectrum`        | `base` `scale` `curve` `span` `baseline` `radius` `rotation` `thickness` `softness` `stroke_blend` `hue` `brightness` `glow` · `zoom` `pan_x` `pan_y` `mirror_order` `mirror_reflect` · `saturation` `hue_spread` `palette_mix` `palette_steps` `palette_contour` |
 | `emitter`         | `spawn_rate` `gravity` `launch_speed` `launch_angle` `spread` `lifetime` `lifetime_spread` `source_y` `source_width` `spawn_fade` `prewarm` `size` `size_spread` `shape` `points` `star_valley` `star_curve` `star_jitter` `spin` `twinkle` `brightness` · `zoom` `pan_x` `pan_y` · `hue` `saturation` `hue_spread` `hue_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_field`     | `shape` `points` `star_valley` `star_curve` `star_jitter` `scale` `gamma` `coord_mode` `rotation` · `pan_x` `pan_y` · `saturation` `color_span` `color_center` `palette_mix` `palette_steps` `palette_contour` |
 | `shape_collage`   | `count` `layout` `seed` `roster` `size_hierarchy` `angle_bias` `density` `drift` `spin` `recompose` `recompose_blend` `pump_size` `pump_alpha` `scale` `paper` `opacity` `edge_softness` · `pan_x` `pan_y` · `saturation` `color_span` `palette_shift` `palette_mix` |
@@ -1669,6 +1669,30 @@ wrong one is the trap the `glow` entry below records.
   > profile whatever it asks for. That is the same regime as the `thickness` dead
   > zone above, one derivative up.
 
+- `stroke_blend` — which **seam** the figure draws through, default `0`. At `0`
+  the batch is **additive light** (ADR-0056), which is what these four scenes
+  have always drawn: overlapping strokes sum, so white over red is pink. At `1`
+  the whole batch — segments and any arcs together — composites **over**, so a
+  stroke laid on another **replaces the interior of what it covers** and a
+  quantized palette keeps its plateaus. That is the difference between a
+  luminous world and a printed one, and it is what puts these four systems in
+  the [limited-ink class](../docs/preset-palettes.md#limited-ink--a-supported-palette-class-at-the-draw-seam),
+  whose enumerated list of every later stage that would put a fourth colour in
+  your frame — and each one's off switch — is on that page.
+
+  > **It is a switch, not a mix**: a draw call has one blend mode, so the
+  > decision is taken at `0.5` on the CPU each frame. Values in between select
+  > one seam or the other, not a blend of the two — a `[smoothing]` entry on this
+  > param buys you a delayed flip, nothing more.
+  >
+  > **Opaque strokes are ordered.** Additive light is order-independent; OVER is
+  > not, so which stroke wins an overlap is the order the scene emits its
+  > geometry in. That is what makes the seam useful and also what makes a figure
+  > look different beyond its palette when you flip it.
+  >
+  > **Turning it on usually costs `brightness`.** Additive light builds up where
+  > a figure crosses itself, and a dense rosette leans on that. Under OVER it
+  > does not, so the same `brightness` reads flatter and often darker.
 - `glow` — the line renderer's **per-segment light** multiplier, default `1.0`
   (exactly what these scenes drew before it was bindable), whole-figure on all
   four. **It multiplies the stroke's colour and never its coverage**: a dimmed
@@ -3076,6 +3100,66 @@ instant hit with a slow decay. A scalar entry is exactly
 > will drift upward rather than tracking. Reach for the pair on things that
 > should *hit* (`burst`, `mirror_reflect`, `thickness` on a beat); leave
 > continuous params symmetric.
+
+## An event with a memory — the `[latch]` table
+
+An optional top-level `[latch]` table declares named **armed-and-fired events**
+([ADR-0137](../docs/adrs/0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md)).
+It sits beside `[smoothing]` in every sense: same place in the file, same
+resolved-once-at-load treatment, same reset on a preset switch — and it answers
+the question `[smoothing]` cannot, because easing shapes a value over time
+without ever holding one.
+
+```toml
+[latch]
+recut = { arm = "mod(time, 100) > 90", fire = "onset > 0.6", hold = 0.5 }
+
+[params]
+recompose = "recut"
+```
+
+| key | value | meaning |
+|---|---|---|
+| `arm` | expression | Above `0.5` opens an **arming window**; the fall closes it, the next rise opens a new one. Required. |
+| `fire` | expression | The latch fires on this expression's **rising edge** inside an open window. A value already above `0.5` when the window opened is not an edge. Required. |
+| `hold` | seconds | How long the fired latch reads `1.0`. A bare number, not an expression. Optional; default `0`, which is a single frame. |
+
+The name on the left is yours, and it becomes an ordinary variable in every
+expression of the preset — `[params]`, `[per_vertex]` and `[layer.params]` — so it
+multiplies, gates, eases through `[smoothing]`, and can be read by several
+bindings at once.
+
+**The property, stated once because everything else follows from it: one rise per
+arming window.** However many `fire` edges a window contains, the latch rises on
+the first and on no other, and the next rise requires `arm` to have fallen and
+risen again. A window with no `fire` edge in it produces no rise at all. That is
+what separates a latch from `min(arm_expr, fire_expr)`, which goes true on every
+onset in the window.
+
+`hold` runs on real elapsed time, so it is the same duration at any refresh rate,
+and it is validated non-negative and finite at load.
+
+**The cap is four latches per preset.** That is a chosen number rather than a
+measured one — as many independent events as a preset can hold in one reader's
+head — and the storage behind it is a fixed block resolved at load, so asking for
+a fifth is a load error naming the cap rather than a slower path. Two further
+load errors, both there to stop a binding silently reading something else: a latch
+name that the grammar already resolves (`bass`, `time`, `pi`, `sin`, …) is
+rejected, and a latch's `arm`/`fire` may not name another latch.
+
+> **A latch is the one part of the preset surface whose value depends on the
+> frames before this one.** The state lives in the render layer beside the
+> smoothers, never inside the expression, so the evaluator is unchanged — but two
+> things follow that no other table has.
+>
+> **A single-frame probe reads a latch at rest.** Anything evaluating one frame in
+> isolation sees `0.0` and cannot distinguish a latch that can never fire from one
+> that has not fired yet. `shot --report` drives a frame sequence and does see a
+> latch; a one-frame reading does not.
+>
+> **A latch nothing reads is a load warning**, in the shape an inert
+> `[occupancy] exempt` entry gets and for the same reason: you would otherwise
+> believe an event was wired up while nothing consumed it.
 
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 

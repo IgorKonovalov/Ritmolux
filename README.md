@@ -178,7 +178,7 @@ one, so you always land where you asked.
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. `↑`/`↓` walk the list and wrap at both ends, `←`/`→` step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, preset name, now playing. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
 | `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
@@ -223,6 +223,32 @@ restart. Off means no track ever reaches the visualizer.
 ### Flags & environment
 
 - `--list-devices` — enumerate audio capture devices (Windows-only).
+- `--input loopback|line-in` — where audio comes from, overriding `config.toml`'s `[input] mode`.
+  `loopback` taps whatever the system is playing; `line-in` captures an input endpoint (an audio
+  interface, a mixer feed). Windows-only. A value that is neither is a usage error and the app
+  exits, the same way a bad `--tier` does.
+  **The input also moves while the app is running** — the settings menu's **Input mode** and
+  **Input device** rows swap the capture stream in place and write the choice to `config.toml`, so
+  `--input` pins the launch rather than the session. Expect a brief hitch on the swap (the old
+  stream is stopped and the new one opened synchronously), and, when the two endpoints negotiate
+  different sample rates, a second or two of re-adaptation while the level tracking rebuilds.
+- `--device "<friendly name>"` — which endpoint to capture, overriding `config.toml`'s
+  `[input] device`. Copy a name out of `--list-devices`; a substring is enough. **The two flags
+  override independently** — `--device` alone keeps the configured mode, `--input` alone keeps the
+  configured device name. A name that matches no active endpoint of the selected mode is *not* an
+  error: capture falls back to that mode's default endpoint and says so on stderr, because the
+  interface being unplugged is a fact about the world rather than a typo in the flag. Giving
+  **no name at all** — a trailing `--device`, or `--device=` — *is* an error: an empty value selects
+  the default endpoint, which is the opposite of what naming a device asks for. Precedence is
+  `--input`/`--device` > `config.toml`'s `[input]`; there is no environment variable, because an
+  input selection is a property of a rig and already persists to the config.
+
+  **If the input goes away mid-show** — the interface is unplugged, the driver resets — the app says
+  so and reopens on that mode's default endpoint, a few times and then no more; `F3` and the
+  `capture` column of `diagnostics.log` name what it fell back to, or say `lost …` if nothing worked.
+  Re-plugging does **not** restore the device, and that is why a recovery is the one input change
+  that is *not* written to `config.toml`: your `[input] device` still names the interface you chose,
+  so the next launch goes back to it. Pick it again from the `S` menu to return to it in this run.
 - `--soak [path]` — write a long-run instrumentation trace (frame-time stats) for stability
   testing; a bare `--soak` logs to a default path under the per-user data dir.
 - `--tier floor|rich` — pin the quality tier instead of letting the engine pick. Unpinned, the app

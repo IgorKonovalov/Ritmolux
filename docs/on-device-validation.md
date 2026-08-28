@@ -188,6 +188,39 @@ footprint so the vendor spread is on record.
       pixel (one per channel, in `srgb_slope`) on a fullscreen draw. Expected to be unmeasurable,
       never measured on weak hardware. Overlay on (`F3`), report the p99.
       _(Plan 0082 Phase 5 was a `human` verdict on one display; extracted at that plan's close.)_
+- [ ] **A live audio input, unplugged and plugged back in — with a removable interface attached.**
+      Plan 0130 made the capture stream restartable and gave a dead input a recovery path
+      ([ADR-0142](adrs/0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md)):
+      the capture thread stores one flag when `AUDCLNT_E_DEVICE_INVALIDATED` comes back from a
+      packet call, and the shell reopens the mode's default endpoint up to
+      `INPUT_RECOVERY_ATTEMPTS` times before writing a `lost …` verdict. **None of that has ever
+      run against a real device loss** — the plan's Phase 5 ran with no removable interface on the
+      box, so the whole path is pinned only by unit tests over a synthesized flag. With music
+      playing into an interface (the `Line (ZOOM AMS-22 Audio)` endpoint the plan was designed
+      against, or any USB interface), select it from the `S` menu's **Input device** row and then
+      pull the cable. Report **(a)** whether the picture recovers to the default endpoint within a
+      few frames and what `F3`'s `audio` line then reads; **(b)** whether re-plugging leaves it
+      unrecovered — it should, and confirming that is the check, because hot-plug is ADR-0142
+      Alternative D and deliberately unbuilt; and **(c)** that `config.toml`'s `[input] device`
+      still names the interface you chose, since a recovery deliberately does not persist its
+      fallback. _(Plan 0130 Phase 5 bullet 3, extracted at that plan's close.)_
+
+      **The open question this answers is not "does the recovery work" but "does it fire at all".**
+      The plan's own risk register names the case that would defeat every line of it: a real unplug
+      whose packet loop simply returns zero frames forever, which is indistinguishable from silence
+      and never sets the flag. If that is what happens, the honest fix is a silence-duration
+      heuristic and that is a worse mechanism worth its own ADR — not a quiet addition. Report which
+      of the two you saw.
+- [ ] **A 96 kHz interface, if one is to hand.** Both analysis windows are sized in samples
+      (`WINDOW_SIZE`, `LOW_WINDOW_SIZE` in `core/src/dsp/mod.rs`), so a 96 kHz stream loses roughly
+      a third of the band axis to one-bin resolution. This is the stated trigger of
+      **design-backlog 0032** — *"worth taking the day someone runs the standalone on a 96 kHz
+      interface and says the sub-bass reads mushy"* — and Plan 0130 is what turned hitting it from a
+      config edit into a keypress. Set the interface to 96 kHz, swap to it from the `S` menu, and
+      report whether the low end reads mushy against the same music at 48 kHz. A finding here is a
+      **backlog update on 0032**, not a fix: sizing the windows in seconds re-opens ADR-0049 and is
+      ADR territory by that entry's own argument. _(Plan 0130 Phase 5 bullet 4, extracted at that
+      plan's close.)_
 
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 
@@ -361,8 +394,10 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 - **`F3`** — toggle the diagnostics overlay (frame-time sparkline + GPU bar + fps/p99 readout, and
   below them the analysis block: `BASS` / `MID` / `TREB` / `ONSET` as meters with their numbers,
   plus a `LOCK` / `FREE` row carrying the downbeat estimator's confidence — Plan 0049). Under the
-  panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2`, or `failed …` with
-  the platform error (Plan 0083). **The corner preset name steps aside while the overlay is up**
+  panel, an `audio` line naming the **capture verdict** — `live WASAPI 48000/2 <endpoint>`,
+  `failed …` with the platform error, or `lost …` when the input went away and did not come back.
+  It is current state, so it follows an input swapped from the `S` menu rather than naming what the
+  run started on. **The corner preset name steps aside while the overlay is up**
   (Plan 0096) — the panel composites after the text layer and used to paint straight over it — so
   where a step below asks you to record *which* preset something happened on, read it from the
   browser (`Tab`) or the window title, not from the corner.

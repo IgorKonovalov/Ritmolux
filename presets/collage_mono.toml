@@ -26,6 +26,12 @@ stops = [
   { at = 1.0000, color = "#ffffff" },
 ]
 
+[latch]
+# Armed for the last ten seconds of each 100 s cycle; spent by the first onset
+# past 0.6 inside that window. See the note on `recompose` below for why the
+# hold is zero and what a quiet window costs.
+recut = { arm = "mod(time, 100) > 90", fire = "onset > 0.6", hold = 0 }
+
 [params]
 paper  = "0.9375"
 layout = "2"
@@ -43,49 +49,67 @@ edge_softness = "0"
 drift = "0.55 + clamp(bass * 0.706, 0, 0.60)"
 spin  = "0.30 + clamp(mid * 0.353, 0, 0.30)"
 
-# ONE RECOMPOSITION EVERY 100 SECONDS, AND THE PERIOD IS WALL CLOCK ON PURPOSE.
-# `recompose` is edge-triggered - it fires on the RISE past 0.5 - so a square
-# wave with one rise per period fires exactly once per period, where the obvious
-# `hash(beat_index) > 0.9` fired every 3-10 seconds: `beat_index` counts onset
-# DETECTIONS at 1.2-2.3 per musical beat, so a 10 % gate on it is several times a
-# phrase, not once a set.
+# THE CANVAS RE-CUTS ON THE MUSIC, AT MOST ONCE PER 100 SECONDS. The `recut`
+# latch above is the whole mechanism: its arming window is the last ten seconds
+# of each 100 s cycle, and inside that window the FIRST onset past 0.6 spends the
+# permission. So the ceiling is the clock's - one recomposition per cycle,
+# guaranteed - and the moment inside it is the music's.
 #
-# The `+ 50` offset is what keeps the load quiet. Without it `mod(time, 100)` is
-# `0 < 50` on the very first frame, so the gate rises the instant the preset
-# loads and re-cuts the canvas as it arrives; offset, the first rise is at t=50.
-# The FALL at t=100 is not an edge the engine acts on, so it costs nothing.
+# `recompose` is edge-triggered, on the RISE past 0.5, and `hold = 0` makes the
+# latch a one-frame pulse: rise, recompose, fall. That is the whole reason the
+# hold is zero rather than a duration - a longer hold would read 1.0 for several
+# frames and the parameter would ignore every one of them after the first.
+#
+# A SILENT WINDOW COSTS A CYCLE. If nothing crosses 0.6 in those ten seconds the
+# permission is never spent, the window closes, and the canvas holds for another
+# 100 s. Measured both ways on this file, through the real analyzer: over a clip
+# with hits in the window it re-cuts once, at t=90; with digital silence across
+# the same ten seconds it does not re-cut at all.
+#
+# BUT "QUIET" IS NOT "SILENT", AND THE DIFFERENCE IS SMALLER THAN IT SOUNDS.
+# `onset` is a fraction of its own DECAYING recent peak, so once a loud passage
+# is a few seconds behind, a pad and a hi-hat cross 0.6 as easily as a kick did.
+# A breakdown with any articulation in it still fires. What gets skipped is
+# near-silence, not an ambient passage - do not rely on this to hold a canvas
+# through a quiet section.
 #
 # `time` is the renderer's shared clock (one per app run, never reset on a preset
-# switch), so this is a genuine wall-clock 100 s and NOT 100 s of screen time -
-# in a rotating set the canvas is often already recomposed when it comes back up.
-# That is the "maximum once per 1-2 min" reading: the ceiling is guaranteed.
+# switch), so the cycle is genuine wall clock and NOT screen time - in a rotating
+# set the canvas is often already recomposed when it comes back up. The latch
+# itself does reset on the switch, so an arming window never crosses into this
+# preset from the one before it.
+#
+# THE ONE ARRIVAL CASE: a load that lands inside an open window arms on its first
+# frame, so roughly one arrival in ten can re-cut within seconds of appearing. It
+# needs a strong onset to do it and `recompose_blend` dissolves it over 0.9 s, so
+# it reads as the poster settling rather than as a glitch.
 #
 # Nothing here fixes the seed. Each recomposition advances the generator's own
 # recomposition index, so successive canvases differ with `seed` left alone.
-recompose       = "mod(time + 50, 100) < 50"
-# Raised from 0.30 s: at one cut every 100 s the change is an EVENT, and a
-# near-cut reads as a glitch where a dissolve reads as a decision.
+recompose       = "recut"
+# At one cut per 100 s the change is an EVENT, and a near-cut reads as a glitch
+# where a dissolve reads as a decision.
 recompose_blend = "0.90"
 pump_size  = "clamp(bass * 0.141, 0, 0.12)"
 pump_alpha = "0"
 
-# THE SWAY IS WHAT MAKES THIS WORLD PASS `animation` (backlog 0145), AND THE RATE
-# IS THE WHOLE POINT OF IT. That gate captures frames 24 and 48 - 0.4 s apart -
-# AT SILENCE, so it sees only a preset's autonomous motion. This canvas is a
-# poster: it is meant to sit still, and nearly all its liveliness is audio-
-# driven, which the gate cannot see.
+# THE SWAY IS THE WHOLE OF THIS POSTER'S AUTONOMOUS MOTION, AND IT IS MEANT TO BE
+# BELOW NOTICE. A 90 s horizontal breath against a 70 s vertical one, at 6 % and
+# 4 % of the frame: incommensurate rates, so the pair traces a path that does not
+# repeat for about ten minutes and the canvas never visibly returns to a pose it
+# held before. A printed sheet is never quite square to the wall; this is that,
+# not an animation.
 #
-# Measured, because the obvious lever is the wrong one: raising `drift` 0.55 ->
-# 1.60 -> 2.50 and `spin` 0.30 -> 1.00 -> 1.60 leaves the statistic at 0.002,
-# UNCHANGED - those multiply each element's own seeded velocity, and over 0.4 s
-# that is nothing. A whole-canvas motion is the only thing that moves in 0.4 s.
-# A scale breath reaches 0.009-0.011 but pulses the composition's size; this pan
-# sway reaches 0.012 without touching it, so the picture keeps its proportions.
+# THE RATE IS THE LEVER, NOT THE AMPLITUDE. At these amplitudes the sway is a
+# settle; take the rates up an order of magnitude and the same 6 %/4 % reads as a
+# wobble, and a composition built on flat cut planes stops looking pinned down.
 #
-# Amplitude is unchanged from a still composition's - only the rates moved, from
-# 0.07/0.09 to 0.70/0.78, an 11 s sway rather than a 90 s one.
-pan_x = "0.06 * sin(time * 0.70)"
-pan_y = "0.04 * sin(time * 0.78 + 1.1)"
+# `drift` and `spin` are NOT this and cannot substitute for it - they multiply
+# each element's OWN seeded velocity, so they change how the pieces live against
+# one another and move the canvas as a whole not at all. A scale breath does move
+# it, but pulses the composition's size; this pan keeps the proportions.
+pan_x = "0.06 * sin(time * 0.07)"
+pan_y = "0.04 * sin(time * 0.09 + 1.1)"
 saturation = "1.0"
 bloom_amount = "0"
 trails       = "0"

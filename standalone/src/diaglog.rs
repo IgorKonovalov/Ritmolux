@@ -423,19 +423,21 @@ mod tests {
         let _ = fs::remove_dir_all(path.parent().expect("the scratch dir"));
     }
 
-    /// **A live capture names the backend and the negotiated format**, and reads
-    /// back differently from the failed run above — so a log cannot be read as
-    /// "audio was flowing" when it was not.
+    /// **A live capture names the backend, the negotiated format and the
+    /// endpoint**, and reads back differently from the failed run above — so a
+    /// log cannot be read as "audio was flowing" when it was not, and a remote
+    /// tester can see *which* device it was flowing from.
     #[test]
     fn a_live_capture_names_its_backend_and_format() {
         let path = scratch("capture-live");
-        let token = CaptureVerdict::Live {
-            backend: "WASAPI",
-            format: AudioFormat {
+        let token = CaptureVerdict::live(
+            "WASAPI",
+            AudioFormat {
                 sample_rate: 44_100,
                 channels: 2,
             },
-        }
+            "Line (ZOOM AMS-22 Audio)",
+        )
         .token();
 
         let mut log = DiagLog::new(Some(path.clone()));
@@ -454,7 +456,10 @@ mod tests {
             .expect("one sample row")
             .split('\t')
             .collect();
-        assert_eq!(capture_field(&row), "live WASAPI 44100/2");
+        assert_eq!(
+            capture_field(&row),
+            "live WASAPI 44100/2 Line (ZOOM AMS-22 Audio)"
+        );
         assert_ne!(
             capture_field(&row),
             CaptureVerdict::failed("WASAPI", "device in use").token(),

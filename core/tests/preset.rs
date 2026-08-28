@@ -809,6 +809,196 @@ fn per_element_evaluation_performs_no_heap_allocation() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The `[latch]` table (ADR-0137)
+// ---------------------------------------------------------------------------
+
+/// A preset with `body` spliced in after a minimal fragment-field header.
+fn latched(body: &str) -> Result<Preset, lmv_core::preset::PresetError> {
+    Preset::from_toml_str(&format!("system = \"fragment_field\"\n{body}"))
+}
+
+/// One `[latch]` entry, with `arm`/`fire` that never fire, plus a binding that
+/// reads it. The declarations are what is under test in most of these; what the
+/// expressions would do at run time is Phase 4's question.
+const ONE_LATCH: &str = "[latch]\nrecut = { arm = \"time > 1\", fire = \"onset > 0.6\",                          hold = 0.5 }\n[params]\nwarp = \"recut\"\n";
+
+/// **The whole of Phase 3's behavior:** an author's latch name compiles, and a
+/// binding that reads it evaluates to the latch's **rest value** — because
+/// nothing writes the reserved slot yet.
+///
+/// The `0.0` is not a placeholder assertion standing in for the real one. It is
+/// the property ADR-0137 relies on everywhere a latch is read outside a frame
+/// sequence: a single-frame probe sees a latch at rest and cannot distinguish an
+/// unfirable latch from a quiet one.
+#[test]
+fn a_latch_name_compiles_and_reads_at_rest() {
+    let preset = latched(ONE_LATCH).expect("a preset with one latch loads");
+    assert_eq!(preset.latches.len(), 1, "the table has one entry");
+    let latch = preset.latches.first().expect("the latch");
+    assert_eq!(latch.name, "recut");
+    assert_eq!(latch.hold, 0.5);
+
+    let binding = preset
+        .params
+        .iter()
+        .find(|b| b.name == "warp")
+        .expect("the binding that reads it");
+    assert!(
+        binding.expr.uses_latch(0),
+        "the binding must resolve onto latch slot 0, not onto some other variable"
+    );
+    // Every variable bound loud, so a wrong slot would read something non-zero.
+    let vars = Variables::new(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 9.0, 120.0, 1.0);
+    assert_eq!(
+        binding.expr.eval(&vars),
+        0.0,
+        "a latch reads its rest value until the render layer advances one"
+    );
+}
+
+/// The cap is a wall with a number in the message, not a silent truncation.
+#[test]
+fn more_latches_than_the_block_holds_is_a_load_error_naming_the_cap() {
+    let entries: String = (0..5)
+        .map(|i| format!("l{i} = {{ arm = \"time > 1\", fire = \"onset > 0.5\" }}\n"))
+        .collect();
+    let Err(err) = latched(&format!("[latch]\n{entries}")) else {
+        panic!("a preset over the cap must fail to load");
+    };
+    let message = err.to_string();
+    assert!(
+        message.contains('4') && message.contains('5'),
+        "the error names the cap and what was asked for: {message}"
+    );
+    // Four is fine, so the wall is where it says it is.
+    let four: String = (0..4)
+        .map(|i| format!("l{i} = {{ arm = \"time > 1\", fire = \"onset > 0.5\" }}\n"))
+        .collect();
+    let preset = latched(&format!("[latch]\n{four}")).expect("a preset at the cap must still load");
+    assert_eq!(preset.latches.len(), 4);
+}
+
+/// A bad latch expression fails at the same boundary as a bad `[params]` one,
+/// in the same shape, and the message says **which key of which latch**.
+#[test]
+fn a_bad_latch_expression_is_a_load_error_naming_its_key() {
+    for (key, table) in [
+        (
+            "arm",
+            "[latch]\nrecut = { arm = \"time >\", fire = \"onset > 0.5\" }\n",
+        ),
+        (
+            "fire",
+            "[latch]\nrecut = { arm = \"time > 1\", fire = \"nope(1)\" }\n",
+        ),
+    ] {
+        let Err(err) = latched(table) else {
+            panic!("a latch with a bad `{key}` must fail to load");
+        };
+        let message = err.to_string();
+        assert!(
+            message.contains("recut") && message.contains(key),
+            "the error names the latch and the key: {message}"
+        );
+        assert!(
+            message.contains("invalid expression"),
+            "it is reported as an expression error, like a bad [params] binding: {message}"
+        );
+    }
+}
+
+/// `hold` is a duration and is validated as one, at the load boundary the
+/// smoothing constants are validated at.
+#[test]
+fn a_hold_is_validated_as_a_non_negative_duration() {
+    for bad in ["-0.5", "nan", "inf"] {
+        let Err(err) = latched(&format!(
+            "[latch]\nrecut = {{ arm = \"time > 1\", fire = \"onset > 0.5\", hold = {bad} }}\n"
+        )) else {
+            panic!("hold = {bad} must fail to load");
+        };
+        assert!(
+            err.to_string().contains("hold"),
+            "the error names the key: {err}"
+        );
+    }
+    assert!(
+        latched("[latch]\nrecut = { arm = \"time > 1\", fire = \"onset > 0.5\" }\n").is_ok(),
+        "hold is optional and defaults to a single frame"
+    );
+}
+
+/// A latch may not take a name the grammar already resolves, and the reserved
+/// placeholders are not a name an author can reach either.
+///
+/// Both halves guard the same thing from opposite sides. Without the first, a
+/// latch called `bass` would compile to the band — the binding would work, read
+/// the wrong thing, and never say so. Without the second, `_latch0` would be a
+/// second way to spell a latch that bypasses the name the author chose, which is
+/// the readability ADR-0137 rejected Alternative B to keep.
+#[test]
+fn a_latch_name_cannot_shadow_the_grammar_and_the_slots_are_not_bindable() {
+    for taken in ["bass", "time", "index", "pi", "sin", "_latch0"] {
+        let Err(err) = latched(&format!(
+            "[latch]\n{taken} = {{ arm = \"time > 1\", fire = \"onset > 0.5\" }}\n"
+        )) else {
+            panic!("a latch named `{taken}` must fail to load");
+        };
+        assert!(
+            err.to_string().contains(taken),
+            "the error names the collision: {err}"
+        );
+    }
+    let Err(err) = latched("[params]\nwarp = \"_latch0\"\n") else {
+        panic!("the reserved placeholder must not be bindable from an expression");
+    };
+    assert!(
+        err.to_string().contains("_latch0"),
+        "the error names the identifier it could not resolve: {err}"
+    );
+}
+
+/// A latch cannot read a latch — the two expressions compile with no latch name
+/// in scope, which is what makes "every latch, then the params" a complete
+/// evaluation order rather than one with a dependency graph in it.
+#[test]
+fn a_latch_cannot_read_another_latch() {
+    let Err(err) = latched(
+        "[latch]\nfirst = { arm = \"time > 1\", fire = \"onset > 0.5\" }\n         second = { arm = \"first\", fire = \"onset > 0.5\" }\n",
+    ) else {
+        panic!("a latch naming a latch must fail to load");
+    };
+    assert!(
+        err.to_string().contains("first"),
+        "the error names the identifier it refused: {err}"
+    );
+}
+
+/// A declared latch nothing reads is inert, and inert is surfaced rather than
+/// silent — the same treatment an `[occupancy] exempt` entry naming an unbound
+/// param gets.
+#[test]
+fn a_latch_no_binding_names_is_surfaced() {
+    let preset = latched("[latch]\nrecut = { arm = \"time > 1\", fire = \"onset > 0.5\" }\n")
+        .expect("it still loads — an inert latch is not an error");
+    assert!(
+        preset
+            .warnings
+            .iter()
+            .any(|w| w.contains("recut") && w.contains("inert")),
+        "an unread latch is surfaced: {:?}",
+        preset.warnings
+    );
+    // And a latch something reads is not warned about.
+    let read = latched(ONE_LATCH).expect("valid preset");
+    assert!(
+        !read.warnings.iter().any(|w| w.contains("[latch]")),
+        "a latch a binding names must not warn: {:?}",
+        read.warnings
+    );
+}
+
 /// A `[smoothing]` entry naming a per-element binding cannot work — the smoother
 /// holds one scalar and a series has no single value — so it is a **surfaced
 /// warning** rather than a silent no-op, and it points at the table that does.

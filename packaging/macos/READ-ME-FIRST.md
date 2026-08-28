@@ -56,7 +56,7 @@ The app says which it was. Either of these answers it, and neither needs the
 Terminal:
 
   - Press F3. Under the diagnostics panel there is a line starting with
-    "audio". If it reads "live SCK 48000/2" then sound is reaching the app and
+    "audio". If it starts with "live SCK" then sound is reaching the app and
     the problem is elsewhere - check that something is actually playing. If it
     reads "failed SCK ..." then the rest of that line is the reason. A photo of
     the screen is enough.

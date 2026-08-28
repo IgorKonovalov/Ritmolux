@@ -7,14 +7,14 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    AnalysisMetrics, CaptureImage, HeadlessOptions, ParamRoute, ParamSmoother, RenderError,
-    Renderer, Roster, element_prefix, evaluate_series, resolve_route,
+    AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamRoute, ParamSmoother,
+    RenderError, Renderer, Roster, element_prefix, evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
 // when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
 use super::transition::Mode;
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Preset, SystemKind, Variables, compile};
+use crate::preset::{Easing, Latch, Preset, SystemKind, Variables, compile};
 use crate::render::metrics::frame_diff;
 use crate::render::post::{KALEIDOSCOPE, TRAILS};
 
@@ -644,6 +644,264 @@ fn only_a_spectrum_preset_claims_a_per_element_prefix() {
             preset.system.as_str()
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// The latch bank (ADR-0137)
+// ---------------------------------------------------------------------------
+
+/// One latch driven by two named grammar variables, so a test can steer `arm`
+/// and `fire` independently: `bass` is the arming window and `treb` the trigger.
+fn probe_latch(hold: f32) -> Vec<Latch> {
+    vec![Latch {
+        name: "recut".into(),
+        arm: compile("bass").expect("arm compiles"),
+        fire: compile("treb").expect("fire compiles"),
+        hold,
+    }]
+}
+
+/// Step the bank one frame at the given `(arm, fire)` levels and read the
+/// latch's output. `bass` carries `arm`, `treb` carries `fire`.
+fn step(bank: &mut LatchBank, latches: &[Latch], arm: f32, fire: f32, dt: f32) -> f32 {
+    let vars = Variables::new(arm, 0.0, fire, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    read_latch(&bank.advance(latches, vars, dt))
+}
+
+/// The latch's value out of a bound `Variables`, read through a compiled
+/// expression that names it — the same path a preset binding takes, rather than
+/// a second way of reaching the slot that could agree with the first by luck.
+fn read_latch(vars: &Variables<'_>) -> f32 {
+    LATCH_READER.with(|e| e.eval(vars))
+}
+
+thread_local! {
+    /// `recut` compiled once against a one-latch name list, so every read in
+    /// this section resolves the same slot the loader would.
+    static LATCH_READER: crate::preset::Expr =
+        crate::preset::expr::compile_with_latches("recut", &["recut".to_string()])
+            .expect("the reader compiles");
+}
+
+/// **The behavioral property of ADR-0137**: exactly one rise per arming window,
+/// however many `fire` edges the window contains, and the next rise requires
+/// `arm` to have fallen and risen again.
+///
+/// A `hold` of zero is deliberate here — it makes each rise exactly one frame,
+/// so counting frames at `1.0` counts rises. The duration is the next test's
+/// question, not this one's.
+#[test]
+fn a_latch_rises_once_per_arming_window() {
+    let latches = probe_latch(0.0);
+    let mut bank = LatchBank::default();
+    let dt = 1.0 / 60.0;
+
+    // Window one: five `fire` edges inside it (each a 1 -> 0 -> 1 in `treb`).
+    let mut rises = 0;
+    for _ in 0..5 {
+        rises += step(&mut bank, &latches, 1.0, 1.0, dt) as u32;
+        rises += step(&mut bank, &latches, 1.0, 0.0, dt) as u32;
+    }
+    assert_eq!(
+        rises, 1,
+        "five fire edges in one arming window must produce ONE rise, got {rises}"
+    );
+
+    // Still armed? No — more edges in the same window change nothing.
+    for _ in 0..5 {
+        assert_eq!(step(&mut bank, &latches, 1.0, 1.0, dt), 0.0);
+        assert_eq!(step(&mut bank, &latches, 1.0, 0.0, dt), 0.0);
+    }
+
+    // The window closes and re-opens: `arm` falls, then rises. Now one more.
+    step(&mut bank, &latches, 0.0, 0.0, dt);
+    step(&mut bank, &latches, 1.0, 0.0, dt);
+    assert_eq!(
+        step(&mut bank, &latches, 1.0, 1.0, dt),
+        1.0,
+        "a re-armed window fires again on its first edge"
+    );
+    assert_eq!(step(&mut bank, &latches, 1.0, 0.0, dt), 0.0);
+    assert_eq!(
+        step(&mut bank, &latches, 1.0, 1.0, dt),
+        0.0,
+        "and only once in the new window either"
+    );
+}
+
+/// The other half of the property: a window containing no `fire` edge produces
+/// no rise at all. Without this, a latch that fired on the arming edge alone
+/// would pass the test above.
+#[test]
+fn an_arming_window_with_no_fire_edge_never_rises() {
+    let latches = probe_latch(0.0);
+    let mut bank = LatchBank::default();
+    let dt = 1.0 / 60.0;
+
+    for _ in 0..3 {
+        for _ in 0..20 {
+            assert_eq!(
+                step(&mut bank, &latches, 1.0, 0.0, dt),
+                0.0,
+                "an armed window with `fire` never true must stay at rest"
+            );
+        }
+        step(&mut bank, &latches, 0.0, 0.0, dt);
+    }
+
+    // A `fire` that was already true when the window opened is not an edge in
+    // it either — the trigger is the rise, not the level.
+    let mut bank = LatchBank::default();
+    step(&mut bank, &latches, 0.0, 1.0, dt);
+    for _ in 0..10 {
+        assert_eq!(
+            step(&mut bank, &latches, 1.0, 1.0, dt),
+            0.0,
+            "a `fire` already held when the window opened is not a rising edge"
+        );
+    }
+}
+
+/// `hold` is a **duration**, so the same wall-clock time split into a different
+/// number of frames holds for the same length — ADR-0014's rule, and the reason
+/// the bank takes `dt` rather than counting frames.
+#[test]
+fn a_hold_lasts_the_same_wall_clock_at_two_frame_rates() {
+    /// How long the latch reads 1.0 after one fire, in seconds, at `dt`.
+    fn held_seconds(dt: f32) -> f32 {
+        let latches = probe_latch(0.5);
+        let mut bank = LatchBank::default();
+        // Arm without firing, then one edge.
+        step(&mut bank, &latches, 1.0, 0.0, dt);
+        let mut frames = 0u32;
+        while step(
+            &mut bank,
+            &latches,
+            1.0,
+            if frames == 0 { 1.0 } else { 0.0 },
+            dt,
+        ) > 0.5
+        {
+            frames += 1;
+            assert!(frames < 10_000, "the hold must end");
+        }
+        frames as f32 * dt
+    }
+
+    let at_60 = held_seconds(1.0 / 60.0);
+    let at_30 = held_seconds(1.0 / 30.0);
+    let at_144 = held_seconds(1.0 / 144.0);
+    for (label, held, dt) in [
+        ("60 Hz", at_60, 1.0 / 60.0),
+        ("30 Hz", at_30, 1.0 / 30.0),
+        ("144 Hz", at_144, 1.0 / 144.0),
+    ] {
+        // Measured in frames, which is the unit the claim is made in. The
+        // `1e-3` is float slack, not headroom: the countdown accumulates `dt`
+        // subtractions in `f32`, so the step that should land exactly on zero
+        // can land a rounding error above it and buy one more frame — and the
+        // claim must not turn on the last bit of that accumulation.
+        let off_by_frames = (held - 0.5).abs() / dt;
+        assert!(
+            off_by_frames <= 1.0 + 1e-3,
+            "a hold of 0.5 s must last 0.5 s at {label}, within one frame; got {held} \
+             ({off_by_frames:.3} frames off)"
+        );
+    }
+}
+
+/// A `hold` of zero is one frame — the shortest pulse a binding can read, and
+/// not "no pulse at all", which is what a naive countdown would give.
+#[test]
+fn a_zero_hold_is_exactly_one_frame() {
+    let latches = probe_latch(0.0);
+    let mut bank = LatchBank::default();
+    let dt = 1.0 / 60.0;
+    step(&mut bank, &latches, 1.0, 0.0, dt);
+    assert_eq!(step(&mut bank, &latches, 1.0, 1.0, dt), 1.0);
+    assert_eq!(step(&mut bank, &latches, 1.0, 0.0, dt), 0.0);
+}
+
+/// A reset forgets the window and the hold, which is what stops an armed state
+/// crossing a preset switch.
+#[test]
+fn a_reset_disarms_and_drops_the_hold() {
+    let latches = probe_latch(1.0);
+    let mut bank = LatchBank::default();
+    let dt = 1.0 / 60.0;
+    step(&mut bank, &latches, 1.0, 0.0, dt);
+    assert_eq!(step(&mut bank, &latches, 1.0, 1.0, dt), 1.0);
+    bank.reset();
+    assert_eq!(
+        step(&mut bank, &latches, 1.0, 0.0, dt),
+        0.0,
+        "a reset drops a hold that was still running"
+    );
+}
+
+/// A preset with no `[latch]` table hands its bindings the bundle it was given,
+/// untouched — the guarantee behind "a preset that declares no table pays
+/// nothing".
+#[test]
+fn a_preset_with_no_latches_is_handed_its_bundle_unchanged() {
+    let mut bank = LatchBank::default();
+    let vars = Variables::new(0.3, 0.4, 0.5, 0.6, 1.0, 0.7, 8.0, 120.0, 0.9);
+    let out = bank.advance(&[], vars, 1.0 / 60.0);
+    let probe = compile("bass + mid + treb + onset + beat + bar + time + tempo + novelty")
+        .expect("the probe compiles");
+    assert_eq!(probe.eval(&out), probe.eval(&vars));
+    assert_eq!(read_latch(&out), 0.0, "an undeclared latch reads at rest");
+}
+
+/// A latched preset renders identically twice over the same frame and `dt`
+/// sequence — the determinism NFR 6 asks of every capture, held across the one
+/// piece of expression-layer state that depends on history.
+#[test]
+fn a_latched_preset_renders_identically_over_the_same_sequence() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 96,
+        height: 96,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let preset = Preset::from_toml_str(
+        "system = \"fragment_field\"\nname = \"latch_determinism\"\n\
+         [latch]\nrecut = { arm = \"mod(time, 0.4) > 0.2\", fire = \"onset > 0.5\", \
+         hold = 0.15 }\n\
+         [params]\nwarp = \"0.2 + recut * 0.6\"\nbrightness = \"0.8\"\n",
+    )
+    .expect("the latched preset loads");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    // A stimulus with onsets scattered across it, so the latch fires more than
+    // once and the two runs have real state to disagree about.
+    let stimulus: Vec<AnalysisFrame> = (0..48)
+        .map(|i| AnalysisFrame {
+            onset: if i % 7 == 0 { 1.0 } else { 0.0 },
+            ..Default::default()
+        })
+        .collect();
+    let a = renderer
+        .capture_preset_over(&name, &stimulus)
+        .expect("first run");
+    let b = renderer
+        .capture_preset_over(&name, &stimulus)
+        .expect("second run");
+    assert_eq!(a.len(), stimulus.len());
+    for (i, (x, y)) in a.iter().zip(b.iter()).enumerate() {
+        assert_eq!(x.rgba, y.rgba, "frame {i} differs between two runs");
+    }
+    // Non-vacuity: the sequence has to actually move, or two identical black
+    // runs would satisfy the assertion above.
+    let (Some(first), Some(last)) = (a.first(), a.last()) else {
+        panic!("the run produced frames");
+    };
+    assert_ne!(
+        first.rgba, last.rgba,
+        "the latched preset must change over the stimulus"
+    );
 }
 
 #[test]

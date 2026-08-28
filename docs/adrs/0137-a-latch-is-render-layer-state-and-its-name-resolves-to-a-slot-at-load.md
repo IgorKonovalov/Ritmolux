@@ -1,8 +1,8 @@
 # ADR-0137 — A latch is render-layer state, and its name resolves to a slot at load
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0123)
 > **Date:** 2026-08-27
-> **Related plan(s):** [0123](../plans/0123-a-gate-a-latch-and-an-ink.md)
+> **Related plan(s):** [0123](../plans/done/0123-a-gate-a-latch-and-an-ink.md)
 > **Supplements:** [0019](0019-eased-parameters.md), [0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
 
 ## Context

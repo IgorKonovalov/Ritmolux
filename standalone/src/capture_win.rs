@@ -9,6 +9,12 @@
 //! zero logging, zero file I/O — it copies device buffers into the SPSC ring
 //! and sleeps. Endpoint enumeration and friendly-name strings are built once at
 //! setup, *before* the real-time loop, so they never violate that discipline.
+//!
+//! The loop **reports and never decides** (ADR-0142). When the stream dies it
+//! stores one `AtomicBool` and returns; it does not re-enumerate, does not
+//! reopen anything, and does not say so on stderr — all three would allocate or
+//! block. Choosing what to run next belongs to the shell, which is the only
+//! place that can rebuild the analyzer anyway.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,11 +24,12 @@ use std::time::Duration;
 
 use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Media::Audio::{
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-    DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient, IAudioClient, IMMDevice,
-    IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture,
-    eConsole, eRender,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_DEVICE_INVALIDATED, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient,
+    IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX,
+    WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -71,11 +78,31 @@ pub struct CaptureHandle {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
     format: AudioFormat,
+    /// Friendly name of the endpoint the stream actually opened — the resolved
+    /// one, so a selection that degraded to the default names what is running
+    /// rather than what was asked for.
+    device: String,
+    /// Set by the capture thread when its stream is gone. The whole of what that
+    /// thread gained: one store, never a read.
+    lost: Arc<AtomicBool>,
 }
 
 impl CaptureHandle {
     pub fn format(&self) -> AudioFormat {
         self.format
+    }
+
+    /// The endpoint this stream is running on, by friendly name.
+    pub fn device(&self) -> &str {
+        &self.device
+    }
+
+    /// Whether the capture thread has reported its stream dead.
+    ///
+    /// Relaxed: the flag is the whole message and nothing is published with it,
+    /// so there is no write to order against. The shell reads it once a frame.
+    pub fn lost(&self) -> bool {
+        self.lost.load(Ordering::Relaxed)
     }
 }
 
@@ -124,6 +151,8 @@ impl From<windows::core::Error> for CaptureError {
 pub fn start(selector: &CaptureSelector) -> Result<(CaptureHandle, SampleConsumer), CaptureError> {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = Arc::clone(&stop);
+    let lost = Arc::new(AtomicBool::new(false));
+    let thread_lost = Arc::clone(&lost);
     // The selection is resolved on the capture thread (all WASAPI calls share
     // one COM apartment there); move an owned copy across.
     let selector = selector.clone();
@@ -133,15 +162,17 @@ pub fn start(selector: &CaptureSelector) -> Result<(CaptureHandle, SampleConsume
 
     let thread = std::thread::Builder::new()
         .name("wasapi-capture".into())
-        .spawn(move || capture_thread(&selector, &thread_stop, &setup_tx))
+        .spawn(move || capture_thread(&selector, &thread_stop, &thread_lost, &setup_tx))
         .expect("spawning the capture thread is an init-time invariant");
 
     match setup_rx.recv() {
-        Ok(Ok((format, consumer))) => Ok((
+        Ok(Ok((format, device, consumer))) => Ok((
             CaptureHandle {
                 stop,
                 thread: Some(thread),
                 format,
+                device,
+                lost,
             },
             consumer,
         )),
@@ -158,7 +189,7 @@ pub fn start(selector: &CaptureSelector) -> Result<(CaptureHandle, SampleConsume
     }
 }
 
-type SetupResult = Result<(AudioFormat, SampleConsumer), CaptureError>;
+type SetupResult = Result<(AudioFormat, String, SampleConsumer), CaptureError>;
 
 /// Resolve the endpoint to open: a `wanted` friendly name is matched among the
 /// active endpoints of `dataflow` (exact, else case-insensitive substring),
@@ -241,28 +272,81 @@ fn flow_label(dataflow: EDataFlow) -> &'static str {
     }
 }
 
-/// Print the active render and capture endpoints by friendly name — the
-/// `--list-devices` startup aid (Plan 0009 Phase 2). Initializes COM on the
-/// calling thread for the enumeration and tears it down before returning.
-pub fn list_devices() -> Result<(), CaptureError> {
-    let com = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    com.ok()?;
-    let result = (|| unsafe {
+/// The endpoint dataflow a capture mode reads from: loopback taps a render
+/// endpoint, line-in captures an input endpoint.
+fn dataflow(mode: CaptureMode) -> EDataFlow {
+    match mode {
+        CaptureMode::Loopback => eRender,
+        CaptureMode::LineIn => eCapture,
+    }
+}
+
+/// A `CoInitializeEx` whose matching `CoUninitialize` is tied to the scope.
+///
+/// `CoInitializeEx` is per-thread and reference-counted: `S_OK` and `S_FALSE`
+/// (already initialized, same apartment) each take a reference that must be
+/// released, while `RPC_E_CHANGED_MODE` means the thread is already in the
+/// *other* apartment and no reference was taken — so uninitializing then would
+/// release someone else's. That last case is the render/UI thread, which winit
+/// has already put in an STA; `MMDeviceEnumerator` is a Both-model object, so
+/// enumerating from there is still valid.
+struct ComScope {
+    /// Whether this scope took the reference it must release.
+    owned: bool,
+}
+
+impl ComScope {
+    /// # Safety
+    /// The returned scope must be dropped on the thread that created it.
+    unsafe fn enter() -> Result<Self, CaptureError> {
+        let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        if hr == RPC_E_CHANGED_MODE {
+            return Ok(Self { owned: false });
+        }
+        hr.ok()?;
+        Ok(Self { owned: true })
+    }
+}
+
+impl Drop for ComScope {
+    fn drop(&mut self) {
+        if self.owned {
+            unsafe { CoUninitialize() };
+        }
+    }
+}
+
+/// The active endpoints a capture mode can run on, by friendly name, in the
+/// order Windows enumerates them.
+///
+/// Enumeration is COM: it allocates and blocks, so this is a **setup-time**
+/// call and never reaches the capture thread's real-time loop (NFR section 5).
+/// The shell caches what it returns rather than calling it per frame.
+pub fn endpoints(mode: CaptureMode) -> Result<Vec<String>, CaptureError> {
+    let _com = unsafe { ComScope::enter()? };
+    unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-        let render = enumerate_endpoints(&enumerator, eRender)?;
-        let capture = enumerate_endpoints(&enumerator, eCapture)?;
-        Ok::<_, CaptureError>((render, capture))
-    })();
-    unsafe { CoUninitialize() };
+        Ok(enumerate_endpoints(&enumerator, dataflow(mode))?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect())
+    }
+}
 
-    let (render, capture) = result?;
+/// Print the active render and capture endpoints by friendly name — the
+/// `--list-devices` startup aid (Plan 0009 Phase 2). Prints exactly what
+/// [`endpoints`] returns, so the roster the operator reads and the roster the
+/// settings menu cycles cannot come from two different enumerations.
+pub fn list_devices() -> Result<(), CaptureError> {
+    let render = endpoints(CaptureMode::Loopback)?;
+    let capture = endpoints(CaptureMode::LineIn)?;
     println!("Render devices (mode = \"loopback\"):");
-    for (name, _) in &render {
+    for name in &render {
         println!("  {name}");
     }
     println!("Capture devices (mode = \"line-in\"):");
-    for (name, _) in &capture {
+    for name in &capture {
         println!("  {name}");
     }
     Ok(())
@@ -281,6 +365,7 @@ struct Stream {
 fn capture_thread(
     selector: &CaptureSelector,
     stop: &AtomicBool,
+    lost: &AtomicBool,
     setup_tx: &mpsc::Sender<SetupResult>,
 ) {
     // COM init and all WASAPI calls stay on this one thread.
@@ -291,9 +376,9 @@ fn capture_thread(
     }
 
     match setup_stream(selector) {
-        Ok((mut stream, format, consumer)) => {
-            let _ = setup_tx.send(Ok((format, consumer)));
-            run_capture_loop(&mut stream, stop);
+        Ok((mut stream, format, device, consumer)) => {
+            let _ = setup_tx.send(Ok((format, device, consumer)));
+            run_capture_loop(&mut stream, stop, lost);
             unsafe {
                 let _ = stream.audio_client.Stop();
             }
@@ -308,17 +393,21 @@ fn capture_thread(
 
 fn setup_stream(
     selector: &CaptureSelector,
-) -> Result<(Stream, AudioFormat, SampleConsumer), CaptureError> {
+) -> Result<(Stream, AudioFormat, String, SampleConsumer), CaptureError> {
     // Loopback taps a render endpoint with the loopback stream flag; line-in
     // captures an input endpoint with no extra flags.
-    let (dataflow, stream_flags) = match selector.mode {
-        CaptureMode::Loopback => (eRender, AUDCLNT_STREAMFLAGS_LOOPBACK),
-        CaptureMode::LineIn => (eCapture, 0u32),
+    let stream_flags = match selector.mode {
+        CaptureMode::Loopback => AUDCLNT_STREAMFLAGS_LOOPBACK,
+        CaptureMode::LineIn => 0u32,
     };
+    let flow = dataflow(selector.mode);
     unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-        let device = pick_device(&enumerator, dataflow, selector.device.as_deref())?;
+        let device = pick_device(&enumerator, flow, selector.device.as_deref())?;
+        // Read at setup, before the real-time loop, and carried out with the
+        // handle: the loop can never ask an endpoint for its name.
+        let friendly = friendly_name(&device).unwrap_or_else(|| "<unknown>".to_owned());
         let audio_client: IAudioClient = device.Activate(CLSCTX_ALL, None)?;
 
         let mix_format = audio_client.GetMixFormat()?;
@@ -359,14 +448,31 @@ fn setup_stream(
                 channels: core_format.channels as usize,
             },
             core_format,
+            friendly,
             consumer,
         ))
     }
 }
 
+/// Whether a packet-call error means the stream is *gone* rather than merely
+/// unhappy.
+///
+/// `AUDCLNT_E_DEVICE_INVALIDATED` is what WASAPI reports when the endpoint is
+/// removed, disabled, or has its format changed underneath the client. Every
+/// other code stays transient: the loop cannot tell a hiccup from a teardown,
+/// and promoting both would tear capture down on noise.
+fn is_device_lost(err: &windows::core::Error) -> bool {
+    err.code() == AUDCLNT_E_DEVICE_INVALIDATED
+}
+
 /// The real-time loop. From here until `stop` flips: no allocation, no locks,
 /// no logging, no I/O — copy packets into the ring, release, sleep.
-fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool) {
+///
+/// A dead stream ends the loop rather than sleeping back into it: `lost` is
+/// stored and the function returns, leaving the shell to decide what runs next.
+/// Spinning on an invalidated device delivers nothing and says nothing, which is
+/// the failure this exit exists to end.
+fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool, lost: &AtomicBool) {
     // Preallocated so silent packets cost no heap work inside the loop.
     let silence = [0.0f32; SILENCE_CHUNK_SAMPLES];
     let channels = stream.channels;
@@ -380,7 +486,13 @@ fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool) {
         loop {
             let packet_frames = match unsafe { capture_client.GetNextPacketSize() } {
                 Ok(n) => n,
-                Err(_) => break,
+                Err(e) => {
+                    if is_device_lost(&e) {
+                        lost.store(true, Ordering::Relaxed);
+                        return;
+                    }
+                    break;
+                }
             };
             if packet_frames == 0 {
                 break;
@@ -391,7 +503,11 @@ fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool) {
             let got = unsafe {
                 capture_client.GetBuffer(&mut data, &mut frames_read, &mut flags, None, None)
             };
-            if got.is_err() {
+            if let Err(e) = got {
+                if is_device_lost(&e) {
+                    lost.store(true, Ordering::Relaxed);
+                    return;
+                }
                 break;
             }
             let sample_count = frames_read as usize * channels;
@@ -406,7 +522,11 @@ fn run_capture_loop(stream: &mut Stream, stop: &AtomicBool) {
                 // without blocking.
                 let _ = producer.push_samples(samples);
             }
-            if unsafe { capture_client.ReleaseBuffer(frames_read) }.is_err() {
+            if let Err(e) = unsafe { capture_client.ReleaseBuffer(frames_read) } {
+                if is_device_lost(&e) {
+                    lost.store(true, Ordering::Relaxed);
+                    return;
+                }
                 break;
             }
         }
@@ -466,4 +586,51 @@ unsafe fn parse_mix_format(fmt: *const WAVEFORMATEX) -> Result<MixFormat, Captur
         sample_rate,
         channels,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use windows::Win32::System::Com::COINIT_APARTMENTTHREADED;
+
+    use super::*;
+
+    /// **Enumeration has to work from a thread that is already in an STA**, and
+    /// leave that apartment standing.
+    ///
+    /// The render/UI thread is an STA (winit initializes one), and the settings
+    /// menu enumerates from there. `CoInitializeEx(MULTITHREADED)` answers
+    /// `RPC_E_CHANGED_MODE` on such a thread: treating that as a failure empties
+    /// the roster on exactly the thread that needs it, and pairing it with a
+    /// `CoUninitialize` releases a reference the call never took — which tears
+    /// the caller's apartment down, so the *next* COM call fails instead of this
+    /// one. Hence two enumerations and then a plain object creation: the damage
+    /// this guards against is always visible one call late.
+    #[test]
+    fn enumerating_from_an_sta_leaves_the_apartment_intact() {
+        let hr = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+        assert!(hr.is_ok(), "the test could not enter an STA: {hr:?}");
+
+        let first = endpoints(CaptureMode::Loopback);
+        let second = endpoints(CaptureMode::LineIn);
+        let after: Result<IMMDeviceEnumerator, _> =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) };
+        unsafe { CoUninitialize() };
+
+        // A machine with no endpoints at all is allowed (a headless runner has
+        // none); being told the apartment is wrong is not.
+        for result in [&first, &second] {
+            if let Err(CaptureError::Windows(e)) = result {
+                assert_ne!(
+                    e.code(),
+                    RPC_E_CHANGED_MODE,
+                    "an STA caller was reported as a failure: {e}"
+                );
+            }
+        }
+        assert!(
+            after.is_ok(),
+            "the caller's apartment did not survive the enumeration: {:?}",
+            after.err()
+        );
+    }
 }
