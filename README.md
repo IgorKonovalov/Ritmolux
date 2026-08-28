@@ -260,6 +260,44 @@ restart. Off means no track ever reaches the visualizer.
   writes it to `config.toml`'s `[quality] tier`. `--tier` and `LMV_TIER` still win at the next
   launch, so the precedence below is unchanged. Expect a brief re-accumulation of trails and
   feedback when it switches: the tier sizes GPU resources, so changing it rebuilds them.
+- `--osc <host:port>` — publish the analyzer's telemetry as OSC over UDP, so a lighting console or a
+  bridge can follow the music. **Off unless you ask for it**; the flag both aims the sink and turns
+  it on, so `enabled = false` in `config.toml` cannot veto a target typed for this run. A target
+  that will not resolve is a usage error and the app exits — the same way a bad `--tier` does —
+  whereas a stale target in `config.toml` degrades to no sink and says so, because a config file
+  must not stop a show. Sends are **non-blocking and dropped on failure**: a broken link costs the
+  telemetry, never a frame, and the app prints one line when it starts failing and one when it
+  recovers rather than a line per frame.
+
+  The `[osc]` section in `config.toml` carries the same settings for a rig you run every night:
+  `enabled` (default `false`), `target` (default `127.0.0.1:9000`), and `rate_hz` — datagram sets
+  per second, default `60`, where `0` means every rendered frame. `--osc` overrides `target` and
+  leaves `rate_hz` to the file, which is the one key it has no spelling for.
+
+  **The address space is versioned in the addresses**, so a later signal is additive under the same
+  `/lmv/v1` prefix and a mapping you have already bound keeps working. One argument per address, so
+  a console binds a parameter to an address rather than to a position inside a message:
+
+  | Address | Type | What it carries |
+  |---------|------|-----------------|
+  | `/lmv/v1/level/bass` | `f` | Bass level, peak-normalized to `0`–`1` |
+  | `/lmv/v1/level/mid` | `f` | Mid level, peak-normalized |
+  | `/lmv/v1/level/treb` | `f` | Treble level, peak-normalized |
+  | `/lmv/v1/level/onset` | `f` | Spectral-flux onset envelope, peak-normalized |
+  | `/lmv/v1/level/rms` | `f` | Broadband RMS of the waveform trace — **un-normalized**, unlike the four above it, because the trace it comes from deliberately is. Map it with a gain in the console |
+  | `/lmv/v1/raw/bass` | `f` | Raw mean magnitude in the bass band — the absolute twin of `level/bass` |
+  | `/lmv/v1/raw/mid` | `f` | Raw mean magnitude, mid |
+  | `/lmv/v1/raw/treb` | `f` | Raw mean magnitude, treble |
+  | `/lmv/v1/raw/onset` | `f` | Raw spectral-flux envelope |
+  | `/lmv/v1/beat/trigger` | `i` | `1` on a frame an onset fired, `0` otherwise — the discrete event |
+  | `/lmv/v1/beat/index` | `i` | Monotone count of onset detections. **Not a musical beat count** — the detector fires 1.2x–2.3x per beat depending on material, so no fixed multiplier turns it into bars. Useful as a ratchet, not as a meter |
+  | `/lmv/v1/beat/phase` | `f` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next |
+  | `/lmv/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles |
+  | `/lmv/v1/preset` | `s` | The active preset's name |
+
+  Telemetry rides the rendered frame, so it stops when the window is hidden and the preset name
+  lags a switch by one frame. Nothing here is a musical timebase you can drive a sequencer from —
+  it is a level feed for lights.
 - `LMV_PRESET_DIR=<dir>` — point the app at a custom preset folder instead of the seeded per-user
   directory; edits to `*.toml` there hot-reload live.
 - `LMV_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
