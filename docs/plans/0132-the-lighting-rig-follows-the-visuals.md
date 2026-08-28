@@ -18,8 +18,10 @@ so Arena can sample it onto fixtures and the room inherits the preset's actual c
 
 **The OSC half ships first and stands alone.** It touches no `core` code, needs no GPU, no SDK and
 no Plan 0115, and its first user-visible behavior is **a lamp changing on the beat**. The NDI half
-is behind two gates that can each kill it, and the plan is ordered so that neither takes the OSC
-half down with it.
+is behind two gates that can each kill it — Plan 0115's unbuilt frame tap and an unread SDK licence
+— and the plan is ordered so that neither takes the OSC half down with it. **Under the 2026-08-29
+show date that ordering is the whole point:** Phases 1a through 4 are the deliverable, and nothing
+on the show-night path waits on the video half.
 
 ## Context & problem
 
@@ -31,8 +33,8 @@ music does — which is exactly what this engine already computes and already dr
 [ADR-0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
 is the decision: two sinks, Arena owns the mapping, the transport set is constrained by what Arena
 can natively ingest across machines. It also lists **six facts it rests on that are unverified in
-this repo** — the NDI licence chief among them — and this plan's first phase is where they are
-established, before any code exists to be wasted.
+this repo** — the NDI licence chief among them. Phases 1a and 1b establish them, split so the
+NDI ones gate only the NDI phases.
 
 **The two halves have very different dependency weight, and the phase order is built on that.** The
 OSC half is a UDP socket and a message encoder in the shell. The NDI half needs
@@ -42,8 +44,9 @@ put the cheap, certain half behind the expensive, uncertain one.
 
 ## Decision
 
-Take ADR-0144 as written, and **order the plan so value lands before risk**: the human rig gate
-first, then the entire OSC path through to a lamp moving on the beat, then the video path.
+Take ADR-0144 as written, and **order the plan so value lands before risk**: confirm the rig half we
+do not own, then the entire OSC path through to a lamp moving on the beat, then — behind its own
+stop gate and its own external dependency — the video path.
 
 ## Architecture diagram
 
@@ -77,34 +80,53 @@ flowchart LR
 
 ## Implementation phases
 
-### Phase 1 — Establish the six unverified facts on the real rig, with no engine code
+> **Amended 2026-08-28, on a show date of 2026-08-29.** Phase 1 was originally one human stop gate
+> covering both transports and running before `dev` started. That is wrong under a deadline: it puts
+> the cheap, certain OSC half behind an NDI licence read that cannot help tomorrow's show. It is
+> split into **1a (OSC)** and **1b (NDI)**, and **only 1b is a stop gate** — for Phases 5 to 7 alone.
+
+### Phase 1a — Confirm Arena reaches the lamps at all, with no engine code
 
 - **Owner skill:** human
-- **What:** settle every assumption ADR-0144's `## Notes` lists, using generic tools only, on the
-  actual Arena installation and the actual fixtures. **This is a stop gate with three separable
-  outcomes**, and which one occurs decides how much of this plan runs.
+- **What:** establish that the half of the chain **we do not own** works, before anything we build
+  is pointed at it. This is not a formality: if Arena's Art-Net output is not reaching a fixture,
+  every signal we send is irrelevant and the failure will look like ours.
 - **Files touched:** none in the repo. Findings go in this plan's `## Implementation log`.
-- **How:** two independent probes, either order.
-  - **OSC probe.** From the visualizer machine, send OSC to Arena with any generic sender, bind an
-    incoming address to a parameter in Arena, and watch a fixture. Record the port, the address
-    matching rules, and whether a value arriving at frame rate is acted on per message or throttled.
-  - **NDI probe.** From the visualizer machine, publish a generic NDI source (a test pattern or
-    screen capture from NDI's own tools) across the Ethernet link, and receive it in Arena. Record
-    Arena's edition and version, whether NDI appears as a source at all, and the name and sampling
-    model of Arena's DMX/Art-Net output feature — read off the running app, not from memory.
-  - **The licence read.** Open the NDI SDK's own licence and record what it says about accepting
-    terms, redistributing the runtime, and attribution.
-- **Done when** this plan's log records all six of ADR-0144's unverified facts, **and states which
-  of these three outcomes occurred:**
-  - **(a) Both probes work and the licence permits our distribution model.** The whole plan
-    proceeds as written.
-  - **(b) OSC works; NDI does not** — unsupported by that Arena, or the licence refuses. **Phases 2
-    to 4 proceed and Phases 5 to 7 do not.** ADR-0144 is accepted with a dated `Outcome` section
-    recording which, and its **Alternative C** (HDMI plus a capture card) becomes the live question
-    for a separate plan. This outcome still delivers a working feature.
-  - **(c) Neither works.** The plan stops here and ADR-0144 is superseded rather than accepted.
-- **Note the fallback that is not a failure:** if the licence forbids *redistribution* but permits
-  the operator installing the NDI runtime on both machines, that is outcome (a) with a documented
+- **How** — at the venue, in roughly this order, none of it needing our code:
+  - Move a parameter **by hand** in Arena and watch a fixture change. Record Arena's DMX/Art-Net
+    output feature name and how it samples a source onto a fixture.
+  - Turn on Arena's **OSC input** and record the port it listens on, and how a parameter is bound
+    to an incoming address — Arena defines the address, so record the exact string it expects.
+  - Record both machines' IP addresses and confirm they reach each other across the Ethernet link.
+  - Record Arena's **edition and version**.
+- **Done when** the log records the above, and in particular **whether a hand-moved parameter in
+  Arena visibly changes a fixture.** If it does not, this plan is blocked on the rig, not on us, and
+  that is the finding.
+- **Under the deadline this phase may run *concurrently with* Phase 2 rather than before it**, and
+  the OSC probe may be performed with the Phase 2 binary itself instead of a generic sender. The
+  risk that accepts is small and named: our sink emits standard OSC 1.0 over UDP, so the only thing
+  a generic sender would have de-risked is our own encoder, which Phase 2 unit-tests against the
+  spec's padding rules anyway.
+
+### Phase 1b — The NDI probe and the licence read
+
+- **Owner skill:** human
+- **What:** settle ADR-0144's remaining unverified facts for the video half. **This is a stop gate
+  for Phases 5 to 7 only.** It does not gate Phases 2 to 4 and it is not on the show-night path.
+- **Files touched:** none in the repo. Findings go in this plan's `## Implementation log`.
+- **How:** publish a generic NDI source (a test pattern or screen capture from NDI's own tools) from
+  the visualizer machine across the Ethernet link, and receive it in Arena. Separately, open the NDI
+  SDK's own licence and record what it says about accepting terms, redistributing the runtime, and
+  attribution.
+- **Done when** the log records whether NDI appears as a source in that Arena at all, the licence
+  terms, and **which of these outcomes occurred:**
+  - **(a) NDI arrives and the licence permits our distribution model.** Phases 5 to 7 proceed.
+  - **(b) NDI is unsupported there, or the licence refuses.** Phases 5 to 7 do not run. ADR-0144 is
+    accepted with a dated `Outcome` section recording which, and its **Alternative C** (HDMI plus a
+    capture card) becomes the live question for a separate plan. **Phases 2 to 4 are unaffected and
+    the plan still delivers a working feature.**
+- **The fallback that is not a failure:** if the licence forbids *redistribution* but permits the
+  operator installing the NDI runtime on both machines, that is outcome (a) with a documented
   install step, not outcome (b). Say which one it is.
 
 ### Phase 2 — The OSC telemetry sink, through to values on the wire
@@ -205,7 +227,7 @@ flowchart LR
 ### Phase 6 — The NDI sender in the standalone
 
 - **Owner skill:** dev
-- **Depends on:** Phase 1 outcome (a), and Phase 5.
+- **Depends on:** Phase 1b outcome (a), and Phase 5.
 - **What:** publish each resolved frame as an NDI source, behind a cargo feature that is **off by
   default**.
 - **Files touched:** new `standalone/src/ndi.rs`, `standalone/Cargo.toml`, `standalone/src/main.rs`,
@@ -299,7 +321,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |-------|-------|-------|--------|
-| 1 | human | not started | — |
+| 1a | human | not started | — |
+| 1b | human | not started | — |
 | 2 | dev | not started | — |
 | 3 | dev | not started | — |
 | 4 | human | not started | — |
