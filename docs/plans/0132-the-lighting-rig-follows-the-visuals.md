@@ -385,9 +385,13 @@ bullet is unmet and needs the rig.
 pattern match against `/lmv/v1/beat/*` behaves differently for a prefix than for
 a sibling.
 
-**One observation outside this phase's scope:** the tempo estimate settled at
-**59.84 BPM against a signal built at 120 BPM** — a half-tempo lock. The sink
-publishes what the analyzer reports; nothing here touches the estimator.
+**One observation outside this phase's scope, and its retraction.** The tempo
+estimate settled at **59.84 BPM against a signal built at 120 BPM** in the
+13-second probe above, which read as a half-tempo lock. A later 45-second run on
+the same signal settled at **127.84 BPM**, so the low reading was the estimator
+still warming rather than a standing defect. Recorded because the first number
+was written here before the second existed; **there is no tempo finding.** The
+sink publishes what the analyzer reports either way.
 
 **Phase 3 — the inline send ships; `standalone/src/osc.rs` and
 `standalone/src/main.rs` were not modified.** The criterion is met on all three
