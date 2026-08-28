@@ -274,8 +274,8 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The analyzer levels the trace | dev | done | `afd8aa5` |
-| 2 — The trace spans the width | dev | done | committed with this row |
-| 3 — One reference capture | human | not started | |
+| 2 — The trace spans the width | dev | done | `3560eed` |
+| 3 — One reference capture | human | **stop gate — waiting on the user** | |
 | 4 — The base amplitude constant | dev | not started | |
 | 5 — The docs say what the contract is | dev | not started | |
 
