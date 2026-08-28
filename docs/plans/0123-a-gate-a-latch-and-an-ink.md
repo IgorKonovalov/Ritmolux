@@ -324,7 +324,7 @@ struct LatchBank {
 | 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
 | 4 — the latch bank runs | dev | done | `696fca9` |
 | 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
-| 6 — `collage_mono` recomposes on the music | human | not started | |
+| 6 — `collage_mono` recomposes on the music | human | done | `60b3508` |
 | 7 — the line family gets a seam | dev | done | `e745c45` |
 | 8 — the class is written down | dev | done | `a9a16b9` |
 | 9 — a mono line world | human | not started | |
@@ -353,6 +353,16 @@ struct LatchBank {
   would happen: it rewrites the two rate lines to the values the file now
   carries, so it has stopped measuring a hypothetical preset and measures the
   shipped one.
+- **The latch is separated from its own arming window** (Phase 6), which is the
+  claim `collage_mono` now rests on and the one a single frame cannot make. On a
+  copy of the shipped preset with `drift`, `spin`, `pan_x`, `pan_y`,
+  `angle_bias`, `density`, `scale` and `pump_size` pinned to constants — so any
+  difference between two frames **is** a recomposition — and the window shortened
+  to one second in two: **silence at 60 vs 480 frames, across about seven arming
+  windows, is byte-identical**, while the same file under `--signal click:120`
+  re-cuts once per window with the `recompose_blend` dissolve visible mid-hop.
+  The shipped file, whose window opens at `t > 90 s`, is composition-static
+  across a whole 4 s filmstrip. `--report` flags nothing.
 - **`collage_mono` measured with every enumerated mixer off** (Phase 8), 1280x720:
   three flat regions, `#000000` exact over 86 007 px, and **none of the three
   carrying the palette's literal RGB** (`#ffffff` → `#e7e7e7`, `#b00808` →
@@ -418,8 +428,6 @@ struct LatchBank {
   additive circles in one picture.
 - **Phase 7 did not touch `core/src/preset/schema.rs`**, which it lists.
   `SystemKind::param_names()` already delegates to each scene's `PARAMS`, so
-  declaring `stroke_blend` in the four scenes is the whole of making it reachable.
-- **Phase 7 landed one line of Phase 8's doc pass.**
   `every_declared_param_is_documented_in_the_presets_readme` fails the moment a
   `PARAMS` entry has no README mention, so `stroke_blend`'s roster rows and its
   entry are in Phase 7's commit; the class prose is in Phase 8's.
@@ -429,25 +437,31 @@ struct LatchBank {
 - **`presets/` touched:** one `.toml` edited — `collage_mono.toml`, in Phase 2.
   No preset added or retired yet; Phase 9 is what would add one. `presets/README.md`
   in Phases 7 and 8.
-- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **0145 is complete —
-  both halves.** For the other two the **engine half** shipped and the content
-  half is an outstanding `human` phase (0147 → Phase 6, 0148 → Phase 9).
+- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **0145 and 0147 are
+  complete — both halves.** For 0148 the **engine half** shipped and the content
+  half is Phase 9.
 - **What shipped:** feature. A `[latch]` grammar table with render-layer state, a
   preset-reachable `stroke_blend` on the four line systems, a disjunctive
   `animation` gate with a second derived floor, and `AnalysisFrame::fully_driven`
   in `core`. No C ABI change, no new scene, no new dependency.
 - **Operator docs touched:** `docs/capturing.md`, `docs/presets.md`,
   `docs/preset-palettes.md`, `presets/README.md`.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`): exits 1, one
-  broken.** `docs/design-backlog.md:3389` — 0145's probe asserts
-  `present: let audio = AnalysisFrame::default\(\); in: core/tests/animation.rs`,
-  and Phase 1 renamed that binding to `silent_audio`. The entry is one this plan
-  `Closes:`, so the probe is describing code the plan changed on purpose. **The
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`): exits 1, three
+  broken.** All three are entries this plan `Closes:`, and each describes code
+  the plan changed on purpose:
+  - `:3389` — 0145 asserts `present: let audio = AnalysisFrame::default\(\); in:
+    core/tests/animation.rs`; Phase 1 renamed that binding to `silent_audio`.
+  - `:3393` — 0145 asserts `present: THE SWAY IS WHAT MAKES THIS WORLD PASS in:
+    presets/collage_mono.toml`; Phase 2 is precisely the removal of that header.
+  - `:3497` — 0147 asserts `present: "mod\(time \+ 50, 100\) < 50" in:
+    presets/collage_mono.toml`; Phase 6 replaced that binding with the latch.
+
+  A probe falsified **by the plan that closes its entry** is the gate working,
+  not a defect: each one now reads as evidence the content half landed. **The
   tree's tip is red on this gate and `pre-push` runs it.** Nothing here edited
   `docs/design-backlog.md` — the backlog is architect's lane.
-- **Outstanding `human` phases:** 6 (`collage_mono` recomposes on a latch) and 9
-  (a mono line world on the new seam). Both are `preset-author` sessions and
-  neither blocks the other. Phase 2 landed as `77dadd9`.
+- **Outstanding `human` phases:** 9 (a mono line world on the new seam), a
+  `preset-author` session. Phases 2 and 6 landed as `77dadd9` and `60b3508`.
 
 ## Followups (after this lands)
 
