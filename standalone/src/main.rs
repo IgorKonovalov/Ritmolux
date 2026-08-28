@@ -31,6 +31,7 @@ use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
 use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
 use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierState};
 use soak::SoakLog;
+use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::{
     APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
     rss, tier_env,
@@ -185,6 +186,10 @@ struct AppState {
     /// Per-beat downbeat decomposition log, present only with `--downbeat-log`
     /// (Plan 0086 Phase 1). Absent otherwise, so the frame path is unchanged.
     downbeat_log: Option<DownbeatLog>,
+    /// Lighting telemetry sink, present only when `--osc` or `[osc] enabled`
+    /// turned it on (ADR-0144). Absent otherwise, so the frame path is a `None`
+    /// test and no socket is bound.
+    osc: Option<OscSink>,
     /// Wall-clock time of the previous left-button press, for detecting a
     /// double-click (fullscreen toggle). `None` until the first click.
     last_click: Option<Instant>,
@@ -249,6 +254,7 @@ impl AppState {
         downbeat_log_path: Option<PathBuf>,
         tier: Option<Tier>,
         input: config::Input,
+        osc: Option<OscSink>,
     ) -> Self {
         let size = window.inner_size();
         let mut renderer = Renderer::new(
@@ -328,6 +334,7 @@ impl AppState {
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
             downbeat_log: downbeat_log_path.map(DownbeatLog::new),
+            osc,
             last_click: None,
             pending_switch_settle: false,
             // Seeded from what `reload_presets` already printed above, so the
@@ -560,6 +567,41 @@ impl AppState {
         // lock. The core ignores a string it already has, so this cannot
         // re-trigger the banner on its own.
         self.poll_now_playing();
+
+        // Lighting telemetry (ADR-0144), opt-in. Sent **before** the render so
+        // the datagrams leave ahead of the present's vsync wait rather than
+        // behind it, which is the largest single latency this path can avoid.
+        //
+        // Two consequences of riding the rendered frame, both deliberate. A
+        // preset switch dissolves, so `preset_name` still answers with the
+        // outgoing preset for one frame after a switch (see
+        // `pending_switch_settle`) - a 16 ms lag on a string that moves every
+        // tens of seconds. And a hidden window returns above this point, so
+        // telemetry stops with the picture; the sink follows what is drawn.
+        if let Some(osc) = self.osc.as_mut() {
+            let preset = self.renderer.preset_name();
+            osc.send(
+                now,
+                &Telemetry {
+                    bass: frame.bass,
+                    mid: frame.mid,
+                    treb: frame.treb,
+                    onset: frame.onset,
+                    rms: rms_of(&frame.waveform),
+                    bass_raw: frame.bass_raw,
+                    mid_raw: frame.mid_raw,
+                    treb_raw: frame.treb_raw,
+                    onset_raw: frame.onset_raw,
+                    beat: frame.beat,
+                    beat_index: frame.beat_index,
+                    // `bar` is beat phase under a documented misnomer
+                    // (ADR-0050); the wire uses the true name.
+                    beat_phase: frame.bar,
+                    tempo: frame.bpm,
+                    preset,
+                },
+            );
+        }
 
         // Queue the on-canvas text for this frame (active name + browse list).
         self.queue_frame_text();
@@ -1684,6 +1726,10 @@ struct App {
     /// `[input]` (Plan 0130). Held beside `config` rather than written into it,
     /// so a flag pins this launch without persisting itself on the next save.
     input: config::Input,
+    /// The telemetry sink, already bound in `main` — so a bad target is a
+    /// startup error rather than a window that opens and then reports one.
+    /// `None` when the sink is off.
+    osc: Option<OscSink>,
     state: Option<AppState>,
 }
 
@@ -1723,6 +1769,7 @@ impl ApplicationHandler for App {
                         self.downbeat_log_path.take(),
                         self.tier,
                         std::mem::take(&mut self.input),
+                        self.osc.take(),
                     );
                     state.window.request_redraw();
                     self.state = Some(state);
@@ -2032,6 +2079,46 @@ fn resolve_input(
     (resolved, source)
 }
 
+/// The `--osc <host:port>` override, in both the spaced and the `=` spelling.
+///
+/// `Err` on the flag with nothing after it. An empty value is refused for the
+/// same reason `--device=` is: it reads as a request and means nothing.
+fn parse_osc_arg() -> Result<Option<String>, String> {
+    parse_osc_arg_from(std::env::args().skip(1))
+}
+
+/// [`parse_osc_arg`]'s rule as a pure function of the argument list.
+fn parse_osc_arg_from(args: impl Iterator<Item = String>) -> Result<Option<String>, String> {
+    let mut args = args.peekable();
+    let mut target = None;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--osc", &mut args) {
+            let value = value?;
+            if value.trim().is_empty() {
+                return Err("--osc: expected a target as host:port".to_owned());
+            }
+            target = Some(value);
+        }
+    }
+    Ok(target)
+}
+
+/// Resolve the telemetry target: `--osc` over `[osc]`. `None` means the sink
+/// stays off and no socket is bound.
+///
+/// **The flag both aims the sink and turns it on**, which is what makes
+/// `--osc 10.0.0.4:7700` a complete instruction rather than one that also needs
+/// `enabled = true` in a file. `enabled = false` in the config cannot veto a
+/// flag typed for this run — the flag is the more specific statement, the same
+/// precedence `--input` and `--tier` already have.
+fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<(String, u32)> {
+    match flag {
+        Some(target) => Some((target, config.rate_hz)),
+        None if config.enabled => Some((config.target.clone(), config.rate_hz)),
+        None => None,
+    }
+}
+
 /// Default soak-log location: under the per-user app dir, or `soak.log` in the
 /// current directory if that can't be resolved — so `--soak` always logs
 /// somewhere.
@@ -2245,6 +2332,38 @@ fn main() {
         );
     }
 
+    // Lighting telemetry, flag over config (ADR-0144). Bound here rather than
+    // in the window's `resumed`, so a target that cannot be resolved is a usage
+    // error at startup - a flag typed for this run, refused for the same reason
+    // a bad `--tier` is. A target that comes from `config.toml` is **not**
+    // fatal: a stale file must not stop the show, so it degrades to no sink and
+    // says so (NFR 10).
+    let osc_flag = match parse_osc_arg() {
+        Ok(target) => target,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let from_flag = osc_flag.is_some();
+    let osc = match resolve_osc(osc_flag, &config.osc) {
+        Some((target, rate_hz)) => match OscSink::bind(&target, rate_hz) {
+            Ok(sink) => {
+                eprintln!("osc telemetry to {} at {rate_hz} Hz", sink.target());
+                Some(sink)
+            }
+            Err(msg) if from_flag => {
+                eprintln!("{msg}");
+                std::process::exit(1);
+            }
+            Err(msg) => {
+                eprintln!("{msg}; osc telemetry off");
+                None
+            }
+        },
+        None => None,
+    };
+
     let mut app = App {
         config,
         config_path,
@@ -2252,6 +2371,7 @@ fn main() {
         downbeat_log_path,
         tier,
         input,
+        osc,
         state: None,
     };
     if let Err(err) = event_loop.run_app(&mut app) {
@@ -2264,8 +2384,8 @@ fn main() {
 mod tests {
     use super::{
         INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
-        RecoveryPolicy, config, device_row_index, parse_input_args_from, preset_name_visible,
-        resolve_input,
+        RecoveryPolicy, config, device_row_index, parse_input_args_from, parse_osc_arg_from,
+        preset_name_visible, resolve_input, resolve_osc,
     };
 
     /// **A live input costs nothing and never reopens.** The policy runs every
@@ -2364,6 +2484,63 @@ mod tests {
             "a flapping endpoint reopened past the bound"
         );
         assert_eq!(gave_up, 1, "the give-up notice did not arrive exactly once");
+    }
+
+    /// `--osc` in both spellings, and the empty value refused for the same
+    /// reason `--device=` is: it reads as a request and names nothing.
+    #[test]
+    fn both_osc_flag_spellings_parse() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+
+        assert_eq!(
+            parse_osc_arg_from(argv(&["--osc", "192.168.0.1:9000"]).into_iter()),
+            Ok(Some("192.168.0.1:9000".to_owned()))
+        );
+        assert_eq!(
+            parse_osc_arg_from(argv(&["--osc=192.168.0.1:9000"]).into_iter()),
+            Ok(Some("192.168.0.1:9000".to_owned()))
+        );
+        // An unaccompanied flag stays absent; the resolver decides what that means.
+        assert_eq!(
+            parse_osc_arg_from(argv(&["--soak", "--tier=floor"]).into_iter()),
+            Ok(None)
+        );
+        assert!(parse_osc_arg_from(argv(&["--osc="]).into_iter()).is_err());
+        assert!(parse_osc_arg_from(argv(&["--osc"]).into_iter()).is_err());
+    }
+
+    /// **The flag both aims the sink and turns it on**, and `enabled = false` in
+    /// a file cannot veto it — otherwise `--osc <target>` would silently do
+    /// nothing on the one machine whose config had ever been written. With no
+    /// flag, the config decides, and the built-in default is off: a machine that
+    /// never asked for a lighting rig binds no socket.
+    #[test]
+    fn the_osc_flag_overrides_the_config_and_enables_the_sink() {
+        let off = config::Osc::default();
+        assert!(!off.enabled, "the built-in default must be off");
+        assert_eq!(resolve_osc(None, &off), None);
+
+        assert_eq!(
+            resolve_osc(Some("10.0.0.4:7700".to_owned()), &off),
+            Some(("10.0.0.4:7700".to_owned(), off.rate_hz)),
+            "an explicit flag did not beat `enabled = false`"
+        );
+
+        let on = config::Osc {
+            enabled: true,
+            target: "192.168.1.101:7000".to_owned(),
+            rate_hz: 30,
+        };
+        assert_eq!(
+            resolve_osc(None, &on),
+            Some(("192.168.1.101:7000".to_owned(), 30))
+        );
+        // The flag moves the target and leaves the cadence to the file, which is
+        // the only key it has no spelling for.
+        assert_eq!(
+            resolve_osc(Some("10.0.0.4:7700".to_owned()), &on),
+            Some(("10.0.0.4:7700".to_owned(), 30))
+        );
     }
 
     /// Both spellings of both flags, and the fact that an absent flag stays

@@ -1,6 +1,6 @@
 # 0132 — The lighting rig follows the visuals
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) (proposed),
@@ -317,16 +317,74 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0132-the-lighting-rig-follows-the-visuals`, worktree
+`C:/Users/Igor Konovalov/WORK/lmv-plan-0132`, branched from `main` at `1ec19f2`
+(after Plan 0127's close).
 
 | phase | owner | state | commit |
 |-------|-------|-------|--------|
-| 1a | human | not started | — |
+| 1a | human | partly answered by Phase 2's probe — see Notes | — |
 | 1b | human | not started | — |
-| 2 | dev | not started | — |
+| 2 | dev | done | committed with this row |
 | 3 | dev | not started | — |
 | 4 | human | not started | — |
 | 5 | dev | not started | — |
 | 6 | dev | not started | — |
 | 7 | human | not started | — |
 | 8 | dev | not started | — |
+
+### Notes
+
+**Phase 2 — the rig is not reachable from the dev machine, and the "another
+host" done-when was met on this one instead.** The user gave the Arena machine
+as `192.168.1.101/24`. `ping` returns 100% loss, and three independent causes
+were established before any code ran:
+
+- the dev machine is `192.168.0.171/24` on Wi-Fi — `192.168.1.0/24` is a
+  different subnet and is not on-link;
+- its Ethernet adapter holds `169.254.118.59`, an APIPA address, so the switched
+  gigabit link ADR-0144 requires is not up;
+- `Find-NetRoute 192.168.1.101` resolves to a VPN tunnel (`10.32.5.126`), so
+  traffic for that address leaves through the tunnel rather than the LAN.
+
+`192.168.0.1` (the local gateway) answers in 1-5 ms, so the NIC and the local
+LAN are fine; the path to Arena does not yet exist. **These are Phase 1a's
+findings, arrived at from this end of the link rather than at the venue**, and
+Phase 1a's own questions — whether a hand-moved Arena parameter changes a
+fixture, Arena's OSC port and address strings, its edition — are all still
+open.
+
+So the first done-when bullet was run with the monitor on **this** host
+(`127.0.0.1:9000`), not another one. What it recorded, over ~13 s of loopback
+capture against a synthesized 120 BPM signal: **7,281 datagrams, all 14
+addresses present, every datagram a multiple of 4 bytes.** `level/bass`,
+`level/mid`, `level/treb` and `level/onset` each swept the full `0.0`-`1.0`
+range; `level/rms` `0.0`-`0.505`; `beat/index` ratcheted 0 to 23; `tempo`
+settled at 59.84; `preset` carried `Clifford`. The cross-host half of that
+bullet is unmet and needs the rig.
+
+**Two shapes the plan left open, decided here.**
+
+- **`rms` has no source in `AnalysisFrame`.** ADR-0144 names it in the fixed set
+  and the engine computes no such value. It is computed in the shell from
+  `AnalysisFrame::waveform` (`osc::rms_of`) and published at
+  `/lmv/v1/level/rms`. It is therefore **un-normalized**, unlike the four levels
+  beside it, because the waveform it comes from deliberately is (ADR-0049) —
+  an operator mapping it needs a console-side gain where the other four need
+  none. The observed range above is the evidence for what that gain faces.
+- **The failure behaviour** (the plan asks for a stated choice): a send error
+  drops the datagram, increments a counter, and prints **only on the edge**
+  between working and failing, and again on recovery — the transition shape
+  `reported_overflow` and `reported_demotion` already use. Nothing propagates
+  with `?`. The socket is **non-blocking**, so a `sendto` stalling on ARP
+  resolution cannot cost a frame; `WouldBlock` counts as a drop like any other.
+
+**The address the plan calls "the beat counter" is published as
+`/lmv/v1/beat/trigger` + `/lmv/v1/beat/index`,** two addresses rather than one:
+`/lmv/v1/beat` would have been a prefix of `/lmv/v1/beat/phase`, and an OSC
+pattern match against `/lmv/v1/beat/*` behaves differently for a prefix than for
+a sibling.
+
+**One observation outside this phase's scope:** the tempo estimate settled at
+**59.84 BPM against a signal built at 120 BPM** — a half-tempo lock. The sink
+publishes what the analyzer reports; nothing here touches the estimator.
