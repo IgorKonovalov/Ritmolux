@@ -127,6 +127,11 @@ struct AppState {
     /// resolved — hotkey changes then apply live but don't persist.
     config: Config,
     config_path: Option<PathBuf>,
+    /// The capture selection currently running — resolved at launch across
+    /// `--input` / `--device` / `[input]`, and moved by the settings rows.
+    /// Held apart from `config.input` because a launch flag pins the run
+    /// without writing itself into the file the operator keeps.
+    input: config::Input,
     /// Index (into the live monitor list) of the display the operator has
     /// selected — advanced by the `D` hotkey, used when going fullscreen.
     display_index: usize,
@@ -291,6 +296,7 @@ impl AppState {
             frame_text_meta: Vec::new(),
             config,
             config_path,
+            input,
             display_index,
         }
     }
@@ -689,6 +695,14 @@ impl AppState {
             display_count: monitors.len(),
             display_name,
             diagnostics: self.overlay_on,
+            input_mode: self.input.mode,
+            // The shell holds no endpoint roster, so the device row names what
+            // is running rather than a position in a list, and both input rows
+            // read as the value they have.
+            input_device_index: 0,
+            input_device_count: 0,
+            input_device_name: self.input.device.clone(),
+            input_editable: false,
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
             preset_dir: self.preset_dir.display().to_string(),
@@ -719,6 +733,9 @@ impl AppState {
             SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
             SettingsAction::CycleDisplay => self.cycle_display(),
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
+            // Unreachable while `input_editable` is false: the modal returns
+            // `None` for both rows, so no key can produce either action.
+            SettingsAction::SetInputMode(_) | SettingsAction::CycleInputDevice => {}
             // Persisted, unlike diagnostics: a clean canvas is a staging choice,
             // not a debugging state, so it should survive the restart.
             SettingsAction::TogglePresetName => {

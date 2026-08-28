@@ -9,6 +9,12 @@
 //! module from holding a `Renderer`, a `Window` or a `Config` — and what makes
 //! the dwell clamps and the row/action mapping assertable as values.
 //!
+//! Two config *enums* do cross the seam — [`Tier`] and
+//! [`InputMode`](crate::config::InputMode) — because the rows carrying them are
+//! switches over a closed set, and a row that re-spelled the value could
+//! disagree with what `config.toml` holds. They are `Copy` value types, not the
+//! `Config` struct, so nothing here reads or writes a file.
+//!
 //! # Why not one `ui` module shared with the browser
 //!
 //! The two modals' rows mean genuinely different things: the browser is
@@ -18,6 +24,8 @@
 //! vertically — and that agreement is asserted here rather than inherited.
 
 use lmv_core::render::Tier;
+
+use crate::config::InputMode;
 
 /// Dwell edit step, in seconds. Coarse on purpose: this is a live-show control
 /// operated by eye, not a scheduler.
@@ -68,6 +76,20 @@ pub struct SettingsView {
     pub display_count: usize,
     pub display_name: String,
     pub diagnostics: bool,
+    /// Which capture path is running (`[input] mode`).
+    pub input_mode: InputMode,
+    /// Position of the running endpoint in the shell's cached roster, and how
+    /// big that roster is. A count of zero means there is no roster — an
+    /// enumeration that failed and a dataflow with genuinely no active endpoint
+    /// arrive here identically, and neither may make the row panic or move.
+    pub input_device_index: usize,
+    pub input_device_count: usize,
+    pub input_device_name: String,
+    /// Whether the two input rows can be *moved*. False on macOS and Linux,
+    /// where the capture path takes no operator selection: the rows still
+    /// render, so the menu keeps one shape everywhere and the value stays
+    /// visible, but `edit` yields nothing — the treatment `Presets` already has.
+    pub input_editable: bool,
     /// Whether the corner preset name is drawn at all (`[hud] preset_name`).
     pub preset_name: bool,
     /// Whether a track change announces itself (`[hud] now_playing`).
@@ -136,6 +158,13 @@ pub enum SettingsAction {
     ToggleFullscreen,
     CycleDisplay,
     ToggleDiagnostics,
+    /// Switch the capture path. A switch rather than a toggle, for the reason
+    /// the tier row is one: the value a key produces does not depend on the
+    /// value it is on, so key repeat cannot walk it back and forth.
+    SetInputMode(InputMode),
+    /// Advance to the next endpoint in the shell's cached roster, wrapping.
+    /// Directionless, like [`CycleDisplay`](SettingsAction::CycleDisplay).
+    CycleInputDevice,
     /// Show or hide the corner preset name, persisted (Plan 0096 Phase 3).
     TogglePresetName,
     /// Announce track changes or not, persisted (Plan 0097 Phase 3).
@@ -153,6 +182,8 @@ pub enum SettingsRow {
     Fullscreen,
     Display,
     Diagnostics,
+    InputMode,
+    InputDevice,
     PresetName,
     NowPlaying,
     Presets,
@@ -160,7 +191,7 @@ pub enum SettingsRow {
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 10] = [
+    pub const ALL: [SettingsRow; 12] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
@@ -168,6 +199,11 @@ impl SettingsRow {
         SettingsRow::Fullscreen,
         SettingsRow::Display,
         SettingsRow::Diagnostics,
+        // The pair stays adjacent and in this order: the mode decides which
+        // roster the device row indexes, so reading them the other way round
+        // describes an endpoint list that does not exist yet.
+        SettingsRow::InputMode,
+        SettingsRow::InputDevice,
         // Beside the preset name: both are `[hud]` keys about what the shell
         // paints over the show, and an operator clearing the canvas wants them
         // in one place.
@@ -185,6 +221,8 @@ impl SettingsRow {
             SettingsRow::Fullscreen => "Fullscreen",
             SettingsRow::Display => "Display",
             SettingsRow::Diagnostics => "Diagnostics",
+            SettingsRow::InputMode => "Input mode",
+            SettingsRow::InputDevice => "Input device",
             SettingsRow::PresetName => "Preset name",
             SettingsRow::NowPlaying => "Now playing",
             SettingsRow::Presets => "Presets",
@@ -214,6 +252,28 @@ impl SettingsRow {
                 )
             }
             SettingsRow::Diagnostics => on_off(view.diagnostics).to_owned(),
+            // The kebab word `config.toml` holds, not a prettier one: the menu
+            // and the file have to name the same thing.
+            SettingsRow::InputMode => view.input_mode.as_str().to_owned(),
+            SettingsRow::InputDevice => {
+                if view.input_device_count == 0 {
+                    // No roster to hold a position in, so the row names what is
+                    // running rather than inventing a `1 of 1`.
+                    if view.input_device_name.is_empty() {
+                        "none".to_owned()
+                    } else {
+                        view.input_device_name.clone()
+                    }
+                } else {
+                    // 1-based for the operator, like the `Display` row.
+                    format!(
+                        "{} of {} - {}",
+                        view.input_device_index + 1,
+                        view.input_device_count,
+                        view.input_device_name
+                    )
+                }
+            }
             SettingsRow::PresetName => on_off(view.preset_name).to_owned(),
             SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
@@ -246,6 +306,21 @@ impl SettingsRow {
             SettingsRow::Fullscreen => SettingsAction::ToggleFullscreen,
             SettingsRow::Display => SettingsAction::CycleDisplay,
             SettingsRow::Diagnostics => SettingsAction::ToggleDiagnostics,
+            SettingsRow::InputMode if view.input_editable => {
+                SettingsAction::SetInputMode(if right {
+                    InputMode::LineIn
+                } else {
+                    InputMode::Loopback
+                })
+            }
+            // An empty roster has nothing to advance to, so the key is inert
+            // rather than asking the shell to index into a list that is not
+            // there.
+            SettingsRow::InputDevice if view.input_editable && view.input_device_count > 0 => {
+                SettingsAction::CycleInputDevice
+            }
+            // Read-only: this platform's capture path takes no selection.
+            SettingsRow::InputMode | SettingsRow::InputDevice => SettingsAction::None,
             SettingsRow::PresetName => SettingsAction::TogglePresetName,
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             // Read-only: it tells you where presets are loaded from, which is a

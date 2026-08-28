@@ -314,8 +314,8 @@ struct CaptureHandle {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — endpoint roster as a value, flags over config | dev | done | committed with this row |
-| 2 — the two rows in the pure state machine | dev | not started | |
+| 1 — endpoint roster as a value, flags over config | dev | done | `9005a8d` |
+| 2 — the two rows in the pure state machine | dev | done | committed with this row |
 | 3 — the shell swaps capture live | dev | not started | |
 | 4 — a dead input reports itself | dev | not started | |
 | 5 — on-device gate | human | not started | |
@@ -327,6 +327,10 @@ struct CaptureHandle {
   Phase 2, and the `rename_all = "kebab-case"` they must agree with lives in that file.
 - The resolver and its tests went in `main.rs`, not `lib.rs`: `mod config` is a binary module, so
   `Input`/`InputMode` are not visible from the lib crate.
+- Phase 2 also touched `standalone/src/main.rs`, which its file list omits: extending
+  `SettingsView` breaks the shell's `settings_view()` and `apply_settings_action()`, so the phase
+  cannot build without them. The wiring it lands is a stub — `input_editable: false`, an empty
+  roster, and a no-op arm for the two actions — which Phase 3 replaces.
 - `--input` and `--device` override **field by field** (`--device` alone keeps the configured
   mode). The plan's done-when pins only the both-flags case; the per-field rule is documented in
   `README.md` and asserted in `the_flags_override_the_config_field_by_field`.
