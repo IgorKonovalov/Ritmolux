@@ -163,7 +163,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) | The waveform is levelled at the analyzer, and it publishes the gain it removed | proposed 2026-08-28 (Plan 0127) |
 | [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | proposed 2026-08-28 (Plan 0128) |
 | [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | proposed 2026-08-28 (Plan 0129) |
-| [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | proposed 2026-08-28 (Plan 0130) |
+| [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | accepted 2026-08-28 (Plan 0130), Outcome |
 | [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | proposed 2026-08-28 (Plan 0131) |
 | [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | proposed 2026-08-28 (Plan 0132) |
 <!-- roster:end -->
