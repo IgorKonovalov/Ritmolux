@@ -60,10 +60,18 @@ spin  = "0.30 + clamp(mid * 0.353, 0, 0.30)"
 # hold is zero rather than a duration - a longer hold would read 1.0 for several
 # frames and the parameter would ignore every one of them after the first.
 #
-# A QUIET WINDOW COSTS A CYCLE, AND THAT IS THE POINT. If nothing crosses 0.6 in
-# those ten seconds the permission is never spent, the window closes, and the
-# canvas holds for another 100 s. A poster that re-cuts during an ambient passage
-# because a timer said so is what this replaces.
+# A SILENT WINDOW COSTS A CYCLE. If nothing crosses 0.6 in those ten seconds the
+# permission is never spent, the window closes, and the canvas holds for another
+# 100 s. Measured both ways on this file, through the real analyzer: over a clip
+# with hits in the window it re-cuts once, at t=90; with digital silence across
+# the same ten seconds it does not re-cut at all.
+#
+# BUT "QUIET" IS NOT "SILENT", AND THE DIFFERENCE IS SMALLER THAN IT SOUNDS.
+# `onset` is a fraction of its own DECAYING recent peak, so once a loud passage
+# is a few seconds behind, a pad and a hi-hat cross 0.6 as easily as a kick did.
+# A breakdown with any articulation in it still fires. What gets skipped is
+# near-silence, not an ambient passage - do not rely on this to hold a canvas
+# through a quiet section.
 #
 # `time` is the renderer's shared clock (one per app run, never reset on a preset
 # switch), so the cycle is genuine wall clock and NOT screen time - in a rotating
