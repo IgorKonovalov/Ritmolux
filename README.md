@@ -237,9 +237,18 @@ restart. Off means no track ever reaches the visualizer.
   override independently** — `--device` alone keeps the configured mode, `--input` alone keeps the
   configured device name. A name that matches no active endpoint of the selected mode is *not* an
   error: capture falls back to that mode's default endpoint and says so on stderr, because the
-  interface being unplugged is a fact about the world rather than a typo in the flag. Precedence is
+  interface being unplugged is a fact about the world rather than a typo in the flag. Giving
+  **no name at all** — a trailing `--device`, or `--device=` — *is* an error: an empty value selects
+  the default endpoint, which is the opposite of what naming a device asks for. Precedence is
   `--input`/`--device` > `config.toml`'s `[input]`; there is no environment variable, because an
   input selection is a property of a rig and already persists to the config.
+
+  **If the input goes away mid-show** — the interface is unplugged, the driver resets — the app says
+  so and reopens on that mode's default endpoint, a few times and then no more; `F3` and the
+  `capture` column of `diagnostics.log` name what it fell back to, or say `lost …` if nothing worked.
+  Re-plugging does **not** restore the device, and that is why a recovery is the one input change
+  that is *not* written to `config.toml`: your `[input] device` still names the interface you chose,
+  so the next launch goes back to it. Pick it again from the `S` menu to return to it in this run.
 - `--soak [path]` — write a long-run instrumentation trace (frame-time stats) for stability
   testing; a bare `--soak` logs to a default path under the per-user data dir.
 - `--tier floor|rich` — pin the quality tier instead of letting the engine pick. Unpinned, the app

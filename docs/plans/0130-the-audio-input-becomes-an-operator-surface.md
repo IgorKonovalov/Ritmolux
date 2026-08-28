@@ -362,6 +362,7 @@ struct CaptureHandle {
 | 2 — the two rows in the pure state machine | dev | done | `7eee5f0` |
 | 3 — the shell swaps capture live | dev | done | `dd8fbf3` |
 | 4 — a dead input reports itself | dev | done | `5e29453` |
+| 4b — the review fixes | dev | done | committed with this row |
 | 5 — on-device gate | human | not started | |
 
 ### Notes
@@ -397,6 +398,22 @@ struct CaptureHandle {
   asserts the token verbatim), `docs/on-device-validation.md` and both
   `packaging/*/READ-ME-FIRST.md`, which quote the old token to a tester.
 - Phase 5's on-device gate is untouched and none of its four bullets is covered here.
+- Phase 4b also touched `README.md`, which its file list omits. Two of its done-whens change what an
+  operator observes: a valueless `--device` now exits non-zero, and a recovery no longer writes
+  `config.toml`. The `--device` bullet and a new paragraph under it carry both.
+- Phase 4b's device-row rule went into a free `device_row_index(roster, configured, running)` rather
+  than staying inside the `AppState` method, which needs a window to construct. Its done-when says
+  the row is positioned by the endpoint capture reports running, and that is only assertable as a
+  value; the substring case that motivated the fix is the third assertion in
+  `the_device_row_follows_the_endpoint_that_is_running`.
+- Phase 4b's `--device` done-when names the trailing spelling. `--device=` and an all-whitespace
+  value reach `start_capture` as the same empty string, so all three are refused together rather
+  than only the one the criterion spells out.
+- `a_recovery_restores_the_full_budget` was rewritten, not added to: it asserted the single-live-frame
+  restore that the flap done-when removes. It is now
+  `a_recovery_restores_the_full_budget_once_it_has_settled` and pins the window from both sides.
+- `endpoint_matches` is deleted. It was the second matcher the device-row done-when is about, and
+  nothing else called it.
 
 ### Close triggers
 

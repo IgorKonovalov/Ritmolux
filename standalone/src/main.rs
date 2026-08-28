@@ -99,6 +99,16 @@ struct AppState {
     /// actually moved — an unchanged format keeps the AGC's running peak and the
     /// tempo history, which is most swaps between two 48 kHz endpoints.
     capture_format: AudioFormat,
+    /// Friendly name of the endpoint the running stream actually opened, as the
+    /// capture layer resolved it — `None` when nothing is running, or on a
+    /// platform whose capture path selects no endpoint.
+    ///
+    /// This is what positions the `Input device` row. Deriving that position by
+    /// matching the *configured* name against the roster instead needs a second
+    /// implementation of `pick_device`'s rule, and a second one spelled
+    /// differently disagrees whenever one endpoint's name is a substring of
+    /// another's.
+    capture_endpoint: Option<String>,
     scratch: Vec<f32>,
     occluded: bool,
     /// Frames since the last title refresh (title shows core-sourced fps + p99).
@@ -278,6 +288,7 @@ impl AppState {
 
         let capture = start_capture(&input);
         let capture_format = capture.format;
+        let capture_endpoint = capture.endpoint.clone();
         // Rendered once, here, and only borrowed afterwards: the log's row builder
         // runs every frame and the overlay every frame it is up (Plan 0083).
         let capture_token = capture.verdict.token();
@@ -299,6 +310,7 @@ impl AppState {
             _capture: capture.handle,
             capture_token,
             capture_format,
+            capture_endpoint,
             scratch: vec![0.0; 32_768],
             occluded: false,
             title_tick: 0,
@@ -706,17 +718,28 @@ impl AppState {
     #[cfg(not(windows))]
     fn refresh_input_roster(&mut self) {}
 
-    /// Where the running selection sits in the cached roster.
+    /// Where the running endpoint sits in the cached roster.
     ///
-    /// A configured name that matches no active endpoint has no position, and
-    /// the answer is the roster's leading `default` slot — which is not a
-    /// fallback for the display's sake but the endpoint capture *actually*
-    /// opened, since `pick_device` degrades a name it cannot find the same way.
+    /// Positioned by the name the capture layer reports it **actually opened**,
+    /// compared exactly: both strings come out of the same `endpoints()`
+    /// enumeration, so exact is total here. Matching the *configured* name
+    /// instead would need a second copy of `pick_device`'s rule — exact across
+    /// every endpoint, and only then substring across every endpoint — and a
+    /// copy spelled as a single per-element pass disagrees with it whenever one
+    /// endpoint's name is a substring of another's, highlighting a row the
+    /// stream is not on and cycling from the wrong place.
+    ///
+    /// An explicit `default` selection is the roster's leading slot whatever it
+    /// resolved to, tested with the same rule `start_capture` uses to decide
+    /// there is no name to match. A selection that named an absent endpoint has
+    /// no such slot: it degraded to the default endpoint, and the row names
+    /// that endpoint rather than the word.
     fn input_device_index(&self) -> usize {
-        self.input_roster
-            .iter()
-            .position(|name| endpoint_matches(name, &self.input.device))
-            .unwrap_or(0)
+        device_row_index(
+            &self.input_roster,
+            &self.input.device,
+            self.capture_endpoint.as_deref(),
+        )
     }
 
     /// Stop the running capture stream and start one on `input`, in place.
@@ -736,7 +759,10 @@ impl AppState {
     /// are simply absent, the analyzer runs on `FALLBACK_FORMAT`, and the reason
     /// goes into the verdict — the same degradation a failed startup capture
     /// takes. A swap that fails must not be able to end the show.
-    fn restart_capture(&mut self, input: &config::Input) {
+    ///
+    /// `persist` decides whether `config.toml` follows. See [`Persist`]: an
+    /// operator's swap is a choice the file records, a recovery is not.
+    fn restart_capture(&mut self, input: &config::Input, persist: Persist) {
         // Stop first. The old thread has to be joined before the new one exists
         // or the ring's single-producer invariant would briefly have two
         // claimants, and an endpoint is not reliably re-openable while a stream
@@ -753,6 +779,7 @@ impl AppState {
         }
         self.consumer = started.consumer;
         self._capture = started.handle;
+        self.capture_endpoint = started.endpoint;
         // A stream that is running is not a lost one, whoever asked for it. A
         // start that *failed* leaves the flag as it was, so a recovery keeps its
         // budget and a manual swap does not acquire one.
@@ -760,12 +787,14 @@ impl AppState {
             self.input_lost = false;
         }
 
-        // The selection is recorded even when the start failed: it is what the
-        // operator asked for, so the row shows it and the next launch retries
-        // it, while the verdict says it is not delivering.
+        // The running selection follows even when the start failed: it is what
+        // was asked for, so the row shows it while the verdict says it is not
+        // delivering.
         self.input = input.clone();
-        self.config.input = input.clone();
-        self.save_config();
+        if persist == Persist::Yes {
+            self.config.input = input.clone();
+            self.save_config();
+        }
         eprintln!("audio input: {}", self.capture_token);
         self.window.request_redraw();
     }
@@ -776,6 +805,17 @@ impl AppState {
     /// the whole mechanism. Recovery reopens the mode's **default** endpoint
     /// rather than the named one: the named one is the device that just went
     /// away, and asking for it again is the one request guaranteed to fail.
+    ///
+    /// The reopen is [`Persist::No`]. The operator did not choose the default
+    /// endpoint, and since a re-plug deliberately does not restore the device
+    /// (ADR-0142 Alternative D), `[input] device` in the file is the only record
+    /// of which endpoint the rig wants — a recovery that wrote over it would
+    /// turn a pulled cable into a permanently changed configuration.
+    ///
+    /// Called from `redraw`, so the flag is observed at frame cadence: while the
+    /// window is occluded or minimized nothing redraws and a loss is not seen
+    /// until it comes back. Accepted — there is no show to interrupt behind a
+    /// hidden window.
     fn poll_input_lost(&mut self) {
         if capture_lost(self._capture.as_ref()) {
             self.input_lost = true;
@@ -788,10 +828,13 @@ impl AppState {
                      (attempt {attempt} of {INPUT_RECOVERY_ATTEMPTS})",
                     self.input.mode.as_str()
                 );
-                self.restart_capture(&config::Input {
-                    mode: self.input.mode,
-                    device: DEFAULT_ENDPOINT.to_owned(),
-                });
+                self.restart_capture(
+                    &config::Input {
+                        mode: self.input.mode,
+                        device: DEFAULT_ENDPOINT.to_owned(),
+                    },
+                    Persist::No,
+                );
             }
             Recovery::GiveUp => {
                 self.capture_token = CaptureVerdict::Lost {
@@ -818,10 +861,13 @@ impl AppState {
             // Idempotent, so holding the key does not restart capture per repeat.
             return;
         }
-        self.restart_capture(&config::Input {
-            mode,
-            device: DEFAULT_ENDPOINT.to_owned(),
-        });
+        self.restart_capture(
+            &config::Input {
+                mode,
+                device: DEFAULT_ENDPOINT.to_owned(),
+            },
+            Persist::Yes,
+        );
         // The other dataflow has its own endpoints; the row would otherwise
         // cycle the previous mode's list.
         self.refresh_input_roster();
@@ -834,10 +880,13 @@ impl AppState {
             return;
         }
         let next = (self.input_device_index() + 1) % self.input_roster.len();
-        self.restart_capture(&config::Input {
-            mode: self.input.mode,
-            device: self.input_roster[next].clone(),
-        });
+        self.restart_capture(
+            &config::Input {
+                mode: self.input.mode,
+                device: self.input_roster[next].clone(),
+            },
+            Persist::Yes,
+        );
     }
 
     /// Toggle auto-rotate and **persist it** — the one path for both the `A`
@@ -1372,6 +1421,22 @@ struct CaptureStart {
     consumer: Option<SampleConsumer>,
     format: AudioFormat,
     verdict: CaptureVerdict,
+    /// The endpoint the stream actually opened, by friendly name — the resolved
+    /// one, so a selection that degraded names what is running. `None` when the
+    /// start failed, and on a platform whose capture path picks no endpoint.
+    endpoint: Option<String>,
+}
+
+/// Whether a capture swap writes its selection back to `config.toml`.
+///
+/// The distinction is who asked. A settings row is an operator choosing an
+/// input, and the file records it like every other row. A recovery is the shell
+/// keeping the show alive on whatever endpoint is left, which is not a choice
+/// and must not overwrite one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Persist {
+    Yes,
+    No,
 }
 
 /// How many times a lost input is reopened before the shell stops trying.
@@ -1383,6 +1448,20 @@ struct CaptureStart {
 /// without letting a permanently removed interface stutter the show for longer
 /// than the silence would have.
 const INPUT_RECOVERY_ATTEMPTS: u32 = 3;
+
+/// Consecutive live frames before a recovered input is judged settled and its
+/// retry budget restored.
+///
+/// Without it a single live frame restores the budget, so a stream that opens
+/// and dies immediately — a flapping USB interface, a driver resetting in a loop
+/// — gets a fresh three attempts every cycle and reopens for the rest of the
+/// show. That is the blocking device activation per frame [`INPUT_RECOVERY_ATTEMPTS`]
+/// exists to bound, reached by a different road. A stream that survives this many
+/// frames is delivering rather than merely constructed: an invalidated endpoint
+/// reports itself on the first packet call after start, well inside it. The cost
+/// is that a genuine second unplug within the window inherits the first
+/// incident's remaining budget instead of a full one.
+const INPUT_RECOVERY_SETTLE_FRAMES: u32 = 60;
 
 /// What the shell should do about the capture stream this frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1405,18 +1484,30 @@ enum Recovery {
 struct RecoveryPolicy {
     attempts: u32,
     announced: bool,
+    /// Consecutive live frames since the last loss, counted only while a budget
+    /// is actually spent — an input that has never been lost has nothing to
+    /// restore and never enters the window.
+    settled: u32,
 }
 
 impl RecoveryPolicy {
     /// Advance one frame.
     fn poll(&mut self, lost: bool) -> Recovery {
         if !lost {
-            // A live stream restores the full budget, so a device lost twice in
-            // one show gets a real second chance rather than the remainder of
-            // the first.
-            *self = Self::default();
+            if self.attempts == 0 {
+                return Recovery::Hold;
+            }
+            // A device lost twice in one show should get a real second chance
+            // rather than the remainder of the first — but only once the stream
+            // has proved it is delivering, or a flap would restore the budget
+            // faster than the bound can spend it.
+            self.settled += 1;
+            if self.settled >= INPUT_RECOVERY_SETTLE_FRAMES {
+                *self = Self::default();
+            }
             return Recovery::Hold;
         }
+        self.settled = 0;
         if self.attempts < INPUT_RECOVERY_ATTEMPTS {
             self.attempts += 1;
             return Recovery::Reopen(self.attempts);
@@ -1458,16 +1549,6 @@ const CAPTURE_BACKEND: &str = "none";
 /// match", and the leading entry of the settings menu's endpoint roster.
 const DEFAULT_ENDPOINT: &str = "default";
 
-/// Whether a configured device name selects the endpoint `friendly`.
-///
-/// The rule `pick_device` resolves with — exact ignoring case, else a
-/// case-insensitive substring — so the row reports the endpoint capture opened
-/// rather than a different one that also happens to contain the name.
-fn endpoint_matches(friendly: &str, wanted: &str) -> bool {
-    friendly.eq_ignore_ascii_case(wanted)
-        || friendly.to_lowercase().contains(&wanted.to_lowercase())
-}
-
 /// The format both platform arms fall back to when capture fails, so the analyzer
 /// has something valid to start on. **The verdict never reports it** — a log
 /// stating a format nothing is delivering is worse than no log.
@@ -1475,6 +1556,26 @@ const FALLBACK_FORMAT: AudioFormat = AudioFormat {
     sample_rate: 48_000,
     channels: 2,
 };
+
+/// The roster position of the endpoint a stream actually opened.
+///
+/// Pure, so the one property that matters is assertable without a window: the
+/// row is positioned by what capture **reports running** (`running`), never by
+/// re-matching the configured name against the roster. The configured name is
+/// consulted for exactly one thing — whether it is the `default` word, which is
+/// the roster's leading slot whatever endpoint it resolved to — and that test is
+/// the same one `start_capture` uses to decide there is no name to match.
+///
+/// A name that matched no endpoint degraded to the default endpoint inside the
+/// capture layer, so `running` names that endpoint and the row does too, rather
+/// than echoing a request nothing honoured.
+fn device_row_index(roster: &[String], configured: &str, running: Option<&str>) -> usize {
+    if configured.trim().is_empty() || configured.eq_ignore_ascii_case(DEFAULT_ENDPOINT) {
+        return 0;
+    }
+    let running = running.unwrap_or_default();
+    roster.iter().position(|name| name == running).unwrap_or(0)
+}
 
 /// The capture layer's mode for a config mode — the one place the two enums
 /// meet, so `core`'s source-agnostic split does not turn into a match repeated
@@ -1499,12 +1600,14 @@ fn start_capture(input: &config::Input) -> CaptureStart {
     match capture_win::start(&selector) {
         Ok((handle, consumer)) => {
             let format = handle.format();
-            let verdict = CaptureVerdict::live(CAPTURE_BACKEND, format, handle.device());
+            let endpoint = handle.device().to_owned();
+            let verdict = CaptureVerdict::live(CAPTURE_BACKEND, format, &endpoint);
             CaptureStart {
                 handle: Some(handle),
                 consumer: Some(consumer),
                 format,
                 verdict,
+                endpoint: Some(endpoint),
             }
         }
         Err(err) => {
@@ -1516,6 +1619,7 @@ fn start_capture(input: &config::Input) -> CaptureStart {
                 consumer: None,
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
+                endpoint: None,
             }
         }
     }
@@ -1534,6 +1638,8 @@ fn start_capture(_input: &config::Input) -> CaptureStart {
                 consumer: Some(consumer),
                 format,
                 verdict,
+                // Not an endpoint anything can select, so it positions no row.
+                endpoint: None,
             }
         }
         Err(err) => {
@@ -1543,6 +1649,7 @@ fn start_capture(_input: &config::Input) -> CaptureStart {
                 consumer: None,
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
+                endpoint: None,
             }
         }
     }
@@ -1556,6 +1663,7 @@ fn start_capture(_input: &config::Input) -> CaptureStart {
         consumer: None,
         format: FALLBACK_FORMAT,
         verdict: CaptureVerdict::Unsupported,
+        endpoint: None,
     }
 }
 
@@ -1801,14 +1909,29 @@ fn parse_tier_arg() -> Result<Option<Tier>, String> {
 /// The value of `--name value` / `--name=value` when `arg` is that flag, else
 /// `None`. The spaced spelling consumes the next argument, which is why the
 /// iterator is threaded through rather than re-scanned.
-fn flag_value(arg: &str, name: &str, args: &mut impl Iterator<Item = String>) -> Option<String> {
+///
+/// The inner `Err` is the flag with nothing after it at all. It is a usage error
+/// rather than an empty value, because an empty value is not inert: `--device`
+/// reads `""` as the mode's default endpoint, which is the opposite of asking
+/// for a device by name.
+fn flag_value(
+    arg: &str,
+    name: &str,
+    args: &mut impl Iterator<Item = String>,
+) -> Option<Result<String, String>> {
     if let Some(inline) = arg
         .strip_prefix(name)
         .and_then(|rest| rest.strip_prefix('='))
     {
-        return Some(inline.to_owned());
+        return Some(Ok(inline.to_owned()));
     }
-    (arg == name).then(|| args.next().unwrap_or_default())
+    if arg != name {
+        return None;
+    }
+    Some(
+        args.next()
+            .ok_or_else(|| format!("{name}: expected a value")),
+    )
 }
 
 /// The `--input <mode>` / `--device <name>` overrides, in both the spaced and
@@ -1834,11 +1957,19 @@ fn parse_input_args_from(
     let mut device = None;
     while let Some(arg) = args.next() {
         if let Some(value) = flag_value(&arg, "--input", &mut args) {
+            let value = value?;
             mode =
                 Some(config::InputMode::from_name(&value).ok_or_else(|| {
                     format!("--input `{value}`: expected `loopback` or `line-in`")
                 })?);
         } else if let Some(value) = flag_value(&arg, "--device", &mut args) {
+            let value = value?;
+            // Both spellings, so `--device=` is refused for the same reason a
+            // trailing `--device` is: it selects the default endpoint while
+            // reading as a request for a named one.
+            if value.trim().is_empty() {
+                return Err("--device: expected an endpoint name (see --list-devices)".to_owned());
+            }
             device = Some(value);
         }
     }
@@ -2096,11 +2227,21 @@ fn main() {
     };
     let (input, input_source) = resolve_input(input_mode_flag, input_device_flag, &config.input);
     if input_source != InputSource::Default {
+        // Only Windows' capture path takes a selection; the macOS arm taps the
+        // system mix and Linux has no capture at all. A line that named a source
+        // for a selection the platform never applied would explain a surprising
+        // input by pointing at something that had no effect on it.
+        let applied = if cfg!(windows) {
+            ""
+        } else {
+            " (ignored: this platform's capture path selects no endpoint)"
+        };
         eprintln!(
-            "audio input {} on '{}' by {}",
+            "audio input {} on '{}' by {}{}",
             input.mode.as_str(),
             input.device,
-            input_source.as_str()
+            input_source.as_str(),
+            applied
         );
     }
 
@@ -2122,8 +2263,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        INPUT_RECOVERY_ATTEMPTS, InputSource, Modal, Recovery, RecoveryPolicy, config,
-        parse_input_args_from, preset_name_visible, resolve_input,
+        INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
+        RecoveryPolicy, config, device_row_index, parse_input_args_from, preset_name_visible,
+        resolve_input,
     };
 
     /// **A live input costs nothing and never reopens.** The policy runs every
@@ -2162,21 +2304,66 @@ mod tests {
         }
     }
 
-    /// **A recovered input gets its whole budget back.** An interface unplugged
-    /// twice in one show is two incidents, not one long one, so the second must
-    /// not inherit the remainder of the first.
+    /// **A recovered input gets its whole budget back — once it has settled.**
+    /// An interface unplugged twice in one show is two incidents, not one long
+    /// one, so the second must not inherit the remainder of the first. What the
+    /// window buys is that "recovered" means a stream that kept delivering, not
+    /// one that merely got constructed; the frame the window closes on is
+    /// asserted from both sides, because an off-by-one here is the difference
+    /// between this rule and the one below it.
     #[test]
-    fn a_recovery_restores_the_full_budget() {
+    fn a_recovery_restores_the_full_budget_once_it_has_settled() {
         let mut policy = RecoveryPolicy::default();
         assert_eq!(policy.poll(true), Recovery::Reopen(1));
         assert_eq!(policy.poll(true), Recovery::Reopen(2));
-        // The reopen worked: the next frame sees a live stream.
+
+        // One frame short of the window, the budget is still spent.
+        for _ in 0..INPUT_RECOVERY_SETTLE_FRAMES - 1 {
+            assert_eq!(policy.poll(false), Recovery::Hold);
+        }
+        assert_ne!(
+            policy,
+            RecoveryPolicy::default(),
+            "the budget came back before the stream had settled"
+        );
+
+        // The frame that completes it restores everything.
         assert_eq!(policy.poll(false), Recovery::Hold);
+        assert_eq!(policy, RecoveryPolicy::default());
 
         for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
             assert_eq!(policy.poll(true), Recovery::Reopen(attempt));
         }
         assert_eq!(policy.poll(true), Recovery::GiveUp);
+    }
+
+    /// **A flapping endpoint cannot outrun the bound.** A stream that opens and
+    /// dies on the very next frame is the case that defeats a budget restored by
+    /// a single live frame: it would hand back three attempts every cycle and
+    /// reopen for the rest of the show, which is the blocking device activation
+    /// per frame the bound exists to prevent, reached by a different road than
+    /// a device that never comes back at all.
+    #[test]
+    fn a_stream_that_dies_as_fast_as_it_opens_still_gives_up() {
+        let mut policy = RecoveryPolicy::default();
+        let mut reopens = 0;
+        let mut gave_up = 0;
+        for _ in 0..10_000 {
+            match policy.poll(true) {
+                Recovery::Reopen(_) => {
+                    reopens += 1;
+                    // The reopen "worked" — for exactly one frame.
+                    assert_eq!(policy.poll(false), Recovery::Hold);
+                }
+                Recovery::GiveUp => gave_up += 1,
+                Recovery::Hold => {}
+            }
+        }
+        assert_eq!(
+            reopens, INPUT_RECOVERY_ATTEMPTS,
+            "a flapping endpoint reopened past the bound"
+        );
+        assert_eq!(gave_up, 1, "the give-up notice did not arrive exactly once");
     }
 
     /// Both spellings of both flags, and the fact that an absent flag stays
@@ -2224,6 +2411,76 @@ mod tests {
         // Including the spelling that swallows the next argument when there is
         // none to swallow: an empty value is still a value that named no mode.
         assert!(parse_input_args_from(argv(&["--input"]).into_iter()).is_err());
+    }
+
+    /// **A `--device` with no name is a usage error, in both spellings.** An
+    /// empty value is not inert: `start_capture` reads `""` as the mode's
+    /// default endpoint, so the flag would quietly select the opposite of what
+    /// asking for a device by name means.
+    #[test]
+    fn a_device_flag_with_no_name_is_a_usage_error() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+
+        // Trailing, with nothing to swallow.
+        let err = parse_input_args_from(argv(&["--device"]).into_iter())
+            .expect_err("a bare `--device` selected something");
+        assert!(err.contains("--device"), "{err}");
+        // The `=` spelling of the same mistake, and a value that is only space.
+        assert!(parse_input_args_from(argv(&["--device="]).into_iter()).is_err());
+        assert!(parse_input_args_from(argv(&["--device", "   "]).into_iter()).is_err());
+
+        // The explicit word still parses: `default` is a real selection, and it
+        // is the one an operator types to undo a `--device` in a launcher.
+        assert_eq!(
+            parse_input_args_from(argv(&["--device", "default"]).into_iter()),
+            Ok((None, Some("default".to_owned())))
+        );
+    }
+
+    /// **The device row is positioned by what capture reports running**, never
+    /// by re-matching the configured name against the roster.
+    ///
+    /// The third case is the one that motivates the rule and the only one a
+    /// second matcher gets wrong: `pick_device` matches exact across *every*
+    /// endpoint before it tries substring across every endpoint, so an exact
+    /// name that is also a substring of an earlier entry opens the later one —
+    /// while a per-element exact-or-substring pass stops at the earlier entry
+    /// and highlights a row the stream is not on. Neither name in the pair on
+    /// the development box is a substring of the other, which is why nothing
+    /// there can tell the two rules apart.
+    #[test]
+    fn the_device_row_follows_the_endpoint_that_is_running() {
+        let roster: Vec<String> = ["default", "Headphones (2- USB Audio)", "Headphones"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
+
+        // The `default` word is the leading slot whatever it resolved to — the
+        // row and `config.toml` name the same thing.
+        assert_eq!(
+            device_row_index(&roster, "default", Some("Headphones (2- USB Audio)")),
+            0
+        );
+        assert_eq!(device_row_index(&roster, "  ", Some("Headphones")), 0);
+
+        // The substring trap: `pick_device` opened the exact match at index 2.
+        assert_eq!(
+            device_row_index(&roster, "Headphones", Some("Headphones")),
+            2
+        );
+
+        // A name that matched nothing degraded inside the capture layer, and the
+        // row names the endpoint actually running rather than the request.
+        assert_eq!(
+            device_row_index(&roster, "ZOOM AMS-22", Some("Headphones (2- USB Audio)")),
+            1
+        );
+
+        // Nothing running, and a roster that does not contain what is: index 0
+        // rather than a panic or an out-of-range row.
+        assert_eq!(device_row_index(&roster, "Headphones", None), 0);
+        assert_eq!(device_row_index(&roster, "Headphones", Some("Gone")), 0);
+        assert_eq!(device_row_index(&[], "Headphones", Some("Headphones")), 0);
     }
 
     /// **The flags win over `config.toml`, one field at a time.** This is the
