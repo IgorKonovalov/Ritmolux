@@ -87,11 +87,18 @@ struct AppState {
     consumer: Option<SampleConsumer>,
     // Held for its Drop: stops the capture thread with the app.
     _capture: Option<capture_handle::Handle>,
-    /// The startup capture verdict, already rendered to its one-line token
-    /// (Plan 0083). Built once and borrowed by both durable surfaces — the
-    /// `diagnostics.log` `capture` column and the F3 overlay — so the two can
-    /// never disagree about the same run.
+    /// The capture verdict of the stream running *now*, already rendered to its
+    /// one-line token. Rendered in one place and stored, so the two durable
+    /// surfaces — the `diagnostics.log` `capture` column and the F3 overlay —
+    /// borrow the same string and cannot disagree; re-rendered on every swap, so
+    /// the log answers what capture is listening to rather than what it started
+    /// on (ADR-0142).
     capture_token: String,
+    /// The format the live [`AppState::analyzer`] was built on. Kept beside the
+    /// analyzer because a swap rebuilds it only when the negotiated format
+    /// actually moved — an unchanged format keeps the AGC's running peak and the
+    /// tempo history, which is most swaps between two 48 kHz endpoints.
+    capture_format: AudioFormat,
     scratch: Vec<f32>,
     occluded: bool,
     /// Frames since the last title refresh (title shows core-sourced fps + p99).
@@ -132,6 +139,16 @@ struct AppState {
     /// Held apart from `config.input` because a launch flag pins the run
     /// without writing itself into the file the operator keeps.
     input: config::Input,
+    /// The active endpoints of [`Self::input`]'s mode, `default` first, as the
+    /// `Input device` row cycles them.
+    ///
+    /// **Cached, and refreshed only when the settings modal opens and when the
+    /// mode changes.** Enumeration is COM — it allocates and blocks — and
+    /// [`AppState::settings_view`] runs every frame the modal is up, so
+    /// enumerating there would put a blocking COM call on the render thread once
+    /// a frame. The cost of caching is that a device appearing or disappearing
+    /// while the menu is open is not seen until it is reopened.
+    input_roster: Vec<String>,
     /// Index (into the live monitor list) of the display the operator has
     /// selected — advanced by the `D` hotkey, used when going fullscreen.
     display_index: usize,
@@ -249,6 +266,7 @@ impl AppState {
         renderer.enable_diagnostics(true);
 
         let capture = start_capture(&input);
+        let capture_format = capture.format;
         // Rendered once, here, and only borrowed afterwards: the log's row builder
         // runs every frame and the overlay every frame it is up (Plan 0083).
         let capture_token = capture.verdict.token();
@@ -269,6 +287,7 @@ impl AppState {
             consumer: capture.consumer,
             _capture: capture.handle,
             capture_token,
+            capture_format,
             scratch: vec![0.0; 32_768],
             occluded: false,
             title_tick: 0,
@@ -297,6 +316,10 @@ impl AppState {
             config,
             config_path,
             input,
+            // Left empty until the settings modal is opened: a roster nothing is
+            // reading is a COM enumeration paid for nothing, and every reader of
+            // it is behind a keypress.
+            input_roster: Vec::new(),
             display_index,
         }
     }
@@ -638,6 +661,128 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// The mode's active endpoints, re-enumerated into the cache.
+    ///
+    /// COM, so this is a keypress-driven call and never a per-frame one. A
+    /// failed enumeration empties the roster rather than keeping a stale one:
+    /// the `Input device` row then reports what is running and goes inert, which
+    /// is honest, where stale names would offer endpoints that may be gone.
+    #[cfg(windows)]
+    fn refresh_input_roster(&mut self) {
+        let mode = capture_mode(self.input.mode);
+        self.input_roster.clear();
+        match capture_win::endpoints(mode) {
+            Ok(names) => {
+                // `default` is a real, always-reachable choice — it is what an
+                // unnamed selection means in `config.toml`, and it is where a
+                // lost device recovers to — so it leads the roster rather than
+                // being only spellable by editing the file.
+                self.input_roster.push(DEFAULT_ENDPOINT.to_owned());
+                self.input_roster.extend(names);
+            }
+            Err(err) => eprintln!(
+                "could not enumerate {} endpoints: {err}",
+                self.input.mode.as_str()
+            ),
+        }
+    }
+
+    /// No endpoint enumeration on platforms whose capture path takes no
+    /// selection; the two input rows are read-only there.
+    #[cfg(not(windows))]
+    fn refresh_input_roster(&mut self) {}
+
+    /// Where the running selection sits in the cached roster.
+    ///
+    /// A configured name that matches no active endpoint has no position, and
+    /// the answer is the roster's leading `default` slot — which is not a
+    /// fallback for the display's sake but the endpoint capture *actually*
+    /// opened, since `pick_device` degrades a name it cannot find the same way.
+    fn input_device_index(&self) -> usize {
+        self.input_roster
+            .iter()
+            .position(|name| endpoint_matches(name, &self.input.device))
+            .unwrap_or(0)
+    }
+
+    /// Stop the running capture stream and start one on `input`, in place.
+    ///
+    /// Synchronous on the render/UI thread, which is where every policy
+    /// decision about capture lives (ADR-0142): dropping the handle joins the
+    /// polling thread, and `start_capture` blocks until the new stream is live.
+    /// That is a hitch of tens of milliseconds, paid on a keypress the operator
+    /// just made.
+    ///
+    /// The [`Analyzer`] is rebuilt **only when the negotiated format moved**. A
+    /// rebuild discards the AGC's running peak and the tempo history, so a swap
+    /// between two endpoints that both negotiate 48 kHz keeps the picture
+    /// adapted; a 48 -> 44.1 kHz swap cannot, and re-adapts over a second or two.
+    ///
+    /// A failed start is not an error path out of here: the handle and consumer
+    /// are simply absent, the analyzer runs on `FALLBACK_FORMAT`, and the reason
+    /// goes into the verdict — the same degradation a failed startup capture
+    /// takes. A swap that fails must not be able to end the show.
+    fn restart_capture(&mut self, input: &config::Input) {
+        // Stop first. The old thread has to be joined before the new one exists
+        // or the ring's single-producer invariant would briefly have two
+        // claimants, and an endpoint is not reliably re-openable while a stream
+        // still holds it.
+        self._capture = None;
+        self.consumer = None;
+
+        let started = start_capture(input);
+        self.capture_token = started.verdict.token();
+        if started.format != self.capture_format {
+            self.analyzer = Analyzer::new(started.format)
+                .expect("capture layer already validated this format at the boundary");
+            self.capture_format = started.format;
+        }
+        self.consumer = started.consumer;
+        self._capture = started.handle;
+
+        // The selection is recorded even when the start failed: it is what the
+        // operator asked for, so the row shows it and the next launch retries
+        // it, while the verdict says it is not delivering.
+        self.input = input.clone();
+        self.config.input = input.clone();
+        self.save_config();
+        eprintln!("audio input: {}", self.capture_token);
+        self.window.request_redraw();
+    }
+
+    /// Switch the capture path (the `Input mode` row).
+    ///
+    /// The device name goes back to `default`, because a friendly name belongs
+    /// to one dataflow: a render endpoint's name matches nothing among capture
+    /// endpoints, so carrying it across would resolve to the default anyway and
+    /// leave the row naming an endpoint that is not running.
+    fn set_input_mode(&mut self, mode: config::InputMode) {
+        if self.input.mode == mode {
+            // Idempotent, so holding the key does not restart capture per repeat.
+            return;
+        }
+        self.restart_capture(&config::Input {
+            mode,
+            device: DEFAULT_ENDPOINT.to_owned(),
+        });
+        // The other dataflow has its own endpoints; the row would otherwise
+        // cycle the previous mode's list.
+        self.refresh_input_roster();
+    }
+
+    /// Advance to the next endpoint in the cached roster, **wrapping** — the
+    /// `Input device` row, and the same end-of-list rule `cycle_display` uses.
+    fn cycle_input_device(&mut self) {
+        if self.input_roster.is_empty() {
+            return;
+        }
+        let next = (self.input_device_index() + 1) % self.input_roster.len();
+        self.restart_capture(&config::Input {
+            mode: self.input.mode,
+            device: self.input_roster[next].clone(),
+        });
+    }
+
     /// Toggle auto-rotate and **persist it** — the one path for both the `A`
     /// hotkey and the settings row.
     ///
@@ -696,13 +841,18 @@ impl AppState {
             display_name,
             diagnostics: self.overlay_on,
             input_mode: self.input.mode,
-            // The shell holds no endpoint roster, so the device row names what
-            // is running rather than a position in a list, and both input rows
-            // read as the value they have.
-            input_device_index: 0,
-            input_device_count: 0,
-            input_device_name: self.input.device.clone(),
-            input_editable: false,
+            // Read off the cache, never enumerated here: this runs every frame
+            // the modal is up.
+            input_device_index: self.input_device_index(),
+            input_device_count: self.input_roster.len(),
+            input_device_name: self
+                .input_roster
+                .get(self.input_device_index())
+                .cloned()
+                .unwrap_or_else(|| self.input.device.clone()),
+            // Windows is the only platform whose capture path takes a selection;
+            // elsewhere the rows render and do not move.
+            input_editable: cfg!(windows),
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
             preset_dir: self.preset_dir.display().to_string(),
@@ -733,9 +883,8 @@ impl AppState {
             SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
             SettingsAction::CycleDisplay => self.cycle_display(),
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
-            // Unreachable while `input_editable` is false: the modal returns
-            // `None` for both rows, so no key can produce either action.
-            SettingsAction::SetInputMode(_) | SettingsAction::CycleInputDevice => {}
+            SettingsAction::SetInputMode(mode) => self.set_input_mode(mode),
+            SettingsAction::CycleInputDevice => self.cycle_input_device(),
             // Persisted, unlike diagnostics: a clean canvas is a staging choice,
             // not a debugging state, so it should survive the restart.
             SettingsAction::TogglePresetName => {
@@ -1050,6 +1199,12 @@ impl AppState {
             // a filter character, and the branch above returns before reaching
             // this match.
             KeyCode::KeyS => {
+                // One of the two refresh points (the other is a mode change).
+                // Enumeration is COM, so it happens on the keypress that makes
+                // the roster visible, not on the frames that draw it.
+                if !self.settings.is_open() {
+                    self.refresh_input_roster();
+                }
                 let view = self.settings_view();
                 let action = self.settings.handle_key(SettingsKey::Toggle, &view);
                 self.apply_settings_action(action);
@@ -1162,6 +1317,21 @@ struct CaptureStart {
     verdict: CaptureVerdict,
 }
 
+/// The device name that means "the mode's default endpoint" — the value
+/// `config.toml` ships with, the word `pick_device` treats as "no name to
+/// match", and the leading entry of the settings menu's endpoint roster.
+const DEFAULT_ENDPOINT: &str = "default";
+
+/// Whether a configured device name selects the endpoint `friendly`.
+///
+/// The rule `pick_device` resolves with — exact ignoring case, else a
+/// case-insensitive substring — so the row reports the endpoint capture opened
+/// rather than a different one that also happens to contain the name.
+fn endpoint_matches(friendly: &str, wanted: &str) -> bool {
+    friendly.eq_ignore_ascii_case(wanted)
+        || friendly.to_lowercase().contains(&wanted.to_lowercase())
+}
+
 /// The format both platform arms fall back to when capture fails, so the analyzer
 /// has something valid to start on. **The verdict never reports it** — a log
 /// stating a format nothing is delivering is worse than no log.
@@ -1170,16 +1340,25 @@ const FALLBACK_FORMAT: AudioFormat = AudioFormat {
     channels: 2,
 };
 
+/// The capture layer's mode for a config mode — the one place the two enums
+/// meet, so `core`'s source-agnostic split does not turn into a match repeated
+/// at every call site.
+#[cfg(windows)]
+fn capture_mode(mode: config::InputMode) -> capture_win::CaptureMode {
+    match mode {
+        config::InputMode::Loopback => capture_win::CaptureMode::Loopback,
+        config::InputMode::LineIn => capture_win::CaptureMode::LineIn,
+    }
+}
+
 #[cfg(windows)]
 fn start_capture(input: &config::Input) -> CaptureStart {
     let selector = capture_win::CaptureSelector {
-        mode: match input.mode {
-            config::InputMode::Loopback => capture_win::CaptureMode::Loopback,
-            config::InputMode::LineIn => capture_win::CaptureMode::LineIn,
-        },
+        mode: capture_mode(input.mode),
         // "default" (or empty) means the mode's default endpoint — no name match.
-        device: (!input.device.trim().is_empty() && !input.device.eq_ignore_ascii_case("default"))
-            .then(|| input.device.clone()),
+        device: (!input.device.trim().is_empty()
+            && !input.device.eq_ignore_ascii_case(DEFAULT_ENDPOINT))
+        .then(|| input.device.clone()),
     };
     match capture_win::start(&selector) {
         Ok((handle, consumer)) => {

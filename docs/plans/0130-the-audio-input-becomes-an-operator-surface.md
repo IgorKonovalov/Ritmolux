@@ -315,8 +315,8 @@ struct CaptureHandle {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — endpoint roster as a value, flags over config | dev | done | `9005a8d` |
-| 2 — the two rows in the pure state machine | dev | done | committed with this row |
-| 3 — the shell swaps capture live | dev | not started | |
+| 2 — the two rows in the pure state machine | dev | done | `7eee5f0` |
+| 3 — the shell swaps capture live | dev | done | committed with this row |
 | 4 — a dead input reports itself | dev | not started | |
 | 5 — on-device gate | human | not started | |
 
@@ -331,6 +331,15 @@ struct CaptureHandle {
   `SettingsView` breaks the shell's `settings_view()` and `apply_settings_action()`, so the phase
   cannot build without them. The wiring it lands is a stub — `input_editable: false`, an empty
   roster, and a no-op arm for the two actions — which Phase 3 replaces.
+- Phase 3 also touched `standalone/src/capture_win.rs` (Phase 4's file) to add
+  `enumerating_from_an_sta_leaves_the_apartment_intact`: the render thread enumerates from an STA,
+  which `CoInitializeEx(MULTITHREADED)` answers with `RPC_E_CHANGED_MODE`, and nothing else in the
+  suite exercises that.
+- The settings menu's endpoint roster leads with a synthetic `default` entry, so the value
+  `config.toml` ships with is reachable by cycling. The plan does not specify the roster's contents.
+- Phase 3's live `S` -> `Input mode` -> `Input device` swap is **not** verified here: driving the
+  window needs foreground focus, which Windows denies a process started from a background shell
+  (two attempts, `AppActivate` and `SetForegroundWindow`). It is Phase 5's first bullet.
 - `--input` and `--device` override **field by field** (`--device` alone keeps the configured
   mode). The plan's done-when pins only the both-flags case; the per-field rule is documented in
   `README.md` and asserted in `the_flags_override_the_config_field_by_field`.

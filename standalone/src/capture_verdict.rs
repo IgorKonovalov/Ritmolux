@@ -5,10 +5,17 @@
 //! on stderr, which a Finder or Explorer launch discards: a remote tester's log
 //! could prove capture never delivered a sample and could not say why.
 //!
-//! So the verdict is decided once, at startup on the render/UI thread, rendered
-//! into a short token there, and then only *borrowed* — by the `diagnostics.log`
-//! row builder (which runs every frame) and by the F3 overlay. Both surfaces read
-//! the same stored string, so they cannot disagree about the same run.
+//! So the verdict is decided on the render/UI thread, rendered into a short token
+//! there, and then only *borrowed* — by the `diagnostics.log` row builder (which
+//! runs every frame) and by the F3 overlay. Both surfaces read the same stored
+//! string, so they cannot disagree about what is running.
+//!
+//! It is **current state, not a startup fact** (ADR-0142). The input can be
+//! swapped from the settings menu and can be lost and recovered underneath the
+//! app, so the token is re-rendered on every swap and both surfaces answer *what
+//! is capture listening to now*. What does not change is that it is rendered in
+//! one place and stored: two surfaces formatting a verdict apiece is how a log
+//! and an overlay come to disagree.
 //!
 //! Nothing here touches `core/`: capture is a shell concern by ADR-0001.
 
