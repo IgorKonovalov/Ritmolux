@@ -353,6 +353,16 @@ struct LatchBank {
   would happen: it rewrites the two rate lines to the values the file now
   carries, so it has stopped measuring a hypothetical preset and measures the
   shipped one.
+- **The driven roster grew to two, on a world this plan never touched**
+  (post-plan smoke). `Suprematist`'s pan rates carried the same "bought, not
+  chosen" comment `collage_mono`'s did — a `shape_collage` canvas covers every
+  pixel, so only element edges move the whole-frame mean and a slow breath read
+  `0.0006` against the floor. With the rates down to `0.08`/`0.11` it reads
+  silent **0.0082** / driven **0.0627**, and the sweep prints
+  `still in silence, live on the music (2 of them): ["Collage Mono", "Suprematist"]`.
+  **ADR-0136's premise was that more than one world wanted this**; that is now
+  measured rather than argued, on a preset chosen by the user's eye and not by
+  the plan.
 - **The latch is separated from its own arming window** (Phase 6), which is the
   claim `collage_mono` now rests on and the one a single frame cannot make. On a
   copy of the shipped preset with `drift`, `spin`, `pan_x`, `pan_y`,
@@ -497,11 +507,23 @@ struct LatchBank {
 
 ### Close triggers
 
-- **`presets/` touched:** one `.toml` edited — `collage_mono.toml`, in Phases 2
-  and 6 — and **one added**, `curve_broadside.toml` (`Broadside`), in Phase 9.
-  Nothing retired, so the shipped set goes 53 → 54 and **`architect` owes the set
-  a curation pass** under ADR-0089's cohort rules. `presets/README.md` in Phases
-  7 and 8.
+- **`presets/` touched:** **four `.toml`, and two of them are outside this plan's
+  phases.** In-scope: `collage_mono.toml` edited in Phases 2 and 6, and
+  `curve_broadside.toml` (`Broadside`) added in Phase 9. Out-of-scope, both
+  user-directed during the post-plan smoke and both landed here because they
+  **depend on the `[latch]` and the driven gate this plan ships**, which exist
+  nowhere else yet:
+  - `collage_suprematist.toml` (`fe9cbe3`) — its `recompose` moved off
+    `hash(beat_index) > 0.88` (a re-cut every few seconds, the same ADR-0109
+    trap 0147 filed) onto a `recut` latch at 100-160 s, and its pan rates
+    `0.62`/`0.81` → `0.08`/`0.11`, which the driven branch is what permits.
+  - `curve_ionwake.toml` (`b1f1a90`) — `n` 5 → 4, and a recorded finding that
+    `d` is very nearly inert on that file.
+
+  **The close should decide whether these two stay in this plan's history or are
+  split onto their own lane.** Nothing retired, so the shipped set goes 53 → 54
+  and **`architect` owes the set a curation pass** under ADR-0089's cohort rules.
+  `presets/README.md` in Phases 7 and 8.
 - **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **All three are
   complete in both halves** — each entry's engine half shipped in a `dev` phase
   and its content half in the `preset-author` phase that follows it.
