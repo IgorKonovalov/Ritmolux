@@ -97,8 +97,9 @@ flowchart LR
 > as that ADR said it might.
 >
 > **What this plan still owes at close:** ADR-0144 accepted with a dated `Outcome` recording that
-> its premise was rejected rather than falsified, and Phase 4's *"which addresses were useful"*
-> finding, which is real and is filed as design-backlog 0157.
+> its premise was rejected rather than falsified, Phase 4's *"which addresses were useful"* finding
+> (real, and filed as design-backlog 0157), and **Phase 8's shipping half** — `--osc` and `[osc]`
+> are user-facing and currently undocumented. See the note on Phase 8.
 
 
 > **Amended 2026-08-28, on a show date of 2026-08-29.** Phase 1 was originally one human stop gate
@@ -297,8 +298,24 @@ flowchart LR
 
 ### Phase 8 — The operator documentation
 
-> **RETIRED 2026-08-29.** Documentation moves to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 9, which
-> also brings the rig facts in from the out-of-repo probe folder.
+> **NARROWED 2026-08-29, not retired — and the first draft of this note got it wrong.** It moved the
+> whole phase to [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 9, which would have shipped
+> `--osc` and `[osc]` with **no document anywhere naming either** — `README.md`'s
+> *Flags & environment* section lists `--device`, `--audio`, `--fps` and `--ffmpeg` and does not
+> list `--osc`.
+>
+> **The split is by what ships.** `docs/lighting.md`, the rig topology and the Arena-side setup
+> describe a path that no longer exists, and those move to Plan 0133 Phase 9 along with the rig
+> facts still sitting in the out-of-repo probe folder. **The `--osc` flag, the `[osc]` config keys
+> and the `/lmv/v1` address table ship at this plan's close and are documented at it** — a
+> user-facing flag that no document names is precisely the operator-doc drift the close ceremony
+> exists to catch, and deferring it to a plan that has not started is how it would have gone
+> unnoticed.
+>
+> **What this close owes:** `README.md`'s flag list gains `--osc`, the `[osc]` config keys are
+> documented beside the `[input]` and `[rotate]` precedent, and the address table is checked against
+> `Telemetry::messages` in `standalone/src/osc.rs` rather than against this plan's prose. `docs/nfr.md`
+> section 10 is Plan 0133's, since the lighting path it would describe is that plan's architecture.
 
 - **Owner skill:** dev
 - **What:** write the operator guide and sweep the docs a new surface makes stale.
@@ -365,7 +382,7 @@ flowchart LR
 | 5 | dev | RETIRED — moves to Plan 0133 Phase 8 | — |
 | 6 | dev | RETIRED — no NDI | — |
 | 7 | human | RETIRED — moves to Plan 0133 Phase 8 | — |
-| 8 | dev | RETIRED — moves to Plan 0133 Phase 9 | — |
+| 8 | dev | NARROWED — `--osc` + `[osc]` docs owed at this close; the NDI/Arena half moves to Plan 0133 Phase 9 | — |
 
 ### Notes
 
