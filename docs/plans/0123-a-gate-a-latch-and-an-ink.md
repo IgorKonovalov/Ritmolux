@@ -320,7 +320,7 @@ struct LatchBank {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the gate asks both readings | dev | done | `c96f0fa` |
-| 2 — `collage_mono`'s sway comes back down | human | not started | |
+| 2 — `collage_mono`'s sway comes back down | human | done | `77dadd9` |
 | 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
 | 4 — the latch bank runs | dev | done | `696fca9` |
 | 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
@@ -345,6 +345,14 @@ struct LatchBank {
   `the_driven_branch_carries_the_world_that_is_still_by_design`, which rewrites
   `collage_mono`'s two rate lines out of the shipped file: at `0.07`/`0.09` it
   reads silent **0.0025** / driven **0.0621**. Phase 2 makes the roster non-empty.
+- **The driven roster is non-empty, with exactly one entry** (Phase 2). At the
+  shipped rates `0.07`/`0.09` the sweep reads `Collage Mono` silent **0.0025** /
+  driven **0.0621** — 3.65x over `DRIVEN_FLOOR` — and prints
+  `still in silence, live on the music (1 of them): ["Collage Mono"]`. Those are
+  the probe's own numbers to four places, which is what its doc comment said
+  would happen: it rewrites the two rate lines to the values the file now
+  carries, so it has stopped measuring a hypothetical preset and measures the
+  shipped one.
 - **`collage_mono` measured with every enumerated mixer off** (Phase 8), 1280x720:
   three flat regions, `#000000` exact over 86 007 px, and **none of the three
   carrying the palette's literal RGB** (`#ffffff` → `#e7e7e7`, `#b00808` →
@@ -356,8 +364,10 @@ struct LatchBank {
   shipped silent minimum as `0.0205` (`Banded Mandala`); the sweep now reads
   **0.0143** — `Collage Mono`, whose sway was raised for this measurement — so its
   stated 2.05x slack is really 1.43x. The plan forbids touching it, and Phase 2
-  restores the premise: with the rates back down the silent minimum returns to
-  `0.0201` (`On White`). Left for the close to decide whether to re-derive.
+  restored the premise: with the rates down the silent minimum reads `0.0201`
+  (`On White`), so the recorded 2.05x is now 2.01x — accurate to within the
+  rounding, but against a different preset than the comment names. Left for the
+  close to decide whether to re-derive.
 - **Four intermediate-value stages ADR-0138 does not name** (Phase 8), added per
   the phase's instruction: the **backdrop composite**, the **A/B palette
   crossfade**, the **duotone ink pass**, an **`over` layer join** (all four
@@ -416,10 +426,12 @@ struct LatchBank {
 
 ### Close triggers
 
-- **`presets/` touched:** no `.toml`. `presets/README.md` only, in Phases 7 and 8.
-- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. Each entry's **engine
-  half** shipped; each one's content half is an outstanding `human` phase (0145 →
-  Phase 2, 0147 → Phase 6, 0148 → Phase 9).
+- **`presets/` touched:** one `.toml` edited — `collage_mono.toml`, in Phase 2.
+  No preset added or retired yet; Phase 9 is what would add one. `presets/README.md`
+  in Phases 7 and 8.
+- **Plan header `Closes:`** design-backlog 0145, 0147, 0148. **0145 is complete —
+  both halves.** For the other two the **engine half** shipped and the content
+  half is an outstanding `human` phase (0147 → Phase 6, 0148 → Phase 9).
 - **What shipped:** feature. A `[latch]` grammar table with render-layer state, a
   preset-reachable `stroke_blend` on the four line systems, a disjunctive
   `animation` gate with a second derived floor, and `AnalysisFrame::fully_driven`
@@ -433,9 +445,9 @@ struct LatchBank {
   `Closes:`, so the probe is describing code the plan changed on purpose. **The
   tree's tip is red on this gate and `pre-push` runs it.** Nothing here edited
   `docs/design-backlog.md` — the backlog is architect's lane.
-- **Outstanding `human` phases:** 2 (`collage_mono`'s sway back down), 6
-  (`collage_mono` recomposes on a latch), 9 (a mono line world on the new seam).
-  All three are `preset-author` sessions and none blocks another.
+- **Outstanding `human` phases:** 6 (`collage_mono` recomposes on a latch) and 9
+  (a mono line world on the new seam). Both are `preset-author` sessions and
+  neither blocks the other. Phase 2 landed as `77dadd9`.
 
 ## Followups (after this lands)
 
