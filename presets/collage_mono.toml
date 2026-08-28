@@ -69,23 +69,23 @@ recompose_blend = "0.90"
 pump_size  = "clamp(bass * 0.141, 0, 0.12)"
 pump_alpha = "0"
 
-# THE SWAY IS WHAT MAKES THIS WORLD PASS `animation` (backlog 0145), AND THE RATE
-# IS THE WHOLE POINT OF IT. That gate captures frames 24 and 48 - 0.4 s apart -
-# AT SILENCE, so it sees only a preset's autonomous motion. This canvas is a
-# poster: it is meant to sit still, and nearly all its liveliness is audio-
-# driven, which the gate cannot see.
+# THE SWAY IS THE WHOLE OF THIS POSTER'S AUTONOMOUS MOTION, AND IT IS MEANT TO BE
+# BELOW NOTICE. A 90 s horizontal breath against a 70 s vertical one, at 6 % and
+# 4 % of the frame: incommensurate rates, so the pair traces a path that does not
+# repeat for about ten minutes and the canvas never visibly returns to a pose it
+# held before. A printed sheet is never quite square to the wall; this is that,
+# not an animation.
 #
-# Measured, because the obvious lever is the wrong one: raising `drift` 0.55 ->
-# 1.60 -> 2.50 and `spin` 0.30 -> 1.00 -> 1.60 leaves the statistic at 0.002,
-# UNCHANGED - those multiply each element's own seeded velocity, and over 0.4 s
-# that is nothing. A whole-canvas motion is the only thing that moves in 0.4 s.
-# A scale breath reaches 0.009-0.011 but pulses the composition's size; this pan
-# sway reaches 0.012 without touching it, so the picture keeps its proportions.
+# THE RATE IS THE LEVER, NOT THE AMPLITUDE. At these amplitudes the sway is a
+# settle; take the rates up an order of magnitude and the same 6 %/4 % reads as a
+# wobble, and a composition built on flat cut planes stops looking pinned down.
 #
-# Amplitude is unchanged from a still composition's - only the rates moved, from
-# 0.07/0.09 to 0.70/0.78, an 11 s sway rather than a 90 s one.
-pan_x = "0.06 * sin(time * 0.70)"
-pan_y = "0.04 * sin(time * 0.78 + 1.1)"
+# `drift` and `spin` are NOT this and cannot substitute for it - they multiply
+# each element's OWN seeded velocity, so they change how the pieces live against
+# one another and move the canvas as a whole not at all. A scale breath does move
+# it, but pulses the composition's size; this pan keeps the proportions.
+pan_x = "0.06 * sin(time * 0.07)"
+pan_y = "0.04 * sin(time * 0.09 + 1.1)"
 saturation = "1.0"
 bloom_amount = "0"
 trails       = "0"
