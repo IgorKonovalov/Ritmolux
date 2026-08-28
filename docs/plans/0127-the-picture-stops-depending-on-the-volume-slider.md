@@ -1,6 +1,6 @@
 # 0127 — The picture stops depending on the volume slider
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (proposed — the level contract this builds), [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (the normalizer it reuses), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (the aspect habit Phase 2 applies one level down), [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the idiom the trace draws into)
@@ -269,17 +269,23 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/lmv-plan-0127` on `plan-0127-the-picture-stops-depending-on-the-volume-slider`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The analyzer levels the trace | dev | not started | |
+| 1 — The analyzer levels the trace | dev | done | committed with this row |
 | 2 — The trace spans the width | dev | not started | |
 | 3 — One reference capture | human | not started | |
 | 4 — The base amplitude constant | dev | not started | |
 | 5 — The docs say what the contract is | dev | not started | |
 
 ### Notes
+
+- Phase 1 also touched two files outside its stated list, both the new field's blast radius:
+  `core/tests/preset.rs` builds an `AnalysisFrame` literally, and `analysis_is_deterministic`
+  destructures it exhaustively so a new field cannot escape the bit-exact hash. Covered in both.
+- `WAVE_FLOOR = 1e-3`, derived rather than copied from `BAND_FLOOR`: measured against
+  `dynamic_groove` at 48 kHz, trace peak 0.900 loud / 0.206 in the resting beats.
 
 ### Close triggers
 

@@ -576,6 +576,9 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         // is ramped for the same reason `spectrum` is — a slot that leaked into
         // an expression would read a distinguishable number rather than a zero.
         waveform: std::array::from_fn(|i| -1.0 + i as f32 / 256.0),
+        // The trace's divisor (ADR-0139), unreachable from the grammar for the
+        // same reason the trace itself is, and distinct from every value above.
+        waveform_gain: 0.55,
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.

@@ -629,6 +629,7 @@ fn analysis_is_deterministic() {
                 let AnalysisFrame {
                     spectrum,
                     waveform,
+                    waveform_gain,
                     onset,
                     beat,
                     bass,
@@ -656,6 +657,7 @@ fn analysis_is_deterministic() {
                         .map(|v| v.to_bits())
                         .collect(),
                     vec![
+                        waveform_gain.to_bits(),
                         onset.to_bits(),
                         bass.to_bits(),
                         mid.to_bits(),
@@ -719,14 +721,14 @@ fn one_hop_analyzes_well_under_the_hop_interval() {
     assert_eq!(SPECTRUM_BINS, 64);
 }
 
-/// **The waveform is the signal, in time order, un-normalized** (Plan 0100
-/// Phase 4) — the four properties the warp mesh's `wave_mode` draw rests on.
+/// **The waveform is the signal, in time order, levelled** (Plan 0100 Phase 4,
+/// ADR-0139) — the four properties the warp mesh's `wave_mode` draw rests on.
 ///
 /// It is not a fifth statistic. Everything else on the frame is a *measurement*
-/// of the window; this is the window, and the assertions below are what
-/// distinguishes the two.
+/// of the window; this is the window's own shape, scaled by one number the frame
+/// publishes, and the assertions below are what distinguishes the two.
 #[test]
-fn the_waveform_is_the_recent_signal_rather_than_a_measurement_of_it() {
+fn the_waveform_is_the_recent_signal_levelled_rather_than_a_measurement_of_it() {
     // A sine at a frequency that fits a whole number of cycles into the tail, so
     // the trace is checkable sample by sample rather than statistically.
     let freq = SR as f32 / 64.0; // 750 Hz — 8 whole cycles across 512 samples
@@ -738,30 +740,32 @@ fn the_waveform_is_the_recent_signal_rather_than_a_measurement_of_it() {
     }
     let frame = analyzer.take_frame();
 
-    // 1. It is the TAIL of the window, consecutive — so it round-trips against
-    //    the generator, phase and all.
+    // 1. It is the TAIL of the window, consecutive — so multiplying the
+    //    published gain back round-trips against the generator, phase and all.
+    //    That reconstruction IS the escape hatch, exercised where it is claimed.
     let tail = &signal[signal.len() - WAVE_SAMPLES..];
     for (i, (got, want)) in frame.waveform.iter().zip(tail).enumerate() {
+        let raw = got * frame.waveform_gain;
         assert!(
-            (got - want).abs() < 1e-6,
-            "sample {i}: waveform {got} != signal {want}"
+            (raw - want).abs() < 1e-6,
+            "sample {i}: waveform {got} * gain {} = {raw} != signal {want}",
+            frame.waveform_gain
         );
     }
 
-    // 2. It is UN-normalized, unlike every level on this frame. A 0.4-amplitude
-    //    sine reaches 0.4, not 1.0 — which is the whole difference between a
-    //    scope trace and a threshold-able level (ADR-0049).
+    // 2. It is LEVELLED, like every level on this frame. A 0.4-amplitude sine
+    //    reaches 1.0 and the gain carries the 0.4 — which is what makes the
+    //    trace the same picture at any fader position, on either frontend
+    //    (ADR-0139). The shape is untouched; only the scale moved.
     let peak = frame.waveform.iter().fold(0.0f32, |m, v| m.max(v.abs()));
     assert!(
-        (peak - amp).abs() < 0.01,
-        "the trace must keep the signal's own amplitude, got {peak} for {amp}"
+        (peak - 1.0).abs() < 0.01,
+        "the levelled trace must reach full scale, got {peak}"
     );
-    // 750 Hz is a MID-band tone, so that is the level normalization drives.
     assert!(
-        frame.mid > peak,
-        "...while the normalized level of the same signal is driven toward 1: \
-         mid {} against trace peak {peak}",
-        frame.mid
+        (frame.waveform_gain - amp).abs() < 0.01,
+        "the gain must carry the signal's own amplitude, got {} for {amp}",
+        frame.waveform_gain
     );
 
     // 3. It is bipolar — a spectrum is not. A trace that had been rectified or
@@ -776,9 +780,117 @@ fn the_waveform_is_the_recent_signal_rather_than_a_measurement_of_it() {
     for hop in vec![0.0f32; WINDOW_SIZE * 8].chunks_exact(HOP_SIZE) {
         quiet.push_interleaved(hop);
     }
+    let quiet_frame = quiet.take_frame();
     assert!(
-        quiet.take_frame().waveform.iter().all(|v| *v == 0.0),
+        quiet_frame.waveform.iter().all(|v| *v == 0.0),
         "silence must be a flat line"
+    );
+    assert_eq!(
+        quiet_frame.waveform_gain, 0.0,
+        "and it publishes no gain, so reconstructing it gives silence too"
+    );
+}
+
+/// ADR-0139's whole point, through the analyzer: the same music at two gains
+/// produces the same trace, so the OS volume slider stops being a visual
+/// parameter and the two frontends stop disagreeing.
+///
+/// The standalone taps loopback *after* the endpoint volume and the plugin taps
+/// the decoded stream *before* it; nothing else about the two paths differs by
+/// the time samples reach the analyzer, so a gain sweep is the whole of that
+/// asymmetry. Shaped after `normalized_levels_are_portable_across_absolute_gain`
+/// because it is the same property one array over.
+#[test]
+fn the_trace_is_portable_across_absolute_gain() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 2,
+    };
+    let groove = lmv_core::signal::dynamic_groove(120.0, 6.0, format);
+    let hop_samples = HOP_SIZE * format.channels as usize;
+
+    let read = |gain: f32| -> Vec<[f32; WAVE_SAMPLES]> {
+        let mut analyzer = Analyzer::new(format).expect("valid format");
+        groove
+            .chunks(hop_samples)
+            .map(|hop| {
+                let scaled: Vec<f32> = hop.iter().map(|s| s * gain).collect();
+                analyzer.push_interleaved(&scaled);
+                analyzer.take_frame().waveform
+            })
+            .collect()
+    };
+
+    // 18 % on the master slider is the reading design-backlog 0123 measured the
+    // near-flat ribbon at; 1.0 is what `shot --audio` feeds from a file.
+    let full = read(1.0);
+    let quiet = read(0.18);
+    let worst = full
+        .iter()
+        .zip(quiet.iter())
+        .flat_map(|(a, b)| a.iter().zip(b.iter()))
+        .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()));
+    assert!(
+        worst < 1e-4,
+        "a quieter copy must draw the same trace, worst divergence {worst}"
+    );
+
+    // Non-vacuity: the traces have real amplitude, so this is not two silent
+    // runs agreeing with each other.
+    let loudest = full
+        .iter()
+        .flat_map(|t| t.iter())
+        .fold(0.0f32, |m, v| m.max(v.abs()));
+    assert!(
+        loudest > 0.5,
+        "the fixture should drive the trace to real amplitude, peaked at {loudest}"
+    );
+}
+
+/// The dynamics the un-normalized trace was defended for: a levelled trace still
+/// draws the quiet passage smaller than the loud one.
+///
+/// `dynamic_groove`'s phrase rests for two of every eight beats at a `0.04`
+/// scale, and the release is seconds-scale, so the rest sits well inside the
+/// window where the loud phrase's peak still governs. Asserted as an ordering —
+/// the ratio is a function of `RELEASE_TAU_SECS` and belongs to ADR-0049.
+#[test]
+fn a_quiet_passage_still_draws_a_smaller_trace_than_a_loud_one() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    let groove = lmv_core::signal::dynamic_groove(120.0, 8.0, format);
+    let mut analyzer = Analyzer::new(format).expect("valid format");
+    // Peak trace amplitude per beat, at 120 bpm — beats 6 and 7 of each phrase
+    // of eight are the rest.
+    let hops_per_beat = (SR as usize / 2) / HOP_SIZE;
+    let mut per_beat: Vec<f32> = Vec::new();
+    for (index, hop) in groove.chunks_exact(HOP_SIZE).enumerate() {
+        analyzer.push_interleaved(hop);
+        let peak = analyzer
+            .take_frame()
+            .waveform
+            .iter()
+            .fold(0.0f32, |m, v| m.max(v.abs()));
+        let beat = index / hops_per_beat;
+        if beat >= per_beat.len() {
+            per_beat.push(peak);
+        } else if let Some(slot) = per_beat.get_mut(beat) {
+            *slot = slot.max(peak);
+        }
+    }
+    // The second phrase, so the running peak is warm and the first phrase's
+    // silent start is not in the comparison.
+    let loud = per_beat.get(12).copied().expect("12 beats of groove");
+    let rest = per_beat.get(14).copied().expect("14 beats of groove");
+    assert!(
+        rest < loud,
+        "the rest must draw smaller than the build: rest {rest}, loud {loud}"
+    );
+    assert!(
+        rest > 0.0,
+        "...and it must still draw: a rest is quieter, not silent"
     );
 }
 
