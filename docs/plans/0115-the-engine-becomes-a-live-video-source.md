@@ -423,6 +423,15 @@ under what name, and how that TOP reads the colour.
   It also means the `lmv_spout_resize` entry point in this plan's illustrative C surface is
   redundant — `SendImage(pData, w, h)` with new dimensions already drives the whole path. Recorded
   as an observation for Phase 3, not acted on.
+- **The operator is named `Syphon Spout In`, not `Spout In`.** This plan and ADR-0125 both call it
+  a "Spout In TOP" throughout; no operator by that name exists in the TOP family. Derivative ships
+  the two app-to-app transports as one operator — Spout on Windows, Syphon on macOS — so the entry
+  in the OP Create Dialog reads `Syphon Spout In` (and `Syphon Spout Out`). Nothing about the
+  decision changes; it is a naming fact, and it matters because **Phase 7's done-when is that a
+  reader can set up both sides from `docs/capturing.md` alone**, which a reader hunting a
+  non-existent `Spout In` cannot do. The same TOP family also carries `NDI In`/`NDI Out` and
+  `Shared Mem In`, i.e. ADR-0125's Alternatives B and C are both present on this install if the
+  measurement ever sends us back to them.
 - **The receiving install is TouchDesigner Non-Commercial, and it caps resolution at 1280x1280.**
   Read from Derivative's own licence documentation, not from the installer. Phase 4's
   `--size 1280x720` sits inside the cap and is unaffected. **Phase 6's "largest size and frame rate
