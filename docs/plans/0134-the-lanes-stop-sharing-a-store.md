@@ -13,8 +13,7 @@ The shared artifact store [ADR-0141](../adrs/0141-one-artifact-store-serves-ever
 place this morning serves one lane another lane's compiled `lmv-core`, because **the worktree path
 is not in cargo's fingerprint** — so two worktrees with the same layout and the same dependency
 graph are indistinguishable and one lane's artifact is handed to the other as fresh. Plan 0115's
-lane compiled against a `core` that does not contain its own new methods; Plan 0104's lane, which
-holds 18 presets `main` does not, would embed `main`'s preset library instead of its own. We delete
+lane compiled against a `core` that does not contain its own new methods. We delete
 the `target-dir` redirect, **keep the `rust-lld` linker**, and delete the poisoned store. The first
 visible behavior is `cargo build` in a lane writing into that lane's own `target/` again.
 
@@ -29,9 +28,12 @@ full evidence. The short form:
 - Freshness then resolves the dep-info's **relative** source paths against whichever package root is
   building, and compares mtimes — so a lane whose files predate its neighbour's build is told the
   neighbour's artifact is current.
-- `core/build.rs` collides the same way, and it is the half that reaches content: seven build-script
-  outputs, all 57 entries, none containing `lsystem_bower`, which exists only in the Plan 0104
-  worktree (**72 presets against `main`'s 54**).
+- **Whether `core/build.rs` collides the same way is unresolved**, and this plan no longer claims it
+  does. Seven `debug` build-script outputs carried the same 57 entries with no `lsystem_bower` in
+  them, but the Plan 0104 lane read **two distinct** preset lists in the `release` tree at the same
+  moment (72 and 54), so outputs were keyed per lane there. Compiling `build.rs` and running it are
+  separate units with separate fingerprints, and the run's output is what decides the embedded set.
+  The store was deleted before the question was settled, so neither reading can be re-checked.
 
 `CLAUDE.md` names three hazards for this store — `cargo clean` wiping every lane, monotonic growth,
 lock serialization. All three cost time and disk. This one **compiles against source the lane does
@@ -60,9 +62,9 @@ so the hazard is sequential rather than concurrent and no scheduling rule touche
 flowchart TB
     subgraph before["before — one store, two lanes indistinguishable"]
         direction TB
-        b104["lmv-plan-0104<br/>72 presets"]
+        b104["lmv-plan-0104"]
         b115["lmv-plan-0115<br/>core with open_tap"]
-        bmain["main<br/>54 presets"]
+        bmain["main"]
         bstore[["WORK/.lmv-target<br/>fingerprint path hash:<br/>ONE value for all three"]]
         b104 --> bstore
         b115 --> bstore
@@ -116,16 +118,17 @@ flowchart TB
 - **Notes for the implementer:**
   - **Run this in each live worktree separately** (`main`, `lmv-plan-0104`, `lmv-plan-0115`), because
     the whole question is whether they differ.
-  - The `lmv-plan-0104` check is the sharp one: that lane holds **72** presets, `main` holds 54, and
-    every build-script output in the deleted store carried 54. It is the only place the *content*
-    half of the collision is observable.
+  - **The `lmv-plan-0104` preset check is a confirmation, not a conviction.** That lane holds 72
+    presets against `main`'s 54, and whether the old store ever served it the wrong set is
+    unresolved and now unanswerable. Check it because it is cheap and because the lane is mid-close,
+    not because this plan expects it to have been wrong.
   - Expect a cold build — 105 s by Plan 0129 Phase 1's measurement, per lane. That is the price
     ADR-0147 accepts and it is not a finding.
 - **Done when:**
   - In `lmv-plan-0104`, the embedded preset set the build produces has **72 entries, not 54**, and
-    names at least one preset that exists only in that lane (`lsystem_bower` is the one this plan
-    checked). **This is the check that the content half is actually gone**; a 54-entry answer means
-    something still shares.
+    names at least one preset that exists only in that lane (`lsystem_bower`, `warp_wellhead`). A
+    54-entry answer would mean something still shares and is a finding; a 72-entry answer confirms
+    the lane and settles nothing about the past, per the note above.
   - In `lmv-plan-0115`, `cargo nextest run --workspace` is green, including
     `standalone/tests/frame_tap_memory.rs` — the test whose `no method named open_tap` failure was
     the loud instance. **This is the run `dev` discarded rather than report**, and it now has an
@@ -186,3 +189,48 @@ flowchart TB
   cold build actually hurting.
 - **It does not add a gate**, because none is possible against a file the repository cannot see.
 - **It does not fix backlog 0160 or 0161.**
+
+## Implementation log
+
+**Lane:** `main` — this plan changes one machine-local file and no repository code, so it needs no
+worktree.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — Cut the redirect and destroy the store | human | done 2026-08-29 | none — the file is outside the repository |
+| 2 — Prove each lane compiles what it contains | dev | not started | |
+| 3 — The record says what happened | dev | not started | |
+
+**Phase 1 — done, and it found a hazard the phase did not anticipate.**
+
+- `WORK/.cargo/config.toml` now holds the `[target.x86_64-pc-windows-msvc]` linker block and
+  nothing else. Its header was rewritten to cite ADR-0147 and to say the redirect is not to be put
+  back, since the file is the only place a future session will look.
+- `WORK/.lmv-target` measured **16.07 GB** and is gone.
+- `cargo metadata --no-deps` in all three live worktrees — `light-music-visualizer`,
+  `lmv-plan-0104`, `lmv-plan-0115` — reports a `target_directory` inside that worktree.
+
+- **THE HAZARD: this phase deletes a directory another lane may be building into, and the phase as
+  written does not say to check.** A `cargo nextest run --workspace` had started roughly a minute
+  before the delete ran. `Remove-Item -Recurse` removed `debug/.fingerprint` and `debug/build`, then
+  failed `Access to the path 'animation-d21c4cc9a8924c78.exe' is denied` on a running test binary —
+  which is the only reason the collision was noticed at all. Five test binaries were live and
+  accumulating CPU at that moment. **A recursive delete of a build directory needs a check for
+  processes rooted in it, not an existence check**, and on Windows the lock is what reports the
+  problem rather than anything in the tooling.
+- That run was stopped deliberately, and the session that owned it was told why and told the store
+  had been revoked under it. **Its verdict was unusable regardless** — a `--workspace` run against
+  the shared store cannot say which `lmv-core` it tested, which is the whole of ADR-0147.
+- A **new** `cargo clippy --workspace --all-targets` started immediately afterwards and was left
+  alone: with the redirect gone it compiles into its own worktree's `target/`, so it neither touched
+  the remnant nor needed to be stopped. That is the first observation of the fixed behaviour.
+
+- **CORRECTION, same day, from the Plan 0104 lane.** This plan and ADR-0147 first stated that the
+  build script collided too and that a lane could embed another's preset set. **That claim is
+  withdrawn.** The Plan 0104 session read two distinct generated preset lists in the deleted store's
+  `release` tree — 72 and 54 — which is inconsistent with a guaranteed collision, and it named the
+  distinction that was elided: compiling `build.rs` and running it are separate units with separate
+  fingerprints. The seven identical `debug` outputs were an **absence** (only `main` and the Plan
+  0115 lane ever built in `debug`, and both carry the same 54 presets), and an absence was read as a
+  collision. The library collision is directly evidenced and unaffected. **Neither reading can be
+  re-checked: the store was deleted in this phase, before the question was settled.**
