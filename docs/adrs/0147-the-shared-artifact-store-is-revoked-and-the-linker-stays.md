@@ -35,14 +35,21 @@ the same output filename. Freshness is then decided by resolving the dep-info's 
 paths against whichever package root is building and comparing mtimes — so a lane whose files are
 older than the recorded build time is told its neighbour's artifact is up to date.
 
-**The build script collides too, and that is the half that reaches content.** `core/build.rs` globs
-`presets/*.toml` and records **absolute** paths in its rerun-if-changed set. Six of the seven
-build-script outputs in the store name the main checkout; one names the Plan 0115 lane. All seven
-carry the same 57 entries, and none contains `lsystem_bower` — a preset that exists only in the Plan
-0104 worktree, which holds **72 presets against main's 54**. So the embedded preset library a lane
-compiles is the library of whichever checkout last ran the build script, and a lane that adds a
-preset can compile without it. Plan 0104 — *"The library stops being lopsided"* — is a preset plan,
-is live, and is in exactly this shape.
+**Whether the build script collides in the same way is unresolved, and this ADR does not rest on
+it.** The `debug` tree held seven build-script output directories, all carrying the same 57
+generated entries, none containing `lsystem_bower` — a preset that exists only in the Plan 0104
+worktree, which holds **72 presets against main's 54**. That was first read as the content half of
+the same collision. **It does not support that reading.** The Plan 0104 lane reports that the
+`release` tree held **two distinct** generated preset lists at the same moment — one of 72 presets
+with `warp_wellhead`, `lsystem_coral` and `star_zellij` in it, one of 54 — so the build script did
+run per lane there and its output directory was keyed per lane. Seven identical `debug` outputs are
+equally explained by the fact that the only two checkouts that built in `debug` were `main` and the
+Plan 0115 lane, which carry the *same* 54 presets; an absence is not a collision. The distinction
+the counter-evidence turns on is real and was elided: **compiling `build.rs` and running it are
+separate units with separate fingerprints**, and it is the run's output that decides the embedded
+set. Neither reading can now be re-checked, because the store was deleted before the question was
+settled. **Nothing below depends on the answer** — the library collision is directly evidenced and
+is sufficient on its own.
 
 The distinction that decides this ADR is between the two failures. Here it failed **loudly**,
 because a method was missing and the compile broke. The dangerous case is two lanes whose cores
@@ -84,9 +91,9 @@ provenance and nothing can attribute them after the fact.
 - **A lane compiles what it contains.** The property is restored by construction rather than by a
   check, which matters because no check was possible: cargo offers no hook that could have caught
   this, and the loud instance was found only because a method happened to be missing.
-- **The preset library a lane embeds is the lane's.** Plan 0104's 18 unshipped presets stop being
-  invisible to its own build, and the `preset-author` lane stops being able to author against a
-  compiled set it did not write.
+- **The question of what a lane embeds stops being open.** Whether the build script ever served one
+  lane another's preset set is unresolved above and is now unanswerable; with no shared store the
+  question cannot arise again. Plan 0104's rebuild after the revocation embeds its own 72.
 - **Measurements become attributable again.** Plan 0115's `dev` session discarded a full-suite run
   rather than report it, because it could not be known which core it ran against. That is the right
   call and it is not a cost anyone should have to pay.
@@ -153,7 +160,10 @@ discipline about when lanes run touches it.
 ## Notes
 
 The fingerprint evidence in Context was read directly out of `WORK/.lmv-target/debug/.fingerprint/`
-and `debug/build/*/output` on 2026-08-29, before the store was deleted. The single-valued `path`
+and `debug/build/*/output` on 2026-08-29, before the store was deleted — and the deletion is why the
+build-script question above stays open. **Destroying the artifact was the same act as destroying the
+evidence about it**, which is worth one line here: the store was removed for being untrustworthy,
+and that removed the only material that could have characterised how untrustworthy it was. The single-valued `path`
 field is the whole finding in one number, and it is worth repeating that this is a property of cargo
 and not a misconfiguration: nothing in `WORK/.cargo/config.toml` could have made two worktrees
 distinguishable to it.
