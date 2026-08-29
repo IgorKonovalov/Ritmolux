@@ -256,248 +256,107 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | 4 — Prove nothing about the tests changed | dev | done | a50b193 |
 | 5 — Repair the one script the redirect breaks | dev | done | a29a23a |
 | 6 — Measure where the suite time actually goes | dev | done | a3d57c6 |
-| 7 — Write down what a machine has to do | dev | done | committed with this row |
+| 7 — Write down what a machine has to do | dev | done | 952d5c3 |
 
 ### Notes
 
-**Phase 1 — the baseline.** Machine (ADR-0071): AMD Ryzen 9 5900HS, Windows 10
-19045, rustc 1.97.1, cargo-nextest 0.9.140, on AC with standby disabled. Nothing
-else ran during the timings. Baseline commit `35fd027`.
+**Machine** (ADR-0071): AMD Ryzen 9 5900HS, Windows 10 19045, rustc 1.97.1,
+cargo-nextest 0.9.140, on AC. Baseline `35fd027`.
+
+**Phase 1 — baseline.** Compile-and-link only, `--no-run` throughout, so no figure
+here covers suite run time.
 
 | measurement | value |
 |---|---|
-| cold `cargo build`, fresh worktree | **105 s** (129 crates compiled) |
-| cold `cargo nextest run --workspace --no-run` after it | **66 s** (16 further crates, then the test-binary links) |
-| cold, from nothing to all test binaries | **171 s** |
-| warm one-file-edit rebuild (`touch core/src/lib.rs`, then `--no-run`) | **28 s** |
-| cold `target/` after both builds | **4,504 MB** |
+| cold `cargo build`, fresh worktree | 105 s (129 crates) |
+| cold `--no-run` after it | 66 s (171 s cumulative) |
+| warm one-file-edit rebuild | 28 s |
+| cold `target/` | 4,504 MB |
 
-**Three premises in the plan and ADR-0141 do not match the machine as measured.**
-Recorded as measurements; what follows from them is not this lane's call.
+**Three premises do not match the machine.** There is **one** live worktree, not
+three — 0123 and 0127 were removed, 0132 closed the same night — and its `target/`
+measured 15,002 MB against the ADR's 2.4 GB. A default `cargo build` compiles
+**129** crates, not 305: that is the `Cargo.lock` entry count, and
+`default-members` excludes `core-cabi` and `milkconv`. The cold build at 105 s is
+**faster than the 2m12s the ADR cites for a warm one**, and the quoted *"small
+change is taking hours"* is reproduced by no figure here — the warm edit is 28 s.
 
-- **Worktree count.** The plan and ADR open on *"three worktrees hold 23.2 GB"*.
-  `git worktree list` returns **one** — the main checkout — because the Plan 0123
-  and 0127 lanes were removed and Plan 0132's closed the same night this ran. The
-  remaining lane's `target/` measures **15,002 MB**, against the 2.4 GB the ADR
-  recorded for it. So the disk figure is now one lane at 14.65 GB rather than
-  three summing to 23.2 GB, and the growth is within a lane, not across lanes.
-- **Crate count.** Both documents say the dependency graph is **305 crates**.
-  That is the count of `[[package]]` entries in `Cargo.lock`; a default
-  `cargo build` compiles **129**, because `default-members` excludes `core-cabi`
-  and `milkconv` (ADR-0072, ADR-0113). `--no-run` adds 16 more for dev-
-  dependencies. 305 is reachable only by `--workspace` with every feature.
-- **Magnitude.** ADR-0141 cites `cargo build` on a warm `main` at **2m12s**. The
-  cold build measured here — a worktree with no `target/` at all — is **105 s**,
-  faster than the figure the ADR gives for a warm one. The user report the plan
-  quotes (*"small change is taking hours"*) is not reproduced by any number in
-  the table above; the warm inner-loop edit is 28 s. These timings cover compile
-  and link only. `--no-run` was used throughout, so no suite was executed, and
-  Phase 6 is where run time gets measured.
+**Deviation.** `git worktree add ../lmv-measure-0129 main` cannot run as written:
+`main` is checked out in the primary worktree. Used `--detach`, same commit.
 
-**Deviation — `git worktree add ../lmv-measure-0129 main` cannot run as written.**
-`main` is checked out in the primary worktree, so git refuses to check it out
-again. Used `git worktree add --detach ../lmv-measure-0129 main`, which lands the
-same commit. The scratch worktree was removed after measuring, per the phase.
+**Phase 2 — linker.** `linker = "rust-lld.exe"` under
+`[target.x86_64-pc-windows-msvc]`, the plan's first-choice form. `cargo build -v`
+shows `-C linker=rust-lld.exe` reaching rustc and a negative control naming a
+nonexistent linker fails the build, so a green build means `rust-lld` linked. Cold
+path to all test binaries **171 s to 145 s**, suite 341.8 s to 340.9 s, result set
+identical at 1122 tests across 54 binaries, goldens passed unblessed with no
+baseline rewritten. The stanza changes the build fingerprint, so the first build
+in an existing lane recompiles every dependency (1m25s) — once per lane.
 
-**Noted while reading, for Phase 4.** `standalone/tests/shot_cli.rs` has two
-target-directory dependencies, and the phase's done-when names one. `shot_exe()`
-walks ancestors from the test binary and is `CARGO_TARGET_DIR`-safe as its
-comment claims. `scratch()` (line 115) builds its path as
-`repo_root().join("target")`, which is repo-relative and unaffected by a
-redirect. Not yet exercised under the store.
-
-**Phase 2 — the linker.** The plan's first-choice form resolves; the ADR's
-fallback was not needed. The whole stanza:
-
-```toml
-[target.x86_64-pc-windows-msvc]
-linker = "rust-lld.exe"
-```
-
-`rust-lld.exe` is not on `PATH`, and rustc still finds it in its own sysroot, so
-no explicit path and no `-Clinker-flavor=lld-link` are involved.
-
-**That it is actually linking was established, not inferred.** `cargo build -v`
-shows `-C linker=rust-lld.exe` reaching rustc; and a negative control — the same
-stanza naming a linker that does not exist — fails the build at the first build
-script. So a green build under this config means `rust-lld` ran.
-
-| measurement | baseline (`link.exe`) | `rust-lld` | delta |
-|---|---|---|---|
-| cold `cargo build` | 105 s | **91 s** | -14 s |
-| cold `--no-run` after it | 66 s | **54 s** | -12 s |
-| cold, nothing to all test binaries | 171 s | **145 s** | **-26 s** |
-| cold `target/` | 4,504 MB | 4,519 MB | +15 MB |
-| `cargo nextest run --workspace` | 341.8 s | 340.9 s | +0.9 s |
-
-Both cold figures come from a scratch worktree created for the purpose and
-removed after; the `rust-lld` one branched one commit later than the baseline's,
-and that commit is docs-only, so the compiled input is identical.
-
-**The result set is unchanged and the goldens did not move.** 1122 tests across
-54 binaries, 1122 passed, 5 skipped, under both linkers; `diff` of the sorted
-test-name lists is empty. `LMV_BLESS` was unset, the four golden binaries
-(`golden`, `composite`, `layer`) ran and passed, and `git status` is clean, so no
-baseline was rewritten.
-
-**One cost, recorded because it is not free to toggle.** Adding the stanza
-changes the build fingerprint, so the first build in an existing warm lane
-recompiles every dependency — 1m25s on `main`. It is paid once per lane per
-config change, not per build.
-
-**Phase 3 — the store.** Added above the existing linker stanza:
-
-```toml
-[build]
-target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"
-```
-
-**Ancestor discovery reaches `WORK/`**, and Phase 2 had already established it:
-the linker stanza in the same file governed builds run from inside the workspace,
-proven there by a negative control. ADR-0141's named risk does not arise and the
-gitignored-per-worktree fallback is unused.
+**Phase 3 — store.** `[build] target-dir = ".../WORK/.lmv-target"`. Ancestor
+discovery reaches `WORK/`, established in Phase 2.
 
 **The done-when names three live worktrees; there is one.** `main` built into the
-store and did not re-create its own `target/` — checked by finding no file written
-under the old tree during that build. Its 14.65 GB `target/` was then removed,
-taking the disk from 63 GB free to 77 GB. The "each worktree" half of the
-criterion was then satisfied against **two purpose-made worktrees** created and
-removed for the measurement, rather than against lanes that do not exist. Neither
-created a local `target/`.
+store without writing to its old tree, whose 14.65 GB was then removed (63 GB free
+to 77 GB); the "each worktree" half was met against **two purpose-made worktrees**,
+created and removed for the measurement. A new lane compiles **3 crates, all
+workspace, in 15 s** against 129 in 105 s, and reaches every test binary in
+**57 s against 171 s** with **zero dependencies recompiled**. The first new lane
+also rebuilt `image`'s 16 dev-dependencies, which a plain `cargo build` never
+builds — a first-population cost, absent on the second lane, which is why two were
+measured. Store 5,444 MB, replacing a 14,650 MB per-lane tree.
 
-**The headline claim, measured twice.** A worktree that has never built before:
-
-| | crates compiled | wall |
-|---|---|---|
-| baseline, cold, no store (Phase 1) | 129 | 105 s |
-| first new lane, `cargo build` | **3** — all workspace | **15 s** |
-| first new lane, `--no-run` after it | 16 | 56 s |
-| second new lane, `cargo build` | **3** — all workspace | **15 s** |
-| second new lane, `--no-run` after it | **5 — all workspace, 0 dependencies** | **42 s** |
-
-The first new lane's 16 are `image`'s dev-dependency chain, which a plain
-`cargo build` never builds, so the store had not yet seen them. That is a
-first-population cost, not a per-lane one, which is why the second lane was
-measured: **0 dependencies recompiled**, and the five are the workspace crates
-themselves, which recompile because their path is part of their fingerprint.
-
-**Steady state for a new lane is 57 s from nothing to every test binary, against
-171 s.** The store measures 5,444 MB and replaced a 14,650 MB per-lane tree.
-
-**Phase 4 — what the store changed about the tests.** Nothing, by every check the
-phase names.
-
-| check | result |
-|---|---|
-| `cargo nextest run --workspace --no-fail-fast` | 1122 run, 1122 passed, 5 skipped, 344.6 s |
-| result set vs the Phase 1-era baseline | **`diff` empty** — same names, same count, same outcome |
-| `cargo clippy --workspace --all-targets -- -D warnings` | clean, 56 s |
-| `cargo fmt --all --check` | clean |
-| golden suite, `LMV_BLESS` unset | 5 golden tests passed, no baseline rewritten |
-| `standalone/tests/shot_cli.rs` locating `examples/shot.exe` | 22 `shot_cli` tests passed |
-
-Suite wall time across all three configurations — 341.8 s unmodified, 340.9 s
-under `rust-lld`, 344.6 s under the store — spans 1.1 %, so nothing here reads as
-a change in run cost.
+**Phase 4 — coverage.** 1122 run, 1122 passed, 5 skipped, `diff` against the
+pre-config baseline empty; clippy `--workspace --all-targets -D warnings` and
+`fmt --check` clean; 5 goldens passed unblessed; 22 `shot_cli` tests still locate
+`examples/shot.exe`. Suite time across all three configurations spans 1.1 %.
 
 **Finding — the repository's `target/` comes back, and only the tests bring it.**
-`standalone/tests/shot_cli.rs` builds its output path in `scratch()` (line 115) as
-`repo_root().join("target")`, which is repo-relative and so unaffected by
-`build.target-dir`. After the suite ran under the store, the worktree held a
-`target/` again, containing `shot-cli-tests/` and nothing else, 4 MB. This
-contradicts Phase 3's *"none of them re-creates its own `target/`"* — that
-criterion holds for every build and fails on a test run.
+`shot_cli.rs` builds its output path in `scratch()` (line 115) as
+`repo_root().join("target")`, which no redirect reaches; after the suite ran under
+the store the worktree held a `target/` again, carrying `shot-cli-tests/` and
+nothing else, 4 MB. Phase 3's *"none of them re-creates its own `target/`"* holds
+for every build and fails on a test run. Two things hide it: `**/target` is
+gitignored, so `git status` stays clean, and the sibling `shot_exe()` **is**
+redirect-safe and carries the comment that makes the file look already audited.
+Left as found, per the phase.
 
-Two things make it easy to miss. `**/target` is in `.gitignore`, so
-`git status` stays clean; and the sibling helper `shot_exe()` **is**
-redirect-safe, walks ancestors from the test binary, and carries the comment
-that made the file look already-audited. `scratch()`'s own comment — *"under
-`target/` so it never escapes the build tree"* — states an invariant that the
-store falsifies, since that path is no longer the build tree.
+**Phase 5 — script.** `build.ps1`'s one `$repo\target` assumption now reads
+`target_directory` from `cargo metadata`; both branches were exercised by moving
+the config aside. Exits 0 in 89 s, staticlib inside the store, `foo_lmv.dll` at
+**9,564,672 bytes** against **9,285,120** dated 2026-08-24. **That +3.0 % is
+recorded, not explained:** between those builds both the source moved (0123, 0127
+and 0132 closed, the last adding the OSC sink) and the Rust side gained the
+stanza. Unrelated: `'vswhere.exe' is not recognized`, from `vcvars64.bat`'s own
+lookup at a line this phase does not touch.
 
-Left as found, per the phase's *"a finding, not a fix-up"*. Not repaired, and no
-test was touched.
+**Phase 6 — where `reactivity` goes.** Two runs per configuration, the probe
+raising workspace crates through `CARGO_PROFILE_DEV_OPT_LEVEL` in the environment
+only. Shipped profile **126.1 s**, workspace crates optimized **102.0 s**, so
+**our unoptimized code is 24.1 s, 19.1 %** — the minority arm, so the deferred
+question closes here with no ADR owed and no profile edit made. The suite is
+quoted at ~89 s in the plan and measures 126.1 s, both from this machine five days
+apart. Store grew to 7,200 MB.
 
-**Phase 5 — the script.** `plugin-foobar/build.ps1` had exactly one
-`$repo\target` assumption, at the line the plan names. It now asks cargo:
-
-```powershell
-$meta = cargo metadata --format-version 1 --no-deps --manifest-path (Join-Path $repo "Cargo.toml") | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
-$coreLib = Join-Path $meta.target_directory "release\lmv_core_c.lib"
-```
-
-**Both branches of "correct whether or not a redirect is in effect" were
-exercised**, by moving the config aside and asking again: without it
-`target_directory` reports `…/light-music-visualizer/target`, with it
-`…/WORK/.lmv-target`. A machine that never opted in is unaffected.
-
-`.\build.ps1` exits 0 in 89 s. The staticlib resolves to
-`WORK/.lmv-target/release/lmv_core_c.lib` (97,762,378 bytes) and
-`plugin-foobar/build/foo_lmv.dll` is produced at **9,564,672 bytes**, against
-**9,285,120** for the DLL previously on disk, dated 2026-08-24.
-
-**That +279,552 bytes (+3.0 %) cannot be attributed from this measurement**, and
-is recorded rather than explained: between the two builds both the source moved
-(Plans 0123, 0127 and 0132 closed, the last adding the OSC sink to the shell) and
-the Rust side gained the `rust-lld` stanza. The C++ shim is still compiled and
-linked by MSVC either way, and a staticlib is an archive rather than a link
-product, so source growth is the likelier of the two — but nothing here separates
-them.
-
-**Unrelated stderr, unchanged by this phase.** The log carries
-`'vswhere.exe' is not recognized` raised inside `vcvars64.bat`'s own lookup at
-the `cmd /c` line. Compilation and linking proceed and the DLL is produced. That
-line is not one this phase touches.
-
-**Phase 6 — where the `reactivity` time goes.** Two runs per configuration, so
-the delta is not read off one sample. The probe raised workspace crates to
-`opt-level = 2` through `CARGO_PROFILE_DEV_OPT_LEVEL` in the environment only;
-nothing in `Cargo.toml` was edited and nothing was committed.
-
-| configuration | run 1 | run 2 | mean |
-|---|---|---|---|
-| shipped profile, `lmv-core` at `opt-level = 0` | 127.4 s | 124.9 s | **126.1 s** |
-| probe, workspace crates at `opt-level = 2` | 101.6 s | 102.3 s | **102.0 s** |
-
-**Our unoptimized code is 24.1 s of the suite, or 19.1 %.** That is the minority
-arm the phase describes, so by its own terms the question closes here: the
-remaining ~81 % is inside dependencies that already compile optimized, chiefly
-`wgpu-core` validation and `naga`. No ADR is owed and no profile edit was made.
-
-Rebuilding the workspace optimized cost 24 s, so the probe is cheap to repeat if
-the ratio is ever worth re-checking.
-
-**The suite is larger than the plan records.** It is quoted at ~89 s; it measures
-**126.1 s** here. Both figures are from this machine, five days apart.
-
-The store holds both artifact sets afterwards and grew from 5,444 MB to 7,200 MB.
-Disk: 71 GB free.
-
-**Phase 7 — the documentation.** Three files, each written for a different
-reader. `CLAUDE.md` gains a `## Machine setup` section carrying the **complete
-file contents**, so a fresh machine can be set up without opening ADR-0141; the
-`dev` context states the two rules a lane can break (never hardcode
-`<repo>/target`, never `cargo clean`); the `architect` context states what it
-changes when designing — a new lane starts warm, so sequencing a plan behind
-another to inherit its `target/` now buys nothing, and any plan assuming parallel
-lanes needs a fresh argument.
-
-All three phrase it as ADR-0033 phrases `core.hooksPath`: opt-in per machine,
-and **inert when skipped** — a machine without the file builds correctly into its
-own `target/`.
-
-All five repo gates exit 0: `check-doc-links`, `check-index-rows`,
-`check-backlog-claims`, `check-comment-hygiene`, `check-filter-figures`.
+**Phase 7 — docs.** `CLAUDE.md` carries the complete file contents, so a fresh
+machine needs no ADR. All five repo gates exit 0.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:** none
+- **What shipped:** one fix and docs — no feature, and no pixel moves. Five files:
+  `plugin-foobar/build.ps1` (the staticlib path now comes from `cargo metadata`),
+  `CLAUDE.md`, both skill `project-context.md`, and this plan. The store and the
+  linker themselves ship in **no commit**: they live in `WORK/.cargo/config.toml`,
+  outside every repo, machine-local by construction.
+- **Operator docs touched:** none.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Outstanding `human` phases:** none — all seven phases are `dev` and all seven
+  landed.
+- **Log length:** 111 lines against the 99 of `## Implementation phases`. Six of
+  the seven done-whens require a measurement to be recorded, and what remains
+  beyond those is findings; nothing was cut past that point.
 
 ## Followups (after this lands)
 
