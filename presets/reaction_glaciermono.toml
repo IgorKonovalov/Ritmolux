@@ -54,10 +54,34 @@ kill = "0.0450"
 # The warm-up now decays over ~17 s rather than 5. It has to: at a settled 0.22
 # this regime establishes slowly, and the boost is what buys the pattern its
 # first minute without making the rest of the set run at that speed.
-flow   = "0.22 + max(0, 1.0 - time * 0.06) + clamp(bass * 0.165, 0, 0.14) + clamp(onset * 0.100, 0, 0.06)"
+# THE ESTABLISHING BOOST, AND IT IS SIZED FOR A ROTATION RATHER THAN A SOAK.
+# A Gray-Scott field starts as noise, and this world runs its chemistry slower
+# than any other in the library - which is the whole point of it, and also why
+# it was unusable live. Measured at 200x200 under a held stimulus: at 2 s it is
+# a black blob with one ring, at 10 s barely more, and it does not resolve into
+# coral until about a MINUTE in. A preset switch re-seeds the simulation, so in
+# a rotation this world was essentially never seen as itself.
+#
+# The `max(0, ...)` term front-loads the rate and then gets out of the way: it
+# adds 1.20 at t=0 and reaches zero at 45 s, so the field resolves into coral
+# within about ten seconds and the glacial pace it is named for takes over once
+# there is something to move slowly. The old term added 1.0 and expired at
+# 16.7 s - not enough boost, and gone before it had done anything.
+#
+# 1.20 IS A CEILING, NOT A PREFERENCE. `flow` is the simulation RATE, and
+# Gray-Scott has a stability limit: too large a step and the field DIVERGES to
+# uniform solvent, which prints as a completely black frame. A draft of this fix
+# used 2.2 and did exactly that - worse than the slow warm-up it was repairing.
+# Swept at 0.60 / 0.90 / 1.20 / 1.50 against a ten-second render; all four are
+# stable and 1.20 develops fastest. Do not raise it without rendering.
+flow   = "0.22 + max(0, 1.20 - time * 0.027) + clamp(bass * 0.165, 0, 0.14) + clamp(onset * 0.100, 0, 0.06)"
 # 0.62 fired on most detections, and every one stamps a fresh growth - which is
 # what made a slow simulation still look busy. At 0.88 only the hardest hits seed.
-inject = "onset > 0.88"
+# 0.62, not 0.88. Since ADR-0049 each band is a fraction of its own recent peak
+# and the real-music onset mean is about 0.20, so a 0.88 gate fires only on the
+# very hardest hits in a track - this world went whole passages with no fresh
+# disturbance at all, which on a slow field means nothing new to look at.
+inject = "onset > 0.62"
 
 # Verdigris' plain 8-fold fold, and for its reason: the fold is what turns a
 # field into a FIGURE. It folds about a screen-centred axis, which is why this
