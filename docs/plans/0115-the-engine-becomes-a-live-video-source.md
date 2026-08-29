@@ -366,7 +366,7 @@ void      lmv_spout_destroy(LmvSpout *);
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Stage the SDK, prove the receiving half | human | not started | |
+| 1 — Stage the SDK, prove the receiving half | human | in progress — SDK facts recorded, TouchDesigner checks outstanding | |
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
 | 3 — The Spout shim | dev | not started | |
 | 4 — `lmv --stream` | dev | not started | |
@@ -375,6 +375,59 @@ void      lmv_spout_destroy(LmvSpout *);
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 1 — four of the six findings, read out of the staged SDK.** The release is unpacked at
+`WORK/spout-2.007.017/`, outside the repo. The two still open are the two that are questions *about
+TouchDesigner* and cannot be answered from the SDK: whether the sender appears in a Spout In TOP and
+under what name, and how that TOP reads the colour.
+
+- **Release and hash, for the Phase 3 pin.** Spout **2.007.017**, published 2025-10-22. Two assets
+  matter and both are pinned by their own hash, because they serve different phases:
+  - `Spout-SDK-binaries_2-007-017_1.zip` — 3,472,666 bytes, sha256
+    `695f20e3505fa0da51b2eb959af359f5d9e2c914bb9676e9118d19f6a5424bf4`. Carries
+    `include/SpoutDX/*.h` and MD + MT builds of `SpoutDX.lib`, `SpoutDX_static.lib` and
+    `SpoutDX.dll`. **This is what the Phase 3 shim compiles and links against.**
+  - `SPOUT_2007-017.zip` — 12,422,533 bytes, sha256
+    `944f4ef7648a89087757bcbaaebd277bcdc47afc5af1435b5ed0f6298a74f8c7`. Carries
+    `DEMO/SpoutSender.exe` + `DEMO/SpoutReceiver.exe` and `SETTINGS/SpoutSettings.exe` — the
+    known-good sender the outstanding TouchDesigner check points a TOP at. Not a build input.
+- **Licence: Simplified BSD (2-clause)**, read from `SPOUT-2007/licence.txt`. Copyright
+  2014-2025 Lynn Jarvis. ADR-0125's assertion holds and this is **not** a blocking finding. Clause 2
+  binds us: binary redistribution must reproduce the copyright notice and the disclaimer in the
+  materials shipped with the distribution, so the Phase 7 release zip needs that notice — the same
+  obligation ADR-0115 discharges for the foobar SDK.
+- **The CPU entry point is `SendImage`, and it has no flags.**
+  `bool spoutDX::SendImage(const unsigned char *pData, unsigned int width, unsigned int height,
+  unsigned int pitch = 0)`. It converts nothing: after `CheckSender(width, height, m_dwFormat)` it
+  is one `ID3D11DeviceContext::UpdateSubresource` of the caller's bytes into the shared texture,
+  followed by a `Flush`. Three consequences, all read from `SpoutDX.cpp` at tag 2.007.017:
+  - **Channel order is a format, not a flag, and the default is wrong for us.** `m_dwFormat`
+    initialises to `DXGI_FORMAT_B8G8R8A8_UNORM` (87). Our readback is RGBA8, so
+    `SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` (28) must be called **before the first send** or
+    every frame ships with red and blue swapped. `CreateSharedDX11Texture` passes the format
+    through verbatim (only 0, 21 and 22 are remapped), and 28 is one of the two values Spout's own
+    receive path recognises, so it is the value to use. Note it is the **linear-typed** UNORM:
+    Spout will be carrying our display-referred sRGB-encoded bytes in a texture typed as UNORM,
+    which is the precise shape of the colour question still open on the TouchDesigner side.
+  - **Row order needs no flag.** `UpdateSubresource` writes row 0 to row 0, so the shared texture
+    is top-down, matching `CaptureImage`'s row-major top-to-bottom. `ReceiveImage` carries `bRGB`
+    and `bInvert`; the send path carries neither, because it does nothing to invert.
+  - **`pitch` takes a padded stride directly.** It defaults to `width * 4` and is otherwise used as
+    the row pitch verbatim, so a future caller could hand over `capture`'s 256-byte-aligned readback
+    buffer without the unpadding copy. Not in Phase 2's scope and not needed while `read_back`
+    returns tight rows, but it means the padding strip is optional rather than structural.
+- **A sender survives a resolution change, in place.** `CheckSender` compares `m_Width`/`m_Height`/
+  `m_dwFormat` against the arguments and, on a change, releases the shared texture, creates a new
+  one and calls `sendernames.UpdateSender` with the **same sender name**. The sender is never
+  unregistered and re-registered, so Phase 4's question is settled: **a resize updates the sender.**
+  It also means the `lmv_spout_resize` entry point in this plan's illustrative C surface is
+  redundant — `SendImage(pData, w, h)` with new dimensions already drives the whole path. Recorded
+  as an observation for Phase 3, not acted on.
+- **One trap for Phase 4's naming.** `SetSenderName` auto-increments on collision — a second sender
+  asking for `name` is registered as `name_1`, then `name_2`. A crashed previous run can leave a
+  stale registration, so the name TouchDesigner shows is not guaranteed to be the name we asked
+  for. `GetName()` returns the name actually registered, and that is what the mode should print.
+
 
 **Phase 2 — three disclosed deviations.**
 
