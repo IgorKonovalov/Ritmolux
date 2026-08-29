@@ -444,11 +444,96 @@ void      lmv_spout_destroy(LmvSpout *);
 | 3 — The Spout shim | dev | done | `ae436cf`, `2df3555` |
 | 3b — The GPU becomes nameable | dev | done | committed with this row |
 | 4 — `lmv --stream` | dev | done | committed with this row |
-| 5 — The stream survives a set | dev | not started | |
+| 5 — The stream survives a set | dev | done | committed with this row |
 | 6 — The gate in TouchDesigner | human | not started | |
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 5 — done. It began by finding that the thing it was told to reuse was broken.**
+
+- **AUTO-ROTATE HAD NOT ROTATED SINCE 2026-07-26, IN THE SHIPPED WINDOWED APP.** Wiring the
+  `Director` in meant reading how the shell drives it, and the shell does not: the branch called
+  `on_preset_switched()`, which is bookkeeping *about* a switch and performs none. `git log -L` names
+  the commit — `43e1278`, *"describe the incoming preset after a switch, not the outgoing"* — which
+  correctly deferred the title and cap-overflow reads by one frame and took `cycle_preset()` with
+  them. The other two callers were untouched, because each performs its change before notifying.
+  **Fixed under the user's explicit instruction, in its own commit `64758ad`**, outside this phase:
+  both rotation paths now go through one `rotate_to_next` helper that pairs the change with its
+  bookkeeping, so neither half is reachable alone.
+  - **The new test covers the contract, not the call site, and that distinction is the finding.**
+    It drives `advance` until it asks to rotate and carries the decision out on a headless renderer
+    — reading `cycle_preset`'s returned *incoming* name, since `preset_name()` deliberately stays on
+    the outgoing preset until the dissolve's capture frame. What no test here can assert is what the
+    event loop's branch calls: `AppState` needs a real window and lives in the binary. **That
+    absence is what let this ship**, and closing it needs an `AppState` harness that does not exist.
+
+- **Rotation, in the stream: `rotate   : frame 5400, AutoTimer -> 'Clifford Gallery'`** — frame 5400
+  at 60 fps is 90 s, which is the operator config's `max_dwell_secs` exactly.
+- **`--preset "Clifford"` held for 7200 frames and logged no rotation.**
+- **Rotation is ON by default here, which the window's config is not.** `[rotate] auto` defaults to
+  `false` (ADR-0027) and the operator's config has it off, so "exactly as the window does it" would
+  have meant a source that never rotates — the thing this phase exists to prevent. The dwell bounds
+  still come from the config; `--preset` turns rotation off.
+
+**Readings, asserted against nothing.**
+
+| | render+readback | spout send | resident set |
+|---|---|---|---|
+| rotating, 7200 frames | 6.13-8.04 ms | 0.64-0.79 ms | 277 MB, +0.2 MB over 5400 frames, +9.1 MB across the rotation |
+| pinned, 7200 frames | 7.28-9.31 ms | 0.67-0.83 ms | 278 MB, +0.5 MB across 7200 frames |
+
+- **The sink is not the bottleneck, by an order of magnitude.** The Spout upload is ~0.7 ms against
+  ~8 ms for the engine's draw-and-readback. That is the reading ADR-0125's zero-copy exit was to be
+  decided on, and it points away from it — with the caveat below about what "draw and readback"
+  still contains.
+- **Two stages are reported, not three, and it is structural rather than a shortcut.**
+  `render_tapped` encodes, submits and then blocks mapping the readback, so no CPU-visible instant
+  separates "drew" from "read back"; a timer around the encode would measure the encode. Splitting
+  them needs **GPU timestamp queries** — a device feature and a `core` seam. So the ~8 ms is
+  engine-plus-readback together, and if that ever needs attributing, that is the work it takes.
+- **Resident set is flat.** +0.2 MB over 5400 frames pinned; the +9.1 MB step is a rotation
+  allocating the incoming preset's resources, and it comes back down.
+
+**The ten-minute done-when, and it is the run that matters.** `--stream --fps 60 --frames 36000`:
+**36000 frames, 600.00 s wall, 599.99 s scene clock** — 60.00 fps exactly over ten minutes — with
+**six rotations**, every one an `AutoTimer` at a ~5400-frame spacing, which is the config's 90 s
+`max_dwell_secs`:
+
+```
+rotate   : frame  5400, AutoTimer -> 'Clifford Gallery'
+rotate   : frame 10802, AutoTimer -> 'De Jong Gallery'
+rotate   : frame 16203, AutoTimer -> 'Dragon'
+rotate   : frame 21603, AutoTimer -> 'Barnsley Fern'
+rotate   : frame 27004, AutoTimer -> 'Ink on Paper'
+rotate   : frame 32401, AutoTimer -> 'Leviathan'
+render: resident set 289 MB, growth +7.1 MB across 36000 frames after a +43.3 MB warm-up (peak 289 MB, 22 samples)
+```
+
+**+7.1 MB across 36000 frames and six preset switches**, peak 289 MB. That is the residency reading
+the gate is taken against.
+
+**An unexplained intermittent, recorded as one rather than as a mechanism.** Two mid-length runs came
+in ~3 % slow — 7200 frames in **121.74 s** rotating and **123.81 s** pinned, against a 120.00 s
+target — while every other run hit its target exactly: 900 frames at 60 fps in **15.00 s**, 900 at
+30 fps in **30.01 s**, 21600 in **360.00 s**, and the 36000-frame run above in **600.00 s**. Two
+explanations were proposed and **both are falsified**:
+
+- *The dissolve.* Falsified by the pinned run, which has no dissolve and was the **slower** of the
+  two.
+- *That deadline pacing accrues permanent debt — an overrunning frame skips its sleep and nothing
+  renders faster to repay it.* Falsified by the ten-minute run, which is **five times longer**,
+  carries **six** dissolves, and lands on 600.00 s. A mechanism that accumulates would show most
+  there and shows nothing.
+
+So the shortfall is real, was observed twice, and **nothing here explains it**; it does not scale
+with run length and it is not the rotations. It is written down at that strength deliberately, and
+the gate should watch for it rather than treat it as understood.
+
+**One property does hold across every run: the animation is not slow when the frame rate is.**
+Scene clock tracks wall clock to 0.02 s over 123.81 s in the worst case, because `dt` is measured
+rather than assumed — so a run that misses 60 fps still renders in correct real time and simply
+delivers fewer frames.
 
 **Phase 4 — done, with one done-when unexercised and four disclosed deviations.**
 
