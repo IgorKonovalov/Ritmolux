@@ -66,20 +66,32 @@ stops = [
 # The `noise` term is the resting drift, offset by `index` so the wedges move
 # out of step - without it the world is frozen in a silence, since a rosette's
 # slow turn alone moves too few pixels to read as alive.
-base = "0.3 + hash(index * 23) * 0.16 + noise(time * 1.8 + index * 9) * 0.12"
+# THE RESTING ORNAMENT IS SMALLER THAN IT LOOKS IT SHOULD BE, TO LEAVE THE
+# MUSIC SOMEWHERE TO GO. The first draft rested at 0.30-0.58 and multiplied the
+# band level by 0.85, so the audio moved about a quarter of what the seeded rest
+# already drew and the world measured 0.0194 on its best band against the
+# suite's 0.02 floor - a spectrum preset that barely read the spectrum. Rest and
+# readout traded places: the ornament is now 0.20-0.42 and the band term carries
+# the figure.
+base = "0.20 + hash(index * 23) * 0.12 + noise(time * 1.8 + index * 9) * 0.10"
 
+# `scale` multiplies each element's OWN band level, which is the only route the
+# spectrum has into this world - there is no `bin()` term anywhere in the file,
+# and mid and treble reach the frame through nothing else. presets/README.md
+# says useful values sit well above 1 and the first draft sat below it, which is
+# why mid measured 0.0036 and treble 0.0008: not damped, simply never spent.
 curve = "0.6"
-scale = "0.85"
+scale = "1.55"
 
 # The hub. Small, so the wedges dominate - the opposite proportion from Halo,
 # where the ring is the body and the spokes are its fringe.
-radius = "0.2 + clamp(bass * 0.129, 0, 0.11)"
+radius = "0.2 + clamp(bass * 0.235, 0, 0.20)"
 
 # Heavy wedges: 12 spokes around a circle is a 30-degree slot each, and 16 fills
 # roughly half of one at the hub. `softness` 0 is a solid stroke with a
 # one-pixel antialiased edge - anything above it puts a gradient inside the ink,
 # which is the one thing a print cannot have.
-thickness = "16 + clamp(onset * 3.33, 0, 2.0)"
+thickness = "16 + clamp(onset * 8.33, 0, 5.0)"
 softness  = "0"
 stroke_blend = "1"
 glow      = "1.0"
