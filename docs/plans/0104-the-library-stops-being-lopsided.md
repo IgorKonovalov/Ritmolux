@@ -376,7 +376,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — is the big family actually big | dev | done | `7561492` |
-| 2 — the singletons get a range | human | not started | — |
+| 2 — the singletons get a range | human (`preset-author`) | done | `b2866ec` |
 | 3 — the thin families fill out | human | not started | — |
 | 4 — `star_pattern`, after the renderer settles | human | not started | — |
 | 4b — `warp_mesh` gets its first worlds | human | not started | — |
@@ -404,6 +404,45 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 - Phase 1's done-when asks for a verdict on `attractor`; the verdict does **not** reduce the
   authoring count, and the reasoning for that is in the result block rather than here.
 
+#### Phase 2 result — authored 2026-08-29
+
+Seven worlds, all fresh-slate ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)):
+`lsystem` **1 → 4** (Coral, Rime, Bower), `spectrum` **1 → 4** (Skyline, Ridge, Anemone),
+`shape_field` **3 → 4** (Aperture). Library **54 → 61**.
+
+| Preset | system | bass | mid | treb | onset | anim | cover |
+|---|---|---|---|---|---|---|---|
+| Coral | `lsystem` | 0.044 | 0.035 | 0.004 | 0.000 | 0.012 | 0.810 |
+| Rime | `lsystem` | 0.045 | 0.004 | 0.009 | 0.004 | 0.014 | 0.866 |
+| Bower | `lsystem` | 0.022 | 0.031 | 0.007 | 0.023 | 0.013 | 0.813 |
+| Skyline | `spectrum` | 0.040 | 0.070 | 0.006 | 0.088 | 0.002 | 0.913 |
+| Ridge | `spectrum` | 0.065 | 0.038 | 0.008 | 0.028 | 0.007 | 0.817 |
+| Anemone | `spectrum` | 0.020 | 0.011 | 0.004 | 0.031 | 0.012 | 0.526 |
+| Aperture | `shape_field` | 0.070 | 0.106 | 0.030 | 0.040 | 0.031 | 0.981 |
+
+**Gates: `cargo nextest run -p lmv-core`, 851 passed, 5 skipped.** The advisory distinctness
+report flags **no pair inside any of the three families** — the only `NEAR-DUP` lines the library
+emits are still the four-way `attractor` cluster Phase 1 recorded, so no header has to justify an
+intentional pair.
+
+Three things a later phase should carry forward.
+
+- **The phase's own guidance held: `mid` was the axis to build across.** Phase 1 measured eleven of
+  eighteen at-or-below-floor presets under 0.010 on it. Four of these seven now report mid above
+  0.030, and Aperture's **0.106** is the strongest mid in `shape_field` by a factor of five.
+- **A branching or line figure has too little area for a level term to register**, and this cost
+  several rounds. Coral, Rime, Bower and Ridge all measured under or barely at the reactivity
+  floor with every band riding the stroke; what fixed each was moving the level response to a
+  **whole-frame** stage — `exposure`, or `bg_bright` — and leaving the stroke's own brightness
+  nearly flat, which is also what the additive ceiling wants. Ridge went 0.010 → 0.065 on that one
+  change.
+- **`shot --report`'s `anim` column and the `animation` gate do not agree on these worlds.** Skyline
+  reports `anim` 0.002 and Ridge 0.007 against the gate's own 0.01 floor, and both **pass**
+  `every_preset_animates_over_time` — as does Coral at 0.012 and Bower at 0.013. The idle motion is
+  real and visible (rendered at frames 24 and 48, the bar heights differ plainly); the report's
+  column simply measures a narrower thing than the gate does. Worth knowing before someone tunes a
+  preset to move that number. **Filed under `## Followups`.**
+
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
@@ -419,3 +458,8 @@ zero-world system still at zero, which is the exact defect the plan was opened t
   and left alone: this plan's files-touched is `presets/*.toml` plus itself.
 - Re-run `node scripts/docs-shots.mjs` if any gallery preset is retired — the committed images name
   presets by hand.
+- **`shot --report`'s `anim` column disagrees with the `animation` gate**, noticed by Phase 2 and
+  left alone. Four presets that pass `every_preset_animates_over_time` report `anim` at or below the
+  gate's own `ANIM_FLOOR` — Skyline at 0.002, Ridge at 0.007. The report's figure is a diff between
+  two silent captures 0.4 s apart; the gate measures something else, and the column is the number an
+  author reaches for first. Either the column should say what it measures or the two should agree.
