@@ -223,6 +223,29 @@ restart. Off means no track ever reaches the visualizer.
 ### Flags & environment
 
 - `--list-devices` — enumerate audio capture devices (Windows-only).
+- `--list-adapters` — enumerate graphics adapters, from **both** rosters: the one the renderer
+  selects through and the one the Spout sender selects through. They are separate enumerations and
+  are not assumed to agree on order, so both are printed with their own indices.
+- `--stream` — run **headless** as a live video source and publish every frame as a **Spout
+  sender**, for TouchDesigner (or any Spout receiver) on the same machine. No window, no swapchain,
+  no codec. Windows-only, and present only in a build with the `spout` feature — the release
+  `lmv.exe` has it; a plain `cargo build` does not, and `--stream` there fails with a named error
+  saying so. Presets rotate on the operator config's dwell timer exactly as they do in the window
+  (rotation is **on** here even where `[rotate] auto` is off, since a headless source has nobody to
+  press `Space`). Ctrl-C stops it and prints the run's frames, wall clock and scene clock.
+  Companion flags, all `--stream`-only: `--size WxH` (default `1280x720`), `--fps N` (default 60),
+  `--preset <name>` to hold one scene and disable rotation, `--sender <name>` to change the
+  published sender name (default `lmv`), and `--frames N` for a bounded, self-terminating run.
+  See [docs/capturing.md](docs/capturing.md#the-live-video-out-lmv---stream) for the
+  TouchDesigner side.
+- `--gpu <name|index>` — which graphics adapter `--stream` uses, named from `--list-adapters`.
+  **On a machine with one GPU you will never need it; on a hybrid laptop it is the difference
+  between a picture and nothing.** A Spout sender shares a D3D11 texture by handle and the receiver
+  opens it on its own device, which works only when both are the same physical GPU — and Windows
+  hands a plain console process the power-saving GPU while the receiving application runs on the
+  discrete one. One flag moves both halves: the renderer and the sender each resolve the name
+  against their own roster. Unset, the renderer asks for the high-performance adapter and the sender
+  follows it by name, printing what both resolved to.
 - `--input loopback|line-in` — where audio comes from, overriding `config.toml`'s `[input] mode`.
   `loopback` taps whatever the system is playing; `line-in` captures an input endpoint (an audio
   interface, a mixer feed). Windows-only. A value that is neither is a usage error and the app

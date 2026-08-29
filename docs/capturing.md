@@ -1222,6 +1222,149 @@ is reading a different statistic.
 first two together. Keep the provenance when you consume it: a flag only ever
 means *not observed under this stimulus*.
 
+## The live video-out: `lmv --stream`
+
+Every other instrument on this page writes a **file**. This one writes a **live
+video stream** into another application on the same machine — TouchDesigner,
+Resolume, OBS, anything that receives [Spout](https://spout.zeal.co/) — with no
+window on our side, no codec anywhere, and a latency of a frame or two
+(ADR-0125).
+
+```bash
+# The whole thing. Open a Syphon Spout In TOP in TouchDesigner and set its
+# Sender Name to `lmv`.
+lmv --stream --size 1280x720 --fps 60
+```
+
+**It exists only in a build with the `spout` feature.** The shipped release
+`lmv.exe` has it; a plain `cargo build` does not, and `--stream` there fails
+with a named error rather than starting and publishing nowhere. To build it
+yourself you need the SDK staged first — it is third-party, pinned by hash and
+never committed:
+
+```bash
+powershell -File packaging/spout/fetch-sdk.ps1
+cargo run -p standalone --bin lmv --features spout --release -- --stream
+```
+
+### The TouchDesigner side
+
+The operator is called **`Syphon Spout In`**, not "Spout In" — Derivative ships
+the two app-to-app transports as one TOP, Spout on Windows and Syphon on macOS,
+so that is the name in the OP Create Dialog. Set its **Sender Name** to whatever
+the mode prints, which is not always what you asked for:
+
+```
+publishing 1280x720 at 60 fps as Spout sender 'lmv'
+```
+
+`SetSenderName` **increments on collision** — a run that was force-killed leaves
+its registration behind, and the next one comes up as `lmv_1`, then `lmv_2`. The
+mode prints the name it actually got for exactly this reason. A TOP pointed at a
+name nobody is publishing reports `No Active Sender Found`.
+
+**No colour setting is needed on either side.** The engine reads back
+display-referred sRGB bytes and Spout publishes them untouched
+(`SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` matches the readback, so nothing
+swaps red and blue and nothing re-encodes). A receiving TOP put beside a
+`Movie File In` TOP of the same frame as a PNG is indistinguishable from it. If
+your picture looks washed out or crushed, something in *your* network is
+re-interpreting it, not the sender.
+
+### Which GPU, and why it is not a preference
+
+**On a machine with one GPU, skip this. On a hybrid laptop it is the difference
+between a picture and nothing at all.**
+
+A Spout sender shares a D3D11 texture *by handle*, and the receiver opens that
+handle on its own device — which succeeds only when both devices are the same
+physical GPU. Windows hands a plain console process the integrated GPU to save
+power while TouchDesigner runs on the discrete one, and the receiver then
+reports only `Unable to open shared Spout Texture`, naming neither adapter nor
+the mismatch.
+
+```bash
+lmv --list-adapters              # both rosters, with their own indices
+lmv --stream --gpu "RTX 3080"    # one name moves the renderer AND the sender
+```
+
+`--list-adapters` prints **two** lists because there are two enumerations, and
+they are not assumed to agree on order — the renderer selects through `wgpu`,
+the sender through the Spout SDK, and on a machine with a software rasterizer
+installed the two lists are not even the same length. `--gpu` takes a name (a
+substring is enough, case-insensitively) or an index, and **each side resolves it
+against its own roster**; an ambiguous name is an error listing what it matched,
+never an arbitrary pick.
+
+Unset, the renderer asks for the high-performance adapter and the sender follows
+it by name. Both resolved choices are printed at startup, always:
+
+```
+renderer : NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu), driver 32.0.15.8142
+sender   : adapter [1] NVIDIA GeForce RTX 3080 Laptop GPU
+```
+
+### Presets, and stopping
+
+Presets rotate on the operator config's `[rotate]` dwell timer exactly as they
+do in the window — **and rotation is on here even when `auto` is off**, because a
+headless source has nobody to press `Space` and a four-hour set on one scene is
+not what this mode is for. `--preset <name>` holds one scene and turns rotation
+off. Rotations are announced:
+
+```
+rotate   : frame 5400, AutoTimer -> 'Clifford Gallery'
+```
+
+`Ctrl-C` stops the run through its own exit path, which is what makes it print
+the three numbers a measurement needs — frames emitted, wall clock, scene clock.
+`--frames N` bounds a run so it terminates and reports on its own.
+
+### What it costs, and what those numbers mean
+
+Every 30 s and at exit, the mode reports its per-stage cost and its resident set:
+
+```
+stream: render+readback 7.79 ms, spout send 0.79 ms, mean over 1800 frames
+render: resident set 277 MB, growth +0.2 MB across 5400 frames ...
+stream: 36000 frames, 600.00 s wall, 599.99 s scene clock, on NVIDIA GeForce RTX 3080 ...
+```
+
+**Two stages, not three.** `render+readback` is the engine drawing the frame
+*and* pulling it back to the CPU: the readback blocks, so no CPU-visible instant
+separates them and splitting them would need GPU timestamp queries. `spout send`
+is the upload into the sender's own device. The split answers the question that
+matters — whether the sink is what limits the rate — and on the development
+machine it is not, by an order of magnitude.
+
+**Measured, on one machine, once** (RTX 3080 Laptop, 1280x720 at 60 fps, one
+preset held, nothing else on the GPU): a **30-minute run emitted 108,000 frames
+in 1800.00 s wall against 1799.99 s scene**, at 3.67-7.82 ms of render+readback
+and 0.27-0.58 ms of Spout send per frame, with the resident set at a 280 MB peak
+growing **2.0 MB across the whole run**. That is a reading from one box and one
+driver, not a specification — a machine that cannot hold the rate reports it the
+way the next paragraph describes.
+
+**Wall clock against scene clock is the honest frame-rate reading.** They track
+each other because `dt` is measured per frame rather than assumed, so a run that
+cannot hold the requested rate renders in correct real time and simply delivers
+fewer frames: the animation is never slow, the frame *count* is low. Compare the
+frames emitted against `fps x wall` to see whether the rate was held.
+
+### What it does not do
+
+- **Windows only.** Spout has no macOS form; the analogue there is Syphon,
+  a different SDK against a Metal/IOSurface seam.
+- **No audio.** Spout is a video transport. TouchDesigner takes audio from its
+  own source.
+- **Same machine only.** Spout shares GPU memory between processes on one box;
+  there is nothing to send over a network. A remote sink would be `--render`'s
+  `ffmpeg` pipe pointed at SRT or RTSP, which is not built.
+- **Nothing in the test suite covers it.** The mode is wall-clock paced, so its
+  output is not reproducible and no golden can assert on it. Every claim about
+  this path is either a byte-identity claim against a deterministic capture or a
+  human looking at a receiver.
+
 ## `--downbeat-log`: the estimator's terms, one row per beat
 
 The one instrument on this page that runs the **live app** rather than a headless
