@@ -111,6 +111,30 @@ impl DiagLog {
         let _ = file.flush();
     }
 
+    /// Append a one-off `#`-prefixed note, outside the 1 Hz sample cadence.
+    ///
+    /// For events a sample row cannot carry because they happen once and have no
+    /// column: the operator console opening on a given surface and present mode,
+    /// or refusing to. The `#` prefix is what keeps the file's contract intact —
+    /// every consumer splits a row on `\t` and reads by index, so a note must be
+    /// skippable on its first byte rather than parsed and discarded.
+    ///
+    /// Not rate-limited: the caller is a keypress, not a frame.
+    pub fn note(&mut self, text: &str) {
+        let Some(path) = self.path.clone() else {
+            return;
+        };
+        self.rotate_if_large(&path);
+        if self.file.is_none() {
+            self.open(&path);
+        }
+        let Some(file) = self.file.as_mut() else {
+            return;
+        };
+        let _ = writeln!(file, "# {text}");
+        let _ = file.flush();
+    }
+
     /// Open (creating dirs and the file) for appending, writing the
     /// header when the file did not exist. A failure is reported once
     /// and leaves the logger dormant.
