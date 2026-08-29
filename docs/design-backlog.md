@@ -3869,3 +3869,45 @@ looking.
 - **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
+
+## 0162 - the claim gate resolves a probe path against the working tree, so a path inside `.gitignore` verifies locally and can only ever fail on CI
+
+> **Filed 2026-08-29** from a red CI `links` job whose one broken probe was entry 0161's own,
+> written hours earlier by the close that filed it and green on the machine that wrote it.
+
+`runProbe` resolves `<path>` with `existsSync` against the working tree and asks nothing further. A
+path that exists but is **not in the repo** is indistinguishable from one that is, so a probe
+pointing into gitignored territory - `renders/`, `target/`, `spike/` - passes at every call site
+that runs on the authoring machine and fails only at the one that does not.
+
+Two of the three call sites are on that machine: the `pre-push` hook and the architect close
+ceremony both read a full working tree, ignored files included. The third is the CI `links` job,
+which [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) names the
+un-bypassable one, and it checks out a clone that by definition contains no ignored file. So the
+gate is green wherever the fix would still be cheap and red only once the push has happened.
+
+**The instance.** Entry 0161's second bullet probed `renders/plan-0106-p6/run.sh`. `renders/` is
+ignored in full, so that script exists on the authoring machine and in no checkout anywhere. It
+went green at the close that filed it and green at pre-push, then broke the `links` job on the
+first push that carried it - which was a push of 12 accumulated commits, so the breakage surfaced
+against an unrelated fix rather than against the close that caused it. Repaired in place by taking
+the `unprobeable:` opt-out, which is the honest reduction here: nothing in a checkout can see it.
+
+**Impact.** Low severity, and it recurs by construction rather than by accident. The cost is not
+the one broken entry - it is that the local gate whose entire purpose is to pre-empt a red CI
+reports OK, so the author learns from a runner, after pushing, that a claim they verified does not
+verify. The lag is unbounded: an unpushed close can sit for days before a push exposes it.
+
+**What a fix looks like:** one git question beside the `existsSync`. `git ls-files -- <path>`
+returns nothing for a path the repo does not track and handles directories, which probe paths often
+are, so a non-empty result is the whole test; `git check-ignore -q` answers it from the other side.
+Either lets the probe report *"probe path is not tracked"* rather than today's *"does not exist"*,
+which is the message a CI reader currently gets for a file sitting in front of them in their own
+tree. One invocation covering the whole probe set keeps it to a single process, the way the
+staleness advisory already batches its `git log`.
+
+- **Verified 2026-08-29** - the probe path is resolved against the filesystem and nothing else: `present: if \(!existsSync\(pathAbs\)\) in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nothing asks git whether that path is ignored: `absent: check-ignore in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nor whether it is tracked: `absent: ls-files in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - `renders/` is ignored in full, so nothing beneath it reaches a checkout: `present: ^renders/$ in: .gitignore`
+- **Verified 2026-08-29** - the local call site that goes green regardless: `present: check-backlog-claims in: .githooks/pre-push`
