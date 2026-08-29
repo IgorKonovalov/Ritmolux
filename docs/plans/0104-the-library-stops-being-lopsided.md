@@ -377,7 +377,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 |---|---|---|---|
 | 1 — is the big family actually big | dev | done | `7561492` |
 | 2 — the singletons get a range | human (`preset-author`) | done | `b2866ec` |
-| 3 — the thin families fill out | human | not started | — |
+| 3 — the thin families fill out | human (`preset-author`) | done | `87eafaa` |
 | 4 — `star_pattern`, after the renderer settles | human | not started | — |
 | 4b — `warp_mesh` gets its first worlds | human | not started | — |
 | 5 — curate the set, not the presets | dev | not started | — |
@@ -443,6 +443,55 @@ Three things a later phase should carry forward.
   column simply measures a narrower thing than the gate does. Worth knowing before someone tunes a
   preset to move that number. **Filed under `## Followups`.**
 
+#### Phase 3 result — authored 2026-08-29
+
+Five worlds, all fresh-slate: `swarm` **2 → 4** (Braid, Stipple), `parametric_curve` **3 → 4**
+(Loom), `emitter` **3 → 4** (Petalfall), `shape_collage` **3 → 4** (Nocturne).
+Library **61 → 66**. `reaction_diffusion` was already over the floor and is untouched.
+
+| Preset | system | bass | mid | treb | onset | anim | cover |
+|---|---|---|---|---|---|---|---|
+| Braid | `swarm` | 0.110 | 0.050 | 0.010 | 0.092 | 0.093 | 0.934 |
+| Stipple | `swarm` | 0.050 | 0.013 | 0.001 | 0.011 | 0.010 | 0.222 |
+| Loom | `parametric_curve` | 0.070 | 0.045 | 0.012 | 0.047 | 0.039 | 0.694 |
+| Petalfall | `emitter` | 0.060 | 0.001 | 0.007 | 0.024 | 0.015 | 0.989 |
+| Nocturne | `shape_collage` | 0.055 | 0.002 | 0.002 | 0.029 | 0.016 | 0.229 |
+
+**Gates: `cargo nextest run -p lmv-core`, 851 passed, 5 skipped.** No new intra-family
+near-duplicate pair anywhere in the library.
+
+**The phase's two named targets were both hit.** `emitter` and `shape_collage` were onset-deaf —
+six of the seven presets at exactly `0.000`. Petalfall reports **0.024** and Nocturne **0.029**,
+the strongest onset in each family. And `emitter` had the library's smallest footprints
+(0.105 / 0.253 / 0.277); Petalfall covers **0.989**, which cost nothing but moving the source line
+above the frame and throwing downward.
+
+**Three findings, and the second is the one worth reading.**
+
+- **`swarm` can read as cohesive, and the lever is `field_freq`, not the count.** The plan asked
+  whether the family can read as a flock at all or whether that is an engine gap. It can: at 6.4
+  the population resolves into a few ribbons with genuinely empty dark between them. **The
+  question was answered from the other end too** — the low end was drafted as the second world and
+  rejected, because at 1.15 the field's structure is larger than the frame, there are no legible
+  channels, and the still is exactly the scatter the family is criticised for. Both shipped worlds
+  sit near the 2.3 default, so the family had no range on the one lever that decides its shape.
+  **No backlog note is owed**; this is content, not an engine limit.
+- **Braid collapsed on its first horizon and the suite could not see it.** Ten simulated minutes
+  took coverage from `0.5647` to `0.0002` and `peak/mean` from 6.7 to **4608** — the whole
+  population converged onto the field's attracting streamlines and then onto points on them, and
+  the frame went empty. Every gate stayed green throughout. `swarm_drift`, run identically as a
+  control, held coverage `0.910 → 0.948`, so it was this world's defect and not the family's: a
+  high `field_freq` converges far faster than a low one, and Drift survives because both its
+  structural params *travel* — its field breathes and its `spin` crosses zero and reverses. Fixed
+  the same way and re-measured stable; Stipple was horizon-checked clean as well. Both verdicts
+  are in the preset headers.
+- **The horizon cannot exercise an edge-triggered lever.** Braid binds `reseed`, which
+  `presets/README.md` names as the recovery lever for exactly this pile-up — and the horizon holds
+  a fixed stimulus, so `onset` stays at `0` for the whole run and the gate never fires once. That
+  is the right way round here (a world that needed a transient to stay alive would die in a quiet
+  passage), but it means **`--horizon` measures the unaided mechanism only**, and a world whose
+  long-run stability genuinely rests on a gate has no instrument. **Filed under `## Followups`.**
+
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
@@ -463,3 +512,8 @@ Three things a later phase should carry forward.
   gate's own `ANIM_FLOOR` — Skyline at 0.002, Ridge at 0.007. The report's figure is a diff between
   two silent captures 0.4 s apart; the gate measures something else, and the column is the number an
   author reaches for first. Either the column should say what it measures or the two should agree.
+- **`shot --horizon` holds its stimulus fixed, so it cannot fire an edge-triggered param.** Noticed
+  by Phase 3. `reseed`, `recompose` and every `[latch]` need a *rising edge*, and `--set` holds a
+  level for the whole run — so a world whose long-run stability rests on one is measured as though
+  that lever did not exist. Braid's collapse and its fix were both found and confirmed with `reseed`
+  silently inert. A `--horizon` that could pulse a named variable on a period would close it.
