@@ -159,10 +159,15 @@ gamma = "0.92 + clamp(treb * 0.30, 0, 0.18)"
 # rather than on level.
 palette_contour = "0.62 + clamp(onset * 0.38, 0, 0.23)"
 
-# A slow, tiny wander of the figure's own turn. NOT audio-driven and not a
-# camera move: 0.055 rad is about three degrees, enough that the outline never
-# sits perfectly still and far too little to read as rotation.
-rotation = "noise(time * 0.021) * 0.055 - 0.0275"
+# PINNED AT ZERO, AND A SYMMETRIC FIGURE IS WHY. An earlier version carried a
+# slow noise wander of about +/- 1.6 degrees on the theory that an outline which
+# never moves reads as dead. That is true of an asymmetric figure and FALSE of
+# this one: a heart is bilaterally symmetric, so the eye locks onto its vertical
+# axis and reads any tilt as a mistake rather than as life - judged on a wall,
+# the complaint was that the hearts were "not along the vertical line". The
+# breathing this world needs comes from `scale` and the ring travel, neither of
+# which touches the axis.
+rotation = "0"
 
 [smoothing]
 # The two slow terms ease; the thump in `scale` deliberately does not appear

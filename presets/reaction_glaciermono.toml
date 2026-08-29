@@ -26,8 +26,64 @@ stops = [
 ]
 
 [params]
+# -- THE REGIME WAS OUTSIDE THE PATTERN-FORMING REGION, AND THAT IS WHY THIS
+# -- WORLD KEPT GOING BLACK ------------------------------------------------------
+#
+# It shipped at feed 0.0140 against kill 0.0450, which is past the edge of the
+# Gray-Scott plane where patterns sustain: at that pair the field decays to
+# uniform solvent and the frame is SOLID BLACK. It did not always do so, which is
+# exactly what made it hard to see - `feed` carries a `mid` term, so whether the
+# world lived depended on the music, and the whole margin was about 0.00005.
+# Rendered at one stimulus it was a full mandala and at another, five hundredths
+# of a band away, there was no picture at all.
+#
+# Two earlier repairs to this file were aimed at the wrong thing because of it.
+# The establishing boost was raised on the theory that the world was merely slow
+# to develop, and the fast colour bindings were added on the theory that it was
+# merely slow to react. Both were real improvements and neither could fix a
+# regime that dies.
+#
+# Swept at (feed, kill) = (0.0140, 0.0450) / (0.0200, 0.0480) / (0.0260, 0.0510)
+# / (0.0320, 0.0550) / (0.0380, 0.0600) / (0.0545, 0.0620), all at 700 frames
+# under a held stimulus: the shipped pair is the ONLY dead one, and every other
+# pair holds a pattern. 0.0200 / 0.0480 is the sparsest of the living set, which
+# is the one that still reads as a glacier rather than as a reef.
+#
+# DO NOT NUDGE THESE TOWARD THE OLD VALUES. The F/K pair is not a look control
+# with a safe neighbourhood - it selects which member of the family this is, and
+# one edge of it is a blank frame.
+#
+# -- WHY THE FAST REACTIVITY IS ALL ON THE COLOUR, AND NONE OF IT ON THE FIELD --
+#
+# Judged against music this world read as SLOW TO REACT, and it was: every audio
+# term it carried went into `feed` and `flow`, which are the chemistry. A
+# Gray-Scott field integrates - a change to either alters how the pattern GROWS,
+# so the picture answers over seconds and not on the hit, and both were smoothed
+# on top of that (`feed` at 1.5 s, `flow` with a 0.8 s attack). Meanwhile every
+# parameter that acts on THIS frame - `color_center`, `palette_contour`, `glow`,
+# `saturation` - was pinned to a constant.
+#
+# The split below is the repair, and it is the right shape for this system
+# rather than a workaround: the FIELD is slow because a reaction-diffusion field
+# is slow, and that is the look. The COLOUR MAPPING is a per-pixel lookup of the
+# field that already exists, so it answers immediately and costs the chemistry
+# nothing. Slow structure, fast surface.
+#
+# `color_center` is the strong one. With `color_span` at 6.0 the palette repeats
+# six times across the field's range, so a shift of 0.05 moves the banding by a
+# whole band and every contour in the frame travels at once - growth you can see
+# on the beat, drawn on a field that has not moved yet.
+#
+# THE SPARSE FRAMES ARE THE CHEMISTRY, NOT THIS TERM, and that was checked
+# rather than assumed. A filmstrip against a click track shows the picture
+# swinging from a full white mandala to nearly all black, which looks exactly
+# like a colour term throwing too far - so the throw was halved and the strip
+# re-rendered. It came back INDISTINGUISHABLE. The field itself passes through
+# dense and sparse states as it evolves, at a rate no `[params]` binding here
+# sets, so the throw was restored to full. If those empty stretches ever need
+# fixing the lever is `feed`/`kill` - the regime - and not the palette.
 palette_steps   = "20"
-palette_contour = "0.45"
+palette_contour = "0.40 + clamp(onset * 0.667, 0, 0.40)"
 
 # Coral regime. Tiny moves only - the F/K pair IS the pattern family.
 # THE SPARSE REGIME, AND IT IS ON A CLIFF. At F 0.0140 / k 0.0450 the reaction
@@ -42,8 +98,8 @@ palette_contour = "0.45"
 # be unremarkable anywhere else takes this regime off the cliff and the world
 # does not come back on its own. Nudge, never sweep: the total audio excursion
 # is 0.0006, about 4 % of the base.
-feed = "0.0140 + noise(time * 0.008) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
-kill = "0.0450"
+feed = "0.0200 + noise(time * 0.008) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
+kill = "0.0480"
 # The `max(0, ...)` term is a WARM-UP, not a look: this regime establishes
 # slowly, so the first five seconds run fast and it decays to nothing by t=5.
 # SETTLED RATE 0.22, ABOUT A QUARTER OF THE FAST TWIN'S. Three separate things
@@ -90,11 +146,11 @@ kaleido_order = "8"
 kaleido_angle = "0"
 contour = "0"
 hatch   = "0"
-glow    = "1.0"
+glow    = "1.00 + clamp(mid * 0.494, 0, 0.42) + clamp(bass * 0.235, 0, 0.20)"
 
 # RD's field only reaches ~0..0.4, so the span has to be ~2.4 to walk the palette.
 color_span   = "6.00"
-color_center = "sin(time * 0.013) * 0.02"
+color_center = "sin(time * 0.013) * 0.02 + clamp(bass * 0.0118, 0, 0.010) + clamp(onset * 0.0100, 0, 0.006)"
 saturation   = "1.0"
 
 # SPARSITY IS MAGNIFICATION HERE, NOT REGIME. The obvious move - push `feed`
@@ -118,6 +174,7 @@ bloom_amount = "0"
 trails       = "0"
 
 [smoothing]
-flow = { attack = 0.80, release = 2.50 }
+flow = { attack = 0.25, release = 1.20 }
 feed = 1.50
-color_center = 0.60
+color_center = 0.12
+palette_contour = 0.08
