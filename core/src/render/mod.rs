@@ -66,7 +66,7 @@ use crate::preset::{
     Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
 };
 use background::Background;
-pub use capture::CaptureImage;
+pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
 pub use context::{RenderContext, RenderError};
 use ink::Ink;

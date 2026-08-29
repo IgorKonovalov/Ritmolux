@@ -1,6 +1,6 @@
 # 0115 — The engine becomes a live video source
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
@@ -362,12 +362,12 @@ void      lmv_spout_destroy(LmvSpout *);
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0115-live-video-source`, worktree `WORK/lmv-plan-0115`, branched from `main` at `5590a4f`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Stage the SDK, prove the receiving half | human | not started | |
-| 2 — The core grows a frame tap | dev | not started | |
+| 2 — The core grows a frame tap | dev | done | committed with this row |
 | 3 — The Spout shim | dev | not started | |
 | 4 — `lmv --stream` | dev | not started | |
 | 5 — The stream survives a set | dev | not started | |
@@ -375,6 +375,33 @@ void      lmv_spout_destroy(LmvSpout *);
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 2 — three disclosed deviations.**
+
+- **The 300-frame residency test is in `standalone/tests/frame_tap_memory.rs`, not
+  `core/tests/`.** The phase asked for both tests under `core/tests/` *and* for `ResidentSet` to be
+  reused rather than rewritten, and those cannot both hold: `ResidentSet` and the per-OS
+  working-set read underneath it (`standalone/src/rss.rs`) are platform code, which `core` may not
+  hold, and `core` cannot dev-depend on the standalone without a cycle. The byte-identity half is
+  in `core/tests/frame_tap.rs` as written; the residency half moved and reuses the helper.
+  `ResidentSet::sample` went from private to `pub` to make that reuse possible — the one edit
+  outside the phase's file list, in `standalone/src/shot/render.rs`.
+- **`open_tap` returns `FrameTap`, not `Result<FrameTap, RenderError>`.** `RenderContext` floors
+  both dimensions at 1 where the size enters, so the constructor has nothing left to reject and a
+  `Result` that is never `Err` invites an `.expect()` at the call site. The plan's data-shapes
+  block is marked illustrative.
+- **`render_tapped` draws under `SaltMode::Live`, not `Pinned`.** The plan is silent on the salt.
+  A tap is a live render path, so a preset declaring `seed = "random"` (ADR-0051) must vary per
+  launch here as it does in the window. `salt == pinned_salt` for every preset that declares
+  anything else — which is all 54 shipped — so byte identity with `capture_frame` is unaffected.
+
+**Readings taken, asserted against nothing.** The 300-frame run on the dev box's software adapter
+at 64x48 printed `resident set 82 MB, growth -13.1 MB across 300 frames after a +33.0 MB warm-up
+(peak 100 MB, 21 samples)`.
+
+**Non-vacuity control run on the byte-identity test.** Multiplying the tap's `dt` by three made it
+fail at the first differing pixel; reverted, and the suite is green on the tip.
+
 
 ### Close triggers
 

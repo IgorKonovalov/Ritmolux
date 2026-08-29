@@ -1,10 +1,15 @@
 //! The capture API — `Renderer`'s headless, off-hot-path entry points
 //! (Plan 0013), carved out of `render/mod.rs` by Plan 0061 Phase 3.
 //!
-//! **This is dev-tooling API, not app API.** Nothing in the standalone's frame
-//! loop and nothing behind the C ABI calls into this file: its callers are the
-//! `shot` example and `core/tests/`. Every entry point here blocks on a GPU
-//! readback, so calling one from a live loop is a stutter by construction.
+//! **Dev-tooling API, with one exception at the bottom of the file.** Every
+//! `capture_*` entry point here is driven by the `shot` example and
+//! `core/tests/`, never by the standalone's frame loop and never from behind the
+//! C ABI: each blocks on a GPU readback, so calling one from a *display* loop is
+//! a stutter by construction. The frame tap (Plan 0115) blocks on the same
+//! readback and is nonetheless a live path — a headless source has no present
+//! deadline to miss, only throughput to hold, and its readback is what bounds
+//! the run's memory. It lives here because it shares the offscreen machinery,
+//! not because it shares the caller.
 //!
 //! It is a second `impl Renderer` block rather than a separate type, because the
 //! methods are public API whose paths must not move — `Renderer::capture_preset`
@@ -622,5 +627,92 @@ impl Renderer {
 
         #[cfg(feature = "text")]
         self.text_layer.end_frame();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The sustained frame tap (Plan 0115 Phase 2)
+// ---------------------------------------------------------------------------
+
+impl Renderer {
+    /// Open a [`FrameTap`] sized to this renderer's configured target — the one
+    /// GPU allocation a tapped run makes, so the per-frame path makes none.
+    ///
+    /// The tap is fixed at the size it is built with. A [`resize`](Renderer::resize)
+    /// underneath a live tap leaves the two disagreeing, and the tap wins: it is
+    /// what [`render_tapped`](Self::render_tapped) draws and copies against.
+    /// Reopen after a resize to follow it.
+    ///
+    /// Infallible: `RenderContext` floors both dimensions at 1 where the size
+    /// enters, so there is nothing left to reject here.
+    pub fn open_tap(&self) -> FrameTap {
+        FrameTap::new(
+            &self.ctx.device,
+            self.ctx.surface_format(),
+            self.ctx.config.width,
+            self.ctx.config.height,
+        )
+    }
+
+    /// Advance the scene clock by `dt` real seconds, draw the active preset for
+    /// `frame` through the same `draw_frame` the window presents through, and
+    /// read the result back out of `tap`.
+    ///
+    /// `dt` is **per call**, which is the difference between this and
+    /// [`capture_stream`](Self::capture_stream)'s one fixed step: a caller that
+    /// falls behind the wall clock yields fewer, correctly-timed frames rather
+    /// than a picture running slow against the music.
+    ///
+    /// Draws under [`SaltMode::Live`], because a tap is a live render path and
+    /// not a capture: a preset declaring `seed = "random"` (ADR-0051) must vary
+    /// per launch here exactly as it does in the window. Both salts are equal for
+    /// every preset that declares anything else, which is why a tapped frame and
+    /// a [`capture_frame`](Self::capture_frame) of the same preset at the same
+    /// clock are still byte-identical (`core/tests/frame_tap.rs`).
+    ///
+    /// **Blocks on the readback**, as every path through
+    /// [`capture::read_back`](capture::read_back) does. That is what bounds a
+    /// long run's memory — the poll retires each frame's submission before the
+    /// next is encoded (the retention Plan 0099 measured) — and it is why this is
+    /// a *source* entry point and not a display one: there is no present deadline
+    /// here, only throughput.
+    pub fn render_tapped(
+        &mut self,
+        tap: &mut FrameTap,
+        frame: &AnalysisFrame,
+        dt: f32,
+    ) -> Result<CaptureImage, RenderError> {
+        let (width, height) = (tap.width, tap.height);
+        self.time += dt;
+        let mut encoder = self
+            .ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("lmv-frame-tap"),
+            });
+        capture::record_clear(&mut encoder, &tap.view);
+        let _ = self.draw_frame(
+            frame,
+            &mut encoder,
+            &tap.view,
+            width,
+            height,
+            dt,
+            SaltMode::Live,
+        );
+        capture::record_copy(
+            &mut encoder,
+            &tap.texture,
+            &tap.buffer,
+            tap.padded_bpr,
+            width,
+            height,
+        );
+        self.ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        #[cfg(feature = "text")]
+        self.text_layer.end_frame();
+
+        capture::read_back(&self.ctx.device, &tap.buffer, width, height, tap.padded_bpr)
     }
 }
