@@ -107,6 +107,14 @@ contradicts this file is a plan bug — surface it, don't guess.
   `bin()` positions only. Measured per-hop analysis cost after the change is 31.5 µs
   (from 17.2 µs), against the ~11 ms allocated here — roughly 350x headroom. Cold start
   now publishes its first frame at ~171 ms instead of ~43 ms, once per stream.
+- **This budget binds the window, and the streamed picture sits outside it.**
+  `lmv --stream` ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md))
+  publishes frames to another application, which then composites and presents them on its own
+  schedule — so what a viewer of that composite sees is governed by the receiver's pipeline, not
+  by anything measurable here. Our half adds a GPU readback and an upload to the numbers above;
+  everything after the Spout sender is out of our hands and is deliberately not budgeted. A
+  latency claim about the streamed path is a claim about two applications, and this document
+  only speaks for one.
 
 ## 4. Size and dependencies
 

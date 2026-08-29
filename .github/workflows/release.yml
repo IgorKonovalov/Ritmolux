@@ -66,12 +66,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+      # The Spout video-out (ADR-0125). Staged here and nowhere else: the
+      # `spout` feature is off by default, so the CI check job, the macOS arm
+      # and every ordinary build never need the SDK, a C++ compiler step or a
+      # network. Mirrors the foobar job's own staging step exactly.
+      - name: Stage the pinned Spout SDK
+        shell: pwsh
+        run: ./packaging/spout/fetch-sdk.ps1
       - name: Build, stage, zip and verify
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
 
-          cargo build --release -p standalone
+          # --features spout is what makes `lmv --stream` exist in the shipped
+          # binary; without it the mode fails with a named error saying so.
+          cargo build --release -p standalone --features spout
           if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 
           # Section-anchored, the same shape plugin-foobar/build.ps1 uses
@@ -95,6 +104,11 @@ jobs:
           # preset content, and the zip is for a tester rather than an author.
           Copy-Item presets/*.toml "$stage/presets/"
           Copy-Item packaging/windows/READ-ME-FIRST.md "$stage/READ-ME-FIRST.txt"
+          # Spout is Simplified BSD and is STATICALLY linked into lmv.exe, so
+          # clause 2 binds this archive: a binary redistribution must reproduce
+          # the notice in the materials shipped with it. No SpoutDX.dll travels
+          # (build.rs links SpoutDX_static.lib) - the notice does.
+          Copy-Item packaging/spout/spout-license.txt "$stage/spout-license.txt"
 
           # -Path without a wildcard keeps the staging folder as the archive's
           # single top-level entry, which is the layout Plan 0036 specifies.
@@ -114,12 +128,12 @@ jobs:
           # host we happened to try it on is not a check.
           $entries = $entries | ForEach-Object { $_.Replace('\', '/') }
 
-          foreach ($required in "$name/lmv.exe", "$name/READ-ME-FIRST.txt") {
+          foreach ($required in "$name/lmv.exe", "$name/READ-ME-FIRST.txt", "$name/spout-license.txt") {
               if ($entries -notcontains $required) {
                   throw "zip is missing $required"
               }
           }
-          Write-Host "    ok: zip top level holds lmv.exe and READ-ME-FIRST.txt"
+          Write-Host "    ok: zip top level holds lmv.exe, READ-ME-FIRST.txt and spout-license.txt"
 
           $repoCount = (Get-ChildItem presets/*.toml).Count
           $zipCount = ($entries | Where-Object { $_ -like "$name/presets/*.toml" }).Count

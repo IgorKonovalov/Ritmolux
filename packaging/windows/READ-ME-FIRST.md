@@ -72,7 +72,41 @@ The presets folder next to this file is a reference copy you can read. The app
 does not load it - it has its own built in.
 
 
-5. What to send back
+5. Sending the picture into TouchDesigner (optional)
+---------------------------------------------------
+
+This build can run with NO WINDOW and hand its picture straight to another
+application on the same PC - TouchDesigner, Resolume, OBS - over Spout. No
+recording, no codec, a frame or two of delay.
+
+  lmv.exe --stream --size 1280x720 --fps 60
+
+Then in TouchDesigner add a "Syphon Spout In" TOP (that is its real name; there
+is no operator called just "Spout In") and set its Sender Name to what the
+window-less run prints, usually:
+
+  publishing 1280x720 at 60 fps as Spout sender 'lmv'
+
+Nothing to configure for colour - it should look the same as the app does.
+
+IF YOU GET NOTHING, AND YOUR LAPTOP HAS TWO GRAPHICS CHIPS, this is almost
+certainly why. Spout can only hand a picture to a program running on the SAME
+graphics chip, and Windows gives a window-less program the power-saving one
+while TouchDesigner uses the fast one. Run:
+
+  lmv.exe --list-adapters
+
+and then name the one TouchDesigner is using:
+
+  lmv.exe --stream --gpu "RTX 3080"
+
+Ctrl-C stops it and prints how many frames it sent.
+
+Spout is a separate open-source project (Simplified BSD); its copyright notice
+is the spout-license.txt beside this file.
+
+
+6. What to send back
 --------------------
 
 Five things, however roughly:
