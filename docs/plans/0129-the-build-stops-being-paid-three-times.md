@@ -252,8 +252,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 |---|---|---|---|
 | 1 — Take the baseline | dev | done | b17d8cc |
 | 2 — Point the MSVC target at `rust-lld` | dev | done | fbc065b |
-| 3 — One artifact store for every lane | dev | done | committed with this row |
-| 4 — Prove nothing about the tests changed | dev | not started | |
+| 3 — One artifact store for every lane | dev | done | 3323a71 |
+| 4 — Prove nothing about the tests changed | dev | done | committed with this row |
 | 5 — Repair the one script the redirect breaks | dev | not started | |
 | 6 — Measure where the suite time actually goes | dev | not started | |
 | 7 — Write down what a machine has to do | dev | not started | |
@@ -383,6 +383,40 @@ themselves, which recompile because their path is part of their fingerprint.
 
 **Steady state for a new lane is 57 s from nothing to every test binary, against
 171 s.** The store measures 5,444 MB and replaced a 14,650 MB per-lane tree.
+
+**Phase 4 — what the store changed about the tests.** Nothing, by every check the
+phase names.
+
+| check | result |
+|---|---|
+| `cargo nextest run --workspace --no-fail-fast` | 1122 run, 1122 passed, 5 skipped, 344.6 s |
+| result set vs the Phase 1-era baseline | **`diff` empty** — same names, same count, same outcome |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean, 56 s |
+| `cargo fmt --all --check` | clean |
+| golden suite, `LMV_BLESS` unset | 5 golden tests passed, no baseline rewritten |
+| `standalone/tests/shot_cli.rs` locating `examples/shot.exe` | 22 `shot_cli` tests passed |
+
+Suite wall time across all three configurations — 341.8 s unmodified, 340.9 s
+under `rust-lld`, 344.6 s under the store — spans 1.1 %, so nothing here reads as
+a change in run cost.
+
+**Finding — the repository's `target/` comes back, and only the tests bring it.**
+`standalone/tests/shot_cli.rs` builds its output path in `scratch()` (line 115) as
+`repo_root().join("target")`, which is repo-relative and so unaffected by
+`build.target-dir`. After the suite ran under the store, the worktree held a
+`target/` again, containing `shot-cli-tests/` and nothing else, 4 MB. This
+contradicts Phase 3's *"none of them re-creates its own `target/`"* — that
+criterion holds for every build and fails on a test run.
+
+Two things make it easy to miss. `**/target` is in `.gitignore`, so
+`git status` stays clean; and the sibling helper `shot_exe()` **is**
+redirect-safe, walks ancestors from the test binary, and carries the comment
+that made the file look already-audited. `scratch()`'s own comment — *"under
+`target/` so it never escapes the build tree"* — states an invariant that the
+store falsifies, since that path is no longer the build tree.
+
+Left as found, per the phase's *"a finding, not a fix-up"*. Not repaired, and no
+test was touched.
 
 ### Close triggers
 
