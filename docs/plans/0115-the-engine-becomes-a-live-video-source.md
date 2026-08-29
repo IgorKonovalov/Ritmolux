@@ -4,6 +4,7 @@
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
+> [0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) (proposed),
 > [0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
 > [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md),
 > [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
@@ -175,6 +176,70 @@ flowchart LR
     one to check deliberately rather than assume.
   - `fetch-sdk.ps1` fails loudly on a hash mismatch rather than proceeding.
 
+### Phase 3b — The GPU becomes nameable, on both sides, from one flag
+
+> **Added 2026-08-29, after Phase 3.** Phase 3 found that a Spout sender must live on the receiver's
+> GPU and that a console process does not get it by default. The plan had no phase for choosing a
+> GPU, and Phase 4 cannot be written without one. [ADR-0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
+> is the decision: **one `--gpu <name>`, and each side matches it against its own roster.**
+>
+> **Read ADR-0146's Context before starting.** The two adapters are *not* coupled on the CPU pixel
+> path — our `wgpu` device never touches the shared texture, and `spout_probe.rs`, the instrument
+> that produced the Phase 3 finding, uses no `wgpu` at all. The sender's adapter is a **correctness**
+> constraint; the renderer's is a **frame-rate** one. On this machine both resolve to the RTX 3080,
+> which is precisely why no reading taken here can distinguish them.
+
+- **Owner skill:** dev
+- **What:** the renderer's adapter becomes selectable and nameable in `core`, the two rosters become
+  printable from the standalone, and one `--gpu` argument resolves both. No streaming yet — this
+  phase makes Phase 4 expressible and is checkable on its own through the existing probe.
+- **Files touched:** `core/src/render/context.rs` (the headless constructor's adapter preference,
+  and the accessor for the resolved adapter description), `core/src/render/mod.rs` and every existing
+  caller of `new_headless` (`shot`, the golden harness, `core/tests/`), `standalone/src/gpu.rs` (new
+  — resolving one name against both rosters), `standalone/src/spout/mod.rs` (name-to-index lookup
+  over the existing `adapters()`), `standalone/examples/spout_probe.rs` (take a name as well as an
+  index), `standalone/tests/`.
+- **Notes for the implementer:**
+  - **The resolution is two independent lookups against one string, not a cross-API match.** Do not
+    plumb PCI IDs or a LUID through the shim — ADR-0146 Alternative C is the answer to the zero-copy
+    question and is deliberately not built here.
+  - `wgpu::Instance::enumerate_adapters(Backends)` exists at the pinned `=30.0.0` and returns a
+    future resolving to `Vec<Adapter>`. `RenderContext` already builds an adapter description
+    through `describe_adapter` for ADR-0071 reports; the resolved name wants to be readable, not
+    re-derived.
+  - **The adapter preference stays in `wgpu`'s vocabulary** — a power preference, a name, or the
+    existing software-fallback request. No platform type, no vendor branch, no backend branch: this
+    is a `core` change that must not cost `core` its GPU-abstract rule, and it is **not** a C ABI
+    change, so `LMV_ABI_VERSION` does not move.
+  - `new_headless`'s existing `prefer_software` bool is what the golden harness and every QA path
+    pass today. Whatever shape replaces it, **those callers must keep asking for exactly what they
+    ask for now** — a golden that moves in this phase is a finding, not a rebless.
+  - An **index** stays accepted alongside a name, for the machine with two identical adapters that a
+    substring cannot separate.
+  - The fallback path is the dangerous one: when the sender cannot match the renderer's name into the
+    DXGI roster it reverts to the D3D11 default, which on a hybrid box is the wrong GPU. **That
+    fallback prints.** A silent revert reproduces exactly the Phase 3 failure this phase exists to
+    prevent.
+- **Done when:**
+  - `lmv --list-adapters` prints both rosters — what `wgpu` enumerates and what `lmv_spout_adapter_name`
+    enumerates — with indices, on a build with the `spout` feature; and prints the `wgpu` roster
+    alone without it.
+  - **On this two-adapter machine, the two rosters are printed side by side and it is written down
+    whether the descriptions are byte-identical.** ADR-0146's default rests on that match and calls
+    it a heuristic; this is the one place it can be observed rather than assumed. If they differ, say
+    how — the finding changes the default, not the flag.
+  - `--gpu` resolves to the same physical GPU on both sides, by name and by index, and an
+    unresolvable argument fails with a named error **listing both rosters** rather than an index
+    nobody can interpret.
+  - `spout_probe.rs` run with `--gpu` naming the discrete GPU reaches TouchDesigner exactly as the
+    Phase 3 index did, and run with the integrated one does not — **the same observation Phase 3
+    made, now driven by a name.** That is the control: a flag that resolves to the wrong GPU must
+    still fail, or the resolution is not doing anything.
+  - Every existing golden and capture path is **byte-identical, unblessed**, on both adapters. This
+    phase touches the constructor every one of them goes through.
+  - `cargo build`, `cargo clippy --workspace --all-targets` and `cargo nextest run --workspace`
+    behave as they do today **without** the `spout` feature, needing no SDK and no C++ step.
+
 ### Phase 4 — `lmv --stream`: the headless live source
 
 - **Owner skill:** dev
@@ -194,6 +259,9 @@ flowchart LR
     are.
   - Built **without** the `spout` feature, `--stream` must fail with a named error saying the
     binary was built without it — not silently do nothing.
+  - **The GPU is resolved by Phase 3b and consumed here, not re-decided.** `--gpu` feeds the
+    headless `Renderer`'s adapter preference and the sender's index from one argument; with no flag
+    the renderer takes `HighPerformance` and the sender follows it by name (ADR-0146).
 - **Done when:**
   - `lmv --stream --size 1280x720 --fps 60`, with music playing, shows this engine's picture live
     in a TouchDesigner Spout In TOP, reacting to that music.
@@ -203,6 +271,9 @@ flowchart LR
     scene-clock elapsed.** They exist so Phase 6's reading is a measurement rather than an
     argument. **No threshold is asserted on them here.**
   - `--stream` with no capture device available fails with a named error naming the flag.
+  - **The mode prints both resolved adapters by name at startup**, and on a machine with more than
+    one adapter and no `--gpu`, prints the warning ADR-0146 requires — naming the symptom, since
+    the receiver's own message names neither adapter. It proceeds rather than refusing.
 
 ### Phase 5 — The stream survives a set
 
@@ -235,7 +306,9 @@ flowchart LR
     the same size and compare. ADR-0125 names this as the hazard nothing in the repo can catch, and
     this is the instrument.
   - **The largest size and frame rate that hold steady** for ≥ 30 minutes (108,000 frames at
-    60 fps), with the per-stage cost line from Phase 5 saying what the limit was.
+    60 fps), with the per-stage cost line from Phase 5 saying what the limit was. **Write down
+    which GPU rendered it** - the mode prints it, and a frame-rate figure that does not name its
+    adapter is worthless on a machine with two (ADR-0071, ADR-0146).
   - **Latency**, estimated by eye against the audio — good enough to answer "can you cut to this",
     which is the question that matters.
   - **Resident-set growth** across that run.
