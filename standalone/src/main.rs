@@ -2260,11 +2260,62 @@ fn warn_cap_overflow(renderer: &Renderer) {
     }
 }
 
+/// Print every graphics adapter, from **both** rosters, and exit (ADR-0146).
+///
+/// Both, because they are separate enumerations that are never assumed to agree
+/// on order: the renderer selects through wgpu and the Spout sender through the
+/// sender API, and `--gpu` is resolved against each independently. Printing them
+/// side by side is also the only way to see whether the two describe the same
+/// GPU with the same string, which is what the no-flag default rests on.
+fn list_adapters_and_exit() {
+    let renderer_roster = lmv_core::render::list_adapters();
+    if renderer_roster.is_empty() {
+        eprintln!("renderer (wgpu): no adapters enumerated");
+    } else {
+        eprintln!("renderer (wgpu):");
+        for (index, adapter) in renderer_roster.iter().enumerate() {
+            eprintln!("  [{index}] {}", adapter.detail);
+        }
+    }
+
+    #[cfg(all(feature = "spout", windows))]
+    {
+        let sender_roster = standalone::spout::adapters();
+        if sender_roster.is_empty() {
+            eprintln!("spout sender: no adapters enumerated");
+        } else {
+            eprintln!("spout sender:");
+            for (index, name) in sender_roster.iter().enumerate() {
+                eprintln!("  [{index}] {name}");
+            }
+        }
+        eprintln!();
+        eprintln!(
+            "pass --gpu with a name from either list (or an index) to put the renderer and \
+             the sender on one GPU. The sender's adapter decides whether a receiver can open \
+             the stream at all; the renderer's decides how fast it runs."
+        );
+    }
+    #[cfg(not(all(feature = "spout", windows)))]
+    {
+        eprintln!();
+        eprintln!("built without the 'spout' feature, so there is no sender roster to list.");
+    }
+}
+
 fn main() {
     // Startup aid: print the enumerable audio endpoints and exit, so the
     // operator can copy a friendly name into `input.device` (Plan 0009 Phase 2).
     if std::env::args().skip(1).any(|arg| arg == "--list-devices") {
         list_devices_and_exit();
+        return;
+    }
+
+    // The same aid for GPUs, and it answers a sharper question than a
+    // preference: on a hybrid machine the Spout sender's adapter decides
+    // whether a receiver can open the stream at all (ADR-0146).
+    if std::env::args().skip(1).any(|arg| arg == "--list-adapters") {
+        list_adapters_and_exit();
         return;
     }
 

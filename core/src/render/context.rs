@@ -41,6 +41,24 @@ pub enum RenderError {
     /// An audio-driven capture was handed a PCM format the analyzer rejected at
     /// the intake boundary (Plan 0013).
     AudioFormat(FormatError),
+    /// A requested graphics adapter is not on this machine. Carries the roster
+    /// so the message can name what is available rather than an index nobody
+    /// can interpret (ADR-0146).
+    NoSuchAdapter {
+        /// What the caller asked for, as they wrote it.
+        requested: String,
+        /// Every adapter this machine enumerates, described.
+        available: Vec<String>,
+    },
+    /// A requested adapter name matched more than one adapter. A substring
+    /// cannot separate two adapters whose descriptions share it, so the caller
+    /// is told which ones collided rather than handed an arbitrary pick.
+    AmbiguousAdapter {
+        /// What the caller asked for, as they wrote it.
+        requested: String,
+        /// The adapters the request matched.
+        matched: Vec<String>,
+    },
     /// The consumer of a **streamed** capture refused a frame — the offline
     /// render mode's pipe closed, the encoder died, the file could not be
     /// written (Plan 0101 / ADR-0114). The string is the consumer's own message,
@@ -67,6 +85,20 @@ impl std::fmt::Display for RenderError {
                 write!(f, "no preset named '{name}' in the roster")
             }
             RenderError::AudioFormat(e) => write!(f, "invalid audio format for capture: {e}"),
+            RenderError::NoSuchAdapter {
+                requested,
+                available,
+            } => write!(
+                f,
+                "no graphics adapter matching '{requested}'; this machine has: {}",
+                available.join("; ")
+            ),
+            RenderError::AmbiguousAdapter { requested, matched } => write!(
+                f,
+                "'{requested}' matches {} adapters: {}",
+                matched.len(),
+                matched.join("; ")
+            ),
             RenderError::Sink(msg) => write!(f, "{msg}"),
         }
     }
@@ -94,6 +126,144 @@ fn describe_adapter(info: &wgpu::AdapterInfo) -> String {
         out.push_str(&format!(" {}", info.driver_info));
     }
     out
+}
+
+/// Which graphics adapter a headless context should render on.
+///
+/// Stated in wgpu's own vocabulary and nothing else: no platform type, no
+/// vendor branch, no backend branch, so `core` stays GPU-abstract (ADR-0001)
+/// while still letting a shell say which GPU it means.
+///
+/// **The variants are not interchangeable views of one preference.** The first
+/// three ask wgpu to choose and accept whatever it returns; the last two name
+/// one adapter out of the enumerated roster and fail if it is not there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdapterChoice {
+    /// Whatever wgpu picks with default options. On a hybrid machine this is
+    /// the power-saving GPU for a console process, which is why a live path
+    /// wants `HighPerformance` instead.
+    Default,
+    /// Force a fallback (software) adapter - WARP on DX12 - so captures
+    /// rasterize identically across machines. What the golden suite asks for.
+    Software,
+    /// `PowerPreference::HighPerformance`: the discrete GPU on a hybrid
+    /// machine.
+    HighPerformance,
+    /// The one enumerated adapter whose name contains this string, matched
+    /// case-insensitively. More than one match is an error, not a pick.
+    Named(String),
+    /// The adapter at this position in [`list_adapters`]'s roster.
+    Index(usize),
+}
+
+impl From<bool> for AdapterChoice {
+    /// The `prefer_software` bool every capture path already passes.
+    fn from(prefer_software: bool) -> Self {
+        if prefer_software {
+            AdapterChoice::Software
+        } else {
+            AdapterChoice::Default
+        }
+    }
+}
+
+/// One enumerated adapter: the name a caller matches against, and the full
+/// description a caller prints.
+///
+/// Two fields because the two jobs want different strings. `name` is wgpu's
+/// bare `AdapterInfo::name`, which is what a substring is matched against and
+/// what a DXGI `Description` is expected to equal; `detail` adds backend,
+/// device type and driver, which help a reader choose and would wreck a match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdapterDescription {
+    /// wgpu's bare adapter name - the match key.
+    pub name: String,
+    /// Name plus backend, device type and driver, for printing.
+    pub detail: String,
+}
+
+/// Every graphics adapter wgpu enumerates on this machine, in wgpu's order.
+///
+/// The order is the enumeration's own and is **not** promised to agree with any
+/// other API's roster; a caller that needs one adapter across two APIs matches
+/// by name on each side rather than by shared index (ADR-0146).
+pub fn list_adapters() -> Vec<AdapterDescription> {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+    describe_roster(&instance)
+}
+
+fn describe_roster(instance: &wgpu::Instance) -> Vec<AdapterDescription> {
+    pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+        .iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            AdapterDescription {
+                name: info.name.clone(),
+                detail: describe_adapter(&info),
+            }
+        })
+        .collect()
+}
+
+/// Resolve a choice to one adapter, or say why it could not be.
+fn resolve_adapter(
+    instance: &wgpu::Instance,
+    choice: &AdapterChoice,
+) -> Result<wgpu::Adapter, RenderError> {
+    let by_preference = |options: wgpu::RequestAdapterOptions<'_, '_>| {
+        pollster::block_on(instance.request_adapter(&options)).map_err(RenderError::RequestAdapter)
+    };
+    match choice {
+        AdapterChoice::Default => by_preference(wgpu::RequestAdapterOptions::default()),
+        AdapterChoice::Software => by_preference(wgpu::RequestAdapterOptions {
+            force_fallback_adapter: true,
+            ..Default::default()
+        }),
+        AdapterChoice::HighPerformance => by_preference(wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            ..Default::default()
+        }),
+        AdapterChoice::Index(wanted) => {
+            let roster = describe_roster(instance);
+            pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+                .into_iter()
+                .nth(*wanted)
+                .ok_or_else(|| RenderError::NoSuchAdapter {
+                    requested: format!("index {wanted}"),
+                    available: roster.into_iter().map(|entry| entry.detail).collect(),
+                })
+        }
+        AdapterChoice::Named(wanted) => {
+            let needle = wanted.to_lowercase();
+            let roster = describe_roster(instance);
+            let hits: Vec<usize> = roster
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| entry.name.to_lowercase().contains(&needle))
+                .map(|(at, _)| at)
+                .collect();
+            match hits.as_slice() {
+                [] => Err(RenderError::NoSuchAdapter {
+                    requested: wanted.clone(),
+                    available: roster.into_iter().map(|entry| entry.detail).collect(),
+                }),
+                [only] => pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+                    .into_iter()
+                    .nth(*only)
+                    .ok_or_else(|| RenderError::NoSuchAdapter {
+                        requested: wanted.clone(),
+                        available: roster.iter().map(|entry| entry.detail.clone()).collect(),
+                    }),
+                several => Err(RenderError::AmbiguousAdapter {
+                    requested: wanted.clone(),
+                    matched: several
+                        .iter()
+                        .filter_map(|at| roster.get(*at).map(|entry| entry.detail.clone()))
+                        .collect(),
+                }),
+            }
+        }
+    }
 }
 
 /// Owns the wgpu instance, surface, device, and queue for one output window.
@@ -211,12 +381,23 @@ impl RenderContext {
         height: u32,
         prefer_software: bool,
     ) -> Result<Self, RenderError> {
+        Self::new_headless_on(width, height, &AdapterChoice::from(prefer_software))
+    }
+
+    /// A headless context on a **named** adapter (ADR-0146).
+    ///
+    /// The one real constructor of the two; [`new_headless`](Self::new_headless)
+    /// delegates here. It exists because a live video-out has to render on a
+    /// GPU the operator can name - on a hybrid machine Windows hands a console
+    /// process the power-saving one - while every capture path wants exactly
+    /// the adapter it already asks for.
+    pub fn new_headless_on(
+        width: u32,
+        height: u32,
+        choice: &AdapterChoice,
+    ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            force_fallback_adapter: prefer_software,
-            ..Default::default()
-        }))
-        .map_err(RenderError::RequestAdapter)?;
+        let adapter = resolve_adapter(&instance, choice)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("lmv-headless-device"),
             ..Default::default()

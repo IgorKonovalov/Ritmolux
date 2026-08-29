@@ -441,13 +441,56 @@ void      lmv_spout_destroy(LmvSpout *);
 |---|---|---|---|
 | 1 — Stage the SDK, prove the receiving half | human | done — gate passed; its colour item was answered in Phase 3 | |
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
-| 3 — The Spout shim | dev | done | `ae436cf` + committed with this row |
+| 3 — The Spout shim | dev | done | `ae436cf`, `2df3555` |
+| 3b — The GPU becomes nameable | dev | done | committed with this row |
 | 4 — `lmv --stream` | dev | not started | |
 | 5 — The stream survives a set | dev | not started | |
 | 6 — The gate in TouchDesigner | human | not started | |
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 3b — done, with one done-when left for the TouchDesigner gate.**
+
+- **The two rosters print, and the descriptions are byte-identical** for both shared adapters:
+  wgpu reports `AMD Radeon(TM) Graphics` and `NVIDIA GeForce RTX 3080 Laptop GPU`, and so does
+  `lmv_spout_adapter_name`. ADR-0146's no-flag default rests on that match and calls it a
+  heuristic; on this machine it is exact, and this is the reading the phase asked for.
+- **The rosters are not the same enumeration, and their lengths differ.** wgpu lists **three**
+  — the two above plus `Microsoft Basic Render Driver (Dx12, Cpu)` — against the sender's
+  **two**. Positions 0 and 1 happen to agree here, so nothing on this machine would have caught an
+  index passed to the wrong API; the extra entry is what shows the two orders are independent
+  rather than merely believed to be.
+- **`--gpu "RTX 3080"` resolves to adapter [1] through `standalone::gpu`**, the same GPU Phase 3
+  reached by passing the index. An unresolvable name exits 2 printing the roster
+  (`no graphics adapter matching 'Matrox'; this machine has [0] ... [1] ...`), and an ambiguous one
+  is an error rather than a pick.
+- **Deviation from the phase's file list, agreed before starting: `new_headless` keeps its
+  signature.** The phase listed "every existing caller of `new_headless`" — **93 call sites across
+  61 files**, every one of which wants the adapter it already asks for. Instead
+  `RenderContext::new_headless_on` and `Renderer::new_headless_on` are the real constructors and the
+  existing three delegate to them, so no existing call site changed. Two files touched in `core`
+  rather than 61, and the byte-identical-golden done-when holds by construction rather than by 93
+  careful edits.
+- **`RenderError` gains `NoSuchAdapter` and `AmbiguousAdapter`**, both carrying the roster, so a
+  refused selection can name what the machine has instead of an index.
+- **The `spout` roster is read through a slice, not a feature-gated call.** `standalone/src/gpu.rs`
+  is unconditional and names Spout nowhere; `sender_adapter` takes `&[String]`, so the resolution
+  logic compiles, runs and is tested with no SDK and no `spout` feature. Eleven unit tests cover it,
+  including the Phase 3 failure as a named case (following the renderer must land on the discrete
+  GPU, never the integrated one).
+- **NOT SATISFIED HERE, and it needs the receiver: "the probe with `--gpu` naming the discrete GPU
+  reaches TouchDesigner, and the integrated one does not."** No test in this repository can ask it.
+  The probe was run both ways and behaves correctly on this side — it pins [1] and [0] respectively
+  and publishes in both cases — but whether the TOP opens the shared texture is the observation,
+  and it is outstanding.
+- The probe registered as `lmv-probe_1` on one run, which is the `SetSenderName` increment Phase 1
+  predicted from a stale registration. It is why the mode prints `lmv_spout_name`'s answer.
+
+**Readings, asserted against nothing.** `cargo nextest run --workspace`: **1135 passed, 5 skipped,
+424 s**, no baseline blessed and none modified. This is the first full-suite run in this lane whose
+core is attributable — the earlier one was discarded under the shared artifact store, which
+ADR-0147 has since revoked.
 
 **Phase 3 — done, and verified in TouchDesigner.** The shim publishes, a `Syphon Spout In` TOP
 receives it, and **the colour question is settled**: the TOP and a `Movie File In` TOP loaded with
