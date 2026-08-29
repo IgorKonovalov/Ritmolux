@@ -423,6 +423,15 @@ under what name, and how that TOP reads the colour.
   It also means the `lmv_spout_resize` entry point in this plan's illustrative C surface is
   redundant — `SendImage(pData, w, h)` with new dimensions already drives the whole path. Recorded
   as an observation for Phase 3, not acted on.
+- **The receiving install is TouchDesigner Non-Commercial, and it caps resolution at 1280x1280.**
+  Read from Derivative's own licence documentation, not from the installer. Phase 4's
+  `--size 1280x720` sits inside the cap and is unaffected. **Phase 6's "largest size and frame rate
+  that hold steady" is therefore bounded by the licence rather than by the frame budget**, and
+  1920x1080 — the size ADR-0125's 8.29 MB/frame and ~498 MB/s figures are stated at — cannot be
+  confirmed end to end on this install. Our own half of that number is still measurable from Phase
+  5's per-stage cost line at any size; it is the TouchDesigner-side confirmation that is capped, and
+  Phase 6 should say so rather than report the cap as a limit of this engine. TouchDesigner 2025
+  also requires a Vulkan 1.1 GPU, which this box has.
 - **One trap for Phase 4's naming.** `SetSenderName` auto-increments on collision — a second sender
   asking for `name` is registered as `name_1`, then `name_2`. A crashed previous run can leave a
   stale registration, so the name TouchDesigner shows is not guaranteed to be the name we asked
