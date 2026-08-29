@@ -381,7 +381,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 | 4 — `star_pattern`, after the renderer settles | human (`preset-author`) | done | `c1a6e09` |
 | 4b — `warp_mesh` gets its first worlds | human (`preset-author`) | done | `c1a6e09` |
 | 5 — curate the set, not the presets | dev | done (by `preset-author`) | — |
-| 6 — does the set read as a library | human | not started | — |
+| 6 — does the set read as a library | human | done | — (verdict, no commit) |
 
 ### Notes
 
@@ -584,6 +584,28 @@ original framing is restored.
 obvious intended entry, the defect it describes (a ~13-texel interior reading as a soft upscaled
 figure) is real, and its `palette_steps` workaround is live — so nothing needs re-tuning and the
 correct fix is a backlog number, which is `architect`'s to supply. **Filed under `## Followups`.**
+
+#### Phase 6 result — walked 2026-08-29
+
+The set was walked in the running app on the full 72, launched with `LMV_PRESET_DIR` pointed at this
+worktree so the seeded per-user copy could not shadow the branch. **The user's verdict: "looks good,
+approved all."**
+
+Both halves of the done-when are answered.
+
+- **It reads as a library.** The question the plan opened with — whether the set reads as one strong
+  family and eleven samplers — is closed in the affirmative direction.
+- **No world was named for retirement.** Phase 1 handed this phase a starting list (the four-way
+  `attractor` cluster: Lorenz Gallery, Valentine, Butterfly to Knot, Rho Walk, five of whose six
+  pairs the advisory distinctness report flags). **The user retired none of them, so nothing is
+  retired** — an approval of the whole set is the answer to the question, not a deferral of it. The
+  four stay, and the report keeps flagging them; that is the report being advisory rather than a
+  gate ([ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)), and it is the
+  state the plan closes in rather than an open item.
+
+That leaves **no deletion in this plan at all**, which is what
+[ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules and the plan's
+own *"It does not delete presets"* both wanted: the eighteen worlds are purely additive.
 
 ## Followups (after this lands)
 
