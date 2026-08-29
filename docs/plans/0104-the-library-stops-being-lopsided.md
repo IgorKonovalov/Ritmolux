@@ -375,7 +375,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — is the big family actually big | dev | done | committed with this row |
+| 1 — is the big family actually big | dev | done | `7561492` |
 | 2 — the singletons get a range | human | not started | — |
 | 3 — the thin families fill out | human | not started | — |
 | 4 — `star_pattern`, after the renderer settles | human | not started | — |
