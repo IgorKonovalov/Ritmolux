@@ -1,0 +1,139 @@
+# Ridge - the spectrum as a single continuous contour with a phosphor memory
+# (Plan 0104 Phase 2). Authored fresh-slate (ADR-0089). This is the family's
+# `polyline` world and its highest-resolution one: 64 elements is the ceiling
+# the engine's own band count sets, so the figure is the analysis at full
+# resolution and nothing is averaged away.
+#
+# WHY 64 IS THE CEILING AND WHY THIS WORLD SITS ON IT. The engine analyses 64
+# log-spaced bands and the scene reduces them to `elements` by averaging each
+# element's own contiguous slice - a real partition, so no band is dropped or
+# counted twice. At 64 the partition is the identity: one element per band. A
+# readout finer than its own data would be a lie, which is why the table refuses
+# more, and a readout AT its data is what a contour wants - the line has a knot
+# at every band and reads as terrain instead of as a chart.
+#
+# WHAT DRIVES WHAT. Everything, and by construction: on this system nothing in
+# [params] maps audio to position, because that mapping IS the scene. What the
+# params say is how far the contour reaches and what it looks like. The
+# discretion left is where the world spends its energy - and it spends it on the
+# TAIL rather than on the level. `trails` holds each contour for about six
+# tenths of a second, so a sweep leaves a fading terrain behind the live line
+# and the world reads as a seismograph rather than as a meter.
+#
+# THE TAIL CANNOT PILE UP, and that is a `max` decision rather than a tuning
+# one. The trails stage's default blend is max(current, past * trails): the
+# accumulation can never exceed the brightest thing in it, so a long tail
+# saturates to one contour's brightness and stops. `add` would sum every past
+# contour and the frame would fill; there is deliberately no [feedback] table
+# here and no fb_* transform, so the past fades in place rather than travelling.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45, read
+# against a static control that printed delta 0.0000 monotone 0.00 on all three
+# statistics:
+#
+#   coverage    0.8151 -> 0.8151   delta +0.0000   monotone 0.00
+#   peak/mean  10.9641 -> 10.8995  delta -0.0647   monotone 0.45
+#   footprint   0.0115 ->  0.0206  delta +0.0091   monotone 0.47
+#
+# Coverage is bit-flat over the whole run and the other two wander with under
+# half their travel in one direction, which is what breathing looks like against
+# a `monotone` near 1.00 for grinding into a corner. The `max` claim above is
+# therefore measured rather than argued. Re-run it if `blend` ever becomes `add`
+# or an fb_* term is added - both change the mechanism this measures.
+system = "spectrum"
+name   = "Ridge"
+
+[spectrum]
+elements = 64
+layout = "polyline"
+# A fast attack keeps the knot a transient puts in the line; a long release is
+# what makes the terrain behind it read as terrain. Asymmetry earns its keep
+# more here than anywhere else in the engine - see presets/README.md.
+smoothing = { attack = 0.018, release = 0.5 }
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0f3b4a" },  # deep teal - the low end of the contour
+  { at = 0.40, color = "#1fb8b0" },  # cyan
+  { at = 0.72, color = "#9ff0d8" },  # pale green
+  { at = 1.00, color = "#ffffff" },  # white - the top of the contour
+]
+
+[params]
+# A low rest so the contour is a horizon in a silence rather than a flat wire on
+# the floor, and a small per-element tilt so even a dead band sits somewhere.
+# The `noise` term is the resting swell, offset by `index` so the knots wander
+# out of step and the contour is terrain rather than a rising wire. Without it
+# this world is frozen in a silence - nothing else in it reads the clock, and a
+# readout that stops when the music does reads as a broken preset.
+base = "0.05 + index * 0.05 + noise(time * 2.2 + index * 13) * 0.13"
+
+# dB-like compression, `scale` retuned DOWN for it in the same edit (the two are
+# not independent and the factor is large). At 64 elements the top of the
+# spectrum is quiet on almost everything, and a linear map leaves that half of
+# the figure stubbed flat against the baseline - which is exactly the half a
+# contour needs in order to have a shape.
+curve = "0.45"
+scale = "0.55"
+
+baseline = "-0.55"
+span     = "1.7"
+
+# The horizon tilts, slowly. On `bars` and `polyline` `rotation` is not the
+# figure's natural motion the way it is on the ring - it tips the whole readout,
+# which is what keeps a contour from reading as a chart.
+rotation = "sin(time * 0.09) * 0.06"
+
+# A FINE LINE, WHICH THE JOIN WORK MADE POSSIBLE. A polyline turns sharply at
+# every one of its 64 knots, and before Plan 0039 the wedge of background at
+# each turn scaled with the stroke - so this figure above all had to be drawn
+# heavy to hide its own vertices. It does not any more: the quads either side of
+# a vertex overlap. 2.4 is chosen for the weight, not to hide anything, and it
+# sits an order above the 0.167 dead zone where every value renders identically.
+thickness = "3.0 + clamp(treb * 1.83, 0, 1.1)"
+softness  = "0.3"
+glow      = "0.95"
+
+# The contour is the whole picture, so its level stays low - a bright line over
+# its own accumulated tail is how this mechanism washes out. The reach comes
+# from `scale` and the band levels, not from luminance.
+brightness = "0.62 + clamp(bass * 0.235, 0, 0.2)"
+
+# Colour walks the frequency axis: deep teal at the bottom of the spectrum,
+# white at the top, so where the energy is reads off the contour's colour.
+hue        = "0"
+hue_spread = "1.0"
+saturation = "1.05"
+
+# Six tenths of a second of memory (retention is per 1/60 s, so 0.96 is 0.086
+# of the light left after a second). Long enough to see where the line has
+# been, short enough that a chorus does not bury the live contour.
+trails = "0.96"
+
+# THE GROUND CARRIES THE LOW END, AND THE CONTOUR DOES NOT. A 64-knot line is a
+# few thousand lit pixels in a frame of a million, so a level term on the stroke
+# alone is a small event however hard it is driven - measured, the whole world
+# moved 0.010 on its strongest band with everything riding the line. Lifting the
+# field behind it moves the frame instead, and it reads as the light in the room
+# changing rather than as the readout flashing.
+bg_hue       = "0.02"
+bg_bright    = "0.06 + clamp(bass * 0.129, 0, 0.11)"
+exposure     = "0.95 + clamp(mid * 0.412, 0, 0.35)"
+bg_angle     = "0"
+bg_hue_span  = "0.06"
+bg_shade     = "1.0"
+bg_shade_end = "0.3"
+bg_vignette  = "0.55"
+
+# The line's crossings and its brightest knots are what clear the threshold, so
+# a hit lights the peaks of the terrain and leaves the valleys alone.
+bloom_amount    = "0.3 + clamp(onset * 0.83, 0, 0.5)"
+bloom_threshold = "0.85"
+bloom_radius    = "1.3"
+
+[smoothing]
+thickness    = { attack = 0.02, release = 0.35 }
+brightness   = 0.3
+bg_bright    = { attack = 0.05, release = 0.45 }
+exposure     = { attack = 0.05, release = 0.4 }
+bloom_amount = { attack = 0.03, release = 0.35 }
