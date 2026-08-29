@@ -13,6 +13,79 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md)
+  — closed 2026-08-29. Six phases plus a `dev`-added Phase 4b, in the `lmv-plan-0104` lane,
+  `7561492`..`be385c9` plus the close. Review: **one blocker, three majors, three minors, two nits.**
+  Version **0.92.0** (minor). Closed no backlog entry; **corrected** 0038 and **withdrew** a
+  followup against 0099.
+
+  **What landed.** 18 presets, purely additive, 54 → 72, bringing all twelve registered systems to
+  the floor of four. `lsystem` 1→4, `spectrum` 1→4, `star_pattern` 2→4, `swarm` 2→4,
+  `warp_mesh` **0→4** — the library's only zero-world system, and the reason the plan's own
+  instrument could not see it: `shot --report` prints a section per *populated* family, so an empty
+  system is absent rather than flagged. Verified independently at the close by counting top-level
+  `system =` against the scene registry, not off the report.
+
+  **What the plan falsified about itself.** Phase 1 found the nine-month-old census dead — the
+  library had grown 39→54 and gained a twelfth system — and rewrote every term of the arithmetic
+  while keeping the total at 18 by coincidence. The user authorized `dev` to edit five phase blocks
+  to do it, which is outside the lane's normal permission and is recorded as such. The
+  seventeen-or-seventeen question the plan opened on was answered: **thirteen distinct worlds and
+  one four-way converged cluster**, which did not reduce the authoring count.
+
+  **What outlived the plan.** Three findings the content lane should carry. A branching or line
+  figure has too little area for a level term to register on the stroke — the fix is a whole-frame
+  stage (`exposure`, `bg_bright`), and it moved Ridge 0.010 → 0.065. `swarm` *can* read as a flock
+  and the lever is `field_freq`, not the population count, answered from both ends (6.4 ships, 1.15
+  was drafted and rejected). And **Braid collapsed on its first horizon with every gate green** —
+  ten simulated minutes took coverage 0.5647 → 0.0002 and peak/mean 6.7 → 4608 — caught by hand,
+  fixed, and re-measured stable against a `swarm_drift` control. `--horizon` holds its stimulus
+  fixed, so it cannot fire an edge-triggered lever like `reseed`; that gap is filed.
+
+  **The two majors, both in Phase 5's workaround sweep, both repaired at the close.** The sweep
+  declared `design-backlog 0140` and `0099` nonexistent and rewrote `fragment_driftmono`'s header on
+  that premise, deleting a correct pointer. Both are **live entries**, and both citations were right.
+  The mechanism is worth keeping: the "104 rows" it counted are the *ledger* inside
+  `design-backlog.md`'s `roster:begin` region, which holds **closed** entries — live bodies sit above
+  it and are not rows. A sweep asking whether entry NNNN exists must grep `^## NNNN` across the
+  backlog **and** its archive. Separately, this plan's own cohorts falsified backlog **0038**, whose
+  twice-dated claim that *exactly one* preset binds `exposure` is now sixteen — fifteen of them
+  authored here. That claim is carried `unprobeable:`, so `check-backlog-claims.mjs` stayed green
+  across every run of the plan that broke it: the case the close prints that roster for.
+
+  **The blocker, and it is the reason this close took two attempts.** The re-run on the lane's own
+  artifacts failed: `spectrum_anemone`, a Phase 2 world, reacts to no band above the suite's `0.02`
+  floor — max **0.0194**, three times below the next-weakest preset in its own cohort table. The
+  plan's log records that phase as `cargo nextest run -p lmv-core, 851 passed`. Both statements
+  cannot hold, and the store explains it: ADR-0141's shared artifact store was live throughout this
+  plan, only `main` and the 0115 lane ever built in `debug`, and both carried the **54-preset**
+  embedded set — so a `debug` sweep served from it iterated a library containing none of the
+  eighteen. **The plan's central content gate was very likely never applied to the content the plan
+  added.** Repaired at the close in the content lane: the defect was proportion, not damping — every
+  passing sibling carries an audio term that moves the whole figure (Halo grows its ring 0.26 on
+  bass across 48 spokes), where Anemone had the family's weakest, and its `scale` — the multiplier
+  on each element's own band level, and the only route the spectrum has into that world — sat at
+  0.85, below the 1.0 `presets/README.md` names as the bottom of the useful range. Rest and readout
+  traded places; it now measures **0.0359**. Structural only, so the limited-ink argument in its
+  header survives. **Recorded rather than absorbed:** a done-when the log reported as met was not,
+  and the fix is unreviewed by anyone but its author, the architect lane having been asked to do the
+  content work directly.
+
+  **Curation verdict (`presets/` touched).** The eighteen earn their places. All fresh-slate under
+  ADR-0089, no family converged, and each cohort was authored against a measured gap rather than a
+  count — `emitter`/`shape_collage` were onset-deaf at 0.000 and now report 0.024/0.029;
+  `star_pattern` sat at 0.007 and Corona reports 0.067. The only `NEAR-DUP` lines the library emits
+  are still Phase 1's four-way `attractor` cluster; no new pair was introduced. Phase 6's user
+  verdict approved all 72 and **retired nothing**, so the cluster stays flagged-but-shipped — the
+  advisory report behaving as ADR-0067 intends.
+
+  **Gates re-run from scratch at the close, because no earlier green run was attributable.**
+  ADR-0147 revoked ADR-0141's shared artifact store mid-review; every suite run behind this plan,
+  `dev`'s and the reviewer's first, had gone through it. Rebuilt cold into the lane's own `target/`
+  and confirmed the embedded set is this checkout's — 72 presets, all 18 present, `include_str!`
+  paths under `lmv-plan-0104` — before re-running `fmt`, `clippy --workspace --all-targets` and
+  `nextest --workspace`.
+
 - [0129 — The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md)
   — closed 2026-08-29. Seven phases of seven, taken in the main checkout rather than a lane (which
   is what the plan asked for), `b17d8cc`..`952d5c3` plus the close's `6371136`. Review: **no

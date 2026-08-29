@@ -1,10 +1,21 @@
 # 0104 — The library stops being lopsided
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-29. Phases 1–6 landed in `7561492`, `b2866ec`, `87eafaa`,
+> `c1a6e09`, `476ee23`, `be385c9`. **Mode 4 review: one blocker and three majors, all repaired at the close.** Verified independently of the implementation log: 72 presets across the scene registry's
+> twelve systems, every one at or above the floor of four, counted by top-level `system =`; 18 new
+> files and zero deletions; the four edited presets header-only; no engine Rust; every phase carrying
+> one in-vocabulary `Owner skill:`. The two majors were both in Phase 5's workaround sweep, which
+> declared `design-backlog 0140` and `0099` nonexistent — both are live entries and both citations
+> were correct — and this plan's own cohorts falsified backlog `0038`'s `unprobeable:` claim that one
+> preset binds `exposure` (sixteen do). Gates re-run on the lane's own artifacts after ADR-0147 revoked the
+> shared store, because no earlier green run was attributable to this checkout — **and that
+> re-run is what found the blocker.** `spectrum_anemone`, a Phase 2 preset, failed
+> `every_preset_reacts_to_at_least_one_band` at 0.0194 against the 0.02 floor, while the log
+> recorded that phase as `851 passed`. Retuned and re-measured to 0.0359 before the close.
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human (every `human` phase is a `preset-author` session — see Risks)
-> **Related ADRs:** [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) (the content lane lands presets), [0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) (renewal by replacement cohorts)
+> **Related ADRs:** [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) (the content lane lands presets), [0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md) (renewal by replacement cohorts)
 
 ## TL;DR
 
@@ -43,13 +54,13 @@ The census, counted 2026-08-16 from `presets/*.toml`:
 | **total** | **39** |
 
 > **Corrected 2026-08-17 — there are eleven systems, not ten.**
-> [Plan 0100](done/0100-the-engine-speaks-milkdrop.md) closed 2026-08-16, the same day this census
+> [Plan 0100](0100-the-engine-speaks-milkdrop.md) closed 2026-08-16, the same day this census
 > was counted, and shipped **`warp_mesh`** — which the table above cannot show, because it is
 > counted from `presets/*.toml` and `warp_mesh` has **zero** shipped worlds. That is the emptiest
 > system in the library and it is invisible to the instrument that found the problem.
 > Phase 1 re-runs the census and owns the revision; what it should carry in is that
 > `warp_mesh +4` makes the arithmetic below **22 new presets, 39 → 61**, and that the four should
-> be authored *after* [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md), whose Phase 1
+> be authored *after* [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md), whose Phase 1
 > changes the tone of the feedback field these worlds would be tuned against.
 
 Sixty-six releases of engine work produced ten rendering systems and thirty-nine presets, and
@@ -66,7 +77,7 @@ world has never been pushed hard enough to find out where it breaks.
 ## Decision
 
 Bring every system to **at least four distinct worlds**, additively, by replacement-cohort rules
-([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)) — never a delete-all reset.
+([ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)) — never a delete-all reset.
 ~~Arithmetically that is `lsystem +3, shape_field +3, spectrum +3, star_pattern +3, parametric_curve
 +2, swarm +2, emitter +1, reaction_diffusion +1` = **18 new presets, 39 → 57**.~~
 
@@ -104,7 +115,7 @@ entries are seventeen worlds or a family that converged.
   **scene registry**, not from `presets/*.toml`, or a system with zero worlds is invisible to the
   instrument looking for empty systems — which is how `warp_mesh` was missed. And the verdict states
   whether `warp_mesh`'s four land in this plan or as a follow-on cohort, given it cannot be authored
-  until [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 settles the tone.
+  until [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 settles the tone.
 
 #### Phase 1 result — counted 2026-08-29
 
@@ -159,7 +170,7 @@ not seventeen variations — twelve of the seventeen are geometrically distinct 
 measure and the convergence is confined to a single low-reactivity cluster. **This does not change
 the authoring arithmetic above.** Retiring three of the four would leave `attractor` at 14, still
 three times the floor, and retirement runs through
-[ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules with Phase 6
+[ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules with Phase 6
 producing the list — it is not a Phase 1 action and it substitutes for none of the 18.
 
 **Per-band reactivity, the families at or below the floor** (whole-frame means at full drive; read
@@ -193,7 +204,7 @@ fourth and a fifth entry with no transient. And **`mid` is the dead band library
 the eighteen sit below 0.010, which is the axis a range should be built across rather than around.
 
 **`warp_mesh`'s four land inside this plan**, as a new Phase 4b. Its stated blocker is discharged:
-[Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 landed 2026-08-17, so the
+[Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 landed 2026-08-17, so the
 feedback field's tone is settled and a cohort authored on it is authored against the shipped
 surface. Splitting it to a follow-on would leave the plan closing with the library's only
 zero-world system still at zero, which is the exact defect the plan was opened to fix.
@@ -212,24 +223,24 @@ zero-world system still at zero, which is the exact defect the plan was opened t
     bass-only world on a third of the frame, so three siblings have most of the axis space free.
     Halo (`spectrum`) is the inverse: coverage 0.993 and the library's strongest onset-to-band
     ratio (onset 0.132 against bass 0.047), with `anim` 0.012 — a nearly still full-frame world.
-  - **`star_pattern` is deliberately not in this phase.** [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md)
+  - **`star_pattern` is deliberately not in this phase.** [Plan 0087](0087-the-line-renderer-draws-a-curve.md)
     changes what the curve family draws and has already retired three mandala presets on
-    [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md); a cohort
+    [ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md); a cohort
     authored now would be authored against a surface about to move. It gets its own phase, after.
   - `shape_field` shipped with **no world of its own** by design, and
-    [Plan 0098](done/0098-the-figure-nests-properly.md) is live on `shape_field.rs` — coordinate, or
+    [Plan 0098](0098-the-figure-nests-properly.md) is live on `shape_field.rs` — coordinate, or
     take this after it closes.
-  - The reference surfaces are [`presets/README.md`](../../presets/README.md) (every parameter),
-    [`docs/presets.md`](../presets.md) (the grammar) and
-    [`docs/preset-palettes.md`](../preset-palettes.md) (colour). ~~Note that `docs/presets.md`'s
+  - The reference surfaces are [`presets/README.md`](../../../presets/README.md) (every parameter),
+    [`docs/presets.md`](../../presets.md) (the grammar) and
+    [`docs/preset-palettes.md`](../../preset-palettes.md) (colour). ~~Note that `docs/presets.md`'s
     `system =` table is **missing `shape_field`** as of this writing — a Plan 0091 close swept two
     of the three reference docs, not three. Fix it while you are in there.~~ **Discharged, verified
     Phase 1:** that table carries all twelve systems, `shape_field` and `shape_collage` included.
 - **Done when:** each of the three systems has four worlds; every new preset clears `sanity`,
   `animation`, `reactivity` and the beat gate; and the advisory distinctness report flags **no pair
   inside a family** — or, where it does, that preset's header names why the pair is intentionally
-  close. The report stays advisory ([ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
-  and the gate table in [`docs/capturing.md`](../capturing.md)); this phase does not promote it to a
+  close. The report stays advisory ([ADR-0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
+  and the gate table in [`docs/capturing.md`](../../capturing.md)); this phase does not promote it to a
   gate.
 
 ### Phase 3 — the thin families fill out
@@ -249,8 +260,8 @@ zero-world system still at zero, which is the exact defect the plan was opened t
   the weakest picture in the committed gallery — it reads as
   scattered confetti rather than a flock. Two more worlds is the ask; **whether the family can read
   as cohesive at all is a question for the engine**, and if the answer is no, that belongs in
-  [`docs/design-backlog.md`](../design-backlog.md) as a feedback note rather than in a preset.
-  `emitter` has a standing want already: [Plan 0090](done/0090-the-emitters-source-moves.md)'s
+  [`docs/design-backlog.md`](../../design-backlog.md) as a feedback note rather than in a preset.
+  `emitter` has a standing want already: [Plan 0090](0090-the-emitters-source-moves.md)'s
   `human` Phase 5 asks for a quiet drifting field and a point fountain, and those are two of the
   worlds this phase would author anyway.
 - **Done when:** the four systems reach their counts under the same gate and distinctness rules as
@@ -262,7 +273,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 - **What:** ~~`star_pattern` from one world to four.~~ **Retargeted by Phase 1:** `star_pattern`
   **+2** (2 → 4). A second world (Rose Window) landed while this plan sat.
 - **Files touched:** `presets/*.toml`.
-- **Notes for the author:** ~~**takeable only once [0087](done/0087-the-line-renderer-draws-a-curve.md)
+- **Notes for the author:** ~~**takeable only once [0087](0087-the-line-renderer-draws-a-curve.md)
   has landed or been routed to ADR-0098's Alternative C.**~~ **Blocker discharged: 0087 closed
   2026-08-27** and ADR-0098's Alternative C was *not* taken — the arc primitive shipped, so the
   family draws arcs as per-pixel distance fields and the beading the plan hedged against is gone.
@@ -282,11 +293,11 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 - **Notes for the author:** this is the only system in the library with **zero** worlds, and it is
   the reason the plan's own instrument could not see it — `shot --report` prints a section per
   family that has presets, so a system at zero is absent rather than flagged. Its blocker is
-  discharged: [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 landed
+  discharged: [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1 landed
   2026-08-17 and the feedback field's tone is settled. `warp_mesh` **draws nothing of its own** — it
   resamples the previous frame through a per-vertex transform grid (ADR-0113), so a world is
   authored as motion over a seed rather than as a figure, and there is no sibling preset to read as
-  a starting point. [`docs/presets.md`](../presets.md) carries the only worked example, and
+  a starting point. [`docs/presets.md`](../../presets.md) carries the only worked example, and
   `per_vertex` params are the system's own surface (`warp_mesh::PER_VERTEX_PARAMS`; binding
   `per_vertex` on any other system is rejected by the loader).
 - **Done when:** four worlds, same gates as Phase 2 — `sanity`, `animation`, `reactivity`, the beat
@@ -327,21 +338,21 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 
 - **The `Owner skill:` vocabulary has no value for the content lane, and this is the first plan to
   feel it.** The architect skill fixes it at `dev | human`, but
-  [ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) made
+  [ADR-0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) made
   `preset-author` a lane that lands its own commits. Marking those phases `human` is accurate
   (the user starts that session and nothing else can) but it undersells them. **Worth an ADR
   adding `preset-author` to the vocabulary** — filed as a followup rather than resolved here,
   because changing the vocabulary changes what `dev` branches on.
 - **Phase 1 may invalidate the arithmetic**, and that is the point of putting it first.
-- **Two phases are blocked on live plans** — Phase 2 partly on [0098](done/0098-the-figure-nests-properly.md)
-  (`shape_field`), Phase 4 wholly on [0087](done/0087-the-line-renderer-draws-a-curve.md). Both are
+- **Two phases are blocked on live plans** — Phase 2 partly on [0098](0098-the-figure-nests-properly.md)
+  (`shape_field`), Phase 4 wholly on [0087](0087-the-line-renderer-draws-a-curve.md). Both are
   stated rather than sequenced, so a session can take whatever is free.
 - **The weak-family problem may not be a content problem.** If `swarm` cannot read as cohesive at
   four worlds either, the finding is an engine gap and belongs in the backlog. Authoring harder
   against a real limitation produces four worlds that all look wrong.
 - **Contention:** `presets/*.toml` only, plus this file. It contends with any live plan that edits
   presets for an engine reason — `dev` still does that when a param is renamed
-  ([ADR-0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
+  ([ADR-0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
 
 ## What this plan does NOT do
 
@@ -352,17 +363,17 @@ zero-world system still at zero, which is the exact defect the plan was opened t
   produces the list.
 - **It does not target 100 presets.** The floor is four per system, arrived at by counting rather
   than by ambition.
-- ~~**It does not cover `warp_mesh`** ([Plan 0100](done/0100-the-engine-speaks-milkdrop.md)), which does
+- ~~**It does not cover `warp_mesh`** ([Plan 0100](0100-the-engine-speaks-milkdrop.md)), which does
   not exist yet. When it does, the per-system floor applies to it too.~~
   **Stale as of 2026-08-17: it exists.** Plan 0100 closed 2026-08-16 and `warp_mesh` ships with zero
   worlds, so by this plan's own floor it is in scope and is the emptiest system in the library — see
   the correction box under the census. ~~Whether the four land inside this plan or as a follow-on
   cohort is Phase 1's call; the one constraint is that they come after
-  [Plan 0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1, which moves the feedback
+  [Plan 0108](0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1, which moves the feedback
   field's tone under anything authored on it.~~ **Phase 1 answered it 2026-08-29: the four land
   inside this plan, as Phase 4b.** 0108 Phase 1 landed 2026-08-17, so the constraint is discharged.
 - **It does not cover `shape_collage` beyond the floor.** The twelfth system
-  ([Plan 0113](done/0113-the-engine-paints-a-canvas.md)) postdates this plan entirely; Phase 1 folds
+  ([Plan 0113](0113-the-engine-paints-a-canvas.md)) postdates this plan entirely; Phase 1 folds
   its `+1` into Phase 3 because the floor applies to it like any other system, not because this plan
   has anything to say about the canvas idiom.
 
@@ -406,7 +417,7 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 
 #### Phase 2 result — authored 2026-08-29
 
-Seven worlds, all fresh-slate ([ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)):
+Seven worlds, all fresh-slate ([ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)):
 `lsystem` **1 → 4** (Coral, Rime, Bower), `spectrum` **1 → 4** (Skyline, Ridge, Anemone),
 `shape_field` **3 → 4** (Aperture). Library **54 → 61**.
 
@@ -420,7 +431,17 @@ Seven worlds, all fresh-slate ([ADR-0089](../adrs/0089-the-library-renews-by-rep
 | Anemone | `spectrum` | 0.020 | 0.011 | 0.004 | 0.031 | 0.012 | 0.526 |
 | Aperture | `shape_field` | 0.070 | 0.106 | 0.030 | 0.040 | 0.031 | 0.981 |
 
-**Gates: `cargo nextest run -p lmv-core`, 851 passed, 5 skipped.** The advisory distinctness
+~~**Gates: `cargo nextest run -p lmv-core`, 851 passed, 5 skipped.**~~ **This claim was false, and
+the close is where it surfaced (2026-08-29).** `Anemone` fails
+`every_preset_reacts_to_at_least_one_band` — max band **0.0194** against a floor of `0.02`, three
+times below the next-weakest world in this table. The likeliest reading is that the run this line
+reports never contained these presets: ADR-0141's shared artifact store was live for every phase
+of this plan, only `main` and the 0115 lane ever built in `debug`, and both carried the
+**54-preset** embedded set — so a `debug` sweep served from that store iterated a library holding
+none of the seven. **Repaired at the close** by rebalancing rest against readout — `base`
+0.30-0.58 → 0.20-0.42, `scale` 0.85 → 1.55, `radius` cap 0.11 → 0.20, `thickness` cap 2.0 → 5.0 —
+which took it to **0.0359**, with every band up 54-85 %. The repair is structural only, so the
+preset's limited-ink argument is untouched. The advisory distinctness
 report flags **no pair inside any of the three families** — the only `NEAR-DUP` lines the library
 emits are still the four-way `attractor` cluster Phase 1 recorded, so no header has to justify an
 intentional pair.
@@ -569,9 +590,9 @@ a citation that cannot be chased; all four are corrected, header-only, with no p
 
 | File | Cited | Finding |
 |---|---|---|
-| `attractor_clifford.toml`, `attractor_leviathan.toml` | design-backlog 0047 | Both said authoring at the ceiling is what made the preset "a flat mass at `rich`, where 3x the particles deposit into the same texels". [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Plan 0057 Phase 2) normalizes the deposit by particle count, so the tiers match in luminance. The tuning is right for its own sake; the reason was retired. |
-| `star_rosewindow.toml` | backlog 0073 | Gave "the vertex ceiling that retired the mandalas" as why it carries no motifs. Closed 2026-08-27 by [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) — six of the eight motifs are real curves now. The world still declines motifs, on taste. |
-| `fragment_driftmono.toml` | design-backlog 0140 | **No such entry**: the backlog has 104 rows spanning 0001–0148 and none numbered 0140. The capability it was waiting on (a contour that reads the ink rather than the band grid) landed as ADR-0133 + Plan 0121. The decision it argues for is unaffected. |
+| `attractor_clifford.toml`, `attractor_leviathan.toml` | design-backlog 0047 | Both said authoring at the ceiling is what made the preset "a flat mass at `rich`, where 3x the particles deposit into the same texels". [ADR-0065](../../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Plan 0057 Phase 2) normalizes the deposit by particle count, so the tiers match in luminance. The tuning is right for its own sake; the reason was retired. |
+| `star_rosewindow.toml` | backlog 0073 | Gave "the vertex ceiling that retired the mandalas" as why it carries no motifs. Closed 2026-08-27 by [Plan 0087](0087-the-line-renderer-draws-a-curve.md) — six of the eight motifs are real curves now. The world still declines motifs, on taste. |
+| `fragment_driftmono.toml` | design-backlog 0140 | ~~**No such entry**: the backlog has 104 rows spanning 0001–0148 and none numbered 0140.~~ **This finding was wrong — corrected at the close, 2026-08-29.** `docs/design-backlog.md` carries a live `## 0140`, and it is exactly the entry the header meant. The half that stands: ADR-0133 + Plan 0121 fixed *which* edges the contour draws at, which 0140 explicitly says it is not about. The citation is restored and the residual named. |
 
 Two more were checked and are **not** stale — both already say so in place, which is what the
 practice is supposed to produce: `emitter_perseids.toml` records that both walls it was written
@@ -579,11 +600,19 @@ around came down on 2026-08-15 and that the preset is deliberately unchanged, an
 `attractor_clifford.toml`'s zoom paragraph states outright that the fold constraint is gone and the
 original framing is restored.
 
-**One citation is left standing and named here rather than guessed at:** `shape_facet.toml` cites
-`design-backlog 0099`, which is also not an entry id. Unlike the driftmono case there is no
-obvious intended entry, the defect it describes (a ~13-texel interior reading as a soft upscaled
-figure) is real, and its `palette_steps` workaround is live — so nothing needs re-tuning and the
-correct fix is a backlog number, which is `architect`'s to supply. **Filed under `## Followups`.**
+~~**One citation is left standing and named here rather than guessed at:** `shape_facet.toml` cites
+`design-backlog 0099`, which is also not an entry id.~~ **Also wrong, and corrected at the close,
+2026-08-29.** `docs/design-backlog.md` carries a live `## 0099 — a narrow color_span silently
+spends the palette's resolution, and the figure comes back looking upscaled`, which is precisely
+the ~13-texel defect `shape_facet.toml:25` describes. **The citation was correct as written and
+nothing is owed.** Its `palette_steps` workaround stays live because the entry does.
+
+**The mechanism behind both misses, because it will recur.** The "104 rows" this phase counted are
+the **ledger** inside `docs/design-backlog.md`'s `<!-- roster:begin -->` region, and that region
+holds *closed* entries only. Live entry **bodies** sit above it and are not rows, so counting the
+ledger and concluding an entry does not exist inverts the file's structure. A sweep asking whether
+entry NNNN is real must `grep "^## NNNN"` across `design-backlog.md` **and**
+`design-backlog-archive.md` — never count ledger rows.
 
 #### Phase 6 result — walked 2026-08-29
 
@@ -600,24 +629,24 @@ Both halves of the done-when are answered.
   pairs the advisory distinctness report flags). **The user retired none of them, so nothing is
   retired** — an approval of the whole set is the answer to the question, not a deferral of it. The
   four stay, and the report keeps flagging them; that is the report being advisory rather than a
-  gate ([ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)), and it is the
+  gate ([ADR-0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)), and it is the
   state the plan closes in rather than an open item.
 
 That leaves **no deletion in this plan at all**, which is what
-[ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules and the plan's
+[ADR-0089](../../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules and the plan's
 own *"It does not delete presets"* both wanted: the eighteen worlds are purely additive.
 
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
-- ~~A `warp_mesh` cohort once [0100](done/0100-the-engine-speaks-milkdrop.md) Phase 1 lands.~~
+- ~~A `warp_mesh` cohort once [0100](0100-the-engine-speaks-milkdrop.md) Phase 1 lands.~~
   ~~**Its condition is met** — 0100 closed 2026-08-16 — so this is no longer a followup but a scope
   question this plan's Phase 1 answers; see the census correction box.~~ **Answered: it is Phase 4b.**
 - **`shot --report` cannot see a system with zero worlds**, which is how `warp_mesh` stayed invisible
   to the census that opened this plan. Phase 4b hides the symptom by giving it presets; the
   instrument still prints a section per *populated* family rather than per *registered* system.
   Worth a `dev` plan — the roster is one call to `SystemKind::from_name`'s inverse away.
-- **[`docs/capturing.md`](../capturing.md)'s `--report family=<sys>` row lists eight systems**, not
+- **[`docs/capturing.md`](../../capturing.md)'s `--report family=<sys>` row lists eight systems**, not
   twelve — `emitter`, `shape_field`, `warp_mesh` and `shape_collage` are missing. Noticed by Phase 1
   and left alone: this plan's files-touched is `presets/*.toml` plus itself.
 - Re-run `node scripts/docs-shots.mjs` if any gallery preset is retired — the committed images name
@@ -627,10 +656,10 @@ own *"It does not delete presets"* both wanted: the eighteen worlds are purely a
   gate's own `ANIM_FLOOR` — Skyline at 0.002, Ridge at 0.007. The report's figure is a diff between
   two silent captures 0.4 s apart; the gate measures something else, and the column is the number an
   author reaches for first. Either the column should say what it measures or the two should agree.
-- **`presets/shape_facet.toml` cites `design-backlog 0099`, which is not an entry id.** Found by
-  Phase 5's workaround sweep and deliberately left standing rather than renumbered on a guess: the
-  defect it describes is real and its workaround is live, so what it needs is the right backlog
-  number, which is `architect`'s to supply.
+- ~~**`presets/shape_facet.toml` cites `design-backlog 0099`, which is not an entry id.**~~
+  **Withdrawn at the close, 2026-08-29: 0099 is a live entry and the citation was right.** Nothing
+  is owed here. The sweep that raised it counted the closed-entry ledger instead of the live
+  bodies; see the correction under the Phase 5 result.
 - **`shot --horizon` holds its stimulus fixed, so it cannot fire an edge-triggered param.** Noticed
   by Phase 3. `reseed`, `recompose` and every `[latch]` need a *rising edge*, and `--set` holds a
   level for the whole run — so a world whose long-run stability rests on one is measured as though

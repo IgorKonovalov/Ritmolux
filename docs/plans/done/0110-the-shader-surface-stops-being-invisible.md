@@ -336,7 +336,7 @@ cannot drift.
 - **Does not cover `milk/vm.rs` or `warp_mesh/draw.rs`** unless Phase 6's reading forces it.
 - **Does not convert a corpus preset, wire `milkconv` into `core`'s tests, or ship a
   shader-carrying preset to `presets/`.** Shipping `warp_mesh` worlds belongs to Plan
-  [0104](../0104-the-library-stops-being-lopsided.md) and the `preset-author` lane.
+  [0104](0104-the-library-stops-being-lopsided.md) and the `preset-author` lane.
 - **Does not change engine behavior.** If a phase finds a defect, it records it and the fix goes
   to a followup — a coverage plan that also changes what the code does cannot tell you which of
   the two moved the baseline.
