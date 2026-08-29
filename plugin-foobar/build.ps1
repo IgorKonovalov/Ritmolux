@@ -28,7 +28,13 @@ if (-not (Test-Path (Join-Path $sdk "foobar2000\SDK\foobar2000.h"))) {
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 cargo build --release -p lmv-core-cabi 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
-$coreLib = Join-Path $repo "target\release\lmv_core_c.lib"
+# The artifact store is not always $repo\target: a machine-local .cargo/config.toml
+# above the worktree can point build.target-dir elsewhere (ADR-0141), and cargo
+# finds it by walking ancestors, so this script cannot tell from its own path.
+# --no-deps keeps it to the workspace manifest, which is all target_directory needs.
+$meta = cargo metadata --format-version 1 --no-deps --manifest-path (Join-Path $repo "Cargo.toml") | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
+$coreLib = Join-Path $meta.target_directory "release\lmv_core_c.lib"
 
 # --- 2. Locate MSVC ---
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
