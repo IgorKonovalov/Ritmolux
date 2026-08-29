@@ -1,0 +1,144 @@
+# Tide Mono - a deposited field dragged through a warping mesh and printed black
+# on white. The cohort's WEATHER: the only world here with no figure at all, just
+# a full frame of moving ink that never resolves into an object.
+#
+# It exists because the set had none. Every other mono world is a figure, a
+# field with a structure, or a readout - something a room can name. A set of
+# fifteen wants one that is only motion, and it wants it on the family with zero
+# mono coverage.
+#
+# -- IT IS A DUOTONE, AND `warp_mesh` HAS ITS OWN REASON FOR THAT -----------------
+#
+# THIS FILE IS NOT IN THE LIMITED-INK CLASS AND CANNOT BE, and the cause here is
+# different from the additive-deposit one that keeps `attractor`, `swarm` and
+# `emitter` out. `warp_mesh` COLOURS ITS LIGHT AT DEPOSIT TIME: the palette is
+# sampled when a stroke is laid into the accumulation buffer, not when the
+# accumulated field is read back out. So `palette_steps` cannot band the field -
+# there is no per-pixel palette coordinate at the end of the chain to quantize.
+# That is filed as backlog 0146 and it is not a preset-side problem.
+#
+# The route to flat ink is therefore the terminal remap, as it is for the other
+# three: a two-pole luminance lerp, black at one end and white at the other. TWO
+# INKS IS THE CEILING. There is no red in this world and there cannot be one.
+#
+# -- WHAT MAKES IT READ AS TIDE RATHER THAN AS SMOKE ------------------------------
+#
+# Two stages that fight each other, and the balance between them IS the look:
+#
+#   `deposit`  lays new light into the buffer each frame, as a ring of arms
+#   `decay`    is the fraction of the past surviving per SECOND
+#
+# A high decay with a low deposit is smoke - everything blurs and nothing has an
+# edge. A low decay with a high deposit is a strobe: each frame overwrites the
+# last and the mesh's warping never gets to act on anything. The middle, which is
+# where this file sits, is where a stroke survives long enough for the mesh to
+# drag it into a current before it fades. `decay` is the sensitive one.
+#
+# THE MESH IS WHAT DRAGS IT. `[per_vertex]` is evaluated once per vertex with
+# `x`/`y`/`rad`/`ang` bound, so `zoom` rising with `rad` pulls the rim harder than
+# the centre and the field is stretched outward as it ages - which is what turns
+# a static ring of arms into a current running off the edge of the frame.
+#
+# `wrap = "0"`. With wrap on, the field that leaves one edge re-enters at the
+# other and the world becomes a closed loop that fills solid over a few minutes.
+# Off, the tide runs out of frame and the page is continuously renewed. On a
+# world with an accumulation axis and a two-pole remap that will ink anything
+# bright, that is the difference between a picture and a black rectangle.
+#
+# -- THE REMAP --------------------------------------------------------------------
+#
+# `paper_*` takes the DARK input and `ink_*` the BRIGHT, so the buffer's empty
+# regions become the page and the deposited light becomes the ink. `ink_gamma`
+# runs BELOW 1 - see the note on it below, which is the one number in this file
+# that two drafts got wrong in the same direction.
+#
+# NO `bg_*` - a lit backdrop raises the floor luminance, the remap reads that as
+# ink, and the page greys. The same trap `attractor_ink.toml` records.
+system = "warp_mesh"
+name   = "Tide Mono"
+
+[mesh]
+# Cells, not pixels. Coarser than the shipped warp worlds' 32x24 on purpose: a
+# coarse mesh drags in wide sheets and a fine one shreds the field into filaments,
+# and this world wants the sheet.
+x = 20
+y = 16
+
+[per_vertex]
+# Evaluated once per vertex with x/y/rad/ang bound. The rim is pulled harder than
+# the centre, so the field stretches outward as it ages and runs off the edge.
+zoom = "1.006 + rad * 0.028"
+rot  = "0.035 + sin(ang * 2.0) * 0.020"
+
+[palette]
+# The remap discards hue, so this does NOT set the colour on screen - it sets
+# which parts of the field are BRIGHT and therefore which become ink. Neutral so
+# that luminance ramp stays honest.
+stops = [
+  { at = 0.00, color = "#202020" },
+  { at = 0.55, color = "#9c9c9c" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# THE PRESS. Black ink, white page. `ink_amount` rests at a pole and never
+# between - a partial amount is a dirty grey page, not a fainter print.
+ink_amount   = "1"
+paper_hue    = "0"
+paper_sat    = "0"
+paper_bright = "1"
+ink_hue      = "0"
+ink_sat      = "0"
+ink_bright   = "0"
+# 0.55, AND THE DIRECTION OF THIS PARAM IS THE THING TO GET RIGHT. Above 1 thins
+# the mid-tones TOWARD THE PAPER so only the strongest strokes keep full ink;
+# below 1 INKS the mids for a heavier, flatter print. Neither pole moves at any
+# value.
+#
+# Two drafts of this file got it backwards in the same direction. 3.2 printed
+# pale grey smudges; 1.30, chosen as "closer to 1", printed slightly darker grey
+# smudges - because both are still on the thinning side. This field is broad and
+# smooth, a deposited pinwheel with long soft shoulders and very little of it at
+# the very top of the range, so nearly all of its light lives in exactly the
+# mid-tones a gamma above 1 discards.
+#
+# A field whose light is CONCENTRATED wants a high gamma - `attractor_thomasred`
+# runs 1.8 over a sparse line drawing. A field whose light is SPREAD wants a low
+# one. This is the second kind, and the rule generalises across the duotones
+# here better than any single value does.
+ink_gamma    = "0.55"
+
+# THE FIELD. `warp` is the mesh distortion and `warp_speed` its rate - the rate
+# INTEGRATES a phase (ADR-0132), so binding it to audio accelerates the flow
+# rather than teleporting it.
+warp       = "1.15 + clamp(bass * 0.412, 0, 0.35)"
+warp_scale = "1.85"
+warp_speed = "0.34 + clamp(treb * 0.500, 0, 0.30)"
+wrap       = "0"
+
+# THE BALANCE THAT IS THE LOOK. See the header. `decay` is the sensitive one and
+# it shortens under bass, which RENEWS the page on a heavy passage rather than
+# letting it silt up - the right direction against a remap that inks anything
+# bright.
+decay   = "0.30 - clamp(bass * 0.094, 0, 0.08)"
+deposit = "1.9 + clamp(mid * 0.941, 0, 0.80) + clamp(onset * 0.667, 0, 0.40)"
+
+deposit_radius = "0.34"
+deposit_width  = "0.075"
+deposit_arms   = "7"
+deposit_twist  = "1.9"
+deposit_spin   = "0.14"
+
+darken_center = "0.05"
+brighten      = "1"
+hue           = "0.55"
+color_span    = "0.40"
+saturation    = "0"     # the remap discards hue anyway; this keeps the ramp honest
+
+[smoothing]
+# The two accumulation rates ease, because a step in either is visible as a
+# flash: `decay` changes how much of the past is standing and `deposit` how much
+# arrives, and both act on a buffer rather than on this frame.
+decay   = 0.55
+deposit = 0.30
+warp    = 0.35

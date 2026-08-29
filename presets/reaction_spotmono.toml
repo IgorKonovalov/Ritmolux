@@ -1,0 +1,113 @@
+# Spot Mono - the Gray-Scott system run in its SPOT regime and printed in the
+# three inks: black ground, white cells, a red rim on every one. Not a third
+# tuning of the coral the other two mono reaction worlds draw - a different
+# member of the family, which is what the F/K pair selects.
+#
+# `reaction_fluxmono` and `reaction_glaciermono` are one regime at two rates, and
+# their headers say so. This file moves the pair itself: a lower feed against a
+# higher kill leaves isolated cells that divide rather than a connected coral
+# that grows. Where those two make a reef, this makes a culture.
+#
+# -- WHY THE RED IS AN OUTLINE AND NOT A FILL -------------------------------------
+#
+# Gray-Scott's level distribution is BIMODAL - the field dwells at the solvent
+# floor and at the spot plateau, and crosses between them quickly. So the two
+# dwell points get the two GROUNDS (black solvent, white cell) and the red goes
+# in the fast-crossing region between them, where the coordinate sweeps through
+# in a few pixels and the ink draws as a RIM around every form.
+#
+# That placement rule is the same one the other two mono reaction worlds record,
+# and it is worth restating because it is the whole reason a limited palette
+# works on this system at all: a red band at a dwell point does not outline
+# anything, it POOLS, and the frame becomes a red field with black holes in it.
+# The band layout below is a consequence of the field's statistics, not a taste.
+#
+# The spot regime sharpens this rather than changing it. Isolated cells have more
+# boundary per unit area than a connected coral does, so the same red band buys
+# more visible outline here - which is why this world reads as drawn while the
+# coral pair read as printed.
+#
+# -- THE REGIME IS THE PRESET, AND IT IS THE THING NOT TO CASUALLY RETUNE ---------
+#
+# `feed` and `kill` together select which member of the Gray-Scott family this
+# is, and the interesting regimes occupy a narrow band of that plane. The moves
+# below are deliberately tiny - a few thousandths - because a few hundredths is a
+# different world, and several nearby ones are degenerate: the field either dies
+# to uniform solvent or fills to uniform plateau, and both are a flat frame that
+# every gate in the suite will pass while showing nothing.
+#
+# WHAT DRIVES WHAT
+#   feed     a slow autonomous wander plus the low end - cells fatten and divide
+#   kill     the mids, very slightly - the rim thickness
+#   flow     the simulation rate, so a loud passage is a faster culture
+#   inject   the onset, seeding fresh disturbance into the field
+#
+# THE WARM-UP IS REAL AND IT IS NOT A BUG. A Gray-Scott field starts as noise and
+# takes seconds to establish its pattern, so this world ARRIVES LATE after a
+# preset switch - the first frames are a grey wash rather than cells. Both
+# shipped mono reaction worlds have the same property; `reaction_fluxmono` reads
+# coverage 0.029 in the half second the test suite watches, which is the warm-up
+# and not a defect. Judge it a few beats in.
+#
+# THE HORIZON IS THE CHECK THIS WORLD OWES. A reaction-diffusion field is the
+# textbook accumulation axis - this frame's output IS next frame's input - and a
+# short horizon reads SETTLING as drift, which is exactly what
+# `reaction_verdigris` does at 30 s. Run `shot --horizon` long enough to clear
+# the warm-up, against a static control, and record the verdict here.
+system = "reaction_diffusion"
+name = "Spot Mono"
+
+[palette]
+# 20 bands: black 8 / RED 2 / white 9 / RED 1. The two dwell points take the two
+# grounds and the red sits in the fast-crossing region between them - see the
+# header. The single band at the very top marks only the densest cores, which on
+# this regime is a cell that has just divided.
+stops = [
+  { at = 0.00, color = "#000000" },
+  { at = 0.39, color = "#000000" },
+  { at = 0.41, color = "#b00808" },
+  { at = 0.49, color = "#b00808" },
+  { at = 0.51, color = "#ffffff" },
+  { at = 0.94, color = "#ffffff" },
+  { at = 0.96, color = "#b00808" },
+  { at = 1.00, color = "#b00808" },
+]
+
+[params]
+palette_steps   = "20"
+palette_contour = "0.35"
+
+# THE REGIME. Spots rather than coral - see the header on why these moves are
+# thousandths. The bass term is section-slow through `[smoothing]` below, so
+# loud PASSAGES fatten the cells and quiet ones let them divide, on a timescale
+# the chemistry can actually follow.
+feed = "0.0295 + noise(time * 0.045 + 30) * 0.0016 + clamp(bass * 0.0041, 0, 0.0035)"
+kill = "0.0615 + noise(time * 0.038 + 70) * 0.0004 + clamp(mid * 0.00035, 0, 0.0003)"
+
+# The simulation rate. A loud passage is a faster culture, which is growth rather
+# than brightness and is the right place for the energy on a banded field.
+flow = "1.60 + clamp(bass * 0.941, 0, 0.80)"
+
+# Fresh disturbance on a hit. Small: this field's pattern is its own, and a heavy
+# inject overwrites it with noise rather than perturbing it.
+inject = "0.030 + clamp(onset * 0.117, 0, 0.07)"
+
+# The coordinate. RD's field tops out well under 1, so the span has to reach past
+# it for the palette's upper bands to be used at all.
+color_span   = "2.05"
+color_center = "0.02"
+saturation   = "1"
+palette_mix  = "0"
+
+# Tight on the culture so the cells read large. A constant - not a breathing
+# microscope, which on this cohort would be a camera move.
+zoom = "0.78"
+glow = "0.62"
+
+[smoothing]
+# The chemistry needs a SUSTAINED push to change regime, so `feed` follows
+# sections rather than beats - a fast attack here would just jitter the F/K point
+# around without the field ever reorganising.
+feed = { attack = 2.2, release = 4.5 }
+flow = 0.30
+glow = 0.25
