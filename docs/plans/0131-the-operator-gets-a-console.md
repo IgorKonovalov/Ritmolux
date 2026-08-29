@@ -347,9 +347,9 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The console window opens | dev | done | committed with this row |
+| 1 — The console window opens | dev | done | `9ab7726` |
 | 2 — The program preview | dev | **not taken** — out of this session's scope | |
-| 3 — The modals move to the console | dev | done | committed with this row |
+| 3 — The modals move to the console | dev | done | `9ab7726` |
 | 4 — Transport, staging and the mouse | dev | **not taken** — out of this session's scope | |
 | 5 — Persistence, the flag, and the docs | dev | **not taken** — out of this session's scope | |
 | 6 — The on-device gate | human | not started | |
