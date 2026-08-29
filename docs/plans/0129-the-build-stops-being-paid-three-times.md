@@ -251,8 +251,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Take the baseline | dev | done | b17d8cc |
-| 2 — Point the MSVC target at `rust-lld` | dev | done | committed with this row |
-| 3 — One artifact store for every lane | dev | not started | |
+| 2 — Point the MSVC target at `rust-lld` | dev | done | fbc065b |
+| 3 — One artifact store for every lane | dev | done | committed with this row |
 | 4 — Prove nothing about the tests changed | dev | not started | |
 | 5 — Repair the one script the redirect breaks | dev | not started | |
 | 6 — Measure where the suite time actually goes | dev | not started | |
@@ -344,6 +344,45 @@ baseline was rewritten.
 changes the build fingerprint, so the first build in an existing warm lane
 recompiles every dependency — 1m25s on `main`. It is paid once per lane per
 config change, not per build.
+
+**Phase 3 — the store.** Added above the existing linker stanza:
+
+```toml
+[build]
+target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"
+```
+
+**Ancestor discovery reaches `WORK/`**, and Phase 2 had already established it:
+the linker stanza in the same file governed builds run from inside the workspace,
+proven there by a negative control. ADR-0141's named risk does not arise and the
+gitignored-per-worktree fallback is unused.
+
+**The done-when names three live worktrees; there is one.** `main` built into the
+store and did not re-create its own `target/` — checked by finding no file written
+under the old tree during that build. Its 14.65 GB `target/` was then removed,
+taking the disk from 63 GB free to 77 GB. The "each worktree" half of the
+criterion was then satisfied against **two purpose-made worktrees** created and
+removed for the measurement, rather than against lanes that do not exist. Neither
+created a local `target/`.
+
+**The headline claim, measured twice.** A worktree that has never built before:
+
+| | crates compiled | wall |
+|---|---|---|
+| baseline, cold, no store (Phase 1) | 129 | 105 s |
+| first new lane, `cargo build` | **3** — all workspace | **15 s** |
+| first new lane, `--no-run` after it | 16 | 56 s |
+| second new lane, `cargo build` | **3** — all workspace | **15 s** |
+| second new lane, `--no-run` after it | **5 — all workspace, 0 dependencies** | **42 s** |
+
+The first new lane's 16 are `image`'s dev-dependency chain, which a plain
+`cargo build` never builds, so the store had not yet seen them. That is a
+first-population cost, not a per-lane one, which is why the second lane was
+measured: **0 dependencies recompiled**, and the five are the workspace crates
+themselves, which recompile because their path is part of their fingerprint.
+
+**Steady state for a new lane is 57 s from nothing to every test binary, against
+171 s.** The store measures 5,444 MB and replaced a 14,650 MB per-lane tree.
 
 ### Close triggers
 
