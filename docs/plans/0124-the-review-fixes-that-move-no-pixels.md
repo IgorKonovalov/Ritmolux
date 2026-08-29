@@ -131,6 +131,17 @@ flowchart LR
   is the cheap check).
 
 ### Phase 4 — The maps name every crate
+
+> **LANDED OUT OF BAND 2026-08-29, by `architect` during a documentation audit**, in the same pass
+> that corrected the revoked artifact store in these same three files (Plan 0134 Phase 3) — the two
+> phases touch the same paragraphs and splitting them would have meant editing them twice. All five
+> `[workspace] members` now appear by name in all three maps; `core/src/milk/`, `tools/sd-filter/`
+> and `presets/pending/` are mapped in `CLAUDE.md` and in both skill contexts; the C ABI count
+> narration is retired for a rule that forbids restating the roster here at all. Both Node gates
+> exit 0. **`dev` should treat this phase as done and verify rather than redo it** — the done-when
+> grep above is the check. **The rest of Plan 0124 is untouched and still owed**, including the
+> `core/tests/common/` harness that 0125 and 0126 depend on.
+
 - **Owner skill:** dev
 - **What:** Add `milkconv/` and `core/src/milk/` to `CLAUDE.md`'s "Where things live" (with the
   one-line reason it is outside `default-members`, in the same voice as the `core-cabi` entry),

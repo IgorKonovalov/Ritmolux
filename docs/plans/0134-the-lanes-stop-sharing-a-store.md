@@ -140,6 +140,20 @@ flowchart TB
 
 ### Phase 3 — The record says what happened
 
+> **LANDED OUT OF BAND 2026-08-29, by `architect` during a documentation audit, while a live show
+> was running and no build could be started.** The hazard was live — Phase 1's config edit had
+> already been made on the machine, so `CLAUDE.md` was the only remaining place still telling a
+> reader to recreate the redirect. What landed: `CLAUDE.md`'s section is now *"Machine setup: the
+> linker override"* and carries the do-not-reinstate warning plus ADR-0053's revived disk Negative;
+> the **same stale store text was also found in `.claude/skills/architect/references/project-context.md`
+> and `.claude/skills/dev/references/project-context.md`** — both are corrected, and the `dev` one
+> gained the `open_tap`-shaped symptom so an implementer recognises it. **This phase's Files-touched
+> list named two files and the real blast radius was four**; the two skill contexts are the ones a
+> lane actually reads before building. `docs/plans/README.md` was refreshed in the same pass.
+> **Still owed by this phase:** nothing in `CLAUDE.md`, but re-check the grep done-when at close.
+> ADRs are cited there as markdown links rather than bare numbers, matching that file's existing
+> style — the bare-number rule is ADR-0127's and governs `.rs` comments.
+
 - **Owner skill:** dev
 - **What:** correct the two places that describe the store as it was, so the next session reading
   either one is not told to set up a thing that has been revoked.
