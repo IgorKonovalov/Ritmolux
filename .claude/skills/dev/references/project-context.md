@@ -14,6 +14,8 @@ core/            # package `lmv-core` — DSP + render + scenes + preset engine.
   src/audio.rs   #   source-agnostic sample intake, validated at the boundary
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
   src/preset/    #   .toml schema (schema.rs) + the pure expression evaluator (expr.rs)
+  src/milk/      #   the MilkDrop RUNTIME (ADR-0113): per-frame bytecode VM + shader emitter.
+                 #   Not milkconv/ — that is the ahead-of-time converter and never ships.
   src/render/    #   wgpu layer, the composite stages, and scenes/ (NOT core/src/scenes/)
   tests/         #   incl. the behavioral gates: sanity.rs, reactivity.rs, animation.rs, golden.rs
 core-cabi/       # package `lmv-core-cabi` — the C ABI and nothing else (ADR-0072).
@@ -26,34 +28,49 @@ lmv-ring/        # package `lmv-ring` — the lock-free SPSC ring, zero-dependen
 standalone/      # package `standalone`, binary `lmv` — winit + wgpu + loopback capture
   examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of lmv.exe)
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
+milkconv/        # package `milkconv` — the MilkDrop `.milk` -> preset converter (ADR-0113).
+                 #   NEVER ships and nothing shipped depends on it, so it is OUTSIDE
+                 #   `default-members` like core-cabi: `--workspace`, `-p milkconv`, or its own
+                 #   tests build it, and the everyday loop does not.
 presets/         # the shipped preset library (*.toml) + README.md (the param roster)
-docs/adrs/  docs/plans/  docs/specs/  docs/diagrams/
+  pending/       #   authored + approved but NOT shipped, held back by a known engine/harness gap.
+                 #   build.rs's read_dir is non-recursive (ADR-0022), so it is skipped by design.
+tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
+scripts/         # the five Node gates (doc links, index rows, backlog claims, filter figures,
+                 #   comment hygiene) — pre-push and CI's `links` job run all five
+docs/adrs/  docs/plans/  docs/specs/
 ```
 
-## The artifact store (machine-local, opt-in)
+## The machine-local cargo config (opt-in)
 
-Where `cargo` writes is **not necessarily `<repo>/target`**. A machine-local
-`WORK/.cargo/config.toml` — one directory above every worktree, found by cargo's ancestor walk —
-can redirect `build.target-dir` to a single shared store and point the MSVC target at `rust-lld`:
+A machine-local `WORK/.cargo/config.toml` — one directory above every worktree, found by cargo's
+ancestor walk — points the MSVC target at the toolchain's bundled `rust-lld`:
 
 ```toml
-[build]
-target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"
-
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld.exe"
 ```
 
-It is **never committed** (CI's `Swatinem/rust-cache` caches `./target`) and **inert when absent** —
-a machine without it builds into its own `target/`, so every command below is unchanged either way.
-See [ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md).
+That is the whole file. It is **never committed** and **inert when absent** — a machine without it
+builds correctly, just with the default linker — so every command below is unchanged either way.
 
-What this changes for you:
+**Each worktree compiles into its own `target/`, and it must stay that way.**
+[ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md) added a
+`[build] target-dir` redirect to a single shared store;
+[ADR-0147](../../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+revoked it, because **the worktree path is not in cargo's fingerprint** — two lanes with the same
+layout and dependency graph are indistinguishable, so cargo hands one lane the other's compiled
+`lmv-core` and calls it fresh. Plan 0115's lane hit `no method named open_tap found for struct
+Renderer` against source that defines it. **If you see a compile error naming a symbol you can read
+in the file, suspect this before you suspect your code** — and check that no `[build] target-dir`
+has reappeared in that config. The linker half above is not implicated.
+
+What this leaves you:
 
 - **Never hardcode `<repo>/target` in a script or a test.** Ask `cargo metadata --format-version 1`
-  for `target_directory`, which is right under both layouts; `plugin-foobar/build.ps1` does this.
-- **Never run `cargo clean`** — it wipes the store for every lane, not just yours.
-- **Two lanes building at once serialize** on cargo's lock. Build one lane at a time.
+  for `target_directory`; `plugin-foobar/build.ps1` does this. It is right under any layout.
+- **Disk cost is severe and recurring** (ADR-0053): one lane held ~8 GB in
+  `target/debug/incremental`. Removing a finished lane's worktree is the chore that pays it back.
 
 ## Canonical commands (run from repo root)
 
