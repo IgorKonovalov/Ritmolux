@@ -1,0 +1,140 @@
+# Curve Mono - a Maurer rose printed as a two-colour engraving: the chord walk
+# in black with the red arriving partway along it, on white. The cohort's LINE,
+# and the only world here whose whole figure is a single continuous path rather
+# than a set of separate marks.
+#
+# `stroke_blend = "1"` AND WHY THIS FIGURE NEEDS IT MOST. A Maurer rose is one
+# walk of a few hundred chords that crosses itself constantly - the moire of
+# those crossings IS the figure. Additively every crossing sums, so a two-ink
+# rose becomes a pink haze exactly in its densest region, which is the part you
+# are looking at. Under OVER a chord replaces the interior of what it covers and
+# the crossings stay two flat inks with a visible over-under.
+#
+# THE WEIGHT HAD TO COME DOWN WHEN THE SEAM WENT ON. Additive light builds up
+# where a figure crosses itself and this figure is nothing but crossings, so the
+# additive version got its apparent density for free. Under OVER it does not, and
+# a dense rose at an additive preset's `thickness` prints as a black disc. The
+# range below is deliberately at the bottom of the 1.5 to 3.2 the shipped line
+# presets use.
+#
+# -- WHERE THE RED IS -------------------------------------------------------------
+#
+# `hue_spread` on `parametric_curve` walks POSITION ALONG THE TRACED PATH - chord
+# 0 is the walk's first, and the divisor is `samples` rather than the revealed
+# prefix. So the palette is laid along the walk itself, and the red is not a
+# region of the picture but a stretch of the DRAWING: the pen changes colour
+# partway round and changes back. Which part of the frame that lands in moves as
+# the rose morphs, which is the whole reason to put a limited palette on this
+# system rather than a flat ink.
+#
+# `hue = 0` starts the walk at palette 0; `hue_spread = 0.70` ends it at 0.70,
+# inside the black run that resumes at 0.500. The red run is 0.375 to 0.500, so
+# one eighth of the walk carries it. Nothing reaches band 7.
+#
+# BECAUSE THE DIVISOR IS `samples`, A `draw_progress` RIDE DRAWS THE GRADIENT ON
+# rather than re-tinting what is already down - a half-revealed curve shows the
+# palette's first half. That is a real gesture and this file does not use it, for
+# the reason `lsystem_sumimono.toml` records at length: the line scenes
+# fit-normalize, so a reveal that changes the figure's extent is a zoom. Here the
+# rose's extent is set by `n`/`d` and is nearly constant under a reveal, so it
+# would be safer than it was there - but it is still an unmeasured risk on a show
+# night and the file does without.
+#
+# -- THE MORPH --------------------------------------------------------------------
+#
+# `n` and `d` are the rose parameters and they are what make one Maurer rose a
+# different figure from another. Held at integers they draw a stable rosette;
+# swept, the figure reorganises continuously. `d` is walked slowly here and `n`
+# is held, because moving both at once produces a figure that never settles into
+# anything a room can recognise.
+#
+# `phase` IS NOT `spin`. It is added INSIDE the sine - `r = sin(n*theta + phase)
+# + radial_offset` - so it reshapes the petals as it advances, where `spin` would
+# merely turn the finished figure. That distinction is why there is a `phase`
+# term here and no `spin` at all: this world changes rather than rotates, which
+# is the standing preference across the library.
+#
+# `spin` also INTEGRATES a phase since ADR-0132, so binding it to audio would be
+# safe in a way it was not before Plan 0122 - but a turning rosette still reads
+# as a turntable, so it stays at its default.
+#
+# -- THE PAPER --------------------------------------------------------------------
+#
+# Band 7 exists as a white stop purely so `bg_hue` has something to sample -
+# `bg_hue` is a coordinate in this preset's own `[palette]` (ADR-0086). The
+# figure is kept off it by `hue_spread`. One flat sample, no span, no tilt, no
+# vignette. The backdrop is a mixer and the exemption is the one
+# `lsystem_sumimono.toml` records: an opaque stroke mixes only at its edge.
+system = "parametric_curve"
+name = "Curve Mono"
+
+[curve]
+family = "maurer_rose"
+
+[palette]
+# Eight bands in three runs: black 3 / RED 1 / black 3 / white 1. Band k's centre
+# is (2k+1)/16, so the boundaries at 0.375, 0.500 and 0.875 each fall midway
+# between two centres.
+#
+# THE RED IS ONE BAND AND NOT TWO. At two the walk carried red across a quarter
+# of its length, and on a figure that crosses itself as hard as this one that
+# read as a red figure with black scribble inside it rather than a black
+# engraving with a red passage. One band is an eighth of the walk and reads as an
+# event.
+stops = [
+  { at = 0.000, color = "#000000" },   # bands 0-2   the walk sets out
+  { at = 0.370, color = "#000000" },
+  { at = 0.380, color = "#b00808" },   # band  3     the red stretch
+  { at = 0.495, color = "#b00808" },
+  { at = 0.505, color = "#000000" },   # bands 4-6   and back to black
+  { at = 0.870, color = "#000000" },
+  { at = 0.880, color = "#ffffff" },   # band  7     the PAPER - see the header
+  { at = 1.000, color = "#ffffff" },
+]
+
+[params]
+stroke_blend  = "1"
+palette_steps = "8"
+palette_mix   = "0"
+saturation    = "1"
+hue           = "0"
+hue_spread    = "0.70"
+
+# THE ROSE. `n` held, `d` walked - see the header for why not both. The chord
+# count is what makes it a Maurer rose rather than a plain rose curve; 480 is
+# well inside the 20 000 segment cap and dense enough for the moire to read.
+n       = "6"
+d       = "71 + sin(time * 0.041) * 4.0"
+samples = "480"
+
+# Petal reshaping from inside the sine - NOT a rotation. The onset shoves it, so
+# a hit reorganises the figure instead of moving the camera. Gain 0.35 / 0.60.
+phase = "noise(time * 0.031) * 0.9 + clamp(onset * 0.583, 0, 0.35)"
+
+# Pushes `r` off the unit range, folding the rose toward spiral and annular
+# forms. A small, slow term - at any size it stops being a rose.
+radial_offset = "0.06 + noise(time * 0.019 + 50) * 0.10"
+
+# THE ENGRAVING. Weight takes the low end, which on a black ink is the only place
+# it can go. Deliberately at the bottom of the shipped range - see the header on
+# what the OVER seam cost this figure.
+thickness = "1.50 + clamp(bass * 0.706, 0, 0.60)"
+softness  = "0.10"
+
+brightness = "1.0"
+glow       = "1.0"
+scale      = "1.16"
+
+# THE PAPER. Band 7, sampled flat.
+bg_hue        = "0.94"
+bg_hue_span   = "0"
+bg_bright     = "1"
+bg_shade      = "1"
+bg_shade_end  = "1"
+bg_vignette   = "0"
+bg_ramp_gamma = "1"
+bg_angle      = "0"
+
+[smoothing]
+thickness = 0.16
+phase     = 0.22

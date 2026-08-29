@@ -1,0 +1,181 @@
+# Heartfall - black hearts thrown up a white page, arcing over and falling out of
+# shot. The cohort's second heart and its opposite: `shape_heartmono.toml` is ONE
+# heart the whole frame is made of, this is MANY the frame merely contains.
+#
+# -- IT IS A DUOTONE, AND THAT IS A CEILING RATHER THAN A CHOICE ------------------
+#
+# `emitter` is outside the limited-ink class along with `swarm` and `attractor`,
+# and for the same structural reason: its marks draw through an ADDITIVE deposit
+# with no opacity-preserving seam in that renderer. `stroke_blend`, which is what
+# puts the four line systems in the class, has no equivalent here. So two hearts
+# overlapping would sum, and a red heart over a black one would be neither.
+#
+# The route to flat ink on this system is the terminal remap, and that stage is a
+# two-pole luminance lerp - TWO INKS IS THE CEILING, and it discards hue on the
+# way through. Black marks on a white page is what it can do; black marks, a red
+# accent and a white page is not, at any setting.
+#
+# Read this as the cohort's black-and-white plate rather than as a member of its
+# three-ink set. `attractor_thomasred.toml` records the same ceiling and spends
+# its one free ink on the GROUND instead; this file spends nothing and stays at
+# two, because a heart reads as a heart in silhouette and a coloured page would
+# be the louder half of the picture.
+#
+# -- WHY THE MARKS ARE SILHOUETTES AND NOT OUTLINES -------------------------------
+#
+# A shaped mark drawn straight into the chain is a silhouette IN ADDITIVE LIGHT:
+# the compositor adds, so black adds nothing and a dark edge cannot exist there.
+# A heart drawn that way is a heart-shaped GLOW, brightest in its middle and
+# fading to nothing at its outline - not a black body with a clean rim
+# (ADR-0084's deliberate scope).
+#
+# The ink remap is what converts that. It keys on LUMINANCE, so the glow's bright
+# middle becomes solid ink and the page takes everything the marks did not reach.
+# The rim's crispness is therefore set by `size` and by `ink_gamma` rather than
+# by anything shaped: a high gamma thins the mid-tones toward the paper, which
+# tightens every heart's edge at once. That is the knob to reach for if these
+# read as smudges rather than as stamps.
+#
+# `shape = "4"` IS THE HEART, from the closed five-name roster shared by `swarm`,
+# `emitter` and `shape_field` (ADR-0084/0105). It is the same selector
+# `shape_heartmono.toml` uses at frame scale.
+#
+# -- THE THROW --------------------------------------------------------------------
+#
+# Everything about the arc is in `[params]` - this system has no structural
+# table. The source sits below the frame and the hearts are thrown up through it,
+# so what a room sees is the top of each arc rather than the launch, which is
+# what makes it read as falling rather than as a fountain.
+#
+# THE BEAT THROWS THEM. `spawn_rate` takes the onset, so a dense passage fills
+# the page and a quiet one lets it empty - the population IS the reactivity here,
+# which is structure rather than luminance and is the right place for it against
+# a remap that blots when it is over-inked.
+#
+# HORIZON VERDICT, 2026-08-29 (`shot --horizon 10 --size 96x96`, held at
+# bass 0.6 / mid 0.45 / onset 0.4): THE PAGE DOES NOT SILT UP. A spawning
+# population is an accumulation axis - the reason to check is that a rate which
+# outruns the lifetime fills the frame permanently and nothing in the test suite
+# watches longer than half a second. Over ten simulated minutes:
+#
+#     coverage    0.1302 -> 0.2469   delta +0.1166   monotone 0.45
+#     peak/mean  16.9694 ->  8.2638  delta -8.7055   monotone 0.55
+#     footprint   0.3519 ->  0.3546  delta +0.0027   monotone 0.42
+#
+# Coverage roughly doubles end to end, which looks alarming until the monotone
+# column is read beside it: 0.45 means the travel went both ways in nearly equal
+# measure, so this is the population BREATHING against its spawn schedule rather
+# than silting up. A pile-up reads as a large delta at a monotone near 1.00.
+# Concentration falls rather than rising, which is the opposite sign to a world
+# collecting into a corner, and the footprint is flat.
+#
+# The static control was run at the same horizon and printed delta 0.0000 /
+# monotone 0.00 on all three, which is what makes these numbers readable. No
+# threshold was applied and this is not a gate (ADR-0099). Re-run it if
+# `spawn_rate`, `lifetime` or `prewarm` moves.
+#
+# NO `bg_*`. The white page is the remap's paper pole. A lit backdrop raises the
+# frame's floor luminance, which the remap reads as INK, and the page greys over
+# - the same trap `attractor_ink.toml` records.
+system = "emitter"
+name = "Heartfall"
+
+[palette]
+# The remap discards hue, so this gradient does NOT set the colour on screen - it
+# sets which parts of the frame are BRIGHT, and therefore which become ink. Kept
+# neutral so that luminance ramp stays honest.
+stops = [
+  { at = 0.00, color = "#2a2a2a" },
+  { at = 0.55, color = "#9a9a9a" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# THE PRESS. Black ink, white page. `ink_amount` rests at a pole and never
+# between: a partial amount crossfades toward the untouched near-black source,
+# which is a dirty grey page rather than a fainter print.
+ink_amount   = "1"
+paper_hue    = "0"
+paper_sat    = "0"
+paper_bright = "1"
+ink_hue      = "0"
+ink_sat      = "0"
+ink_bright   = "0"
+# Thins the mid-tones toward the paper so only each mark's core keeps full ink -
+# which is what gives a heart a tight rim instead of a smudge. See the header.
+ink_gamma    = "2.2"
+
+# THE MARK.
+shape = "4"        # the heart
+size  = "7.0 + clamp(bass * 1.765, 0, 1.5)"
+size_spread = "0.30"
+
+# THE THROW. The source sits below the frame edge and spans most of its width, so
+# the hearts enter already rising and no launch is ever visible.
+#
+# `launch_angle` IS RADIANS CLOCKWISE FROM STRAIGHT UP, NOT FROM THE HORIZON.
+# `0` throws vertically and `1.57` throws to the RIGHT. The first draft of this
+# file wrote 1.5708 meaning "straight up" and rendered a blank white page,
+# because every heart was fired sideways out of frame before it could rise into
+# it. `spread` does the fanning; this stays at 0.
+#
+# TWO MORE NUMBERS THAT WERE WRONG BY THE SAME ORDER. `size` is in the same units
+# the shipped emitters use - `emitter_perseids` runs 1.7 - and the first draft
+# had 0.085, which is a mark a fraction of a pixel across. `spawn_rate` was 9
+# against that file's 200. Both are now in the shipped range, with the rate held
+# well under a spark emitter's because a heart is a far larger mark and this page
+# floods where that one twinkles.
+source_y     = "-1.15"
+source_width = "1.70"
+launch_speed = "2.30"
+launch_angle = "0"         # radians CLOCKWISE FROM STRAIGHT UP - see below
+spread       = "0.42"
+gravity      = "1.30"
+lifetime     = "3.4"
+lifetime_spread = "0.40"
+
+# THE POPULATION IS THE REACTIVITY. Gain from the cap: 13 / 0.60 for an `onset`
+# term puts a typical passage near half the ceiling and a peak at it. The
+# baseline is not zero - an empty page in a quiet passage reads as a broken
+# preset rather than a restrained one.
+#
+# THE RATE IS AN ORDER UNDER A SPARK EMITTER'S ON PURPOSE. `emitter_perseids`
+# runs 200 and up; these marks are forty times its area and print as solid ink,
+# so the same rate is a black page rather than a fuller one.
+spawn_rate = "18 + clamp(onset * 21.7, 0, 13)"
+
+# THE HEARTS TUMBLE, AND THE PRESET SURFACE CANNOT STOP THEM. Each mark is given
+# a random spawn ORIENTATION by the scene, and `spin` is a rate applied on top of
+# it - so `spin = "0"` freezes the tumble without righting it, and a good third
+# of the page is upside-down hearts at any moment. Rendered and confirmed at
+# `spin = "0"`; there is no `launch_spin` or orientation seed to bind.
+#
+# So the tumble is made DELIBERATE rather than fought: these are falling, and
+# something falling turns. A world that needed upright hearts would need an
+# engine param that does not exist, and that is filed as feedback rather than
+# worked around here.
+spin     = "0.35"
+twinkle  = "0.10"
+
+# HIGH ON PURPOSE, AND IT IS NOT A LUMINANCE SETTING ON THIS WORLD. Against the
+# ink remap `brightness` decides how much of each mark's glow crosses to the ink
+# pole - so on a duotone it is a COVERAGE control, and a dim mark prints as a
+# grey smudge rather than a faint heart. Swept at 4 / 8 / 16 / 32 against
+# `ink_gamma` 1.0 / 2.0 / 3.5 / 6.0: the pair below is where a heart has a solid
+# body and a rim you can see. The two move together - a high brightness alone
+# inks the skirt as well and the mark bloats, and a high gamma alone thins the
+# whole thing to nothing.
+brightness = "16.0"
+saturation = "0.10"
+
+# Fills the frame at load rather than starting empty and taking a lifetime to
+# populate - which matters because a preset switch lands mid-set, not at a
+# convenient moment.
+prewarm    = "1"
+spawn_fade = "0.12"
+
+[smoothing]
+# The population eases so the page fills and empties rather than flickering
+# between densities. `size` eases for the same reason.
+spawn_rate = 0.42
+size       = 0.22

@@ -1,0 +1,171 @@
+# Heart Mono - a nested heart target in the three-ink set: white body, red key
+# rings, black ground. The valentine as a WOODCUT rather than as a glow.
+#
+# WHY `shape_field` AND NOT A MARK OR A CURVE. This scene hands the palette a
+# FIGURE COORDINATE rather than a level, so a band of palette is a band of
+# constant scaling and quantizing it draws the heart again at every ring. It is
+# also the flattest surface in the engine: no `glow` param, no baked radial
+# vignette, and the shader hands the LUT colour to the composite untouched but
+# for the contour term. Flat colour in, flat colour out - which is what a print
+# is, and it is why no tonemap-shoulder trick is needed anywhere in this file.
+#
+# `coord_mode = "1"` IS LOAD-BEARING. The default coordinate is a DISTANCE,
+# whose level sets are offset curves, and an inward offset is an EROSION: it
+# rounds a reflex corner while keeping convex ones sharp. On a heart that means
+# the bottom point survives and the top notch fills in, further at every ring, so
+# the interior comes out as a nested blob with a dip in it. Mode 1 hands over
+# `r / r_boundary(theta)` instead, whose contours are SCALED COPIES - every ring
+# is the same heart, smaller. No value of `gamma` or `palette_steps` substitutes
+# for it (ADR-0111).
+#
+# -- THE THREE NUMBERS THAT ARE WELDED TOGETHER -----------------------------------
+#
+# `palette_steps`, the stop boundaries, and `color_span` are ONE design, not
+# three knobs. Do not move any of them alone.
+#
+#   1. `palette_steps = 20` is PINNED and must never be bound. Band k's centre
+#      sits at (2k+1)/40, and every stop boundary below is a multiple of 0.05, so
+#      each centre lands exactly 0.025 - 6.4 LUT texels - inside a plateau. At
+#      any other step count the centres move and the run layout silently becomes
+#      a different picture. This is the one param on this scene it would be
+#      natural to ride on the beat for "ring density" and it is the one that
+#      cannot be.
+#   2. The runs, centre outward, are  white 4 / RED 1 / black 3 / white 2 /
+#      RED 1 / black 3 / white 2 / RED 1 / black 3. Three red rings, each one
+#      band wide, each landing between a white run and a black one - so every
+#      red edge is a place where two inks meet with nothing between them, which
+#      is what makes `palette_contour` worth having on (below).
+#   3. `color_span = 0.85` sets ONE FULL RUN OF THE PALETTE per 1.176 units of
+#      figure coordinate, and the figure's outline (coordinate exactly 1) lands
+#      at palette 0.85 - the start of the final black run.
+#
+#      THE RINGS DO NOT STOP THERE, AND THAT IS THE WHOLE PICTURE. The palette
+#      LUT is sampled with `AddressMode::Repeat` (verified in
+#      `core/src/render/palette.rs`), so a coordinate past 1.0 WRAPS and draws
+#      the palette again. Outside the outline the coordinate keeps growing, so
+#      the ring sequence repeats outward to the frame edge: an Op-art heart
+#      tunnel rather than one emblem on a ground. A first draft of this file was
+#      written believing the coordinate CLAMPED, and predicted a small heart on
+#      flat black. It was wrong, and the render is the reason this paragraph
+#      exists.
+#
+#      THE CONSEQUENCE FOR THE PALETTE: because it repeats, the palette's two
+#      ENDS are a seam that is on screen. Stop 0 is white and stop 1.0 is black,
+#      so the seam is an ordinary run boundary with no ramp across it and
+#      `palette_contour` draws its key line there like any other. Change either
+#      end to the same ink and the seam becomes a double-width run instead.
+#
+# `color_center` IS PINNED AT 0 AND THIS IS NOT TASTE. At the figure's deepest
+# point the coordinate is 0, so the palette coordinate there collapses to
+# `color_center` and nothing else - the heart's core colour and that parameter
+# are the same number. Drifting it to travel the rings cycles the core along with
+# them. The travel here comes from `scale` instead, which slides every contour
+# across the frame while the core stays the ink it is.
+#
+# -- THE HEARTBEAT ----------------------------------------------------------------
+#
+# `scale` carries a LUB-DUB, not a pulse: two decaying thumps off one detection,
+# the second at 0.22 s and 60 % of the first. There is no `exp` in the grammar,
+# so each thump is a clamped linear decay - `max(0, 1 - t * k)` - which is a
+# triangle rather than a true envelope and reads the same at this duration.
+#
+# WHAT `time_since_beat` ACTUALLY COUNTS: onset DETECTIONS, not musical beats
+# (ADR-0109), which run 1.35x-2.10x per beat and wander between 1x, 2x and 4x
+# inside one track. So this figure thumps on activity, not on the pulse, and it
+# is deliberately built that way - a lub-dub on every detection reads as a heart
+# working harder in a dense passage, which is the whole gesture. Do not try to
+# convert the counter to bars; no fixed multiplier exists.
+#
+# NO SMOOTHING ON `scale`. The thump IS the transient - a time constant on it
+# smears the two beats into one swell and the figure just breathes.
+#
+# NO ROTATION, NO ZOOM, NO PAN. Standing preference: camera moves are not this
+# project's reactivity. Every audio term here spends itself on the figure.
+#
+# -- WHAT KEEPS IT IN THE LIMITED-INK CLASS ---------------------------------------
+#
+# No `trails`, no `bloom_*`, no `kaleido_*`, no `bg_*`, no `[palette_b]`, no ink
+# pass. Each of those is an enumerated mixer that would put a fourth colour in
+# the frame, and with none of them active there is also no internal post grid and
+# so no resample. `saturation` is pinned at 1: it pulls each colour toward its
+# own luminance, which would walk the red off `#b00808`.
+#
+# `palette_contour` IS ON, and only ADR-0133 makes that safe. It draws a hairline
+# at each band edge, and twenty steps in nine runs means most edges fall INSIDE a
+# plateau - white meeting white - where a hairline is grey shading across flat
+# colour, precisely what a two-ink print is defined by not having. Since Plan
+# 0121 the shader samples the two band centres an edge separates and stays silent
+# when they resolve to the same ink, so the line falls at the eight RUN
+# boundaries and nowhere else. Six of those eight touch the red, which is where a
+# key line earns its keep: it is what makes a printed red read as registered
+# rather than as a fill.
+system = "shape_field"
+name = "Heart Mono"
+
+[palette]
+# Stop boundaries are all multiples of 0.05 and the jumps are 0.01 wide - about
+# 2.5 LUT texels, so the transition is real but every band centre sits 6.4 texels
+# clear of it. Written as pairs that jump, so there is no ramp anywhere.
+stops = [
+  { at = 0.000, color = "#ffffff" },   # bands 0-3   the heart's solid body
+  { at = 0.195, color = "#ffffff" },
+  { at = 0.205, color = "#b00808" },   # band  4     first key ring
+  { at = 0.245, color = "#b00808" },
+  { at = 0.255, color = "#000000" },   # bands 5-7
+  { at = 0.395, color = "#000000" },
+  { at = 0.405, color = "#ffffff" },   # bands 8-9
+  { at = 0.495, color = "#ffffff" },
+  { at = 0.505, color = "#b00808" },   # band  10    second key ring
+  { at = 0.545, color = "#b00808" },
+  { at = 0.555, color = "#000000" },   # bands 11-13
+  { at = 0.695, color = "#000000" },
+  { at = 0.705, color = "#ffffff" },   # bands 14-15
+  { at = 0.795, color = "#ffffff" },
+  { at = 0.805, color = "#b00808" },   # band  16    third key ring
+  { at = 0.845, color = "#b00808" },
+  { at = 0.855, color = "#000000" },   # bands 17-19 the outline falls in here,
+  { at = 1.000, color = "#000000" },   #             then the whole run repeats
+]
+
+[params]
+shape      = "4"        # the heart
+coord_mode = "1"        # scaled copies, not offsets - see the header
+
+# PINNED. See welded number 1 in the header before touching this.
+palette_steps = "20"
+
+# The outline lands at the start of the final black run. See welded number 3.
+color_span   = "0.85"
+color_center = "0"
+saturation   = "1"
+
+# THE HEARTBEAT. Baseline 0.58 of the short half-axis - big enough that the
+# outer rings reach the 16:9 corners and the frame is filled rather than
+# vignetted by its own emptiness. The bass term is the slow swell a passage
+# builds; the two thumps are the beat.
+#
+# Gain from the cap, not by feel: 0.10 / 0.85 for a `bass` term puts a typical
+# passage near half the ceiling and a peak at it.
+scale = "0.58 + clamp(bass * 0.118, 0, 0.10) + 0.075 * max(0, 1 - time_since_beat * 8) + 0.045 * max(0, 1 - abs(time_since_beat - 0.22) * 8)"
+
+# WHERE THE RINGS CROWD. Above 1 they bunch toward the outline and the core
+# opens out; below 1 they crowd into the core. The treble walks it a little
+# either side of even spacing, so detail thickens the outer rings without
+# touching a single luminance term. Gain 0.30 / 0.60 for a `treb` term.
+gamma = "0.92 + clamp(treb * 0.30, 0, 0.18)"
+
+# The key line. It has no ink of its own - it is a scalar darken - so it is
+# spent on the six red edges and nothing else, and it thickens on activity
+# rather than on level.
+palette_contour = "0.62 + clamp(onset * 0.38, 0, 0.23)"
+
+# A slow, tiny wander of the figure's own turn. NOT audio-driven and not a
+# camera move: 0.055 rad is about three degrees, enough that the outline never
+# sits perfectly still and far too little to read as rotation.
+rotation = "noise(time * 0.021) * 0.055 - 0.0275"
+
+[smoothing]
+# The two slow terms ease; the thump in `scale` deliberately does not appear
+# here, and neither does `scale` itself.
+gamma           = 0.35
+palette_contour = 0.12
