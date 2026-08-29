@@ -1,0 +1,156 @@
+# Stipple - the swarm as a DRAWING: ten thousand marks hatching a flow field in
+# ink on warm paper (Plan 0104 Phase 3). Authored fresh-slate (ADR-0089). The
+# family had three luminous worlds and no drawn one; this is the register the
+# terminal ink remap opens, and it changes what the population is for - each
+# particle stops being a light and becomes a pen stroke.
+#
+# INK WORKS HERE FOR THE REASON IT WORKS ON `lsystem_vellum` AND WOULD NOT ON A
+# CONTINUOUS FIELD. The remap drives the frame toward two poles, so it wants
+# pixels that already sit near 0 and 1: a bright mark on black is exactly that,
+# where a mid-luminance field lands mid-ramp and greys out. A swarm of additive
+# marks over an unlit backdrop is a stipple by construction, which is why this
+# world keeps `bg_bright` at zero rather than lighting an atmosphere it would
+# then have to fight.
+#
+# `trails` IS THE PEN, NOT AN EFFECT. At 0 each particle is a dot and the frame
+# is pointillist; at 0.62 each one draws a short stroke ALONG ITS OWN
+# STREAMLINE, so the accumulated frame is hatching that follows the field. That
+# is the whole picture: the currents are legible because the marks draw them,
+# not because the marks are arranged in them.
+#
+# `field_freq` SITS BETWEEN THE FAMILY'S TWO ENDS AND THAT IS DELIBERATE.
+# `swarm_braid`, authored in the same sitting, takes the high end (6.4 - a few
+# ribbons, real dark between). The low end was drafted here too and REJECTED:
+# rendered at 1.15, the field's structure is larger than the frame, so there are
+# no legible channels at all and the still reads as the scattered confetti this
+# family is criticised for - the migrating convergence front the parameter table
+# promises takes tens of seconds and is invisible in a frame. 3.6 is where the
+# currents are large enough to hatch along and small enough that several fit.
+#
+# WHAT DRIVES WHAT. Bass presses the drawing darker through `exposure` - the
+# lever Vellum found, and for the same reason: it sits UPSTREAM of the ink remap,
+# so it is what pushes a faint mark's luminance down the ramp into real ink
+# instead of construction-grey. Mid drives the current, treble varies the nib,
+# and onset scatters the hatching.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45:
+#
+#   coverage     0.0864 ->  0.1474   delta  +0.0610   monotone 0.45
+#   peak/mean   49.3552 -> 30.3111   delta -19.0441   monotone 0.55
+#   footprint    0.0905 ->  0.1406   delta  +0.0501   monotone 0.53
+#
+# Two mechanisms here could pile up and neither does. The hatching is a fading
+# accumulation over an ink remap, which is the documented blot trap - the page
+# filling in solid - and the coverage rows sit between 0.10 and 0.16 for the
+# whole run with no upward march. The flow field is the other, and the ribbons
+# of `swarm_braid` collapsed on exactly that until its field was made to breathe;
+# this world's `field_freq` is mid-range, which converges far more slowly, and
+# `peak/mean` falls rather than climbing. Every monotone is near 0.5, so all
+# three statistics wander instead of travelling. Re-run it if `trails` goes past
+# about 0.75, which is where the hatching closes up.
+system = "swarm"
+name   = "Stipple"
+
+[palette]
+# In ink mode the palette shapes LUMINANCE only - the two poles below are the
+# colour. This ramp is therefore a tonal scale, dark to light, and what it
+# controls is which marks land as full ink and which stay pale construction
+# lines.
+stops = [
+  { at = 0.00, color = "#141414" },
+  { at = 0.40, color = "#585858" },
+  { at = 0.72, color = "#a8a8a8" },
+  { at = 1.00, color = "#f2f2f2" },
+]
+
+[params]
+# Mid-range structure (see header): several currents across the frame, each wide
+# enough that a hatching stroke can follow it.
+field_freq = "3.6 + clamp(mid * 0.94, 0, 0.8)"
+# Near-frozen. The flock reading comes from neighbours holding the same
+# streamline, and a field being rewritten quickly is a field nothing can hatch.
+spin  = "0.04 + clamp(mid * 0.035, 0, 0.03)"
+force = "1.6 + clamp(mid * 0.94, 0, 0.8)"
+
+# The scatter, and this world's transient. `burst` rather than `reseed`: a
+# drawing wants its hatching disturbed continuously by the loud passages, not
+# kicked once per hit - the kick is `swarm_braid`'s gesture and the two worlds
+# should not share it.
+burst = "clamp(onset * 0.83, 0, 0.5) + beat * (bar < 0.3) * 0.6"
+
+# THE NIB. Small, because a stipple is made of marks the eye does not resolve
+# individually; the spread is what keeps it from reading as a halftone screen.
+size        = "1.2 + clamp(bass * 0.706, 0, 0.6)"
+size_spread = "0.85"
+shape       = "0"
+# Low. Under the ink remap a twinkling mark crosses the ink threshold and back,
+# which reads as the drawing flickering rather than as the paper glittering -
+# the opposite of what it buys on a luminous world.
+twinkle = "0.15 + clamp(treb * 0.25, 0, 0.15)"
+
+brightness = "0.95 + clamp(mid * 0.235, 0, 0.2)"
+hue_center = "0.6"
+hue_spread = "0.85"
+saturation = "0.9"
+
+# The whole torus. Below about 0.84 the near depth layer's edge shows, and on a
+# world with a flat paper ground a domain rectangle would be a drawn box.
+zoom  = "1.0"
+pan_x = "sin(time * 0.012) * 0.05"
+pan_y = "cos(time * 0.0095) * 0.035"
+
+# THE PEN (see header). Long enough that a mark draws a stroke, short enough
+# that the strokes stay separate - past about 0.75 the hatching closes up and
+# the page fills solid, which is the blot trap the ink docs record.
+trails = "0.55 + clamp(bass * 0.176, 0, 0.15)"
+
+# No atmosphere: the ground here is the PAPER, and it comes from the ink stage
+# below rather than from the backdrop pass.
+bg_bright   = "0"
+bg_vignette = "0.35"
+
+# The pressure of the pen. Upstream of the remap (see header), so this is what
+# takes a mark from construction-grey to ink - and bound to the bass it is also
+# the world's level response, which a stipple needs because no single mark moves
+# enough pixels to read as reactive.
+#
+# THE BASE IS A COMPROMISE BETWEEN TWO GATES PULLING OPPOSITE WAYS, and both
+# ends of it were measured. An ink remap is a two-pole map, so what a band can
+# move is which side of the threshold a mark falls on: at 1.9 nearly every mark
+# already sat past it, nothing a band did could be seen, and the world measured
+# 0.016 on its strongest column - under the reactivity floor while reading as
+# perfectly reactive in prose. Dropping to 1.15 fixed that and broke the other
+# end: a silent frame of pale construction marks on pale paper has almost no
+# contrast, so the idle motion stopped registering too. 1.55 leaves the resting
+# stipple legibly grey and a bass peak at 2.8 fully inked.
+exposure = "1.55 + clamp(bass * 1.18, 0, 1.0) + clamp(onset * 0.42, 0, 0.25)"
+
+# GRAPHITE ON WARM PAPER. The poles are LINEAR values encoded to sRGB on the way
+# out, so a paper that reads as warm cream is a smaller number than the display
+# value suggests. Bloom is off: a halo around a pen stroke is the one thing that
+# would say this is not a drawing.
+ink_amount   = "1"
+paper_hue    = "0.1"
+paper_sat    = "0.22"
+# THE LAMP, AND THE SECOND HALF OF THE LOW-END RESPONSE. `exposure` alone moves
+# only the marks, and marks are a minority of the pixels however dense the
+# stipple is; the paper is the other 70 % of the frame and it is the only thing
+# in an ink world that can move all of them at once. Raised WITH the ink getting
+# darker, so a loud passage is the drawing gaining contrast from both directions
+# rather than the page simply flashing.
+paper_bright = "0.72 + clamp(bass * 0.165, 0, 0.14)"
+ink_hue      = "0.62"
+ink_sat      = "0.35"
+ink_bright   = "0.05"
+bloom_amount = "0"
+
+[smoothing]
+field_freq = 1.4
+spin       = 1.1
+force      = 0.5
+size       = { attack = 0.06, release = 0.45 }
+brightness = 0.3
+twinkle    = 0.5
+trails     = 0.5
+exposure     = { attack = 0.05, release = 0.45 }
+paper_bright = { attack = 0.05, release = 0.5 }
