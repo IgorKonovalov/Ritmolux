@@ -1,9 +1,8 @@
 // The whole C++ surface of the Spout video-out (Plan 0115 Phase 3, ADR-0125).
 //
-// Four `extern "C"` functions over one `spoutDX` instance. The seam exists so
-// the C++ side stays four functions wide and everything above it is Rust: the
-// same discipline plugin-foobar/ runs over the core's C ABI, pointing the other
-// way.
+// Six `extern "C"` functions over one `spoutDX` instance. The seam exists so
+// the C++ side stays narrow and everything above it is Rust: the same
+// discipline plugin-foobar/ runs over the core's C ABI, pointing the other way.
 //
 // Ownership: `lmv_spout_create` returns an opaque heap pointer the caller must
 // hand back to `lmv_spout_destroy` exactly once. Nothing here is thread-safe -
@@ -13,7 +12,10 @@
 //
 // No exception can cross this boundary: `spoutDX` throws nothing, and the only
 // allocation is a `new (std::nothrow)` that reports failure as a null return.
+//
+// Policy lives in Rust. The adapter is a parameter here, not a decision.
 
+#include <cstdlib>
 #include <new>
 
 #include "SpoutDX.h"
@@ -26,14 +28,48 @@ struct LmvSpout {
 
 extern "C" {
 
-// Claim a sender name and fix its pixel format. Returns null on any failure,
-// which the Rust side turns into a named error.
+// How many graphics adapters the machine has, or 0 if that cannot be answered.
+// Paired with `lmv_spout_adapter_name` so a caller can name them in a message
+// rather than printing an index nobody can interpret.
+int lmv_spout_adapter_count() {
+    spoutDX probe;
+    return probe.GetNumAdapters();
+}
+
+// Write adapter `index`'s name into `buffer`, NUL-terminated. Returns 1 on
+// success, 0 on failure or a bad index.
+int lmv_spout_adapter_name(int index, char *buffer, int length) {
+    if (buffer == nullptr || length <= 0) {
+        return 0;
+    }
+    buffer[0] = '\0';
+    spoutDX probe;
+    return probe.GetAdapterName(index, buffer, length) ? 1 : 0;
+}
+
+// Claim a sender name, fix its pixel format, and choose the GPU it will live
+// on. Returns null on any failure, which the Rust side turns into a named
+// error.
 //
-// `SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` is mandatory, not a preference.
-// `spoutDX` defaults `m_dwFormat` to DXGI_FORMAT_B8G8R8A8_UNORM and `SendImage`
-// converts nothing - it is one `UpdateSubresource` of the caller's bytes - so a
-// sender left on the default publishes our RGBA frames with red and blue
-// swapped, on every frame, with nothing to indicate it.
+// `adapter` IS THE ONE ARGUMENT THAT DECIDES WHETHER THIS WORKS AT ALL ON A
+// HYBRID LAPTOP, and it is not a performance preference. A Spout sender shares
+// a D3D11 texture by handle; the receiver opens that handle on its own device,
+// which succeeds only when both devices are the same physical GPU. A machine
+// with an integrated and a discrete GPU hands a plain console process the
+// integrated one to save power while the receiving application runs on the
+// discrete one, and the receiver then reports only that it could not open the
+// shared texture - it cannot see why. Measured on a two-adapter laptop: a
+// sender on the integrated GPU is invisible to a receiver on the discrete one,
+// and pinning it to the discrete one makes the picture appear unchanged
+// otherwise. `-1` means whatever D3D11 would pick, which is right on a
+// single-GPU machine and a coin toss anywhere else.
+//
+// `SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` matches the engine's readback
+// so `SendImage` - which converts nothing, being one `UpdateSubresource` of the
+// caller's bytes - carries them across untouched. Leaving it at the SDK default
+// of B8G8R8A8_UNORM would publish every frame with red and blue swapped. It has
+// no bearing on whether the texture can be OPENED; that is the adapter's job
+// alone, and both formats were checked against a real receiver to establish it.
 //
 // `width` and `height` are validated and no more: the shared texture and the
 // sender registration are created by the first `lmv_spout_send`, because the
@@ -42,15 +78,30 @@ extern "C" {
 //
 // The NAME, however, is settled here and is worth reading back: `SetSenderName`
 // resolves a collision by incrementing (name, name_1, name_2 ...) when an
-// earlier run crashed and left its registration behind, so what a receiver
-// lists is what `lmv_spout_name` returns and not necessarily what was asked
-// for. Registration applies no further increment on top of that.
-LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned int height) {
+// earlier run left its registration behind, so what a receiver lists is what
+// `lmv_spout_name` returns and not necessarily what was asked for.
+// Registration applies no further increment on top of that.
+//
+// `LMV_SPOUT_LOG` in the environment turns on the SDK's own verbose log. It is
+// read here rather than passed in because it configures the SDK's global
+// logger rather than this sender, and it is the only thing that reports what
+// the D3D11 layer actually did.
+LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned int height,
+                           int adapter) {
     if (sender_name == nullptr || width == 0 || height == 0) {
         return nullptr;
     }
     LmvSpout *spout = new (std::nothrow) LmvSpout();
     if (spout == nullptr) {
+        return nullptr;
+    }
+    if (std::getenv("LMV_SPOUT_LOG") != nullptr) {
+        spoututils::EnableSpoutLog();
+        spoututils::SetSpoutLogLevel(spoututils::SPOUT_LOG_VERBOSE);
+    }
+    // Before anything creates the D3D11 device, which the first send does.
+    if (adapter >= 0 && !spout->sender.SetAdapter(adapter)) {
+        delete spout;
         return nullptr;
     }
     if (!spout->sender.SetSenderName(sender_name)) {
@@ -64,6 +115,10 @@ LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned
 // Publish one frame. `rgba` is `width * height * 4` bytes of tight, row-major,
 // top-to-bottom RGBA8 - the layout `lmv_core`'s CaptureImage already returns.
 // Returns 1 on success, 0 on failure.
+//
+// No conversion and no copy of our own: the sender's format matches these
+// bytes, so a frame costs the readback and the upload and nothing between them
+// - the two copies ADR-0125 budgeted for.
 //
 // Rows need no inversion flag and there is none to pass: `SendImage` writes row
 // 0 to row 0. A width or height differing from the last call is handled inside

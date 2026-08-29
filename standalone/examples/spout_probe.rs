@@ -26,8 +26,13 @@
 //! needs a colour setting, and finding that out here is the whole point.
 //!
 //! ```text
-//! cargo run -p standalone --features spout --example spout_probe
+//! cargo run -p standalone --features spout --example spout_probe -- [adapter]
 //! ```
+//!
+//! The optional argument is a graphics adapter index, which the probe lists on
+//! startup. **On a machine with two GPUs it is not optional in practice**: a
+//! Spout receiver can only open a sender that lives on the GPU it renders with,
+//! and a console process is handed the power-saving one by default.
 //!
 //! Requires the staged SDK (`packaging/spout/fetch-sdk.ps1`) and is gated on
 //! the `spout` feature by `required-features`, so an ordinary build never
@@ -36,7 +41,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use standalone::spout::SpoutSender;
+use standalone::spout::{SpoutSender, adapters};
 
 /// 1280x720: inside the 1280x1280 cap a TouchDesigner Non-Commercial key
 /// imposes on the receiving TOP, and the size Plan 0115 Phase 4 streams at.
@@ -61,7 +66,25 @@ fn main() {
         Err(e) => eprintln!("could not write the reference PNG ({e}) — the sender still runs"),
     }
 
-    let mut sender = match SpoutSender::new(SENDER_NAME, WIDTH, HEIGHT) {
+    // On a machine with two GPUs the receiver can only open a sender that lives
+    // on the same one it renders with, so the roster is printed whatever
+    // happens: a probe that fails silently on the wrong adapter is the exact
+    // confusion this exists to prevent.
+    let roster = adapters();
+    for (index, name) in roster.iter().enumerate() {
+        eprintln!("adapter [{index}] {name}");
+    }
+    let adapter = adapter_argument();
+    match adapter {
+        Some(index) => eprintln!("using adapter {index}"),
+        None if roster.len() > 1 => eprintln!(
+            "using the default adapter, but this machine has {} — if the receiver cannot open              the sender, re-run with the index of the one it renders on",
+            roster.len()
+        ),
+        None => {}
+    }
+
+    let mut sender = match SpoutSender::new(SENDER_NAME, WIDTH, HEIGHT, adapter) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("spout_probe: {e}");
@@ -96,6 +119,22 @@ fn main() {
         let spent = started.elapsed();
         if let Some(rest) = FRAME.checked_sub(spent) {
             std::thread::sleep(rest);
+        }
+    }
+}
+
+/// The adapter index from the first command-line argument, if there is one.
+///
+/// An argument rather than a constant because which adapter is right is a
+/// property of the machine and of what is receiving, and neither is knowable
+/// here.
+fn adapter_argument() -> Option<u32> {
+    let raw = std::env::args().nth(1)?;
+    match raw.parse() {
+        Ok(index) => Some(index),
+        Err(_) => {
+            eprintln!("spout_probe: '{raw}' is not an adapter index");
+            std::process::exit(2);
         }
     }
 }

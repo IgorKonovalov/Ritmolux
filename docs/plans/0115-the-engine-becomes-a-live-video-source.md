@@ -366,9 +366,9 @@ void      lmv_spout_destroy(LmvSpout *);
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Stage the SDK, prove the receiving half | human | done — gate passed; the colour item is deferred into Phase 3, see the notes | |
+| 1 — Stage the SDK, prove the receiving half | human | done — gate passed; its colour item was answered in Phase 3 | |
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
-| 3 — The Spout shim | dev | code done, TouchDesigner check outstanding | committed with this row |
+| 3 — The Spout shim | dev | done | `ae436cf` + committed with this row |
 | 4 — `lmv --stream` | dev | not started | |
 | 5 — The stream survives a set | dev | not started | |
 | 6 — The gate in TouchDesigner | human | not started | |
@@ -376,41 +376,73 @@ void      lmv_spout_destroy(LmvSpout *);
 
 ### Notes
 
-**Phase 3 — the code is complete; its one TouchDesigner done-when is outstanding.** Everything a
-person cannot check is checked: the SDK stages and hash-checks, the shim compiles and links, the
-probe publishes, and the feature-off path is proven SDK-free. What remains is putting the probe's
-picture in front of a `Syphon Spout In` TOP and comparing it against the PNG it writes — the check
-Phase 1 deferred here.
+**Phase 3 — done, and verified in TouchDesigner.** The shim publishes, a `Syphon Spout In` TOP
+receives it, and **the colour question is settled**: the TOP and a `Movie File In` TOP loaded with
+the reference PNG the probe writes are indistinguishable side by side, with no colour setting on
+either. That closes ADR-0125's "likeliest way this ships looking wrong" and the item Phase 1
+deferred here. `standalone/examples/spout_probe.rs` is the instrument and stays.
 
-- **Three entry points became four, but not the four the plan listed: `resize` is out and `name` is
-  in.** `lmv_spout_resize` has no possible caller — `SendImage(pData, w, h)` drives `CheckSender`,
-  which resizes the sender in place under the same name, and Phase 4's mode is headless at a fixed
-  size with no resize path at all. `lmv_spout_name` replaces it because `SetSenderName` resolves a
-  collision by incrementing, so the name a receiver lists is a runtime fact the mode has to read
-  back rather than a constant it can assume.
-- **`SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` is in `lmv_spout_create` and is load-bearing.**
-  The SDK default is BGRA and `SendImage` converts nothing, so without it every frame ships with red
-  and blue swapped. The probe's red/green/blue patches exist to make exactly that failure visible.
+- **THE PLATFORM FINDING, and it is the one worth carrying forward: a Spout sender must live on the
+  same physical GPU as its receiver, and on a hybrid laptop it does not by default.** Spout shares
+  a D3D11 texture by handle and the receiver opens that handle on its own device; that works only
+  when both devices are the same GPU. The dev box has two — `[0] AMD Radeon(TM) Graphics`
+  (integrated), `[1] NVIDIA GeForce RTX 3080 Laptop GPU` — and Windows hands a plain console
+  process the integrated one to save power while TouchDesigner runs on the discrete one. The
+  receiver reports only `Unable to open shared Spout Texture. Spout may not be Vulkan compatible on
+  this GPU.`, which names neither the adapter nor the mismatch. Pinning the sender to adapter 1 made
+  the picture appear, unchanged in every other respect. **Spout's own demo sender works without any
+  of this** because OpenGL applications are routed to the discrete GPU by driver profile, which is
+  what makes ours the only failing sender on a machine where Spout demonstrably works.
+- **`lmv_spout_create` therefore takes an adapter index**, `-1` for the D3D11 default, and
+  `lmv_spout_adapter_count` / `lmv_spout_adapter_name` enumerate so a caller can name the choices
+  rather than print a bare integer. `standalone::spout::adapters()` is the Rust face of that, and an
+  out-of-range index is rejected on the Rust side so the error can list what the machine has.
+- **Four entry points became six, and neither the additions nor the removal is the plan's list.**
+  `resize` is out: `SendImage` carries the dimensions and drives an in-place resize under the same
+  name, and the headless mode has no resize path. `name` is in, because `SetSenderName` increments
+  on collision. The two adapter functions are in because without them the shim does not work on this
+  machine at all.
+- **A hypothesis was tried, falsified by the receiver, and reverted.** Before the adapter was
+  understood, the format was blamed: `spoutDX`'s GL and DX senders create the shared texture with
+  identical flags (`bKeyed = false, bNThandle = false`, read at the pinned tag), so the pixel format
+  was the only difference left between the working demo and ours. The shim was changed to publish
+  `B8G8R8A8_UNORM` with a per-frame `spoutCopy::rgba2bgra`; **the receiver still refused it**, which
+  is what redirected the search to the adapter. With the adapter pinned, `R8G8B8A8_UNORM` with no
+  conversion was then checked against the receiver and is correct, so the conversion was removed.
+  **The frame path costs the two copies ADR-0125 budgeted, not three.** Recorded because the
+  question "does Spout need BGRA" now has a measured answer instead of a plausible one.
+- **`SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` stays, for its original reason only.** It matches
+  the engine's readback so `SendImage` carries the bytes untouched; left at the SDK's BGRA default
+  it would swap red and blue. It has no bearing on whether the texture can be opened - both formats
+  were put in front of the receiver to establish that.
+- **This reaches Phase 4 as a design question the plan did not anticipate.** ADR-0125 argues that
+  "Spout's D3D11 device is entirely its own and never meets ours", and for the abstraction that
+  holds - but the two devices must now agree on a *GPU*. `wgpu` selects the renderer's adapter
+  independently of `spoutDX`, so `--stream` has to land both on the adapter the receiver uses. A
+  `--spout-adapter` flag is the easy half; making the wgpu adapter agree is the half nothing in the
+  plan covers.
 - **The sender registers lazily, on the first frame, because `spoutDX::CheckSender` is `protected`.**
-  Eager registration was written first and the compiler rejected it, which also corrects a Phase 1
-  note that read `CheckSender` as public. The name is still settled at create time — `SetSenderName`
-  does the increment — so `SpoutSender::name()` answers before any frame; only the receiver's
-  listing waits.
-- **`cc` is a new direct build-dependency and no new graph.** It was already in `Cargo.lock` as a
-  transitive build-dependency, so it is pinned to `=1.3.0`, the version already resolved, and the
-  lock gains one edge and no package.
+  Eager registration was written first and the compiler rejected it, correcting a Phase 1 note that
+  had read `CheckSender` as public. The name is still settled at create time, so
+  `SpoutSender::name()` answers before any frame; only the receiver's listing waits.
+- **The increment was observed, not just read about.** Force-killing a probe left `lmv-probe`
+  registered, and the next run came up as `lmv-probe_1`. This is why the mode must print
+  `lmv_spout_name`'s answer rather than the name it asked for.
+- **`cc` is a new direct build-dependency and no new graph.** Already in `Cargo.lock` as a
+  transitive build-dependency, so it is pinned to `=1.3.0`, the version already resolved; the lock
+  gains one edge and no package.
 - **The feature-off path was checked by removing the SDK, not by assuming.** With
-  `standalone/spout-sdk/` moved aside: `cargo build --workspace`, `cargo clippy --workspace
-  --all-targets` and `cargo fmt --all --check` all clean, no C++ step, no network. The probe example
-  carries `required-features = ["spout"]`, so cargo skips the target entirely rather than compiling
-  it and failing.
-- **The hash-mismatch path was exercised**, not just written: a deliberately wrong pin made
+  `standalone/spout-sdk/` moved aside, `cargo build --workspace`, `cargo clippy --workspace
+  --all-targets` and `cargo fmt --all --check` are all clean, with no C++ step and no network. The
+  probe carries `required-features = ["spout"]`, so cargo skips the target rather than compiling it
+  and failing.
+- **The hash-mismatch path was exercised**, not merely written: a deliberately wrong pin made
   `fetch-sdk.ps1` exit 1, print expected against actual, and delete the archive so a rejected
   download cannot be reused. The pin was restored and the SDK re-staged afterwards.
 - **The Spout licence notice is committed at `packaging/spout/spout-license.txt`** and staged beside
-  the SDK by `fetch-sdk.ps1`. The binaries archive carries no licence of its own, and clause 2 of
-  the Simplified BSD licence obliges a binary distribution to reproduce the notice — so the notice
-  is tracked while the SDK never is. Phase 7's release zip has to carry it.
+  the SDK by `fetch-sdk.ps1`. The binaries archive carries no licence of its own and clause 2 of the
+  Simplified BSD licence obliges a binary distribution to reproduce the notice, so the notice is
+  tracked while the SDK never is. Phase 7's release zip has to carry it.
 
 **A finding that is not about this plan: the shared artifact store served this lane another lane's
 `lmv-core`, and it was a correctness failure rather than a slow build.**
@@ -516,7 +548,10 @@ covers it. The release is unpacked at `WORK/spout-2.007.017/`, outside the repo.
   variable that no test in this repo can see, so **Phase 3's TouchDesigner check is what confirms
   a .017 sender is read by a .014 receiver**, and this line is here so a failure there is
   recognised as version skew rather than chased as a shim bug.
-- **The colour item is deferred into Phase 3, and could not have been done here.** Phase 1's
+- **The colour item was deferred into Phase 3 and is ANSWERED there** — the receiving TOP and a
+  `Movie File In` TOP of the same reference image are indistinguishable, with no colour setting on
+  either. The rest of this entry records why it could not be done in Phase 1.
+- **Why it could not be done here.** Phase 1's
   method asks the demo sender to publish a known reference image; `SpoutSender.exe` publishes its
   own animated content and takes no image input, so the reference-vs-TOP comparison is not
   available before a sender we control exists. A TouchDesigner round trip (Movie File In ->
