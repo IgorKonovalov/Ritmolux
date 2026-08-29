@@ -443,12 +443,61 @@ void      lmv_spout_destroy(LmvSpout *);
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
 | 3 — The Spout shim | dev | done | `ae436cf`, `2df3555` |
 | 3b — The GPU becomes nameable | dev | done | committed with this row |
-| 4 — `lmv --stream` | dev | not started | |
+| 4 — `lmv --stream` | dev | done | committed with this row |
 | 5 — The stream survives a set | dev | not started | |
 | 6 — The gate in TouchDesigner | human | not started | |
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 4 — done, with one done-when unexercised and four disclosed deviations.**
+
+- **The mode runs and holds its rate.** `--stream --size 1280x720 --fps 60 --frames 900` emitted
+  `900 frames, 15.00 s wall, 14.99 s scene clock` on the RTX 3080. A 300-frame run gave
+  `5.02 s wall, 5.00 s scene`. **No threshold is asserted on any of it**; these are the readings
+  Phase 6 is taken against.
+- **The no-flag default resolves both adapters correctly on this hybrid machine**, which is the
+  first end-to-end exercise of ADR-0146: the renderer took `HighPerformance` and landed on the
+  RTX 3080, and the sender **followed it by name** to adapter [1] with no `--gpu` given. The
+  two-adapter warning printed as required.
+- **No window is created, and this was checked rather than argued.** With the mode running,
+  `EnumWindows` filtered to the process reports **zero** top-level windows and
+  `MainWindowHandle=0`. The `--stream` branch sits ahead of `EventLoop::new()`, which is the only
+  thing on this path that can make one.
+- **NOT EXERCISED: "`--stream` with no capture device available fails with a named error naming the
+  flag."** The error path exists and its text leads with `--stream:`, but it could not be reached
+  on this machine. Every `CaptureError` variant is a genuine WASAPI failure and an unmatched device
+  name **degrades to the default endpoint** rather than failing, so producing the state would mean
+  disabling the box's audio device. No test was written for it, because asserting that a string
+  literal contains `--stream` tests nothing.
+
+Four deviations from the phase's file list and notes, none of them silent:
+
+- **`standalone/src/stream.rs` is a *binary* module, and `standalone/src/lib.rs` is untouched.**
+  The phase lists `lib.rs`, but the loop needs `capture_win`, `config` and `director`, and all
+  three are declared in `main.rs` rather than the library. A lib-side `stream` could not reach any
+  of them.
+- **The unit tests live in the module, not in `standalone/tests/`.** Same cause, and it is a hard
+  one: an integration test under `standalone/tests/` links the **library**, so it cannot see a
+  binary module's items at all. `main.rs` already carries its own `mod tests` and this follows it.
+  Twelve tests cover the request, the parse errors and the pacing arithmetic.
+- **`standalone/Cargo.toml` gains one feature on a crate already linked** — `Win32_System_Console`,
+  for `SetConsoleCtrlHandler`. Without it Ctrl-C tears the process down mid-frame and the three
+  exit numbers never print, which is the phase's own done-when. No new dependency and no new graph.
+- **Two flags the phase did not name.** `--frames N` bounds a run so it exits on its own and
+  reports — which is how every figure above was taken, and how Phase 6 can take a repeatable one.
+  `--sender NAME` overrides the default sender name `lmv`.
+
+One choice the plan left open: the headless renderer is pinned to **`Tier::Rich`**. There is no
+frame-time governor on this path, so an auto tier could not demote itself the way the window's
+does; pinning states the quality rather than leaving it to a governor that is not there.
+
+**Pacing is deadline-based, and that is the property the tests defend.** Frame `n` is due at
+`n * period` from the start of the run rather than one sleep per frame, so an overrunning frame
+costs only itself instead of dragging every later deadline back. `a_slow_frame_does_not_push_every_later_frame_back`
+asserts both halves, including that a run already past a deadline does not sleep at all, and
+`a_long_run_computes_its_deadlines_without_overflow` takes the arithmetic to 864,000 frames — four
+hours at 60 fps.
 
 **Phase 3b — done, with one done-when left for the TouchDesigner gate.**
 

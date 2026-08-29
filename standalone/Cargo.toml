@@ -85,6 +85,11 @@ windows = { version = "=0.62.2", features = [
     "Win32_Media_Multimedia",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
+    # Ctrl-C handling for `--stream` (Plan 0115 Phase 4): a headless source is
+    # stopped from the console, and the handler is what lets it leave through
+    # its own exit path and print the run's three numbers instead of being torn
+    # down mid-frame. A feature on the crate the shell already links.
+    "Win32_System_Console",
     "Win32_System_ProcessStatus",
     "Win32_System_Threading",
     "Win32_System_Variant",
