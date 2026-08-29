@@ -444,6 +444,13 @@ deferred here. `standalone/examples/spout_probe.rs` is the instrument and stays.
   Simplified BSD licence obliges a binary distribution to reproduce the notice, so the notice is
   tracked while the SDK never is. Phase 7's release zip has to carry it.
 
+**Session stopped before Phase 4, pending an architect decision.** Phase 3's adapter finding
+changes what Phase 4 builds: the mode has to put the wgpu renderer and the Spout sender on the same
+GPU, and the plan has no phase for that. The user's stated lean, for that session to design
+against, is a **flag plus the headless mode, with the stream going only to TouchDesigner** — i.e.
+the plan's existing scope (no windowed preview, no second consumer) plus adapter selection. Nothing
+in Phase 4 has been started.
+
 **A finding that is not about this plan: the shared artifact store served this lane another lane's
 `lmv-core`, and it was a correctness failure rather than a slow build.**
 `standalone/tests/frame_tap_memory.rs` failed with `no method named open_tap found for struct
