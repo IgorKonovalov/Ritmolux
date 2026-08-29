@@ -1,9 +1,11 @@
 # 0129 — The build stops being paid three times
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-08-29
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) (proposed)
+> **Related ADRs:** [0141](../../adrs/0141-one-artifact-store-serves-every-lane.md)
+> (**accepted 2026-08-29 with a dated `Outcome`** - four of its quantified premises were falsified
+> by Phase 1 on the machine it was measured on; the Decision stands)
 
 ## TL;DR
 
@@ -99,7 +101,7 @@ flowchart TB
   scratch worktree's `target/` size. Remove the scratch worktree.
 - **Done when:** The implementation log carries a table with four numbers — cold `cargo build`, cold
   test-binary build, warm one-file-edit rebuild, and cold `target/` size — each naming this machine,
-  per [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). These
+  per [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md). These
   are measurements, not thresholds; no test asserts them.
 
 ### Phase 2 — Point the MSVC target at `rust-lld`

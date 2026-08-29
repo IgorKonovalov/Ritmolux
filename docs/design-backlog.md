@@ -3783,3 +3783,89 @@ either shape and is the part an operator actually reaches for.
 
 - **Verified 2026-08-29** - flags are still scanned one at a time with no roster: `present: fn parse_soak_arg() in: standalone/src/main.rs`
 - `unprobeable:` that no unclaimed argument is rejected is a negative about the whole of `main`'s argument handling, not a match countable in one file; the two commands above are the reduction, and they are re-runnable against any build.
+
+## 0160 - the test suite re-creates a `target/` inside the worktree that no redirect reaches, and its own comment says it cannot
+
+> **Filed 2026-08-29** at Plan 0129's close, from that plan's Phase 4, which found it and left it as
+> found per the phase's own instruction.
+
+[ADR-0141](adrs/0141-one-artifact-store-serves-every-lane.md) points every lane at one shared
+artifact store through a machine-local `build.target-dir`. Plan 0129 Phase 3's done-when says the
+lanes write there and *"none of them re-creates its own `target/`"*, and that holds for **every
+build** and fails on a **test run**.
+
+`standalone/tests/shot_cli.rs` has two path helpers and only one of them is redirect-safe:
+
+- `shot_exe()` walks up from `std::env::current_exe()` looking for an `examples/` sibling, so it
+  follows the store wherever it goes. It is correct, and it carries the comment that makes the file
+  look already audited.
+- `scratch()` builds `repo_root().join("target").join("shot-cli-tests")`. `repo_root()` is derived
+  from `CARGO_MANIFEST_DIR`, not from where cargo writes, so this reaches into the **worktree**
+  regardless of the redirect.
+
+Its doc comment states the invariant it breaks: *"under `target/` so it never escapes the build
+tree."* Under the store, `target/` is not the build tree, so the scratch output escapes it in
+exactly the direction the comment promises it will not.
+
+**Measured 2026-08-29** on the close checkout, after the suite had run under the store: the
+repository held a `target/` containing `shot-cli-tests/` and nothing else, ~4 MB.
+
+**Why nothing surfaces it.** `**/target` is gitignored, so `git status` stays clean; the directory
+is small, so no disk pressure appears; and the tests pass either way, because the path is created
+before use. It is visible only by looking.
+
+**Impact.** Low today - a stray gitignored directory per worktree that `git worktree remove` still
+deletes. It matters because it is the one place a redirect assumption is written into a **test**
+rather than a script, and because the comment above it actively argues the opposite, which is how
+the next reader gets it wrong.
+
+**What a fix looks like:** `env!("CARGO_TARGET_TMPDIR")`, which cargo sets to a per-test-binary
+directory inside the real target dir and which exists for exactly this - or `cargo metadata`'s
+`target_directory`, the answer `plugin-foobar/build.ps1` already uses. Either way the doc comment
+has to be re-stated, since it is the part that is wrong independently of the path.
+
+- **Verified 2026-08-29** - the scratch path still starts at the repo root: `present: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-08-29** - and still joins its way to a dir inside it: `present: \.join\("shot-cli-tests"\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-08-29** - the sibling that is correct is still correct, so the file is genuinely split: `present: current_exe in: standalone/tests/shot_cli.rs`
+
+## 0161 - three committed scripts still resolve cargo output under `<repo>/target`, which the artifact-store docs assert nothing does
+
+> **Filed 2026-08-29** at Plan 0129's close, by grepping the class its Phase 5 fixed one instance of.
+
+[ADR-0141](adrs/0141-one-artifact-store-serves-every-lane.md)'s Negative section names **one**
+committed script the redirect breaks, `plugin-foobar/build.ps1`, and Plan 0129 Phase 5 fixed it
+properly - it now reads `target_directory` from `cargo metadata`, correct under both layouts, with
+both branches exercised. The plan's Phase 7 documentation then generalized that into a rule, and
+`.claude/skills/dev/references/project-context.md` states it flatly: *"Never hardcode
+`<repo>/target` in a script or a test."*
+
+**Three committed scripts still do**, and they resolve cargo *output*, so a redirect points them at
+a path that does not exist:
+
+- `packaging/macos/bundle.sh` - `${repo_root}/target/${triple}/release/lmv` for both Apple targets
+  before the `lipo`. Inert today because the config is Windows-only and no Mac has opted in; it is
+  the one on a **release** path, so it is the one that matters if that changes.
+- `renders/plan-0106-p6/run.sh` and `renders/plan-0106-p7/run.sh` - `SHOT=target/release/examples/shot.exe`.
+  Broken on the development machine right now. They are archived one-off render scripts from a closed
+  plan, so nothing runs them on a schedule.
+
+**Not in this class, checked:** `packaging/foobar/build-component.ps1` reads its DLL from
+`plugin-foobar/build/` and only *writes* to `$repo\target\dist`, which is where CI's
+`release.yml` expects to find the zips - correct, and it should stay. `.github/workflows/release.yml`
+uses `target/` throughout and is right to: CI never has the config. The `scripts/*.mjs` default
+out-dirs under `target/` are outputs into a gitignored directory, the same untidiness as 0160
+rather than breakage.
+
+**Impact.** Low and latent. Nothing here fails a gate, nothing fails CI, and the only currently
+broken pair is archived. The reason to record it is that the documentation now asserts a property
+the tree does not have, and a doc that overstates its own sweep is what makes the next person stop
+looking.
+
+**What a fix looks like:** `bundle.sh` asks `cargo metadata --format-version 1 --no-deps` for
+`target_directory` the way `build.ps1` does - four lines and a `jq` or a `python -c`. The two
+`renders/` scripts are historical and the honest options are the same one-line fix or a line in
+`renders/README.md` saying they assume the pre-ADR-0141 layout.
+
+- **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
+- **Verified 2026-08-29** - the two render scripts still assume the old layout: `present: SHOT=target/release/examples/shot\.exe in: renders/plan-0106-p6/run.sh`
+- **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`

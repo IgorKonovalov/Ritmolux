@@ -1,9 +1,9 @@
 # ADR-0141 — One artifact store serves every lane, and its config lives above the repo
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-29 (Plan 0129) - carries an `Outcome`
 > **Date:** 2026-08-28
 > **Amends:** [ADR-0053](0053-plan-lanes-run-in-git-worktrees.md)
-> **Related plan(s):** [0129](../plans/0129-the-build-stops-being-paid-three-times.md)
+> **Related plan(s):** [0129](../plans/done/0129-the-build-stops-being-paid-three-times.md)
 
 ## Context
 
@@ -165,3 +165,43 @@ time, currently forbidden by root `Cargo.toml` because inlining muddies the line
 coverage ratchet is derived from — is **not decided here**. Plan 0129 Phase 5 measures where the
 89-second `reactivity` suite actually spends its time and reports; if our unoptimized code turns out
 to be a minority of it, the question dies for free.
+
+## Outcome (added at Plan 0129's close, 2026-08-29)
+
+**The Decision stands and is delivered.** A worktree that has never built compiles 3 workspace
+crates in 15-24 s with **zero dependencies recompiled**, against 129 crates in 105 s cold; the
+store holds 5.4-7.2 GB where one lane's `target/` held 14.65 GB; `rust-lld` took the cold path to
+every test binary from 171 s to 145 s and moved no golden; the result set is identical at 1122
+tests. Every argument above survives.
+
+**Four of the quantified premises in Context do not**, all measured on the same machine on
+2026-08-28 by Plan 0129 Phase 1, and they are recorded here rather than edited away.
+
+| Context claims | Phase 1 measured |
+|---|---|
+| three live worktrees, 23.2 GB total | **one** live worktree (0123 and 0127 were removed, 0132 closed the same night) |
+| that worktree's `target/` at 2.4 GB | **15,002 MB** |
+| 305 crates compiled per lane | **129** on a default `cargo build`; 305 is the `Cargo.lock` entry count, and `default-members` excludes `core-cabi` and `milkconv` |
+| `cargo build` warm on `main`: 2m12s | a **cold** build takes **105 s** - faster than the figure cited for a warm one |
+
+The user's report that *"a small change is taking hours"* is reproduced by no figure Plan 0129
+took: the warm one-file-edit rebuild is **28 s**. So the multiplier this ADR argued from was 1x,
+not 3x, and the cold-build tax it names was smaller than stated. **What it got right is the shape
+rather than the size** - the cost is real, it is paid per lane, and paying it once per machine is
+the correct trade at any multiplier. Nothing in Decision, Consequences or Alternatives turns on
+the arithmetic above.
+
+Three smaller corrections. The **Notes** section cites "Plan 0129 Phase 5" for the `reactivity`
+measurement; it is **Phase 6**, and that suite measures **126.1 s**, not the 89 s quoted. Its
+finding lands on the arm this ADR hoped for: our unoptimized code is **24.1 s, 19.1 %** of the
+suite, a minority, **so the `opt-level` question dies here with no ADR owed**. And `core/tests/`
+holds **40** top-level integration-test binaries, not the 41 repeated throughout.
+
+**One Neutral claim was half wrong, and it is the finding worth carrying forward.**
+`standalone/tests/shot_cli.rs` was recorded here as needing no change. Its `shot_exe()` is indeed
+redirect-safe, but its sibling `scratch()` builds output paths as `repo_root().join("target")`,
+which no redirect reaches - so a **test run** re-creates a `target/` inside the worktree, holding
+`shot-cli-tests/` and nothing else. `**/target` is gitignored, so nothing surfaces it. The
+Negative section's *"One committed script breaks"* is likewise an instance of a class:
+`packaging/macos/bundle.sh` and the two `renders/plan-0106-p*/run.sh` scripts still resolve cargo
+output under `<repo>/target`. Both are filed to the design backlog - entries **0160** and **0161** - rather than fixed at the close.

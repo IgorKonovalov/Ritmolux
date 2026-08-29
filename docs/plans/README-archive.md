@@ -13,6 +13,58 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0129 — The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md)
+  — closed 2026-08-29. Seven phases of seven, taken in the main checkout rather than a lane (which
+  is what the plan asked for), `b17d8cc`..`952d5c3` plus the close's `6371136`. Review: **no
+  blockers, one major, four minors.** Version **0.91.1** (patch). Closed no backlog entry; filed
+  0160 + 0161. Curation: not triggered — `presets/` untouched.
+
+  **It delivers, and the delivery was re-verified at the close rather than read off the log.** A
+  worktree that has never built compiles **3 workspace crates in 23.6 s with zero dependencies
+  recompiled**, and `cargo metadata` in it reports `WORK/.lmv-target`; no `target/` appears in the
+  new lane. Against Phase 1's cold baseline of **129 crates in 105 s**, that is the plan's headline
+  claim standing on its own measurement. The linker half took the cold path to every test binary
+  from **171 s to 145 s** and moved no golden, with the result set identical at 1122 tests across 54
+  binaries. Phase 6 closed the deferred `opt-level` question for free on the arm the ADR hoped for:
+  our unoptimized code is **24.1 s, 19.1 %** of the `reactivity` suite — a minority, so no ADR is
+  owed and no profile was edited.
+
+  **The major is that ADR-0141's Context was falsified in four places by the plan's own Phase 1**,
+  and the ADR was accordingly accepted with a dated `Outcome` rather than a body edit. There was
+  **one** live worktree, not three; its `target/` held **15,002 MB**, not the 2.4 GB tabulated; a
+  default `cargo build` compiles **129** crates, not 305 (that is the `Cargo.lock` entry count, and
+  `default-members` excludes `core-cabi` and `milkconv`); and a full **cold** build takes **105 s**,
+  *faster* than the 2m12s the ADR cites for a warm one. The user's *"a small change is taking
+  hours"* is reproduced by no figure the plan took — the warm one-file-edit rebuild is **28 s**. So
+  the multiplier argued from was 1x rather than 3x, including in the plan's own title. **The
+  Decision survives all of it**: paying the dependency graph once per machine is the right trade at
+  any multiplier, and the 105 s → 23.6 s result is the proof. What did not survive is the size of
+  the number, and the ADR now says so in its own body.
+
+  **The finding worth carrying: the repository's `target/` comes back, and only the test suite
+  brings it.** `standalone/tests/shot_cli.rs`'s `scratch()` builds output paths as
+  `repo_root().join("target")`, which no redirect reaches, so a test run re-creates a `target/`
+  holding `shot-cli-tests/` and nothing else — confirmed present at the close. Its own doc comment
+  says *"under `target/` so it never escapes the build tree"*, an invariant that is now false. Two
+  things hid it: `**/target` is gitignored, and the sibling `shot_exe()` **is** redirect-safe and
+  carries the comment that makes the file look already audited. ADR-0141's Neutral section had
+  recorded the file as needing no change on the strength of that half. Filed as backlog 0160.
+
+  **"One committed script breaks" was a class, not an instance.** Phase 5 fixed
+  `plugin-foobar/build.ps1` correctly — `cargo metadata`'s `target_directory`, right under both
+  layouts, both branches exercised by moving the config aside — but the new documentation asserts
+  *"Nothing may hardcode `<repo>/target`"* while `packaging/macos/bundle.sh` and the two
+  `renders/plan-0106-p*/run.sh` scripts still do. Blast radius is small (the foobar packaging path
+  reads its DLL from `plugin-foobar/build/`, and CI never has the config), but the sweep is
+  overstated. Filed as backlog 0161.
+
+  **The thing that ships in no commit is the point.** The store and the linker live in
+  `WORK/.cargo/config.toml`, outside every checkout, machine-local by construction — CI's
+  `Swatinem/rust-cache` caches `./target`, so a committed redirect would have been a CI regression.
+  Five tracked files changed in total: `build.ps1`, `CLAUDE.md`, both skill `project-context.md`,
+  and the plan. Zero Rust. The documentation is the entire enforcement mechanism, which ADR-0141
+  names as weaker than a gate and accepts.
+
 - [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md)
   — closed 2026-08-29. Two phases of eight on `plan-0132-the-lighting-rig-follows-the-visuals` in
   `WORK/lmv-plan-0132`, `c8bdcd5`..`36c1cdf` plus the close's `e8e3a9b`. Review: **no blockers, one
@@ -5278,6 +5330,12 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0082]: done/0082-the-gradient-stops-banding.md
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
 [0087]: done/0087-the-line-renderer-draws-a-curve.md
+[0123]: done/0123-a-gate-a-latch-and-an-ink.md
+[0124]: 0124-the-review-fixes-that-move-no-pixels.md
+[0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
+[0126]: 0126-the-large-files-split-along-their-seams.md
+[0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
+[0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 
 ## 0109 — The MilkDrop import gets its geometry back
 
@@ -5550,3 +5608,12 @@ had been wrong since Plan 0048 gave it a `BandNormalizer`.
 **Curation:** `presets/` untouched, so no sweep was owed. The stale-workaround grep over
 `presets/*.toml` is clean for this plan's defects — nothing in the shipped set cites 0120, 0122,
 0123 or the waveform level as a constraint it was authored around.
+
+### Superseded sequencing note - Plan 0129 (archived 2026-08-29 at its close)
+
+**Added 2026-08-28, from the user's report that a small change costs hours: [0129](done/0129-the-build-stops-being-paid-three-times.md).** It is the one plan on this roster that is **worth taking before the others rather than alongside them** — it does not change a pixel or a test, it changes what every lane behind it costs to open. Seven approved plans are queued, and each currently pays a cold 305-crate build before its first edit compiles.
+
+- **It contends with nothing.** Its only tracked edit is `plugin-foobar/build.ps1` (Phase 5) plus doc lines (Phase 7); everything else lives in a file outside every checkout. No plan on this roster touches either.
+- **Take it in the main checkout, not a lane.** Opening a worktree to fix the cost of opening worktrees pays the very build this plan removes, and Phase 1's baseline wants a cold scratch tree it creates and deletes itself.
+- **Approved 2026-08-28, and sequenced by the user: it goes next, once the two lanes in flight ([0123] and [0127]) close — both closed 2026-08-28, so it is clear to start.** That ordering is deliberate rather than incidental — taking it while either lane is live would measure a baseline against a machine whose store is being written by someone else, and Phase 3's headline number is a cold-versus-warm comparison that wants a quiet box. The five plans behind it ([0120](0120-the-standalone-ships-on-ubuntu.md), [0124], [0125], [0126], [0128]) each open a lane and are each the beneficiary.
+- **Phase 6 is a measurement that may become an ADR** — whether `lmv-core`'s own `opt-level = 0` is a large share of the GPU suites' wall time. It reports and stops; acting on it reopens ADR-0033's ratchet derivation and is out of scope here.
