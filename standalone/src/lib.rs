@@ -28,6 +28,11 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+// Resolving one operator-supplied GPU name into the renderer's adapter and
+// the sender's, each against its own roster (ADR-0146). Not feature-gated:
+// the renderer half applies with or without a video-out, and the sender half
+// takes the roster as a slice so it compiles and tests without the SDK.
+pub mod gpu;
 pub mod osc;
 pub mod rss;
 pub mod shot;

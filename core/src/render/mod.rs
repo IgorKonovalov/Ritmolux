@@ -68,7 +68,7 @@ use crate::preset::{
 use background::Background;
 pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
-pub use context::{RenderContext, RenderError};
+pub use context::{AdapterChoice, AdapterDescription, RenderContext, RenderError, list_adapters};
 use ink::Ink;
 use now_playing::NowPlaying;
 use overlay::Overlay;
@@ -1298,8 +1298,28 @@ impl Renderer {
     /// render (Plan 0044 Phase 3). Always **pinned**, so a capture never demotes
     /// mid-run and stays reproducible.
     pub fn new_headless_tiered(opts: HeadlessOptions, tier: Tier) -> Result<Self, RenderError> {
+        Self::new_headless_on(opts, tier, &AdapterChoice::from(opts.prefer_software))
+    }
+
+    /// A headless renderer pinned to `tier`, on a **named** adapter (ADR-0146).
+    ///
+    /// The one real headless constructor; the two above delegate here with the
+    /// choice their `prefer_software` flag already implies, so every capture
+    /// path resolves exactly the adapter it resolved before.
+    ///
+    /// A live video-out needs this because the adapter is not a performance
+    /// preference there: a Spout receiver can only open a sender that lives on
+    /// the GPU it renders with, and on a hybrid machine a console process is
+    /// handed the power-saving one. The **sender's** adapter is what that
+    /// constrains; this one is the renderer's, and the two are matched by name
+    /// on each side rather than by a shared index.
+    pub fn new_headless_on(
+        opts: HeadlessOptions,
+        tier: Tier,
+        adapter: &AdapterChoice,
+    ) -> Result<Self, RenderError> {
         Ok(Self::from_context(
-            RenderContext::new_headless(opts.width, opts.height, opts.prefer_software)?,
+            RenderContext::new_headless_on(opts.width, opts.height, adapter)?,
             RendererOptions::pinned(tier),
         ))
     }

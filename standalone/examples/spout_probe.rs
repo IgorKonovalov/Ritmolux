@@ -26,13 +26,15 @@
 //! needs a colour setting, and finding that out here is the whole point.
 //!
 //! ```text
-//! cargo run -p standalone --features spout --example spout_probe -- [adapter]
+//! cargo run -p standalone --features spout --example spout_probe -- --gpu "RTX 3080"
+//! cargo run -p standalone --features spout --example spout_probe -- --gpu 1
 //! ```
 //!
-//! The optional argument is a graphics adapter index, which the probe lists on
-//! startup. **On a machine with two GPUs it is not optional in practice**: a
-//! Spout receiver can only open a sender that lives on the GPU it renders with,
-//! and a console process is handed the power-saving one by default.
+//! `--gpu` takes a name from the roster the probe prints on startup, or an
+//! index, and is resolved by the same `standalone::gpu` code the stream mode
+//! uses. **On a machine with two GPUs it is not optional in practice**: a Spout
+//! receiver can only open a sender that lives on the GPU it renders with, and a
+//! console process is handed the power-saving one by default.
 //!
 //! Requires the staged SDK (`packaging/spout/fetch-sdk.ps1`) and is gated on
 //! the `spout` feature by `required-features`, so an ordinary build never
@@ -41,6 +43,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use standalone::gpu::{SenderAdapter, sender_adapter};
 use standalone::spout::{SpoutSender, adapters};
 
 /// 1280x720: inside the 1280x1280 cap a TouchDesigner Non-Commercial key
@@ -74,15 +77,37 @@ fn main() {
     for (index, name) in roster.iter().enumerate() {
         eprintln!("adapter [{index}] {name}");
     }
-    let adapter = adapter_argument();
-    match adapter {
-        Some(index) => eprintln!("using adapter {index}"),
-        None if roster.len() > 1 => eprintln!(
-            "using the default adapter, but this machine has {} — if the receiver cannot open              the sender, re-run with the index of the one it renders on",
-            roster.len()
-        ),
-        None => {}
-    }
+    let wanted = gpu_argument();
+    // The probe has no renderer to follow, so with no `--gpu` it takes the
+    // D3D11 default and says so; the stream mode's no-flag path follows its own
+    // renderer's adapter instead.
+    let adapter = match wanted.as_deref() {
+        None if roster.len() > 1 => {
+            eprintln!(
+                "using the default adapter, but this machine has {} — if the receiver cannot                  open the sender, re-run with --gpu naming the one it renders on",
+                roster.len()
+            );
+            None
+        }
+        None => None,
+        Some(raw) => match sender_adapter(Some(raw), "", &roster) {
+            Ok(SenderAdapter::Pinned(index)) => {
+                eprintln!(
+                    "using adapter [{index}] {}",
+                    roster.get(index as usize).map_or("?", String::as_str)
+                );
+                Some(index)
+            }
+            Ok(SenderAdapter::Default { reason }) => {
+                eprintln!("spout_probe: {reason}");
+                None
+            }
+            Err(message) => {
+                eprintln!("spout_probe: {message}");
+                std::process::exit(2);
+            }
+        },
+    };
 
     let mut sender = match SpoutSender::new(SENDER_NAME, WIDTH, HEIGHT, adapter) {
         Ok(s) => s,
@@ -123,20 +148,29 @@ fn main() {
     }
 }
 
-/// The adapter index from the first command-line argument, if there is one.
+/// The `--gpu` argument, or a bare first argument, if there is one.
 ///
 /// An argument rather than a constant because which adapter is right is a
 /// property of the machine and of what is receiving, and neither is knowable
-/// here.
-fn adapter_argument() -> Option<u32> {
-    let raw = std::env::args().nth(1)?;
-    match raw.parse() {
-        Ok(index) => Some(index),
-        Err(_) => {
-            eprintln!("spout_probe: '{raw}' is not an adapter index");
-            std::process::exit(2);
+/// here. A bare argument is still accepted so the index form Phase 3 used keeps
+/// working.
+fn gpu_argument() -> Option<String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "--gpu" {
+            return match args.next() {
+                Some(value) => Some(value),
+                None => {
+                    eprintln!("spout_probe: --gpu expects an adapter name or index");
+                    std::process::exit(2);
+                }
+            };
+        }
+        if !arg.starts_with("--") {
+            return Some(arg);
         }
     }
+    None
 }
 
 /// The reference: a black-to-white ramp across the top half, four patches
