@@ -28,8 +28,8 @@
 # system rather than a flat ink.
 #
 # `hue = 0` starts the walk at palette 0; `hue_spread = 0.70` ends it at 0.70,
-# inside the black run that resumes at 0.500. The red run is 0.375 to 0.500, so
-# one eighth of the walk carries it. Nothing reaches band 7.
+# inside band 5's red. So the walk crosses bands 0 to 5 - three black, three red,
+# alternating - and never reaches band 7, which is the paper's.
 #
 # BECAUSE THE DIVISOR IS `samples`, A `draw_progress` RIDE DRAWS THE GRADIENT ON
 # rather than re-tinting what is already down - a half-revealed curve shows the
@@ -72,24 +72,43 @@ name = "Curve Mono"
 family = "maurer_rose"
 
 [palette]
-# Eight bands in three runs: black 3 / RED 1 / black 3 / white 1. Band k's centre
-# is (2k+1)/16, so the boundaries at 0.375, 0.500 and 0.875 each fall midway
-# between two centres.
+# Eight bands, ALTERNATING black and red for the six the figure reaches, with the
+# paper alone in band 7. Band k's centre is (2k+1)/16 and every boundary is a
+# multiple of 0.125, so each centre sits clear of a jump.
 #
-# THE RED IS ONE BAND AND NOT TWO. At two the walk carried red across a quarter
-# of its length, and on a figure that crosses itself as hard as this one that
-# read as a red figure with black scribble inside it rather than a black
-# engraving with a red passage. One band is an eighth of the walk and reads as an
-# event.
+# THE RED IS DISTRIBUTED RATHER THAN POOLED, AND THAT IS THE WHOLE REVISION.
+# Judged against music, this world read TOO DARK - the walk crosses about six
+# bands and only one of them was red, so five sixths of a self-crossing figure
+# was black ink and the frame went muddy at any density.
+#
+# Widening the red run was the obvious fix and it is the wrong one: a contiguous
+# run puts all the red in one stretch of the walk, which lands as a red BLOCK in
+# whichever part of the frame that stretch happens to occupy, and an earlier
+# draft of this file was cut back from two bands for exactly that reason.
+# Alternating instead means the pen changes colour three times on its way round,
+# so red and black interleave everywhere the curve crosses itself and the figure
+# lightens evenly instead of growing a coloured region.
+#
+# Rendered at 2 / 3 / 4 red bands against thickness 1.10 and 1.50: two is still
+# dark, four loses the black engraving entirely, and three at the thinner stroke
+# is where the figure has air in it and still reads as drawn rather than dyed.
 stops = [
-  { at = 0.000, color = "#000000" },   # bands 0-2   the walk sets out
-  { at = 0.370, color = "#000000" },
-  { at = 0.380, color = "#b00808" },   # band  3     the red stretch
-  { at = 0.495, color = "#b00808" },
-  { at = 0.505, color = "#000000" },   # bands 4-6   and back to black
-  { at = 0.870, color = "#000000" },
-  { at = 0.880, color = "#ffffff" },   # band  7     the PAPER - see the header
-  { at = 1.000, color = "#ffffff" },
+  { at = 0.0000, color = "#000000" },   # band 0
+  { at = 0.1200, color = "#000000" },
+  { at = 0.1300, color = "#b00808" },   # band 1   red
+  { at = 0.2450, color = "#b00808" },
+  { at = 0.2550, color = "#000000" },   # band 2
+  { at = 0.3700, color = "#000000" },
+  { at = 0.3800, color = "#b00808" },   # band 3   red
+  { at = 0.4950, color = "#b00808" },
+  { at = 0.5050, color = "#000000" },   # band 4
+  { at = 0.6200, color = "#000000" },
+  { at = 0.6300, color = "#b00808" },   # band 5   red
+  { at = 0.7450, color = "#b00808" },
+  { at = 0.7550, color = "#000000" },   # band 6
+  { at = 0.8700, color = "#000000" },
+  { at = 0.8800, color = "#ffffff" },   # band 7   the PAPER - see the header
+  { at = 1.0000, color = "#ffffff" },
 ]
 
 [params]
@@ -115,10 +134,13 @@ phase = "noise(time * 0.031) * 0.9 + clamp(onset * 0.583, 0, 0.35)"
 # forms. A small, slow term - at any size it stops being a rose.
 radial_offset = "0.06 + noise(time * 0.019 + 50) * 0.10"
 
-# THE ENGRAVING. Weight takes the low end, which on a black ink is the only place
-# it can go. Deliberately at the bottom of the shipped range - see the header on
-# what the OVER seam cost this figure.
-thickness = "1.50 + clamp(bass * 0.706, 0, 0.60)"
+# THE ENGRAVING. Weight takes the low end. 1.10 to 1.60 is BELOW the 1.5 to 3.2
+# the shipped line presets use, and deliberately so on this figure alone: a
+# Maurer rose is hundreds of chords crossing constantly, so its ink area comes
+# from the crossings rather than from the stroke, and a weight that suits a
+# sparse figure fills this one in solid. Lowered from 1.50 with the red rebalance
+# above - the two together are what lifted it out of muddy.
+thickness = "1.10 + clamp(bass * 0.588, 0, 0.50)"
 softness  = "0.10"
 
 brightness = "1.0"
