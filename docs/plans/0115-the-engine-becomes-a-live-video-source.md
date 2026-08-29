@@ -366,7 +366,7 @@ void      lmv_spout_destroy(LmvSpout *);
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Stage the SDK, prove the receiving half | human | in progress — SDK facts recorded, TouchDesigner checks outstanding | |
+| 1 — Stage the SDK, prove the receiving half | human | done — gate passed; the colour item is deferred into Phase 3, see the notes | |
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
 | 3 — The Spout shim | dev | not started | |
 | 4 — `lmv --stream` | dev | not started | |
@@ -376,10 +376,11 @@ void      lmv_spout_destroy(LmvSpout *);
 
 ### Notes
 
-**Phase 1 — four of the six findings, read out of the staged SDK.** The release is unpacked at
-`WORK/spout-2.007.017/`, outside the repo. The two still open are the two that are questions *about
-TouchDesigner* and cannot be answered from the SDK: whether the sender appears in a Spout In TOP and
-under what name, and how that TOP reads the colour.
+**Phase 1 — the gate passed.** Spout's own `SpoutSender.exe` reaches TouchDesigner 2025.33070 on
+this machine: its demo content renders in a `Syphon Spout In` TOP at `/project1/syphonspoutin1`.
+**Phase 3 onward proceeds as written.** Five of the six done-when items are settled below; the
+sixth — colour — is deferred into Phase 3 with its reason, and Phase 3's own done-when already
+covers it. The release is unpacked at `WORK/spout-2.007.017/`, outside the repo.
 
 - **Release and hash, for the Phase 3 pin.** Spout **2.007.017**, published 2025-10-22. Two assets
   matter and both are pinned by their own hash, because they serve different phases:
@@ -437,10 +438,37 @@ under what name, and how that TOP reads the colour.
   `--size 1280x720` sits inside the cap and is unaffected. **Phase 6's "largest size and frame rate
   that hold steady" is therefore bounded by the licence rather than by the frame budget**, and
   1920x1080 — the size ADR-0125's 8.29 MB/frame and ~498 MB/s figures are stated at — cannot be
-  confirmed end to end on this install. Our own half of that number is still measurable from Phase
+  confirmed end to end on this install. **Confirmed from the receiver itself**, which raises
+  `Warning: Resolution limited to max 1280x1280 with Non-Commercial key` on the TOP. Our own half of that number is still measurable from Phase
   5's per-stage cost line at any size; it is the TouchDesigner-side confirmation that is capped, and
   Phase 6 should say so rather than report the cap as a limit of this engine. TouchDesigner 2025
   also requires a Vulkan 1.1 GPU, which this box has.
+- **What the receiving TOP reports, read from its info panel.** `Size: 1280 720`,
+  `Format: 8-bit fixed (RGBA)`, `GPU Mem this TOP: 8.85 MB`. The format line is the encouraging
+  one: the TOP presents the received texture as 8-bit RGBA, which is the order
+  `SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` will publish, so our bytes land without a swizzle
+  on either side. It says nothing about *transfer function*, which is the half still open.
+- **TouchDesigner links Spout SDK 2.007.014; we pin 2.007.017.** The receiver's own info panel
+  names its version. The skew is expected to be harmless and the pin stays at **.017**: Spout's
+  cross-process contract is the shared-memory sender-name map plus a DX11 shared-texture handle,
+  not the library version, so sender and receiver are versioned independently by design — and
+  .017 is the release whose `SendImage` carries the optional row pitch. It is nonetheless a real
+  variable that no test in this repo can see, so **Phase 3's TouchDesigner check is what confirms
+  a .017 sender is read by a .014 receiver**, and this line is here so a failure there is
+  recognised as version skew rather than chased as a shim bug.
+- **The colour item is deferred into Phase 3, and could not have been done here.** Phase 1's
+  method asks the demo sender to publish a known reference image; `SpoutSender.exe` publishes its
+  own animated content and takes no image input, so the reference-vs-TOP comparison is not
+  available before a sender we control exists. A TouchDesigner round trip (Movie File In ->
+  `Syphon Spout Out` -> `Syphon Spout In`) is not a substitute: if TouchDesigner sends and receives
+  under the same convention it round-trips clean even where that convention differs from ours,
+  which hides exactly the defect being hunted. **Phase 3's own done-when already states the check**
+  — a known solid colour and a black-to-white ramp published by our sender, matched against a
+  reference — so nothing is lost but the ordering, and the ordering was forced.
+- **One reading not to conclude from.** The TOP reported `CPU Cook Time: 28.940 ms`, annotated
+  `(CPU Cook Time not measured on previous cook)`, i.e. a first measurement rather than a settled
+  one. At face value that would cap the receive side near 34 fps, which would matter; it is
+  recorded so **Phase 6 takes a proper reading** rather than treating this one as a result.
 - **One trap for Phase 4's naming.** `SetSenderName` auto-increments on collision — a second sender
   asking for `name` is registered as `name_1`, then `name_2`. A crashed previous run can leave a
   stale registration, so the name TouchDesigner shows is not guaranteed to be the name we asked
