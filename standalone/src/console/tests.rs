@@ -120,3 +120,63 @@ fn a_closed_console_claims_no_events() {
 fn an_unknown_window_is_unknown() {
     assert_eq!(dispatch(&9u32, &1u32, Some(&2u32)), Target::Unknown);
 }
+
+// --- scale: fitting the list into the console's own window ------------------
+
+/// A console smaller than the reference shrinks; one at or above it does not
+/// magnify. The show's own type size is the ceiling, never a starting point to
+/// grow from.
+#[test]
+fn a_small_console_shrinks_and_a_large_one_does_not_grow() {
+    assert!(scale(640.0) < 1.0);
+    assert_eq!(scale(1080.0), 1.0);
+    assert_eq!(scale(2160.0), 1.0);
+}
+
+/// The shrink has a floor: an operator who cannot read the list across a desk
+/// is worse off than one scrolling a larger one.
+#[test]
+fn the_scale_has_a_readable_floor() {
+    assert_eq!(scale(1.0), MIN_SCALE);
+    assert_eq!(scale(100.0), MIN_SCALE);
+}
+
+/// A degenerate size never produces a scale that would collapse the layout or
+/// poison every coordinate with a NaN.
+#[test]
+fn a_degenerate_height_falls_back_to_unity() {
+    assert_eq!(scale(0.0), 1.0);
+    assert_eq!(scale(-10.0), 1.0);
+    assert_eq!(scale(f32::NAN), 1.0);
+}
+
+/// **The property the fix exists for.** Laying out at the logical size and then
+/// scaling by the same factor lands the result inside the real window — so the
+/// grid the browser computes is one that fits, rather than the top-left corner
+/// of a grid built for the projector.
+#[test]
+fn the_logical_size_scales_back_into_the_real_window() {
+    let (w, h) = (900.0, 640.0);
+    let (lw, lh) = logical_size(w, h);
+    let s = scale(h);
+
+    assert!((lw * s - w).abs() < 0.01);
+    assert!((lh * s - h).abs() < 0.01);
+    // And it is genuinely bigger, which is what buys the extra columns and rows.
+    assert!(lw > w);
+    assert!(lh > h);
+}
+
+/// Scaling moves positions and type together, so the list keeps its proportions
+/// instead of shrinking the font inside a full-size grid.
+#[test]
+fn scaling_moves_position_and_size_together() {
+    let mut rows = vec![Line::new("row".to_owned(), 100.0, 200.0, 22.0, [1.0; 4])];
+    scale_lines(&mut rows, 0.5);
+
+    let row = &rows[0];
+    assert_eq!((row.x, row.y, row.size), (50.0, 100.0, 11.0));
+    // Colour and text are untouched — this is geometry only.
+    assert_eq!(row.text, "row");
+    assert_eq!(row.color, [1.0; 4]);
+}

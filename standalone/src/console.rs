@@ -135,6 +135,59 @@ pub fn route(mut chrome: Vec<Line>, mut modal: Vec<Line>, console: Console) -> F
     dst
 }
 
+/// The window height [`crate::overlay`]'s list constants were authored against —
+/// the windowed 1080p default the app opens at, and the size the NFR 1
+/// performance floor is quoted for.
+///
+/// It is a **reference, not a requirement**: the constants are device pixels, so
+/// drawing them unscaled into a console a third the height puts three quarters
+/// of the roster off the bottom edge and every column but the first off the
+/// right. [`scale`] is what maps them onto whatever window the console got.
+const REFERENCE_HEIGHT: f32 = 1080.0;
+
+/// Smallest scale worth drawing: below this the rows stop being readable across
+/// a desk, and an operator who cannot read the list is worse off than one
+/// scrolling a larger one.
+const MIN_SCALE: f32 = 0.45;
+
+/// How much to shrink the list geometry for a console of `height` device pixels.
+///
+/// Capped at `1.0`: a console larger than the reference gets the same type as
+/// the show, never magnified. A uniform factor rather than separate x and y
+/// terms, because it scales the **font size** as well as the positions, and type
+/// stretched on one axis is unreadable in a way a smaller grid is not.
+pub fn scale(height: f32) -> f32 {
+    if !height.is_finite() || height <= 0.0 {
+        return 1.0;
+    }
+    (height / REFERENCE_HEIGHT).clamp(MIN_SCALE, 1.0)
+}
+
+/// The size to lay a list out against, so that `scale`-ing the result lands it
+/// inside a console of `width` x `height`.
+///
+/// The list geometry reasons in device pixels at the reference size, so the way
+/// to get more columns and more rows into a small window is to lay out against a
+/// **larger logical** window and shrink what comes back — not to re-derive the
+/// constants per window, which would put a second copy of the layout rule in the
+/// shell.
+pub fn logical_size(width: f32, height: f32) -> (f32, f32) {
+    let s = scale(height);
+    (width / s, height / s)
+}
+
+/// Shrink every line's position and font size by `s`, in place.
+///
+/// Applied to the lines the console receives and nothing else: the show's own
+/// text is already sized for the show.
+pub fn scale_lines(lines: &mut [Line], s: f32) {
+    for line in lines {
+        line.x *= s;
+        line.y *= s;
+        line.size *= s;
+    }
+}
+
 /// The console's own standing header, drawn above whatever the routing sends it.
 ///
 /// Present even with no modal open, so an operator can tell a console that is

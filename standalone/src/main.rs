@@ -1196,13 +1196,32 @@ impl AppState {
     /// [`overlay::ListLayout`], so the drawing and the `Left`/`Right` keys can
     /// never disagree about where a row is.
     fn list_layout(&self, visible_len: usize) -> overlay::ListLayout {
-        let size = self.window.inner_size();
-        overlay::layout(
-            visible_len,
-            self.browse.highlight(),
-            size.width as f32,
-            size.height as f32,
-        )
+        // Laid out against whichever surface will actually draw it. With the
+        // console open that is the console: laying the browser out for the
+        // output's 1920x1080 and then drawing it into a 900x640 window puts
+        // every column but the first off the right edge and most of the roster
+        // off the bottom, which is what the operator sees as truncated names.
+        //
+        // The console lays out at its **logical** size and the lines are scaled
+        // down on the way out (`console::scale_lines`), so a smaller window gets
+        // smaller type and more of the roster rather than a clipped corner of a
+        // full-size grid.
+        let (w, h) = match self.renderer.aux_size() {
+            Some((w, h)) => console::logical_size(w as f32, h as f32),
+            None => {
+                let size = self.window.inner_size();
+                (size.width as f32, size.height as f32)
+            }
+        };
+        overlay::layout(visible_len, self.browse.highlight(), w, h)
+    }
+
+    /// The factor the console's text is shrunk by, or `1.0` with none attached.
+    fn console_scale(&self) -> f32 {
+        match self.renderer.aux_size() {
+            Some((_, h)) => console::scale(h as f32),
+            None => 1.0,
+        }
     }
 
     /// Push any track change the metadata source picked up into the core's
@@ -1367,6 +1386,11 @@ impl AppState {
             self.frame_text
                 .console
                 .insert(0, console::header(self.renderer.preset_name()));
+            // After the header joins them, so the whole console surface is
+            // scaled by one factor and the header cannot drift off the rows.
+            // Read before the mutable borrow, not inside the call.
+            let s = self.console_scale();
+            console::scale_lines(&mut self.frame_text.console, s);
         }
 
         let runs = self.frame_text.output_runs();
@@ -1540,7 +1564,10 @@ impl AppState {
             // The operator console. Out here only, like `S`: while the browser
             // is open `C` is a filter character and the branch above has already
             // returned.
-            KeyCode::KeyC => self.toggle_console(event_loop),
+            // Not on repeat: holding the key would flap a window open and shut
+            // rather than scroll a list, and creating a swapchain per repeat is
+            // the most expensive thing any binding here can do.
+            KeyCode::KeyC if !event.repeat => self.toggle_console(event_loop),
             // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
             // pair reads as a range with the floor on the left.
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
@@ -2010,9 +2037,17 @@ impl ApplicationHandler for App {
                 WindowEvent::RedrawRequested => state.window.request_redraw(),
                 // Keys reach the **same** state machines from either window: the
                 // console is a second keyboard onto one app, not a second app.
-                WindowEvent::KeyboardInput { event, .. }
-                    if event.state == ElementState::Pressed =>
-                {
+                // `!is_synthetic` is load-bearing here, not tidiness. winit
+                // replays the currently-held keys at a window that gains focus,
+                // and this window gains focus the instant `C` creates it - while
+                // `C` is still physically down. Handling that replay ran the
+                // toggle a second time and the console closed a few milliseconds
+                // after it opened.
+                WindowEvent::KeyboardInput {
+                    event,
+                    is_synthetic: false,
+                    ..
+                } if event.state == ElementState::Pressed => {
                     state.handle_key(event_loop, &event);
                 }
                 _ => {}
@@ -2047,7 +2082,14 @@ impl ApplicationHandler for App {
             // which is the only place that knows whether the key is a modal
             // navigation key (Plan 0050 Phase 2). Dropping them here is what made
             // holding an arrow in the browser do nothing.
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+            // Synthetic events are the focus-change key-state replay, never a
+            // press the operator made; no binding wants them (see the console
+            // arm above, where handling them closed the window on open).
+            WindowEvent::KeyboardInput {
+                event,
+                is_synthetic: false,
+                ..
+            } if event.state == ElementState::Pressed => {
                 state.handle_key(event_loop, &event);
             }
             _ => {}
