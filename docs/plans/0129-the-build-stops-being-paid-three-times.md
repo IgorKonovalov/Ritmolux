@@ -253,8 +253,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | 1 — Take the baseline | dev | done | b17d8cc |
 | 2 — Point the MSVC target at `rust-lld` | dev | done | fbc065b |
 | 3 — One artifact store for every lane | dev | done | 3323a71 |
-| 4 — Prove nothing about the tests changed | dev | done | committed with this row |
-| 5 — Repair the one script the redirect breaks | dev | not started | |
+| 4 — Prove nothing about the tests changed | dev | done | a50b193 |
+| 5 — Repair the one script the redirect breaks | dev | done | committed with this row |
 | 6 — Measure where the suite time actually goes | dev | not started | |
 | 7 — Write down what a machine has to do | dev | not started | |
 
@@ -417,6 +417,38 @@ store falsifies, since that path is no longer the build tree.
 
 Left as found, per the phase's *"a finding, not a fix-up"*. Not repaired, and no
 test was touched.
+
+**Phase 5 — the script.** `plugin-foobar/build.ps1` had exactly one
+`$repo\target` assumption, at the line the plan names. It now asks cargo:
+
+```powershell
+$meta = cargo metadata --format-version 1 --no-deps --manifest-path (Join-Path $repo "Cargo.toml") | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
+$coreLib = Join-Path $meta.target_directory "release\lmv_core_c.lib"
+```
+
+**Both branches of "correct whether or not a redirect is in effect" were
+exercised**, by moving the config aside and asking again: without it
+`target_directory` reports `…/light-music-visualizer/target`, with it
+`…/WORK/.lmv-target`. A machine that never opted in is unaffected.
+
+`.\build.ps1` exits 0 in 89 s. The staticlib resolves to
+`WORK/.lmv-target/release/lmv_core_c.lib` (97,762,378 bytes) and
+`plugin-foobar/build/foo_lmv.dll` is produced at **9,564,672 bytes**, against
+**9,285,120** for the DLL previously on disk, dated 2026-08-24.
+
+**That +279,552 bytes (+3.0 %) cannot be attributed from this measurement**, and
+is recorded rather than explained: between the two builds both the source moved
+(Plans 0123, 0127 and 0132 closed, the last adding the OSC sink to the shell) and
+the Rust side gained the `rust-lld` stanza. The C++ shim is still compiled and
+linked by MSVC either way, and a staticlib is an archive rather than a link
+product, so source growth is the likelier of the two — but nothing here separates
+them.
+
+**Unrelated stderr, unchanged by this phase.** The log carries
+`'vswhere.exe' is not recognized` raised inside `vcvars64.bat`'s own lookup at
+the `cmd /c` line. Compilation and linking proceed and the DLL is produced. That
+line is not one this phase touches.
 
 ### Close triggers
 
