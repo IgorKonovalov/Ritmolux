@@ -15,6 +15,7 @@ mod nowplaying_win;
 mod overlay;
 mod settings;
 mod soak;
+mod stream;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -2317,6 +2318,29 @@ fn main() {
     if std::env::args().skip(1).any(|arg| arg == "--list-adapters") {
         list_adapters_and_exit();
         return;
+    }
+
+    // The headless live source, decided BEFORE the event loop exists: this mode
+    // has no window and must not create one, so it cannot be a branch taken
+    // later inside the app (ADR-0125).
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    match stream::parse(&argv) {
+        Ok(Some(request)) => {
+            let config = resolve_config_path()
+                .as_deref()
+                .map(Config::load)
+                .unwrap_or_default();
+            if let Err(message) = stream::run(&request, &config.input) {
+                eprintln!("{message}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        Ok(None) => {}
+        Err(message) => {
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
     }
 
     // expect: init-time invariant — without an event loop there is no app.
