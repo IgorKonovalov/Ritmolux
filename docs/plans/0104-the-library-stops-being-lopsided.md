@@ -378,9 +378,9 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 | 1 — is the big family actually big | dev | done | `7561492` |
 | 2 — the singletons get a range | human (`preset-author`) | done | `b2866ec` |
 | 3 — the thin families fill out | human (`preset-author`) | done | `87eafaa` |
-| 4 — `star_pattern`, after the renderer settles | human | not started | — |
-| 4b — `warp_mesh` gets its first worlds | human | not started | — |
-| 5 — curate the set, not the presets | dev | not started | — |
+| 4 — `star_pattern`, after the renderer settles | human (`preset-author`) | done | `c1a6e09` |
+| 4b — `warp_mesh` gets its first worlds | human (`preset-author`) | done | `c1a6e09` |
+| 5 — curate the set, not the presets | dev | done (by `preset-author`) | — |
 | 6 — does the set read as a library | human | not started | — |
 
 ### Notes
@@ -492,6 +492,99 @@ above the frame and throwing downward.
   passage), but it means **`--horizon` measures the unaided mechanism only**, and a world whose
   long-run stability genuinely rests on a gate has no instrument. **Filed under `## Followups`.**
 
+#### Phases 4 and 4b result — authored 2026-08-29
+
+`star_pattern` **2 → 4** (Zellij, Corona) and `warp_mesh` **0 → 4** (Wellhead, Millrace, Sirocco,
+Cauldron). Library **66 → 72**.
+
+| Preset | system | bass | mid | treb | onset | anim | cover |
+|---|---|---|---|---|---|---|---|
+| Zellij | `star_pattern` | 0.085 | 0.047 | 0.057 | 0.021 | 0.043 | 0.438 |
+| Corona | `star_pattern` | 0.084 | 0.029 | 0.039 | **0.067** | 0.019 | 0.727 |
+| Wellhead | `warp_mesh` | 0.021 | 0.033 | 0.002 | 0.012 | 0.038 | 0.816 |
+| Millrace | `warp_mesh` | 0.018 | 0.042 | 0.004 | 0.014 | 0.027 | 0.710 |
+| Sirocco | `warp_mesh` | 0.015 | 0.038 | 0.002 | 0.012 | 0.038 | 0.723 |
+| Cauldron | `warp_mesh` | 0.033 | 0.038 | 0.000 | 0.031 | 0.027 | 0.915 |
+
+**Phase 4b's done-when is observable and met: `shot --presets presets --report` now prints TWELVE
+family sections.** `warp_mesh` was absent rather than flagged, which is the blind spot that let the
+plan's opening census miss the emptiest system in the library.
+
+**Phase 4's target was the family's onset, not its count.** Both shipped `star_pattern` worlds
+measure 0.007. Corona reports **0.067** — an order up — on a gesture the system had and nothing
+used: `scale` on a `scallop` is its lobe *depth*, and sweeping it through zero passes through a
+plain circle rather than through anything undefined, so it is safe to drive hard.
+
+Three things a later phase should carry.
+
+- **A `warp_mesh` world's `--horizon` is dominated by warm-up, on every one of the four.** The field
+  starts *empty* by construction, so the 0 s row is the picture before it exists and the
+  first-to-last delta measures the fill. Wellhead reads `coverage 0.2011 → 0.8879`, which looks like
+  a collapse in reverse and is not: `monotone` runs 0.25–0.60 across the four and every world holds
+  its band for the nine and a half minutes after the fill. Recorded in each header.
+- **The warp needs something to stir.** Cauldron drafted with a broad smooth deposit came back as a
+  featureless two-tone gradient — a wobble applied to a smooth field moves it and changes nothing
+  visible. On this system the deposit is the *texture the motion is legible against*, not just fuel.
+  This is the single most useful thing learned about hand-authoring the idiom.
+- **Sirocco's `wrap` argument was falsified by measurement**, which is worth recording because the
+  argument was sound. The file shipped a paragraph saying toroidal was structural, since a purely
+  translational field must empty; that is true of the *field* and false of the *picture*, because
+  the deposit keeps feeding it. Measured both ways over ten simulated minutes the two are within a
+  couple of percent on every statistic, so it is off — which removes recirculation as an
+  accumulation route outright rather than leaving it bounded by the decay.
+
+#### Phase 5 result — the final census and the workaround sweep, 2026-08-29
+
+**Roster from the scene registry** (`SystemKind::as_str`, `core/src/preset/schema.rs`), counted from
+`presets/*.toml` by **top-level `system =` only** — four presets carry a `[layer]` whose sub-system
+is not a world of the system it borrows (`attractor` ×2, `shape_field` ×1, `parametric_curve` ×1).
+
+| System | Plan's census (2026-08-16) | Phase 1 (2026-08-29) | Now | Floor |
+|---|---|---|---|---|
+| `attractor` | 17 | 17 | 17 | ✓ |
+| `fragment_field` | 8 | 13 | 13 | ✓ |
+| `reaction_diffusion` | 3 | 6 | 6 | ✓ |
+| `parametric_curve` | 2 | 3 | **4** | ✓ |
+| `emitter` | 3 | 3 | **4** | ✓ |
+| `lsystem` | **1** | 1 | **4** | ✓ |
+| `shape_collage` | *(did not exist)* | 3 | **4** | ✓ |
+| `shape_field` | **1** | 3 | **4** | ✓ |
+| `spectrum` | **1** | 1 | **4** | ✓ |
+| `star_pattern` | **1** | 2 | **4** | ✓ |
+| `swarm` | 2 | 2 | **4** | ✓ |
+| `warp_mesh` | **0** | **0** | **4** | ✓ |
+| **total** | **39** | **54** | **72** | |
+
+**Every registered system is at or above the floor of four.** The plan's revised arithmetic was
+18 new presets, 54 → 72; that is exactly what landed.
+
+**Near-duplicate sweep over all 72:** the only `NEAR-DUP` lines the report emits are still the
+four-way `attractor` cluster Phase 1 recorded (Lorenz Gallery, Valentine, Butterfly to Knot, Rho
+Walk, five of their six pairs). **Eleven of twelve families report `none below shape 0.08`** — no
+pair was introduced by any of the eighteen new worlds.
+
+**Workaround sweep** (`grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN\|backlog 00NN"
+presets/*.toml`, widened to real numbers). Four headers named a defect that has since been fixed or
+a citation that cannot be chased; all four are corrected, header-only, with no parameter touched:
+
+| File | Cited | Finding |
+|---|---|---|
+| `attractor_clifford.toml`, `attractor_leviathan.toml` | design-backlog 0047 | Both said authoring at the ceiling is what made the preset "a flat mass at `rich`, where 3x the particles deposit into the same texels". [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (Plan 0057 Phase 2) normalizes the deposit by particle count, so the tiers match in luminance. The tuning is right for its own sake; the reason was retired. |
+| `star_rosewindow.toml` | backlog 0073 | Gave "the vertex ceiling that retired the mandalas" as why it carries no motifs. Closed 2026-08-27 by [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) — six of the eight motifs are real curves now. The world still declines motifs, on taste. |
+| `fragment_driftmono.toml` | design-backlog 0140 | **No such entry**: the backlog has 104 rows spanning 0001–0148 and none numbered 0140. The capability it was waiting on (a contour that reads the ink rather than the band grid) landed as ADR-0133 + Plan 0121. The decision it argues for is unaffected. |
+
+Two more were checked and are **not** stale — both already say so in place, which is what the
+practice is supposed to produce: `emitter_perseids.toml` records that both walls it was written
+around came down on 2026-08-15 and that the preset is deliberately unchanged, and
+`attractor_clifford.toml`'s zoom paragraph states outright that the fold constraint is gone and the
+original framing is restored.
+
+**One citation is left standing and named here rather than guessed at:** `shape_facet.toml` cites
+`design-backlog 0099`, which is also not an entry id. Unlike the driftmono case there is no
+obvious intended entry, the defect it describes (a ~13-texel interior reading as a soft upscaled
+figure) is real, and its `palette_steps` workaround is live — so nothing needs re-tuning and the
+correct fix is a backlog number, which is `architect`'s to supply. **Filed under `## Followups`.**
+
 ## Followups (after this lands)
 
 - An ADR adding `preset-author` to the `Owner skill:` vocabulary.
@@ -512,6 +605,10 @@ above the frame and throwing downward.
   gate's own `ANIM_FLOOR` — Skyline at 0.002, Ridge at 0.007. The report's figure is a diff between
   two silent captures 0.4 s apart; the gate measures something else, and the column is the number an
   author reaches for first. Either the column should say what it measures or the two should agree.
+- **`presets/shape_facet.toml` cites `design-backlog 0099`, which is not an entry id.** Found by
+  Phase 5's workaround sweep and deliberately left standing rather than renumbered on a guess: the
+  defect it describes is real and its workaround is live, so what it needs is the right backlog
+  number, which is `architect`'s to supply.
 - **`shot --horizon` holds its stimulus fixed, so it cannot fire an edge-triggered param.** Noticed
   by Phase 3. `reseed`, `recompose` and every `[latch]` need a *rising edge*, and `--set` holds a
   level for the whole run — so a world whose long-run stability rests on one is measured as though

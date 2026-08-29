@@ -1,10 +1,20 @@
 # Rose Window - the interlace successor (Plan 0075, cohort 1). The Hankin
-# interlace kept at the scale it is honest at (long straight chords - no
-# sampled-curve motifs, which is the vertex ceiling that retired the mandalas,
-# backlog 0073) and multiplied by the SYMMETRY STAGE instead: kaleido_radial
+# interlace kept at the scale it is honest at (long straight chords, no motifs)
+# and multiplied by the SYMMETRY STAGE instead: kaleido_radial
 # repeats the rosette as concentric shrinking rings and one winding of
 # kaleido_spiral shears them into a Droste twist - an infinite stained-glass
 # window, travelling slowly inward forever.
+#
+# THE REASON THIS FILE GAVE FOR HAVING NO MOTIFS IS RETIRED (Plan 0104 Phase 5
+# sweep). It used to cite the vertex ceiling that retired the mandalas -
+# backlog 0073, every motif a parametric outline sampled to straight segments,
+# so a circle read as a polygon at ornament scale. Plan 0087 closed that
+# 2026-08-27: `circle` and `arc` are single per-pixel arcs, `petal`, `teardrop`
+# and `trefoil` are G1 arc chains, and only `diamond` and `chevron` are still
+# polylines. Motifs are available to this world now and it declines them on
+# taste - a bare interlace multiplied by the symmetry stage is a different
+# picture from an ornamented one, and `star_zellij` (Plan 0104 Phase 4) is where
+# the composite went instead.
 #
 # WHAT DRIVES WHAT. variant sweeps the contact angle continuously (the morph
 # is engine-quantized to 0.1 degrees, so it rebuilds cleanly); kaleido_zoom is

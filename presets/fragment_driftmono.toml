@@ -164,8 +164,18 @@ stops = [
 # frame colours 56 -> 741 at `palette_contour = 1.0`, for a picture whose seams
 # were already as hard as they can be. The contoured render is not bad; it is
 # heavier, and heavier is the wrong direction for a thread pulled through ink.
-# See `shape_contourmono`'s header for the case where it IS the right direction,
-# and design-backlog 0140 for the shape that would settle it either way.
+# See `shape_contourmono`'s header for the case where it IS the right direction.
+#
+# THE CAPABILITY THIS PARAGRAPH USED TO WAIT ON HAS LANDED (Plan 0104 Phase 5
+# sweep). It pointed at `design-backlog 0140` for "the shape that would settle
+# it either way", and there is no such entry - the backlog runs 0001..0148 with
+# 104 rows and none numbered 0140. The capability itself arrived as ADR-0133 and
+# Plan 0121: the contour now samples the two band centres an edge separates and
+# stays silent when they resolve to the same ink, so it fires at run boundaries
+# rather than at every band edge. That does not change the decision here. This
+# world's five run boundaries are already black-meets-white or white-meets-red
+# at full contrast, so a line at each of them only fattens the black side, which
+# is the measurement below.
 palette_steps   = "20"
 palette_contour = "0"
 
