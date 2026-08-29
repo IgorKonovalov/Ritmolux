@@ -407,6 +407,30 @@ predicts. `open_console` treats an `attach_aux` error as non-fatal — the windo
 reason goes to the diagnostic log, the show is untouched — and nothing on this machine or in CI can
 reach that branch. Phase 6 remains the only thing that would.
 
+**Two defects found by driving the console on the machine, both fixed in `b9edb61`.** Neither was
+reachable from the pure tests, and both are worth carrying into Phase 2 and Phase 4:
+
+- **The list was laid out against the output and drawn into the console.** `list_layout` read
+  `self.window.inner_size()`, so a 1920x1080 grid landed in a 900x640 window — all but the first
+  column off the right edge, most of the roster off the bottom, rows reading as oversized. The
+  layout now takes its size from the surface that will draw it: the console lays out at a
+  **logical** size and the emitted lines are scaled back by the same factor, so a smaller window
+  gets smaller type and *more* of the roster rather than a clipped corner of a full-size grid. At
+  900x640 the factor is 0.59 — four columns of thirty-two rows, the whole roster at once. Capped at
+  1.0 (never magnify past the show's own type) and floored at 0.45 (readable across a desk).
+  **This is [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s shape wearing
+  different clothes**: geometry destined for one surface must take its size from that surface. Phase
+  2's preview is the same trap with a stronger claim attached, since its rectangle must carry the
+  *output's* aspect while living in the console's window.
+- **The console opened and closed within milliseconds, intermittently.** winit replays the
+  currently-held keys at a window that gains focus; the console gains focus the instant `C` creates
+  it, while `C` is still down, and the replayed press ran the toggle again. Whether it fired
+  depended on how long the key was held, which is what made it look intermittent rather than broken.
+  Synthetic key events are now ignored in **both** windows — they are a focus-change artifact and no
+  binding wants one — and the toggle additionally ignores key repeat, since holding the key would
+  build and tear down a swapchain per repeat. **Phase 4 adds more console bindings and inherits
+  this**: any new one is exposed to the same replay.
+
 **Not verified on two displays.** The dev box's second-display behaviour, the present mode actually
 negotiated, and the cost of a second swapchain to the output are all unmeasured; the plan puts them
 in Phase 6 and Phase 6 was not run. The present mode is logged on open so that gate can read which
