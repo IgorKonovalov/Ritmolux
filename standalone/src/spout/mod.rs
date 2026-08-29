@@ -21,8 +21,14 @@ struct LmvSpout {
 }
 
 unsafe extern "C" {
-    fn lmv_spout_create(sender_name: *const c_char, width: c_uint, height: c_uint)
-    -> *mut LmvSpout;
+    fn lmv_spout_adapter_count() -> c_int;
+    fn lmv_spout_adapter_name(index: c_int, buffer: *mut c_char, length: c_int) -> c_int;
+    fn lmv_spout_create(
+        sender_name: *const c_char,
+        width: c_uint,
+        height: c_uint,
+        adapter: c_int,
+    ) -> *mut LmvSpout;
     fn lmv_spout_send(
         spout: *mut LmvSpout,
         rgba: *const u8,
@@ -58,6 +64,9 @@ pub enum SpoutError {
     },
     /// The SDK refused the frame.
     SendFailed { width: u32, height: u32 },
+    /// A graphics adapter index that does not exist on this machine. Carries
+    /// the roster so the message can name what is available.
+    NoSuchAdapter { index: u32, available: Vec<String> },
 }
 
 impl fmt::Display for SpoutError {
@@ -90,6 +99,19 @@ impl fmt::Display for SpoutError {
             SpoutError::SendFailed { width, height } => {
                 write!(f, "the Spout sender refused a {width}x{height} frame")
             }
+            SpoutError::NoSuchAdapter { index, available } => {
+                write!(f, "no graphics adapter {index} on this machine; it has ")?;
+                if available.is_empty() {
+                    return write!(f, "none that Spout can enumerate");
+                }
+                for (i, name) in available.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[{i}] {name}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -112,23 +134,77 @@ pub struct SpoutSender {
     height: u32,
 }
 
+/// The graphics adapters Spout can see, in index order.
+///
+/// Worth printing before choosing one: on a machine with more than one entry,
+/// [`SpoutSender::new`]'s `adapter` argument decides whether a receiver can open
+/// the sender at all, not how fast it runs.
+pub fn adapters() -> Vec<String> {
+    // SAFETY: no arguments and no shared state — the callee builds a temporary
+    // sender to enumerate through and drops it before returning.
+    let count = unsafe { lmv_spout_adapter_count() }.max(0);
+    (0..count)
+        .map(|index| {
+            let mut buffer = [0u8; 256];
+            // SAFETY: `buffer` is a live, writable array of exactly the length
+            // passed, and the callee NUL-terminates within it.
+            let ok = unsafe {
+                lmv_spout_adapter_name(
+                    index,
+                    buffer.as_mut_ptr().cast::<c_char>(),
+                    buffer.len() as c_int,
+                )
+            };
+            if ok == 0 {
+                return format!("adapter {index} (name unavailable)");
+            }
+            let end = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
+            String::from_utf8_lossy(buffer.get(..end).unwrap_or_default()).into_owned()
+        })
+        .collect()
+}
+
 impl SpoutSender {
-    /// Claim a sender named `name` for frames of `width` x `height`.
+    /// Claim a sender named `name` for frames of `width` x `height`, on graphics
+    /// adapter `adapter` — or on whatever D3D11 picks, for `None`.
+    ///
+    /// **`adapter` is a correctness argument on a machine with two GPUs, not a
+    /// performance one.** A Spout sender shares a D3D11 texture by handle and
+    /// the receiver opens that handle on its own device, which works only when
+    /// both are the same physical GPU. A hybrid laptop hands a plain console
+    /// process its integrated GPU to save power while the receiving application
+    /// runs on the discrete one, and the receiver then reports only that it
+    /// could not open the shared texture. [`adapters`] lists the choices.
     ///
     /// The **name** is settled here — [`name`](Self::name) is answerable
     /// straight away, and may differ from `name` where a stale registration
     /// forced an increment. The sender itself becomes visible to a receiver on
     /// the first [`send`](Self::send), because the SDK's eager registration
     /// entry point is not public.
-    pub fn new(name: &str, width: u32, height: u32) -> Result<Self, SpoutError> {
+    pub fn new(
+        name: &str,
+        width: u32,
+        height: u32,
+        adapter: Option<u32>,
+    ) -> Result<Self, SpoutError> {
         if width == 0 || height == 0 {
             return Err(SpoutError::EmptySize { width, height });
         }
+        // Rejected here rather than at the seam so the message can name the
+        // adapters the machine does have; the C side only answers yes or no.
+        let available = adapters();
+        if let Some(index) = adapter
+            && index as usize >= available.len()
+        {
+            return Err(SpoutError::NoSuchAdapter { index, available });
+        }
         let c_name = CString::new(name).map_err(|_| SpoutError::NameNotCString)?;
+        let pick = adapter.map_or(-1, |index| index as c_int);
         // SAFETY: `c_name` is a valid NUL-terminated string that outlives the
-        // call, and the dimensions are non-zero. The callee copies the name and
+        // call, the dimensions are non-zero and `pick` is either -1 or an index
+        // checked against the roster above. The callee copies the name and
         // returns either null or a handle this type takes sole ownership of.
-        let raw = unsafe { lmv_spout_create(c_name.as_ptr(), width, height) };
+        let raw = unsafe { lmv_spout_create(c_name.as_ptr(), width, height, pick) };
         let handle = NonNull::new(raw).ok_or_else(|| SpoutError::CreateFailed {
             name: name.to_string(),
             width,
