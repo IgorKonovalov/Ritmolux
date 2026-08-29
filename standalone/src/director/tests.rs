@@ -255,3 +255,64 @@ fn inverted_dwell_config_is_clamped() {
     }
     assert_eq!(d.advance(1.0, &steady), Some(Rotation::AutoTimer));
 }
+
+/// A rotation the director asks for must reach the renderer and change the
+/// scene — the contract `advance`'s own doc states and the halves of which
+/// drifted apart.
+///
+/// It pairs the two ends deliberately. `advance` returning `Some` is a
+/// *decision*, and `cycle_preset` is the only thing that carries it out; a
+/// caller holding one without the other produces an app whose auto-rotate
+/// announces switches that never happen, which is what shipped between
+/// 2026-07-26 and this test.
+///
+/// **What it does not cover, stated so nobody reads it as more than it is:**
+/// the call site in the shell. `AppState` needs a real window and lives in the
+/// binary, so nothing here can assert that the event loop's rotation branch
+/// calls `rotate_to_next`. That branch is guarded structurally instead — the
+/// helper pairs the change with its bookkeeping so neither can be reached
+/// alone.
+#[test]
+fn a_rotation_the_director_asks_for_changes_the_preset() {
+    use lmv_core::render::{HeadlessOptions, Renderer};
+
+    let Ok(mut renderer) = Renderer::new_headless(HeadlessOptions {
+        width: 64,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        eprintln!("skipped: no GPU adapter available for a headless renderer");
+        return;
+    };
+    assert!(
+        renderer.preset_names().count() > 1,
+        "a rotation is only observable across at least two presets"
+    );
+    let before = renderer.preset_name().to_owned();
+
+    // Auto-rotate with a one-second cap, driven past it on steady energy.
+    let mut director = make(true, 0, 1, false);
+    let mut rotated = None;
+    for _ in 0..120 {
+        if let Some(reason) = director.advance(1.0 / 60.0, &frame(0.5)) {
+            rotated = Some(reason);
+            break;
+        }
+    }
+    let reason = rotated.expect("a 1 s cap must fire within 2 s of frames");
+
+    // `cycle_preset` returns the INCOMING name straight away; `preset_name()`
+    // still reads the outgoing one until the dissolve's capture frame has
+    // rendered, which is what the shell's deferred title read exists for. So
+    // the incoming name is what says the roster advanced.
+    let incoming = renderer.cycle_preset().to_owned();
+    assert_ne!(
+        incoming, before,
+        "the director asked to rotate ({reason:?}) and the roster did not advance"
+    );
+    assert_eq!(
+        renderer.preset_name(),
+        before,
+        "the outgoing preset stays active until the dissolve's capture frame"
+    );
+}

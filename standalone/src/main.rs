@@ -559,7 +559,7 @@ impl AppState {
         // Hands-off scene rotation: the director decides from dt + this frame's
         // energy whether to advance the preset (manual Space/A override it).
         if self.director.advance(dt, &frame).is_some() {
-            self.on_preset_switched();
+            self.rotate_to_next();
         }
 
         // Hand the core any track change the metadata source picked up since the
@@ -660,6 +660,19 @@ impl AppState {
         self.pending_switch_settle = true;
         self.note_soak_switch();
         self.window.request_redraw();
+    }
+
+    /// Advance to the next preset and record the switch.
+    ///
+    /// **The single path a rotation takes**, whether the director asked for it
+    /// or the operator did. It exists because the two were open-coded and drifted:
+    /// `on_preset_switched` is bookkeeping *about* a switch and performs none, so
+    /// a caller that reached for it alone marked a rotation that never happened
+    /// and the scene never changed. Pairing the two here is what makes that
+    /// unrepresentable.
+    fn rotate_to_next(&mut self) {
+        self.renderer.cycle_preset();
+        self.on_preset_switched();
     }
 
     /// Mark a GPU-resource rebuild in the soak log, if one is running
@@ -1339,8 +1352,7 @@ impl AppState {
                 // Manual next scene: reset the director's dwell so the auto
                 // timer restarts from this moment.
                 self.director.force_next();
-                self.renderer.cycle_preset();
-                self.on_preset_switched();
+                self.rotate_to_next();
             }
             KeyCode::KeyA => self.toggle_auto_rotate(),
             KeyCode::F3 => self.toggle_diagnostics(),
