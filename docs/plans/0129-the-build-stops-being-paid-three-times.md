@@ -255,8 +255,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | 3 — One artifact store for every lane | dev | done | 3323a71 |
 | 4 — Prove nothing about the tests changed | dev | done | a50b193 |
 | 5 — Repair the one script the redirect breaks | dev | done | a29a23a |
-| 6 — Measure where the suite time actually goes | dev | done | committed with this row |
-| 7 — Write down what a machine has to do | dev | not started | |
+| 6 — Measure where the suite time actually goes | dev | done | a3d57c6 |
+| 7 — Write down what a machine has to do | dev | done | committed with this row |
 
 ### Notes
 
@@ -473,6 +473,22 @@ the ratio is ever worth re-checking.
 
 The store holds both artifact sets afterwards and grew from 5,444 MB to 7,200 MB.
 Disk: 71 GB free.
+
+**Phase 7 — the documentation.** Three files, each written for a different
+reader. `CLAUDE.md` gains a `## Machine setup` section carrying the **complete
+file contents**, so a fresh machine can be set up without opening ADR-0141; the
+`dev` context states the two rules a lane can break (never hardcode
+`<repo>/target`, never `cargo clean`); the `architect` context states what it
+changes when designing — a new lane starts warm, so sequencing a plan behind
+another to inherit its `target/` now buys nothing, and any plan assuming parallel
+lanes needs a fresh argument.
+
+All three phrase it as ADR-0033 phrases `core.hooksPath`: opt-in per machine,
+and **inert when skipped** — a machine without the file builds correctly into its
+own `target/`.
+
+All five repo gates exit 0: `check-doc-links`, `check-index-rows`,
+`check-backlog-claims`, `check-comment-hygiene`, `check-filter-figures`.
 
 ### Close triggers
 

@@ -93,6 +93,43 @@ scripts/             # Repo maintenance. Five Node gates, all run by pre-push an
                      #   scripts/fixtures/ holds their seeded bite checks.
 ```
 
+## Machine setup: the shared artifact store (opt-in, and inert if skipped)
+
+Every worktree can compile into **one shared artifact store** rather than its own `target/`, and the
+MSVC target can link with the toolchain's bundled `rust-lld`. Both live in one **machine-local**
+file that sits one directory *above* the worktrees — `WORK/.cargo/config.toml`, beside
+`light-music-visualizer/` rather than inside it — so cargo's ancestor walk finds it from whichever
+lane is building and a new lane needs no setup of its own:
+
+```toml
+[build]
+target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+```
+
+That is the whole file. `rust-lld.exe` is not on `PATH` and still resolves — rustc finds it in its
+own sysroot, so no explicit path and no linker-flavor flag are needed.
+
+**It is never committed, and it cannot be.** CI's `Swatinem/rust-cache` caches `./target`, so a
+committed redirect breaks the cache on every runner; the macOS arm has a different linker story; and
+that path names one machine. Like `git config core.hooksPath .githooks`
+([ADR-0033](docs/adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)), this is
+**opt-in per machine and inert when skipped** — a machine without the file builds correctly into its
+own `target/`, and `plugin-foobar/build.ps1` asks `cargo metadata` where the store is rather than
+assuming either layout.
+
+Three hazards come with it, none of them gated:
+
+- **`cargo clean` in any lane wipes the store for every lane.** Nothing prevents this; it is the
+  reason the chore below is manual rather than scripted.
+- **The store grows monotonically.** It accumulates every profile and feature combination any lane
+  ever built, and sweeping it is a manual chore with no trigger.
+- **Two lanes building at once serialize** on cargo's lock — the single
+  [ADR-0053](docs/adrs/0053-plan-lanes-run-in-git-worktrees.md) positive that
+  [ADR-0141](docs/adrs/0141-one-artifact-store-serves-every-lane.md) knowingly revokes.
+
 ## How we work (canonical workflow)
 
 This project runs a **three-skill** plan-driven harness (`.claude/skills/`), adapted from the
