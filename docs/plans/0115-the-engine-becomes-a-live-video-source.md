@@ -479,11 +479,36 @@ void      lmv_spout_destroy(LmvSpout *);
   logic compiles, runs and is tested with no SDK and no `spout` feature. Eleven unit tests cover it,
   including the Phase 3 failure as a named case (following the renderer must land on the discrete
   GPU, never the integrated one).
-- **NOT SATISFIED HERE, and it needs the receiver: "the probe with `--gpu` naming the discrete GPU
-  reaches TouchDesigner, and the integrated one does not."** No test in this repository can ask it.
-  The probe was run both ways and behaves correctly on this side — it pins [1] and [0] respectively
-  and publishes in both cases — but whether the TOP opens the shared texture is the observation,
-  and it is outstanding.
+- **SATISFIED, at the receiver, and the pair is what makes it evidence.** One binary, one sender
+  name, one argument different:
+
+  | `--gpu` | resolved | what the `Syphon Spout In` TOP showed |
+  |---|---|---|
+  | `"Radeon"` | adapter [0], AMD integrated | error badge, empty texture |
+  | `"RTX 3080"` | adapter [1], NVIDIA discrete | the reference picture, marker stepping |
+
+  That is Phase 3's platform finding reproduced through a **name** rather than an index, and the
+  negative half is what rules out "any adapter would have worked".
+
+- **THE INSTRUMENT WAS DEFECTIVE AND PRODUCED A FALSE NEGATIVE FIRST. This is the finding worth
+  carrying.** On the first attempt the integrated-GPU run showed a **normal, correct picture** in
+  the TOP — which reads as Phase 3's whole platform finding being wrong. It was not: **a Spout
+  receiver that loses its sender keeps presenting the last texture it received**, and the probe
+  published a *static* image, so a live feed and a frozen frame from the previous working run are
+  the same picture. Nothing on the screen distinguished them.
+  - The probe now stamps a **liveness marker** — a white cell stepping across the bottom band, four
+    steps a second, redrawn from the untouched reference each frame so it never accumulates. Moving
+    means live, parked means frozen, absent means nothing was ever received. With it, the
+    integrated-GPU run reads as an error badge and an empty texture, which is the true result.
+  - **The same trap is loaded for Phase 6**, which asks a human to judge colour fidelity and latency
+    by eye in that TOP. Every one of those readings can be taken against a frozen frame from an
+    earlier run, and none of them would look wrong. The marker is in the probe; whether the stream
+    mode needs one is a question for the close.
+  - A second confound, independent of the first: **force-killing a probe leaves its name registered,
+    so the next run increments** and a TOP pinned to the old name reports `No Active Sender Found`,
+    which is a *third* distinct symptom and not the adapter one. All three were hit during this
+    phase. The observed names alternated `lmv-probe` / `lmv-probe_1` across runs, which is why the
+    probe prints `lmv_spout_name`'s answer rather than the name it asked for.
 - The probe registered as `lmv-probe_1` on one run, which is the `SetSenderName` increment Phase 1
   predicted from a stale registration. It is why the mode prints `lmv_spout_name`'s answer.
 
