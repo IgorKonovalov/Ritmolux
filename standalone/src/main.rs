@@ -4,6 +4,7 @@ mod capture_verdict;
 #[cfg(windows)]
 mod capture_win;
 mod config;
+mod console;
 mod diaglog;
 mod director;
 mod downbeatlog;
@@ -27,7 +28,7 @@ use director::Director;
 use downbeatlog::DownbeatLog;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
-use lmv_core::render::{CapOverflow, Renderer, RendererOptions, TextRun, Tier};
+use lmv_core::render::{CapOverflow, Renderer, RendererOptions, Tier};
 use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
 use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierState};
 use soak::SoakLog;
@@ -69,6 +70,17 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 /// On-canvas active-preset-name label: top-left inset (device px), font size,
 /// and a light near-white color legible over most scenes.
+/// The operator console's window title, so it is tellable from the show's in a
+/// taskbar and by a window manager.
+const CONSOLE_TITLE: &str = concat!("lmv console ", env!("CARGO_PKG_VERSION"));
+/// The console's default size. Wide enough for the browser's multi-column list
+/// at its current column width, short enough to sit beside other desk windows.
+const CONSOLE_WIDTH: u32 = 900;
+const CONSOLE_HEIGHT: u32 = 640;
+/// Inset from the chosen monitor's top-left, so the console does not open flush
+/// into a corner under a taskbar.
+const CONSOLE_MARGIN: i32 = 64;
+
 const NAME_INSET: f32 = 16.0;
 const NAME_SIZE: f32 = 28.0;
 const NAME_COLOR: [f32; 4] = [0.9, 0.95, 1.0, 1.0];
@@ -127,6 +139,19 @@ struct AppState {
     /// independent pure state machine — see [`settings`] for why it is not the
     /// same one.
     settings: SettingsState,
+    /// The operator console's window, `None` while it is closed (ADR-0143).
+    ///
+    /// The window is the whole of the console's shell-side state: there is no
+    /// second `Renderer`, no second scene clock and no second modal state
+    /// machine. What the console *shows* is decided every frame by
+    /// [`console::route`], from the same lines the output would have drawn.
+    console_window: Option<Arc<Window>>,
+    /// This frame's text, split by destination and retained across frames so the
+    /// split reuses its buffers rather than allocating two vectors per frame.
+    frame_text: console::FrameText,
+    /// Scratch for the frame's modal rows, before routing moves them into
+    /// [`AppState::frame_text`]. Retained for its capacity.
+    modal_scratch: Vec<console::Line>,
     /// Whether the tier is pinned rather than engine-resolved — seeded from the
     /// launch pin (`--tier` / `LMV_TIER` / `[quality] tier`) and set by any
     /// explicit change. Tracked here rather than read off the renderer because
@@ -224,9 +249,9 @@ struct AppState {
     /// have to be re-queued every frame — an early return is **not** the fix
     /// here, reuse is. Holding the two vectors on the state means a steady-state
     /// frame allocates only when the content grows past the retained capacity.
-    frame_texts: Vec<String>,
-    /// `(x, y, size, color)` parallel to [`Self::frame_texts`].
-    frame_text_meta: Vec<(f32, f32, f32, [f32; 4])>,
+    /// The show's own furniture for this frame — corner preset name, capture
+    /// verdict — before routing moves it onto the output.
+    chrome_scratch: Vec<console::Line>,
 }
 
 /// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
@@ -341,8 +366,10 @@ impl AppState {
             // frame loop does not re-announce the startup preset's truncation.
             reported_overflow: renderer_overflow,
             reported_demotion: false,
-            frame_texts: Vec::new(),
-            frame_text_meta: Vec::new(),
+            console_window: None,
+            frame_text: console::FrameText::default(),
+            modal_scratch: Vec::new(),
+            chrome_scratch: Vec::new(),
             config,
             config_path,
             input,
@@ -362,6 +389,88 @@ impl AppState {
     fn save_config(&self) {
         if let Some(path) = &self.config_path {
             self.config.save(path);
+        }
+    }
+
+    /// Open or close the operator console (the `C` hotkey).
+    fn toggle_console(&mut self, event_loop: &ActiveEventLoop) {
+        if self.console_window.is_some() {
+            self.close_console();
+        } else {
+            self.open_console(event_loop);
+        }
+    }
+
+    /// Open the console on a display that is **not** the show's, when there is
+    /// one; with a single monitor it opens as an ordinary window on that monitor,
+    /// which is a supported mode rather than an error — a one-screen machine is
+    /// where this gets developed and demonstrated.
+    ///
+    /// A surface the renderer's adapter cannot drive is not fatal: the window
+    /// stays shut, the reason is logged once, and the show is untouched. That is
+    /// the dual-GPU path, and it is built blind here — no CI runner and no
+    /// single-GPU dev box can exercise it.
+    fn open_console(&mut self, event_loop: &ActiveEventLoop) {
+        let monitors: Vec<MonitorHandle> = self.window.available_monitors().collect();
+        // Not the show's monitor, when the machine has another. `display_index`
+        // is the output's own resolved position, so this asks the same question
+        // `resolve_monitor` answered rather than a second one spelled
+        // differently.
+        let target = monitors
+            .iter()
+            .enumerate()
+            .find(|(i, _)| *i != self.display_index)
+            .map(|(_, m)| m.clone());
+
+        let mut attrs = Window::default_attributes()
+            .with_title(CONSOLE_TITLE)
+            .with_inner_size(winit::dpi::PhysicalSize::new(CONSOLE_WIDTH, CONSOLE_HEIGHT));
+        if let Some(monitor) = target {
+            // Position rather than fullscreen: the console is a desk-side
+            // window an operator drags and resizes, not a second show surface.
+            let origin = monitor.position();
+            attrs = attrs.with_position(winit::dpi::PhysicalPosition::new(
+                origin.x + CONSOLE_MARGIN,
+                origin.y + CONSOLE_MARGIN,
+            ));
+        }
+
+        let window = match event_loop.create_window(attrs) {
+            Ok(window) => Arc::new(window),
+            Err(err) => {
+                eprintln!("could not open the operator console: {err}");
+                return;
+            }
+        };
+        let size = window.inner_size();
+        match self
+            .renderer
+            .attach_aux(Arc::clone(&window), size.width, size.height)
+        {
+            Ok(mode) => {
+                self.diag_log.note(&format!(
+                    "console opened: {}x{}, present mode {}",
+                    size.width,
+                    size.height,
+                    mode.as_str()
+                ));
+                window.request_redraw();
+                self.console_window = Some(window);
+            }
+            Err(err) => {
+                // The window is dropped here, so nothing is left on screen.
+                self.diag_log.note(&format!(
+                    "console surface unavailable on this adapter, staying closed: {err}"
+                ));
+            }
+        }
+    }
+
+    /// Close the console and release its swapchain. Idempotent.
+    fn close_console(&mut self) {
+        if self.console_window.take().is_some() {
+            self.renderer.detach_aux();
+            self.diag_log.note("console closed");
         }
     }
 
@@ -609,6 +718,9 @@ impl AppState {
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
         }
+        // After the show's present, never before it and never inside it: the
+        // console is a monitor and must not delay the frame it reports on.
+        self.present_console();
         // A dissolve's capture frame has now flipped the roster to the incoming
         // preset and applied its structural config, so this is the first moment the
         // renderer describes it rather than the one it is leaving (see
@@ -1129,14 +1241,33 @@ impl AppState {
         // borrow would forbid. `take` leaves an empty Vec behind for the
         // duration and the originals - with their retained capacity - go back at
         // the end, so a steady-state frame does no allocation here.
-        let mut texts = std::mem::take(&mut self.frame_texts);
-        let mut meta = std::mem::take(&mut self.frame_text_meta);
-        texts.clear();
-        meta.clear();
+        //
+        // Two buffers, not one: `chrome` is the picture's own furniture and
+        // always lands on the output, while `modal` follows the operator to
+        // whichever surface is driving. `console::route_into` is what decides,
+        // and it is the only thing that decides — a branch here that skipped
+        // building the modal rows when the console is open would work today and
+        // silently disagree with the routing the first time the rule changes.
+        let mut chrome = std::mem::take(&mut self.chrome_scratch);
+        let mut modal = std::mem::take(&mut self.modal_scratch);
+        chrome.clear();
+        modal.clear();
 
-        if preset_name_visible(self.modal(), self.overlay_on, self.config.hud.preset_name) {
-            texts.push(self.renderer.preset_name().to_owned());
-            meta.push((NAME_INSET, NAME_INSET, NAME_SIZE, NAME_COLOR));
+        // `output_modal`, not `modal`: with the console open the rows are not on
+        // the show, so nothing covers the corner name and it must stay.
+        let console_open = self.console_state();
+        if preset_name_visible(
+            output_modal(self.modal(), console_open),
+            self.overlay_on,
+            self.config.hud.preset_name,
+        ) {
+            chrome.push(console::Line::new(
+                self.renderer.preset_name().to_owned(),
+                NAME_INSET,
+                NAME_INSET,
+                NAME_SIZE,
+                NAME_COLOR,
+            ));
         }
 
         // The capture verdict, under the core's diagnostics panel and only while
@@ -1144,8 +1275,8 @@ impl AppState {
         // capture state, so this line and the log's `capture` column are the same
         // sentence about the same run.
         if self.overlay_on {
-            texts.push(overlay::capture_line(&self.capture_token));
-            meta.push((
+            chrome.push(console::Line::new(
+                overlay::capture_line(&self.capture_token),
                 NAME_INSET,
                 overlay::CAPTURE_TOP,
                 overlay::CAPTURE_SIZE,
@@ -1155,8 +1286,13 @@ impl AppState {
 
         if self.modal() == Some(Modal::Settings) {
             let view = self.settings_view();
-            texts.push("settings  -  up/down  left/right  esc".to_owned());
-            meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
+            modal.push(console::Line::new(
+                "settings  -  up/down  left/right  esc".to_owned(),
+                LIST_INSET,
+                LIST_TOP,
+                ROW_SIZE,
+                HEADER_COLOR,
+            ));
 
             // One column, always: ten rows fit any window this app opens in —
             // they start at `ROWS_TOP` (94 px) with a 30 px pitch, so the last
@@ -1169,8 +1305,13 @@ impl AppState {
                 } else {
                     ("  ", ROW_COLOR)
                 };
-                texts.push(format!("{marker}{label:<14}{value}"));
-                meta.push((LIST_INSET, y, ROW_SIZE, color));
+                modal.push(console::Line::new(
+                    format!("{marker}{label:<14}{value}"),
+                    LIST_INSET,
+                    y,
+                    ROW_SIZE,
+                    color,
+                ));
             }
         } else if self.modal() == Some(Modal::Browse) {
             let names = self.roster_names();
@@ -1185,8 +1326,13 @@ impl AppState {
             } else {
                 format!("filter: {}", self.browse.filter())
             };
-            texts.push(header);
-            meta.push((LIST_INSET, LIST_TOP, ROW_SIZE, HEADER_COLOR));
+            modal.push(console::Line::new(
+                header,
+                LIST_INSET,
+                LIST_TOP,
+                ROW_SIZE,
+                HEADER_COLOR,
+            ));
 
             // Column-major flow (Plan 0050 Phase 3): every placement decision is
             // the pure `layout`, so this loop only turns `(column, row)` into
@@ -1203,29 +1349,61 @@ impl AppState {
                 } else {
                     ("  ", ROW_COLOR)
                 };
-                texts.push(format!("{marker}{}", overlay::fit(name)));
-                meta.push((x, y, ROW_SIZE, color));
+                modal.push(console::Line::new(
+                    format!("{marker}{}", overlay::fit(name)),
+                    x,
+                    y,
+                    ROW_SIZE,
+                    color,
+                ));
             }
         }
 
-        let runs: Vec<TextRun<'_>> = texts
-            .iter()
-            .zip(meta.iter())
-            .map(|(t, &(x, y, size, color))| TextRun {
-                text: t.as_str(),
-                x,
-                y,
-                size,
-                color,
-            })
-            .collect();
+        // The console's standing header, so an idle console still reads as live.
+        // Queued after the routing has cleared last frame's lines and before the
+        // modal rows land under it.
+        console::route_into(&mut self.frame_text, &mut chrome, &mut modal, console_open);
+        if console_open.is_open() {
+            self.frame_text
+                .console
+                .insert(0, console::header(self.renderer.preset_name()));
+        }
+
+        let runs = self.frame_text.output_runs();
         self.renderer.queue_text(&runs);
 
-        // `runs` borrows `texts`, so the buffers can only go home once its last
-        // use is behind us.
+        // `runs` borrows `self.frame_text`, so the scratch buffers can only go
+        // home once its last use is behind us.
         drop(runs);
-        self.frame_texts = texts;
-        self.frame_text_meta = meta;
+        self.chrome_scratch = chrome;
+        self.modal_scratch = modal;
+    }
+
+    /// Whether the operator console is open this frame.
+    fn console_state(&self) -> console::Console {
+        if self.console_window.is_some() {
+            console::Console::Open
+        } else {
+            console::Console::Closed
+        }
+    }
+
+    /// Present the console's half of this frame, if one is attached.
+    ///
+    /// Separate from the output's `render` and after it: the console is a
+    /// monitor, so a frame it drops or a present that stalls must cost the show
+    /// nothing. A failure here closes the console rather than killing the app.
+    fn present_console(&mut self) {
+        if self.console_window.is_none() {
+            return;
+        }
+        let runs = self.frame_text.console_runs();
+        let result = self.renderer.present_aux(&runs);
+        drop(runs);
+        if let Err(err) = result {
+            eprintln!("console present failed, closing it: {err}");
+            self.close_console();
+        }
     }
 
     /// Route a pressed key. Overlay control keys (toggle / nav / enter / esc /
@@ -1233,7 +1411,7 @@ impl AppState {
     /// printable characters narrow the type-to-filter query and every other key
     /// is swallowed. When it is closed, non-overlay keys fall through to the
     /// shell's own bindings — Space-cycle and the F3 diagnostics toggle.
-    fn handle_key(&mut self, event: &KeyEvent) {
+    fn handle_key(&mut self, event_loop: &ActiveEventLoop, event: &KeyEvent) {
         let PhysicalKey::Code(code) = event.physical_key else {
             return;
         };
@@ -1359,6 +1537,10 @@ impl AppState {
             }
             KeyCode::KeyF => self.toggle_fullscreen(),
             KeyCode::KeyD => self.cycle_display(),
+            // The operator console. Out here only, like `S`: while the browser
+            // is open `C` is a filter character and the branch above has already
+            // returned.
+            KeyCode::KeyC => self.toggle_console(event_loop),
             // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
             // pair reads as a range with the floor on the left.
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
@@ -1423,6 +1605,21 @@ enum Modal {
 /// the flag that hides the name must not take it with it.
 fn preset_name_visible(modal: Option<Modal>, diagnostics: bool, enabled: bool) -> bool {
     enabled && modal.is_none() && !diagnostics
+}
+
+/// The modal **as the output sees it**: `None` while the operator console is
+/// open, because the rows are drawn there instead.
+///
+/// [`preset_name_visible`] yields the corner name to whatever is drawn over it.
+/// Once the console exists, "a modal is open" and "a modal covers the show" stop
+/// being the same fact, and feeding the raw one to that rule would blank the
+/// name on the projector every time the operator opened a menu on their own
+/// screen — a visible change to the show, caused by a surface the audience
+/// cannot see.
+///
+/// A free function beside the rule it feeds, so both are assertable as values.
+fn output_modal(modal: Option<Modal>, console: console::Console) -> Option<Modal> {
+    if console.is_open() { None } else { modal }
 }
 
 /// Map a physical key to the settings modal's abstract key, or `None` for keys
@@ -1782,13 +1979,47 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         let Some(state) = self.state.as_mut() else {
             if let WindowEvent::CloseRequested = event {
                 event_loop.exit();
             }
             return;
         };
+
+        // Which of our two windows this came from. The console's own close
+        // button and resize must not be handled as the show's — closing the
+        // console leaves the app running, closing the output exits.
+        let target = console::dispatch(
+            &id,
+            &state.window.id(),
+            state.console_window.as_ref().map(|w| w.id()).as_ref(),
+        );
+        if target == console::Target::Unknown {
+            return; // a stale event from a window already gone
+        }
+
+        if target == console::Target::Console {
+            match event {
+                WindowEvent::CloseRequested => state.close_console(),
+                WindowEvent::Resized(size) => {
+                    state.renderer.resize_aux(size.width, size.height);
+                }
+                // The console redraws with the show, from the output's frame
+                // loop — it carries no clock of its own.
+                WindowEvent::RedrawRequested => state.window.request_redraw(),
+                // Keys reach the **same** state machines from either window: the
+                // console is a second keyboard onto one app, not a second app.
+                WindowEvent::KeyboardInput { event, .. }
+                    if event.state == ElementState::Pressed =>
+                {
+                    state.handle_key(event_loop, &event);
+                }
+                _ => {}
+            }
+            return;
+        }
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
@@ -1817,7 +2048,7 @@ impl ApplicationHandler for App {
             // navigation key (Plan 0050 Phase 2). Dropping them here is what made
             // holding an arrow in the browser do nothing.
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                state.handle_key(&event);
+                state.handle_key(event_loop, &event);
             }
             _ => {}
         }
@@ -2384,8 +2615,8 @@ fn main() {
 mod tests {
     use super::{
         INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
-        RecoveryPolicy, config, device_row_index, parse_input_args_from, parse_osc_arg_from,
-        preset_name_visible, resolve_input, resolve_osc,
+        RecoveryPolicy, config, console, device_row_index, output_modal, parse_input_args_from,
+        parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
     };
 
     /// **A live input costs nothing and never reopens.** The policy runs every
@@ -2770,5 +3001,49 @@ mod tests {
         assert!(!preset_name_visible(None, false, false));
         assert!(!preset_name_visible(None, true, false));
         assert!(!preset_name_visible(Some(Modal::Browse), false, false));
+    }
+
+    /// A modal opened on the console does not cover the show, so the corner name
+    /// stays on it. Without this the operator opening a menu on their own screen
+    /// would blank a line on the projector.
+    #[test]
+    fn a_modal_on_the_console_leaves_the_shows_name_alone() {
+        use console::Console;
+
+        for modal in [Modal::Browse, Modal::Settings] {
+            assert!(preset_name_visible(
+                output_modal(Some(modal), Console::Open),
+                false,
+                true
+            ));
+        }
+    }
+
+    /// With no console, the rule is exactly what it was: the modal is on the
+    /// show and covers the name.
+    #[test]
+    fn a_modal_on_the_output_still_suppresses_the_name() {
+        use console::Console;
+
+        for modal in [Modal::Browse, Modal::Settings] {
+            assert!(!preset_name_visible(
+                output_modal(Some(modal), Console::Closed),
+                false,
+                true
+            ));
+        }
+    }
+
+    /// The diagnostics panel is on the show either way, so it covers the name
+    /// whatever the console is doing — the console relocates modals, not F3.
+    #[test]
+    fn the_console_does_not_rescue_the_name_from_the_panel() {
+        use console::Console;
+
+        assert!(!preset_name_visible(
+            output_modal(Some(Modal::Browse), Console::Open),
+            true,
+            true
+        ));
     }
 }

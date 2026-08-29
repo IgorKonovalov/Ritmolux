@@ -1,6 +1,6 @@
 # 0131 — The operator gets a console
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) (proposed)
@@ -343,20 +343,80 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main`, worktree `WORK/light-music-visualizer` (no worktree — taken directly on `main`).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The console window opens | dev | not started | |
-| 2 — The program preview | dev | not started | |
-| 3 — The modals move to the console | dev | not started | |
-| 4 — Transport, staging and the mouse | dev | not started | |
-| 5 — Persistence, the flag, and the docs | dev | not started | |
+| 1 — The console window opens | dev | done | committed with this row |
+| 2 — The program preview | dev | **not taken** — out of this session's scope | |
+| 3 — The modals move to the console | dev | done | committed with this row |
+| 4 — Transport, staging and the mouse | dev | **not taken** — out of this session's scope | |
+| 5 — Persistence, the flag, and the docs | dev | **not taken** — out of this session's scope | |
 | 6 — The on-device gate | human | not started | |
 
 ### Notes
 
+**A partial plan, taken under a deadline.** The user asked for Phases 1 and 3 only, on `main`,
+ahead of a show the same evening. Phases 2, 4 and 5 were not attempted and nothing here anticipates
+them beyond leaving their seams intact. The console that exists after this commit opens on `C`,
+carries the two modals and a standing header line, and shows **no preview of the output** — that is
+Phase 2 and it is absent, not stubbed.
+
+**Deviation — the plan's file path `core/src/render/aux.rs` cannot exist on Windows.** `AUX` is a
+reserved DOS device name, so the file creates fine and the compiler then cannot open it
+(`error[E0583]: file not found for module 'aux'` against a path `ls` shows present). The module is
+`core/src/render/aux_target.rs`, matching its `AuxTarget` type; a comment at the `mod` declaration
+records why, since the obvious tidy-up is to rename it back. Phase 2 lists the same path and will
+hit the same wall.
+
+**Deviation — Phase 3's byte-identity done-when was met with a different instrument, agreed with
+the user before the phase was written.** The criterion names "the same instrument Phase 2 built",
+and Phase 2 was not taken. Phase 2's instrument is a GPU frame comparison, and it exists because
+Phase 2 changes the output's pixel path (intermediate texture, `copy_texture_to_texture`, the sRGB
+round-trip it names as the likely silent failure). With Phase 2 absent that path is untouched:
+`draw_frame` still writes straight to the output swapchain, so the only route by which modal text
+can reach the show is the output's own `TextRun` list. That is asserted directly and purely, with no
+GPU, in `standalone/src/console/tests.rs`:
+`console_open_keeps_modal_text_off_the_output` compares the output's lines with a modal open against
+the same frame with it closed and requires **equality**, not absence of modal strings. Four further
+tests hold the surrounding shape — the rows reach the console, chrome never follows them there, the
+closed-console path is unchanged, and both surfaces are fed the same `Vec<Line>`. **This instrument
+does not cover what Phase 2's would**: it says nothing about pixels, so if Phase 2 is later taken,
+its byte-identity criterion is still owed in full and this does not discharge it.
+
+**Deviation — Phases 1 and 3 landed in one commit rather than two.** The routing seam is shared:
+Phase 3's split of `queue_frame_text` into chrome-versus-modal is what Phase 1's console has to be
+handed in order to draw anything, and a Phase-1-only commit would have introduced a second window
+that renders a header and nothing else, then rewritten the text path underneath it. One commit was
+the smaller change; the cost is that the two phases cannot be reverted separately.
+
+**Deviation — `core/src/render/context.rs` was edited and the phase does not list it.**
+`RenderContext` discarded both the `wgpu::Instance` and the `wgpu::Adapter` after construction, and
+a second surface needs both: a surface is only usable with a device whose adapter came from the same
+instance, and `get_default_config` takes the adapter. Two retained handles, filled at both existing
+construction sites, no behaviour change. There was no way to attach a secondary surface without
+this.
+
+**`DiagLog` gained a `note` method** for the two one-off console lines Phase 1 asks the diagnostic
+log to carry. `diagnostics.log` is a frozen tab-separated column format whose consumers read by
+index, so notes are written `#`-prefixed and skippable on their first byte rather than as rows with
+empty columns.
+
+**The dual-GPU degrade path is built and unexercised**, exactly as the plan's Risks section
+predicts. `open_console` treats an `attach_aux` error as non-fatal — the window is dropped, the
+reason goes to the diagnostic log, the show is untouched — and nothing on this machine or in CI can
+reach that branch. Phase 6 remains the only thing that would.
+
+**Not verified on two displays.** The dev box's second-display behaviour, the present mode actually
+negotiated, and the cost of a second swapchain to the output are all unmeasured; the plan puts them
+in Phase 6 and Phase 6 was not run. The present mode is logged on open so that gate can read which
+arm ran.
+
 ### Close triggers
+
+**Not filled: this plan is not closed.** Phases 2, 4 and 5 (`dev`) and Phase 6 (`human`) are still
+outstanding, so there is no close to trigger. The fields below are answered when the last phase
+lands, not per phase.
 
 - **`presets/` touched:**
 - **Plan header `Closes:`** none
