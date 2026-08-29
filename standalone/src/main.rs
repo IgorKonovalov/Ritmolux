@@ -2342,7 +2342,7 @@ fn main() {
                 .as_deref()
                 .map(Config::load)
                 .unwrap_or_default();
-            if let Err(message) = stream::run(&request, &config.input) {
+            if let Err(message) = stream::run(&request, &config.input, &config.rotate) {
                 eprintln!("{message}");
                 std::process::exit(1);
             }

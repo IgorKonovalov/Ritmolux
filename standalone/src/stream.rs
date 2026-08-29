@@ -67,6 +67,9 @@ pub struct StreamRequest {
     /// Stop after this many frames, for a bounded measured run. `None` runs
     /// until Ctrl-C.
     pub frames: Option<u64>,
+    /// Hold this preset for the whole run and rotate nothing. `None` rotates on
+    /// the director's dwell timer.
+    pub preset: Option<String>,
 }
 
 impl Default for StreamRequest {
@@ -78,6 +81,7 @@ impl Default for StreamRequest {
             gpu: None,
             sender: DEFAULT_SENDER.to_owned(),
             frames: None,
+            preset: None,
         }
     }
 }
@@ -124,6 +128,13 @@ pub fn parse(args: &[String]) -> Result<Option<StreamRequest>, String> {
                     return Err("--sender: the name cannot be empty".to_owned());
                 }
                 request.sender = raw.clone();
+            }
+            "--preset" => {
+                let raw = rest.next().ok_or("--preset: expected a preset name")?;
+                if raw.trim().is_empty() {
+                    return Err("--preset: the name cannot be empty".to_owned());
+                }
+                request.preset = Some(raw.clone());
             }
             "--frames" => {
                 let raw = rest.next().ok_or("--frames: expected a count")?;
@@ -188,6 +199,60 @@ pub fn rest_before(index: u64, period: Duration, elapsed: Duration) -> Option<Du
     due.checked_sub(elapsed).filter(|rest| !rest.is_zero())
 }
 
+/// How often the run reports its resident set and per-stage costs, in frames.
+/// 1800 is 30 s at 60 fps: often enough to watch a trend over a set, rare
+/// enough that the reporting is not itself a cost.
+pub const REPORT_EVERY: u64 = 1800;
+
+/// Wall-clock spent in each stage of the frame path, accumulated since the last
+/// report.
+///
+/// **Two stages, because the engine/sink boundary is the only one a caller-side
+/// clock can see.** `render_tapped` encodes the draw, submits it and then blocks
+/// mapping the readback, so there is no CPU-visible instant between "drew" and
+/// "read back": the block absorbs the GPU execution and the transfer together,
+/// and a timer around the encode alone would measure the encode. Splitting those
+/// two needs GPU timestamp queries — a device feature and a `core` seam, not a
+/// clock out here. The split that *is* available is the one that says whether
+/// the sink limits the rate, which is the question the readback-versus-zero-copy
+/// decision turns on (ADR-0125).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StageCosts {
+    /// Time inside `render_tapped`: draw, submit and the blocking readback.
+    pub render: Duration,
+    /// Time inside the Spout send: the upload into the sender's own device.
+    pub send: Duration,
+    /// Frames these totals cover.
+    pub frames: u64,
+}
+
+impl StageCosts {
+    /// Mean per-frame cost of each stage over the accumulated window.
+    pub fn line(&self) -> String {
+        if self.frames == 0 {
+            return "stream: no frames to cost".to_owned();
+        }
+        let per = |total: Duration| total.as_secs_f64() * 1000.0 / self.frames as f64;
+        format!(
+            "stream: render+readback {:.2} ms, spout send {:.2} ms, mean over {} frames",
+            per(self.render),
+            per(self.send),
+            self.frames
+        )
+    }
+
+    /// Start a fresh window, so each report covers the interval since the last
+    /// one rather than the whole run to date.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
+/// Whether frame `frames` closes a reporting interval.
+pub fn should_report(frames: u64, every: u64) -> bool {
+    every != 0 && frames != 0 && frames.is_multiple_of(every)
+}
+
 /// The exit line: frames emitted, wall-clock elapsed, scene-clock elapsed.
 ///
 /// The three exist so the frame-rate reading taken against this mode is a
@@ -222,13 +287,18 @@ unsafe extern "system" fn console_handler(_kind: u32) -> windows::core::BOOL {
 
 /// Run the headless source until Ctrl-C or `--frames`.
 #[cfg(all(feature = "spout", windows))]
-pub fn run(request: &StreamRequest, input: &crate::config::Input) -> Result<(), String> {
+pub fn run(
+    request: &StreamRequest,
+    input: &crate::config::Input,
+    rotate: &crate::config::Rotate,
+) -> Result<(), String> {
     use std::sync::atomic::Ordering;
     use std::time::Instant;
 
     use lmv_core::dsp::Analyzer;
     use lmv_core::render::{HeadlessOptions, Renderer, Tier};
     use standalone::gpu::{self, SenderAdapter};
+    use standalone::shot::render::ResidentSet;
     use standalone::spout::{SpoutSender, adapters};
 
     // The renderer's adapter is a frame-rate choice; the sender's, below, is a
@@ -308,10 +378,36 @@ pub fn run(request: &StreamRequest, input: &crate::config::Input) -> Result<(), 
         eprintln!("note     : could not install a Ctrl-C handler; the exit summary may not print");
     }
 
+    // A headless source has nobody to press Space, so rotation is ON here even
+    // though `[rotate] auto` defaults off for the window (ADR-0027): a source
+    // stuck on one preset for a four-hour set is not what this mode is for. The
+    // dwell bounds still come from the operator's config, and `--preset` opts
+    // out entirely.
+    let mut director = crate::director::Director::from_config(&crate::config::Rotate {
+        auto: request.preset.is_none(),
+        ..rotate.clone()
+    });
+    if let Some(name) = request.preset.as_deref() {
+        if !renderer.select_preset_by_name(name) {
+            return Err(format!(
+                "--stream: no preset named '{name}'; --list-presets is not a flag, but the                  embedded set is what the window browses"
+            ));
+        }
+        eprintln!("preset   : '{name}', held for the run - rotation is off");
+    } else {
+        eprintln!(
+            "rotation : on, dwell {}-{} s from the operator config",
+            rotate.min_dwell_secs, rotate.max_dwell_secs
+        );
+    }
+
     let period = request.period();
     let mut scratch = vec![0.0_f32; 32_768];
     let mut frames: u64 = 0;
     let mut scene = 0.0_f64;
+    let mut costs = StageCosts::default();
+    let mut resident = ResidentSet::default();
+    resident.sample();
 
     // Frame pacing is a shell concern; the core stays clock-free.
     #[allow(
@@ -349,13 +445,50 @@ pub fn run(request: &StreamRequest, input: &crate::config::Input) -> Result<(), 
         last = now;
         scene += f64::from(dt);
 
+        // Hands-off rotation, on the same director the window runs. The
+        // decision and the change are paired here for the same reason the
+        // shell pairs them: a rotation that is announced and not carried out
+        // leaves the source on one scene for the whole set.
+        if let Some(reason) = director.advance(dt, &frame) {
+            let incoming = renderer.cycle_preset().to_owned();
+            eprintln!("rotate   : frame {frames}, {reason:?} -> '{incoming}'");
+        }
+
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "stage costing reads the wall clock; core analysis stays clock-free"
+        )]
+        let drew = Instant::now();
         let image = renderer
             .render_tapped(&mut tap, &frame, dt)
             .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "stage costing reads the wall clock; core analysis stays clock-free"
+        )]
+        let sent = Instant::now();
         sender
             .send(&image.rgba, image.width, image.height)
             .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "stage costing reads the wall clock; core analysis stays clock-free"
+        )]
+        let done = Instant::now();
+        costs.render += sent.duration_since(drew);
+        costs.send += done.duration_since(sent);
+        costs.frames += 1;
         frames += 1;
+
+        if should_report(frames, REPORT_EVERY) {
+            resident.sample();
+            eprintln!("{}", costs.line());
+            eprintln!(
+                "{}",
+                resident.summary(frames.min(u64::from(u32::MAX)) as u32)
+            );
+            costs.reset();
+        }
 
         #[allow(
             clippy::disallowed_methods,
@@ -372,6 +505,14 @@ pub fn run(request: &StreamRequest, input: &crate::config::Input) -> Result<(), 
         reason = "stream pacing reads the wall clock; core analysis stays clock-free"
     )]
     let wall = started.elapsed();
+    resident.sample();
+    if costs.frames > 0 {
+        eprintln!("{}", costs.line());
+    }
+    eprintln!(
+        "{}",
+        resident.summary(frames.min(u64::from(u32::MAX)) as u32)
+    );
     eprintln!("{}", summary(frames, wall, scene, &adapter));
     Ok(())
 }
@@ -379,7 +520,11 @@ pub fn run(request: &StreamRequest, input: &crate::config::Input) -> Result<(), 
 /// Without the `spout` feature (or off Windows) there is no sink, and the mode
 /// says so rather than starting and publishing nowhere.
 #[cfg(not(all(feature = "spout", windows)))]
-pub fn run(_request: &StreamRequest, _input: &crate::config::Input) -> Result<(), String> {
+pub fn run(
+    _request: &StreamRequest,
+    _input: &crate::config::Input,
+    _rotate: &crate::config::Rotate,
+) -> Result<(), String> {
     Err(
         "--stream needs a build with the 'spout' feature on Windows; this binary was built \
          without it, so there is no Spout sender to publish to"
@@ -503,6 +648,75 @@ mod tests {
             rest_before(last, period, Duration::ZERO).expect("the deadline is in the future");
         assert_eq!(rest, Duration::from_nanos(16_666_666 * last));
         assert!(rest.as_secs() > 14_000, "four hours of frames: {rest:?}");
+    }
+
+    #[test]
+    fn a_pinned_preset_parses_and_is_refused_empty() {
+        let request = parse(&args(&["--stream", "--preset", "attractor_ink"]))
+            .expect("valid")
+            .expect("--stream was given");
+        assert_eq!(request.preset.as_deref(), Some("attractor_ink"));
+        assert!(parse(&args(&["--stream", "--preset", "  "])).is_err());
+        assert!(parse(&args(&["--stream", "--preset"])).is_err());
+    }
+
+    #[test]
+    fn with_no_pinned_preset_there_is_none_to_hold() {
+        assert_eq!(
+            parse(&args(&["--stream"]))
+                .expect("valid")
+                .expect("--stream was given")
+                .preset,
+            None
+        );
+    }
+
+    #[test]
+    fn a_report_closes_each_interval_and_nothing_between() {
+        assert!(!should_report(0, 1800), "frame zero closes no interval");
+        assert!(!should_report(1799, 1800));
+        assert!(should_report(1800, 1800));
+        assert!(!should_report(1801, 1800));
+        assert!(should_report(3600, 1800));
+    }
+
+    /// A zero interval must not divide by zero or report every frame.
+    #[test]
+    fn a_zero_interval_reports_never() {
+        assert!(!should_report(1800, 0));
+    }
+
+    #[test]
+    fn the_stage_line_reports_a_mean_per_frame_for_each_stage() {
+        let costs = StageCosts {
+            // 100 frames costing 8 ms each in the engine, 1 ms each in the sink.
+            render: Duration::from_millis(800),
+            send: Duration::from_millis(100),
+            frames: 100,
+        };
+        let line = costs.line();
+        assert!(line.contains("render+readback 8.00 ms"), "{line}");
+        assert!(line.contains("spout send 1.00 ms"), "{line}");
+        assert!(line.contains("over 100 frames"), "{line}");
+    }
+
+    #[test]
+    fn an_empty_window_costs_nothing_rather_than_dividing_by_zero() {
+        assert!(StageCosts::default().line().contains("no frames"));
+    }
+
+    /// Each report covers the interval since the last one, so a slow stretch
+    /// shows up instead of being averaged away by everything before it.
+    #[test]
+    fn resetting_starts_a_fresh_window() {
+        let mut costs = StageCosts {
+            render: Duration::from_millis(800),
+            send: Duration::from_millis(100),
+            frames: 100,
+        };
+        costs.reset();
+        assert_eq!(costs, StageCosts::default());
+        assert_eq!(costs.frames, 0);
     }
 
     #[test]
