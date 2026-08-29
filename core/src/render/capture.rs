@@ -293,3 +293,67 @@ fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32) -> Vec<u8
     }
     out
 }
+
+// ---------------------------------------------------------------------------
+// The sustained frame tap (Plan 0115 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// A persistent offscreen target plus readback buffer, built once and reused for
+/// every frame of a sustained tap.
+///
+/// The difference from the rest of this file is lifetime, not stage. Every other
+/// capture entry point builds its target and buffer per call — right for QA
+/// tooling that takes one frame, and wrong for a source that takes 864,000 of
+/// them, where per-frame texture and buffer creation is GPU allocation inside
+/// the loop. `capture_stream` already reuses its pair, but only for the length
+/// of one fixed-`dt`, one-preset run it drives itself; this type hands that
+/// reuse to a caller who owns the loop.
+///
+/// **Sized at construction and never resized.** `record_copy`'s extent, the
+/// buffer's length and `padded_bpr` are all fixed against `width`×`height`, so a
+/// renderer that resizes underneath a live tap needs a new one — [`open_tap`]
+/// is the only thing that sets these.
+///
+/// [`open_tap`]: super::Renderer::open_tap
+pub struct FrameTap {
+    /// `RENDER_ATTACHMENT | COPY_SRC`, the offscreen the frame draws into.
+    pub(crate) texture: wgpu::Texture,
+    /// A view of `texture`, held rather than recreated per frame.
+    pub(crate) view: wgpu::TextureView,
+    /// `COPY_DST | MAP_READ`, sized `padded_bpr * height`.
+    pub(crate) buffer: wgpu::Buffer,
+    /// Row stride of `buffer`, padded to the 256-byte copy alignment.
+    pub(crate) padded_bpr: u32,
+    /// Pixel width the three resources above are sized against.
+    pub(crate) width: u32,
+    /// Pixel height the three resources above are sized against.
+    pub(crate) height: u32,
+}
+
+impl FrameTap {
+    /// Build the target, its view and the readback buffer in one step — the
+    /// whole of the tap's GPU allocation, paid here so the per-frame path pays
+    /// none.
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> Self {
+        let (texture, view) = create_target(device, format, width, height);
+        let (buffer, padded_bpr) = create_readback(device, width, height);
+        Self {
+            texture,
+            view,
+            buffer,
+            padded_bpr,
+            width,
+            height,
+        }
+    }
+
+    /// The pixel size every frame this tap yields will carry.
+    pub fn size(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+}

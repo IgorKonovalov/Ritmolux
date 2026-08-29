@@ -603,7 +603,11 @@ pub struct ResidentSet {
 
 impl ResidentSet {
     /// Take one reading, if the platform offers one.
-    fn sample(&mut self) {
+    ///
+    /// Public so a caller driving its own frame loop samples on the same terms
+    /// the render mode does, rather than reimplementing the read and diverging
+    /// from `summary`'s warm-baseline arithmetic.
+    pub fn sample(&mut self) {
         if let Some(bytes) = crate::rss::current_rss_bytes() {
             self.samples.push(bytes);
         }
