@@ -3867,5 +3867,5 @@ looking.
 `renders/README.md` saying they assume the pre-ADR-0141 layout.
 
 - **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
-- **Verified 2026-08-29** - the two render scripts still assume the old layout: `present: SHOT=target/release/examples/shot\.exe in: renders/plan-0106-p6/run.sh`
+- **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
