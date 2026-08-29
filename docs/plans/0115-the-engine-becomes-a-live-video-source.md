@@ -367,7 +367,7 @@ void      lmv_spout_destroy(LmvSpout *);
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Stage the SDK, prove the receiving half | human | not started | |
-| 2 — The core grows a frame tap | dev | done | committed with this row |
+| 2 — The core grows a frame tap | dev | done | `b50592a` |
 | 3 — The Spout shim | dev | not started | |
 | 4 — `lmv --stream` | dev | not started | |
 | 5 — The stream survives a set | dev | not started | |
@@ -398,6 +398,13 @@ void      lmv_spout_destroy(LmvSpout *);
 **Readings taken, asserted against nothing.** The 300-frame run on the dev box's software adapter
 at 64x48 printed `resident set 82 MB, growth -13.1 MB across 300 frames after a +33.0 MB warm-up
 (peak 100 MB, 21 samples)`.
+
+**Session stopped after Phase 2, at Phase 1's gate.** Phase 3 onward needs four facts only the
+Phase 1 `human` run produces: the Spout2 release version + SHA-256 for `packaging/spout/sdk-pin.ps1`,
+the licence verdict, the exact `SpoutDX` CPU entry point (name, signature, channel- and row-order
+flag meanings) the shim in Phase 3 wraps, and the TouchDesigner colour setting Phase 3's own
+done-when re-checks against. Phase 2 was built to survive a Phase 1 that kills the rest and is
+independent of all four.
 
 **Non-vacuity control run on the byte-identity test.** Multiplying the tap's `dt` by three made it
 fail at the first differing pixel; reverted, and the suite is green on the tip.
