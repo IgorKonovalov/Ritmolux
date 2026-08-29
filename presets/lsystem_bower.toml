@@ -1,0 +1,132 @@
+# Bower - a branching spray folded into a twelve-fold rose (Plan 0104 Phase 2).
+# Authored fresh-slate (ADR-0089) around the one lever no other lsystem world in
+# the library uses: the GEOMETRY MIRROR. The base figure is a small symmetric
+# bush; `mirror_order` 6 with `mirror_reflect` puts twelve of it about the frame
+# centre, so the sprays interleave into a rosette whose petals are plants. That
+# is a mirror in WORLD space at update time, not the screen-space kaleidoscope -
+# no fold axis to fight, and the figure is genuinely twelve-fold rather than a
+# frame reflected twelve ways.
+#
+# WHAT DRIVES WHAT. This is the family's ONSET world, which the family did not
+# have - Plan 0104 Phase 1 measured Vellum's onset response at 0.003. A
+# transient buys a whole generation across all twelve sprays at once, so a hit
+# reads as the rose OPENING: 1500 segments to 7500, snapped on in 40 ms and let
+# down over half a second. Bass turns it, treble sharpens the stroke, and mid
+# carries the level.
+#
+# SEGMENT BUDGET, AND THE MIRROR IS INSIDE IT. `replicate_mirror` truncates at
+# the tier cap and the copies multiply the base: `F -> F[+F]F[-F]F` quintuples,
+# so depth 3 is 125 and depth 4 is 625 drawn segments, times twelve copies =
+# 1500 and 7500 of the floor tier's 20 000. `max_depth` is 4 for that reason and
+# not for a visual one - depth 5 would be 3125 * 12 = 37 500 and the rose would
+# come back with two of its twelve petals missing.
+#
+# THE PALETTE WALKS GENERATION, AND THIS GRAMMAR HAS THE BRACKETS FOR IT. Every
+# `[` opens a generation, so the ramp is real here (it is not on a Koch or a
+# Gosper rewrite): the trunks of all twelve sprays sit at the gradient's lapis
+# and the twigs at its gold, which is what makes the rosette read as a window
+# with leading rather than as a flat doily.
+system = "lsystem"
+name   = "Bower"
+
+[generator]
+axiom     = "F"
+rules     = { F = "F[+F]F[-F]F" }
+angle_deg = 22
+max_depth = 4
+
+[palette]
+stops = [
+  { at = 0.00, color = "#101a4a" },  # lapis - the trunks
+  { at = 0.30, color = "#37307e" },  # indigo
+  { at = 0.55, color = "#8e2f6b" },  # magenta glass
+  { at = 0.78, color = "#d4553c" },  # vermilion
+  { at = 1.00, color = "#f6c453" },  # gold - the twigs
+]
+
+[params]
+# THE ROSE OPENS ON A TRANSIENT. Gain from the cap the onset way (C / 0.60): the
+# cap is 1.4, so a real-music onset mean of ~0.20 sits at 0.47 - depth 3, closed
+# - and a genuine hit at 0.43 crosses 1.0 into depth 4. The asymmetric ease
+# below is what makes it a gesture rather than a flicker.
+visible_depth = "3 + floor(clamp(onset * 2.33, 0, 1.4))"
+
+# The rosette turns, slowly, and leans into the low end. `mirror_order` folds in
+# world space at update time, so the whole twelve-fold figure turns as one solid
+# thing - there is no fold axis for a rotation to decentre (the kaleido trap).
+rotation      = "time * 0.055 + clamp(bass * 0.176, 0, 0.15)"
+# The breath on `scale` matters more here than the turn does. A rotationally
+# symmetric figure turning about its own centre lands most of what moves on top
+# of a copy of itself, so a rosette reads as almost still to a frame-difference
+# measure however fast it spins; a radial breath moves every petal against the
+# background instead.
+scale         = "0.86 + noise(time * 0.4) * 0.05 + clamp(bass * 0.094, 0, 0.08)"
+# The twelve growing edges breathe together, which on a rosette reads as the
+# petals opening and closing rather than as a redraw. It is also what keeps the
+# world clear of the animation gate's floor in a silence - a slow turn of a
+# rotationally symmetric figure moves surprisingly few pixels, because most of
+# what rotates lands on top of a copy of itself.
+draw_progress = "0.94 + noise(time * 0.33) * 0.06"
+
+# THE FOLD ITSELF - six sectors, each carrying a reflected pair, so twelve
+# sprays. `mirror_reflect` is what makes a petal bilaterally symmetric rather
+# than merely repeated, and it is the difference between a rose window and a
+# pinwheel.
+mirror_order   = "6"
+mirror_reflect = "1"
+
+# Twelve interleaved sprays cross each other constantly, and every crossing sums
+# under the additive seam - so the stroke is narrow and the level is low. This
+# is the additive ceiling doing the tuning: at thickness 2.6 the rosette's inner
+# third welded shut into a solid disc and the leading disappeared.
+thickness  = "1.35 + clamp(treb * 0.83, 0, 0.5)"
+softness   = "0.22"
+glow       = "0.85"
+brightness = "0.4 + clamp(mid * 0.176, 0, 0.15)"
+
+# Generation shading through the jewel ramp (see header).
+# ...and the treble slides the whole ramp, so the window's glass shifts warmer
+# on a bright passage. Colour, not light: the additive ceiling has no room left
+# on this figure.
+hue        = "0.03 + sin(time * 0.027) * 0.025 + clamp(treb * 0.15, 0, 0.09)"
+hue_spread = "0.92"
+saturation = "1.12"
+
+# THE MIDS LIGHT THE CHANCEL. `brightness` is pinned low because twelve
+# interleaved sprays already sum wherever they cross; the whole-frame stop is
+# where the level response goes instead, so the window brightens as one thing
+# rather than the crossings burning out first.
+exposure = "0.92 + clamp(mid * 0.47, 0, 0.4) + clamp(onset * 0.33, 0, 0.2)"
+
+# A dark chancel behind the window, lifted a little from the bottom so the
+# rosette is not floating on flat black.
+bg_hue       = "0.08"
+bg_bright    = "0.11"
+bg_angle     = "0"
+bg_hue_span  = "0.1"
+bg_shade     = "1.0"
+bg_shade_end = "0.35"
+bg_vignette  = "0.6"
+
+# The crossings are where this figure puts light over range, and they sit in the
+# middle of the rosette - so the bloom lights the rose's HEART on a hit, which
+# is the same event the generation step is riding.
+bloom_amount    = "0.28 + clamp(onset * 0.83, 0, 0.5)"
+bloom_threshold = "0.9"
+bloom_radius    = "1.4"
+
+[smoothing]
+# SNAP UP, GLIDE DOWN - the whole gesture. The scene floors the eased value to
+# pick an iteration, so the attack has to be short enough that the flip actually
+# lands inside the transient (0.04 s) while the release is long enough that the
+# rose closes visibly rather than blinking (0.5 s).
+visible_depth = { attack = 0.04, release = 0.5 }
+thickness     = { attack = 0.03, release = 0.35 }
+brightness    = 0.3
+exposure      = { attack = 0.05, release = 0.4 }
+# Short, because the resting breath rides this same param: a long ease would
+# low-pass the noise term out and take the idle motion with it.
+scale         = 0.15
+hue           = 0.35
+rotation      = 0.35
+bloom_amount  = { attack = 0.03, release = 0.4 }

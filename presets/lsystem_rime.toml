@@ -1,0 +1,143 @@
+# Rime - a Koch snowflake drawn as one crisp crystalline outline (Plan 0104
+# Phase 2). Authored fresh-slate (ADR-0089) from the figure: where the library's
+# other lsystem worlds are FILLED - a Gosper meander inking a page, a branching
+# colony pooling light - this one is a single closed boundary and nothing else.
+# The frame is mostly empty on purpose; the whole world is one edge.
+#
+# WHAT DRIVES WHAT. Treble buys detail: the crystal gains a whole iteration on a
+# bright passage, 768 segments of boundary at rest to 3072 at peak, which is the
+# edge going from visibly faceted to visibly furred. Bass breathes the size,
+# onset ticks the stroke, and the figure turns slowly on its own axis - a
+# rotation of the FIGURE, not of the camera.
+#
+# SEGMENT BUDGET AND WHY max_depth STOPS AT 5. The rewrite `F -> F+F--F+F`
+# quadruples, so the drawn count is 3 * 4^n: depth 3 = 192, depth 4 = 768,
+# depth 5 = 3072 of the floor tier's 20 000. Depth 6 would be 12 288 and fits
+# the cap easily - it is excluded for a RESOLUTION reason, not a budget one. The
+# figure is fit-normalized into a 1.8-unit box, so at 1080p a depth-6 segment is
+# about half a pixel long and the boundary stops being a line and becomes a
+# fuzz. Depth 5 is the last iteration whose facets are still individually
+# visible, and that is the one a peak should buy.
+#
+# hue_spread IS DELIBERATELY ABSENT, AND THAT IS THE GRAMMAR'S DOING. On
+# `lsystem` the palette walks GENERATION DEPTH, counted by open brackets - and a
+# Koch rewrite has none, so every segment of this figure sits at generation 0
+# and the ramp would collapse to a flat colour however large it were set (the
+# trap presets/README.md records against the retired arrowhead). The colour
+# instead TRAVELS: `hue` slides the whole boundary through the ice gradient on a
+# long cycle, so the crystal is never twice the same temperature.
+system = "lsystem"
+name   = "Rime"
+
+[generator]
+axiom     = "F--F--F"
+rules     = { F = "F+F--F+F" }
+angle_deg = 60
+max_depth = 5
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0a1730" },  # night
+  { at = 0.22, color = "#1d4f8c" },  # deep ice
+  { at = 0.50, color = "#4aa8d8" },  # glacier blue
+  { at = 0.74, color = "#a8e8f5" },  # rime
+  { at = 1.00, color = "#f2fbff" },  # frost white
+]
+
+[params]
+# A WHOLE ITERATION, BOUGHT BY THE TREBLE. Gain from the cap: the cap is 1.1 and
+# a real-music treble mean is ~0.22, so a typical passage sits at 0.40 (depth 4)
+# and a bright one at 0.55 crosses into depth 5. The floor of 4 is where the
+# boundary first reads as a snowflake rather than as a hexagon with dents.
+visible_depth = "4 + floor(clamp(treb * 1.83, 0, 1.1))"
+
+# The crystal turns slowly in place and breathes with the low end. Both are
+# small: a still figure on an empty ground shows every bit of motion it has.
+rotation = "time * 0.043"
+scale    = "0.93 + clamp(bass * 0.118, 0, 0.1) + sin(time * 0.11) * 0.02"
+# The boundary is never quite closed - the last two percent of it draws and
+# undraws continuously, so the growing edge stays alive through a silence
+# without the figure ever visibly restarting.
+draw_progress = "0.975 + noise(time * 0.31) * 0.025"
+
+# A CRISP STROKE, WHICH IS THE POINT OF THE WHOLE WORLD. `softness` 0.08 is a
+# solid core with barely more than the one-pixel antialiased edge, so the
+# boundary reads as ETCHED rather than as a lit filament - the opposite
+# judgement from `lsystem_coral`, on the same param, for the same reason
+# (the figure decides the stroke, not the library). Thickness stays low because
+# a Koch edge doubles back on itself constantly and a wide nib fills its own
+# notches: measured, 3.0 closed the depth-5 facets entirely.
+thickness  = "1.7 + clamp(onset * 0.83, 0, 0.5)"
+softness   = "0.08"
+glow       = "1.0"
+# A crisp stroke reads brighter at the same level than a soft one does - more of
+# the footprint sits at full coverage - so this is trimmed against the soft
+# worlds rather than matched to them.
+brightness = "0.88 + clamp(bass * 0.353, 0, 0.3)"
+
+# THE COLOUR TRAVELS INSTEAD OF SPREADING (see header). A full cycle is about
+# 260 s, so within a single track the crystal drifts one or two stops rather
+# than sweeping the gradient, which is the intent - a slow change of light on a
+# fixed object, not a rainbow.
+# The mids ride the same slide, and they are the only thing in the world that
+# moves colour rather than light - so a warm passage walks the crystal a stop or
+# two up the ice gradient and a cold one lets it fall back. `mod` keeps the walk
+# cyclic, so it can never jump at the wrap.
+hue        = "mod(0.24 + time * 0.0038 + clamp(mid * 0.212, 0, 0.18), 1.0)"
+hue_spread = "0"
+saturation = "1.0"
+
+# THE WHOLE-FRAME STOP CARRIES THE LOW END. A crisp figure on an empty ground
+# has very few pixels to move, so a level term on the stroke alone is a small
+# event however hard it is driven; `exposure` moves the sky with it. It sits
+# upstream of the tonemap, so a third of a stop reads as the light changing
+# rather than as the crystal flashing.
+exposure = "0.95 + clamp(bass * 0.412, 0, 0.35)"
+
+# Night sky, darkest overhead. The ramp runs top-to-bottom so the ground the
+# crystal sits on lifts slightly toward the bottom edge and the figure is not
+# floating on a flat black rectangle.
+bg_hue       = "0.02"
+bg_bright    = "0.1"
+bg_angle     = "3.1416"
+bg_hue_span  = "0.16"
+bg_shade     = "0.4"
+bg_shade_end = "1.0"
+bg_vignette  = "0.62"
+
+# THE INTERIOR IS EMPTY AND IT STAYS EMPTY - `trails` IS OFF DELIBERATELY. The
+# obvious way to fill a hollow boundary is the feedback stage, and three
+# settings of it were rendered and rejected here, each failing the same way for
+# a different reason. `fb_zoom` below 1 with a long tail pulls ghosts inward and
+# they merge into a solid petal blob (the void filling in). Shortening the tail
+# turns the ghosts into a radial veil that buries the etched line under a smear.
+# `fb_zoom` above 1 inverts the world entirely - a dark silhouette inside an
+# outward burst, striking and no longer a crystal. All three destroy the one
+# thing this world is: a single crisp closed line. So the negative space is the
+# composition, and the figure is scaled to nearly fill the frame so that space
+# reads as the inside of a large form rather than as slack around a small one.
+#
+# The consequence to expect in `shot --report`: this world's `cover` is low by
+# construction, lower than any other lsystem in the library. That is the figure,
+# not a defect - a Koch boundary at depth 5 is 3072 segments of a curve with no
+# area at all.
+
+# The one stage that gets an onset, and it is bloom rather than level: a crisp
+# stroke puts real fuel above the threshold, so a hit frosts a halo around the
+# boundary without moving the boundary itself.
+bloom_amount    = "0.3 + clamp(onset * 0.83, 0, 0.5)"
+bloom_threshold = "0.8"
+bloom_radius    = "1.5"
+
+[smoothing]
+# The scene floors the eased value to pick an iteration, so a slow ease would
+# park the param below the flip for its whole travel and the detail step would
+# never land. 0.18 gives a bright passage its iteration and refuses a single
+# cymbal.
+visible_depth = 0.18
+thickness     = { attack = 0.02, release = 0.4 }
+brightness    = 0.3
+hue           = 0.4
+exposure      = { attack = 0.05, release = 0.4 }
+scale         = { attack = 0.06, release = 0.45 }
+bloom_amount  = { attack = 0.03, release = 0.35 }
