@@ -1,0 +1,129 @@
+# Petalfall - blossom coming DOWN through the frame, gusting on the transients
+# (Plan 0104 Phase 3). Authored fresh-slate (ADR-0089).
+#
+# THE SOURCE IS ABOVE THE FRAME, AND THAT IS THE NEW THING. All three shipped
+# emitter worlds throw upward from below - Perseids at a lean, Ember Jet
+# vertically from a point, Drift Field slowly across. The source line is
+# authorable geometry (ADR-0104) and it is clamped to 1.6 frames, so it can sit
+# ABOVE the picture as easily as below it: at `source_y` 1.15 with a
+# `launch_angle` near pi - radians clockwise from straight up, so pi is straight
+# down - the objects are thrown downward and gravity accelerates them further.
+# Nothing else in the family falls, and a fall reads nothing like a throw: the
+# marks enter fast at the top, they never turn over, and the frame has no crest.
+# It also means there is no spawn pop to pay for - the objects are born
+# off-screen - so `spawn_fade` stays at 0 rather than hiding an artifact that
+# does not happen.
+#
+# THE ARITHMETIC. Retirement is at 1.6 frames, so a mark travels 2.75 world
+# units from birth to death. At `launch_speed` 0.42 and `gravity` 0.85 that is
+# 0.42*t + 0.425*t^2 = 2.75, so t = 2.10 s; `lifetime` 2.6 with a wide spread
+# covers it without holding dead pool. The population settles near
+# `spawn_rate * flight time`, which is the density lever the surge below rides.
+#
+# THE FAMILY IS ONSET-DEAF AND THIS IS THE FIX, NOT THE COUNT. Plan 0104
+# Phase 1 measured Drift Field, Ember Jet and Perseids at onset 0.000, 0.000 and
+# 0.022. Here a transient does three things at once, and the middle one is the
+# interesting one: the path is FIXED AT SPAWN and there is no mid-flight force,
+# so kicking `launch_angle` on a hit does not bend the petals already falling -
+# it launches the next ones on a different heading, and that difference travels
+# down the frame as a visible wave. A gust that propagates is what a fall can do
+# and a fountain cannot.
+system = "emitter"
+name   = "Petalfall"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#2a1730" },  # dusk violet
+  { at = 0.38, color = "#8a4a6a" },  # deep rose
+  { at = 0.68, color = "#e08fa8" },  # blossom
+  { at = 0.88, color = "#ffd6dd" },  # pale petal
+  { at = 1.00, color = "#fff6ee" },  # the near-white ones
+]
+
+[params]
+# ABOVE THE FRAME, SPANNING IT (see header). `source_width` is a fraction of the
+# frame's half-width, not world units, so 1 spans the picture on every display.
+source_y     = "1.15"
+source_width = "1"
+spawn_fade   = "0"
+# The fall starts full. A sky that builds over a lifetime is two seconds of
+# empty picture at a preset switch, and an object born back-dated is
+# indistinguishable from one that had been falling all along.
+prewarm = "1"
+
+# DENSITY, AND THE GUST. The base rate is a steady fall; the onset term nearly
+# triples it for the length of a transient, and because only NEW objects see it
+# the surge enters at the top and travels down.
+spawn_rate = "55 + clamp(bass * 71, 0, 60) + clamp(onset * 167, 0, 100)"
+
+gravity      = "0.85"
+launch_speed = "0.42"
+# STRAIGHT DOWN, LEANING. pi is vertical; the noise term is the prevailing
+# wind, and the onset term is the gust - it reaches the petals thrown after it,
+# never the ones already falling (see header).
+launch_angle = "3.1416 + noise(time * 0.07) * 0.34 - 0.17 + clamp(onset * 0.5, 0, 0.3)"
+# A wide cone, so the petals do not fall in ranks.
+spread = "0.55 + clamp(treb * 0.25, 0, 0.15)"
+
+lifetime        = "2.6"
+lifetime_spread = "0.45"
+
+# THE PETAL. A five-pointed star with a high valley radius is a bumpy round
+# blob rather than a spike - which is what a blossom silhouette is - and a
+# little `star_curve` bows its edges inward so the lobes separate. `spin` turns
+# it, and the sign is drawn per object, so the fall tumbles both ways.
+shape       = "3"
+points      = "5"
+star_valley = "0.78"
+star_curve  = "0.3"
+star_jitter = "0.25"
+# BIG ENOUGH TO HAVE A SILHOUETTE. At 1.5 the marks were points and the star
+# arm above was doing nothing an author could see - a shaped mark only reads
+# once it covers enough pixels for its lobes to separate. 2.8 is where the
+# blossom shape arrives; the density below came down in the same edit to pay
+# for it, since bigger marks at the same rate close the frame.
+size        = "2.8 + clamp(bass * 0.71, 0, 0.6)"
+size_spread = "0.75"
+spin        = "1.1 + clamp(mid * 0.94, 0, 0.8)"
+twinkle     = "0.25"
+
+# Held low against the additive ceiling: a full frame of overlapping petals sums
+# fast, and the blossom's pale end is already close to the tonemap's shoulder.
+brightness = "0.75 + clamp(mid * 0.235, 0, 0.2)"
+
+hue        = "0.6"
+hue_center = "0.66"
+hue_spread = "0.5"
+saturation = "0.9 + clamp(treb * 0.25, 0, 0.15)"
+
+# A dusk behind it, darkest at the top so the petals arrive out of shadow and
+# brighten as they fall.
+bg_hue       = "0.03"
+bg_bright    = "0.055 + clamp(bass * 0.059, 0, 0.05)"
+bg_angle     = "3.1416"
+bg_hue_span  = "0.22"
+bg_shade     = "0.35"
+bg_shade_end = "1.0"
+bg_vignette  = "0.5"
+
+# NO TRAILS. On this system a decaying smear behind an object that LEAVES is a
+# comet tail - which is Perseids' whole look and exactly wrong here. A petal
+# that streaks is not falling, it is being thrown.
+trails = "0"
+
+bloom_amount    = "0.2 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "0.95"
+bloom_radius    = "1.4"
+
+[smoothing]
+# Fast up, slow down on the surge: the gust has to land inside the transient,
+# and the fall it produces should thin out over a second rather than stopping.
+spawn_rate   = { attack = 0.04, release = 0.7 }
+launch_angle = { attack = 0.05, release = 0.8 }
+size         = { attack = 0.06, release = 0.45 }
+brightness   = 0.3
+spin         = 0.5
+spread       = 0.4
+saturation   = 0.3
+bg_bright    = 0.5
+bloom_amount = { attack = 0.03, release = 0.4 }
