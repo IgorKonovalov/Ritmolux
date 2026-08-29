@@ -1,6 +1,6 @@
 # 0133 — The engine drives the lights
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) (proposed),
