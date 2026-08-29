@@ -165,8 +165,12 @@ over a lit backdrop — **one pass, not two.**
   Plan 0080 Phase 7. **It is not.** What that phase retired is a different suspicion — that
   `bg_bright = 0.85` was reaching the tonemap's shoulder on the *backdrop ramp* (0 % of the column
   rail-pinned on any channel). Backlog 0038's finding is about **mid-tone figure luminance on
-  attractor presets**, which no backdrop measurement speaks to. **0038 is live**, and only one shipped
-  preset binds `exposure` today (`lsystem_vellum.toml:60`).
+  attractor presets**, which no backdrop measurement speaks to. **0038 is live.** ~~Only one shipped preset binds
+  `exposure` today (`lsystem_vellum.toml:60`).~~ **Corrected 2026-08-29 at the Plan 0104 close:
+  sixteen do, fifteen of them authored by that plan's cohorts, which reached for `exposure` as the
+  whole-frame level stage. None is in this item's population (the attractor family, the softer
+  `fragment_*`, `swarm_drift`), so the retune below is owed exactly as written — what is gone is the
+  premise that the lever is exotic.
 
 ---
 

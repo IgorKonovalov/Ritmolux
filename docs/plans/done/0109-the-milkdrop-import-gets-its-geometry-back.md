@@ -344,6 +344,6 @@ flowchart TB
   [backlog 0109](../../design-backlog.md)'s disk textures. Re-run `milkconv --render` after this closes
   and re-rank both — with the wash and the mirror fixed, that list changes.
 - **`textures/` support, per-vertex evaluation on a compute shader**, or a `warp_mesh` content
-  cohort ([Plan 0104](../0104-the-library-stops-being-lopsided.md) owns the last, and its wait on Plan
+  cohort ([Plan 0104](0104-the-library-stops-being-lopsided.md) owns the last, and its wait on Plan
   0108 Phase 1 is discharged).
 - **Any move on the engine-wide HDR chain.** ADR-0046 and ADR-0096 are inputs, not subjects.

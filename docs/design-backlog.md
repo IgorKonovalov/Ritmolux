@@ -453,9 +453,26 @@ point this entry is the starting measurement rather than a fresh investigation.
   gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
   `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
   were conflated because both mention the tonemap.
-- **Re-verified 2026-08-13:** exactly **one** shipped preset binds `exposure`
-  (`lsystem_vellum.toml:60`), so the lever this entry names as the one-line fix is still essentially
-  unused across the library.
+- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
+  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
+  that its own measured subject is still untouched:
+  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
+  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
+  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
+  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
+  its Phase 2 found that a branching or line figure has too little area for a level term to
+  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
+  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
+  than an unused one, and any argument here resting on its rarity is void.
+- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
+  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
+  — which is the set of presets with no over-range peak, and not one of them was touched by
+  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
+- **Why no gate caught this, which is the reusable part.** The claim is carried as
+  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
+  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
+  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
+  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
 - **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
   0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
   other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
@@ -463,10 +480,12 @@ point this entry is the starting measurement rather than a fresh investigation.
   three-way pass is a two-way pass.
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
 - **Verified against code:** yes — measured, not inferred (numbers below).
-- **Verified 2026-08-15** — the one binding this entry names is still the only one a retune has
-  to start from: `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it does
-  not reduce — `unprobeable: exactly one shipped preset binds exposure is a claim about how many
-  files match, and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
+- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
+  `exposure`, not one.** What that dated check still establishes stands: the original binding is
+  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
+  reduced, and that is why the falsification went unseen for a whole plan:
+  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
+  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
   entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
   — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
   the correction is still owed.
