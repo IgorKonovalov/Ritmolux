@@ -254,8 +254,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 | 2 — Point the MSVC target at `rust-lld` | dev | done | fbc065b |
 | 3 — One artifact store for every lane | dev | done | 3323a71 |
 | 4 — Prove nothing about the tests changed | dev | done | a50b193 |
-| 5 — Repair the one script the redirect breaks | dev | done | committed with this row |
-| 6 — Measure where the suite time actually goes | dev | not started | |
+| 5 — Repair the one script the redirect breaks | dev | done | a29a23a |
+| 6 — Measure where the suite time actually goes | dev | done | committed with this row |
 | 7 — Write down what a machine has to do | dev | not started | |
 
 ### Notes
@@ -449,6 +449,30 @@ them.
 `'vswhere.exe' is not recognized` raised inside `vcvars64.bat`'s own lookup at
 the `cmd /c` line. Compilation and linking proceed and the DLL is produced. That
 line is not one this phase touches.
+
+**Phase 6 — where the `reactivity` time goes.** Two runs per configuration, so
+the delta is not read off one sample. The probe raised workspace crates to
+`opt-level = 2` through `CARGO_PROFILE_DEV_OPT_LEVEL` in the environment only;
+nothing in `Cargo.toml` was edited and nothing was committed.
+
+| configuration | run 1 | run 2 | mean |
+|---|---|---|---|
+| shipped profile, `lmv-core` at `opt-level = 0` | 127.4 s | 124.9 s | **126.1 s** |
+| probe, workspace crates at `opt-level = 2` | 101.6 s | 102.3 s | **102.0 s** |
+
+**Our unoptimized code is 24.1 s of the suite, or 19.1 %.** That is the minority
+arm the phase describes, so by its own terms the question closes here: the
+remaining ~81 % is inside dependencies that already compile optimized, chiefly
+`wgpu-core` validation and `naga`. No ADR is owed and no profile edit was made.
+
+Rebuilding the workspace optimized cost 24 s, so the probe is cheap to repeat if
+the ratio is ever worth re-checking.
+
+**The suite is larger than the plan records.** It is quoted at ~89 s; it measures
+**126.1 s** here. Both figures are from this machine, five days apart.
+
+The store holds both artifact sets afterwards and grew from 5,444 MB to 7,200 MB.
+Disk: 71 GB free.
 
 ### Close triggers
 
