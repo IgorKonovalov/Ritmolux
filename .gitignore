@@ -15,6 +15,17 @@ plugin-foobar/*.exp
 plugin-foobar/sdk/
 plugin-foobar/*.7z
 
+# Spout SDK: third-party, separately licensed, pinned by hash and staged by
+# packaging/spout/fetch-sdk.ps1 (Plan 0115, ADR-0125). Never committed - but the
+# BSD notice binary redistribution obliges us to ship IS committed, at
+# packaging/spout/spout-license.txt.
+standalone/spout-sdk/
+standalone/spout-sdk-staging/
+standalone/Spout-SDK-*.zip
+# The reference image `cargo run --example spout_probe` writes beside itself, so
+# a person can point a Movie File In TOP at it. Derived, regenerated on demand.
+spout-probe-reference.png
+
 # Local test audio for the headless-capture `--audio` path (Plan 0013). Drop your
 # own or royalty-free 16-bit PCM WAV here to test locally; audio is never
 # committed (licensed/factory samples must not be redistributed). Only the

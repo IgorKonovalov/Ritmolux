@@ -24,6 +24,22 @@ path = "src/main.rs"
 [lints]
 workspace = true
 
+[features]
+# The Spout video-out (ADR-0125). OFF BY DEFAULT and Windows-only: with it off
+# there is no C++ compile step, no staged SDK and no network in any build, so
+# CI, the macOS target and every ordinary `cargo build` are untouched by it.
+# The release job turns it on after staging the pinned SDK, the way the foobar
+# component's job already does.
+spout = []
+
+# Compiles the four-function C++ shim over SpoutDX, and only when the `spout`
+# feature asks for it - build.rs returns immediately otherwise. `cc` is already
+# in this workspace's lock file as a transitive build-dependency, so naming it
+# directly adds a name and no graph (NFR 4); pinned exact to the version already
+# resolved so this does not move the lock.
+[build-dependencies]
+cc = "=1.3.0"
+
 [dependencies]
 # `text` enables the glyphon on-canvas text seam (ADR-0009) — the standalone is
 # the only frontend that opts in; the plugin build leaves it off.
@@ -42,6 +58,14 @@ toml = "=1.1.3"
 # the PNG codec only; pinned exact per NFR 4 / the hygiene guard.
 [dev-dependencies]
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
+
+# The Spout colour probe (Plan 0115 Phase 3). `required-features` is what keeps
+# it out of an ordinary build: without `spout` cargo skips the target entirely,
+# so `cargo build --examples`, `cargo clippy --all-targets` and nextest never
+# compile it and never need the SDK. The other examples stay auto-discovered.
+[[example]]
+name = "spout_probe"
+required-features = ["spout"]
 
 # WASAPI loopback capture. Narrow feature set keeps the transitive cost low;
 # winit already pulls windows-sys, so the ecosystem dependency is a sunk cost.
