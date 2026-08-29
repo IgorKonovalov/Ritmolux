@@ -614,6 +614,12 @@ mod tests {
         let second = endpoints(CaptureMode::LineIn);
         let after: Result<IMMDeviceEnumerator, _> =
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) };
+        // The apartment owns the probe's interface, so reduce it to its
+        // verdict *here*, while that apartment still stands. A `Release` that
+        // runs after `CoUninitialize` calls into a torn-down apartment: on a
+        // machine that has endpoints something else keeps the server alive and
+        // it survives, and on one that has none it faults.
+        let after = after.err();
         unsafe { CoUninitialize() };
 
         // A machine with no endpoints at all is allowed (a headless runner has
@@ -628,9 +634,8 @@ mod tests {
             }
         }
         assert!(
-            after.is_ok(),
-            "the caller's apartment did not survive the enumeration: {:?}",
-            after.err()
+            after.is_none(),
+            "the caller's apartment did not survive the enumeration: {after:?}"
         );
     }
 }
