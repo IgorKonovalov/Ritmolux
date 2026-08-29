@@ -1999,6 +1999,7 @@ name = "standalone"
 version = "0.91.1"
 dependencies = [
  "block2 0.6.2",
+ "cc",
  "dispatch2",
  "image",
  "lmv-core",

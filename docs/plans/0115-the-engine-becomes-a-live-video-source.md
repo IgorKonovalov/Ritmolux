@@ -368,13 +368,73 @@ void      lmv_spout_destroy(LmvSpout *);
 |---|---|---|---|
 | 1 — Stage the SDK, prove the receiving half | human | done — gate passed; the colour item is deferred into Phase 3, see the notes | |
 | 2 — The core grows a frame tap | dev | done | `b50592a` |
-| 3 — The Spout shim | dev | not started | |
+| 3 — The Spout shim | dev | code done, TouchDesigner check outstanding | committed with this row |
 | 4 — `lmv --stream` | dev | not started | |
 | 5 — The stream survives a set | dev | not started | |
 | 6 — The gate in TouchDesigner | human | not started | |
 | 7 — Packaging and docs | dev | not started | |
 
 ### Notes
+
+**Phase 3 — the code is complete; its one TouchDesigner done-when is outstanding.** Everything a
+person cannot check is checked: the SDK stages and hash-checks, the shim compiles and links, the
+probe publishes, and the feature-off path is proven SDK-free. What remains is putting the probe's
+picture in front of a `Syphon Spout In` TOP and comparing it against the PNG it writes — the check
+Phase 1 deferred here.
+
+- **Three entry points became four, but not the four the plan listed: `resize` is out and `name` is
+  in.** `lmv_spout_resize` has no possible caller — `SendImage(pData, w, h)` drives `CheckSender`,
+  which resizes the sender in place under the same name, and Phase 4's mode is headless at a fixed
+  size with no resize path at all. `lmv_spout_name` replaces it because `SetSenderName` resolves a
+  collision by incrementing, so the name a receiver lists is a runtime fact the mode has to read
+  back rather than a constant it can assume.
+- **`SetSenderFormat(DXGI_FORMAT_R8G8B8A8_UNORM)` is in `lmv_spout_create` and is load-bearing.**
+  The SDK default is BGRA and `SendImage` converts nothing, so without it every frame ships with red
+  and blue swapped. The probe's red/green/blue patches exist to make exactly that failure visible.
+- **The sender registers lazily, on the first frame, because `spoutDX::CheckSender` is `protected`.**
+  Eager registration was written first and the compiler rejected it, which also corrects a Phase 1
+  note that read `CheckSender` as public. The name is still settled at create time — `SetSenderName`
+  does the increment — so `SpoutSender::name()` answers before any frame; only the receiver's
+  listing waits.
+- **`cc` is a new direct build-dependency and no new graph.** It was already in `Cargo.lock` as a
+  transitive build-dependency, so it is pinned to `=1.3.0`, the version already resolved, and the
+  lock gains one edge and no package.
+- **The feature-off path was checked by removing the SDK, not by assuming.** With
+  `standalone/spout-sdk/` moved aside: `cargo build --workspace`, `cargo clippy --workspace
+  --all-targets` and `cargo fmt --all --check` all clean, no C++ step, no network. The probe example
+  carries `required-features = ["spout"]`, so cargo skips the target entirely rather than compiling
+  it and failing.
+- **The hash-mismatch path was exercised**, not just written: a deliberately wrong pin made
+  `fetch-sdk.ps1` exit 1, print expected against actual, and delete the archive so a rejected
+  download cannot be reused. The pin was restored and the SDK re-staged afterwards.
+- **The Spout licence notice is committed at `packaging/spout/spout-license.txt`** and staged beside
+  the SDK by `fetch-sdk.ps1`. The binaries archive carries no licence of its own, and clause 2 of
+  the Simplified BSD licence obliges a binary distribution to reproduce the notice — so the notice
+  is tracked while the SDK never is. Phase 7's release zip has to carry it.
+
+**A finding that is not about this plan: the shared artifact store served this lane another lane's
+`lmv-core`, and it was a correctness failure rather than a slow build.**
+`standalone/tests/frame_tap_memory.rs` failed with `no method named open_tap found for struct
+Renderer` while `core/tests/frame_tap.rs` passed in the same worktree against the same committed
+source. The verbose build showed the test linking `liblmv_core-3841a2a685bea7be.rlib` and cargo
+treating it as fresh; that archive contains neither `open_tap` nor `render_tapped`, while the one
+this lane built does. The mechanism is visible in the dep-info: cargo records **relative** source
+paths (`core\src\lib.rs`, no worktree prefix), so two worktrees with the same layout and the same
+feature set are indistinguishable to the fingerprint and one lane's compiled core is handed to the
+other as up to date.
+
+- `CLAUDE.md`'s shared-store section names three hazards - `cargo clean` wiping every lane,
+  monotonic growth, and lock serialisation. This is a fourth, and it differs in kind: those cost
+  time and disk, this one **compiles against source the lane does not contain**.
+- Here it failed loudly because a method was missing. The dangerous case is two lanes whose cores
+  differ only in behaviour, where the suite goes green against code that is not in the lane and
+  nothing says so.
+- The workaround used for every figure reported above is a lane-local
+  `CARGO_TARGET_DIR=WORK/.lmv-target-0115`, which costs the cold rebuild and the disk ADR-0141 was
+  written to save. **An earlier full-suite run in this lane was discarded rather than reported**,
+  because it cannot be known which core it ran against.
+- ADR-0141 and the `CLAUDE.md` section are architect-owned and are not edited here.
+
 
 **Phase 1 — the gate passed.** Spout's own `SpoutSender.exe` reaches TouchDesigner 2025.33070 on
 this machine: its demo content renders in a `Syphon Spout In` TOP at `/project1/syphonspoutin1`.

@@ -31,6 +31,11 @@ use std::path::{Path, PathBuf};
 pub mod osc;
 pub mod rss;
 pub mod shot;
+// The Spout video-out (ADR-0125). Behind a default-off feature AND a Windows
+// cfg, so nothing about a normal build reaches it: the C++ shim it binds is
+// compiled by build.rs under the same two conditions.
+#[cfg(all(feature = "spout", windows))]
+pub mod spout;
 
 /// Per-user application directory name, used under the OS data root for the
 /// shared preset directory, the diagnostics log, and `config.toml`.
