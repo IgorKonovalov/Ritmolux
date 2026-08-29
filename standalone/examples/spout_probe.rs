@@ -54,6 +54,15 @@ const HEIGHT: u32 = 720;
 /// A plausible live cadence, so the sender behaves like the stream mode will.
 const FRAME: Duration = Duration::from_nanos(1_000_000_000 / 60);
 
+/// Height of the liveness band along the bottom edge.
+///
+/// It eats the bottom 40 rows **of the patch row**, not of some spare margin:
+/// the patches already run from mid-height to the bottom edge, so there is no
+/// unused space to put it in. That leaves 320 rows of each patch, which is what
+/// the colour and transfer-function comparison is read from, and the ramp above
+/// is untouched.
+const BAND_H: u32 = 40;
+
 /// The sender name a receiver lists. Not necessarily the one it gets — see the
 /// increment note in `standalone/src/spout/shim.cpp`.
 const SENDER_NAME: &str = "lmv-probe";
@@ -84,7 +93,8 @@ fn main() {
     let adapter = match wanted.as_deref() {
         None if roster.len() > 1 => {
             eprintln!(
-                "using the default adapter, but this machine has {} — if the receiver cannot                  open the sender, re-run with --gpu naming the one it renders on",
+                "using the default adapter, but this machine has {} — if the receiver cannot \
+                 open the sender, re-run with --gpu naming the one it renders on",
                 roster.len()
             );
             None
@@ -122,6 +132,7 @@ fn main() {
     );
 
     let mut frames: u64 = 0;
+    let mut frame = rgba.clone();
     loop {
         // Sender pacing is a shell concern; the core stays clock-free.
         #[allow(
@@ -129,7 +140,8 @@ fn main() {
             reason = "probe frame pacing reads the wall clock; core analysis stays clock-free"
         )]
         let started = Instant::now();
-        if let Err(e) = sender.send(&rgba, WIDTH, HEIGHT) {
+        stamp_liveness(&mut frame, &rgba, frames);
+        if let Err(e) = sender.send(&frame, WIDTH, HEIGHT) {
             eprintln!("spout_probe: frame {frames}: {e}");
             std::process::exit(1);
         }
@@ -171,6 +183,47 @@ fn gpu_argument() -> Option<String> {
         }
     }
     None
+}
+
+/// Overwrite the reference's liveness marker for frame `frames`: a white block
+/// that steps left to right across the bottom edge, one cell per 15 frames.
+///
+/// **A static test pattern cannot answer the question this probe exists to
+/// ask.** A Spout receiver that loses its sender may keep presenting the last
+/// texture it received, so a frozen frame and a live feed are the same picture.
+/// The control that matters here is whether a sender on the *other* GPU
+/// arrives, and its negative result looks exactly like a receiver still showing
+/// the previous, working run. The marker separates them at a glance: moving
+/// means live, parked means frozen, absent means nothing was ever received.
+///
+/// `base` is the untouched reference, so each call restores the row before
+/// drawing - the marker never accumulates and the rest of the frame stays
+/// byte-identical to the PNG written beside it.
+fn stamp_liveness(frame: &mut [u8], base: &[u8], frames: u64) {
+    /// Marker cells across the width. 16 keeps each cell wide enough to read
+    /// from a thumbnail.
+    const CELLS: u32 = 16;
+    /// Frames each cell is lit for. 15 at 60 fps is four steps a second -
+    /// unmistakably moving without strobing.
+    const HOLD: u64 = 15;
+
+    let band = HEIGHT.saturating_sub(BAND_H);
+    let cell_w = WIDTH / CELLS;
+    let lit = ((frames / HOLD) % u64::from(CELLS)) as u32;
+    for y in band..HEIGHT {
+        for x in 0..WIDTH {
+            let at = (y as usize * WIDTH as usize + x as usize) * 4;
+            let Some(slot) = frame.get_mut(at..at + 4) else {
+                continue;
+            };
+            let inside = cell_w > 0 && x / cell_w == lit;
+            if inside {
+                slot.copy_from_slice(&[255, 255, 255, 255]);
+            } else if let Some(original) = base.get(at..at + 4) {
+                slot.copy_from_slice(original);
+            }
+        }
+    }
 }
 
 /// The reference: a black-to-white ramp across the top half, four patches
