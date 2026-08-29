@@ -48,6 +48,26 @@ docs/
 └── settings.json
 ```
 
+## The artifact store (machine-local, opt-in)
+
+Lanes still run in git worktrees ([ADR-0053](../../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)),
+but they no longer each carry their own `target/`. A machine-local `WORK/.cargo/config.toml`, one
+directory above every worktree, can redirect `build.target-dir` to a single shared store and point
+the MSVC target at `rust-lld` — **never committed** (CI's `Swatinem/rust-cache` caches `./target`)
+and **inert when absent**. See
+[ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md).
+
+What this changes when you design:
+
+- **A new lane starts warm.** Opening a worktree no longer implies a cold dependency build, so
+  sequencing a plan behind another to reuse its `target/` buys nothing.
+- **ADR-0141 revokes one ADR-0053 positive**: concurrent lanes now serialize on cargo's lock. Plans
+  that assume two lanes building in parallel need a different argument.
+- **`cargo clean` is destructive across every lane**, and no gate prevents it. A plan that tells
+  someone to clean is a plan that wipes the store.
+- **Nothing may hardcode `<repo>/target`.** `cargo metadata`'s `target_directory` is the answer that
+  holds under both layouts.
+
 ## Canonical commands
 
 Rust (run from repo root):

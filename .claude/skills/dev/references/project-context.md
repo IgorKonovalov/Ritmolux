@@ -30,6 +30,31 @@ presets/         # the shipped preset library (*.toml) + README.md (the param ro
 docs/adrs/  docs/plans/  docs/specs/  docs/diagrams/
 ```
 
+## The artifact store (machine-local, opt-in)
+
+Where `cargo` writes is **not necessarily `<repo>/target`**. A machine-local
+`WORK/.cargo/config.toml` — one directory above every worktree, found by cargo's ancestor walk —
+can redirect `build.target-dir` to a single shared store and point the MSVC target at `rust-lld`:
+
+```toml
+[build]
+target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+```
+
+It is **never committed** (CI's `Swatinem/rust-cache` caches `./target`) and **inert when absent** —
+a machine without it builds into its own `target/`, so every command below is unchanged either way.
+See [ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md).
+
+What this changes for you:
+
+- **Never hardcode `<repo>/target` in a script or a test.** Ask `cargo metadata --format-version 1`
+  for `target_directory`, which is right under both layouts; `plugin-foobar/build.ps1` does this.
+- **Never run `cargo clean`** — it wipes the store for every lane, not just yours.
+- **Two lanes building at once serialize** on cargo's lock. Build one lane at a time.
+
 ## Canonical commands (run from repo root)
 
 **The core package is `lmv-core`, not `core`** — `cargo test -p core` fails with "package ID
