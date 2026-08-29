@@ -250,8 +250,8 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Take the baseline | dev | done | committed with this row |
-| 2 — Point the MSVC target at `rust-lld` | dev | not started | |
+| 1 — Take the baseline | dev | done | b17d8cc |
+| 2 — Point the MSVC target at `rust-lld` | dev | done | committed with this row |
 | 3 — One artifact store for every lane | dev | not started | |
 | 4 — Prove nothing about the tests changed | dev | not started | |
 | 5 — Repair the one script the redirect breaks | dev | not started | |
@@ -305,6 +305,45 @@ walks ancestors from the test binary and is `CARGO_TARGET_DIR`-safe as its
 comment claims. `scratch()` (line 115) builds its path as
 `repo_root().join("target")`, which is repo-relative and unaffected by a
 redirect. Not yet exercised under the store.
+
+**Phase 2 — the linker.** The plan's first-choice form resolves; the ADR's
+fallback was not needed. The whole stanza:
+
+```toml
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+```
+
+`rust-lld.exe` is not on `PATH`, and rustc still finds it in its own sysroot, so
+no explicit path and no `-Clinker-flavor=lld-link` are involved.
+
+**That it is actually linking was established, not inferred.** `cargo build -v`
+shows `-C linker=rust-lld.exe` reaching rustc; and a negative control — the same
+stanza naming a linker that does not exist — fails the build at the first build
+script. So a green build under this config means `rust-lld` ran.
+
+| measurement | baseline (`link.exe`) | `rust-lld` | delta |
+|---|---|---|---|
+| cold `cargo build` | 105 s | **91 s** | -14 s |
+| cold `--no-run` after it | 66 s | **54 s** | -12 s |
+| cold, nothing to all test binaries | 171 s | **145 s** | **-26 s** |
+| cold `target/` | 4,504 MB | 4,519 MB | +15 MB |
+| `cargo nextest run --workspace` | 341.8 s | 340.9 s | +0.9 s |
+
+Both cold figures come from a scratch worktree created for the purpose and
+removed after; the `rust-lld` one branched one commit later than the baseline's,
+and that commit is docs-only, so the compiled input is identical.
+
+**The result set is unchanged and the goldens did not move.** 1122 tests across
+54 binaries, 1122 passed, 5 skipped, under both linkers; `diff` of the sorted
+test-name lists is empty. `LMV_BLESS` was unset, the four golden binaries
+(`golden`, `composite`, `layer`) ran and passed, and `git status` is clean, so no
+baseline was rewritten.
+
+**One cost, recorded because it is not free to toggle.** Adding the stanza
+changes the build fingerprint, so the first build in an existing warm lane
+recompiles every dependency — 1m25s on `main`. It is paid once per lane per
+config change, not per build.
 
 ### Close triggers
 
