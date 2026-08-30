@@ -1,6 +1,6 @@
 # 0134 — The lanes stop sharing a store
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) (proposed),
@@ -212,7 +212,7 @@ worktree.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Cut the redirect and destroy the store | human | done 2026-08-29 | none — the file is outside the repository |
-| 2 — Prove each lane compiles what it contains | dev | not started | |
+| 2 — Prove each lane compiles what it contains | dev | done | committed with this row |
 | 3 — The record says what happened | dev | not started | |
 
 **Phase 1 — done, and it found a hazard the phase did not anticipate.**
@@ -248,3 +248,26 @@ worktree.
   0115 lane ever built in `debug`, and both carry the same 54 presets), and an absence was read as a
   collision. The library collision is directly evidenced and unaffected. **Neither reading can be
   re-checked: the store was deleted in this phase, before the question was settled.**
+
+**Phase 2 — two lanes were live, not three, and both are green.** Run sequentially rather than
+concurrently: both suites drive the GPU, and the Plan 0115 log records a second process on it
+inflating that plan's own per-frame cost.
+
+- **`lmv-plan-0115`** (worktree `WORK/lmv-plan-0115`, branch `plan-0115-live-video-source` at
+  `bbbb5eb`): `cargo nextest run --workspace` — **1155 run, 1155 passed, 5 skipped, 415.5 s**,
+  exit 0. `lmv-core::frame_tap a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock`
+  and `standalone::frame_tap_memory one_tap_renders_three_hundred_consecutive_frames_without_growing`
+  both PASS.
+- **`main`** (worktree `WORK/light-music-visualizer` at `49fc107`): `cargo nextest run --workspace`
+  — **1138 run, 1138 passed, 5 skipped, 424.3 s**, exit 0. `LMV_BLESS` was unset for the run and
+  `git status --short` afterwards reports only this plan file, so no baseline was rewritten and no
+  golden moved.
+- The two lanes report **different test counts — 1155 against 1138, a difference of 17** — which is
+  what a lane compiling its own content produces.
+
+- **DEVIATION — the `lmv-plan-0104` done-when could not be run: that worktree no longer exists.**
+  `git worktree list` reports two, and the lane closed and merged before this phase started
+  (`1c4dc51` merge plus `7524b3f` on `main`). The 72-versus-54 embedded-preset check is therefore
+  unrun and unrunnable as written. The phase's own note calls it a confirmation rather than a
+  conviction, and the merged result is on `main`, but nothing here re-established that lane
+  independently.
