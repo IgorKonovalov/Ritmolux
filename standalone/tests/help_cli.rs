@@ -34,6 +34,13 @@ const RESPONDS_WITHIN: Duration = Duration::from_secs(1);
 
 /// Run `lmv` with `args` and return its exit code, stdout and how long it took.
 fn run(args: &[&str]) -> (Option<i32>, String, Duration) {
+    let (code, stdout, _, elapsed) = run_both(args);
+    (code, stdout, elapsed)
+}
+
+/// As [`run`], with stderr as well: a refusal writes there, and the point of
+/// these cases is what the operator is told before the process ends.
+fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
     let started = Instant::now();
     let output = Command::new(env!("CARGO_BIN_EXE_lmv"))
         .args(args)
@@ -43,6 +50,7 @@ fn run(args: &[&str]) -> (Option<i32>, String, Duration) {
     (
         output.status.code(),
         String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
         elapsed,
     )
 }
@@ -108,5 +116,69 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("--definitely-not-a-flag"),
         "the refusal did not name the argument"
+    );
+}
+
+/// **A flag whose companion is absent is refused before anything is built.**
+/// The silence this replaces was a running visualizer doing less than it was
+/// asked; the refusal has to arrive the way `--help` does, from a process that
+/// never opened a window (ADR-0155).
+#[test]
+fn a_stream_only_flag_without_stream_exits_without_starting() {
+    for args in [
+        ["--fps", "30"].as_slice(),
+        ["--size", "1280x720"].as_slice(),
+        ["--sender=rig"].as_slice(),
+        ["--frames", "100"].as_slice(),
+    ] {
+        let (code, _, stderr, elapsed) = run_both(args);
+        assert_eq!(code, Some(2), "`lmv {args:?}` did not exit 2: {stderr:?}");
+        assert!(
+            elapsed < RESPONDS_WITHIN,
+            "`lmv {args:?}` took {elapsed:?}, long enough to have built something"
+        );
+        assert!(
+            stderr.contains("--stream"),
+            "`lmv {args:?}` did not name the missing companion: {stderr:?}"
+        );
+    }
+}
+
+/// **`--gpu` and `--preset` are NOT refused**, because they reach the window.
+/// A regression that put either back behind `--stream` would show up here as a
+/// process that exits 2 naming a flag the operator did not type.
+#[test]
+fn the_two_windowed_flags_are_not_refused_for_a_missing_stream() {
+    let (code, _, stderr, _) = run_both(&["--preset", "a-name-no-preset-has"]);
+    assert_eq!(
+        code,
+        Some(2),
+        "an unknown preset name is still a usage error: {stderr:?}"
+    );
+    assert!(
+        !stderr.contains("--stream"),
+        "`--preset` was refused for a missing `--stream`: {stderr:?}"
+    );
+    assert!(
+        stderr.contains("a-name-no-preset-has"),
+        "the refusal did not name what was typed: {stderr:?}"
+    );
+}
+
+/// **An unknown `--preset` costs no window.** The name is judged against the
+/// roster this launch would load, before the event loop exists, so the failure
+/// is a message rather than a window that opens on an arbitrary scene.
+#[test]
+fn an_unknown_preset_exits_without_opening_a_window() {
+    let (code, _, stderr, elapsed) = run_both(&["--preset", "definitely-not-a-preset"]);
+    assert_eq!(code, Some(2), "expected a usage error: {stderr:?}");
+    assert!(
+        elapsed < RESPONDS_WITHIN,
+        "took {elapsed:?}, which is long enough to have built a renderer"
+    );
+    // The roster is listed so the operator can see what they could have meant.
+    assert!(
+        stderr.contains("this launch holds"),
+        "the refusal did not list the roster: {stderr:?}"
     );
 }
