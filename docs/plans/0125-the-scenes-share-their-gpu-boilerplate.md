@@ -223,8 +223,8 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 |---|---|---|---|
 | 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | 8d2d590 |
 | 2 — `palette::LutPair` | dev | done | 672cd85 |
-| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | committed with this row | |
-| 4 — `gpu::FullscreenScene` | dev | not started | |
+| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | done | c7dab47 |
+| 4 — `gpu::FullscreenScene` | dev | committed with this row | |
 | 5 — `marks::InstancedQuads` | dev | not started | |
 
 ### Notes
@@ -307,6 +307,41 @@ more fields on `PaletteParams` because `warp_mesh` has no `pan_*` at all.
 The rosters `PALETTE_PARAMS` / `PAN_PARAMS` in `common.rs` are `#[cfg(test)]`: `set` keeps its
 `match` (it runs once per bound param per frame), so the roster is a second statement of the
 vocabulary that the test holds the match to — the shape `feedback::PARAMS` uses.
+
+**Phase 4. The "each under 60 lines" done-when is not met, and the reason is the phase's own
+constraint.** Measured from `pub fn new(` to its closing brace:
+
+| scene | constructor | of which the `Self { … }` scene-state literal | of which the layout + bind group |
+|---|---|---|---|
+| `fragment_field` | 66 | 27 | 21 |
+| `shape_field` | 81 | 26 | 40 |
+| `shape_collage` | 129 | 48 | 62 |
+
+What is left after the helper is the `Self { … }` field list — scene state no GPU helper can
+shrink — and the **bind-group layout plus the bind group that pairs with it**, which this phase is
+forbidden to absorb twice over: ADR-0058 wants each of the three layouts visibly distinct, and
+`no_two_layouts_share_a_shape_without_recorded_evidence` finds layouts by **scanning `core/src`
+for `create_bind_group_layout` with literal entries**, so a parameterised one would drop three
+rows off an enumeration `assert_scan_is_whole` holds at 25 or more. `shape_collage`'s layout alone
+is 32 lines of literal entries because both its buffer entries declare a `min_binding_size`. The
+number was not gamed to reach 60.
+
+For the same reason no `gpu::uniform_sized(binding, visibility, size)` entry helper was added,
+which is the one edit that would have shortened `shape_field` and `shape_collage` materially: the
+scan recognizes entries by their **spelling** and asserts the count it recognized equals the count
+in the source, so a new spelling fails it until `MARKERS` is taught — a change to the guard this
+phase must not weaken.
+
+`FullscreenParts` is a two-step build because the bind groups need the buffers and the pipeline
+needs the layouts. The storage buffer is created by the scene through a new `gpu::storage_buffer`
+and handed over with `with_storage`, rather than being asked for by byte count: an
+`Option<&Buffer>` returned to the call site cannot be unwrapped under `scenes/`'s
+`clippy::expect_used` pragma.
+
+The layout guard prints **35 layouts walked and 4 allowed pairs, all of them pre-existing** — no
+new allowlist row. The `docs/capturing.md` adapter check was run at 512x512 on the three SDF
+fixtures as well as at the golden's 128: hardware and WARP agree, and both are byte-identical to
+`main`.
 
 **A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
 `no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning

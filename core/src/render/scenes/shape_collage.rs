@@ -79,7 +79,7 @@ use crate::render::gpu;
 use super::Scene;
 use super::common;
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::{self, Palette};
+use crate::render::palette::Palette;
 
 /// Element kind selectors, as they reach the shader's `shape.z`. Phase 7 of
 /// Plan 0113 extends this roster; these three are what a suprematist canvas is
@@ -787,13 +787,10 @@ const MAX_SEED: f32 = 16_777_216.0;
 /// The flat-graphic canvas: opaque elements over their own paper, composited in
 /// one fullscreen distance-field pass.
 pub struct ShapeCollageScene {
-    pipeline: wgpu::RenderPipeline,
-    uniforms: wgpu::Buffer,
-    storage: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    /// The 256x1 gradient LUT pair (A/B) the fragment samples + crossfades for
-    /// colour (ADR-0021), with the baked palette awaiting upload.
-    luts: palette::LutPair,
+    /// The pipeline, the uniform buffer, the per-element storage buffer, the
+    /// 256x1 gradient LUT pair (A/B) the fragment samples + crossfades for colour
+    /// (ADR-0021), and the one bind group this scene binds.
+    gpu: gpu::FullscreenScene,
     /// The element array the GPU reads, rebuilt every frame from [`Self::live`]
     /// (and [`Self::outgoing`] during a blend) with this frame's time applied.
     ///
@@ -901,22 +898,14 @@ impl ShapeCollageScene {
             gpu::FULLSCREEN_VS_NDC,
             &source,
         );
-        let uniforms = gpu::uniform_buffer(
+        let parts =
+            gpu::FullscreenParts::new(device, "shape-collage", std::mem::size_of::<Params>());
+        let storage = gpu::storage_buffer(
             device,
-            "shape-collage-params",
-            std::mem::size_of::<Params>(),
-        );
-        let storage = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("shape-collage-elements"),
+            "shape-collage-elements",
             // Twice the cap: a recomposition crossfade draws two whole canvases.
-            size: (2 * cap * std::mem::size_of::<Element>()) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        // Seeded with the default `spectrum`; the renderer calls `set_palette`
-        // before the first frame and `render` uploads it, so the textures are
-        // valid even if `set_palette` were never called.
-        let luts = palette::LutPair::new(device, "shape-collage");
+            2 * cap * std::mem::size_of::<Element>(),
+        );
         // See the WGSL's note: the fragment-visible storage buffer is what makes
         // this layout's shape unique in the crate (ADR-0058). Both buffer entries
         // are full literals so each declares a `min_binding_size`, which Plan
@@ -955,7 +944,7 @@ impl ShapeCollageScene {
         });
         // This layout binds the sampler first and the two textures after it, so
         // the pair's role-ordered array is destructured into binding order here.
-        let [lut_a, lut_b, lut_sampler] = luts.bind_entries(1, 2, 0);
+        let [lut_a, lut_b, lut_sampler] = parts.luts().bind_entries(1, 2, 0);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("shape-collage-bind-group"),
             layout: &bind_layout,
@@ -965,7 +954,7 @@ impl ShapeCollageScene {
                 lut_b,
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: uniforms.as_entire_binding(),
+                    resource: parts.uniforms().as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 4,
@@ -973,21 +962,18 @@ impl ShapeCollageScene {
                 },
             ],
         });
-        let pipeline = gpu::fullscreen_pipeline(
-            device,
-            &shader,
-            &[&bind_layout],
-            surface_format,
-            wgpu::BlendState::REPLACE,
-            "shape-collage",
-        );
 
         Self {
-            pipeline,
-            uniforms,
-            storage,
-            bind_group,
-            luts,
+            gpu: parts.with_storage(storage).finish(
+                device,
+                &shader,
+                &[&bind_layout],
+                bind_group,
+                None,
+                surface_format,
+                wgpu::BlendState::REPLACE,
+                "shape-collage",
+            ),
             elements: Vec::with_capacity(2 * cap),
             live: Vec::with_capacity(cap),
             outgoing: Vec::with_capacity(cap),
@@ -1392,7 +1378,7 @@ impl Scene for ShapeCollageScene {
     }
 
     fn set_palette(&mut self, palette: &Palette) {
-        self.luts.set(palette);
+        self.gpu.set_palette(palette);
     }
 
     fn reset_params(&mut self) {
@@ -1478,7 +1464,7 @@ impl Scene for ShapeCollageScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        self.luts.flush(queue);
+        self.gpu.flush_palette(queue);
 
         // `advance` has already stepped the canvas for this frame; a renderer
         // that never calls it (there is none) still gets a composed canvas.
@@ -1489,7 +1475,7 @@ impl Scene for ShapeCollageScene {
         // A zero-length write is not a legal `write_buffer`, and an empty canvas
         // needs no upload: the loop reads `count` entries and stops.
         if self.dirty && !self.elements.is_empty() {
-            queue.write_buffer(&self.storage, 0, bytemuck::cast_slice(&self.elements));
+            self.gpu.write_storage(queue, &self.elements);
             self.dirty = false;
         }
 
@@ -1511,12 +1497,9 @@ impl Scene for ShapeCollageScene {
             ],
             d: [self.occlude, 0.0, 0.0, 0.0],
         };
-        queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
-
-        let mut pass = gpu::color_pass(encoder, "shape-collage-pass", view, wgpu::LoadOp::Load);
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.draw(0..3, 0..1);
+        self.gpu.write_uniform(queue, &params);
+        self.gpu
+            .draw(encoder, "shape-collage-pass", view, wgpu::LoadOp::Load);
     }
 }
 
