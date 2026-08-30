@@ -4139,3 +4139,42 @@ the running adapter has already landed and is what makes any of this attributabl
 - **Verified 2026-08-30** - the resolver that would fix it exists and is reached from `--stream` only: `present: gpu::renderer_choice in: standalone/src/stream.rs`
 - **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/main.rs`
 - **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/main.rs`
+
+## 0166 - the index-row gate measures a row's bytes and never its shape, so a closed-plan bullet dropped into the active-plans table passes
+
+> **Filed 2026-08-30** at Plan 0134's close, by the reviewer making the mistake and having the gate
+> wave it through. Not reported by a lane - found by inspection after the fact.
+
+`scripts/check-index-rows.mjs` enforces [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md):
+every row inside a `<!-- roster:begin cap=N -->` region is a pointer, held to N bytes. **Bytes is
+the only thing it measures.** Inside a region it accepts a line matching either `TABLE_ROW` or
+`BULLET`, records `{ line, bytes, cap }`, and asks nothing about which of the two the surrounding
+region is made of.
+
+`docs/plans/README.md` has two regions and they are different kinds: the **active-plans** region is
+a markdown table (`| Plan | Title | Status | Owner | Live constraint |`), the **recently-closed**
+region is a bullet list. A closed-plan bullet inserted into the table region is a `BULLET` inside a
+region, under cap, so the gate reports `0 over cap` and exits 0.
+
+**Observed 2026-08-30**, during this plan's own close: a `- [0134 ...] - closed 2026-08-30 ...`
+bullet landed immediately under the active roster's `roster:begin` and above its table header,
+because the insertion anchored on the first `Recently closed` string in the file rather than the
+section. `check-index-rows.mjs` passed it (`2 regions, 117 rows, 0 over cap`) and
+`check-doc-links.mjs` passed it too - the link resolves, it just points from the wrong list. It was
+caught by eye before the commit, and nothing in the toolchain would have caught it after.
+
+**Impact.** Low severity, high silence. The failure mode is a closed plan that reads as active, or
+an active plan that reads as closed, in the one file `docs/plans/README.md` that every session opens
+first - and both rosters keep passing. It is the same class as the rot ADR-0116 was written for: the
+convention is stated in prose above the markers and nothing holds anyone to it.
+
+**What a fix looks like:** infer each region's kind from its first measured row and reject rows of
+the other kind - roughly four lines, in the loop that already classifies every line as `TABLE_ROW`
+or `BULLET`. A region containing both is a real possibility elsewhere, so the honest form is
+per-region and inferred rather than a hardcoded expectation per file. `scripts/fixtures/` already
+holds seeded bite checks for these gates, so the fix comes with a fixture that is a bullet in a
+table region.
+
+- **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`

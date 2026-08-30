@@ -29,8 +29,10 @@ $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 cargo build --release -p lmv-core-cabi 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 # The artifact store is not always $repo\target: a machine-local .cargo/config.toml
-# above the worktree can point build.target-dir elsewhere (ADR-0141), and cargo
-# finds it by walking ancestors, so this script cannot tell from its own path.
+# above the worktree can point build.target-dir elsewhere, and cargo finds it by
+# walking ancestors, so this script cannot tell from its own path. No such redirect
+# is configured today - ADR-0147 revoked the shared store ADR-0141 set up - which is
+# why this asks cargo rather than assuming: the answer is right under either layout.
 # --no-deps keeps it to the workspace manifest, which is all target_directory needs.
 $meta = cargo metadata --format-version 1 --no-deps --manifest-path (Join-Path $repo "Cargo.toml") | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
