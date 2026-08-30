@@ -234,9 +234,9 @@ shorter than the placeholder above guessed).
 |---|---|---|---|
 | 1 — One harness for forty test files | dev | done | 709544f |
 | 2 — Four strings, one attribute | dev | done | cf8c47a |
-| 3 — The gate learns the narration shape that survives | dev | done | committed with this row |
-| 4 — The maps name every crate | dev | not started | |
-| 5 — The spec says what the shim does | dev | not started | |
+| 3 — The gate learns the narration shape that survives | dev | done | fdb0fed |
+| 4 — The maps name every crate | dev | landed out of band, verified | (none — see notes) |
+| 5 — The spec says what the shim does | dev | done | committed with this row |
 | 6 — The unwired scripts get a line or get deleted | dev | not started | |
 
 ### Notes
@@ -333,6 +333,23 @@ line in `git diff -- '*.rs' '*.cpp'` for the rewrite is a comment line (`///`, `
 zero non-comment lines, mechanically filtered — and `cargo doc --workspace --no-deps` emits **64**
 intra-doc-link warnings both before and after, so no rustdoc link was broken by the rewording.
 `cargo nextest run --workspace`: 1200 passed, 5 skipped.
+
+**Phase 4 was verified, not redone**, per the out-of-band note in the phase block. All five
+`[workspace] members` from the root `Cargo.toml` — `core`, `core-cabi`, `lmv-ring`, `milkconv`,
+`standalone` — appear by name in `CLAUDE.md`, `.claude/skills/architect/references/project-context.md`
+and `.claude/skills/dev/references/project-context.md`. `core/src/milk/`, `presets/pending/` and
+`tools/sd-filter/` are mapped in all three (`CLAUDE.md:50,67,71`; architect `:31,45,48`; dev
+`:17,36,38`). `grep -n "twelve, and then to thirteen" CLAUDE.md` is empty — the count narration is
+retired. `node scripts/check-doc-links.mjs` exits 0. **This phase produced no commit of its own**;
+there was nothing left to change.
+
+**Phase 5.** The clause read *"letting the shim refuse a core whose ABI it was not built
+against"*; `foo_lmv.cpp:984` is `g_abi_ok = (core_abi >= LMV_ABI_VERSION)`, which refuses only an
+**older** core. The rewritten clause spells the comparison out, carries the shim's own
+justification (the size-guarded `lmv_get_metrics` is what makes a newer core safe) and adds what
+the shim does on refusal — logs to the console, disables preset loading and diagnostics, leaves
+the render path alone. `LMV_ABI_VERSION` and the `extern "C"` surface are untouched; all fifteen
+names in `core-cabi/include/lmv_core.h` still appear in the spec.
 
 **Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
 `HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite
