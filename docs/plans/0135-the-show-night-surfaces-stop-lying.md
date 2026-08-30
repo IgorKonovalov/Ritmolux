@@ -1,6 +1,6 @@
 # 0135 — The show-night surfaces stop lying
 
-> **Status:** in-progress
+> **Status:** in-progress (phases 1-4 done; Phase 5 is `human` and has not run)
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (proposed)
@@ -233,16 +233,45 @@ impl RecoveryPolicy {
 | 1 — The binary knows its own flags | dev | done | `915fc74` |
 | 2 — `--help` prints the roster and exits | dev | done | `c937026` |
 | 3 — An operator's choice is a new incident | dev | done | `e0fd1a7` |
-| 4 — The settle window is in seconds | dev | done | committed with this row |
+| 4 — The settle window is in seconds | dev | done | `6c717d5` |
 | 5 — The unplug gate (evidence only) | human | not started | |
 
 ### Notes
 
+- **One file beyond the plan's list**, in Phase 2 (`c937026`): `standalone/tests/help_cli.rs`.
+  The phase's done-when asks for the exit to be asserted rather than the output, and a window,
+  a wgpu device or a capture client on that path is not observable from inside the process that
+  would be creating them. `CARGO_BIN_EXE_lmv` resolves the binary in an integration test and not
+  in the bin's own unit tests, so the assertion has nowhere else to live.
+  `standalone/tests/shot_cli.rs` is the crate's existing precedent for spawning a CLI.
+- The roster covers `standalone/src/stream.rs`'s seven flags as well as `main.rs`'s, and the
+  drift test scans both files. The plan's file list named only `main.rs`; a roster holding half
+  the flags would have refused `--sender` and its siblings, which Phase 1's second done-when
+  forbids.
+- **Backlog 0156's probe cannot see its own repair.** The entry's reduction is
+  `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`, and the fix landed as
+  `RecoveryPolicy::on_restart` called from `restart_capture` rather than as a direct assignment,
+  so the probe still reads `absent` and the gate still counts the entry as live.
+- `standalone/tests/help_cli.rs` carries a file-level
+  `#![allow(clippy::disallowed_methods, reason = ...)]` for the one-second exit bound. The
+  repo-wide ban is a determinism rule for analysis code; `core/tests/arc_cost.rs` and six
+  siblings use the same escape for the same reason.
+- The two comment corrections named in Phase 3 both landed in `e0fd1a7`; the settle constant's
+  own comment was corrected there too, since resetting the policy changes what it documents.
+- Not acted on: `TITLE_UPDATE_FRAMES` in `standalone/src/main.rs` is still a frame count. It
+  paces the window-title refresh and is not in the recovery path, so Phase 4's second done-when
+  does not reach it.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0159 (Phases 1-2), 0156 (Phase 3), 0155 (Phase 4).
+  0154 is carried, and Phase 5 has not run.
+- **What shipped:** feature (`--help`, and a startup refusal that did not exist) plus two fixes.
+- **Operator docs touched:** `README.md` — the `Flags & environment` section gained a lead-in
+  naming `--help` as the authority and a `--help` / `-h` entry; the per-flag prose is unchanged.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, two broken, both
+  entry 0155 — `present: INPUT_RECOVERY_SETTLE_FRAMES` and `present: Consecutive live frames`,
+  the constant and comment Phase 4 retires. The other four node gates exit 0.
+- **Outstanding `human` phases:** Phase 5, the unplug gate. It has not run, and it needs a
+  removable audio interface on the box.
