@@ -94,6 +94,10 @@ pub struct SettingsView {
     pub preset_name: bool,
     /// Whether a track change announces itself (`[hud] now_playing`).
     pub now_playing: bool,
+    /// Whether the operator console is open right now (ADR-0143). The live
+    /// window state, not the config key: the row reports what is on screen, so
+    /// a console opened by `--console` or the `C` hotkey reads correctly here.
+    pub console: bool,
     /// The resolved preset directory — shown, never edited.
     pub preset_dir: String,
 }
@@ -169,6 +173,9 @@ pub enum SettingsAction {
     TogglePresetName,
     /// Announce track changes or not, persisted (Plan 0097 Phase 3).
     ToggleNowPlaying,
+    /// Open or close the operator console (ADR-0143). The state machine says
+    /// only that it changed; the shell owns the window.
+    ToggleConsole,
 }
 
 /// The rows, in display order. Exhaustive and ordered here so the labels, the
@@ -186,12 +193,13 @@ pub enum SettingsRow {
     InputDevice,
     PresetName,
     NowPlaying,
+    Console,
     Presets,
 }
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 12] = [
+    pub const ALL: [SettingsRow; 13] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
@@ -209,6 +217,10 @@ impl SettingsRow {
         // in one place.
         SettingsRow::PresetName,
         SettingsRow::NowPlaying,
+        // After the two paint switches and before the read-only row: the
+        // console is also about what the operator sees rather than about the
+        // show, but it opens a window rather than changing the canvas.
+        SettingsRow::Console,
         SettingsRow::Presets,
     ];
 
@@ -225,6 +237,7 @@ impl SettingsRow {
             SettingsRow::InputDevice => "Input device",
             SettingsRow::PresetName => "Preset name",
             SettingsRow::NowPlaying => "Now playing",
+            SettingsRow::Console => "Console",
             SettingsRow::Presets => "Presets",
         }
     }
@@ -276,12 +289,18 @@ impl SettingsRow {
             }
             SettingsRow::PresetName => on_off(view.preset_name).to_owned(),
             SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
+            SettingsRow::Console => on_off(view.console).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
     }
 
     /// The action `Left` (or `Right`, when `right`) on this row asks for.
-    fn edit(self, right: bool, view: &SettingsView) -> SettingsAction {
+    ///
+    /// `pub(crate)` so the operator console's transport can ask for a row's
+    /// change through this rather than restating the rule: two surfaces
+    /// offering the same control must produce the same action value, and the
+    /// only way to guarantee that is one function.
+    pub(crate) fn edit(self, right: bool, view: &SettingsView) -> SettingsAction {
         match self {
             // A switch, not a cycle: `[`/`]`'s orientation, floor on the left.
             SettingsRow::Quality => {
@@ -323,6 +342,7 @@ impl SettingsRow {
             SettingsRow::InputMode | SettingsRow::InputDevice => SettingsAction::None,
             SettingsRow::PresetName => SettingsAction::TogglePresetName,
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
+            SettingsRow::Console => SettingsAction::ToggleConsole,
             // Read-only: it tells you where presets are loaded from, which is a
             // launch-time resolution (`LMV_PRESET_DIR`, then the per-user dir),
             // not a thing a menu can move.

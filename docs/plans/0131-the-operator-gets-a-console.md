@@ -348,10 +348,10 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The console window opens | dev | done | `9ab7726` |
-| 2 — The program preview | dev | done | committed with this row |
+| 2 — The program preview | dev | done | `f0760bb` |
 | 3 — The modals move to the console | dev | done | `9ab7726` |
-| 4 — Transport, staging and the mouse | dev | not started | |
-| 5 — Persistence, the flag, and the docs | dev | not started | |
+| 4 — Transport, staging and the mouse | dev | done | committed with this row, jointly with 5 |
+| 5 — Persistence, the flag, and the docs | dev | done | committed with this row, jointly with 4 |
 | 6 — The on-device gate | human | not started | |
 
 ### Notes
@@ -465,6 +465,51 @@ byte-identity test fail at `byte 352 (pixel 88,0 channel 0): Some(69) vs Some(0)
 
 **The whole workspace is green at 1179 tests with every golden unblessed**, and `git status` after
 the run named only source files.
+
+**Phases 4 and 5 — landed in one commit, and that is `dev`'s own sequencing error.** Phase 5's
+edits to `standalone/src/main.rs` were begun while Phase 4's full-suite run was still going, so both
+phases' changes were in that file before either was staged and no non-interactive staging could
+separate them. **Phase 4 was independently verified before Phase 5 was touched** — `cargo nextest
+run --workspace`, **1190 tests, exit 0**, on exactly its own tree — so nothing here is unproven; the
+cost is that the two phases cannot be reverted separately. Unlike the Phase 1 + 3 pairing above,
+there was no reason in the code for this.
+
+**Phase 4 — the transport, and one criterion whose branch does not exist.**
+
+- **The "same action value" criterion is met by construction rather than by agreement.**
+  `console::action_for` does not decide what a shared control does; it calls
+  `SettingsRow::edit`, the settings menu's own rule, and wraps the result. The test asserts the two
+  are equal, but the equality is structural. **This required `SettingsRow::edit` to go from private
+  to `pub(crate)` in `standalone/src/settings.rs`, a file Phase 4 does not list.**
+- **DEVIATION — the plan's "under a random or shuffled rotation policy where no single next preset
+  exists, the line says so" branch is unreachable, because no such policy exists.** `Director`
+  decides only *when* to rotate: it returns a reason and the shell calls `cycle_preset`, which steps
+  the roster forward and wraps. The criterion also says to read the next name "from the director's
+  own state"; the director holds no preset choice at all, so the honest source is the roster. The
+  cross-check is `the_staged_name_is_the_one_the_rotation_then_takes`, which drives a real director
+  to a real rotation and compares the announced name with what `cycle_preset` then returns. The only
+  reachable "says so" case is a roster too short to have a successor.
+- The two roster tests build a headless `Renderer` and so take ADR-0016's skip shape, in a module
+  that was pure until now.
+
+**Phase 5 — the row, the flag, the config, the docs.**
+
+- **`resolve_monitor` was generalized to `resolve_display`** over the two fields any display-bearing
+  section carries, and `[output]` now goes through it too. The phase asked the console to reuse the
+  rule rather than reimplement it, and delegating was the only way to make that structural.
+- **`[console] display` defaults to 1, not 0.** The show defaults to display 0, so a console
+  defaulting to the same index opens on top of the output on every multi-monitor machine. Where the
+  resolved console display is still the show's and another exists, `open_console` takes the other —
+  unless a `display_name` was given, which is honoured as written.
+- **The settings row reports the live window, not the config key**, so a console opened by
+  `--console` or the `C` hotkey reads correctly in the menu.
+- **`SettingsAction::ToggleConsole` is deferred rather than acted on.** `apply_settings_action` has
+  no `ActiveEventLoop` and creating a window needs one, so the action sets a flag that
+  `service_console_request` drains at the end of each window-event arm. All four routes — the flag,
+  the config key, the hotkey and the row — set that same flag, which is what makes them one path.
+- **`standalone/src/settings/tests.rs` was edited**: the shared `view()` fixture gained the new
+  field and the row-roster assertion went from twelve rows to thirteen. Phase 3 forbade editing that
+  file; Phase 5 lists it, and these are the two edits a new row forces.
 
 **Not verified on two displays.** The dev box's second-display behaviour, the present mode actually
 negotiated, and the cost of a second swapchain to the output are all unmeasured; the plan puts them

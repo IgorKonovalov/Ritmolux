@@ -147,6 +147,16 @@ struct AppState {
     /// machine. What the console *shows* is decided every frame by
     /// [`console::route`], from the same lines the output would have drawn.
     console_window: Option<Arc<Window>>,
+    /// Last cursor position seen on the console surface, in its device pixels.
+    ///
+    /// Tracked rather than read at the press because winit's `MouseInput`
+    /// carries no coordinates. Parked off-surface when the pointer leaves, so a
+    /// press that arrives afterwards cannot land on a stale rectangle.
+    console_cursor: (f32, f32),
+    /// A console open/close asked for by something that had no
+    /// `ActiveEventLoop` to create a window with — the settings row, or a
+    /// launch flag. Serviced once per event, where one is in scope.
+    console_toggle_pending: bool,
     /// This frame's text, split by destination and retained across frames so the
     /// split reuses its buffers rather than allocating two vectors per frame.
     frame_text: console::FrameText,
@@ -368,6 +378,8 @@ impl AppState {
             reported_overflow: renderer_overflow,
             reported_demotion: false,
             console_window: None,
+            console_cursor: (-1.0, -1.0),
+            console_toggle_pending: false,
             frame_text: console::FrameText::default(),
             modal_scratch: Vec::new(),
             chrome_scratch: Vec::new(),
@@ -400,6 +412,20 @@ impl AppState {
         } else {
             self.open_console(event_loop);
         }
+        // Persisted like fullscreen and the two `[hud]` switches: where the
+        // operator left the console is a staging choice, not a debugging state,
+        // so it survives the restart. Written from the window rather than from
+        // the intent, so a console that refused to open does not persist as on.
+        self.config.console.enabled = self.console_window.is_some();
+        self.save_config();
+    }
+
+    /// Service a console toggle asked for while no `ActiveEventLoop` was in
+    /// scope — the settings row and the launch flag both take this path.
+    fn service_console_request(&mut self, event_loop: &ActiveEventLoop) {
+        if std::mem::take(&mut self.console_toggle_pending) {
+            self.toggle_console(event_loop);
+        }
     }
 
     /// Open the console on a display that is **not** the show's, when there is
@@ -413,15 +439,28 @@ impl AppState {
     /// single-GPU dev box can exercise it.
     fn open_console(&mut self, event_loop: &ActiveEventLoop) {
         let monitors: Vec<MonitorHandle> = self.window.available_monitors().collect();
-        // Not the show's monitor, when the machine has another. `display_index`
-        // is the output's own resolved position, so this asks the same question
-        // `resolve_monitor` answered rather than a second one spelled
-        // differently.
-        let target = monitors
-            .iter()
-            .enumerate()
-            .find(|(i, _)| *i != self.display_index)
-            .map(|(_, m)| m.clone());
+        // The console's own `[console]` display, through the **same**
+        // name-over-index rule the show's display uses. Where that resolves to
+        // the screen the show is on, and there is another, take the other: a
+        // console stacked on the output is the one configuration it exists to
+        // avoid, and a default index cannot know which screen the show ended up
+        // on. An explicit `display_name` is honoured either way — an operator
+        // who named a screen meant it.
+        let named = self.config.console.display_name.is_some();
+        let resolved = resolve_display(
+            &monitors,
+            self.config.console.display_name.as_deref(),
+            self.config.console.display,
+        );
+        let target = match resolved {
+            Some((index, monitor)) if named || index != self.display_index => Some(monitor),
+            Some(_) => monitors
+                .iter()
+                .enumerate()
+                .find(|(i, _)| *i != self.display_index)
+                .map(|(_, m)| m.clone()),
+            None => None,
+        };
 
         let mut attrs = Window::default_attributes()
             .with_title(CONSOLE_TITLE)
@@ -1112,6 +1151,7 @@ impl AppState {
             .or_else(|| self.config.output.display_name.clone())
             .unwrap_or_else(|| "unknown".to_owned());
         SettingsView {
+            console: self.console_window.is_some(),
             tier: self.renderer.tier(),
             // Demotion wins over the pin: the governor only demotes an *unpinned*
             // session, so the two cannot both be true, and reporting a demotion
@@ -1171,6 +1211,18 @@ impl AppState {
                 self.director.set_dwell_bounds(min_secs, max_secs);
                 self.save_config();
             }
+            // Deferred, not done here: creating a window needs an
+            // `ActiveEventLoop`, which this applier is not given. The flag is
+            // serviced in `window_event`, where one is in scope.
+            //
+            // **Closing the console must not close the menu that asked.** Only
+            // the window goes; `settings` is untouched, so the next frame's
+            // routing — which sends modal lines to the output whenever no
+            // console is open — draws the same menu on the show. That is the
+            // one interaction where the Phase 3 move has to reverse
+            // mid-keystroke, and it reverses by construction rather than by a
+            // special case.
+            SettingsAction::ToggleConsole => self.console_toggle_pending = true,
             SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
             SettingsAction::CycleDisplay => self.cycle_display(),
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
@@ -1414,9 +1466,20 @@ impl AppState {
         // modal rows land under it.
         console::route_into(&mut self.frame_text, &mut chrome, &mut modal, console_open);
         if console_open.is_open() {
-            self.frame_text
-                .console
-                .insert(0, console::header(self.renderer.preset_name()));
+            // The standing furniture, above whatever the routing sent: the
+            // header, the transport labels, and the line naming what a rotation
+            // takes next. Built at the reference geometry like every routed
+            // line, so the one scaling below moves all of them together.
+            let names: Vec<&str> = self.renderer.preset_names().collect();
+            let staging = console::staging_line(
+                console::next_up(&names, self.renderer.active_index()),
+                self.director.auto_enabled(),
+            );
+            drop(names);
+            let mut furniture = vec![console::header(self.renderer.preset_name())];
+            furniture.extend(console::transport_lines(self.director.auto_enabled()));
+            furniture.push(staging);
+            self.frame_text.console.splice(0..0, furniture);
             // After the header joins them, so the whole console surface is
             // scaled by one factor and the header cannot drift off the rows.
             // Read before the mutable borrow, not inside the call.
@@ -1603,6 +1666,41 @@ impl AppState {
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
             KeyCode::BracketRight => self.swap_tier(Tier::Rich),
             _ => {}
+        }
+    }
+
+    /// A left press on the console: resolve it against the transport strip and
+    /// act, or ignore it.
+    ///
+    /// **The console is never a second source of truth.** A control that the
+    /// settings menu also offers is carried here as that menu's own action and
+    /// handed to the same applier the menu's keys reach, so the two surfaces
+    /// cannot drift into two behaviours (`console::action_for`).
+    fn handle_console_press(&mut self) {
+        let Some(window) = self.console_window.as_ref() else {
+            return;
+        };
+        let size = window.inner_size();
+        let (x, y) = self.console_cursor;
+        let Some(button) = console::hit_test(size.width as f32, size.height as f32, x, y) else {
+            return;
+        };
+        match console::action_for(button, &self.settings_view()) {
+            console::ConsoleAction::Next => self.rotate_to_next(),
+            console::ConsoleAction::Prev => {
+                let count = self.renderer.preset_names().count();
+                if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
+                    self.renderer.select_preset(index);
+                    self.on_preset_switched();
+                }
+            }
+            // The director's own reset comes with it, so the dwell restarts from
+            // this moment exactly as a hotkey rotation does.
+            console::ConsoleAction::RotateNow => {
+                self.director.force_next();
+                self.rotate_to_next();
+            }
+            console::ConsoleAction::Settings(action) => self.apply_settings_action(action),
         }
     }
 
@@ -1984,6 +2082,10 @@ struct App {
     /// startup error rather than a window that opens and then reports one.
     /// `None` when the sink is off.
     osc: Option<OscSink>,
+    /// `--console` was passed. Held beside `config` rather than written into it,
+    /// so the flag opens the console for this launch without persisting itself
+    /// — the same shape `--input` / `--device` / `--osc` follow (ADR-0142).
+    console_flag: bool,
     state: Option<AppState>,
 }
 
@@ -2014,7 +2116,7 @@ impl ApplicationHandler for App {
 
             match event_loop.create_window(attrs) {
                 Ok(window) => {
-                    let state = AppState::new(
+                    let mut state = AppState::new(
                         Arc::new(window),
                         std::mem::take(&mut self.config),
                         self.config_path.take(),
@@ -2026,6 +2128,15 @@ impl ApplicationHandler for App {
                         self.osc.take(),
                     );
                     state.window.request_redraw();
+                    // `--console` and `[console] enabled` are one path with the
+                    // hotkey and the settings row: both set the same pending
+                    // flag, which `service_console_request` turns into the same
+                    // `toggle_console` call. Nothing here opens a window
+                    // directly, so no two routes can disagree about whether the
+                    // console is open.
+                    state.console_toggle_pending =
+                        state.config.console.enabled || self.console_flag;
+                    state.service_console_request(event_loop);
                     self.state = Some(state);
                 }
                 Err(err) => {
@@ -2080,8 +2191,29 @@ impl ApplicationHandler for App {
                 } if event.state == ElementState::Pressed => {
                     state.handle_key(event_loop, &event);
                 }
+                // The transport strip. Position is tracked on move rather than
+                // read at the press, because winit's `MouseInput` carries no
+                // coordinates.
+                WindowEvent::CursorMoved { position, .. } => {
+                    state.console_cursor = (position.x as f32, position.y as f32);
+                }
+                WindowEvent::CursorLeft { .. } => {
+                    // Off the surface entirely: park the cursor somewhere no
+                    // control can claim, so a press arriving after the pointer
+                    // left cannot land on a stale rectangle.
+                    state.console_cursor = (-1.0, -1.0);
+                }
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                } => state.handle_console_press(),
                 _ => {}
             }
+            // The console's own S-menu can ask to close the console. Serviced
+            // after the event rather than inside it, because the handler that
+            // decided is several frames down a call chain with no event loop.
+            state.service_console_request(event_loop);
             return;
         }
 
@@ -2124,6 +2256,10 @@ impl ApplicationHandler for App {
             }
             _ => {}
         }
+        // The show window's S-menu asks for the console the same way the
+        // console's own does; one servicing point per window arm keeps the row,
+        // the hotkey and the launch flag on one path.
+        state.service_console_request(event_loop);
     }
 
     #[allow(
@@ -2229,6 +2365,18 @@ fn parse_downbeat_log_arg() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Whether `--console` was passed: open the operator console at launch
+/// (ADR-0143).
+///
+/// A bare presence flag with no value, so there is nothing to reject and no
+/// `Result` — unlike `--tier`, a typo here cannot resolve to a *different*
+/// console. It ORs with `[console] enabled` rather than overriding it: the flag
+/// turns the console on for a run and never off, which is the shape of every
+/// other opt-in launch flag here.
+fn parse_console_flag() -> bool {
+    std::env::args().skip(1).any(|arg| arg == "--console")
 }
 
 /// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
@@ -2449,19 +2597,37 @@ fn resolve_monitor(
     monitors: &[MonitorHandle],
     output: &config::Output,
 ) -> Option<(usize, MonitorHandle)> {
+    resolve_display(monitors, output.display_name.as_deref(), output.display)
+}
+
+/// The name-over-index rule itself, over the two fields any display-bearing
+/// config section carries.
+///
+/// `[output]` and `[console]` both name a display and both fall back to an
+/// index, and they must not answer that question two different ways: winit's
+/// monitor ordering is not stable across boot or hotplug, so a stored index
+/// alone can point at the wrong screen, and a second implementation of the
+/// fallback is a second set of edge cases. An index past the end degrades to
+/// the first monitor rather than to nothing — a console is better on the wrong
+/// screen than absent.
+fn resolve_display(
+    monitors: &[MonitorHandle],
+    name: Option<&str>,
+    index: usize,
+) -> Option<(usize, MonitorHandle)> {
     if monitors.is_empty() {
         return None;
     }
-    if let Some(name) = &output.display_name
-        && let Some((index, monitor)) = monitors
+    if let Some(name) = name
+        && let Some((at, monitor)) = monitors
             .iter()
             .enumerate()
-            .find(|(_, m)| m.name().as_deref() == Some(name.as_str()))
+            .find(|(_, m)| m.name().as_deref() == Some(name))
     {
-        return Some((index, monitor.clone()));
+        return Some((at, monitor.clone()));
     }
-    if let Some(monitor) = monitors.get(output.display) {
-        return Some((output.display, monitor.clone()));
+    if let Some(monitor) = monitors.get(index) {
+        return Some((index, monitor.clone()));
     }
     monitors.first().map(|monitor| (0, monitor.clone()))
 }
@@ -2749,6 +2915,7 @@ fn main() {
         tier,
         input,
         osc,
+        console_flag: parse_console_flag(),
         state: None,
     };
     if let Err(err) = event_loop.run_app(&mut app) {

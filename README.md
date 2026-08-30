@@ -187,12 +187,35 @@ one, so you always land where you asked.
 | `Space`   | Next preset — dissolves (and restarts the auto-rotate timer) |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. `↑`/`↓` walk the list and wrap at both ends, `←`/`→` step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, console. `↑`/`↓` pick a row, `←`/`→` change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
 | `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
 | `D`       | Cycle to the next display/monitor                           |
 | `F3`      | Toggle the diagnostics overlay                              |
+
+### The operator console
+
+`C` opens a second window on a display **other than the show's**, so you can drive the
+app from a desk without typing at the projector. It carries the preset browser and the
+settings menu — while it is open, neither of those draws on the show any more — plus a
+**transport strip** (`prev`, `next`, `rotate`, `auto`, `dwell -/+`, clickable), a line
+naming **what the rotation will take next**, and a **live preview of the output**
+letterboxed in the corner.
+
+It is **off by default and costs nothing while closed**: no second surface, no
+intermediate render target and no extra copy per frame. Open it from the settings
+menu's **Console** row, with `C`, or at launch with `--console` / `enabled = true`
+under `[console]` in `config.toml`; all four are one path, so they cannot disagree
+about whether it is open. The console picks its display by the same name-over-index
+rule the show's own display uses — `[console] display_name` first, then
+`[console] display` — and where that lands on the screen the show is on, it moves to
+another if there is one. Closing it from its own settings menu leaves that menu on the
+show, so you never lose the menu along with the window.
+
+On a single-monitor machine it opens as an ordinary window on that monitor, which is a
+supported way to work rather than an error.
 
 The browser lays the roster out in **as many columns as the window fits**, so a
 library taller than the screen is visible at once rather than scrolled past. When
@@ -231,6 +254,12 @@ restart. Off means no track ever reaches the visualizer.
 
 ### Flags & environment
 
+- `--console` — open the operator console at launch, on a display other than the show's.
+  A presence flag with no value: it turns the console **on** for this run and never off, and
+  it does not write itself into `config.toml` (the same shape `--input` / `--device` / `--osc`
+  follow). `[console] enabled = true` is the persistent form, and the `C` hotkey and the
+  settings menu's **Console** row are the same path — no two of the four can disagree about
+  whether the console is open.
 - `--list-devices` — enumerate audio capture devices (Windows-only).
 - `--list-adapters` — enumerate graphics adapters, from **both** rosters: the one the renderer
   selects through and the one the Spout sender selects through. They are separate enumerations and
