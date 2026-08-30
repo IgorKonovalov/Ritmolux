@@ -1,9 +1,23 @@
 # 0131 — The operator gets a console
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-28
+> **Closed:** 2026-08-30
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) (proposed)
+> **Related ADRs:** [ADR-0143](../../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) (accepted)
+
+> **Close (2026-08-30).** Five `dev` phases on `main`, no worktree: `9ab7726` (Phases 1 + 3),
+> `b9edb61` (the two machine-found defects), `f0760bb` (Phase 2), `03b4b01` (Phases 4 + 5) and
+> `eaba5b0` (the operator-feedback round). Phase 6 (`human`) is **part-run** and its remainder is
+> carried by the checklist entry in
+> [`docs/on-device-validation.md`](../../on-device-validation.md), not by this plan.
+> Mode 4 review: **no blockers, two majors, five minors, two nits.** Re-verified at the close —
+> `fmt`, `clippy --workspace --all-targets` and `cargo nextest run --workspace` at **1199 tests,
+> 5 skipped, exit 0**, with `git status` clean afterwards, so no golden moved. Version **0.94.0**
+> (minor). Curation not triggered: `presets/` untouched. The two majors are both the frame-rate
+> halving Phase 6 measured and the two comments that deny it, filed as
+> [backlog 0164](../../design-backlog.md); the iGPU finding that came out of the same run is
+> [backlog 0165](../../design-backlog.md).
 
 ## TL;DR
 
@@ -418,7 +432,7 @@ reachable from the pure tests, and both are worth carrying into Phase 2 and Phas
   gets smaller type and *more* of the roster rather than a clipped corner of a full-size grid. At
   900x640 the factor is 0.59 — four columns of thirty-two rows, the whole roster at once. Capped at
   1.0 (never magnify past the show's own type) and floored at 0.45 (readable across a desk).
-  **This is [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s shape wearing
+  **This is [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s shape wearing
   different clothes**: geometry destined for one surface must take its size from that surface. Phase
   2's preview is the same trap with a stronger claim attached, since its rectangle must carry the
   *output's* aspect while living in the console's window.

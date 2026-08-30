@@ -195,7 +195,7 @@ impl RecoveryPolicy {
 ## Risks & open questions
 
 - **Phase 1 is a behavior change on the startup path, and `main.rs` is contended.**
-  [Plan 0131](0131-the-operator-gets-a-console.md) is being built directly on `main` inside this
+  [Plan 0131](done/0131-the-operator-gets-a-console.md) is being built directly on `main` inside this
   file and [Plan 0126](0126-the-large-files-split-along-their-seams.md) Phase 7 splits it. Sequence
   this behind 0126 if both are live, or expect a merge. The roster is additive and localized, which
   is the mitigation.
