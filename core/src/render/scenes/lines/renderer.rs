@@ -19,6 +19,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 /// [`SegmentInstance::joined`] bit: the `a` end continues a neighbouring
 /// segment, so the quad extends **backward** along its own direction by the
 /// half-width (ADR-0041).
@@ -871,12 +873,11 @@ impl LineRenderer {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some(&format!("{label}-uniforms")),
-            size: std::mem::size_of::<Uniforms>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(
+            device,
+            &format!("{label}-uniforms"),
+            std::mem::size_of::<Uniforms>(),
+        );
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label}-bind-layout")),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -1283,24 +1284,9 @@ impl LineRenderer {
             }),
         );
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("line-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018); additive strokes
-                    // bloom over it and the empty space reveals it.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018); additive strokes bloom over
+        // it and the empty space reveals it.
+        let mut pass = gpu::color_pass(encoder, "line-pass", view, wgpu::LoadOp::Load);
         if drawn.is_empty() && arcs_drawn.is_empty() {
             return; // nothing to stroke; the backdrop shows through
         }

@@ -450,12 +450,7 @@ impl SwarmScene {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("swarm-misc"),
-            size: std::mem::size_of::<Misc>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(device, "swarm-misc", std::mem::size_of::<Misc>());
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("swarm-bind-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -983,25 +978,10 @@ impl Scene for SwarmScene {
             }),
         );
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("swarm-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018): the additive
-                    // particles bloom over whatever the background pass painted,
-                    // so the sparse gaps between them reveal it.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018): the additive particles
+        // bloom over whatever the background pass painted, so the sparse gaps
+        // between them reveal it.
+        let mut pass = gpu::color_pass(encoder, "swarm-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.instances.slice(..));

@@ -164,6 +164,73 @@ pub(crate) const ADDITIVE_LIGHT_SATURATING_COVERAGE: wgpu::BlendState = wgpu::Bl
 };
 
 // ---------------------------------------------------------------------------
+// Buffers
+// ---------------------------------------------------------------------------
+
+/// A `UNIFORM | COPY_DST` buffer of `size` bytes, unmapped.
+///
+/// `size` is `usize` because every call site passes `size_of::<T>()` for the
+/// uniform struct it writes; the cast to `u64` happens once, here.
+///
+/// This decides nothing a bind-group layout can see. A uniform's *shape* — its
+/// visibility mask and its `min_binding_size` — is declared on the layout entry
+/// ([`uniform`]), not on the buffer, so routing every uniform through one
+/// constructor cannot make two layouts collide (ADR-0058).
+pub(crate) fn uniform_buffer(device: &wgpu::Device, label: &str, size: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some(label),
+        size: size as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// The single-colour-attachment render pass
+// ---------------------------------------------------------------------------
+
+/// Begin a render pass over one colour attachment: no resolve target, no depth,
+/// no timestamp or occlusion queries, `store: Store`.
+///
+/// That is the shape of every pass this crate encodes, and `label`, `view` and
+/// `load` are the only things any of them vary. The value is not the saved
+/// lines — it is that a wgpu field addition to `RenderPassColorAttachment` or
+/// `RenderPassDescriptor` (`depth_slice` and `multiview_mask` each arrived this
+/// way) is one edit here instead of a compiler-driven sweep over forty sites
+/// nobody reads.
+///
+/// `store: Store` is unconditional: a pass whose result is discarded is a pass
+/// that should not have been encoded. Anything wanting a second colour target, a
+/// depth attachment, or `StoreOp::Discard` spells its own descriptor — this
+/// helper is not the place to grow a flag for it.
+///
+/// The returned pass borrows `encoder` and nothing else: wgpu 30 holds the
+/// attachment by `Arc` internally, so `view` need only outlive the call.
+pub(crate) fn color_pass<'encoder>(
+    encoder: &'encoder mut wgpu::CommandEncoder,
+    label: &str,
+    view: &wgpu::TextureView,
+    load: wgpu::LoadOp<wgpu::Color>,
+) -> wgpu::RenderPass<'encoder> {
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some(label),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load,
+                store: wgpu::StoreOp::Store,
+            },
+        })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Fullscreen pass pipeline
 // ---------------------------------------------------------------------------
 

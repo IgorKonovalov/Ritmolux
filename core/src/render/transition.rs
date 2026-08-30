@@ -540,22 +540,12 @@ impl Blend {
                 p: [t.clamp(0.0, 1.0), kind.code(), 0.0, 0.0],
             }),
         );
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("blend-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: out,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(
+            encoder,
+            "blend-pass",
+            out,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
         pass.set_pipeline(&pipeline.pipeline);
         pass.set_bind_group(0, &targets.bind_group, &[]);
         pass.draw(0..3, 0..1);
@@ -590,12 +580,8 @@ impl Pipeline {
             min_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("blend-uniform"),
-            size: std::mem::size_of::<BlendUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniform =
+            gpu::uniform_buffer(device, "blend-uniform", std::mem::size_of::<BlendUniform>());
         let shader = gpu::fullscreen_shader(
             device,
             "blend-shader",

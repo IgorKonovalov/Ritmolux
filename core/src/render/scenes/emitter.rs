@@ -924,12 +924,7 @@ impl EmitterScene {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("emitter-misc"),
-            size: std::mem::size_of::<Misc>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(device, "emitter-misc", std::mem::size_of::<Misc>());
         // **This layout is deliberately not the swarm's, and that is load-bearing
         // on the software adapter** (design-backlog 0039, the surface Plan 0053
         // is about).
@@ -1293,23 +1288,8 @@ impl Scene for EmitterScene {
             queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(live));
         }
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("emitter-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018).
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018).
+        let mut pass = gpu::color_pass(encoder, "emitter-pass", view, wgpu::LoadOp::Load);
         if self.draw_count == 0 {
             return;
         }
