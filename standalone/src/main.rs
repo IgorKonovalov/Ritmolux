@@ -1043,9 +1043,15 @@ impl AppState {
             self.input_lost = false;
         }
 
+        self.input_recovery.on_restart(persist);
+
         // The running selection follows even when the start failed: it is what
-        // was asked for, so the row shows it while the verdict says it is not
-        // delivering.
+        // was asked for, and the verdict is what says it is not delivering. The
+        // two settings rows then disagree about it. `Input mode` reads the pick,
+        // but a failed start leaves `capture_endpoint` at `None`, so
+        // `device_row_index` falls to the roster's leading slot and
+        // `Input device` reads `default` while `self.input.device` still holds
+        // the endpoint the operator named.
         self.input = input.clone();
         if persist == Persist::Yes {
             self.config.input = input.clone();
@@ -1927,7 +1933,10 @@ const INPUT_RECOVERY_ATTEMPTS: u32 = 3;
 /// frames is delivering rather than merely constructed: an invalidated endpoint
 /// reports itself on the first packet call after start, well inside it. The cost
 /// is that a genuine second unplug within the window inherits the first
-/// incident's remaining budget instead of a full one.
+/// incident's remaining budget instead of a full one — for a *recovery's* own
+/// reopen. An operator picking an input resets the policy instead
+/// ([`RecoveryPolicy::on_restart`]), because a human judging that the situation
+/// changed is not the flap this window guards against.
 const INPUT_RECOVERY_SETTLE_FRAMES: u32 = 60;
 
 /// What the shell should do about the capture stream this frame.
@@ -1958,6 +1967,25 @@ struct RecoveryPolicy {
 }
 
 impl RecoveryPolicy {
+    /// Fold a capture restart into the policy: an operator's choice begins a new
+    /// incident, a recovery's own reopen continues the one in progress.
+    ///
+    /// Without this an operator who picks a working input after a give-up leaves
+    /// `attempts` at the bound and `announced` set, so a stream that dies inside
+    /// the settle window takes the `Hold` arm — no reopen, which is intended, and
+    /// **no token rewrite**, which is not: the `capture` column and the F3
+    /// overlay go on reading `live` while nothing is delivering.
+    ///
+    /// Restoring the retry budget is a deliberate consequence rather than a side
+    /// effect. It is the exact case [`INPUT_RECOVERY_SETTLE_FRAMES`] gives up, and
+    /// giving it up is only defensible for the flap that constant guards
+    /// against, not for a human who has just judged that the situation changed.
+    fn on_restart(&mut self, persist: Persist) {
+        if persist == Persist::Yes {
+            *self = Self::default();
+        }
+    }
+
     /// Advance one frame.
     fn poll(&mut self, lost: bool) -> Recovery {
         if !lost {
@@ -3248,8 +3276,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
-        RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
+        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Persist,
+        Recovery, RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
         parse_input_args_from, parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
         unrecognized_flag,
     };
@@ -3878,5 +3906,54 @@ mod tests {
             );
         }
         assert!(text.contains("-h"), "--help does not name its own synonym");
+    }
+
+    /// A policy that has spent its budget and announced the give-up — the state
+    /// an operator reaches for the `S` menu in.
+    fn given_up() -> RecoveryPolicy {
+        let mut policy = RecoveryPolicy::default();
+        for _ in 0..INPUT_RECOVERY_ATTEMPTS {
+            policy.poll(true);
+        }
+        assert_eq!(policy.poll(true), Recovery::GiveUp);
+        policy
+    }
+
+    /// **An operator's choice is a new incident.** After a give-up, a swap to a
+    /// working input, and a death inside the settle window, the spent latch
+    /// returns `Hold` — and `Hold` writes no token, so the `capture` column and
+    /// the F3 overlay would go on reading `live` about a stream delivering
+    /// nothing. The reset is what makes that loss reach `GiveUp` again and
+    /// rewrite the verdict to `lost`.
+    #[test]
+    fn an_operator_swap_makes_the_next_loss_write_its_own_verdict() {
+        let mut inherited = given_up();
+        assert_eq!(
+            inherited.poll(true),
+            Recovery::Hold,
+            "a spent policy is silent, which is the failure"
+        );
+
+        let mut reset = given_up();
+        reset.on_restart(Persist::Yes);
+        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+            assert_eq!(reset.poll(true), Recovery::Reopen(attempt));
+        }
+        assert_eq!(
+            reset.poll(true),
+            Recovery::GiveUp,
+            "the loss after an operator swap wrote no verdict"
+        );
+    }
+
+    /// **A recovery's own reopen still inherits.** The bound exists to stop a
+    /// flapping endpoint handing itself a fresh budget every cycle, and nothing
+    /// about a reopen the shell asked for itself says the situation changed.
+    #[test]
+    fn a_recoverys_own_restart_does_not_reset_the_policy() {
+        let mut policy = given_up();
+        policy.on_restart(Persist::No);
+        assert_eq!(policy.poll(true), Recovery::Hold);
+        assert_ne!(policy, RecoveryPolicy::default());
     }
 }

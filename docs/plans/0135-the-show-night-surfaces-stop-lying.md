@@ -231,8 +231,8 @@ impl RecoveryPolicy {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The binary knows its own flags | dev | done | `915fc74` |
-| 2 — `--help` prints the roster and exits | dev | done | committed with this row |
-| 3 — An operator's choice is a new incident | dev | not started | |
+| 2 — `--help` prints the roster and exits | dev | done | `c937026` |
+| 3 — An operator's choice is a new incident | dev | done | committed with this row |
 | 4 — The settle window is in seconds | dev | not started | |
 | 5 — The unplug gate (evidence only) | human | not started | |
 
