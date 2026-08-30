@@ -254,6 +254,16 @@ restart. Off means no track ever reaches the visualizer.
 
 ### Flags & environment
 
+**`lmv --help` prints the roster and exits** — that is the authority on what this
+binary accepts, and a test holds it in step with the scanners, so a flag that
+exists is a flag `--help` names. An argument no flag claims is a **startup
+error** that names it and the nearest spelling: `lmv --ocs 127.0.0.1:9000` exits
+rather than starting a visualizer that publishes no telemetry. The list below
+says what each flag is *for*, which is the part a roster line has no room for.
+
+- `--help` / `-h` — print the flag roster and exit. Writes to stdout and creates no
+  window, no GPU device and no capture client, so a script can probe the flag surface
+  without starting a show.
 - `--console` — open the operator console at launch, on a display other than the show's.
   A presence flag with no value: it turns the console **on** for this run and never off, and
   it does not write itself into `config.toml` (the same shape `--input` / `--device` / `--osc`

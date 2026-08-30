@@ -2429,6 +2429,11 @@ struct FlagSpec {
 /// that explain themselves best.
 const FLAGS: &[FlagSpec] = &[
     FlagSpec {
+        name: "--help",
+        takes_value: false,
+        help: "print this roster and exit",
+    },
+    FlagSpec {
         name: "--console",
         takes_value: false,
         help: "open the operator console at launch",
@@ -2509,6 +2514,35 @@ const FLAGS: &[FlagSpec] = &[
         help: "<n> stop --stream after this many frames",
     },
 ];
+
+/// Print the flag roster to stdout.
+///
+/// Called as the **first** statement in `main`, before the event loop, the
+/// renderer and any capture client exist. That ordering is the contract: a guard
+/// shelling out to `--help` to discover the flag surface must get an answer and
+/// an exit, not a window (ADR-0148). `standalone/tests/help_cli.rs` asserts it
+/// from outside the process, which is the only place the absence of a window is
+/// observable.
+fn print_help() {
+    print!("{}", help_text());
+}
+
+/// The roster as `--help` renders it, built as a value so its content is
+/// assertable without a process. The *exit* is not — that is what
+/// `standalone/tests/help_cli.rs` spawns the binary for.
+///
+/// The name column is sized to the longest entry (`--list-adapters`) plus a
+/// gap, so adding a longer flag needs the width moved with it.
+fn help_text() -> String {
+    let mut text = String::from("lmv — a real-time music visualizer\n\nusage: lmv [flags]\n\n");
+    for spec in FLAGS {
+        text.push_str(&format!("  {:<17} {}\n", spec.name, spec.help));
+    }
+    text.push_str("\n-h is a synonym for --help.\n");
+    text.push_str("A flag takes its value as `--flag value` or `--flag=value`.\n");
+    text.push_str("README.md says what each one is for; config.toml is the persistent form.\n");
+    text
+}
 
 /// The flag name in `arg` — `--osc` for both `--osc` and `--osc=1.2.3.4:9000` —
 /// or `None` when `arg` is not flag-shaped at all.
@@ -3035,6 +3069,17 @@ fn list_adapters_and_exit() {
 }
 
 fn main() {
+    // Ahead of the roster gate: someone asking what the flags are is the one
+    // caller to answer rather than refuse, so `--help` wins over a typo sharing
+    // the command line with it.
+    if std::env::args()
+        .skip(1)
+        .any(|arg| arg == "--help" || arg == "-h")
+    {
+        print_help();
+        return;
+    }
+
     // Refuse an argument no scanner will claim, before any scanner runs
     // (ADR-0148). Without this the app starts normally while doing less than it
     // was asked to, which on a show floor presents as a cable or controller
@@ -3204,8 +3249,9 @@ fn main() {
 mod tests {
     use super::{
         FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
-        RecoveryPolicy, config, console, device_row_index, output_modal, parse_input_args_from,
-        parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc, unrecognized_flag,
+        RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
+        parse_input_args_from, parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
+        unrecognized_flag,
     };
 
     /// **A live input costs nothing and never reopens.** The policy runs every
@@ -3666,8 +3712,8 @@ mod tests {
     }
 
     /// **Every rostered flag is claimed, in both spellings.** The gate is
-    /// additive: a flag that regresses to being refused is a worse failure than
-    /// the silence it replaces, because it stops a show that used to run.
+    /// additive: a roster that refuses one of its own flags stops a working
+    /// invocation, which is a worse failure than the silence it replaces.
     #[test]
     fn every_rostered_flag_is_claimed_in_both_spellings() {
         for spec in FLAGS {
@@ -3737,5 +3783,100 @@ mod tests {
     #[test]
     fn a_positional_and_a_bare_double_dash_are_not_flags() {
         assert_eq!(refused(&["nonsense", "--"]), None);
+    }
+
+    /// Every flag name a scanner compares an argument against, read out of the
+    /// module's own source.
+    ///
+    /// A flag literal is the **whole** string — `"--osc"`, or the `=` spelling
+    /// `"--tier="` — which is what separates a comparison from prose that
+    /// mentions a flag (`"--stream: no preset named …"`, and `stream.rs`'s line
+    /// saying `--list-presets` is not a flag). The scan stops at the test module,
+    /// where a `--`-prefixed literal is an input rather than a flag the binary
+    /// claims.
+    fn scanner_flag_literals(source: &str) -> Vec<String> {
+        let body = source.split("#[cfg(test)]").next().unwrap_or(source);
+        let bytes = body.as_bytes();
+        let mut found = Vec::new();
+        let mut i = 0;
+        while let Some(offset) = body[i..].find("\"--") {
+            // Past the opening quote; the name itself starts at the dashes.
+            let start = i + offset + 1;
+            let mut end = start;
+            while end < bytes.len()
+                && (bytes[end] == b'-'
+                    || bytes[end].is_ascii_lowercase()
+                    || bytes[end].is_ascii_digit())
+            {
+                end += 1;
+            }
+            let mut close = end;
+            if close < bytes.len() && bytes[close] == b'=' {
+                close += 1;
+            }
+            // A bare `"--"` is the scanners' own test for "the next argument is
+            // a flag, so it is not my value", not a flag name.
+            if end > start + 2 && close < bytes.len() && bytes[close] == b'"' {
+                found.push(body[start..end].to_owned());
+            }
+            i = start + 2;
+        }
+        found
+    }
+
+    /// **ADR-0148's drift gate.** The roster is a second copy of a fact the
+    /// scanners encode, and this is what keeps them in step: a flag added to a
+    /// scanner and not to the roster fails here rather than shipping as an
+    /// argument the binary accepts and `--help` does not mention.
+    ///
+    /// One-directional by construction — it cannot assert that every roster
+    /// entry is still reachable, so a retired flag can linger in `--help`.
+    #[test]
+    fn every_scanner_flag_literal_is_rostered() {
+        let sources = [
+            ("main.rs", include_str!("main.rs")),
+            ("stream.rs", include_str!("stream.rs")),
+        ];
+        for (file, source) in sources {
+            let literals = scanner_flag_literals(source);
+            // A lexer that silently stopped matching would make this test pass
+            // by finding nothing, which is the one way a drift gate fails
+            // quietly.
+            assert!(
+                literals.len() >= 5,
+                "the scan found only {} flag literals in {file}; it has stopped reading the source",
+                literals.len()
+            );
+            for literal in literals {
+                let name = literal.trim_end_matches('=');
+                assert!(
+                    FLAGS.iter().any(|spec| spec.name == name),
+                    "`{name}` is compared against an argument in {file} and is not in FLAGS, \
+                     so the binary accepts a flag --help does not mention"
+                );
+            }
+        }
+    }
+
+    /// **`--help` prints the whole roster.** The roster is what an operator
+    /// reaches for to check a spelling, so an entry it does not print is an
+    /// entry that does not exist as far as anyone outside the source is
+    /// concerned.
+    #[test]
+    fn the_help_text_prints_every_rostered_flag() {
+        let text = help_text();
+        for spec in FLAGS {
+            assert!(
+                text.contains(spec.name),
+                "--help does not mention `{}`",
+                spec.name
+            );
+            assert!(
+                text.contains(spec.help),
+                "--help does not carry the help line for `{}`",
+                spec.name
+            );
+        }
+        assert!(text.contains("-h"), "--help does not name its own synonym");
     }
 }
