@@ -18,6 +18,7 @@
     clippy::unreachable
 )]
 
+use super::common;
 use super::marks;
 use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -158,15 +159,10 @@ const RESEED_KICK: f32 = 0.06;
 // `saturation = 1` leaves color untouched — so an unbound swarm is unchanged.
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
 const DEFAULT_HUE_CENTER: f32 = 0.5;
-const DEFAULT_SATURATION: f32 = 1.0;
-/// `palette_mix` default — 0 = palette A only (the crossfade is a no-op unless a
-/// preset declares `[palette_b]` and binds `palette_mix`).
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // The mark silhouette (ADR-0084). `disc` is exactly the arithmetic the sprite
 // drew before the roster existed, so an unbound swarm is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
@@ -376,13 +372,13 @@ pub struct SwarmScene {
     /// so it reads as the flow changing its mind, not as a teleport.
     field_phase: Phase,
     burst: f32,
-    hue: f32,
-    brightness: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     size: f32,
     field_freq: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// The active baked palette (ADR-0021), sampled per particle on the CPU. Set
     /// by `set_palette` on a preset switch; default `spectrum` reproduces the
     /// prior cosine.
@@ -390,14 +386,6 @@ pub struct SwarmScene {
     /// Per-particle hue band + shared desaturation (ADR-0021).
     hue_spread: f32,
     hue_center: f32,
-    saturation: f32,
-    /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
     /// are quantized on the way to the uniform rather than here, so a
     /// `[smoothing]`-eased binding still eases — it just steps at the midpoints
@@ -554,20 +542,14 @@ impl SwarmScene {
             spin: DEFAULT_SPIN,
             field_phase: Phase::default(),
             burst: DEFAULT_BURST,
-            hue: DEFAULT_HUE,
-            brightness: DEFAULT_BRIGHTNESS,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             size: DEFAULT_SIZE,
             field_freq: DEFAULT_FIELD_FREQ,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             palette: Palette::default_spectrum(),
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
             star_valley: DEFAULT_STAR_VALLEY,
@@ -737,19 +719,13 @@ impl Scene for SwarmScene {
         self.force = DEFAULT_FORCE;
         self.spin = DEFAULT_SPIN;
         self.burst = DEFAULT_BURST;
-        self.hue = DEFAULT_HUE;
-        self.brightness = DEFAULT_BRIGHTNESS;
+        self.colour.reset();
+        self.pan.reset();
         self.size = DEFAULT_SIZE;
         self.field_freq = DEFAULT_FIELD_FREQ;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
         self.star_valley = DEFAULT_STAR_VALLEY;
@@ -767,23 +743,20 @@ impl Scene for SwarmScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "force" => self.force = value,
             "spin" => self.spin = value,
             "burst" => self.burst = value,
-            "hue" => self.hue = value,
-            "brightness" => self.brightness = value,
             "size" => self.size = value,
             "field_freq" => self.field_freq = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
             "star_valley" => self.star_valley = value,
@@ -899,16 +872,16 @@ impl Scene for SwarmScene {
             // Colour through the shared LUT (ADR-0021): the per-particle hue is
             // mapped into the `hue_spread`/`hue_center` band, then desaturated by
             // the shared `saturation`. Defaults reproduce the prior full-wheel look.
-            let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.hue);
+            let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.colour.hue);
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
             // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
                 self.palette.sample(
-                    palette::band_coord(coord, self.palette_steps),
-                    self.palette_mix,
+                    palette::band_coord(coord, self.colour.steps),
+                    self.colour.mix,
                 ),
-                self.saturation,
+                self.colour.saturation,
             );
             // Depth, resolved into the three visual terms it drives (Plan 0043
             // Phase 3). Three `mul_add`-shaped lerps on a value that never changes
@@ -925,7 +898,7 @@ impl Scene for SwarmScene {
             // bit-exact, which is what keeps the shipped captures byte-identical
             // (Plan 0077 Phase 2).
             let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6)
-                * self.brightness
+                * self.colour.brightness
                 * depth_fade
                 * twinkle_factor(p.twinkle_freq, p.twinkle_phase, time, twinkle);
 
@@ -958,7 +931,7 @@ impl Scene for SwarmScene {
             &self.uniforms,
             0,
             bytemuck::bytes_of(&Misc {
-                v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+                v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
                 // Quantized here, on the way into the uniform, so the shader's
                 // precondition stays visible on the CPU side: the roster's
                 // bounds and the integer point count live in `marks`, and no

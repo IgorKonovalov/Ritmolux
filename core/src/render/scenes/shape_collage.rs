@@ -77,6 +77,7 @@
 use crate::render::gpu;
 
 use super::Scene;
+use super::common;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
@@ -145,9 +146,6 @@ const MIN_SCALE: f32 = 0.05;
 /// an arbitrary cap.
 const MAX_SCALE: f32 = 20.0;
 
-/// Shared view transform (ADR-0018): `pan_*` moves the canvas.
-const DEFAULT_PAN: f32 = 0.0;
-
 /// `paper` default — the top of the gradient, which is where a light stop
 /// naturally goes and what both reference grounds are.
 const DEFAULT_PAPER: f32 = 1.0;
@@ -157,9 +155,6 @@ const DEFAULT_PAPER: f32 = 1.0;
 /// authored into its stops.
 const DEFAULT_COLOR_SPAN: f32 = 1.0;
 const DEFAULT_PALETTE_SHIFT: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-/// `palette_mix` default — 0 = palette A only.
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
 /// `opacity` default — fully opaque, which is the whole point of the scene.
 const DEFAULT_OPACITY: f32 = 1.0;
@@ -871,13 +866,14 @@ pub struct ShapeCollageScene {
     pump_size: f32,
     pump_alpha: f32,
     scale: f32,
-    pan_x: f32,
-    pan_y: f32,
+    /// The shared view transform (ADR-0018): `pan_*` moves the canvas.
+    pan: common::PanParams,
     paper: f32,
     color_span: f32,
     palette_shift: f32,
-    saturation: f32,
-    palette_mix: f32,
+    /// The shared palette knobs (ADR-0021). This scene's roster carries only
+    /// `saturation` and `palette_mix` of them.
+    colour: common::PaletteParams,
     opacity: f32,
     edge_softness: f32,
     /// How much of this canvas's (total) coverage the backdrop resolves against
@@ -1020,13 +1016,11 @@ impl ShapeCollageScene {
             pump_size: DEFAULT_PUMP,
             pump_alpha: DEFAULT_PUMP,
             scale: DEFAULT_SCALE,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
+            pan: common::PanParams::default(),
+            colour: common::PaletteParams::new(0.0, common::DEFAULT_BRIGHTNESS),
             paper: DEFAULT_PAPER,
             color_span: DEFAULT_COLOR_SPAN,
             palette_shift: DEFAULT_PALETTE_SHIFT,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
             opacity: DEFAULT_OPACITY,
             edge_softness: DEFAULT_EDGE_SOFTNESS,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
@@ -1421,18 +1415,21 @@ impl Scene for ShapeCollageScene {
         // for the same reason.
         self.recompose = DEFAULT_RECOMPOSE;
         self.scale = DEFAULT_SCALE;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
+        self.pan.reset();
         self.paper = DEFAULT_PAPER;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.palette_shift = DEFAULT_PALETTE_SHIFT;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
+        self.colour.reset();
         self.opacity = DEFAULT_OPACITY;
         self.edge_softness = DEFAULT_EDGE_SOFTNESS;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "count" => self.count = value,
             "layout" => self.layout = value,
@@ -1448,13 +1445,9 @@ impl Scene for ShapeCollageScene {
             "pump_size" => self.pump_size = value,
             "pump_alpha" => self.pump_alpha = value,
             "scale" => self.scale = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "paper" => self.paper = value,
             "color_span" => self.color_span = value,
             "palette_shift" => self.palette_shift = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
             "opacity" => self.opacity = value,
             "edge_softness" => self.edge_softness = value,
             _ => {}
@@ -1509,8 +1502,13 @@ impl Scene for ShapeCollageScene {
                 applied_scale(self.scale),
                 applied_edge_softness(self.edge_softness),
             ],
-            b: [self.pan_x, self.pan_y, self.color_span, self.palette_shift],
-            c: [self.saturation, self.palette_mix, self.opacity, self.paper],
+            b: [self.pan.x, self.pan.y, self.color_span, self.palette_shift],
+            c: [
+                self.colour.saturation,
+                self.colour.mix,
+                self.opacity,
+                self.paper,
+            ],
             d: [self.occlude, 0.0, 0.0, 0.0],
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
