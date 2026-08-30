@@ -720,12 +720,11 @@ impl AppState {
     }
 
     fn redraw(&mut self) {
-        self.poll_input_lost();
-        self.pump_audio();
-
-        // Measure wall-clock dt for the scene director (shell frame pacing;
-        // core analysis stays clock-free). Update the marker even while hidden
-        // so the first visible frame after a gap gets a small, clamped dt.
+        // Measure wall-clock dt for the scene director and the recovery policy's
+        // settle window (shell frame pacing; core analysis stays clock-free).
+        // Update the marker even while hidden so the first visible frame after a
+        // gap gets a small, clamped dt. It is the first thing the frame does
+        // because the recovery poll below measures a duration, not a frame count.
         #[allow(
             clippy::disallowed_methods,
             reason = "shell frame pacing: measures dt for the scene director; core analysis stays clock-free"
@@ -736,6 +735,9 @@ impl AppState {
             .as_secs_f32()
             .min(MAX_DT);
         self.last_frame = now;
+
+        self.poll_input_lost(dt);
+        self.pump_audio();
 
         if self.hidden() {
             return;
@@ -1078,11 +1080,11 @@ impl AppState {
     /// window is occluded or minimized nothing redraws and a loss is not seen
     /// until it comes back. Accepted — there is no show to interrupt behind a
     /// hidden window.
-    fn poll_input_lost(&mut self) {
+    fn poll_input_lost(&mut self, dt: f32) {
         if capture_lost(self._capture.as_ref()) {
             self.input_lost = true;
         }
-        match self.input_recovery.poll(self.input_lost) {
+        match self.input_recovery.poll(self.input_lost, dt) {
             Recovery::Hold => {}
             Recovery::Reopen(attempt) => {
                 eprintln!(
@@ -1922,22 +1924,31 @@ enum Persist {
 /// than the silence would have.
 const INPUT_RECOVERY_ATTEMPTS: u32 = 3;
 
-/// Consecutive live frames before a recovered input is judged settled and its
-/// retry budget restored.
+/// How long a recovered input must keep delivering before it is judged settled
+/// and its retry budget restored.
 ///
-/// Without it a single live frame restores the budget, so a stream that opens
-/// and dies immediately — a flapping USB interface, a driver resetting in a loop
-/// — gets a fresh three attempts every cycle and reopens for the rest of the
-/// show. That is the blocking device activation per frame [`INPUT_RECOVERY_ATTEMPTS`]
-/// exists to bound, reached by a different road. A stream that survives this many
-/// frames is delivering rather than merely constructed: an invalidated endpoint
-/// reports itself on the first packet call after start, well inside it. The cost
-/// is that a genuine second unplug within the window inherits the first
+/// Without a window a single live frame restores the budget, so a stream that
+/// opens and dies immediately — a flapping USB interface, a driver resetting in
+/// a loop — gets a fresh three attempts every cycle and reopens for the rest of
+/// the show. That is the blocking device activation per frame
+/// [`INPUT_RECOVERY_ATTEMPTS`] exists to bound, reached by a different road. A
+/// stream that survives this long is delivering rather than merely constructed:
+/// an invalidated endpoint reports itself on the first packet call after start,
+/// well inside it.
+///
+/// **In seconds, because a frame count is a different guarantee on every
+/// display.** 0.36 s is what the 60-frame window it replaces bought on the
+/// 165 Hz box it was written on — the fast end, where a reader assuming "about
+/// a second" was wrong by nearly 3x. The same 60 frames spanned ~2 s at 30 Hz
+/// and ~250 ms at 240 Hz, so the flap it guards against was bounded on one
+/// display and unbounded on another.
+///
+/// The cost is that a genuine second unplug within the window inherits the first
 /// incident's remaining budget instead of a full one — for a *recovery's* own
 /// reopen. An operator picking an input resets the policy instead
 /// ([`RecoveryPolicy::on_restart`]), because a human judging that the situation
 /// changed is not the flap this window guards against.
-const INPUT_RECOVERY_SETTLE_FRAMES: u32 = 60;
+const INPUT_RECOVERY_SETTLE_SECS: f32 = 0.36;
 
 /// What the shell should do about the capture stream this frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1956,14 +1967,14 @@ enum Recovery {
 /// Pure and WASAPI-free: the shell hands it whether the input is lost and does
 /// what it says, which is what makes the bound assertable without an audio
 /// device to unplug.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 struct RecoveryPolicy {
     attempts: u32,
     announced: bool,
-    /// Consecutive live frames since the last loss, counted only while a budget
-    /// is actually spent — an input that has never been lost has nothing to
-    /// restore and never enters the window.
-    settled: u32,
+    /// Seconds of unbroken delivery since the last loss, counted only while a
+    /// budget is actually spent — an input that has never been lost has nothing
+    /// to restore and never enters the window.
+    settled: f32,
 }
 
 impl RecoveryPolicy {
@@ -1977,7 +1988,7 @@ impl RecoveryPolicy {
     /// overlay go on reading `live` while nothing is delivering.
     ///
     /// Restoring the retry budget is a deliberate consequence rather than a side
-    /// effect. It is the exact case [`INPUT_RECOVERY_SETTLE_FRAMES`] gives up, and
+    /// effect. It is the exact case [`INPUT_RECOVERY_SETTLE_SECS`] gives up, and
     /// giving it up is only defensible for the flap that constant guards
     /// against, not for a human who has just judged that the situation changed.
     fn on_restart(&mut self, persist: Persist) {
@@ -1986,8 +1997,12 @@ impl RecoveryPolicy {
         }
     }
 
-    /// Advance one frame.
-    fn poll(&mut self, lost: bool) -> Recovery {
+    /// Advance one frame, given the seconds it covered.
+    ///
+    /// `dt` is the shell's own frame time, already clamped to [`MAX_DT`], so a
+    /// stalled or resumed window cannot hand the accumulator a jump large enough
+    /// to settle a stream that never delivered.
+    fn poll(&mut self, lost: bool, dt: f32) -> Recovery {
         if !lost {
             if self.attempts == 0 {
                 return Recovery::Hold;
@@ -1996,13 +2011,13 @@ impl RecoveryPolicy {
             // rather than the remainder of the first — but only once the stream
             // has proved it is delivering, or a flap would restore the budget
             // faster than the bound can spend it.
-            self.settled += 1;
-            if self.settled >= INPUT_RECOVERY_SETTLE_FRAMES {
+            self.settled += dt;
+            if self.settled >= INPUT_RECOVERY_SETTLE_SECS {
                 *self = Self::default();
             }
             return Recovery::Hold;
         }
-        self.settled = 0;
+        self.settled = 0.0;
         if self.attempts < INPUT_RECOVERY_ATTEMPTS {
             self.attempts += 1;
             return Recovery::Reopen(self.attempts);
@@ -3276,11 +3291,16 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Persist,
+        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, InputSource, Modal, Persist,
         Recovery, RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
         parse_input_args_from, parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
         unrecognized_flag,
     };
+
+    /// One frame at 60 Hz, for the cases where the *rate* is not what is under
+    /// test — the bound, the flap and the give-up latch all count events rather
+    /// than seconds, so any frame time exercises them the same way.
+    const A_FRAME: f32 = 1.0 / 60.0;
 
     /// **A live input costs nothing and never reopens.** The policy runs every
     /// frame of every show, so the overwhelmingly common answer has to be `Hold`.
@@ -3288,7 +3308,7 @@ mod tests {
     fn a_live_input_is_never_reopened() {
         let mut policy = RecoveryPolicy::default();
         for _ in 0..1000 {
-            assert_eq!(policy.poll(false), Recovery::Hold);
+            assert_eq!(policy.poll(false, A_FRAME), Recovery::Hold);
         }
         assert_eq!(policy, RecoveryPolicy::default(), "a live input kept state");
     }
@@ -3303,15 +3323,15 @@ mod tests {
         let mut policy = RecoveryPolicy::default();
         for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
             assert_eq!(
-                policy.poll(true),
+                policy.poll(true, A_FRAME),
                 Recovery::Reopen(attempt),
                 "attempt {attempt} did not reopen"
             );
         }
-        assert_eq!(policy.poll(true), Recovery::GiveUp);
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::GiveUp);
         for _ in 0..500 {
             assert_eq!(
-                policy.poll(true),
+                policy.poll(true, A_FRAME),
                 Recovery::Hold,
                 "the policy kept talking after it gave up"
             );
@@ -3322,33 +3342,58 @@ mod tests {
     /// An interface unplugged twice in one show is two incidents, not one long
     /// one, so the second must not inherit the remainder of the first. What the
     /// window buys is that "recovered" means a stream that kept delivering, not
-    /// one that merely got constructed; the frame the window closes on is
-    /// asserted from both sides, because an off-by-one here is the difference
-    /// between this rule and the one below it.
+    /// one that merely got constructed; it is asserted from both sides, because
+    /// an off-by-one here is the difference between this rule and the one below
+    /// it.
+    ///
+    /// **Swept over three refresh rates**, which is the property a frame count
+    /// could not state: 30 Hz and 240 Hz are the ends where 60 frames meant
+    /// about 2 s and about 250 ms, and the window has to be the same length of
+    /// time at both.
     #[test]
-    fn a_recovery_restores_the_full_budget_once_it_has_settled() {
-        let mut policy = RecoveryPolicy::default();
-        assert_eq!(policy.poll(true), Recovery::Reopen(1));
-        assert_eq!(policy.poll(true), Recovery::Reopen(2));
+    fn the_settle_window_is_one_duration_on_every_display() {
+        // The two ends where the frame-count version gave different guarantees,
+        // plus the 165 Hz box whose 60 frames the constant is derived from.
+        for hz in [30.0_f32, 165.0, 240.0] {
+            let dt = 1.0 / hz;
+            let mut policy = RecoveryPolicy::default();
+            assert_eq!(policy.poll(true, dt), Recovery::Reopen(1));
+            assert_eq!(policy.poll(true, dt), Recovery::Reopen(2));
 
-        // One frame short of the window, the budget is still spent.
-        for _ in 0..INPUT_RECOVERY_SETTLE_FRAMES - 1 {
-            assert_eq!(policy.poll(false), Recovery::Hold);
+            // Up to the last frame that still lands inside the window, the
+            // budget is spent.
+            let mut elapsed = 0.0_f32;
+            while elapsed + dt < INPUT_RECOVERY_SETTLE_SECS {
+                assert_eq!(policy.poll(false, dt), Recovery::Hold);
+                elapsed += dt;
+            }
+            assert_ne!(
+                policy,
+                RecoveryPolicy::default(),
+                "at {hz} Hz the budget came back after {elapsed} s, inside the window"
+            );
+
+            // The frame that completes it restores everything.
+            assert_eq!(policy.poll(false, dt), Recovery::Hold);
+            elapsed += dt;
+            assert_eq!(
+                policy,
+                RecoveryPolicy::default(),
+                "at {hz} Hz the budget had not come back after {elapsed} s"
+            );
+
+            // The point of the change: the window closes at the same *time* on
+            // every display, to within the one frame no policy can subdivide.
+            assert!(
+                elapsed >= INPUT_RECOVERY_SETTLE_SECS && elapsed < INPUT_RECOVERY_SETTLE_SECS + dt,
+                "at {hz} Hz the window closed at {elapsed} s, which is not within one frame of the window"
+            );
+
+            for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+                assert_eq!(policy.poll(true, dt), Recovery::Reopen(attempt));
+            }
+            assert_eq!(policy.poll(true, dt), Recovery::GiveUp);
         }
-        assert_ne!(
-            policy,
-            RecoveryPolicy::default(),
-            "the budget came back before the stream had settled"
-        );
-
-        // The frame that completes it restores everything.
-        assert_eq!(policy.poll(false), Recovery::Hold);
-        assert_eq!(policy, RecoveryPolicy::default());
-
-        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
-            assert_eq!(policy.poll(true), Recovery::Reopen(attempt));
-        }
-        assert_eq!(policy.poll(true), Recovery::GiveUp);
     }
 
     /// **A flapping endpoint cannot outrun the bound.** A stream that opens and
@@ -3363,11 +3408,11 @@ mod tests {
         let mut reopens = 0;
         let mut gave_up = 0;
         for _ in 0..10_000 {
-            match policy.poll(true) {
+            match policy.poll(true, A_FRAME) {
                 Recovery::Reopen(_) => {
                     reopens += 1;
                     // The reopen "worked" — for exactly one frame.
-                    assert_eq!(policy.poll(false), Recovery::Hold);
+                    assert_eq!(policy.poll(false, A_FRAME), Recovery::Hold);
                 }
                 Recovery::GiveUp => gave_up += 1,
                 Recovery::Hold => {}
@@ -3913,9 +3958,9 @@ mod tests {
     fn given_up() -> RecoveryPolicy {
         let mut policy = RecoveryPolicy::default();
         for _ in 0..INPUT_RECOVERY_ATTEMPTS {
-            policy.poll(true);
+            policy.poll(true, A_FRAME);
         }
-        assert_eq!(policy.poll(true), Recovery::GiveUp);
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::GiveUp);
         policy
     }
 
@@ -3929,7 +3974,7 @@ mod tests {
     fn an_operator_swap_makes_the_next_loss_write_its_own_verdict() {
         let mut inherited = given_up();
         assert_eq!(
-            inherited.poll(true),
+            inherited.poll(true, A_FRAME),
             Recovery::Hold,
             "a spent policy is silent, which is the failure"
         );
@@ -3937,10 +3982,10 @@ mod tests {
         let mut reset = given_up();
         reset.on_restart(Persist::Yes);
         for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
-            assert_eq!(reset.poll(true), Recovery::Reopen(attempt));
+            assert_eq!(reset.poll(true, A_FRAME), Recovery::Reopen(attempt));
         }
         assert_eq!(
-            reset.poll(true),
+            reset.poll(true, A_FRAME),
             Recovery::GiveUp,
             "the loss after an operator swap wrote no verdict"
         );
@@ -3953,7 +3998,7 @@ mod tests {
     fn a_recoverys_own_restart_does_not_reset_the_policy() {
         let mut policy = given_up();
         policy.on_restart(Persist::No);
-        assert_eq!(policy.poll(true), Recovery::Hold);
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::Hold);
         assert_ne!(policy, RecoveryPolicy::default());
     }
 }
