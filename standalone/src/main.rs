@@ -2459,7 +2459,23 @@ struct FlagSpec {
     /// refused rather than passed through, which is the cheaper of the two
     /// mistakes: every value-taking flag is otherwise a place a typo can hide.
     takes_value: bool,
-    /// One line, printed by `--help`.
+    /// The flag this one is only read alongside, or `None` when it is read on
+    /// every run.
+    ///
+    /// A conditionally-claimed flag is invisible to the roster gate below: the
+    /// scanner that would read it returns early when its companion is absent,
+    /// so the flag is walked past as recognized and then read by nothing. That
+    /// is the same "running visualizer doing less than it was asked" ADR-0148
+    /// exists to refuse, one level down, and stating the dependency here is
+    /// what lets `unrecognized_flag` see it (ADR-0155).
+    ///
+    /// The name must itself be in [`FLAGS`]; `every_requires_names_a_real_flag`
+    /// is what holds that, since a typo here would refuse the flag on every run
+    /// instead of on none.
+    requires: Option<&'static str>,
+    /// One line, printed by `--help`. States what the flag does; a `requires`
+    /// dependency is rendered from the field above rather than written into
+    /// this string, so the two cannot disagree.
     help: &'static str,
 }
 
@@ -2474,87 +2490,104 @@ const FLAGS: &[FlagSpec] = &[
     FlagSpec {
         name: "--help",
         takes_value: false,
+        requires: None,
         help: "print this roster and exit",
     },
     FlagSpec {
         name: "--console",
         takes_value: false,
+        requires: None,
         help: "open the operator console at launch",
     },
     FlagSpec {
         name: "--list-devices",
         takes_value: false,
+        requires: None,
         help: "print the audio capture endpoints and exit (Windows-only)",
     },
     FlagSpec {
         name: "--list-adapters",
         takes_value: false,
+        requires: None,
         help: "print the renderer and Spout adapter rosters and exit",
     },
     FlagSpec {
         name: "--input",
         takes_value: true,
+        requires: None,
         help: "<loopback|line-in> where audio comes from",
     },
     FlagSpec {
         name: "--device",
         takes_value: true,
+        requires: None,
         help: "<name> which capture endpoint to open (see --list-devices)",
     },
     FlagSpec {
         name: "--tier",
         takes_value: true,
+        requires: None,
         help: "<floor|rich> pin the quality tier instead of letting the engine pick",
     },
     FlagSpec {
         name: "--osc",
         takes_value: true,
+        requires: None,
         help: "<host:port> publish analyzer telemetry as OSC over UDP",
     },
     FlagSpec {
         name: "--soak",
         takes_value: true,
+        requires: None,
         help: "[path] write a long-run frame-time trace; bare, it uses a default path",
     },
     FlagSpec {
         name: "--downbeat-log",
         takes_value: true,
+        requires: None,
         help: "[path] write the per-beat downbeat decomposition; bare, a default path",
     },
     FlagSpec {
         name: "--stream",
         takes_value: false,
+        requires: None,
         help: "run headless and publish every frame as a Spout sender",
     },
     FlagSpec {
         name: "--size",
         takes_value: true,
-        help: "<WxH> --stream frame size (default 1280x720)",
+        requires: Some("--stream"),
+        help: "<WxH> published frame size (default 1280x720)",
     },
     FlagSpec {
         name: "--fps",
         takes_value: true,
-        help: "<n> --stream frame rate (default 60)",
+        requires: Some("--stream"),
+        help: "<n> published frame rate (default 60)",
     },
     FlagSpec {
         name: "--gpu",
         takes_value: true,
-        help: "<name|index> which adapter --stream renders and sends on",
+        requires: Some("--stream"),
+        help: "<name|index> which graphics adapter renders and sends",
     },
     FlagSpec {
         name: "--sender",
         takes_value: true,
+        requires: Some("--stream"),
         help: "<name> the published Spout sender name (default lmv)",
     },
     FlagSpec {
         name: "--preset",
         takes_value: true,
-        help: "<name> hold one scene for --stream and disable rotation",
+        requires: Some("--stream"),
+        help: "<name> hold one scene and disable rotation",
     },
     FlagSpec {
         name: "--frames",
         takes_value: true,
-        help: "<n> stop --stream after this many frames",
+        requires: Some("--stream"),
+        help: "<n> stop after this many frames",
     },
 ];
 
@@ -2579,7 +2612,14 @@ fn print_help() {
 fn help_text() -> String {
     let mut text = String::from("lmv — a real-time music visualizer\n\nusage: lmv [flags]\n\n");
     for spec in FLAGS {
-        text.push_str(&format!("  {:<17} {}\n", spec.name, spec.help));
+        // The dependency is rendered from `requires`, never read out of `help`:
+        // one field feeds both the printed line and the refusal below, so a
+        // flag's documented coupling and its enforced one are the same fact.
+        let needs = match spec.requires {
+            Some(other) => format!(" [requires {other}]"),
+            None => String::new(),
+        };
+        text.push_str(&format!("  {:<17} {}{}\n", spec.name, spec.help, needs));
     }
     text.push_str("\n-h is a synonym for --help.\n");
     text.push_str("A flag takes its value as `--flag value` or `--flag=value`.\n");
@@ -2629,25 +2669,34 @@ fn nearest_flag(name: &str) -> Option<&'static FlagSpec> {
         .map(|(_, spec)| spec)
 }
 
-/// The first `--`-prefixed argument no scanner will claim, with the nearest
-/// roster entry to it.
+/// One flag-shaped token, as the roster reads it.
+enum Claimed {
+    /// A token matching a roster entry.
+    Known(&'static FlagSpec),
+    /// A `--`-prefixed token no roster entry names, kept verbatim so the
+    /// refusal can echo what was typed rather than a normalized form.
+    Unknown(String),
+}
+
+/// Walk `args` the way the scanners do, yielding one entry per flag-shaped
+/// token.
 ///
-/// One pass in front of the scanners, which are each a full walk of the argument
-/// list looking for a single shape and therefore cannot see an argument nobody
-/// wanted (ADR-0148). A rostered flag's value is stepped over rather than judged,
-/// so a device or sender name that happens to be flag-shaped is still its flag's
-/// value.
-fn unrecognized_flag(
-    args: impl Iterator<Item = String>,
-) -> Option<(String, Option<&'static FlagSpec>)> {
+/// The single copy of the stepping rule: a rostered flag's value is stepped
+/// over rather than judged, so a device or sender name that happens to be
+/// flag-shaped is still its flag's value. Both refusals below read this walk, so
+/// they cannot disagree about which tokens were flags (ADR-0148).
+fn walk_flags(args: impl Iterator<Item = String>) -> Vec<Claimed> {
+    let mut seen = Vec::new();
     let mut args = args.peekable();
     while let Some(arg) = args.next() {
         let Some(name) = flag_name(&arg) else {
             continue;
         };
         let Some(spec) = FLAGS.iter().find(|spec| spec.name == name) else {
-            return Some((arg.clone(), nearest_flag(name)));
+            seen.push(Claimed::Unknown(arg.clone()));
+            continue;
         };
+        seen.push(Claimed::Known(spec));
         // The `=` spelling carries its value inside the same argument, so there
         // is nothing after it to step over.
         if spec.takes_value
@@ -2657,7 +2706,52 @@ fn unrecognized_flag(
             args.next();
         }
     }
-    None
+    seen
+}
+
+/// The first rostered flag whose `requires` companion is absent, with that
+/// companion's name.
+///
+/// The gap ADR-0148 left: a flag claimed only when another flag is present is
+/// walked past as recognized, and then the scanner that would read it returns
+/// early. Nothing downstream mentions it again, so the app runs doing less than
+/// it was asked with no diagnostic — which is the failure the roster exists to
+/// end (ADR-0155).
+fn missing_companion(
+    args: impl Iterator<Item = String>,
+) -> Option<(&'static FlagSpec, &'static str)> {
+    let seen = walk_flags(args);
+    let present = |name: &str| {
+        seen.iter()
+            .any(|claimed| matches!(claimed, Claimed::Known(spec) if spec.name == name))
+    };
+    seen.iter().find_map(|claimed| match claimed {
+        Claimed::Known(spec) => spec
+            .requires
+            .filter(|companion| !present(companion))
+            .map(|companion| (*spec, companion)),
+        Claimed::Unknown(_) => None,
+    })
+}
+
+/// The first `--`-prefixed argument no scanner will claim, with the nearest
+/// roster entry to it.
+///
+/// One pass in front of the scanners, which are each a full walk of the argument
+/// list looking for a single shape and therefore cannot see an argument nobody
+/// wanted (ADR-0148).
+fn unrecognized_flag(
+    args: impl Iterator<Item = String>,
+) -> Option<(String, Option<&'static FlagSpec>)> {
+    walk_flags(args)
+        .into_iter()
+        .find_map(|claimed| match claimed {
+            Claimed::Unknown(arg) => {
+                let nearest = flag_name(&arg).and_then(nearest_flag);
+                Some((arg, nearest))
+            }
+            Claimed::Known(_) => None,
+        })
 }
 
 /// The soak-log path if `--soak` was passed (`--soak <path>` / `--soak=<path>`,
@@ -3137,6 +3231,19 @@ fn main() {
         std::process::exit(2);
     }
 
+    // A rostered flag whose companion is absent, refused for the same reason
+    // and in the same shape (ADR-0155). Second, because a misspelt flag is the
+    // worse diagnosis and should be the one reported: `--fpz 30` is an
+    // unrecognized argument, not `--fps` missing `--stream`.
+    if let Some((spec, companion)) = missing_companion(std::env::args().skip(1)) {
+        eprintln!(
+            "`{}` is only read with `{companion}`, which is not in this command line",
+            spec.name
+        );
+        eprintln!("either add `{companion}` or drop `{}`", spec.name);
+        std::process::exit(2);
+    }
+
     // Startup aid: print the enumerable audio endpoints and exit, so the
     // operator can copy a friendly name into `input.device` (Plan 0009 Phase 2).
     if std::env::args().skip(1).any(|arg| arg == "--list-devices") {
@@ -3292,9 +3399,9 @@ fn main() {
 mod tests {
     use super::{
         FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, InputSource, Modal, Persist,
-        Recovery, RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
-        parse_input_args_from, parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
-        unrecognized_flag,
+        Recovery, RecoveryPolicy, config, console, device_row_index, help_text, missing_companion,
+        output_modal, parse_input_args_from, parse_osc_arg_from, preset_name_visible,
+        resolve_input, resolve_osc, unrecognized_flag,
     };
 
     /// One frame at 60 Hz, for the cases where the *rate* is not what is under
@@ -3784,6 +3891,64 @@ mod tests {
         );
     }
 
+    /// [`missing_companion`] reduced to the pair of names the operator is
+    /// shown.
+    fn orphaned(args: &[&str]) -> Option<(&'static str, &'static str)> {
+        let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        missing_companion(argv.into_iter()).map(|(spec, needs)| (spec.name, needs))
+    }
+
+    /// **The reduction from the entry that produced this arm.** `--gpu 1` with
+    /// no `--stream` used to start the app and render on whatever adapter it
+    /// would have picked anyway, saying nothing — the roster walked past it as
+    /// recognized and `stream::parse` returned before reading it.
+    #[test]
+    fn a_flag_whose_companion_is_absent_is_refused_and_both_are_named() {
+        assert_eq!(orphaned(&["--fps", "30"]), Some(("--fps", "--stream")));
+        assert_eq!(orphaned(&["--sender=rig"]), Some(("--sender", "--stream")));
+
+        // With the companion present each is read by the scanner that claims
+        // it, which is the whole condition.
+        assert_eq!(orphaned(&["--stream", "--fps", "30"]), None);
+        // Order does not matter: the walk collects before it judges.
+        assert_eq!(orphaned(&["--fps", "30", "--stream"]), None);
+    }
+
+    /// A flag-shaped **value** is not its own flag, so it cannot satisfy
+    /// another flag's dependency. `--device` refuses to swallow a flag-shaped
+    /// token, so the `--stream` here is a real occurrence; a `--device=--stream`
+    /// carries it inside the value and is not.
+    #[test]
+    fn a_companion_hiding_in_a_value_does_not_count() {
+        assert_eq!(
+            orphaned(&["--device=--stream", "--fps", "30"]),
+            Some(("--fps", "--stream")),
+            "`--stream` inside an `=` value is text, not a flag occurrence"
+        );
+    }
+
+    /// **A typo in `requires` would refuse its flag on every run**, not on
+    /// none, so it is the one field here whose failure mode is worse than the
+    /// silence it replaces. Nothing else checks it.
+    #[test]
+    fn every_requires_names_a_real_flag() {
+        for spec in FLAGS {
+            let Some(companion) = spec.requires else {
+                continue;
+            };
+            assert!(
+                FLAGS.iter().any(|other| other.name == companion),
+                "`{}` requires `{companion}`, which is not itself in FLAGS",
+                spec.name
+            );
+            assert_ne!(
+                spec.name, companion,
+                "`{}` requires itself, which no argument list can satisfy",
+                spec.name
+            );
+        }
+    }
+
     /// **Every rostered flag is claimed, in both spellings.** The gate is
     /// additive: a roster that refuses one of its own flags stops a working
     /// invocation, which is a worse failure than the silence it replaces.
@@ -3951,6 +4116,47 @@ mod tests {
             );
         }
         assert!(text.contains("-h"), "--help does not name its own synonym");
+    }
+
+    /// **`--help` renders each dependency once, from the field that enforces
+    /// it.** The six `--stream` companions used to carry the coupling as prose
+    /// inside their own `help` strings, where nothing held it to what the code
+    /// did; a flag that changes its dependency now cannot disagree with its own
+    /// documentation, because both read `requires`.
+    #[test]
+    fn the_help_text_states_each_dependency_once() {
+        let text = help_text();
+        for spec in FLAGS {
+            let line = text
+                .lines()
+                .find(|line| line.trim_start().starts_with(spec.name))
+                .unwrap_or_else(|| panic!("--help has no line for `{}`", spec.name));
+            match spec.requires {
+                Some(companion) => {
+                    assert!(
+                        line.contains(&format!("[requires {companion}]")),
+                        "`{}` does not state its dependency: {line}",
+                        spec.name
+                    );
+                    assert_eq!(
+                        line.matches(companion).count(),
+                        1,
+                        "`{}` names `{companion}` more than once: {line}",
+                        spec.name
+                    );
+                }
+                None => assert!(
+                    !line.contains("[requires "),
+                    "`{}` states a dependency it does not have: {line}",
+                    spec.name
+                ),
+            }
+            assert!(
+                !spec.help.contains("[requires "),
+                "`{}` writes its dependency into `help` instead of `requires`",
+                spec.name
+            );
+        }
     }
 
     /// A policy that has spent its budget and announced the give-up — the state

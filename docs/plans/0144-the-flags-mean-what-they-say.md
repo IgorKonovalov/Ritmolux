@@ -1,6 +1,6 @@
 # 0144 — The flags mean what they say
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-08-30
 > **Owner skill(s):** dev
 > **Closes:** design-backlog 0167, design-backlog 0168, design-backlog 0169
@@ -319,11 +319,11 @@ pub struct RendererOptions {
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(dev fills this in on the first phase commit: the worktree path and branch name.)_
+**Lane:** `WORK/lmv-plan-0144` on `plan-0144-the-flags-mean-what-they-say`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The roster states a dependency | dev | | |
+| 1 — The roster states a dependency | dev | done | committed with this row |
 | 2 — `--gpu` reaches the window | dev | | |
 | 3 — `--preset` holds a scene in the window | dev | | |
 | 4 — The broken literal becomes a scanned class | dev | | |
