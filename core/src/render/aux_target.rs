@@ -122,12 +122,11 @@ impl Blit {
                 min_filter: wgpu::FilterMode::Linear,
                 ..Default::default()
             }),
-            rect: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("lmv-console-blit-rect"),
-                size: std::mem::size_of::<[f32; 4]>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
+            rect: gpu::uniform_buffer(
+                device,
+                "lmv-console-blit-rect",
+                std::mem::size_of::<[f32; 4]>(),
+            ),
             bound: None,
         }
     }
@@ -358,22 +357,12 @@ impl AuxTarget {
         let quad = quad.and(self.blit.bound.as_ref().map(|(_, group)| group));
 
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("lmv-console-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(CLEAR),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            let mut pass = gpu::color_pass(
+                &mut encoder,
+                "lmv-console-pass",
+                &view,
+                wgpu::LoadOp::Clear(CLEAR),
+            );
             // The preview first, the text over it: the modal list is what the
             // operator is reading and the monitor must not cover it.
             if let Some(group) = quad {

@@ -1262,24 +1262,21 @@ impl Resources {
 
         let field = PingPongField::new(device, size.0.max(1), size.1.max(1));
 
-        let warp_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-warp-uniform"),
-            size: std::mem::size_of::<WarpUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let deposit_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-deposit-uniform"),
-            size: std::mem::size_of::<DepositUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let present_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-present-uniform"),
-            size: std::mem::size_of::<PresentUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let warp_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-warp-uniform",
+            std::mem::size_of::<WarpUniform>(),
+        );
+        let deposit_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-deposit-uniform",
+            std::mem::size_of::<DepositUniform>(),
+        );
+        let present_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-present-uniform",
+            std::mem::size_of::<PresentUniform>(),
+        );
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("warp-mesh-sampler"),
@@ -1509,12 +1506,11 @@ impl Resources {
             label: Some("warp-mesh-shape-shader"),
             source: wgpu::ShaderSource::Wgsl(SHAPE_SHADER.into()),
         });
-        let shape_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-shape-uniform"),
-            size: std::mem::size_of::<ShapeUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let shape_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-shape-uniform",
+            std::mem::size_of::<ShapeUniform>(),
+        );
         // A vertex-visible sized uniform, which is a shape nothing else in
         // `core/src` holds (ADR-0058): `swarm-bind-layout` is the same kind and
         // visibility with **no** declared size, and that difference is exactly
@@ -1669,22 +1665,12 @@ impl Resources {
     /// very first frame.
     fn encode_clear(&self, encoder: &mut wgpu::CommandEncoder) {
         for view in [self.field.view_a(), self.field.view_b()] {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-field-clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            gpu::color_pass(
+                encoder,
+                "warp-mesh-field-clear",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
         }
     }
 }
@@ -2135,26 +2121,15 @@ impl Scene for WarpMeshScene {
             &res.warp_bg_b
         };
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-warp-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: res.field.write_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        // The mesh covers the whole target, but clearing first
-                        // makes the pass independent of what the buffer held two
-                        // frames ago — which is what keeps a capture a pure
-                        // function of its inputs.
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            // The mesh covers the whole target, but clearing first makes the
+            // pass independent of what the buffer held two frames ago — which
+            // is what keeps a capture a pure function of its inputs.
+            let mut pass = gpu::color_pass(
+                encoder,
+                "warp-mesh-warp-pass",
+                res.field.write_view(),
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
             // A converted warp shader replaces the built-in decay fragment; the
             // vertex stage — the mesh transform — is shared, so `uv` reaching
             // the custom fragment is exactly the warped source uv (Phase 6).
@@ -2186,22 +2161,12 @@ impl Scene for WarpMeshScene {
 
         // --- deposit: this frame's light, onto the warped past ---
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-deposit-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: res.field.write_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            let mut pass = gpu::color_pass(
+                encoder,
+                "warp-mesh-deposit-pass",
+                res.field.write_view(),
+                wgpu::LoadOp::Load,
+            );
             pass.set_pipeline(&res.deposit_pipeline);
             pass.set_bind_group(0, &res.deposit_bg, &[]);
             pass.draw(0..3, 0..1);
@@ -2235,22 +2200,12 @@ impl Scene for WarpMeshScene {
                         v: [aspect, 0.0, 0.0, 0.0],
                     }),
                 );
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("warp-mesh-shape-pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: res.field.write_view(),
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
+                let mut pass = gpu::color_pass(
+                    encoder,
+                    "warp-mesh-shape-pass",
+                    res.field.write_view(),
+                    wgpu::LoadOp::Load,
+                );
                 // Two draws over one buffer, split at the partition the draw
                 // layer built: additive instances first, then the over-blended
                 // ones on top of them. See `draw`'s module docs for why both
@@ -2315,22 +2270,7 @@ impl Scene for WarpMeshScene {
         } else {
             &res.present_bg_b
         };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("warp-mesh-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "warp-mesh-present-pass", view, wgpu::LoadOp::Load);
         // A converted comp shader replaces the built-in remap stack whole — it
         // *is* MilkDrop's composite, gamma and echo and all, in the preset's
         // own arithmetic.

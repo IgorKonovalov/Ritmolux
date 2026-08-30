@@ -34,6 +34,7 @@ use crate::diag::{AnalysisMetrics, Metrics};
 
 use super::overlay_font::{GLYPH_H, GLYPH_W, glyph};
 use super::tier::Tier;
+use crate::render::gpu;
 
 /// Instance buffer capacity in quads. Comfortably covers the panel, ~240
 /// sparkline bars, the bars, and every lit font pixel of the readout — the
@@ -263,23 +264,8 @@ impl Overlay {
         }
         queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(slice));
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("overlay-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load: composite over the scene already in the surface.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load: composite over the scene already in the surface.
+        let mut pass = gpu::color_pass(encoder, "overlay-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&self.pipeline);
         pass.set_vertex_buffer(0, self.instances.slice(..));
         pass.draw(0..6, 0..n as u32);

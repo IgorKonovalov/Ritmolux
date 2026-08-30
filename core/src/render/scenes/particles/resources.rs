@@ -370,15 +370,15 @@ impl PipelineResources {
         // ~0.000 in `animation`. One layout and one bind group has no aliasing
         // surface to get wrong.
         let step_stride = uniform_stride(device);
-        let step_uniform = uniform_buffer(
+        let step_uniform = gpu::uniform_buffer(
             device,
             "attractor-step-uniform",
             (step_stride * STEP_SLOTS) as usize,
         );
         let draw_uniform =
-            uniform_buffer(device, "attractor-draw-uniform", size_of::<DrawUniform>());
+            gpu::uniform_buffer(device, "attractor-draw-uniform", size_of::<DrawUniform>());
         let decay_uniform =
-            uniform_buffer(device, "attractor-decay-uniform", size_of::<DecayUniform>());
+            gpu::uniform_buffer(device, "attractor-decay-uniform", size_of::<DecayUniform>());
 
         // --- compute: read_write storage + step uniform ---
         let compute_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -677,22 +677,12 @@ impl FieldResources {
     /// the first decay pass reads a defined (empty) trail rather than garbage.
     pub(super) fn clear_field(&self, encoder: &mut wgpu::CommandEncoder) {
         for view in [self.field.view_a(), self.field.view_b()] {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("attractor-clear-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            gpu::color_pass(
+                encoder,
+                "attractor-clear-pass",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+            );
         }
     }
 }
@@ -705,15 +695,6 @@ impl FieldResources {
 pub(super) fn uniform_stride(device: &wgpu::Device) -> u32 {
     let align = device.limits().min_uniform_buffer_offset_alignment.max(1);
     size_of::<StepUniform>().next_multiple_of(align as usize) as u32
-}
-
-pub(super) fn uniform_buffer(device: &wgpu::Device, label: &str, size: usize) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some(label),
-        size: size as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    })
 }
 
 pub(super) fn storage_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {

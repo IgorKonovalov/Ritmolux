@@ -308,12 +308,11 @@ impl FragmentFieldScene {
             gpu::FULLSCREEN_VS_NDC,
             SHADER,
         );
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("fragment-field-params"),
-            size: std::mem::size_of::<Params>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(
+            device,
+            "fragment-field-params",
+            std::mem::size_of::<Params>(),
+        );
         let lut_texture_a = palette::lut_texture(device, "fragment-field-lut-a");
         let lut_texture_b = palette::lut_texture(device, "fragment-field-lut-b");
         let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
@@ -541,24 +540,9 @@ impl Scene for FragmentFieldScene {
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("fragment-field-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018); this fullscreen
-                    // field is opaque, so it covers the backdrop as before.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018); this fullscreen field is
+        // opaque, so it covers the backdrop as before.
+        let mut pass = gpu::color_pass(encoder, "fragment-field-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_bind_group(1, &self.lut_bind_group, &[]);

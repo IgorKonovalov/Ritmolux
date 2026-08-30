@@ -221,12 +221,7 @@ impl Resources {
             min_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("ink-uniform"),
-            size: std::mem::size_of::<InkUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniform = gpu::uniform_buffer(device, "ink-uniform", std::mem::size_of::<InkUniform>());
         let shader =
             gpu::fullscreen_shader(device, "ink-shader", gpu::FULLSCREEN_VS_UV_FLIPPED, SHADER);
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -552,22 +547,12 @@ impl Ink {
                 ctl: [self.amount, t, applied_gamma(self.gamma), 0.0],
             }),
         );
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("ink-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: out,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(
+            encoder,
+            "ink-pass",
+            out,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.draw(0..3, 0..1);

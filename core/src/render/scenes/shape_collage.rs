@@ -906,12 +906,11 @@ impl ShapeCollageScene {
             gpu::FULLSCREEN_VS_NDC,
             &source,
         );
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("shape-collage-params"),
-            size: std::mem::size_of::<Params>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(
+            device,
+            "shape-collage-params",
+            std::mem::size_of::<Params>(),
+        );
         let storage = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("shape-collage-elements"),
             // Twice the cap: a recomposition crossfade draws two whole canvases.
@@ -1532,22 +1531,7 @@ impl Scene for ShapeCollageScene {
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("shape-collage-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "shape-collage-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.draw(0..3, 0..1);

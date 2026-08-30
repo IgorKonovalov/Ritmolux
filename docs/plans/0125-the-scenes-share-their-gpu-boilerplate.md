@@ -1,6 +1,6 @@
 # 0125 — The scenes share their GPU boilerplate
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the `Scene` trait stays thin — these helpers sit beside it, not on it), [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (**two layouts that can be live in one frame may not share a shape without allowlist evidence — the constraint every helper here is designed around**, see Decision and Risks), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
@@ -217,17 +217,39 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`WORK/lmv-plan-0125` on `plan-0125-the-scenes-share-their-gpu-boilerplate`)_
+**Lane:** `WORK/lmv-plan-0125` on `plan-0125-the-scenes-share-their-gpu-boilerplate`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | not started | |
+| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | committed with this row | |
 | 2 — `palette::LutPair` | dev | not started | |
 | 3 — `scenes::common::{PaletteParams, PanParams}` | dev | not started | |
 | 4 — `gpu::FullscreenScene` | dev | not started | |
 | 5 — `marks::InstancedQuads` | dev | not started | |
 
 ### Notes
+
+**Phase 1.** The plan counts 33 `RenderPassDescriptor` sites; there were **40**
+(35 in shipped source, 5 in `#[cfg(test)]` modules under `render/`). All 40 matched the
+canonical shape byte-for-byte, so all 40 migrated and the "list what differs" half of the
+done-when has an empty list. The `grep` now returns only `gpu.rs`.
+
+`gpu::uniform_buffer` took **25** `UNIFORM | COPY_DST` sites. One buffer was left: the blur-step
+uniform at `core/src/render/scenes/warp_mesh/shader.rs` is a `create_buffer_init` with
+`UNIFORM` alone — no `COPY_DST`, contents written once at creation — so it is a different
+descriptor, not the same one spelled again. `bloom::small_uniform` was kept as a
+one-line wrapper (it supplies the `V4` size to its four call sites) rather than deleted.
+
+Comments that sat inside the descriptor's `ops` block were hoisted above the call and
+re-wrapped; none was dropped.
+
+**A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
+`no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning
+`core/src` source text** for `create_bind_group_layout` with a literal label and literal
+entries, and `assert_scan_is_whole` holds the count at or above 25. A helper that builds a
+bind-group layout from parameters is invisible to that scan and would both shrink the
+enumeration and blind the collision check. So `FullscreenScene` and `InstancedQuads` must take
+a layout the scene still spells literally, never build one.
 
 ### Close triggers
 

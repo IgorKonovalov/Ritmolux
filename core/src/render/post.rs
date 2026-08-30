@@ -97,6 +97,7 @@ use super::kaleidoscope::Kaleidoscope;
 use super::layer_blend::LayerBlendPass;
 use super::trails::Trails;
 use crate::preset::LayerBlend;
+use crate::render::gpu;
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
@@ -371,22 +372,12 @@ impl Fold {
 /// No pipeline and no draw — just the load op — so this costs a render-pass
 /// begin/end and nothing else.
 fn clear_transparent(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, label: &str) {
-    let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some(label),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    let _pass = gpu::color_pass(
+        encoder,
+        label,
+        view,
+        wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+    );
 }
 
 /// One frame's composite routing: the active stages, in chain order.

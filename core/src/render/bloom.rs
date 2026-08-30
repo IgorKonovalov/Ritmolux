@@ -501,12 +501,7 @@ fn target_texture(
 
 /// A 16-byte uniform buffer.
 fn small_uniform(device: &wgpu::Device, label: &str) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some(label),
-        size: std::mem::size_of::<V4>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    })
+    gpu::uniform_buffer(device, label, std::mem::size_of::<V4>())
 }
 
 impl Resources {
@@ -840,22 +835,7 @@ fn blit(
     pipeline: &wgpu::RenderPipeline,
     bind: &wgpu::BindGroup,
 ) {
-    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some(label),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    let mut pass = gpu::color_pass(encoder, label, view, load);
     pass.set_pipeline(pipeline);
     pass.set_bind_group(0, bind, &[]);
     pass.draw(0..3, 0..1);

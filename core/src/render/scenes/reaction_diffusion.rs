@@ -505,24 +505,15 @@ impl Resources {
 
         let field = PingPongField::new(device, GRID, GRID);
 
-        let sim_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-sim-params"),
-            size: std::mem::size_of::<SimParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let init_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-init-params"),
-            size: std::mem::size_of::<InitParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let present_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-present-params"),
-            size: std::mem::size_of::<PresentParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let sim_uniform =
+            gpu::uniform_buffer(device, "rd-sim-params", std::mem::size_of::<SimParams>());
+        let init_uniform =
+            gpu::uniform_buffer(device, "rd-init-params", std::mem::size_of::<InitParams>());
+        let present_uniform = gpu::uniform_buffer(
+            device,
+            "rd-present-params",
+            std::mem::size_of::<PresentParams>(),
+        );
         // --- init pipeline: one uniform, writes the seed field ---
         let init_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-init-layout"),
@@ -660,22 +651,12 @@ impl Resources {
     /// Encode the one-shot seed pass into the current read texture, filling the
     /// field with the deterministic initial pattern. Run once after a (re)build.
     fn encode_seed(&self, encoder: &mut wgpu::CommandEncoder) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("rd-seed-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: self.field.read_view(),
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(
+            encoder,
+            "rd-seed-pass",
+            self.field.read_view(),
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
         pass.set_pipeline(&self.init_pipeline);
         pass.set_bind_group(0, &self.init_bg, &[]);
         pass.draw(0..3, 0..1);
@@ -1078,23 +1059,13 @@ impl Scene for ReactionDiffusionScene {
                 &res.sim_bg_b
             };
             {
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("rd-sim-pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: res.field.write_view(),
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            // The fullscreen sim pass overwrites every texel.
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
+                // The fullscreen sim pass overwrites every texel.
+                let mut pass = gpu::color_pass(
+                    encoder,
+                    "rd-sim-pass",
+                    res.field.write_view(),
+                    wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                );
                 pass.set_pipeline(&res.sim_pipeline);
                 pass.set_bind_group(0, sim_bg, &[]);
                 pass.draw(0..3, 0..1);
@@ -1108,28 +1079,13 @@ impl Scene for ReactionDiffusionScene {
         } else {
             &res.present_bg_b
         };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("rd-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018). The present is
-                    // **not** opaque: it writes premultiplied alpha, with the
-                    // V-field's `structure` term as coverage, so the coral's
-                    // voids reveal the `bg_*` gradient underneath. Over the
-                    // default black backdrop a premultiplied Load is arithmetically
-                    // an opaque REPLACE, which is why the golden does not move.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018). The present is **not**
+        // opaque: it writes premultiplied alpha, with the V-field's `structure`
+        // term as coverage, so the coral's voids reveal the `bg_*` gradient
+        // underneath. Over the default black backdrop a premultiplied Load is
+        // arithmetically an opaque REPLACE, which is why the golden does not
+        // move.
+        let mut pass = gpu::color_pass(encoder, "rd-present-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&res.present_pipeline);
         pass.set_bind_group(0, present_bg, &[]);
         pass.draw(0..3, 0..1);
