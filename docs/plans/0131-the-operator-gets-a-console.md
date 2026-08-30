@@ -511,6 +511,71 @@ there was no reason in the code for this.
   field and the row-roster assertion went from twelve rows to thirteen. Phase 3 forbade editing that
   file; Phase 5 lists it, and these are the two edits a new row forces.
 
+**Phase 6 — run as far as one display allows, 2026-08-30. Two findings, one of them a stop.**
+
+Run as two 95 s release runs differing only by `--console`, both untouched, `[console] enabled`
+reset to false first so the closed run was genuinely closed. An earlier attempt was **discarded**:
+the operator pressed `C` mid-run, so the "closed" baseline had a console open in it.
+
+- **THE RENDERER IS ON THE INTEGRATED GPU, AND THE WINDOW HAS NO WAY TO ASK OTHERWISE.**
+  `# renderer adapter: AMD Radeon(TM) Graphics (Dx12, IntegratedGpu), driver 30.0.13002.1001`, on a
+  machine that also has an RTX 3080. The windowed path calls `request_adapter` with a
+  `compatible_surface` and default power preference; ADR-0146 gave `--gpu` to `--stream` alone, and
+  `RenderContext::new` takes no `AdapterChoice`. **Every frame-time figure this project has ever
+  quoted from the windowed app on this machine is an iGPU figure**, and until this run nothing said
+  so — the note that says it was added during this phase, because Phase 6 requires naming the GPU
+  and the window had no equivalent of the stream mode's startup print.
+- **THE CONSOLE COSTS THE OUTPUT ABOUT HALF ITS FRAME RATE.** Mean over 18 samples: **61.7 fps
+  closed against 33.1 fps open**; `frame_ms_p99_steady` **18.6 ms against 47.3 ms**. Frame counts
+  agree independently — 5,549 against 2,976 over the same 90 s. **+29 ms per frame is far more than
+  a full-frame copy plus a 900x640 blit accounts for**, and landing within 3 % of exactly half is
+  the shape of two presents serialising rather than of copy cost. Phase 6 names this outcome and
+  says it **routes back to architect rather than being tuned away here**, so nothing was changed.
+- **Both caveats that bound the reading.** It is the **iGPU**, so the absolute cost is not the
+  discrete GPU's; and both surfaces were on **one display at one refresh rate**, which is precisely
+  the configuration the phase says cannot separate the two pacing sources. The measurement says the
+  cost is real and large; it does not say the present mode is the mechanism.
+- **Resident set:** flat at 711 MB closed; **736.2 -> 737.4 MB open, +1.2 MB across 90 s.** Small,
+  and not flat the way the closed run is.
+- **Present mode:** `# console opened: 900x640, present mode Mailbox, with preview` — the
+  non-blocking arm was taken, and the preview path configured. So the halving happened **with**
+  Mailbox, not in the `Fifo` fallback.
+- **NOT ANSWERED, and unreachable on this machine today:** the two-display cross-refresh
+  measurement, the cadence verdict that rides on it, and the **dual-GPU degrade path** — this box is
+  hybrid, but with one display both windows land on one adapter, so the branch still cannot fire.
+  Deferred to the checklist entry in `docs/on-device-validation.md`.
+
+**Operator feedback from driving it, taken the same day and acted on** (`random`, hiding the
+standing text under a modal, and the dwell reading): see the Phase 4/5 note above.
+
+**Operator feedback from the first drive, 2026-08-30, acted on the same session.** Four changes,
+all inside the console's own lane and all disclosed here because none is in a phase's file list as
+written:
+
+- **A `random` control joins the transport**, at the operator's request — the phase names
+  "next / prev / go-to" and not this. It never returns the preset already showing, and that is
+  structural rather than a retry loop: it picks among the `count - 1` positions that are not active
+  and steps past. Asserted exhaustively over roster sizes 2..11, every active position and 64
+  seeds, plus a reachability check. Seeded from a counter mixed through **lowbias32**, the mixer
+  `core` already uses — no new dependency and no clock read.
+- **The standing furniture hides while a modal is up.** The header, transport labels and staging
+  line share `LIST_INSET` with the browse list and the settings menu and piled up on top of them.
+  The controls are also **not hit-testable** under a modal: a drawn-nowhere control that still
+  fires is worse than none.
+- **The dwell bounds are now on the strip.** The two nudge controls moved a number with no reading
+  of it anywhere on the surface, so a press that landed and a press that hit a clamp were
+  indistinguishable. `staging_line` takes the pair the settings menu's Min/Max rows show.
+- **`--console` no longer writes itself into `config.toml`.** The launch route went through
+  `toggle_console`, which persists, so a transient flag edited the operator's file — contradicting
+  its own doc and the `--input` / `--device` / `--osc` shape it claims to follow (ADR-0142).
+  Persistence is now a parameter: an operator's own toggle persists, a launch flag does not. **This
+  was found by running the app, not by any test**, and nothing in the suite covers it.
+
+**One more edit outside every phase's file list: the windowed app now logs its adapter.**
+`AppState::new` writes one `#` note naming `Renderer::adapter_description()`. Phase 6 requires a
+frame-rate figure to name the GPU that produced it (ADR-0071) and the window had no equivalent of
+the stream mode's startup print, so the phase could not have been satisfied without it.
+
 **Not verified on two displays.** The dev box's second-display behaviour, the present mode actually
 negotiated, and the cost of a second swapchain to the output are all unmeasured; the plan puts them
 in Phase 6 and Phase 6 was not run. The present mode is logged on open so that gate can read which

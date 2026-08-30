@@ -156,7 +156,23 @@ struct AppState {
     /// A console open/close asked for by something that had no
     /// `ActiveEventLoop` to create a window with — the settings row, or a
     /// launch flag. Serviced once per event, where one is in scope.
-    console_toggle_pending: bool,
+    ///
+    /// The bool is **whether the result is written to `config.toml`**. An
+    /// operator's own toggle persists, because where they left the console is a
+    /// staging choice that should outlive the restart; a launch flag does not,
+    /// because `--console` turns the console on for one run and must not edit
+    /// the file — the shape `--input` / `--device` / `--osc` already follow
+    /// (ADR-0142).
+    console_request: Option<bool>,
+    /// State for the console's `random` control.
+    ///
+    /// A counter mixed on each press rather than a dependency or a clock read:
+    /// the only property the operator wants is *a different scene*, and
+    /// `console::random_index` guarantees "not the current one" structurally.
+    /// Seeded from the roster length so two machines with different libraries do
+    /// not walk the same order, and advanced per press so a held button does not
+    /// repeat one preset.
+    random_state: u32,
     /// This frame's text, split by destination and retained across frames so the
     /// split reuses its buffers rather than allocating two vectors per frame.
     frame_text: console::FrameText,
@@ -344,7 +360,7 @@ impl AppState {
         )]
         let start = Instant::now();
         let renderer_overflow = renderer.cap_overflow().copied();
-        Self {
+        let mut state = Self {
             window,
             renderer,
             analyzer,
@@ -379,7 +395,8 @@ impl AppState {
             reported_demotion: false,
             console_window: None,
             console_cursor: (-1.0, -1.0),
-            console_toggle_pending: false,
+            console_request: None,
+            random_state: 0x9E37_79B9,
             frame_text: console::FrameText::default(),
             modal_scratch: Vec::new(),
             chrome_scratch: Vec::new(),
@@ -393,7 +410,19 @@ impl AppState {
             // it is behind a keypress.
             input_roster: Vec::new(),
             display_index,
-        }
+        };
+        // **Which GPU is rendering the show**, once, at startup. On a hybrid
+        // machine the windowed path takes whatever `request_adapter` returns for
+        // the surface, which is not necessarily the discrete GPU, and every
+        // frame-time figure taken from this run is a property of that choice
+        // (ADR-0071). The headless `--stream` mode prints both resolved adapters
+        // for the same reason; the window had no equivalent, so a measurement
+        // taken here could not name its own adapter.
+        state.diag_log.note(&format!(
+            "renderer adapter: {}",
+            state.renderer.adapter_description()
+        ));
+        state
     }
 
     /// Persist the current config to disk if a per-user path was resolved. A
@@ -406,25 +435,28 @@ impl AppState {
     }
 
     /// Open or close the operator console (the `C` hotkey).
-    fn toggle_console(&mut self, event_loop: &ActiveEventLoop) {
+    fn toggle_console(&mut self, event_loop: &ActiveEventLoop, persist: bool) {
         if self.console_window.is_some() {
             self.close_console();
         } else {
             self.open_console(event_loop);
         }
-        // Persisted like fullscreen and the two `[hud]` switches: where the
-        // operator left the console is a staging choice, not a debugging state,
-        // so it survives the restart. Written from the window rather than from
-        // the intent, so a console that refused to open does not persist as on.
-        self.config.console.enabled = self.console_window.is_some();
-        self.save_config();
+        if persist {
+            // Persisted like fullscreen and the two `[hud]` switches: where the
+            // operator left the console is a staging choice, not a debugging
+            // state, so it survives the restart. Written from the **window**
+            // rather than from the intent, so a console that refused to open
+            // does not persist as on.
+            self.config.console.enabled = self.console_window.is_some();
+            self.save_config();
+        }
     }
 
     /// Service a console toggle asked for while no `ActiveEventLoop` was in
     /// scope — the settings row and the launch flag both take this path.
     fn service_console_request(&mut self, event_loop: &ActiveEventLoop) {
-        if std::mem::take(&mut self.console_toggle_pending) {
-            self.toggle_console(event_loop);
+        if let Some(persist) = self.console_request.take() {
+            self.toggle_console(event_loop, persist);
         }
     }
 
@@ -1222,7 +1254,7 @@ impl AppState {
             // one interaction where the Phase 3 move has to reverse
             // mid-keystroke, and it reverses by construction rather than by a
             // special case.
-            SettingsAction::ToggleConsole => self.console_toggle_pending = true,
+            SettingsAction::ToggleConsole => self.console_request = Some(true),
             SettingsAction::ToggleFullscreen => self.toggle_fullscreen(),
             SettingsAction::CycleDisplay => self.cycle_display(),
             SettingsAction::ToggleDiagnostics => self.toggle_diagnostics(),
@@ -1465,21 +1497,30 @@ impl AppState {
         // Queued after the routing has cleared last frame's lines and before the
         // modal rows land under it.
         console::route_into(&mut self.frame_text, &mut chrome, &mut modal, console_open);
-        if console_open.is_open() {
-            // The standing furniture, above whatever the routing sent: the
-            // header, the transport labels, and the line naming what a rotation
-            // takes next. Built at the reference geometry like every routed
-            // line, so the one scaling below moves all of them together.
+        // The standing furniture — header, transport labels, staging line —
+        // only while no modal is up. A browse list or a settings menu is what
+        // the operator is reading, it starts at the same inset, and the two
+        // overlap into an unreadable pile. The transport is a resting-state
+        // surface; the modal has its own keys.
+        if console_open.is_open() && self.modal().is_none() {
+            // Built at the reference geometry like every routed line, so the one
+            // scaling below moves all of them together.
             let names: Vec<&str> = self.renderer.preset_names().collect();
             let staging = console::staging_line(
                 console::next_up(&names, self.renderer.active_index()),
                 self.director.auto_enabled(),
+                (
+                    self.config.rotate.min_dwell_secs,
+                    self.config.rotate.max_dwell_secs,
+                ),
             );
             drop(names);
             let mut furniture = vec![console::header(self.renderer.preset_name())];
             furniture.extend(console::transport_lines(self.director.auto_enabled()));
             furniture.push(staging);
             self.frame_text.console.splice(0..0, furniture);
+        }
+        if console_open.is_open() {
             // After the header joins them, so the whole console surface is
             // scaled by one factor and the header cannot drift off the rows.
             // Read before the mutable borrow, not inside the call.
@@ -1660,13 +1701,30 @@ impl AppState {
             // Not on repeat: holding the key would flap a window open and shut
             // rather than scroll a list, and creating a swapchain per repeat is
             // the most expensive thing any binding here can do.
-            KeyCode::KeyC if !event.repeat => self.toggle_console(event_loop),
+            KeyCode::KeyC if !event.repeat => self.toggle_console(event_loop, true),
             // Quality, live (ADR-0054). `[` down a tier, `]` up — the bracket
             // pair reads as a range with the floor on the left.
             KeyCode::BracketLeft => self.swap_tier(Tier::Floor),
             KeyCode::BracketRight => self.swap_tier(Tier::Rich),
             _ => {}
         }
+    }
+
+    /// One step of the console's `random` control, returning the seed for this
+    /// press.
+    ///
+    /// **lowbias32**, the bit-mixer `core` already uses for deterministic
+    /// pseudo-randomness — one round of it, so consecutive counter values do not
+    /// produce neighbouring roster positions the way a bare increment would.
+    fn next_random(&mut self) -> u32 {
+        let mut x = self.random_state.wrapping_add(0x9E37_79B9);
+        self.random_state = x;
+        x ^= x >> 16;
+        x = x.wrapping_mul(0x21F0_AAAD);
+        x ^= x >> 15;
+        x = x.wrapping_mul(0x735A_2D97);
+        x ^= x >> 15;
+        x
     }
 
     /// A left press on the console: resolve it against the transport strip and
@@ -1680,6 +1738,11 @@ impl AppState {
         let Some(window) = self.console_window.as_ref() else {
             return;
         };
+        // Not drawn under a modal, so not clickable under one either: an
+        // invisible control that still fires is worse than no control.
+        if self.modal().is_some() {
+            return;
+        }
         let size = window.inner_size();
         let (x, y) = self.console_cursor;
         let Some(button) = console::hit_test(size.width as f32, size.height as f32, x, y) else {
@@ -1690,6 +1753,16 @@ impl AppState {
             console::ConsoleAction::Prev => {
                 let count = self.renderer.preset_names().count();
                 if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
+                    self.renderer.select_preset(index);
+                    self.on_preset_switched();
+                }
+            }
+            console::ConsoleAction::Random => {
+                let count = self.renderer.preset_names().count();
+                let seed = self.next_random();
+                if let Some(index) =
+                    console::random_index(count, self.renderer.active_index(), seed)
+                {
                     self.renderer.select_preset(index);
                     self.on_preset_switched();
                 }
@@ -2134,9 +2207,14 @@ impl ApplicationHandler for App {
                     // `toggle_console` call. Nothing here opens a window
                     // directly, so no two routes can disagree about whether the
                     // console is open.
-                    state.console_toggle_pending =
-                        state.config.console.enabled || self.console_flag;
-                    state.service_console_request(event_loop);
+                    // Opened without persisting: `[console] enabled` is already
+                    // what it is, and `--console` must not write itself into the
+                    // file. An operator's own toggle is the only thing that
+                    // changes the stored value.
+                    if state.config.console.enabled || self.console_flag {
+                        state.console_request = Some(false);
+                        state.service_console_request(event_loop);
+                    }
                     self.state = Some(state);
                 }
                 Err(err) => {

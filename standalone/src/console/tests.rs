@@ -400,7 +400,7 @@ fn the_predecessor_wraps_and_an_empty_roster_has_none() {
 fn a_roster_of_one_stages_nothing_and_says_so() {
     assert_eq!(next_up(&["only"], 0), None);
     assert_eq!(next_up(&[], 0), None);
-    let line = staging_line(None, true);
+    let line = staging_line(None, true, DWELL);
     assert!(
         line.text.contains("nothing to rotate to"),
         "a roster with no successor must say why rather than name a guess: {}",
@@ -416,11 +416,11 @@ fn the_staging_line_names_the_successor_and_the_rotation_state() {
     let next = next_up(&names, 1).expect("a three-preset roster has a successor");
     assert_eq!(next, "c");
 
-    let on = staging_line(Some(next), true);
+    let on = staging_line(Some(next), true, DWELL);
     assert!(on.text.contains('c'), "{}", on.text);
     assert!(!on.text.contains("auto off"), "{}", on.text);
 
-    let off = staging_line(Some(next), false);
+    let off = staging_line(Some(next), false, DWELL);
     assert!(off.text.contains("auto off"), "{}", off.text);
 }
 
@@ -542,4 +542,83 @@ fn prev_lands_on_the_predecessor_using_only_the_indexed_selector() {
         names.get(start).map(String::as_str),
         "stepping back then forward did not return to the starting preset"
     );
+}
+
+/// The dwell bounds the staging assertions read, well inside the row's range so
+/// the numbers in the line are the numbers passed in.
+const DWELL: (u32, u32) = (20, 90);
+
+/// **The dwell nudges report the value they move.** Two controls that change a
+/// number with no reading of it on the surface leave an operator unable to tell
+/// a press that landed from one that hit a clamp.
+#[test]
+fn the_staging_line_reports_the_dwell_the_nudges_move() {
+    let line = staging_line(Some("b"), true, (20, 90));
+    assert!(
+        line.text.contains("20-90 s"),
+        "the strip must show the dwell bounds its own controls change: {}",
+        line.text
+    );
+
+    // And it is the pair passed in, not a constant: a line that always printed
+    // the defaults would pass the assertion above forever.
+    let moved = staging_line(Some("b"), true, (15, 45));
+    assert!(moved.text.contains("15-45 s"), "{}", moved.text);
+}
+
+/// The random cut never lands on the preset already showing, at every position
+/// of the roster and for every seed the mixer can produce a residue from.
+///
+/// **Asserted exhaustively rather than sampled**, because "never the current
+/// one" is the whole contract: a retry-loop implementation is correct almost
+/// always and spins forever on a one-preset roster, and a modulo that forgets
+/// to step past `active` returns it exactly once per lap.
+#[test]
+fn the_random_cut_never_returns_the_preset_already_showing() {
+    for count in 2..12usize {
+        for active in 0..count {
+            for seed in 0..64u32 {
+                let picked = random_index(count, active, seed)
+                    .expect("a roster of two or more always has somewhere else to go");
+                assert!(picked < count, "{picked} is off a roster of {count}");
+                assert_ne!(
+                    picked, active,
+                    "count {count}, active {active}, seed {seed}: the random cut                      returned the preset already on screen"
+                );
+            }
+        }
+    }
+}
+
+/// Every other position is reachable, so the control is a cut and not a shuffle
+/// between two scenes.
+#[test]
+fn the_random_cut_can_reach_every_other_preset() {
+    let count = 6;
+    let active = 2;
+    let mut seen = std::collections::BTreeSet::new();
+    for seed in 0..256u32 {
+        if let Some(picked) = random_index(count, active, seed) {
+            seen.insert(picked);
+        }
+    }
+    let expected: std::collections::BTreeSet<usize> = (0..count).filter(|i| *i != active).collect();
+    assert_eq!(
+        seen, expected,
+        "the random cut cannot reach every preset that is not the active one"
+    );
+}
+
+/// A roster with nowhere else to go has no random cut, rather than a cut back to
+/// where it already is.
+#[test]
+fn a_roster_with_no_alternative_has_no_random_cut() {
+    assert_eq!(random_index(1, 0, 7), None);
+    assert_eq!(random_index(0, 0, 7), None);
+}
+
+/// The random control is the console's own, like the other two cuts.
+#[test]
+fn the_random_control_is_a_cut_and_not_a_settings_row() {
+    assert_eq!(action_for(Button::Random, &view()), ConsoleAction::Random);
 }
