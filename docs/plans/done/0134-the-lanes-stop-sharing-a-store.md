@@ -1,15 +1,21 @@
 # 0134 — The lanes stop sharing a store
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-08-30. Three phases of three, `2c15cc2` and `d9ee224` plus the
+> out-of-band `713893f` that discharged Phase 3's file edits. Review: **no blockers, one major, four
+> minors.** Version: **none** - docs/chore-only, no production code changed. Verified at the close:
+> `WORK/.cargo/config.toml` holds the linker block alone, `WORK/.lmv-target` is gone, `cargo metadata`
+> reports a `target_directory` inside this worktree, and all three gates exit 0. The major is that
+> **Plan 0129 Phase 3 still hands a reader the redirect** with nothing on the page revoking it -
+> repaired here, since a closed plan is not `dev`'s to amend.
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) (proposed),
-> [0141](../adrs/0141-one-artifact-store-serves-every-lane.md),
-> [0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md)
+> **Related ADRs:** [0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) (accepted),
+> [0141](../../adrs/0141-one-artifact-store-serves-every-lane.md),
+> [0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md)
 
 ## TL;DR
 
-The shared artifact store [ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) put in
+The shared artifact store [ADR-0141](../../adrs/0141-one-artifact-store-serves-every-lane.md) put in
 place this morning serves one lane another lane's compiled `lmv-core`, because **the worktree path
 is not in cargo's fingerprint** — so two worktrees with the same layout and the same dependency
 graph are indistinguishable and one lane's artifact is handed to the other as fresh. Plan 0115's
@@ -19,7 +25,7 @@ visible behavior is `cargo build` in a lane writing into that lane's own `target
 
 ## Context & problem
 
-[ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) carries the
+[ADR-0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) carries the
 full evidence. The short form:
 
 - Across all eight `lmv-core` library fingerprints in the store, cargo's `path` field holds **one**

@@ -5,7 +5,17 @@
 > **Owner skill(s):** dev
 > **Related ADRs:** [0141](../../adrs/0141-one-artifact-store-serves-every-lane.md)
 > (**accepted 2026-08-29 with a dated `Outcome`** - four of its quantified premises were falsified
-> by Phase 1 on the machine it was measured on; the Decision stands)
+> by Phase 1 on the machine it was measured on; the Decision stands),
+> [0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+>
+> **REVOKED IN PART 2026-08-29, one day after this plan closed.**
+> [ADR-0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) removed
+> the shared artifact store Phases 3 and 7 set up: the worktree path is not in cargo's fingerprint,
+> so two lanes with the same layout and dependency graph were served each other's compiled
+> `lmv-core` as fresh. **Do not follow Phase 3 or the `[build] target-dir` line in the Data-shapes
+> snippet below** - the linker half of this plan (Phase 2) is not implicated and stands. This is an
+> append at Plan 0134's close, not an edit: the plan records what was done and why, and this says
+> what has since been taken back.
 
 ## TL;DR
 
@@ -123,6 +133,10 @@ flowchart TB
   is independent of this and the plan continues without it.
 
 ### Phase 3 — One artifact store for every lane
+
+> **REVOKED by ADR-0147, 2026-08-29.** This phase's `[build] target-dir` redirect is gone
+> from the machine config and the store is deleted. Do not recreate it. See the header.
+
 - **Owner skill:** dev
 - **What:** `build.target-dir` redirected to a single store, in the same machine-local config.
 - **Files touched:** `WORK/.cargo/config.toml` (extended).
@@ -189,7 +203,8 @@ flowchart TB
 
 ## Data shapes
 
-The whole configuration surface, illustrative — the exact `rust-lld` stanza is Phase 2's finding:
+The whole configuration surface, illustrative — the exact `rust-lld` stanza is Phase 2's finding.
+**The `[build]` table below is revoked by ADR-0147**; the linker block is what the file holds today:
 
 ```toml
 # C:/Users/Igor Konovalov/WORK/.cargo/config.toml

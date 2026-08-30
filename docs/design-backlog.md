@@ -3860,6 +3860,14 @@ directory inside the real target dir and which exists for exactly this - or `car
 `target_directory`, the answer `plugin-foobar/build.ps1` already uses. Either way the doc comment
 has to be re-stated, since it is the part that is wrong independently of the path.
 
+> **Updated 2026-08-30, at Plan 0134's close.** The redirect this entry is written against is gone -
+> [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked
+> ADR-0141's shared store, so `target/` **is** the build tree again and `scratch()`'s doc comment is
+> accidentally true. **The entry stays live and the fix is unchanged**: the code still derives a
+> cargo *output* path from `CARGO_MANIFEST_DIR` rather than from where cargo writes, which is wrong
+> independently of any redirect and is exactly what a returning redirect would break. What changes
+> is the impact - from a live stray directory to a latent one. Read ADR-0141 above as history.
+
 - **Verified 2026-08-29** - the scratch path still starts at the repo root: `present: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
 - **Verified 2026-08-29** - and still joins its way to a dir inside it: `present: \.join\("shot-cli-tests"\) in: standalone/tests/shot_cli.rs`
 - **Verified 2026-08-29** - the sibling that is correct is still correct, so the file is genuinely split: `present: current_exe in: standalone/tests/shot_cli.rs`
@@ -3901,6 +3909,14 @@ looking.
 `target_directory` the way `build.ps1` does - four lines and a `jq` or a `python -c`. The two
 `renders/` scripts are historical and the honest options are the same one-line fix or a line in
 `renders/README.md` saying they assume the pre-ADR-0141 layout.
+
+> **Updated 2026-08-30, at Plan 0134's close.**
+> [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked
+> ADR-0141's shared store, so all three scripts resolve correctly again - **by accident, not by
+> repair**. The entry stays live: the rule they violate is unchanged, the redirect could return, and
+> `cargo metadata` is the right question under either layout. One line to add to the roster above -
+> `plugin-foobar/build.ps1:32` still cites ADR-0141 as the live reason for asking `cargo metadata`;
+> its behaviour is correct and only the citation is stale. Read ADR-0141 above as history.
 
 - **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
@@ -4023,3 +4039,103 @@ control) - and that is an ADR if it is ever wanted, not a patch.
 - **Verified 2026-08-30** - the absolute twin the consumer needed is already published: `present: "/lmv/v1/raw/bass" in: standalone/src/osc.rs`
 - **Verified 2026-08-30** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /lmv/v1/raw/bass in: README.md`
 - `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `README.md`, `docs/` and the OSC table, not a match countable in one file
+
+## 0164 - the operator console halves the output's frame rate, and two comments say it cannot
+
+> **Filed 2026-08-30** at Plan 0131's close, out of that plan's own Phase 6, which names
+> "it costs the output frames" as a valid outcome and routes it here rather than tuning it away.
+
+Two 95 s release runs differing only by `--console`, both hands-off, `[console] enabled` reset to
+false first so the closed arm was genuinely closed:
+
+| | closed | open |
+|---|---|---|
+| mean fps over 18 samples | **61.7** | **33.1** |
+| `frame_ms_p99_steady` | **18.6 ms** | **47.3 ms** |
+| frames over the same 90 s | 5,549 | 2,976 |
+
+**+29 ms per frame is far more than a full-frame copy plus a 900x640 blit accounts for**, and
+landing within 3 % of exactly half is the shape of two presents serialising rather than of copy
+cost. The console's present mode was confirmed as `Mailbox` from the diagnostic note it writes on
+open, so the **non-blocking arm was taken** and the halving happened with it, not in the `Fifo`
+fallback. That is what convicts ADR-0143's stated cadence property: an independent encoder, submit
+and present is not an independent frame loop.
+
+**Two levers are visible in the diff and neither has been tried.** The console swapchain is
+configured with `desired_maximum_frame_latency = 1`, so its `get_current_texture` waits for its own
+previous present to retire - one vblank - while the output's own present waits for another; two
+vblanks per frame is exactly the halving. And `present_console` runs synchronously in the display
+loop on every frame, with no decimation, which is the explicit remedy Plan 0131 Phase 6 asks for a
+verdict on.
+
+**Two comments state the property the measurement denies**, which is the half of this entry that is
+a defect rather than a design question. `standalone/src/main.rs` says the console present is placed
+after the show's "never before it and never inside it: the console is a monitor and must not delay
+the frame it reports on" - being after this frame's present does not stop it delaying the next one.
+`core/src/render/aux_target.rs` says "a console that stalls or drops a frame cannot alter what the
+show displays". What actually holds is narrower and worth saying instead: the show's **pixels** are
+unaffected, asserted byte-exactly; its **cadence** is not, measured at ~2x.
+
+**What bounds the reading.** It is the **integrated** GPU (see 0165), so the absolute cost is not the
+discrete GPU's; and both surfaces were on **one display at one refresh rate**, which is precisely the
+configuration Plan 0131 Phase 6 says cannot separate the two pacing sources. **The measurement says
+the cost is real and large; it does not say the present mode is the mechanism.** The cross-refresh
+two-display run that would name it is still owed and is on the checklist.
+
+### What a fix looks like
+
+Raise the console's frame latency, or decimate its present to every Nth output frame, or both, and
+re-measure on the same two arms - the instrument already exists and costs 3 minutes. If neither
+lever moves it, the mechanism is elsewhere and the next thing to try is presenting the console off
+the display thread, which is a real design change and an ADR. Whichever lands, the two comments
+above are corrected to the property that survives.
+
+- **Verified 2026-08-30** - the console swapchain still asks for a single in-flight image: `present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs`
+- **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/main.rs`
+- **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/main.rs`
+- **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
+- **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
+
+## 0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure
+
+> **Filed 2026-08-30** at Plan 0131's close. Found by Phase 6, which requires a frame-rate figure to
+> name the GPU that produced it (ADR-0071) - and the window had no equivalent of the stream mode's
+> startup print, so the phase could not have been satisfied without adding one.
+
+The windowed path builds its adapter with `request_adapter` against a `compatible_surface` and a
+**default power preference**, which on a hybrid laptop hands back the power-saving GPU.
+`RenderContext::new` takes no adapter choice at all: [ADR-0146](adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
+gave `--gpu` to `--stream` and to the Spout sender, and there is no windowed equivalent.
+
+Measured on the dev box, which has both an RTX 3080 and integrated Radeon graphics:
+
+```
+# renderer adapter: AMD Radeon(TM) Graphics (Dx12, IntegratedGpu), driver 30.0.13002.1001
+```
+
+**Every windowed frame-time number this project has ever recorded on this machine is therefore an
+iGPU number** - the NFR 1 checks, the soak runs, the tier calibration readings, Plan 0131's own
+console measurement - and until this note was added nothing said so. The numbers are not wrong; they
+are attributed to a machine rather than to the adapter inside it, which is exactly what ADR-0071
+exists to stop.
+
+**This is also why Plan 0131's dual-GPU degrade path has still never been exercised.** `open_console`
+treats an `attach_aux` failure as non-fatal, logs it and leaves the show untouched, and that branch
+is unreachable on a single-adapter run - which every run here is, because the window cannot be put on
+the other GPU.
+
+### What a fix looks like
+
+Extend `--gpu` to the windowed path: `RenderContext::new` takes the same `AdapterChoice` the stream
+mode already resolves, matched against the same roster, with the same
+[ADR-0146](adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) name rule.
+That is a small change with one real question attached - whether a windowed surface can be created
+on an adapter that does not drive the display it is on, which is the same dual-GPU question
+0131 Phase 6 is still owed - so it wants measuring before it is promised. The startup note that names
+the running adapter has already landed and is what makes any of this attributable.
+
+- **Verified 2026-08-30** - the windowed constructor still hands `RenderContext` no adapter choice: `present: RenderContext::new\(target, width, height\)\? in: core/src/render/mod.rs`
+- **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
+- **Verified 2026-08-30** - the resolver that would fix it exists and is reached from `--stream` only: `present: gpu::renderer_choice in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/main.rs`
+- **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/main.rs`
