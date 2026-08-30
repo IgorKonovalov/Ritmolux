@@ -67,7 +67,12 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
 
 // Build output, vendored deps, and VCS internals hold Rust we do not own.
-const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
+// .venv is the Python virtualenv tools/sd-filter installs into: gitignored, and its
+// site-packages ship third-party C and C++ headers this checker is not entitled to
+// judge. The walk reads the filesystem rather than the git index, so an ignored
+// directory is invisible to git status and still scanned here - which is how 490
+// findings in torch and numpy headers came to block a push.
+const SKIP_DIRS = new Set(["target", "node_modules", ".git", ".venv"]);
 
 // The fixture tree carries this checker's own bite check and is skipped on a
 // repo walk, exactly as check-doc-links.mjs skips it; it is scanned when it IS
@@ -75,6 +80,17 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // PATH, not by directory name — the name form also swallowed
 // core/tests/fixtures/ there.
 const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
+
+// Vendored third-party source that lives in the working tree and not in the repo.
+// plugin-foobar/sdk/ is the foobar2000 SDK, gitignored like .venv above: 71 of its
+// C++ files narrate their own history, which is their author's business and not
+// ours to gate. Skipped BY PATH - `sdk` as a bare directory name is generic enough
+// to swallow a directory we do own.
+//
+// Both skips share one cause: this walk reads the filesystem, so a gitignored tree
+// is absent from a fresh CI clone and present locally, and the gate that passes in
+// CI blocks the push that would reach it. Backlog 0170 carries the general form.
+const VENDORED_TREES = new Set([resolve(REPO_ROOT, "plugin-foobar", "sdk")]);
 
 // Which lexer an extension gets. The two dialects differ in three places that
 // matter to a comment scanner — Rust block comments nest and C's do not, the raw
@@ -97,6 +113,7 @@ function sourceFiles(dir = REPO, found = []) {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
+      if (VENDORED_TREES.has(full)) continue;
       sourceFiles(full, found);
     } else {
       const dot = entry.name.lastIndexOf(".");
