@@ -221,8 +221,8 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | committed with this row | |
-| 2 — `palette::LutPair` | dev | not started | |
+| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | 8d2d590 |
+| 2 — `palette::LutPair` | dev | committed with this row | |
 | 3 — `scenes::common::{PaletteParams, PanParams}` | dev | not started | |
 | 4 — `gpu::FullscreenScene` | dev | not started | |
 | 5 — `marks::InstancedQuads` | dev | not started | |
@@ -242,6 +242,33 @@ one-line wrapper (it supplies the `V4` size to its four call sites) rather than 
 
 Comments that sat inside the descriptor's `ops` block were hoisted above the call and
 re-wrapped; none was dropped.
+
+**Phase 2.** There are **seven** owners of the LUT pair, not six: `render/background.rs` carries
+`lut_texture_a`/`palette_dirty` too. It is not in this phase's *Files touched* and it is a
+composite stage rather than a scene, so it was left alone and the done-when grep is clean as
+written — but its flush is `if fresh || self.palette_dirty`, a third condition `LutPair` does not
+model, so adopting it there is a decision rather than a sweep.
+
+**The six split into two shapes, and `LutPair` went where the textures already were** so that no
+allocation moved (a WARP hazard in its own right). `fragment_field`, `shape_field` and
+`shape_collage` own theirs directly, and lost `palette` and `palette_dirty` outright.
+`reaction_diffusion`, `warp_mesh` and the attractor keep the textures inside a lazily-built
+`Resources`, so the pair went there and **the scene still holds a `Palette`** — `set_palette` can
+arrive while `res` is `None`, and that field is what seeds the pair when it is finally built. Those
+three now carry two copies of a 6 KB `Palette` while resources exist. `palette_dirty` is gone from
+all six.
+
+`bind_entries` takes **all three binding numbers** rather than the plan's single `base_binding`:
+the six bind this triple at (0,1,2), (1,2,3), (3,4,5) and — for the two `shape_*` scenes — with
+the sampler at 0 ahead of the textures. A `base_binding` would have decided part of the layout
+shape, which the plan's own Decision forbids.
+
+`flush` returns `bool` (did it upload). That is what the new
+`the_lut_pair_uploads_once_per_set_and_never_otherwise` test in `palette.rs` reads; the six scenes
+ignore it. The suite is 860 tests where Phase 1 ran 859.
+
+`reaction_diffusion::present_bind_group` lost its `#[allow(clippy::too_many_arguments)]` — three
+LUT arguments collapsed into one.
 
 **A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
 `no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning

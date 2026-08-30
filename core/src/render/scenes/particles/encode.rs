@@ -100,25 +100,18 @@ pub(super) struct UniformInputs {
 /// build, the field clear after a (re)build, and the seeded particle scatter on
 /// first build or a `reseed` rising edge. Each clears its own flag, so none
 /// repeats per frame.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn flush_deferred_uploads(
     queue: &wgpu::Queue,
     encoder: &mut wgpu::CommandEncoder,
-    pipelines: &PipelineResources,
+    pipelines: &mut PipelineResources,
     grid: &FieldResources,
     seed_particles: &[Particle],
-    palette: &Palette,
-    palette_dirty: &mut bool,
     needs_clear: &mut bool,
     needs_upload: &mut bool,
 ) {
     // Upload the active palette LUTs (A + B) on a preset switch or a fresh
     // build — off the hot path, once per change.
-    if *palette_dirty {
-        palette::write_lut(queue, &pipelines.lut_texture_a, &palette.lut_a_bytes());
-        palette::write_lut(queue, &pipelines.lut_texture_b, &palette.lut_b_bytes());
-        *palette_dirty = false;
-    }
+    pipelines.luts.flush(queue);
 
     // Clear the trail field once after a (re)build so the first decay reads
     // black rather than garbage.

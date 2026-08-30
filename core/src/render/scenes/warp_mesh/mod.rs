@@ -895,8 +895,10 @@ struct Resources {
     /// How many indices the current mesh draws, and the grid they were built for.
     index_count: u32,
     mesh: (u32, u32),
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
+    /// The shared gradient LUT pair (A/B) the deposit pass samples + crossfades
+    /// (ADR-0021). A fresh pair is dirty, so a (re)build uploads on its first
+    /// frame; a preset switch re-`set`s it through the scene's `set_palette`.
+    luts: palette::LutPair,
     /// The draw layer's own line renderer (Plan 0100 Phase 4).
     ///
     /// **Its own, not the roster's shared one**, for the reason
@@ -1085,8 +1087,10 @@ pub struct WarpMeshScene {
     palette_contour: f32,
     brightness: f32,
     occlude: f32,
+    /// The active baked palette. Held here rather than only in the resources'
+    /// [`palette::LutPair`] because the resources are rebuilt on a resize and
+    /// built lazily: this is what seeds a fresh pair.
     palette: Palette,
-    palette_dirty: bool,
     /// The converted MilkDrop preset's live EEL2 state, when the preset carries a
     /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a hand-authored
     /// preset — executes no VM at all, so the ten native systems and a native
@@ -1200,7 +1204,6 @@ impl WarpMeshScene {
             brightness: DEFAULT_BRIGHTNESS,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
             milk: None,
             shader_spec: None,
             quantize_steps: 0.0,
@@ -1378,11 +1381,7 @@ impl Resources {
         });
 
         // --- deposit pass ---
-        let lut_texture_a = palette::lut_texture(device, "warp-mesh-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "warp-mesh-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        let luts = palette::LutPair::new(device, "warp-mesh");
         // The uniform sits **last** and declares a size, which is what keeps this
         // shape off `blend-bind-layout`'s `[Uniform+size, Texture, Texture,
         // Sampler]` and off `shape-field-bind-layout`'s (ADR-0058). Do not tidy
@@ -1411,24 +1410,18 @@ impl Resources {
         let deposit_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("warp-mesh-deposit-bg"),
             layout: &deposit_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: deposit_uniform.as_entire_binding(),
-                },
-            ],
+            entries: &{
+                let [lut_a, lut_b, lut_sampler] = luts.bind_entries(0, 1, 2);
+                [
+                    lut_a,
+                    lut_b,
+                    lut_sampler,
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: deposit_uniform.as_entire_binding(),
+                    },
+                ]
+            },
         });
         let deposit_pipeline = gpu::fullscreen_pipeline(
             device,
@@ -1645,8 +1638,7 @@ impl Resources {
             indices,
             index_count: indices_data.len() as u32,
             mesh,
-            lut_texture_a,
-            lut_texture_b,
+            luts,
             lines,
             shape_pipeline,
             shape_over_pipeline,
@@ -1711,7 +1703,9 @@ impl Scene for WarpMeshScene {
 
     fn set_palette(&mut self, palette: &Palette) {
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.luts.set(palette);
+        }
     }
 
     fn configure(&mut self, cfg: &super::GeneratorConfig) -> Option<super::CapOverflow> {
@@ -1934,7 +1928,7 @@ impl Scene for WarpMeshScene {
             }
         };
         if stale {
-            self.res = Some(Resources::build(
+            let mut built = Resources::build(
                 &self.device,
                 queue,
                 self.surface_format,
@@ -1943,8 +1937,11 @@ impl Scene for WarpMeshScene {
                 self.max_segments,
                 self.shader_spec.as_ref(),
                 shader_key,
-            ));
-            self.palette_dirty = true;
+            );
+            // A fresh pair's textures are empty and hold the default palette;
+            // hand it the one the scene is actually carrying.
+            built.luts.set(&self.palette);
+            self.res = Some(built);
         }
         let Some(res) = self.res.as_mut() else {
             return;
@@ -1964,11 +1961,7 @@ impl Scene for WarpMeshScene {
             );
             res.needs_clear = false;
         }
-        if self.palette_dirty {
-            palette::write_lut(queue, &res.lut_texture_a, &self.palette.lut_a_bytes());
-            palette::write_lut(queue, &res.lut_texture_b, &self.palette.lut_b_bytes());
-            self.palette_dirty = false;
-        }
+        res.luts.flush(queue);
 
         self.last_aspect = aspect;
         // A converted preset's per-vertex program, evaluated over the whole grid

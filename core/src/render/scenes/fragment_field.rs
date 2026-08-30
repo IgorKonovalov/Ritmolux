@@ -248,14 +248,9 @@ pub struct FragmentFieldScene {
     /// The LUT textures + sampler bind group (group 1), kept distinct from the
     /// uniform group so the pipeline layout does not match the kaleidoscope's.
     lut_bind_group: wgpu::BindGroup,
-    /// The 256×1 gradient LUT textures (A/B) the fragment samples + crossfades
-    /// for color (ADR-0021).
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
-    /// The active baked palette pair, re-uploaded to `lut_texture_a`/`_b` when
-    /// `palette_dirty` (set by `set_palette` on a preset switch), off the hot path.
-    palette: Palette,
-    palette_dirty: bool,
+    /// The 256×1 gradient LUT pair (A/B) the fragment samples + crossfades for
+    /// colour (ADR-0021), with the baked palette awaiting upload.
+    luts: palette::LutPair,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// This frame's elapsed real time, stored by `advance` and consumed by
@@ -313,11 +308,11 @@ impl FragmentFieldScene {
             "fragment-field-params",
             std::mem::size_of::<Params>(),
         );
-        let lut_texture_a = palette::lut_texture(device, "fragment-field-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "fragment-field-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        // Seeded with the default `spectrum` (the prior cosine): the renderer
+        // calls `set_palette` before the first frame with the active preset's
+        // palette, and `render` uploads it. Seeding here keeps the textures valid
+        // even if `set_palette` were never called.
+        let luts = palette::LutPair::new(device, "fragment-field");
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-uniform-layout"),
             entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
@@ -344,20 +339,7 @@ impl FragmentFieldScene {
         let lut_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("fragment-field-lut-bg"),
             layout: &lut_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-            ],
+            entries: &luts.bind_entries(0, 1, 2),
         });
         let pipeline = gpu::fullscreen_pipeline(
             device,
@@ -373,14 +355,7 @@ impl FragmentFieldScene {
             uniforms,
             bind_group,
             lut_bind_group,
-            lut_texture_a,
-            lut_texture_b,
-            // Seed with the default `spectrum` (the prior cosine); the renderer
-            // calls `set_palette` before the first frame with the active preset's
-            // palette, and `render` uploads it. Seeding here keeps the texture
-            // valid even if `set_palette` were never called.
-            palette: Palette::default_spectrum(),
-            palette_dirty: true,
+            luts,
             time: 0.0,
             dt: crate::render::scenes::FALLBACK_DT,
             fold_phase: Phase::default(),
@@ -456,8 +431,7 @@ impl Scene for FragmentFieldScene {
     fn set_palette(&mut self, palette: &Palette) {
         // Store the baked LUT; `render` uploads it (deferred so scenes with lazy
         // GPU resources share this seam). Cheap array copy, off the hot path.
-        self.palette = palette.clone();
-        self.palette_dirty = true;
+        self.luts.set(palette);
     }
 
     fn reset_params(&mut self) {
@@ -520,11 +494,7 @@ impl Scene for FragmentFieldScene {
     ) {
         // Upload the active palette LUTs (A + B) if a preset switch changed them
         // (off the hot path — once per switch, not per frame).
-        if self.palette_dirty {
-            palette::write_lut(queue, &self.lut_texture_a, &self.palette.lut_a_bytes());
-            palette::write_lut(queue, &self.lut_texture_b, &self.palette.lut_b_bytes());
-            self.palette_dirty = false;
-        }
+        self.luts.flush(queue);
 
         let params = Params {
             a: [self.time, aspect.max(0.1), self.warp, self.hue],

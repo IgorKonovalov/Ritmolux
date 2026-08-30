@@ -796,10 +796,9 @@ pub struct ShapeCollageScene {
     uniforms: wgpu::Buffer,
     storage: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
-    palette: Palette,
-    palette_dirty: bool,
+    /// The 256x1 gradient LUT pair (A/B) the fragment samples + crossfades for
+    /// colour (ADR-0021), with the baked palette awaiting upload.
+    luts: palette::LutPair,
     /// The element array the GPU reads, rebuilt every frame from [`Self::live`]
     /// (and [`Self::outgoing`] during a blend) with this frame's time applied.
     ///
@@ -918,11 +917,10 @@ impl ShapeCollageScene {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let lut_texture_a = palette::lut_texture(device, "shape-collage-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "shape-collage-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        // Seeded with the default `spectrum`; the renderer calls `set_palette`
+        // before the first frame and `render` uploads it, so the textures are
+        // valid even if `set_palette` were never called.
+        let luts = palette::LutPair::new(device, "shape-collage");
         // See the WGSL's note: the fragment-visible storage buffer is what makes
         // this layout's shape unique in the crate (ADR-0058). Both buffer entries
         // are full literals so each declares a `min_binding_size`, which Plan
@@ -959,22 +957,16 @@ impl ShapeCollageScene {
                 },
             ],
         });
+        // This layout binds the sampler first and the two textures after it, so
+        // the pair's role-ordered array is destructured into binding order here.
+        let [lut_a, lut_b, lut_sampler] = luts.bind_entries(1, 2, 0);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("shape-collage-bind-group"),
             layout: &bind_layout,
             entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
+                lut_sampler,
+                lut_a,
+                lut_b,
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: uniforms.as_entire_binding(),
@@ -999,10 +991,7 @@ impl ShapeCollageScene {
             uniforms,
             storage,
             bind_group,
-            lut_texture_a,
-            lut_texture_b,
-            palette: Palette::default_spectrum(),
-            palette_dirty: true,
+            luts,
             elements: Vec::with_capacity(2 * cap),
             live: Vec::with_capacity(cap),
             outgoing: Vec::with_capacity(cap),
@@ -1409,8 +1398,7 @@ impl Scene for ShapeCollageScene {
     }
 
     fn set_palette(&mut self, palette: &Palette) {
-        self.palette = palette.clone();
-        self.palette_dirty = true;
+        self.luts.set(palette);
     }
 
     fn reset_params(&mut self) {
@@ -1497,11 +1485,7 @@ impl Scene for ShapeCollageScene {
         view: &wgpu::TextureView,
         aspect: f32,
     ) {
-        if self.palette_dirty {
-            palette::write_lut(queue, &self.lut_texture_a, &self.palette.lut_a_bytes());
-            palette::write_lut(queue, &self.lut_texture_b, &self.palette.lut_b_bytes());
-            self.palette_dirty = false;
-        }
+        self.luts.flush(queue);
 
         // `advance` has already stepped the canvas for this frame; a renderer
         // that never calls it (there is none) still gets a composed canvas.
