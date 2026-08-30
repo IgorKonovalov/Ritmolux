@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0148.** *(**0146 is claimed by the live `plan-0115-live-video-source` lane** and is not on `main` until that plan closes; the number is taken, not free. 0120 was reserved for
+**Next free number: 0154.** *(**0146 is claimed by the live `plan-0115-live-video-source` lane** and is not on `main` until that plan closes; the number is taken, not free. 0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -168,4 +168,10 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | accepted 2026-08-29 (Plan 0132), Outcome, superseded in part by 0145 |
 | [0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md) | The engine drives the fixtures directly over Art-Net | proposed 2026-08-29 (Plan 0133), supersedes 0144 in part |
 | [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | proposed 2026-08-29 (Plan 0134), supersedes 0141 in part |
+| [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | proposed 2026-08-29 (Plan 0135) |
+| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |
+| [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | proposed 2026-08-29 (Plan 0137) |
+| [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
+| [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
+| [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
 <!-- roster:end -->
