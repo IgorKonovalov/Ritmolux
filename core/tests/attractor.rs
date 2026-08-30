@@ -23,6 +23,8 @@ use lmv_core::render::{
     metrics::{coverage, frame_diff, quadrant_spread},
 };
 
+mod common;
+
 const SIZE: u32 = 96;
 /// A 2D map preset and a 3D flow preset from the embedded set — one of each
 /// idiom the scene supports. Repointed at Plan 0075 cohort five, which retired
@@ -47,24 +49,6 @@ fn attractor_view_preset(name: &str, extra: &str) -> Preset {
 /// A pixel counts as lit if any RGB channel differs from the sampled background
 /// by more than this.
 const EPS: u8 = 10;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// The top-left pixel, taken as the scene's background colour (the near-black bed
 /// the attractor clears its trail field to).
@@ -215,7 +199,7 @@ fn mean_luma_over(img: &CaptureImage, mask: &[bool]) -> f32 {
 
 #[test]
 fn attractor_contract() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -617,7 +601,7 @@ fn attractor_contract() {
 /// level change.
 #[test]
 fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     // A sustained mid-energy frame; no beat. The bare preset binds no
@@ -714,7 +698,7 @@ fn the_ifs_tint_channels_move_colour_without_moving_the_figure() {
 /// everywhere.
 #[test]
 fn the_depth_cues_are_exact_no_ops_on_a_flat_family() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let lively = AnalysisFrame {

@@ -40,9 +40,10 @@
 
 use std::f32::consts::{PI, TAU};
 
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+
+mod common;
 
 /// Portrait, and not a 256 px multiple — see the module docs. **Not
 /// interchangeable**: a square or 16:9 target defeats the shear guard entirely.
@@ -164,38 +165,6 @@ const ATTRACTOR_BOTH: (&str, &str) = (
 /// nobody could see.
 const DISTINCT_MEAN: f32 = 0.05;
 
-/// A headless renderer on the **software** adapter, or `None` (a logged skip)
-/// when the runner exposes no GPU adapter — macOS has no software Metal fallback
-/// (ADR-0016). WARP for `composite.rs`'s reason: a guard whose failure mode is
-/// "nobody looked" has to run in CI.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// The fixed frame every fixture is driven by — mid-energy, all bands lit. The
-/// fixtures bind nothing to it; it exists so the scene draws.
-fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    }
-}
-
 /// Load `fixture` into `renderer` and run it for `frames` steps, returning every
 /// rendered frame in order.
 fn run(renderer: &mut Renderer, fixture: (&str, &str), frames: usize) -> Vec<CaptureImage> {
@@ -209,7 +178,7 @@ fn run(renderer: &mut Renderer, fixture: (&str, &str), frames: usize) -> Vec<Cap
         preset.warnings
     );
     renderer.set_presets(vec![preset]);
-    let stimulus = vec![fixed_frame(); frames];
+    let stimulus = vec![common::fixed_frame(); frames];
     renderer
         .capture_preset_over(name, &stimulus)
         .unwrap_or_else(|e| panic!("capture {name}: {e}"))
@@ -309,7 +278,7 @@ fn lit_bbox(img: &CaptureImage) -> (f32, f32) {
 /// holds that select in place.
 #[test]
 fn every_fb_param_at_its_default_is_bit_exactly_no_transform() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let unbound = run(&mut renderer, STILL, FRAMES);
@@ -333,7 +302,7 @@ fn every_fb_param_at_its_default_is_bit_exactly_no_transform() {
 /// frame — so nothing here is a pixel count anyone has to re-tune.
 #[test]
 fn fb_zoom_displaces_the_accumulation_radially() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frames = run(&mut renderer, ZOOM, FRAMES);
@@ -358,7 +327,7 @@ fn fb_zoom_displaces_the_accumulation_radially() {
 /// figure, so the two together say the affine's two axes are not transposed.
 #[test]
 fn fb_rotate_displaces_the_accumulation_tangentially() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frames = run(&mut renderer, ROTATE, FRAMES);
@@ -390,7 +359,7 @@ fn fb_rotate_displaces_the_accumulation_tangentially() {
 /// this is the assertion that would have caught the first two.
 #[test]
 fn a_rotated_accumulation_stays_round() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     // Long enough at 9 rad/s to pass 2*PI and close the ring.
@@ -429,7 +398,7 @@ fn a_rotated_accumulation_stays_round() {
 /// three distinct behaviors to have baselines *of*.
 #[test]
 fn each_warp_kind_bends_the_past_its_own_way() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let control = last_frame(&mut renderer, WARP_CONTROL, 40);
@@ -476,7 +445,7 @@ fn each_warp_kind_bends_the_past_its_own_way() {
 /// instead of far above the tonemap's white — see its header.
 #[test]
 fn an_additive_deposit_converges_instead_of_running_away() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frames = run(&mut renderer, ADD, CONVERGE_FRAMES);
@@ -517,7 +486,7 @@ fn an_additive_deposit_converges_instead_of_running_away() {
 /// blend selector that never reached the shader would pass it.
 #[test]
 fn the_deposit_blend_selector_reaches_the_shader() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let additive = last_frame(&mut renderer, ADD, 120);
@@ -556,7 +525,7 @@ fn the_deposit_blend_selector_reaches_the_shader() {
 /// is what refuses it.
 #[test]
 fn the_attractor_transforms_its_own_past_and_not_its_deposit() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let control = run(&mut renderer, ATTRACTOR_CONTROL, ATTRACTOR_FRAMES);
@@ -602,7 +571,7 @@ fn the_attractor_transforms_its_own_past_and_not_its_deposit() {
 /// the binding to both.
 #[test]
 fn one_binding_moves_both_accumulations() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let scene_only = last_frame(&mut renderer, ATTRACTOR_CONTROL, ATTRACTOR_FRAMES);

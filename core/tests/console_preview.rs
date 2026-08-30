@@ -26,28 +26,13 @@
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
 use lmv_core::dsp::AnalysisFrame;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::CaptureImage;
+
+mod common;
 
 /// Small offscreen size — the claim is about whether the bytes survive a copy,
 /// not about how many of them there are, and the software adapter is slow.
 const SIZE: u32 = 96;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// Whether every pixel of `img` is the same colour.
 ///
@@ -89,7 +74,7 @@ fn a_frame_through_the_preview_is_byte_identical_to_one_drawn_direct() {
     // and nothing public resets a renderer's clock and scene state without also
     // drawing a frame. Sequential and not concurrent: one wgpu device at a time.
     let (name, direct) = {
-        let Some(mut renderer) = headless() else {
+        let Some(mut renderer) = common::headless(SIZE, SIZE) else {
             return;
         };
         assert_eq!(
@@ -106,7 +91,7 @@ fn a_frame_through_the_preview_is_byte_identical_to_one_drawn_direct() {
     };
 
     let through = {
-        let Some(mut renderer) = headless() else {
+        let Some(mut renderer) = common::headless(SIZE, SIZE) else {
             return;
         };
         assert_eq!(
@@ -165,7 +150,7 @@ fn a_frame_through_the_preview_is_byte_identical_to_one_drawn_direct() {
 #[test]
 fn closing_the_preview_returns_the_renderer_to_its_direct_path() {
     let frame = AnalysisFrame::default();
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -206,7 +191,7 @@ fn closing_the_preview_returns_the_renderer_to_its_direct_path() {
 
     // Two more frames from the same clock the first one left, so the comparison
     // is of paths and not of clocks.
-    let mut fresh = match headless() {
+    let mut fresh = match common::headless(SIZE, SIZE) {
         Some(r) => r,
         None => return,
     };

@@ -20,12 +20,11 @@
 //! the test skips there per ADR-0016) and must be blessed on WARP. Eyeball each
 //! before blessing (Plan 0013 Phase 8 habit).
 
-use std::path::{Path, PathBuf};
-
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind};
 use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+
+mod common;
 
 const SIZE: u32 = 128;
 /// Frames warmed before capture — enough for the stateful systems (swarm sim,
@@ -144,75 +143,6 @@ const EXTRA_FIXTURES: [(&str, &str); 9] = [
 /// The stroke fixture's text, named once so the roster entry above and the guard
 /// below cannot come to mean different files.
 const FIXTURES_WARP_MESH_STROKE: &str = include_str!("fixtures/warp_mesh_stroke.toml");
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-}
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// The fixed frame every baseline is rendered under — a representative
-/// mid-energy frame with all bands lit, so a band-reactive fixture still draws.
-///
-/// The `spectrum` array carries a plausible falling profile rather than the
-/// zeros a bare `Default` would give (Plan 0034 Phase 2). A frame claiming
-/// `bass = 0.6` with 64 silent bands is not a frame any audio could produce, and
-/// under it a spectrum fixture would pin a baseline of nothing. No pre-0034
-/// scene reads `spectrum`, so filling it leaves every other baseline unchanged.
-fn fixed_frame() -> AnalysisFrame {
-    let mut frame = AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    };
-    let bands = frame.spectrum.len() as f32;
-    for (i, band) in frame.spectrum.iter_mut().enumerate() {
-        // Loud at the bottom, quiet at the top, with a slow ripple so adjacent
-        // elements differ — a flat ramp would let a transposed mapping pass.
-        let t = i as f32 / bands;
-        *band = (0.9 - 0.7 * t) * (0.75 + 0.25 * (t * 17.0).sin());
-    }
-    frame
-}
-
-fn decode(path: &Path) -> CaptureImage {
-    let img = image::open(path)
-        .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
-        .to_rgba8();
-    CaptureImage {
-        width: img.width(),
-        height: img.height(),
-        rgba: img.into_raw(),
-    }
-}
-
-fn encode(img: &CaptureImage, path: &Path) {
-    let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
-        .expect("capture buffer matches its declared dimensions");
-    buffer
-        .save(path)
-        .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
-}
 
 /// Largest absolute single-channel (RGB) byte difference across the two images.
 fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
@@ -231,12 +161,12 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 
 #[test]
 fn scenes_match_golden_baselines() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
-    let frame = fixed_frame();
+    let frame = common::fixed_frame_spectrum();
     let bless = std::env::var_os("LMV_BLESS").is_some();
-    std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
+    std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
     let mut check = |renderer: &mut Renderer, stem: &str, toml: &str| {
@@ -248,10 +178,10 @@ fn scenes_match_golden_baselines() {
         let fresh = renderer
             .capture_preset(&name, &frame, FRAMES)
             .expect("capture fixture");
-        let path = golden_dir().join(format!("{stem}.png"));
+        let path = common::golden_dir().join(format!("{stem}.png"));
 
         if bless {
-            encode(&fresh, &path);
+            common::encode(&fresh, &path);
             println!("blessed {}", path.display());
             return;
         }
@@ -261,7 +191,7 @@ fn scenes_match_golden_baselines() {
             "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test golden`",
             path.display()
         );
-        let baseline = decode(&path);
+        let baseline = common::decode(&path);
         let mean = frame_diff(&baseline, &fresh);
         let outlier = max_channel_outlier(&baseline, &fresh);
         println!(
@@ -369,7 +299,7 @@ fn the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke() {
     // And it actually reaches the line renderer, which no amount of reading the
     // file can establish: the Plan 0069 extent diagnostic is read off the draw
     // itself and yields nothing when no segment was stroked.
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = Preset::from_toml_str(toml).expect("warp_mesh_stroke.toml is valid");
@@ -377,7 +307,7 @@ fn the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke() {
     renderer.set_presets(vec![preset]);
     set_extent_diagnostic(true);
     renderer
-        .capture_preset(&name, &fixed_frame(), FRAMES)
+        .capture_preset(&name, &common::fixed_frame_spectrum(), FRAMES)
         .expect("capture warp_mesh_stroke");
     let extent = take_draw_extent();
     set_extent_diagnostic(false);

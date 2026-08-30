@@ -37,10 +37,12 @@ use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
 use lmv_core::preset::{Preset, SystemKind};
 use lmv_core::render::{
-    CaptureImage, HeadlessOptions, RenderError, Renderer,
+    CaptureImage, Renderer,
     metrics::{coverage, footprint_diff, frame_diff, quadrant_spread, tonal_flatness},
 };
 use lmv_core::signal::{bass_sine, chord, click_track, treble_tone};
+
+mod common;
 
 /// The fixture under test — the same text `golden.rs` pins a baseline for, so
 /// the two cannot describe different presets.
@@ -119,25 +121,6 @@ fn without_backdrop(mut preset: Preset) -> Preset {
     preset
 }
 
-fn headless() -> Option<Renderer> {
-    headless_on(true)
-}
-
-fn headless_on(prefer_software: bool) -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// `sanity.rs`'s fully-driven frame.
 fn loud() -> AnalysisFrame {
     AnalysisFrame {
@@ -156,7 +139,7 @@ fn loud() -> AnalysisFrame {
 /// something there, is it more than a dot, and does it have an interior.
 #[test]
 fn the_fixture_draws_a_real_shape() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = without_backdrop(fixture());
@@ -202,7 +185,7 @@ fn the_fixture_draws_a_real_shape() {
 /// zero.
 #[test]
 fn the_fixture_animates() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = without_backdrop(fixture());
@@ -234,7 +217,7 @@ fn the_fixture_animates() {
 /// PCM stimuli through the real analyzer.
 #[test]
 fn the_fixture_reacts_to_audio() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = fixture();
@@ -289,7 +272,7 @@ fn the_fixture_reacts_to_audio() {
 /// the control, and the two frames would agree.
 #[test]
 fn the_per_vertex_program_varies_across_the_mesh() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let varying = fixture();
@@ -361,7 +344,10 @@ fn the_per_vertex_program_varies_across_the_mesh() {
 #[test]
 #[ignore = "needs both a hardware and a software adapter; run locally before blessing"]
 fn the_adapters_agree_on_the_warp_mesh() {
-    let (Some(mut hardware), Some(mut software)) = (headless_on(false), headless_on(true)) else {
+    let (Some(mut hardware), Some(mut software)) = (
+        common::headless_on(SIZE, SIZE, false),
+        common::headless_on(SIZE, SIZE, true),
+    ) else {
         eprintln!("skipped: this machine does not expose both adapters");
         return;
     };
@@ -429,7 +415,7 @@ fn milk_fixture() -> Preset {
 /// NFR §6 asks of a capture and what the golden baseline below rests on.
 #[test]
 fn a_bundle_drives_the_mesh_and_reruns_identically() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = milk_fixture();
@@ -479,7 +465,7 @@ fn a_bundle_drives_the_mesh_and_reruns_identically() {
 /// two must differ.
 #[test]
 fn the_bundle_and_not_the_defaults_drives_the_transform() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let driven = milk_fixture();
@@ -605,7 +591,7 @@ fn the_fixture_shaders_begin_with_the_prelude() {
 /// "the pipeline did not build" than "the picture is dim".
 #[test]
 fn the_shader_fixture_draws_a_real_shape_and_animates() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = without_backdrop(shader_fixture());
@@ -671,7 +657,7 @@ fn the_shader_fixture_draws_a_real_shape_and_animates() {
 /// and this would go quiet.
 #[test]
 fn the_shaders_and_not_the_defaults_drive_the_picture() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let mut driven = shader_fixture();
@@ -793,7 +779,7 @@ fn with_blur_level(text: &str, level: u8) -> String {
 /// something this phase does not claim.
 #[test]
 fn each_partly_absent_shader_surface_builds_and_renders() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -872,7 +858,7 @@ fn each_partly_absent_shader_surface_builds_and_renders() {
 /// **not** a cue to tune the fixture until it goes away.
 #[test]
 fn the_blur_chain_changes_the_picture() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let mut full = shader_fixture();
@@ -925,7 +911,7 @@ const LIT_FIXTURE: &str = include_str!("fixtures/warp_mesh_lit_backdrop.toml");
 ///   backdrop with no scene in it at all.
 #[test]
 fn a_lit_backdrop_survives_where_the_draw_layer_drew_nothing() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = Preset::from_toml_str(LIT_FIXTURE).expect("the lit fixture parses");
@@ -1118,7 +1104,7 @@ fn peak(image: &CaptureImage) -> u8 {
 /// except zero.
 #[test]
 fn the_quantized_field_reaches_exact_zero() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -1187,7 +1173,7 @@ fn the_quantized_field_reaches_exact_zero() {
 /// identical and this file would still be green.
 #[test]
 fn the_quantize_switch_reaches_the_shader() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let on = quantize_probe(&mut renderer, "switch-on", "255", "600");

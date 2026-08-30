@@ -22,7 +22,9 @@
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
 use lmv_core::dsp::AnalysisFrame;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::CaptureImage;
+
+mod common;
 
 /// Small offscreen size — the claim is about which stage the bytes come from,
 /// not about how many of them there are, and the software adapter is slow.
@@ -33,23 +35,6 @@ const SIZE: u32 = 96;
 /// restated here rather than imported. If that constant moves, this test fails
 /// and the message below is what says why.
 const CAPTURE_FRAME_DT: f32 = 1.0 / 60.0;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// Whether every pixel of `img` is the same colour.
 ///
@@ -91,7 +76,7 @@ fn a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock() {
     // one — and the name is read out so a mismatch names the preset rather than
     // leaving it to be guessed from the pixels.
     let (name, reference) = {
-        let Some(mut renderer) = headless() else {
+        let Some(mut renderer) = common::headless(SIZE, SIZE) else {
             return;
         };
         let name = renderer.preset_name().to_string();
@@ -102,7 +87,7 @@ fn a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock() {
     };
 
     let tapped = {
-        let Some(mut renderer) = headless() else {
+        let Some(mut renderer) = common::headless(SIZE, SIZE) else {
             return;
         };
         assert_eq!(

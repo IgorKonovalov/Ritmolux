@@ -20,8 +20,9 @@
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
 use lmv_core::preset::default_presets;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer};
 use lmv_core::signal::click_track;
+
+mod common;
 
 /// Small offscreen size — nothing here reads a pixel, and the software adapter
 /// is slow.
@@ -47,23 +48,6 @@ const CLICK_BPM: f32 = 240.0;
 fn clip(hops: usize) -> Vec<f32> {
     let secs = (hops * HOP_SIZE) as f32 / FORMAT.sample_rate as f32;
     click_track(CLICK_BPM, secs, FORMAT)
-}
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
 }
 
 /// Every published field as its raw bit pattern, labelled so a mismatch names
@@ -126,7 +110,7 @@ fn a_preset() -> String {
 /// them published — every hop, every field, bit for bit.
 #[test]
 fn skipping_the_render_leaves_the_published_frames_identical() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();
@@ -172,7 +156,7 @@ fn skipping_the_render_leaves_the_published_frames_identical() {
 /// comparator that compared nothing would pass the test above.
 #[test]
 fn the_bit_comparison_can_fail() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();
@@ -198,7 +182,7 @@ fn the_bit_comparison_can_fail() {
 /// A run that is all warm-up rasterizes nothing, counted rather than timed.
 #[test]
 fn an_all_warmup_run_renders_zero_frames() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();
@@ -254,7 +238,7 @@ const SAMPLES: [u32; 3] = [3, 9, 17];
 /// readback buffer is built at the first sample rather than up front.
 #[test]
 fn a_sampled_frame_is_the_frame_a_plain_capture_of_that_length_returns() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();
@@ -293,7 +277,7 @@ fn a_sampled_frame_is_the_frame_a_plain_capture_of_that_length_returns() {
 /// first frame for every index would satisfy everything above.
 #[test]
 fn an_earlier_row_is_unchanged_by_asking_for_a_longer_run() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();
@@ -326,7 +310,7 @@ fn an_earlier_row_is_unchanged_by_asking_for_a_longer_run() {
 /// The degenerate requests, which a horizon of zero intervals will reach.
 #[test]
 fn an_empty_request_renders_nothing_and_a_repeated_index_renders_once() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = a_preset();

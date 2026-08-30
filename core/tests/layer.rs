@@ -29,7 +29,9 @@ use std::path::{Path, PathBuf};
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, metrics::frame_diff};
+
+mod common;
 
 const WIDTH: u32 = 160;
 const HEIGHT: u32 = 100;
@@ -50,59 +52,7 @@ const MULTIPLY: &str = include_str!("fixtures/layer_multiply.toml");
 fn fixed_frame() -> AnalysisFrame {
     AnalysisFrame {
         bass: 0.9,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    }
-}
-
-/// A headless renderer on the software adapter (reproducible rasterization),
-/// or a logged skip where the runner has no adapter at all (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// The default-adapter twin of [`headless`], for the one assertion WARP cannot
-/// host. A same-system pair duplicates pipelines with **byte-identical bind
-/// layouts**, and WARP is documented to alias those (ADR-0058 / Plan 0053):
-/// measured here, the layer instance's uniform wins and the main's becomes a
-/// dead lever — on the software adapter only; hardware renders both. So this
-/// takes `background_composite.rs`'s posture: the guard runs on developer
-/// machines (hardware adapter) and skips with notice on a software-only
-/// runner, rather than asserting on an adapter that mis-renders the shape
-/// under test.
-fn headless_hardware() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: false,
-    }) {
-        Ok(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: only a software adapter available, and WARP aliases the \
-                 identical pipeline layouts a same-system pair duplicates (ADR-0058)"
-            );
-            None
-        }
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
+        ..common::fixed_frame()
     }
 }
 
@@ -119,7 +69,7 @@ fn load(toml: &str) -> Preset {
 /// Done-when 1: both scenes render, visibly and deterministically.
 #[test]
 fn a_layered_preset_renders_both_scenes_deterministically() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -164,7 +114,7 @@ fn a_layered_preset_renders_both_scenes_deterministically() {
 /// evaluated to.
 #[test]
 fn a_layer_binding_reacts_to_the_analysis_frame() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     // `bass = 0.9` — what the fixture's `zoom = "bass"` should evaluate to.
@@ -213,7 +163,7 @@ fn a_layer_binding_reacts_to_the_analysis_frame() {
 /// too" half is exactly what WARP's layout aliasing breaks.
 #[test]
 fn a_same_system_pair_renders_two_independent_configurations() {
-    let Some(mut renderer) = headless_hardware() else {
+    let Some(mut renderer) = common::headless_hardware(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -287,7 +237,7 @@ fn a_same_system_pair_renders_two_independent_configurations() {
 /// authoring docs inherit the finding rather than rediscover it.
 #[test]
 fn a_fragment_pair_is_legal_and_the_layer_config_is_live() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -331,7 +281,7 @@ fn a_fragment_pair_is_legal_and_the_layer_config_is_live() {
 /// in Phase 5, not asserted on the software adapter.
 #[test]
 fn a_line_on_line_pair_draws_through_two_renderers() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     // The spectrum layer draws its elements from the frame's band array, and
@@ -377,7 +327,7 @@ fn a_line_on_line_pair_draws_through_two_renderers() {
 /// a layerless frame would before folding).
 #[test]
 fn an_over_layer_at_mix_zero_is_pixel_identical_to_layerless() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -432,7 +382,7 @@ fn an_over_layer_at_mix_zero_is_pixel_identical_to_layerless() {
 /// (the WARP pipeline-count posture, Plan 0046's precedent).
 #[test]
 fn the_four_blend_modes_render_distinct_results() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -477,7 +427,7 @@ fn the_four_blend_modes_render_distinct_results() {
 /// and the whole path stays deterministic.
 #[test]
 fn an_over_layer_participates_in_bloom() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -548,7 +498,7 @@ fn luma_stats(img: &CaptureImage) -> (f32, f32, f32) {
 /// byte-identical bind-group layouts, which WARP aliases (ADR-0058).
 #[test]
 fn a_multiply_layer_meets_a_lit_backdrop() {
-    let Some(mut renderer) = headless_hardware() else {
+    let Some(mut renderer) = common::headless_hardware(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -704,7 +654,7 @@ fn a_multiply_layer_meets_a_lit_backdrop() {
 /// teach one of them.
 #[test]
 fn a_dark_particle_layer_in_a_multiply_slot() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();
@@ -778,7 +728,7 @@ fn layered_fixtures_match_golden_baselines() {
         .join("tests")
         .join("golden");
 
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = fixed_frame();

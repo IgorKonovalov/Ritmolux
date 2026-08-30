@@ -53,11 +53,10 @@
 //! off instead of flattening; generalizing the assertion into a suite-wide
 //! no-255 gate would fail on frames that are behaving correctly.
 
-use std::path::{Path, PathBuf};
-
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, metrics::frame_diff};
+
+mod common;
 
 /// Capture width/height — see the module docs. **Not interchangeable.**
 const WIDTH: u32 = 160;
@@ -164,68 +163,6 @@ const FIXTURES: [(&str, &str); 10] = [
 /// The fixture whose whole point is that it does not clip (Plan 0045 Phase 3).
 const OVERLAP: &str = "composite_overlap";
 
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-}
-
-/// A headless renderer on the **software** adapter, or `None` (a logged skip)
-/// when the runner exposes no GPU adapter — macOS has no software Metal fallback
-/// (ADR-0016).
-///
-/// WARP, deliberately, and the question was settled by measurement rather than by
-/// assumption: these captures were confirmed byte-identical across three
-/// consecutive runs before the baselines landed. The alternative posture —
-/// `background_composite.rs`'s request-the-default-adapter-and-skip-on-software —
-/// would have made this guard run on developer machines and **not in CI**, which
-/// for a defect whose entire failure mode is "nobody looked" is the wrong trade.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// The fixed frame every baseline is rendered under — mid-energy, all bands lit.
-fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    }
-}
-
-fn decode(path: &Path) -> CaptureImage {
-    let img = image::open(path)
-        .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
-        .to_rgba8();
-    CaptureImage {
-        width: img.width(),
-        height: img.height(),
-        rgba: img.into_raw(),
-    }
-}
-
-fn encode(img: &CaptureImage, path: &Path) {
-    let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
-        .expect("capture buffer matches its declared dimensions");
-    buffer
-        .save(path)
-        .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
-}
-
 /// Largest absolute single-channel (RGB) byte difference across the two images.
 fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
     a.rgba
@@ -248,12 +185,12 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 /// baseline as well**. Bless by `--test composite` and check `git status`.
 #[test]
 fn composite_stages_match_golden_baselines() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
-    let frame = fixed_frame();
+    let frame = common::fixed_frame();
     let bless = std::env::var_os("LMV_BLESS").is_some();
-    std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
+    std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
     for (stem, toml) in FIXTURES {
@@ -265,7 +202,7 @@ fn composite_stages_match_golden_baselines() {
         let fresh = renderer
             .capture_preset(&name, &frame, FRAMES)
             .expect("capture fixture");
-        let path = golden_dir().join(format!("{stem}.png"));
+        let path = common::golden_dir().join(format!("{stem}.png"));
 
         // Checked ahead of the bless branch on purpose: a `LMV_BLESS` run must
         // not be able to write a clipped baseline and call it the new truth.
@@ -289,7 +226,7 @@ fn composite_stages_match_golden_baselines() {
         }
 
         if bless {
-            encode(&fresh, &path);
+            common::encode(&fresh, &path);
             println!("blessed {}", path.display());
             continue;
         }
@@ -299,7 +236,7 @@ fn composite_stages_match_golden_baselines() {
             "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test composite`",
             path.display()
         );
-        let baseline = decode(&path);
+        let baseline = common::decode(&path);
         let mean = frame_diff(&baseline, &fresh);
         let outlier = max_channel_outlier(&baseline, &fresh);
         println!(

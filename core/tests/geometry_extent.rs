@@ -36,10 +36,12 @@ use lmv_core::{
     dsp::{AnalysisFrame, SPECTRUM_BINS},
     preset::{Preset, SystemKind, default_presets},
     render::{
-        HeadlessOptions, RenderError, Renderer,
+        Renderer,
         scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent},
     },
 };
+
+mod common;
 
 /// Capture size. Nothing here reads a pixel except the byte-identity check, and
 /// that one only needs two frames of the same thing, so this is small on
@@ -52,23 +54,6 @@ const HEIGHT: u32 = 90;
 /// Frames per capture — enough to clear a draw-in and settle any smoothing, at
 /// the cost the sweep below pays 15 times over.
 const FRAMES: u32 = 30;
-
-/// A headless renderer, or `None` (a logged skip) when the runner exposes no GPU
-/// adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: true,
-    }) {
-        Ok(renderer) => Some(renderer),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// The line fixture the inertness check captures, borrowed read-only from the
 /// golden roster: a static 6-petal Maurer rose. Nothing here pins its pixels or
@@ -115,7 +100,7 @@ fn lit_frame() -> AnalysisFrame {
 /// nothing would pass this test trivially.
 #[test]
 fn the_diagnostic_changes_nothing_about_the_picture() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let preset = Preset::from_toml_str(LINE_FIXTURE).expect("the line fixture parses");
@@ -442,7 +427,7 @@ fn fraction_of(renderer: &mut Renderer, preset: Preset) -> Option<f32> {
 /// exactly the mistake ADR-0083 catalogues pixel coverage making, one axis over.
 #[test]
 fn an_over_scaled_figure_measures_below_its_repaired_counterpart() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
 

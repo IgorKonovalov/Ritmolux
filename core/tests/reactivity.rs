@@ -40,8 +40,10 @@
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{HOP_SIZE, WARMUP_HOPS};
 use lmv_core::preset::{Preset, SystemKind, default_presets};
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 use lmv_core::signal::{bass_sine, chord, click_track, treble_tone};
+
+mod common;
 
 /// Small offscreen size — the differential signal doesn't need resolution, and
 /// the software adapter is slow.
@@ -131,24 +133,6 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeField => "shape_field",
         SystemKind::WarpMesh => "warp_mesh",
         SystemKind::ShapeCollage => "shape_collage",
-    }
-}
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
     }
 }
 
@@ -244,7 +228,7 @@ fn max_of(vector: &[(&'static str, f32)]) -> f32 {
 
 #[test]
 fn every_preset_reacts_to_at_least_one_band() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -370,7 +354,7 @@ flash = "0.2"
 /// had stopped arriving. The unbound twin is the control that cannot pass.
 #[test]
 fn a_preset_whose_only_band_binding_is_deleted_fails_the_gate() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let parse = |src: &str| {

@@ -18,7 +18,8 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer};
+
+mod common;
 
 const SIZE: u32 = 64;
 /// Enough frames for the fragment field to be fully established; the fixture
@@ -51,21 +52,6 @@ seed = {seed}
 
 fn load(seed: &str) -> Preset {
     Preset::from_toml_str(&source(seed)).unwrap_or_else(|e| panic!("seed fixture parses: {e}"))
-}
-
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
 }
 
 /// A quiet frame — this fixture binds no band, so the audio is irrelevant and
@@ -127,7 +113,7 @@ fn a_malformed_seed_is_a_surfaced_load_error() {
 /// the two salts this test has just shown to differ.
 #[test]
 fn a_random_seeded_preset_captures_byte_identically() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = silent();

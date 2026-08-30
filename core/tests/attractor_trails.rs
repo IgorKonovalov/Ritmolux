@@ -49,11 +49,10 @@
 //! cannot see an ADR-0037 confusion between them — which is the bug that has
 //! shipped three times, once on this very scene.
 
-use std::path::{Path, PathBuf};
-
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, metrics::frame_diff};
+
+mod common;
 
 /// Capture width/height — see the module docs. **Not interchangeable.**
 const WIDTH: u32 = 160;
@@ -70,63 +69,6 @@ const MAX_OUTLIER: u8 = 48;
 
 const STEM: &str = "attractor_trails";
 const FIXTURE: &str = include_str!("fixtures/attractor_trails.toml");
-
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-}
-
-/// A headless renderer on the **software** adapter, or `None` (a logged skip)
-/// when the runner exposes no GPU adapter — macOS has no software Metal fallback
-/// (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// The fixed frame the baseline is rendered under — mid-energy, all bands lit.
-/// The fixture binds only constants, so nothing here reaches it; it exists so
-/// the capture path is the one every other baseline takes.
-fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    }
-}
-
-fn decode(path: &Path) -> CaptureImage {
-    let img = image::open(path)
-        .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
-        .to_rgba8();
-    CaptureImage {
-        width: img.width(),
-        height: img.height(),
-        rgba: img.into_raw(),
-    }
-}
-
-fn encode(img: &CaptureImage, path: &Path) {
-    let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
-        .expect("capture buffer matches its declared dimensions");
-    buffer
-        .save(path)
-        .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
-}
 
 /// Largest absolute single-channel (RGB) byte difference across the two images.
 fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
@@ -145,14 +87,14 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 
 /// Capture the fixture once, or `None` on an adapterless runner.
 fn capture() -> Option<CaptureImage> {
-    let mut renderer = headless()?;
+    let mut renderer = common::headless(WIDTH, HEIGHT)?;
     let preset =
         Preset::from_toml_str(FIXTURE).unwrap_or_else(|e| panic!("{STEM}.toml is invalid: {e}"));
     let name = preset.name.clone();
     renderer.set_presets(vec![preset]);
     Some(
         renderer
-            .capture_preset(&name, &fixed_frame(), FRAMES)
+            .capture_preset(&name, &common::fixed_frame(), FRAMES)
             .expect("capture the attractor-with-trails fixture"),
     )
 }
@@ -166,8 +108,8 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
     let Some(fresh) = capture() else {
         return;
     };
-    std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
-    let path = golden_dir().join(format!("{STEM}.png"));
+    std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
+    let path = common::golden_dir().join(format!("{STEM}.png"));
 
     // Checked ahead of the bless branch, the way `composite.rs` guards its
     // no-clip claim: a bless must not be able to write an empty frame and call
@@ -187,7 +129,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
     );
 
     if std::env::var_os("LMV_BLESS").is_some() {
-        encode(&fresh, &path);
+        common::encode(&fresh, &path);
         println!("blessed {}", path.display());
         return;
     }
@@ -197,7 +139,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
         "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails`",
         path.display()
     );
-    let baseline = decode(&path);
+    let baseline = common::decode(&path);
     let mean = frame_diff(&baseline, &fresh);
     let outlier = max_channel_outlier(&baseline, &fresh);
     println!(

@@ -1,6 +1,6 @@
 # 0124 — The review fixes that move no pixels
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) (the hygiene gate this widens), [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the crate this maps), [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (the skip shape the shared harness keeps)
@@ -227,12 +227,12 @@ pub fn decode(path: &Path) -> CaptureImage
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/lmv-plan-0124` on
-`plan-0124-the-review-fixes-that-move-no-pixels`)_
+**Lane:** `WORK/lmv-plan-0124` on `plan-0124-review-fixes-no-pixels` (the branch name is
+shorter than the placeholder above guessed).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One harness for forty test files | dev | not started | |
+| 1 — One harness for forty test files | dev | done | committed with this row |
 | 2 — Four strings, one attribute | dev | not started | |
 | 3 — The gate learns the narration shape that survives | dev | not started | |
 | 4 — The maps name every crate | dev | not started | |
@@ -240,6 +240,34 @@ pub fn decode(path: &Path) -> CaptureImage
 | 6 — The unwired scripts get a line or get deleted | dev | not started | |
 
 ### Notes
+
+**Phase 1.** `grep -c "fn headless" core/tests/*.rs` is 0. `core/tests/common/mod.rs` holds
+**four** constructors, not the one the done-when names: `headless` / `headless_on` /
+`headless_hardware` / `headless_tiered`. The copies differed in three ways, and only two of them
+are the "size constant, `prefer_software`" the phase anticipated — `layer.rs` also required a
+hardware adapter and skipped on WARP (ADR-0058), and `bloom.rs` called `new_headless_tiered`.
+Those are different behaviour, not different arguments. The ADR-0016 skip block itself **is**
+singular: one private `build()` holds it, the four public entry points delegate, and
+`grep -c 'eprintln!("skipped: no GPU adapter'` over `core/tests/common/mod.rs` is 1.
+
+**Phase 1, `probe`/`capture` not extracted.** The phase lists `probe` x7 and `capture` x7 among
+the copies. They are not copies: the seven `probe` functions build seven different presets
+(`arc_cost` a star roster, `palette_contour` a fragment_field, `mark_cost` a swarm, `layer` a
+string substitution returning `String`, ...) and the seven `capture` functions take seven
+different argument lists. They share a name and nothing else, so there was nothing to hoist and
+`common/` holds neither.
+
+**Phase 1, the eleven remaining inline skip blocks.** `arc_cost`, `attractor`,
+`backdrop_palette`, `backdrop_ramp`, `background_composite`, `beat`, `collage_cost`,
+`field_cost`, `mark_cost`, `palette_contour` and `reaction_diffusion` still spell the ADR-0016
+block out inside a bespoke `capture_at`-shaped function rather than in a `fn headless`. They were
+outside the phase's stated set (the 27 files defining `headless()`) and are untouched.
+
+**Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
+`HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite
+green unblessed. The renderer is hardware on this box, so the CPU-only skip path was not
+exercised at runtime; what is checked is that its branch and notice text are unchanged from the
+copies they replace.
 
 ### Close triggers
 

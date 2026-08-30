@@ -49,11 +49,11 @@
 //! binary also means `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`
 //! rewrites **this** baseline and cannot reach the roster.
 
-use std::path::{Path, PathBuf};
-
 use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, metrics::frame_diff};
+
+mod common;
 
 /// Capture size. Larger than the other suites' 96–128 on purpose: the feature
 /// under test is a wedge a fraction of a stroke-width across, and at 128 px a
@@ -86,29 +86,6 @@ const BASELINE_STEM: &str = "line_joint_zigzag";
 const MEAN_TOL: f32 = 0.02;
 /// Largest single-channel byte difference tolerated at any pixel.
 const MAX_OUTLIER: u8 = 48;
-
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-}
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// A band array whose downsampled elements alternate hard between [`LOW`] and
 /// [`HIGH`].
@@ -174,25 +151,6 @@ fn luma_at(img: &CaptureImage, world: [f32; 2]) -> f32 {
         }
     }
     sum / n.max(1.0)
-}
-
-fn decode(path: &Path) -> CaptureImage {
-    let img = image::open(path)
-        .unwrap_or_else(|e| panic!("decode baseline {}: {e}", path.display()))
-        .to_rgba8();
-    CaptureImage {
-        width: img.width(),
-        height: img.height(),
-        rgba: img.into_raw(),
-    }
-}
-
-fn encode(img: &CaptureImage, path: &Path) {
-    let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())
-        .expect("capture buffer matches its declared dimensions");
-    buffer
-        .save(path)
-        .unwrap_or_else(|e| panic!("write baseline {}: {e}", path.display()));
 }
 
 /// Largest absolute single-channel (RGB) byte difference across the two images.
@@ -383,11 +341,11 @@ fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
 /// every baseline in the repository — bless by `--test line_joints` and check
 /// `git status`, the trap that cost Plan 0039 two manual restores.
 fn compare_against_baseline(img: &CaptureImage) {
-    std::fs::create_dir_all(golden_dir()).expect("create tests/golden");
-    let path = golden_dir().join(format!("{BASELINE_STEM}.png"));
+    std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
+    let path = common::golden_dir().join(format!("{BASELINE_STEM}.png"));
 
     if std::env::var_os("LMV_BLESS").is_some() {
-        encode(img, &path);
+        common::encode(img, &path);
         println!("blessed {}", path.display());
         return;
     }
@@ -397,7 +355,7 @@ fn compare_against_baseline(img: &CaptureImage) {
         "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`",
         path.display()
     );
-    let baseline = decode(&path);
+    let baseline = common::decode(&path);
     let mean = frame_diff(&baseline, img);
     let outlier = max_channel_outlier(&baseline, img);
     println!(
@@ -417,7 +375,7 @@ fn compare_against_baseline(img: &CaptureImage) {
 /// for.
 #[test]
 fn the_joined_polyline_holds_its_shape_and_its_pixels() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let preset = Preset::from_toml_str(include_str!("fixtures/line_joint_zigzag.toml"))

@@ -14,29 +14,14 @@
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
 use lmv_core::render::metrics::frame_diff;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
+
+mod common;
 
 const SIZE: u32 = 128;
 /// Frames the dissolve spans at the capture harness's fixed step: the engine
 /// default is 1 s and the harness steps at 1/60 s.
 const DISSOLVE_FRAMES: usize = 60;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner exposes
-/// no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless_or_skip() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// Two **static** presets — no `time` in any binding, no spin/rotation — so a
 /// difference between two captured frames is the dissolve and not scene
@@ -242,7 +227,7 @@ fn region_progress(
 /// luma-dissolve must come out level for it.
 #[test]
 fn each_kind_renders_its_own_dissolve() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -346,7 +331,7 @@ fn each_kind_renders_its_own_dissolve() {
 /// the two additive pipelines meet.
 #[test]
 fn an_additive_family_dissolve_stays_clean() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -389,7 +374,7 @@ fn an_additive_family_dissolve_stays_clean() {
 /// and no single step accounts for most of the total change.
 #[test]
 fn a_preset_switch_dissolves_instead_of_cutting() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -460,7 +445,7 @@ fn a_preset_switch_dissolves_instead_of_cutting() {
 /// blend path would show up as drifting pixels and nowhere else.
 #[test]
 fn a_dissolve_is_reproducible_from_the_injected_dt() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -492,7 +477,7 @@ fn a_dissolve_is_reproducible_from_the_injected_dt() {
 /// mean color tracks `paper_*` directly.
 #[test]
 fn ink_poles_crossfade_across_a_dissolve() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -571,7 +556,7 @@ fn ink_poles_crossfade_across_a_dissolve() {
 /// dissolve behind them, must match a capture taken with no dissolve at all.
 #[test]
 fn a_finished_dissolve_leaves_no_trace_on_later_frames() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -622,7 +607,7 @@ fn a_finished_dissolve_leaves_no_trace_on_later_frames() {
 /// `docs/on-device-validation.md`; a WARP capture cannot speak to it.
 #[test]
 fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -712,7 +697,7 @@ fn static_trio() -> Vec<Preset> {
 /// that the two really are different paths.
 #[test]
 fn selecting_a_preset_dissolves_like_a_cycle() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -791,7 +776,7 @@ fn layered_pair() -> Vec<Preset> {
 #[test]
 fn a_switch_mid_dissolve_between_layered_presets_settles_cleanly() {
     let run = || -> Option<(String, CaptureImage)> {
-        let mut renderer = headless_or_skip()?;
+        let mut renderer = common::headless(SIZE, SIZE)?;
         let frame = AnalysisFrame {
             bass: 0.5,
             treb: 0.4,
@@ -832,7 +817,7 @@ fn a_switch_mid_dissolve_between_layered_presets_settles_cleanly() {
 /// so the roster is never left on an index nobody asked for.
 #[test]
 fn a_switch_mid_dissolve_lands_on_the_last_requested_preset() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -882,7 +867,7 @@ fn a_switch_mid_dissolve_lands_on_the_last_requested_preset() {
 /// dissolve, so a mismatch is the switch being lost rather than a blend artifact.
 #[test]
 fn two_switches_between_frames_advance_two_presets() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -932,7 +917,7 @@ fn two_switches_between_frames_advance_two_presets() {
 /// rejecting one would make that no-op visible as a cut.
 #[test]
 fn an_out_of_range_select_leaves_a_running_dissolve_alone() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();
@@ -973,7 +958,7 @@ fn an_out_of_range_select_leaves_a_running_dissolve_alone() {
 /// — no panic, no dangling snapshot, no half-blended frame that never finishes.
 #[test]
 fn a_hot_reload_mid_dissolve_settles_cleanly() {
-    let Some(mut renderer) = headless_or_skip() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame::default();

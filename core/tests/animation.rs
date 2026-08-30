@@ -46,9 +46,11 @@
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{Preset, SystemKind, default_presets};
 use lmv_core::render::{
-    HeadlessOptions, RenderError, Renderer,
+    Renderer,
     metrics::{footprint_diff, frame_diff},
 };
+
+mod common;
 
 /// Capture size for the gate.
 ///
@@ -209,24 +211,6 @@ fn system_name(system: SystemKind) -> &'static str {
     }
 }
 
-/// Build a headless `Renderer` at `size`, or `None` (a logged skip) when the
-/// runner exposes no GPU adapter — macOS has no software Metal fallback
-/// (ADR-0016). Any other build error still panics loudly.
-fn headless_at(size: u32) -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: size,
-        height: size,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// One preset's three readings (ADR-0136).
 #[derive(Clone, Copy)]
 struct Motion {
@@ -290,7 +274,7 @@ fn motions(renderer: &mut Renderer, name: &str) -> Motion {
 
 #[test]
 fn every_preset_animates_over_time() {
-    let Some(mut renderer) = headless_at(SIZE) else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -353,7 +337,7 @@ fn every_preset_animates_over_time() {
 /// does not move either statistic.
 #[test]
 fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control() {
-    let Some(mut renderer) = headless_at(SIZE) else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let probes = probes();
@@ -422,7 +406,7 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
 /// quietly stopped being covered.
 #[test]
 fn the_driven_branch_carries_the_world_that_is_still_by_design() {
-    let Some(mut renderer) = headless_at(SIZE) else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let src = with_param(
@@ -770,7 +754,7 @@ fn the_resolution_ladder_against_the_two_designs_it_penalizes() {
         .collect();
 
     for size in LADDER {
-        let Some(mut renderer) = headless_at(size) else {
+        let Some(mut renderer) = common::headless(size, size) else {
             return;
         };
         let presets: Vec<Preset> = probes

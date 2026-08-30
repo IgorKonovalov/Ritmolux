@@ -63,13 +63,15 @@ use lmv_core::{
     dsp::AnalysisFrame,
     preset::{Preset, SystemKind, default_presets},
     render::{
-        CaptureImage, HeadlessOptions, RenderError, Renderer,
+        CaptureImage,
         metrics::{
             RADIAL_SHELLS, TONE_BANDS, boundary_density, coverage, modal_ground, quadrant_spread,
             radial_shell_occupancy, tonal_flatness,
         },
     },
 };
+
+mod common;
 
 const SIZE: u32 = 96;
 const FRAMES: u32 = 30;
@@ -578,24 +580,6 @@ fn system_name(system: SystemKind) -> &'static str {
     }
 }
 
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// A sustained frame with every level driven to `level` and a beat, so any
 /// audio-gated brightness reaches its lit state.
 ///
@@ -689,7 +673,7 @@ fn sanity_roster() -> (Vec<Preset>, Vec<(String, SystemKind)>) {
 
 #[test]
 fn every_preset_draws_a_real_shape() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = loud();
@@ -914,7 +898,7 @@ trails     = "0.97"
 
 #[test]
 fn a_frame_with_no_tonal_structure_is_reported_flat() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     renderer.set_presets(vec![without_backdrop(blown_out())]);
@@ -1031,7 +1015,7 @@ const STRUCTURELESS_BUT_TONED: &str = "Sumi";
 /// is neither vacuous nor a rename of the check it replaced.
 #[test]
 fn each_term_of_the_flatness_conjunction_is_load_bearing() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -1188,7 +1172,7 @@ trails     = 0.50
 /// stimulus, size and frame count, so nothing but the backdrop differs.
 #[test]
 fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = loud();
@@ -1374,7 +1358,7 @@ density = "clamp(bass - 0.5, 0, 0.5) * 2"
 /// may be**. That is a content judgement and this file does not make it.
 #[test]
 fn a_canvas_the_music_empties_is_convicted_and_black_calls_it_full() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let name = "Emptying Canvas";
@@ -1623,7 +1607,7 @@ bg_bright   = 0.40
 ///    "blot".
 #[test]
 fn the_honest_mandala_tunings_pass_the_structural_measure() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = loud();
@@ -1749,7 +1733,7 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 /// families; this measurement is the evidence that it is wanted.
 #[test]
 fn a_louder_frame_is_reported_against_a_quieter_one() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let (presets, meta) = sanity_roster();
@@ -2191,7 +2175,7 @@ fn report_ground_verdict_changes(
 #[test]
 #[ignore = "measurement, not a gate: Plan 0116 Phase 1 informs a human stop gate, and it is 82 WARP captures"]
 fn each_candidate_ground_is_tabled_against_the_library() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -2654,7 +2638,7 @@ struct StructureRow {
 #[test]
 #[ignore = "measurement, not a gate: this informs a mechanical stop condition"]
 fn each_structure_candidate_is_tabled_against_the_library() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
