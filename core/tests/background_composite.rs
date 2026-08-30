@@ -16,9 +16,12 @@
 //! One `#[test]` per file (its own test binary → its own process) so the single
 //! hardware renderer never coexists with the other suites' WARP devices.
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
 
 const SIZE: u32 = 96;
 
@@ -26,25 +29,12 @@ const SIZE: u32 = 96;
 /// logged skip) when the runner exposes no adapter *or* only a software one — the
 /// coexistence this test probes is a real-hardware behaviour (see the module docs).
 fn hardware() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: false,
-    }) {
-        Ok(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: only a software rasterizer is available (WARP mis-renders the \
-                       fullscreen-scene + background coexistence; see module docs)"
-            );
-            None
-        }
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless_hardware_for(
+        SIZE,
+        SIZE,
+        None,
+        "WARP mis-renders the fullscreen-scene + background coexistence (see module docs)",
+    )
 }
 
 /// Mean (r, g, b) over the pixels selected by `mask`.

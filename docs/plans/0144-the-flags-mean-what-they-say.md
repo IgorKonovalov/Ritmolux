@@ -326,6 +326,6 @@ pub struct RendererOptions {
 | 1 — The roster states a dependency | dev | done | 1b29936 |
 | 2 — `--gpu` reaches the window | dev | done | 3872605 |
 | 3 — `--preset` holds a scene in the window | dev | done | cb6a037 |
-| 4 — The broken literal becomes a scanned class | dev | done, with a deviation | committed with this row |
-| 5 — The dead attribute goes and the last skip blocks fold in | dev | | |
+| 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 7399ab5 |
+| 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | committed with this row |
 | 6 — `cargo doc` becomes a gate | dev | | |

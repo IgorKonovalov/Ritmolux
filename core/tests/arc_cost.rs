@@ -82,11 +82,14 @@
     reason = "a frame-cost report deliberately times execution; the render under test stays clock-free"
 )]
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use std::time::Instant;
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
+use lmv_core::render::{CaptureImage, Renderer, Tier};
 
 /// The floor commitment's own resolution (`docs/nfr.md` §1), not the size the
 /// standalone happens to open at: this measurement exists to be read against
@@ -148,28 +151,12 @@ fn probe(index: usize) -> Preset {
 /// Build a **hardware** headless renderer at the Floor tier, or `None` (a logged
 /// skip) when the runner has no adapter or only a software one.
 fn hardware() -> Option<Renderer> {
-    match Renderer::new_headless_tiered(
-        HeadlessOptions {
-            width: WIDTH,
-            height: HEIGHT,
-            prefer_software: false,
-        },
-        Tier::Floor,
-    ) {
-        Ok(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: only a software rasterizer is available — a WARP frame time is \
-                 not a reading about the shipped renderer (see module docs)"
-            );
-            None
-        }
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless_hardware_for(
+        WIDTH,
+        HEIGHT,
+        Some(Tier::Floor),
+        common::NEEDS_HARDWARE_FOR_TIMING,
+    )
 }
 
 /// Per-frame milliseconds for each probe, plus the frame each drew.

@@ -12,10 +12,13 @@
 //! same way `capture_audio` feeds it (hop-by-hop), so the indices line up
 //! deterministically without depending on the tempo lock.
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use lmv_core::audio::AudioFormat;
 use lmv_core::dsp::{Analyzer, HOP_SIZE};
 use lmv_core::preset::Preset;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::metrics::frame_diff;
 use lmv_core::signal::click_track;
 
 const SIZE: u32 = 96;
@@ -101,17 +104,8 @@ fn beat_accent_preset_responds_on_beat() {
 
     // No GPU adapter (macOS has no software Metal fallback) is a logged skip,
     // not a failure (ADR-0016); any other build error still panics loudly.
-    let mut renderer = match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => r,
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            return;
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
     };
 
     renderer.set_presets(vec![live_preset()]);

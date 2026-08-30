@@ -25,9 +25,12 @@
 //! **Software adapter** (`prefer_software`), like the rest of the GPU suites
 //! (ADR-0016), so this runs on CI rather than only where a GPU happens to be.
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
 
 /// Capture size for the ramp probes. Square, because the ramp's own properties
 /// (continuity, direction, easing) do not vary with aspect — the one test that
@@ -89,18 +92,7 @@ fn probe_preset(palette: &str, bright: &str, params: &str) -> Preset {
 /// Build a software headless renderer at `width` x `height`, or `None` (a logged
 /// skip) when the runner exposes no adapter at all (ADR-0016).
 fn renderer_sized(width: u32, height: u32) -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width,
-        height,
-        prefer_software: true,
-    }) {
-        Ok(renderer) => Some(renderer),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless(width, height)
 }
 
 fn renderer() -> Option<Renderer> {

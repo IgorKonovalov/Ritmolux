@@ -72,12 +72,49 @@ pub fn headless_on(width: u32, height: u32, prefer_software: bool) -> Option<Ren
 /// notice on a software-only runner rather than asserting against an adapter
 /// that mis-renders the shape under test.
 pub fn headless_hardware(width: u32, height: u32) -> Option<Renderer> {
-    match headless_on(width, height, false) {
+    headless_hardware_for(
+        width,
+        height,
+        None,
+        "WARP aliases the identical pipeline layouts a same-system pair duplicates (ADR-0058)",
+    )
+}
+
+/// The reason a **timing** test needs hardware: a WARP frame time is a fact
+/// about a CPU rasterizer, so no threshold stated against the shipped renderer
+/// can be checked with one (ADR-0071).
+pub const NEEDS_HARDWARE_FOR_TIMING: &str =
+    "a WARP frame time is not a reading about the shipped renderer (see module docs)";
+
+/// A hardware-adapter build, skipping with the **caller's own** reason.
+///
+/// The ADR-0016 no-adapter skip lives in `build` and is shared; this adds the
+/// second refusal, and the reason is a parameter because the files that need it
+/// do not share one. Four distinct reasons are live: a frame time that would be
+/// measuring the wrong machine, WARP aliasing byte-identical bind layouts
+/// (ADR-0058), WARP mis-rendering a fullscreen-scene and background together,
+/// and a defect that simply does not reproduce on WARP. Collapsing them onto one
+/// notice would print an aliasing argument at a timing skip, which is how a skip
+/// notice stops being evidence about anything.
+///
+/// `tier` is `None` for the engine's own choice, mirroring [`headless`].
+pub fn headless_hardware_for(
+    width: u32,
+    height: u32,
+    tier: Option<Tier>,
+    reason: &str,
+) -> Option<Renderer> {
+    let built = build(
+        HeadlessOptions {
+            width,
+            height,
+            prefer_software: false,
+        },
+        tier,
+    );
+    match built {
         Some(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: only a software adapter available, and WARP aliases the \
-                 identical pipeline layouts a same-system pair duplicates (ADR-0058)"
-            );
+            eprintln!("skipped: only a software rasterizer is available — {reason}");
             None
         }
         other => other,

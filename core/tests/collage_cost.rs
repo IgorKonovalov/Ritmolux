@@ -135,11 +135,14 @@
     reason = "a frame-cost report deliberately times execution; the render under test stays clock-free"
 )]
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use std::time::Instant;
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, TierConfig};
+use lmv_core::render::{CaptureImage, Renderer, TierConfig};
 
 /// **1080p, because that is the size `docs/nfr.md` §1 states its budget at.**
 /// This scene's cost is per pixel per element, so the render size is half the
@@ -191,25 +194,7 @@ fn probe(count: usize) -> Preset {
 /// Build a **hardware** headless renderer, or `None` (a logged skip) when the
 /// runner has no adapter or only a software one.
 fn hardware() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: WIDTH,
-        height: HEIGHT,
-        prefer_software: false,
-    }) {
-        Ok(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: only a software rasterizer is available — a WARP frame time is \
-                 not a reading about the shipped renderer (see module docs)"
-            );
-            None
-        }
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless_hardware_for(WIDTH, HEIGHT, None, common::NEEDS_HARDWARE_FOR_TIMING)
 }
 
 /// Per-frame milliseconds for each rung, plus the frame each drew.

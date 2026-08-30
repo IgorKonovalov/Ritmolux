@@ -31,9 +31,12 @@
 //! which is the ADR-0058 aliasing configuration — the hardware-vs-WARP comparison
 //! that clears it is recorded in `core/src/render/background.rs`.
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
 
 /// Capture size. Small on purpose — every assertion below is per-pixel over the
 /// whole frame, and the property does not vary with resolution.
@@ -89,18 +92,7 @@ fn flat_palette(rgb: [f32; 3]) -> String {
 /// Build a software headless renderer, or `None` (a logged skip) when the runner
 /// exposes no adapter at all (ADR-0016).
 fn renderer() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(renderer) => Some(renderer),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless(SIZE, SIZE)
 }
 
 /// Capture one backdrop-only preset.
