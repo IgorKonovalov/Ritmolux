@@ -518,16 +518,23 @@ arm ran.
 
 ### Close triggers
 
-**Not filled: this plan is not closed.** Phases 2, 4 and 5 (`dev`) and Phase 6 (`human`) are still
-outstanding, so there is no close to trigger. The fields below are answered when the last phase
-lands, not per phase.
+**Every `dev` phase has landed; Phase 6 (`human`) has not.** The fields below are answered against
+what the five `dev` phases shipped, and the last bullet is the one that says the plan is not
+finished.
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** none — `git diff` across the plan's commits reaches no `presets/` path.
+- **Plan header `Closes:`** none.
+- **What shipped:** feature.
+- **Operator docs touched:** `README.md` (the `C` row in the Controls table, a console section, and
+  `--console` in the flag list) and `docs/on-device-validation.md` (the two-display check Phase 6
+  runs).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 127 stated reductions hold
+  across all 59 live entries, 7 unprobeable, none naming this plan.
+- **Outstanding `human` phases:** **Phase 6, the on-device gate, and it is not a formality.** Two
+  things it settles are structurally invisible to every test here: what the second swapchain costs
+  the output, measurable only on two displays of *different* refresh rates; and whether the console
+  surface configures on a dual-GPU laptop, whose degrade path is built, logged, and **has never been
+  executed**. Its checklist entry is in `docs/on-device-validation.md`.
 
 ## Followups (after this lands)
 
