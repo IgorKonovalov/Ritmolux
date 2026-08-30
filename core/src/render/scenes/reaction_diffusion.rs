@@ -35,6 +35,7 @@
 
 use crate::render::gpu;
 
+use super::common;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
@@ -90,12 +91,9 @@ const DEFAULT_GLOW: f32 = 1.0;
 // (now sampling the shared LUT instead of the private cosine).
 const DEFAULT_COLOR_SPAN: f32 = 0.85;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// View transform defaults (ADR-0018): identity — `zoom` = 1 leaves the sampled
 /// window unscaled, `pan` = 0 unshifted, so an unbound preset is byte-unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 
 /// Beat-stamped seed injection (Phase 3). A rising `inject` edge stamps a blob
 /// of V into the field at the next seeded position, so a beat spawns new growth.
@@ -688,27 +686,19 @@ pub struct ReactionDiffusionScene {
     flow: f32,
     /// This frame's injection level (bound to a beat/onset expression).
     inject: f32,
-    /// Present-look params (Phase 4): palette hue, iso-contour density, hatch
-    /// stripe spacing, glow strength.
-    hue: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `brightness`.
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     contour: f32,
     hatch: f32,
     glow: f32,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5).
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 2): `zoom` scales the
     /// present-pass sample window about its centre, `pan_*` offsets it.
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// How much of this field's coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
@@ -755,19 +745,14 @@ impl ReactionDiffusionScene {
             kill: DEFAULT_KILL,
             flow: DEFAULT_FLOW,
             inject: 0.0,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             contour: DEFAULT_CONTOUR,
             hatch: DEFAULT_HATCH,
             glow: DEFAULT_GLOW,
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
         }
@@ -886,22 +871,22 @@ impl Scene for ReactionDiffusionScene {
         self.kill = DEFAULT_KILL;
         self.flow = DEFAULT_FLOW;
         self.inject = 0.0;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.contour = DEFAULT_CONTOUR;
         self.hatch = DEFAULT_HATCH;
         self.glow = DEFAULT_GLOW;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         // ADR-0002 layer 2 knobs. `feed`/`kill` pick the regime; `flow` scales
         // the diffusion; `inject` is a beat/onset level whose rising edge stamps
         // a seed (edge detected in `update`). `hue`/`contour`/`hatch`/`glow`
@@ -911,19 +896,12 @@ impl Scene for ReactionDiffusionScene {
             "kill" => self.kill = value,
             "flow" => self.flow = value,
             "inject" => self.inject = value,
-            "hue" => self.hue = value,
             "contour" => self.contour = value,
             "hatch" => self.hatch = value,
             "glow" => self.glow = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             _ => {}
         }
     }
@@ -965,19 +943,14 @@ impl Scene for ReactionDiffusionScene {
             feed,
             kill,
             flow,
-            hue,
             contour,
             hatch,
             glow,
             color_span,
             color_center,
-            saturation,
-            palette_mix,
-            palette_steps,
-            palette_contour,
+            colour,
             zoom,
-            pan_x,
-            pan_y,
+            pan,
             occlude,
             ..
         } = self;
@@ -993,12 +966,12 @@ impl Scene for ReactionDiffusionScene {
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentParams {
-                a: [*hue, *contour, *hatch, *glow],
-                b: [*color_span, *color_center, *saturation, *palette_mix],
-                c: [*zoom, *pan_x, *pan_y, *occlude],
+                a: [colour.hue, *contour, *hatch, *glow],
+                b: [*color_span, *color_center, colour.saturation, colour.mix],
+                c: [*zoom, pan.x, pan.y, *occlude],
                 d: [
-                    palette::band_steps(*palette_steps),
-                    palette::band_contour(*palette_contour),
+                    palette::band_steps(colour.steps),
+                    palette::band_contour(colour.contour),
                     0.0,
                     0.0,
                 ],

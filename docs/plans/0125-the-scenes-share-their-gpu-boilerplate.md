@@ -222,8 +222,8 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | 8d2d590 |
-| 2 — `palette::LutPair` | dev | committed with this row | |
-| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | not started | |
+| 2 — `palette::LutPair` | dev | done | 672cd85 |
+| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | committed with this row | |
 | 4 — `gpu::FullscreenScene` | dev | not started | |
 | 5 — `marks::InstancedQuads` | dev | not started | |
 
@@ -269,6 +269,44 @@ ignore it. The suite is 860 tests where Phase 1 ran 859.
 
 `reaction_diffusion::present_bind_group` lost its `#[allow(clippy::too_many_arguments)]` — three
 LUT arguments collapsed into one.
+
+**Phase 3. A file outside *Files touched* had to change: `core/tests/preset.rs`.**
+`declared_params_match_set_param` reads each scene's `set_param` **match arms out of the source
+text** and asserts they equal its `PARAMS`. Delegation makes the eight shared names invisible to
+that scan, so the phase cannot land without it — the guard failed on the first full run. That test
+already carries the precedent: the `fb_*` seven are filtered out of it for exactly this reason
+(both sinks delegate to `feedback::Transform::set_param`) and the coverage is replaced
+programmatically in `feedback.rs`. The same shape was used here — the eight names are filtered,
+the guard now additionally asserts that **a file declaring one of them carries the delegation**,
+and `common.rs` adds `each_block_answers_exactly_its_roster` and
+`every_system_that_declares_a_shared_name_uses_the_shared_spelling`.
+
+**No number moved, and the plan's budget of three was untouched.** The plan expected clamp
+disagreements between scenes. There are none on these names: every scene's `set_param` stores the
+value raw, and the read sites pass it through unchanged — the range decisions live downstream, in
+the shaders, in `marks`, and in the one `finite(self.brightness, ...)` in the emitter's read.
+
+**Only four of the eight names have a universal resting value.** `saturation` (1.0),
+`palette_mix` (0.0) and `pan_x`/`pan_y` (0.0) are the ones `common` now owns outright.
+`DEFAULT_HUE` takes **five** distinct values across the twelve (0.0, and 0.3 / 0.5 / 0.55 / 0.6 on
+the four line families) and the swarm rests at `brightness = 0.8` against 1.0 everywhere else, so
+`PaletteParams::new(hue_rest, brightness_rest)` takes those two from the scene and `reset` returns
+to them. `common::DEFAULT_BRIGHTNESS` is the 1.0 that eleven of the twelve pass.
+
+**The block is wider than three scenes' rosters.** `set` answers all six palette names, so
+`shape_collage` (which declares only `saturation` and `palette_mix`), `shape_field` (no `hue` or
+`brightness`) and `fragment_field` (no `brightness`) now store names their `PARAMS` does not
+declare. Nothing reads them, `is_known_param` is untouched, and `shot --presets presets --report`
+prints zero unknown-param warnings before and after — but it is a widening of what `set_param`
+accepts, and it is the plan's "delegates first" instruction taken literally.
+
+**The field is `colour`, not `palette`**: `reaction_diffusion`, `warp_mesh`, the attractor and the
+four line scenes already carry a `palette: Palette`. `PanParams` is a second type rather than two
+more fields on `PaletteParams` because `warp_mesh` has no `pan_*` at all.
+
+The rosters `PALETTE_PARAMS` / `PAN_PARAMS` in `common.rs` are `#[cfg(test)]`: `set` keeps its
+`match` (it runs once per bound param per frame), so the roster is a second statement of the
+vocabulary that the test holds the match to — the shape `feedback::PARAMS` uses.
 
 **A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
 `no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning

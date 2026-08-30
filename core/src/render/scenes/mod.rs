@@ -15,6 +15,7 @@
     clippy::unreachable
 )]
 
+pub(crate) mod common;
 pub mod emitter;
 pub mod fragment_field;
 pub mod lines;

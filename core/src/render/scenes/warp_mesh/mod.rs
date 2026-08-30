@@ -65,6 +65,7 @@ use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
+use super::common;
 use super::{Phase, Scene, lines};
 
 /// The smallest grid a `[mesh]` table may name, in cells. Below two the mesh is
@@ -316,8 +317,6 @@ const DARKEN_CENTER_STRENGTH: f32 = 0.22;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_COLOR_SPAN: f32 = 1.0;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
@@ -1078,14 +1077,10 @@ pub struct WarpMeshScene {
     echo_alpha: f32,
     echo_zoom: f32,
     echo_orient: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `pan_*`.
+    colour: common::PaletteParams,
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    palette_steps: f32,
-    palette_contour: f32,
-    brightness: f32,
     occlude: f32,
     /// The active baked palette. Held here rather than only in the resources'
     /// [`palette::LutPair`] because the resources are rebuilt on a resize and
@@ -1194,14 +1189,9 @@ impl WarpMeshScene {
             echo_alpha: DEFAULT_ECHO_ALPHA,
             echo_zoom: DEFAULT_ECHO_ZOOM,
             echo_orient: DEFAULT_ECHO_ORIENT,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
-            brightness: DEFAULT_BRIGHTNESS,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
             milk: None,
@@ -1773,17 +1763,17 @@ impl Scene for WarpMeshScene {
         self.echo_alpha = DEFAULT_ECHO_ALPHA;
         self.echo_zoom = DEFAULT_ECHO_ZOOM;
         self.echo_orient = DEFAULT_ECHO_ORIENT;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
-        self.brightness = DEFAULT_BRIGHTNESS;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) {
+            return;
+        }
         // The nine per-vertex outputs, as whole-mesh scalars — the fallback a
         // `[per_vertex]` binding of the same name overrides.
         if let Some(index) = PER_VERTEX_PARAMS.iter().position(|n| *n == name) {
@@ -1814,14 +1804,8 @@ impl Scene for WarpMeshScene {
             "echo_alpha" => self.echo_alpha = value,
             "echo_zoom" => self.echo_zoom = value,
             "echo_orient" => self.echo_orient = value,
-            "hue" => self.hue = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
-            "brightness" => self.brightness = value,
             _ => {}
         }
     }
@@ -2039,14 +2023,14 @@ impl Scene for WarpMeshScene {
                 ],
                 c: [
                     self.deposit_phase.get(),
-                    self.hue + self.color_center,
+                    self.colour.hue + self.color_center,
                     self.color_span,
-                    self.saturation,
+                    self.colour.saturation,
                 ],
                 d: [
-                    self.palette_mix,
-                    palette::band_steps(self.palette_steps),
-                    palette::band_contour(self.palette_contour),
+                    self.colour.mix,
+                    palette::band_steps(self.colour.steps),
+                    palette::band_contour(self.colour.contour),
                     0.0,
                 ],
             }),
@@ -2055,7 +2039,7 @@ impl Scene for WarpMeshScene {
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentUniform {
-                a: [self.brightness, self.occlude, self.gamma, 0.0],
+                a: [self.colour.brightness, self.occlude, self.gamma, 0.0],
                 b: [
                     f32::from(self.brighten >= 0.5),
                     f32::from(self.darken >= 0.5),
@@ -2100,7 +2084,7 @@ impl Scene for WarpMeshScene {
                     size,
                     aspect,
                     self.decay,
-                    self.brightness,
+                    self.colour.brightness,
                     self.occlude,
                     self.quantize_steps,
                 )),

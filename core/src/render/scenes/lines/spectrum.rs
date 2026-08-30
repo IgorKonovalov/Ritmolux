@@ -68,6 +68,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::super::Scene;
+use super::super::common;
 use super::renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, replicate_mirror,
@@ -86,8 +87,6 @@ pub const MAX_ELEMENTS: usize = crate::dsp::SPECTRUM_BINS;
 const DEFAULT_THICKNESS: f32 = 6.0;
 const DEFAULT_HUE: f32 = 0.55;
 const DEFAULT_HUE_SPREAD: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 /// The line renderer's **per-segment falloff** multiplier (Plan 0038 Phase 1) —
 /// not a post-process bloom. `1.0` is the value this scene passed as a literal
@@ -142,7 +141,6 @@ const CURVE_MAX: f32 = 4.0;
 const DEFAULT_ROTATION: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // Geometry mirror (Plan 0018 Phase 4): identity by default.
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
@@ -475,16 +473,11 @@ pub struct SpectrumScene {
     /// The preset's baked colour LUT (ADR-0021), sampled on the CPU per element.
     palette: Palette,
     thickness: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     hue_spread: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
-    brightness: f32,
     glow: f32,
     softness: f32,
     /// Whether this figure draws through the **opacity-preserving** seam
@@ -504,8 +497,6 @@ pub struct SpectrumScene {
     baseline: f32,
     rotation: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     mirror_order: f32,
     mirror_reflect: f32,
 }
@@ -535,13 +526,9 @@ impl SpectrumScene {
             // is the engine cosine, so an unconfigured scene still colours.
             palette: Palette::default_spectrum(),
             thickness: DEFAULT_THICKNESS,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             hue_spread: DEFAULT_HUE_SPREAD,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
-            brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             softness: super::DEFAULT_SOFTNESS,
             stroke_blend: super::ADDITIVE_BLEND,
@@ -553,8 +540,6 @@ impl SpectrumScene {
             baseline: DEFAULT_BASELINE,
             rotation: DEFAULT_ROTATION,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
         }
@@ -609,13 +594,9 @@ impl Scene for SpectrumScene {
 
     fn reset_params(&mut self) {
         self.thickness = DEFAULT_THICKNESS;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.hue_spread = DEFAULT_HUE_SPREAD;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
-        self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.softness = super::DEFAULT_SOFTNESS;
         self.stroke_blend = super::ADDITIVE_BLEND;
@@ -627,8 +608,6 @@ impl Scene for SpectrumScene {
         self.baseline = DEFAULT_BASELINE;
         self.rotation = DEFAULT_ROTATION;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
         // A per-element series lives exactly one frame, like every scalar above:
@@ -638,6 +617,11 @@ impl Scene for SpectrumScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "base" => self.base = value,
             "scale" => self.scale = value,
@@ -647,19 +631,11 @@ impl Scene for SpectrumScene {
             "baseline" => self.baseline = value,
             "rotation" => self.rotation = value,
             "thickness" => self.thickness = value,
-            "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
-            "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "softness" => self.softness = value,
             "stroke_blend" => self.stroke_blend = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "mirror_order" => self.mirror_order = value,
             "mirror_reflect" => self.mirror_reflect = value,
             _ => {}
@@ -768,19 +744,19 @@ impl Scene for SpectrumScene {
             let base = self.series_value(SERIES_BASE, i, self.base);
             let scale = self.series_value(SERIES_SCALE, i, self.scale);
             let thickness = self.series_value(SERIES_THICKNESS, i, self.thickness);
-            let brightness = self.series_value(SERIES_BRIGHTNESS, i, self.brightness);
+            let brightness = self.series_value(SERIES_BRIGHTNESS, i, self.colour.brightness);
             // `hue_spread` walks the palette along the axis on top of whatever
             // `hue` is — at the default spread of 0 the figure is one hue, at 1
             // it spans the palette from the lowest element to the highest.
-            let hue =
-                self.series_value(SERIES_HUE, i, self.hue) + self.hue_spread * (i as f32 / span);
+            let hue = self.series_value(SERIES_HUE, i, self.colour.hue)
+                + self.hue_spread * (i as f32 / span);
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
             // returns it untouched, so an unbound preset is byte-unchanged.
-            let banded = palette::band_coord(hue, self.palette_steps);
+            let banded = palette::band_coord(hue, self.colour.steps);
             let rgb = desaturate(
-                self.palette.sample(banded, self.palette_mix),
-                self.saturation,
+                self.palette.sample(banded, self.colour.mix),
+                self.colour.saturation,
             );
 
             if let Some(slot) = self.lengths.get_mut(i) {
@@ -844,7 +820,7 @@ impl Scene for SpectrumScene {
     ) {
         let xform = ViewTransform {
             zoom: self.zoom,
-            pan: [self.pan_x, self.pan_y],
+            pan: [self.pan.x, self.pan.y],
             _pad: 0.0,
         };
         let mut renderer = self.renderer.borrow_mut();

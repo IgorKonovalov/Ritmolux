@@ -60,6 +60,7 @@
     clippy::unreachable
 )]
 
+use super::common;
 use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
@@ -193,11 +194,8 @@ const MAX_PREWARM: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
 const DEFAULT_HUE_CENTER: f32 = 0.5;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // The shared mark silhouette (ADR-0084). `disc` is this scene's glint, exactly
 // as it was, so an unbound emitter is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
@@ -863,22 +861,15 @@ pub struct EmitterScene {
     size_spread: f32,
     spin: f32,
     twinkle: f32,
-    brightness: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     /// The active baked palette (ADR-0021), sampled per object on the CPU.
     palette: Palette,
-    hue: f32,
     hue_spread: f32,
     hue_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
     /// are quantized on the way to the uniform, not here, so a `[smoothing]`-eased
     /// binding still eases — it just steps at the midpoints
@@ -1046,18 +1037,12 @@ impl EmitterScene {
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
             twinkle: DEFAULT_TWINKLE,
-            brightness: DEFAULT_BRIGHTNESS,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             palette: Palette::default_spectrum(),
-            hue: DEFAULT_HUE,
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
             star_valley: DEFAULT_STAR_VALLEY,
@@ -1127,17 +1112,11 @@ impl Scene for EmitterScene {
         self.size_spread = DEFAULT_SIZE_SPREAD;
         self.spin = DEFAULT_SPIN;
         self.twinkle = DEFAULT_TWINKLE;
-        self.brightness = DEFAULT_BRIGHTNESS;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
         self.star_valley = DEFAULT_STAR_VALLEY;
@@ -1146,6 +1125,11 @@ impl Scene for EmitterScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "spawn_rate" => self.spawn_rate = value,
             "gravity" => self.gravity = value,
@@ -1162,17 +1146,9 @@ impl Scene for EmitterScene {
             "size_spread" => self.size_spread = value,
             "spin" => self.spin = value,
             "twinkle" => self.twinkle = value,
-            "brightness" => self.brightness = value,
-            "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
             "star_valley" => self.star_valley = value,
@@ -1188,7 +1164,7 @@ impl Scene for EmitterScene {
         self.field.step(time, &cfg);
 
         let size = finite(self.size, DEFAULT_SIZE) * BASE_SIZE;
-        let brightness = finite(self.brightness, DEFAULT_BRIGHTNESS);
+        let brightness = finite(self.colour.brightness, DEFAULT_BRIGHTNESS);
         // The three appearance distributions, hoisted: read once, used for every
         // live object. Unlike `spread` and `lifetime_spread` these are resolved
         // at *draw* rather than at spawn, because they describe how an object
@@ -1222,17 +1198,17 @@ impl Scene for EmitterScene {
                 self.hue_center,
                 self.hue_spread,
                 unit(object.seed, channel::HUE),
-                self.hue,
+                self.colour.hue,
             );
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
             // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
                 self.palette.sample(
-                    palette::band_coord(coord, self.palette_steps),
-                    self.palette_mix,
+                    palette::band_coord(coord, self.colour.steps),
+                    self.colour.mix,
                 ),
-                self.saturation,
+                self.colour.saturation,
             );
             let bright = brightness
                 * envelope(u)
@@ -1264,7 +1240,7 @@ impl Scene for EmitterScene {
             &self.uniforms,
             0,
             bytemuck::bytes_of(&Misc {
-                v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+                v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
                 // Quantized here, on the way into the uniform, so the shader's
                 // precondition stays visible on the CPU side: no fractional
                 // point count ever reaches an angular fold (ADR-0084).

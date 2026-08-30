@@ -79,6 +79,7 @@
 use crate::render::gpu;
 
 use super::Scene;
+use super::common;
 use super::marks;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
@@ -96,9 +97,6 @@ const MIN_SCALE: f32 = 0.01;
 /// screen is one interior band — reachable, but it is the end of the useful
 /// range rather than an arbitrary cap.
 const MAX_SCALE: f32 = 20.0;
-
-/// Shared view transform (ADR-0018): `pan_*` moves the figure's centre.
-const DEFAULT_PAN: f32 = 0.0;
 
 /// `rotation` default — **0, and an exact arithmetic identity**: the shader
 /// tests for it and skips the rotation entirely, so every shipped preset and
@@ -142,9 +140,6 @@ const MAX_COORD_MODE: f32 = COORD_MODES.len() as f32 - 1.0;
 /// the exterior contours have somewhere to go.
 const DEFAULT_COLOR_SPAN: f32 = 0.6;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-/// `palette_mix` default — 0 = palette A only.
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 
 const SHADER: &str = r#"
 struct Params {
@@ -393,14 +388,13 @@ pub struct ShapeFieldScene {
     star_curve: f32,
     star_jitter: f32,
     scale: f32,
-    pan_x: f32,
-    pan_y: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `hue` or
+    /// `brightness`.
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    palette_steps: f32,
-    palette_contour: f32,
     /// The response exponent on the distance, raw as the preset bound it;
     /// [`applied_gamma`] conditions it on the way to the uniform.
     gamma: f32,
@@ -497,14 +491,10 @@ impl ShapeFieldScene {
             star_curve: marks::DEFAULT_STAR_CURVE,
             star_jitter: marks::DEFAULT_STAR_JITTER,
             scale: DEFAULT_SCALE,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
+            colour: common::PaletteParams::new(0.0, common::DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             gamma: DEFAULT_GAMMA,
             coord_mode: DEFAULT_COORD_MODE,
             rotation: DEFAULT_ROTATION,
@@ -651,20 +641,21 @@ impl Scene for ShapeFieldScene {
         self.star_curve = marks::DEFAULT_STAR_CURVE;
         self.star_jitter = marks::DEFAULT_STAR_JITTER;
         self.scale = DEFAULT_SCALE;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
+        self.colour.reset();
+        self.pan.reset();
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.gamma = DEFAULT_GAMMA;
         self.coord_mode = DEFAULT_COORD_MODE;
         self.rotation = DEFAULT_ROTATION;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "shape" => self.shape = value,
             "points" => self.points = value,
@@ -672,14 +663,8 @@ impl Scene for ShapeFieldScene {
             "star_curve" => self.star_curve = value,
             "star_jitter" => self.star_jitter = value,
             "scale" => self.scale = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "gamma" => self.gamma = value,
             "coord_mode" => self.coord_mode = value,
             "rotation" => self.rotation = value,
@@ -714,12 +699,12 @@ impl Scene for ShapeFieldScene {
                 marks::mark_points(self.points),
                 applied_scale(self.scale),
             ],
-            b: [self.pan_x, self.pan_y, self.color_span, self.color_center],
+            b: [self.pan.x, self.pan.y, self.color_span, self.color_center],
             c: [
-                self.saturation,
-                self.palette_mix,
-                palette::band_steps(self.palette_steps),
-                palette::band_contour(self.palette_contour),
+                self.colour.saturation,
+                self.colour.mix,
+                palette::band_steps(self.colour.steps),
+                palette::band_contour(self.colour.contour),
             ],
             d: [
                 self.occlude,

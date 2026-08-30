@@ -132,6 +132,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 use super::super::Scene;
+use super::super::common;
 use super::biarc::{self, Piece};
 use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
 use super::{
@@ -139,7 +140,7 @@ use super::{
     replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::{self, Palette};
+use crate::render::palette::Palette;
 
 /// How far (degrees of contact angle) `variant` reaches either side of the
 /// preset's base angle — a pointier star at `0`, a blunter one at `2`. This is
@@ -162,11 +163,11 @@ const STEP_DEG: f32 = 0.1;
 const DEFAULT_VARIANT: f32 = 1.0;
 const DEFAULT_ROTATION: f32 = 0.0;
 const DEFAULT_HUE: f32 = 0.5;
-/// Colour surface (ADR-0021 / ADR-0059), all three at the value that reproduces
-/// the single flat `hue` this scene drew before the palette reached it.
+/// Colour surface (ADR-0021 / ADR-0059), at the value that reproduces the single
+/// flat `hue` this scene drew before the palette reached it: no ramp along the
+/// ring axis. The palette-A-alone and unmodified-saturation halves of that rest
+/// in `scenes::common`, which every system shares them with.
 const DEFAULT_HUE_SPREAD: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_DRAW_PROGRESS: f32 = 1.0;
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_SCALE: f32 = 1.0;
@@ -177,7 +178,6 @@ const DEFAULT_BRIGHTNESS: f32 = 1.0;
 const DEFAULT_GLOW: f32 = 1.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // Geometry mirror (Phase 4): identity by default.
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
@@ -269,19 +269,14 @@ pub struct StarPatternScene {
     palette: Palette,
     variant: f32,
     rotation: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     hue_spread: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     draw_progress: f32,
     thickness: f32,
     scale: f32,
-    brightness: f32,
     glow: f32,
     softness: f32,
     /// Whether this figure draws through the **opacity-preserving** seam
@@ -294,8 +289,6 @@ pub struct StarPatternScene {
     /// preset that does not bind this draws exactly what it drew.
     stroke_blend: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     mirror_order: f32,
     mirror_reflect: f32,
     ring_phase: f32,
@@ -337,22 +330,16 @@ impl StarPatternScene {
             palette: Palette::default_spectrum(),
             variant: DEFAULT_VARIANT,
             rotation: DEFAULT_ROTATION,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             hue_spread: DEFAULT_HUE_SPREAD,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             thickness: DEFAULT_THICKNESS,
             scale: DEFAULT_SCALE,
-            brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             softness: super::DEFAULT_SOFTNESS,
             stroke_blend: super::ADDITIVE_BLEND,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
             ring_phase: DEFAULT_RING_PHASE,
@@ -1599,22 +1586,16 @@ impl Scene for StarPatternScene {
     fn reset_params(&mut self) {
         self.variant = DEFAULT_VARIANT;
         self.rotation = DEFAULT_ROTATION;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.hue_spread = DEFAULT_HUE_SPREAD;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.thickness = DEFAULT_THICKNESS;
         self.scale = DEFAULT_SCALE;
-        self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.softness = super::DEFAULT_SOFTNESS;
         self.stroke_blend = super::ADDITIVE_BLEND;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
         self.ring_phase = DEFAULT_RING_PHASE;
@@ -1623,25 +1604,22 @@ impl Scene for StarPatternScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "variant" => self.variant = value,
             "rotation" => self.rotation = value,
-            "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "draw_progress" => self.draw_progress = value,
             "thickness" => self.thickness = value,
             "scale" => self.scale = value,
-            "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "softness" => self.softness = value,
             "stroke_blend" => self.stroke_blend = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "mirror_order" => self.mirror_order = value,
             "mirror_reflect" => self.mirror_reflect = value,
             "ring_phase" => self.ring_phase = value,
@@ -1747,12 +1725,12 @@ impl Scene for StarPatternScene {
         // buffer sized at build time. The radii are build-time values because a
         // rotate plus a uniform scale leaves a normalized radius unchanged.
         let ramp = ColorRamp {
-            hue: self.hue,
+            hue: self.colour.hue,
             hue_spread: self.hue_spread,
-            palette_mix: self.palette_mix,
-            palette_steps: self.palette_steps,
-            saturation: self.saturation,
-            brightness: self.brightness,
+            palette_mix: self.colour.mix,
+            palette_steps: self.colour.steps,
+            saturation: self.colour.saturation,
+            brightness: self.colour.brightness,
         };
         for (slot, &u) in self.colors.iter_mut().zip(base_radii) {
             *slot = ramp.at(&self.palette, u);
@@ -1843,7 +1821,7 @@ impl Scene for StarPatternScene {
     ) {
         let xform = ViewTransform {
             zoom: self.zoom,
-            pan: [self.pan_x, self.pan_y],
+            pan: [self.pan.x, self.pan.y],
             _pad: 0.0,
         };
         let mut renderer = self.renderer.borrow_mut();

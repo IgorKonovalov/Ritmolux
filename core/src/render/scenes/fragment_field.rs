@@ -27,6 +27,7 @@
 
 use crate::render::gpu;
 
+use super::common;
 use super::{Phase, Scene};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
@@ -37,19 +38,11 @@ const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_GLOW: f32 = 0.7;
 const DEFAULT_FLASH: f32 = 0.0;
-// Shared view transform (ADR-0018): `pan_*` offset the sampled field window. The
-// field's existing `zoom` already scales the sample coordinates (its view-zoom in
-// field space), so Phase 2 completes the ViewTransform here by adding pan.
-const DEFAULT_PAN: f32 = 0.0;
 // Shared palette color knobs (ADR-0021). `color_span` = 0.6 + `color_center` = 0
 // + `saturation` = 1 reproduce the prior look exactly (the old `field*0.6` sample
 // with no desaturation).
 const DEFAULT_COLOR_SPAN: f32 = 0.6;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-/// `palette_mix` default — 0 = palette A only (a no-op unless a preset declares
-/// `[palette_b]` and binds `palette_mix`).
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// The two rate parameters (ADR-0132), in units of the scene's own default
 /// speed. `1.0` is what this scene has always animated at, so a preset that
 /// binds neither renders exactly as before.
@@ -271,22 +264,16 @@ pub struct FragmentFieldScene {
     field_speed: f32,
     fold_speed: f32,
     warp: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `brightness`.
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018): `pan_*` offset the sampled field
+    /// window, on top of `zoom`.
+    pan: common::PanParams,
     zoom: f32,
     glow: f32,
     flash: f32,
-    pan_x: f32,
-    pan_y: f32,
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — **not** a named param,
@@ -363,18 +350,13 @@ impl FragmentFieldScene {
             field_speed: DEFAULT_FIELD_SPEED,
             fold_speed: DEFAULT_FOLD_SPEED,
             warp: DEFAULT_WARP,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             zoom: DEFAULT_ZOOM,
             glow: DEFAULT_GLOW,
             flash: DEFAULT_FLASH,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -441,37 +423,30 @@ impl Scene for FragmentFieldScene {
         self.field_speed = DEFAULT_FIELD_SPEED;
         self.fold_speed = DEFAULT_FOLD_SPEED;
         self.warp = DEFAULT_WARP;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.zoom = DEFAULT_ZOOM;
         self.glow = DEFAULT_GLOW;
         self.flash = DEFAULT_FLASH;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "warp" => self.warp = value,
             "field_speed" => self.field_speed = value,
             "fold_speed" => self.fold_speed = value,
-            "hue" => self.hue = value,
             "zoom" => self.zoom = value,
             "glow" => self.glow = value,
             "flash" => self.flash = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             _ => {}
         }
     }
@@ -497,14 +472,19 @@ impl Scene for FragmentFieldScene {
         self.luts.flush(queue);
 
         let params = Params {
-            a: [self.time, aspect.max(0.1), self.warp, self.hue],
+            a: [self.time, aspect.max(0.1), self.warp, self.colour.hue],
             b: [self.zoom, self.glow, self.flash, self.color_span],
-            c: [self.pan_x, self.pan_y, self.color_center, self.saturation],
+            c: [
+                self.pan.x,
+                self.pan.y,
+                self.color_center,
+                self.colour.saturation,
+            ],
             d: [
-                self.palette_mix,
+                self.colour.mix,
                 self.occlude,
-                palette::band_steps(self.palette_steps),
-                palette::band_contour(self.palette_contour),
+                palette::band_steps(self.colour.steps),
+                palette::band_contour(self.colour.contour),
             ],
             e: [self.fold_phase.get(), self.field_phase.get(), 0.0, 0.0],
         };
