@@ -31,7 +31,7 @@ pub enum SenderAdapter {
     },
 }
 
-/// Which adapter the renderer should ask for.
+/// Which adapter the **`--stream`** renderer should ask for.
 ///
 /// `None` resolves to [`AdapterChoice::HighPerformance`] rather than the wgpu
 /// default: a live source that renders on the power-saving GPU reports that
@@ -39,10 +39,33 @@ pub enum SenderAdapter {
 pub fn renderer_choice(wanted: Option<&str>) -> AdapterChoice {
     match wanted {
         None => AdapterChoice::HighPerformance,
-        Some(raw) => match raw.parse::<usize>() {
-            Ok(index) => AdapterChoice::Index(index),
-            Err(_) => AdapterChoice::Named(raw.to_owned()),
-        },
+        Some(raw) => named_or_index(raw),
+    }
+}
+
+/// Which adapter the **window** should ask for.
+///
+/// An explicit choice is spelled exactly as [`renderer_choice`] spells it, and
+/// `None` is deliberately different: the window asks for
+/// [`AdapterChoice::Default`], which is what it asked for before `--gpu` could
+/// reach it. The flag is an operator's lever, and moving what an *unflagged*
+/// window selects would re-base every windowed frame-time figure this project
+/// has published, inside a change that only added a flag (ADR-0155).
+///
+/// **The two `None` arms must not converge** —
+/// `the_window_and_the_stream_disagree_when_unflagged` is what holds them apart.
+pub fn window_choice(wanted: Option<&str>) -> AdapterChoice {
+    match wanted {
+        None => AdapterChoice::Default,
+        Some(raw) => named_or_index(raw),
+    }
+}
+
+/// A bare integer is a roster position; anything else is a name to match.
+fn named_or_index(raw: &str) -> AdapterChoice {
+    match raw.parse::<usize>() {
+        Ok(index) => AdapterChoice::Index(index),
+        Err(_) => AdapterChoice::Named(raw.to_owned()),
     }
 }
 
@@ -186,6 +209,32 @@ mod tests {
             renderer_choice(Some("RTX 3080")),
             AdapterChoice::Named("RTX 3080".to_owned())
         );
+    }
+
+    /// **The window's unflagged default is not the stream's.** A live source
+    /// wants the fast GPU; the window keeps asking for exactly what it asked
+    /// for before `--gpu` reached it, because every published windowed
+    /// frame-time figure was measured against that request. Reusing
+    /// `renderer_choice` for the window would move all of them silently, which
+    /// is the one thing this plan does not do.
+    #[test]
+    fn the_window_and_the_stream_disagree_when_unflagged() {
+        assert_eq!(window_choice(None), AdapterChoice::Default);
+        assert_eq!(renderer_choice(None), AdapterChoice::HighPerformance);
+        assert_ne!(window_choice(None), renderer_choice(None));
+    }
+
+    /// An explicit choice means the same thing on both paths — the operator
+    /// types one string and it is read the same way whichever mode reads it.
+    #[test]
+    fn an_explicit_choice_is_spelled_the_same_on_both_paths() {
+        for raw in ["1", "0", "RTX 3080", "radeon"] {
+            assert_eq!(
+                window_choice(Some(raw)),
+                renderer_choice(Some(raw)),
+                "`{raw}` is read differently by the window and the stream"
+            );
+        }
     }
 
     #[test]

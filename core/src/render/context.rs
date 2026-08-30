@@ -59,6 +59,21 @@ pub enum RenderError {
         /// The adapters the request matched.
         matched: Vec<String>,
     },
+    /// A named or indexed adapter exists on this machine but cannot present to
+    /// the window that asked for it.
+    ///
+    /// Only reachable on the surface path and only for the enumerated variants:
+    /// the preference variants hand the surface to wgpu as `compatible_surface`
+    /// and so cannot select an adapter that fails this, while `Named`/`Index`
+    /// pick out of the unfiltered roster. Refusing is the point — falling back
+    /// to a working adapter would render on a GPU the operator did not ask for
+    /// and say nothing, which is the failure `--gpu` exists to end (ADR-0155).
+    AdapterCannotPresent {
+        /// What the caller asked for, as they wrote it.
+        requested: String,
+        /// The adapter that request resolved to, described.
+        adapter: String,
+    },
     /// The consumer of a **streamed** capture refused a frame — the offline
     /// render mode's pipe closed, the encoder died, the file could not be
     /// written (Plan 0101 / ADR-0114). The string is the consumer's own message,
@@ -99,6 +114,11 @@ impl std::fmt::Display for RenderError {
                 matched.len(),
                 matched.join("; ")
             ),
+            RenderError::AdapterCannotPresent { requested, adapter } => write!(
+                f,
+                "'{requested}' resolves to {adapter}, which cannot draw into this window; \
+                 pick an adapter that can drive the display this window is on"
+            ),
             RenderError::Sink(msg) => write!(f, "{msg}"),
         }
     }
@@ -137,11 +157,16 @@ fn describe_adapter(info: &wgpu::AdapterInfo) -> String {
 /// **The variants are not interchangeable views of one preference.** The first
 /// three ask wgpu to choose and accept whatever it returns; the last two name
 /// one adapter out of the enumerated roster and fail if it is not there.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum AdapterChoice {
     /// Whatever wgpu picks with default options. On a hybrid machine this is
     /// the power-saving GPU for a console process, which is why a live path
     /// wants `HighPerformance` instead.
+    ///
+    /// The `Default` **impl** resolves here, which is what keeps every caller
+    /// that does not care — the C ABI window path included — asking for exactly
+    /// what it asked for before the choice existed.
+    #[default]
     Default,
     /// Force a fallback (software) adapter - WARP on DX12 - so captures
     /// rasterize identically across machines. What the golden suite asks for.
@@ -206,32 +231,59 @@ fn describe_roster(instance: &wgpu::Instance) -> Vec<AdapterDescription> {
 }
 
 /// Resolve a choice to one adapter, or say why it could not be.
+///
+/// `surface`, when present, is the window this adapter has to be able to draw
+/// into, and it constrains the two kinds of variant differently. The preference
+/// variants pass it to wgpu as `compatible_surface`, so wgpu picks only from
+/// adapters that can present to it. The enumerated variants — `Named` and
+/// `Index` — name one adapter out of the whole roster, which wgpu has not
+/// filtered, so the surface check is ours to make: an operator can name the one
+/// adapter that cannot drive their window, and the honest answer is a refusal
+/// that says so rather than a silent fall-back to a different GPU (ADR-0155).
 fn resolve_adapter(
     instance: &wgpu::Instance,
     choice: &AdapterChoice,
+    surface: Option<&wgpu::Surface<'static>>,
 ) -> Result<wgpu::Adapter, RenderError> {
     let by_preference = |options: wgpu::RequestAdapterOptions<'_, '_>| {
         pollster::block_on(instance.request_adapter(&options)).map_err(RenderError::RequestAdapter)
     };
+    // Every enumerated pick goes through here, so the surface constraint cannot
+    // be honoured on one variant and forgotten on the other.
+    let presenting = |adapter: wgpu::Adapter, requested: &str| match surface {
+        Some(surface) if !adapter.is_surface_supported(surface) => {
+            Err(RenderError::AdapterCannotPresent {
+                requested: requested.to_owned(),
+                adapter: describe_adapter(&adapter.get_info()),
+            })
+        }
+        _ => Ok(adapter),
+    };
     match choice {
-        AdapterChoice::Default => by_preference(wgpu::RequestAdapterOptions::default()),
+        AdapterChoice::Default => by_preference(wgpu::RequestAdapterOptions {
+            compatible_surface: surface,
+            ..Default::default()
+        }),
         AdapterChoice::Software => by_preference(wgpu::RequestAdapterOptions {
             force_fallback_adapter: true,
+            compatible_surface: surface,
             ..Default::default()
         }),
         AdapterChoice::HighPerformance => by_preference(wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: surface,
             ..Default::default()
         }),
         AdapterChoice::Index(wanted) => {
             let roster = describe_roster(instance);
-            pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+            let picked = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
                 .into_iter()
                 .nth(*wanted)
                 .ok_or_else(|| RenderError::NoSuchAdapter {
                     requested: format!("index {wanted}"),
                     available: roster.into_iter().map(|entry| entry.detail).collect(),
-                })
+                })?;
+            presenting(picked, &format!("index {wanted}"))
         }
         AdapterChoice::Named(wanted) => {
             let needle = wanted.to_lowercase();
@@ -247,13 +299,20 @@ fn resolve_adapter(
                     requested: wanted.clone(),
                     available: roster.into_iter().map(|entry| entry.detail).collect(),
                 }),
-                [only] => pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
-                    .into_iter()
-                    .nth(*only)
-                    .ok_or_else(|| RenderError::NoSuchAdapter {
-                        requested: wanted.clone(),
-                        available: roster.iter().map(|entry| entry.detail.clone()).collect(),
-                    }),
+                [only] => {
+                    let picked =
+                        pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+                            .into_iter()
+                            .nth(*only)
+                            .ok_or_else(|| RenderError::NoSuchAdapter {
+                                requested: wanted.clone(),
+                                available: roster
+                                    .iter()
+                                    .map(|entry| entry.detail.clone())
+                                    .collect(),
+                            })?;
+                    presenting(picked, wanted)
+                }
                 several => Err(RenderError::AmbiguousAdapter {
                     requested: wanted.clone(),
                     matched: several
@@ -314,12 +373,13 @@ impl RenderContext {
         target: impl Into<SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        adapter: &AdapterChoice,
     ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = instance
             .create_surface(target)
             .map_err(RenderError::CreateSurface)?;
-        Self::from_surface(&instance, surface, width, height)
+        Self::from_surface(&instance, surface, width, height, adapter)
     }
 
     /// Context from raw display/window handles — the C ABI path, where the
@@ -331,11 +391,12 @@ impl RenderContext {
         target: wgpu::SurfaceTargetUnsafe,
         width: u32,
         height: u32,
+        adapter: &AdapterChoice,
     ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = unsafe { instance.create_surface_unsafe(target) }
             .map_err(RenderError::CreateSurface)?;
-        Self::from_surface(&instance, surface, width, height)
+        Self::from_surface(&instance, surface, width, height, adapter)
     }
 
     fn from_surface(
@@ -343,12 +404,9 @@ impl RenderContext {
         surface: wgpu::Surface<'static>,
         width: u32,
         height: u32,
+        choice: &AdapterChoice,
     ) -> Result<Self, RenderError> {
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            compatible_surface: Some(&surface),
-            ..Default::default()
-        }))
-        .map_err(RenderError::RequestAdapter)?;
+        let adapter = resolve_adapter(instance, choice, Some(&surface))?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("lmv-device"),
             ..Default::default()
@@ -422,7 +480,9 @@ impl RenderContext {
         choice: &AdapterChoice,
     ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-        let adapter = resolve_adapter(&instance, choice)?;
+        // No surface: a headless context presents to nothing, so every adapter
+        // on the machine is a candidate and there is no compatibility to check.
+        let adapter = resolve_adapter(&instance, choice, None)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("lmv-headless-device"),
             ..Default::default()

@@ -1075,18 +1075,32 @@ pub struct HeadlessOptions {
 /// family: a renderer's *construction* choices (quality, later backend or format
 /// preferences) are decided once and never per frame, and threading them as
 /// positional arguments is how the three constructors drift apart.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RendererOptions {
     /// An explicit tier pin, or `None` for auto — which resolves [`Tier::Rich`]
     /// and leaves the frame-time governor free to demote it once (ADR-0045). A
     /// pin is honoured in both directions and never demotes.
     pub tier: Option<Tier>,
+    /// Which graphics adapter the window's context asks for.
+    ///
+    /// [`AdapterChoice::Default`] is what the surface path asked for before this
+    /// field existed and stays the default here: an operator's `--gpu` is a
+    /// lever, not a new preference. Changing what an *unflagged* window selects
+    /// would re-base every frame-time figure this project has published, which
+    /// is a measurement question and not an argument-parsing one (ADR-0155).
+    ///
+    /// Carrying a [`AdapterChoice::Named`] `String` is why this struct is
+    /// `Clone` and no longer `Copy`.
+    pub adapter: AdapterChoice,
 }
 
 impl RendererOptions {
-    /// Options pinning `tier` explicitly.
+    /// Options pinning `tier` explicitly, on the default adapter.
     pub fn pinned(tier: Tier) -> Self {
-        Self { tier: Some(tier) }
+        Self {
+            tier: Some(tier),
+            ..Self::default()
+        }
     }
 }
 
@@ -1295,18 +1309,17 @@ impl Renderer {
     /// Build a renderer drawing into `target` (a safe window handle — the
     /// standalone path). Starts with the embedded default presets.
     ///
-    /// `opts` carries the quality-tier pin;
-    /// [`RendererOptions::default()`](RendererOptions) is auto (rich, governed).
+    /// `opts` carries the quality-tier pin and the adapter choice;
+    /// [`RendererOptions::default()`](RendererOptions) is auto (rich, governed)
+    /// on whatever adapter wgpu picks for the surface.
     pub fn new(
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
         opts: RendererOptions,
     ) -> Result<Self, RenderError> {
-        Ok(Self::from_context(
-            RenderContext::new(target, width, height)?,
-            opts,
-        ))
+        let ctx = RenderContext::new(target, width, height, &opts.adapter)?;
+        Ok(Self::from_context(ctx, opts))
     }
 
     /// Build a **headless** renderer that draws into offscreen textures instead
@@ -1383,8 +1396,13 @@ impl Renderer {
         // The `unsafe` is exactly the surface-from-raw-handle call: the caller's
         // promise about `hwnd`'s validity and lifetime. Construction past that
         // point is the same safe code the other two paths run.
-        let ctx = unsafe { RenderContext::new_unsafe(target, width, height) }?;
-        Ok(Self::from_context(ctx, RendererOptions::default()))
+        // `RendererOptions::default()` carries `AdapterChoice::Default`, which
+        // is the request this path made before the choice was a parameter — the
+        // shim has no flag surface to select an adapter with, and the C ABI
+        // does not move for this (ADR-0155).
+        let opts = RendererOptions::default();
+        let ctx = unsafe { RenderContext::new_unsafe(target, width, height, &opts.adapter) }?;
+        Ok(Self::from_context(ctx, opts))
     }
 
     /// The active quality tier (ADR-0045) — what the diagnostics overlay and the

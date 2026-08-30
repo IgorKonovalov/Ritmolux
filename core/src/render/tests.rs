@@ -7,8 +7,9 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamRoute, ParamSmoother,
-    RenderError, Renderer, Roster, element_prefix, evaluate_series, resolve_route,
+    AdapterChoice, AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamRoute,
+    ParamSmoother, RenderError, Renderer, RendererOptions, Roster, Tier, element_prefix,
+    evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
 // when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
@@ -1783,5 +1784,22 @@ fn an_under_layer_is_one_draw_and_a_layerless_preset_is_unchanged() {
         pair_calls,
         plain_calls + 1,
         "an under layer is one extra scene draw into the same target"
+    );
+}
+
+/// **The shim's window keeps asking for the adapter it always asked for.**
+///
+/// `new_from_win32_hwnd` builds its context from `RendererOptions::default()`,
+/// so this field's default *is* the C ABI path's adapter request. A change to
+/// it would move which GPU every foobar2000 window renders on, silently and
+/// without an ABI bump, which is the one thing widening this struct must not do
+/// (ADR-0155).
+#[test]
+fn the_default_renderer_options_ask_for_the_default_adapter() {
+    assert_eq!(RendererOptions::default().adapter, AdapterChoice::Default);
+    assert_eq!(
+        RendererOptions::pinned(Tier::Floor).adapter,
+        AdapterChoice::Default,
+        "pinning a tier must not also pin an adapter"
     );
 }

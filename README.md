@@ -281,19 +281,31 @@ says what each flag is *for*, which is the part a roster line has no room for.
   saying so. Presets rotate on the operator config's dwell timer exactly as they do in the window
   (rotation is **on** here even where `[rotate] auto` is off, since a headless source has nobody to
   press `Space`). Ctrl-C stops it and prints the run's frames, wall clock and scene clock.
-  Companion flags, all `--stream`-only: `--size WxH` (default `1280x720`), `--fps N` (default 60),
-  `--preset <name>` to hold one scene and disable rotation, `--sender <name>` to change the
-  published sender name (default `lmv`), and `--frames N` for a bounded, self-terminating run.
+  Companion flags, `--stream`-only: `--size WxH` (default `1280x720`), `--fps N` (default 60),
+  `--sender <name>` to change the published sender name (default `lmv`), and `--frames N` for a
+  bounded, self-terminating run. Passing one of these **without** `--stream` is a startup error
+  naming both flags, rather than the silence it used to be. `--gpu` and `--preset` are not on this
+  list — they work in the window too, below.
   See [docs/capturing.md](docs/capturing.md#the-live-video-out-lmv---stream) for the
   TouchDesigner side.
-- `--gpu <name|index>` — which graphics adapter `--stream` uses, named from `--list-adapters`.
+- `--gpu <name|index>` — which graphics adapter to render on, named from `--list-adapters`.
+  Works for **both** the window and `--stream`.
   **On a machine with one GPU you will never need it; on a hybrid laptop it is the difference
   between a picture and nothing.** A Spout sender shares a D3D11 texture by handle and the receiver
   opens it on its own device, which works only when both are the same physical GPU — and Windows
   hands a plain console process the power-saving GPU while the receiving application runs on the
   discrete one. One flag moves both halves: the renderer and the sender each resolve the name
-  against their own roster. Unset, the renderer asks for the high-performance adapter and the sender
-  follows it by name, printing what both resolved to.
+  against their own roster. Unset, `--stream`'s renderer asks for the high-performance adapter and
+  the sender follows it by name, printing what both resolved to.
+  **The window's unset behaviour is deliberately different**: it asks for whatever wgpu picks for
+  the surface, which is what it has always asked for, so no published frame-time figure moves
+  because this flag arrived. On a hybrid laptop that default is the power-saving GPU, and
+  `--gpu <name|index>` is how you move the window onto the discrete one; the startup line in
+  `diagnostics.log` names the adapter and says whether a flag pinned it. A named adapter that
+  cannot drive the window is a startup error rather than a quiet fall-back to another GPU.
+- `--preset <name>` — hold one scene and disable rotation. Works in the window as well as under
+  `--stream`; an unknown name is a startup error and no window opens. Hotkeys still browse the
+  roster, so this pins where a run *starts* and turns the dwell timer off.
 - `--input loopback|line-in` — where audio comes from, overriding `config.toml`'s `[input] mode`.
   `loopback` taps whatever the system is playing; `line-in` captures an input endpoint (an audio
   interface, a mixer feed). Windows-only. A value that is neither is a usage error and the app
