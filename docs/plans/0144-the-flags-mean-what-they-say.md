@@ -327,5 +327,86 @@ pub struct RendererOptions {
 | 2 — `--gpu` reaches the window | dev | done | 3872605 |
 | 3 — `--preset` holds a scene in the window | dev | done | cb6a037 |
 | 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 7399ab5 |
-| 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | committed with this row |
-| 6 — `cargo doc` becomes a gate | dev | | |
+| 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | 8e7bfe3 |
+| 6 — `cargo doc` becomes a gate | dev | **not run**, deferred on the user's call | (none) |
+
+### Notes
+
+**P1 — no deviation.**
+
+**P2 — `RendererOptions` lost `Copy`.** `AdapterChoice::Named` owns a `String`, so the derive could
+not stand. Ten call sites, none of which relied on copy semantics.
+
+**P2 — `standalone/examples/floor.rs` is outside the phase's file list and was edited.** The
+`RenderContext::new` signature change breaks it, and `cargo build --workspace` does not compile
+examples, so only `--all-targets` reports it.
+
+**P2 — the windowed dGPU reading was taken.** `--gpu 1` resolved to
+`NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` and `--gpu 0` to
+`AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, each with `(pinned by --gpu)` in
+`diagnostics.log`. Unflagged behaviour was not re-measured and by design did not change.
+
+**P3 — `--preset` takes the display name, not the filename.** `Clifford`, not
+`attractor_clifford`; this is what `select_preset_by_name` already matched on the `--stream` path,
+so the two agree. Most names need quoting and `README.md` now says so. Two presets in the shipped
+set are both named `Coral`, so one of them is unreachable by name from either path — not touched
+here, and not a defect this plan introduced.
+
+**P4 — the first implementation was wrong, and the volume is what showed it.** Judging the raw
+source slice convicted **1184** sites, essentially every correctly-wrapped literal in the tree,
+because a `\` continuation is still present in the source it reads. The check now decodes the
+literal the way rustc does before judging it.
+
+**P4 — the rule is a threshold and the user chose it.** Presented as three options with counts; the
+chosen shape is a run of 12+ spaces in a single-line literal, which yields **zero false positives
+and zero `hygiene-allow` escapes**. It is silent on narrow instances, of which one existed at six
+spaces (`core/src/dsp/mod.rs`, repaired here). The rejected alternative was a threshold of four with
+roughly thirty escapes. The cost is written into the script beside the constant.
+
+**P4 — 15 convictions repaired**, and four comments written by this plan's own earlier phases
+tripped the pre-existing narration rules and were rewritten.
+
+**P5 — the eleven do not share one skip reason, so the fold is parameterised.** Four distinct
+justifications are live for refusing a software adapter (frame-time meaninglessness, ADR-0058 layout
+aliasing, a mis-rendered scene-over-background, a defect that does not reproduce on WARP).
+`headless_hardware_for(w, h, tier, reason)` holds the mechanism and takes the reason; collapsing
+them would print an aliasing argument at a timing skip.
+
+**P5 — this phase's done-when named a grep that matches nothing.**
+`grep -rn "DeviceType::Cpu" core/tests/*.rs` returns empty on the tree as it stood *before* the
+phase, so it would have passed without the phase running. `RenderError::RequestAdapter` is the shape
+these blocks actually match and is what was used; it now appears only in `core/tests/common/mod.rs`.
+
+**P5 — `#[test]` under `core/tests/` is 237 before and 237 after.** Plan 0124's log recorded 236;
+the difference is `main` moving between that close and this branch, not this phase.
+
+**P6 — not run.** 71 real warnings, not the 64 Plan 0124's log recorded, and **51 of them are in
+`core/src/render/**`**, which the live `plan-0125` lane is restructuring — ten in files it has
+already committed changes to. The user was given the collision with those numbers and chose to defer
+the phase rather than take the merge cost for the plan's lowest-value item. Design-backlog 0169 stays
+live and its count is stale by 7.
+
+**A test this plan added was flaky and is now bound-free.**
+`a_stream_only_flag_without_stream_exits_without_starting` asserted a 1-second wall-clock bound and
+failed once at 1.086 s in a full `--workspace` run while behaving correctly — a reading about load on
+the box, not about the code (ADR-0071). Both new spawning tests drop the bound; `output()` waiting
+for exit is what carries the no-window property, and the exit code and message are what is asserted.
+
+### Close triggers
+
+- **`presets/` touched:** no. `git diff --name-only 77a2e23..HEAD -- presets/` is empty.
+- **Plan header `Closes:`** design-backlog 0167, 0168, 0169. **0167 and 0168 are discharged; 0169 is
+  not** — Phase 6 did not run.
+- **What shipped:** a **feature** — `--gpu` and `--preset` now reach the windowed path, which is new
+  operator-facing capability, alongside the refusal of four flags that were silently ignored. Plus a
+  new gate class, a repaired literal set and a test-harness fold.
+- **Operator docs touched:** `README.md` (the flag list — the four refused, `--gpu` and `--preset`
+  windowed, the display-name rule) and `docs/on-device-validation.md` (the `--gpu` reaches
+  `--stream` only claim, now false, rewritten with the dGPU reading and what it unblocks).
+  `scripts/fixtures/README.md` for the fixture roster.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, two entries, both red on
+  delivery rather than by decay. `0167` — `absent: requires in: standalone/src/main.rs` now matches,
+  because Phase 1 added the field the entry asked for. `0165` — `present: RenderContext::new\(target,
+  width, height\)\?` no longer matches, because Phase 2 gave that call the adapter argument that
+  entry says the window lacks. Left alone for `architect`. The other four Node gates exit 0.
+- **Outstanding `human` phases:** none. Phase 6 is `dev`-owned and deferred, not handed over.
