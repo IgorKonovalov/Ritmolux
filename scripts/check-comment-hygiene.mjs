@@ -146,7 +146,27 @@ function sourceFiles(dir = REPO, found = []) {
  * in the file.
  */
 function commentSpans(source, lang) {
+  return lex(source, lang).comments;
+}
+
+/**
+ * One walk, two answers: the comment spans and the **ordinary** string-literal
+ * spans.
+ *
+ * The lexer already had to find string literals in order not to read a `//`
+ * inside one as a comment; this returns them rather than discarding them, so
+ * the literal check below cannot disagree with the comment check about where a
+ * string starts. Duplicating this walk is the trap — its raw-string, escape and
+ * Rust-lifetime cases are each a bug someone already hit.
+ *
+ * Raw strings are deliberately **not** collected. `r"..."` spanning lines with
+ * aligned columns is a formatted block whose spacing is the author's intent,
+ * and it cannot carry the defect the literal check looks for: the defect is a
+ * missing `\` continuation, and a raw string has no escapes to be missing.
+ */
+function lex(source, lang) {
   const spans = [];
+  const strings = [];
   let i = 0;
   const n = source.length;
 
@@ -210,6 +230,7 @@ function commentSpans(source, lang) {
         if (source[j] === '"') break;
         j++;
       }
+      strings.push([i + 1, Math.min(j, n)]);
       i = j + 1;
       continue;
     }
@@ -241,7 +262,7 @@ function commentSpans(source, lang) {
     i++;
   }
 
-  return spans;
+  return { comments: spans, strings };
 }
 
 /** The comment text of each line, indexed by 0-based line number. */
@@ -280,6 +301,45 @@ function commentLines(source, lang) {
   return out;
 }
 
+/**
+ * Each ordinary string literal's raw source text, keyed by the 0-based line it
+ * **starts** on.
+ *
+ * The start line is the right anchor because that is where the author typed the
+ * opening quote and where the missing `\` belongs. The text is the raw slice
+ * between the quotes, so a literal broken across source lines still carries the
+ * newline and the continuation indent that make it convictable - which is the
+ * whole point, since after a later reflow the run of spaces is all that is left
+ * of the evidence.
+ */
+function stringLiteralLines(source, lang) {
+  const out = new Map();
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === "\n") starts.push(i + 1);
+  }
+  const lineOf = (idx) => {
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid] <= idx) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  for (const [start, end] of lex(source, lang).strings) {
+    const line = lineOf(start);
+    // One line can open several literals; the longest is the one worth showing.
+    const text = source.slice(start, end);
+    const held = out.get(line);
+    if (held === undefined || text.length > held.length) out.set(line, text);
+  }
+
+  return out;
+}
+
 // A relative link target, in markdown's two forms. Only `./` and `../` — an
 // intra-doc link resolves through rustc and is left alone.
 const DEFINITION = /\[[^\]]*\]:\s*(\.\.?\/[^\s)]+)/g;
@@ -308,12 +368,104 @@ const ELAPSED = /\b(?:before|since|until|after)\s+(?:plan|adr|phase)\s+\d+|\bpre
 // a silencer, so it is required.
 const ESCAPE = /hygiene-allow:\s*(\S.*)?$/;
 
+// A run of twelve or more spaces inside a string literal.
+//
+// The defect: a `format!` string broken across source lines without a trailing
+// `\` keeps the newline AND the continuation line's indentation, so the reader
+// gets `(x/y/rad/ang), which` then twenty-two spaces then `reads 0`. It
+// compiles, it matches a `contains` assertion on either half, and it is wrong
+// only where it is read. Joining the lines afterwards leaves the run behind,
+// which is why the check is on the run and not on the line break.
+//
+// **The width is the whole rule, and it is a deliberately partial one.** A lost
+// continuation and a hand-aligned column are the SAME construct - Rust admits a
+// raw newline inside a literal - so nothing mechanical separates them by intent.
+// What does separate them in practice is width: a continuation indent is
+// produced by rustfmt against the enclosing block and measured 14-23 here, while
+// hand-typed alignment measured 4-11. Twelve sits in that gap.
+//
+// The cost is stated rather than hidden: this is silent on a narrow instance,
+// and one existed at 6 (`core/src/dsp/mod.rs`, repaired when this landed). The
+// alternative was a threshold of four and roughly thirty `hygiene-allow` markers
+// through the report-formatting code, which buys the narrow cases by making the
+// escape ordinary - and an escape that is ordinary is how a gate stops meaning
+// anything. See ADR-0127's own note on the escape hatch.
+const LITERAL_RUN = / {12,}/;
+
+/**
+ * Decode a literal's raw source text into what the reader actually gets.
+ *
+ * The one rule that matters here is Rust's **line continuation**: a backslash
+ * immediately before a newline removes the newline *and* the next line's
+ * leading whitespace. A literal wrapped that way is correct and must stay
+ * silent - which is most of them, since rustfmt wraps long messages constantly.
+ * Reading the raw slice instead convicts every correctly-continued literal in
+ * the tree.
+ *
+ * `\` is consumed as a pair so an escaped backslash before a newline is not
+ * mistaken for a continuation. Other escapes pass through unchanged; none of
+ * them produces a space, so none can create or hide the defect.
+ */
+function decodeLiteral(raw) {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i] === "\\") {
+      const next = raw[i + 1];
+      // An escaped backslash is consumed as a pair, so a newline after it is
+      // not mistaken for a continuation.
+      if (next === "\\") {
+        out += "\\\\";
+        i += 2;
+        continue;
+      }
+      // The continuation: the newline and the next line's indent both vanish.
+      if (next === "\n" || (next === "\r" && raw[i + 2] === "\n")) {
+        i += next === "\r" ? 3 : 2;
+        while (i < raw.length && (raw[i] === " " || raw[i] === "\t")) i++;
+        continue;
+      }
+      out += raw[i] + (next ?? "");
+      i += 2;
+      continue;
+    }
+    out += raw[i];
+    i++;
+  }
+  return out;
+}
+
+/** Report the run and an excerpt for a literal carrying the defect, else null. */
+function brokenLiteral(raw) {
+  const text = decodeLiteral(raw);
+  // A literal that still holds a newline after decoding is a formatted BLOCK -
+  // a TOML fixture, embedded WGSL, a multi-line report - whose column spacing is
+  // layout the author typed. The defect is a wrapped *sentence*: one line of
+  // prose that lost its continuation, and prose does not carry a newline in the
+  // middle of itself. Without this the block's own indent reads as the defect.
+  // Both spellings of a line break count: an `\n` escape, which survives
+  // decoding as its own two characters, and a raw newline the author typed
+  // inside the quotes.
+  if (text.includes("\\n") || text.includes("\n")) return null;
+  const hit = LITERAL_RUN.exec(text);
+  if (!hit) return null;
+  if (!/\S/.test(text)) return null;
+  const at = hit.index;
+  if (at === 0 || at + hit[0].length >= text.length) return null;
+  const excerpt = text.length > 90 ? `${text.slice(0, 87)}...` : text;
+  // A raw newline inside the excerpt would break the one-finding-per-line
+  // report format, so it is shown as the escape it should have been.
+  return { spaces: hit[0].length, excerpt: excerpt.split("\n").join("\\n") };
+}
+
 const findings = [];
 let escapes = 0;
 
 for (const [file, lang] of sourceFiles()) {
   const show = file.split(sep).join("/");
-  const comments = commentLines(readFileSync(join(REPO, file), "utf8"), lang);
+  const source = readFileSync(join(REPO, file), "utf8");
+  const comments = commentLines(source, lang);
+  const literals = stringLiteralLines(source, lang);
 
   // An escape covers its own line and the one after it, so a marker can sit
   // above the sentence it is excusing rather than inside it.
@@ -349,6 +501,16 @@ for (const [file, lang] of sourceFiles()) {
     for (const m of text.matchAll(ELAPSED)) {
       findings.push(`${show}:${line + 1} -> narration against an event \`${m[0]}\` (cite it bare)`);
     }
+  }
+
+  for (const [line, text] of [...literals].sort((a, b) => a[0] - b[0])) {
+    if (allowed.has(line)) continue;
+    const broken = brokenLiteral(text);
+    if (!broken) continue;
+    findings.push(
+      `${show}:${line + 1} -> string literal carries ${broken.spaces} spaces mid-sentence ` +
+        `(a line break with no trailing \): "${broken.excerpt}"`,
+    );
   }
 }
 

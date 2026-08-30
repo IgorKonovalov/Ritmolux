@@ -2367,7 +2367,7 @@ const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
     },
     StructureCandidate {
         name: "boundary",
-        note: "share of lit pixels with an unlit 4-neighbour (perimeter over lit area)                - SHIPPED as the second term, and this column now reads metrics::boundary_density",
+        note: "share of lit pixels with an unlit 4-neighbour (perimeter over lit area) - SHIPPED as the second term, and this column now reads metrics::boundary_density",
         measure: Measure::Whole(production_boundary_density),
     },
     StructureCandidate {

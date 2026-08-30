@@ -215,8 +215,8 @@ mod tests {
     /// wants the fast GPU; the window keeps asking for exactly what it asked
     /// for before `--gpu` reached it, because every published windowed
     /// frame-time figure was measured against that request. Reusing
-    /// `renderer_choice` for the window would move all of them silently, which
-    /// is the one thing this plan does not do.
+    /// `renderer_choice` for the window would move all of them silently
+    /// (ADR-0155).
     #[test]
     fn the_window_and_the_stream_disagree_when_unflagged() {
         assert_eq!(window_choice(None), AdapterChoice::Default);

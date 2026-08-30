@@ -1090,7 +1090,7 @@ pub struct RendererOptions {
     /// is a measurement question and not an argument-parsing one (ADR-0155).
     ///
     /// Carrying a [`AdapterChoice::Named`] `String` is why this struct is
-    /// `Clone` and no longer `Copy`.
+    /// `Clone` rather than `Copy`.
     pub adapter: AdapterChoice,
 }
 

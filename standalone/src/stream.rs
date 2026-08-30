@@ -390,7 +390,7 @@ pub fn run(
     if let Some(name) = request.preset.as_deref() {
         if !renderer.select_preset_by_name(name) {
             return Err(format!(
-                "--stream: no preset named '{name}'; --list-presets is not a flag, but the                  embedded set is what the window browses"
+                "--stream: no preset named '{name}'; --list-presets is not a flag, but the embedded set is what the window browses"
             ));
         }
         eprintln!("preset   : '{name}', held for the run - rotation is off");

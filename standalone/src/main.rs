@@ -4016,10 +4016,11 @@ mod tests {
         missing_companion(argv.into_iter()).map(|(spec, needs)| (spec.name, needs))
     }
 
-    /// **The reduction from the entry that produced this arm.** `--gpu 1` with
-    /// no `--stream` used to start the app and render on whatever adapter it
-    /// would have picked anyway, saying nothing — the roster walked past it as
-    /// recognized and `stream::parse` returned before reading it.
+    /// **The reduction from the entry that produced this arm.** Without this
+    /// refusal, `--gpu 1` and no `--stream` starts the app and renders on
+    /// whatever adapter it would have picked anyway, saying nothing: the roster
+    /// walks it past as recognized and `stream::parse` returns before reading
+    /// it (design-backlog 0167).
     #[test]
     fn a_flag_whose_companion_is_absent_is_refused_and_both_are_named() {
         assert_eq!(orphaned(&["--fps", "30"]), Some(("--fps", "--stream")));
@@ -4269,9 +4270,9 @@ mod tests {
     }
 
     /// **`--help` renders each dependency once, from the field that enforces
-    /// it.** The six `--stream` companions used to carry the coupling as prose
-    /// inside their own `help` strings, where nothing held it to what the code
-    /// did; a flag that changes its dependency now cannot disagree with its own
+    /// it.** The coupling is stated once, in `requires`, rather than as prose
+    /// inside each companion's `help` string where nothing holds it to what the
+    /// code does; a flag that changes its dependency cannot disagree with its own
     /// documentation, because both read `requires`.
     #[test]
     fn the_help_text_states_each_dependency_once() {
