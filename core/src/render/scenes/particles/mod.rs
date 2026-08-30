@@ -822,10 +822,10 @@ pub struct AttractorScene {
     /// `perspective`, `depth_fade` and `depth_hue` reach two. That asymmetry is
     /// deliberate — an in-plane spin is a real look on De Jong today.
     spin: f32,
-    /// The active baked palette pair; uploaded to the draw LUT textures when
-    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    /// The active baked palette. Held here rather than only in the pipelines'
+    /// [`palette::LutPair`] because the resources build lazily: `set_palette` can
+    /// arrive with `res` still `None`, and this is what seeds the pair.
     palette: Palette,
-    palette_dirty: bool,
     /// This frame's `reseed` level (bound to a beat/onset expression); its rising
     /// edge disturbs the cloud in place (ADR-0066).
     reseed: f32,
@@ -914,7 +914,6 @@ impl AttractorScene {
             emergence: DEFAULT_EMERGENCE,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
             reseed: 0.0,
             prev_reseed: 0.0,
         }
@@ -955,18 +954,20 @@ impl AttractorScene {
                 res
             }
             None => {
-                // First build: the LUT textures are fresh, so the palette needs its
-                // one upload, and the particle buffer has never been written — this
-                // is the arm the seed upload belongs to.
-                self.palette_dirty = true;
+                // First build: the LUT pair is fresh and holds the default palette,
+                // so hand it the one the scene is carrying, and the particle buffer
+                // has never been written — this is the arm the seed upload belongs
+                // to.
                 self.needs_upload = true;
-                Resources::build(
+                let mut built = Resources::build(
                     &self.device,
                     self.surface_format,
                     self.trail_w,
                     self.trail_h,
                     self.particle_count,
-                )
+                );
+                built.pipelines.luts.set(&self.palette);
+                built
             }
         };
         self.res = Some(res);
@@ -1357,7 +1358,9 @@ impl Scene for AttractorScene {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
         // lazily on first render). Cheap array copy, off the hot path.
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.pipelines.luts.set(palette);
+        }
     }
 
     fn reset_params(&mut self) {
@@ -1672,8 +1675,6 @@ impl Scene for AttractorScene {
             root_tint,
             root_hue,
             emergence,
-            palette,
-            palette_dirty,
             ..
         } = self;
         let Some(Resources { pipelines, grid }) = res.as_mut() else {
@@ -1686,8 +1687,6 @@ impl Scene for AttractorScene {
             pipelines,
             grid,
             seed_particles,
-            palette,
-            palette_dirty,
             needs_clear,
             needs_upload,
         );

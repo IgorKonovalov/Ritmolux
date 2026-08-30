@@ -199,12 +199,12 @@ pub(super) struct PipelineResources {
     pub(super) decay_uniform: wgpu::Buffer,
     pub(super) compute_bg: wgpu::BindGroup,
     pub(super) draw_bg: wgpu::BindGroup,
-    /// The shared gradient LUT textures (A/B) the draw vertex shader samples +
+    /// The shared gradient LUT pair (A/B) the draw vertex shader samples +
     /// crossfades (ADR-0021); uploaded from the scene's baked palette on the first
-    /// frame after a build and on a preset switch. They outlive a grid change, so
-    /// a resize does not re-upload the palette.
-    pub(super) lut_texture_a: wgpu::Texture,
-    pub(super) lut_texture_b: wgpu::Texture,
+    /// frame after a build and on a preset switch. It lives here rather than in
+    /// [`FieldResources`] because it outlives a grid change, so a resize does not
+    /// re-upload the palette.
+    pub(super) luts: palette::LutPair,
     /// Kept so a grid change can rebuild [`FieldResources`]' four bind groups
     /// without recreating a layout, a sampler, or any pipeline.
     pub(super) decay_layout: wgpu::BindGroupLayout,
@@ -436,11 +436,7 @@ impl PipelineResources {
         // Shared gradient LUTs (ADR-0021): two 256×1 textures (A/B) + a repeat
         // sampler, bound to the draw pass and sampled per-particle in the vertex
         // shader (so VERTEX visibility).
-        let lut_texture_a = palette::lut_texture(device, "attractor-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "attractor-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        let luts = palette::LutPair::new(device, "attractor");
 
         // --- draw: the particle buffer as an instance vertex buffer, additively
         // into the trail field (float target so the accumulation has headroom) ---
@@ -471,24 +467,18 @@ impl PipelineResources {
         let draw_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("attractor-draw-bg"),
             layout: &draw_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: draw_uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-            ],
+            entries: &{
+                let [lut_a, lut_b, lut_sampler] = luts.bind_entries(1, 2, 3);
+                [
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: draw_uniform.as_entire_binding(),
+                    },
+                    lut_a,
+                    lut_b,
+                    lut_sampler,
+                ]
+            },
         });
         let draw_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("attractor-draw-pipeline-layout"),
@@ -604,8 +594,7 @@ impl PipelineResources {
             decay_uniform,
             compute_bg,
             draw_bg,
-            lut_texture_a,
-            lut_texture_b,
+            luts,
             decay_layout,
             present_layout,
             field_sampler,

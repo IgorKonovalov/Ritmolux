@@ -376,10 +376,9 @@ pub struct ShapeFieldScene {
     pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
-    palette: Palette,
-    palette_dirty: bool,
+    /// The 256x1 gradient LUT pair (A/B) the fragment samples + crossfades for
+    /// colour (ADR-0021), with the baked palette awaiting upload.
+    luts: palette::LutPair,
     /// The silhouette and its point count, raw as the preset bound them —
     /// `marks::mark_shape` / `mark_points` quantize on the way to the uniform,
     /// which is where a selector's precondition belongs (the `kaleido_edge`
@@ -433,11 +432,10 @@ impl ShapeFieldScene {
         );
         let uniforms =
             gpu::uniform_buffer(device, "shape-field-params", std::mem::size_of::<Params>());
-        let lut_texture_a = palette::lut_texture(device, "shape-field-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "shape-field-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        // Seeded with the default `spectrum`; the renderer calls `set_palette`
+        // before the first frame and `render` uploads it, so the textures are
+        // valid even if `set_palette` were never called.
+        let luts = palette::LutPair::new(device, "shape-field");
         // One group, sampler first and uniform last — see the WGSL's note for
         // why this shape and not `fragment_field`'s two-group split. The uniform
         // entry is a full literal rather than `gpu::uniform` because that helper
@@ -463,22 +461,16 @@ impl ShapeFieldScene {
                 },
             ],
         });
+        // This layout binds the sampler first and the two textures after it, so
+        // the pair's role-ordered array is destructured into binding order here.
+        let [lut_a, lut_b, lut_sampler] = luts.bind_entries(1, 2, 0);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("shape-field-bind-group"),
             layout: &bind_layout,
             entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
+                lut_sampler,
+                lut_a,
+                lut_b,
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: uniforms.as_entire_binding(),
@@ -498,10 +490,7 @@ impl ShapeFieldScene {
             pipeline,
             uniforms,
             bind_group,
-            lut_texture_a,
-            lut_texture_b,
-            palette: Palette::default_spectrum(),
-            palette_dirty: true,
+            luts,
             shape: marks::DEFAULT_SHAPE,
             points: marks::DEFAULT_POINTS,
             star_valley: marks::DEFAULT_STAR_VALLEY,
@@ -652,8 +641,7 @@ impl Scene for ShapeFieldScene {
     }
 
     fn set_palette(&mut self, palette: &Palette) {
-        self.palette = palette.clone();
-        self.palette_dirty = true;
+        self.luts.set(palette);
     }
 
     fn reset_params(&mut self) {
@@ -715,11 +703,7 @@ impl Scene for ShapeFieldScene {
         // the shader will: the `ring` refusal is a fact about the SELECTED arm,
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
-        if self.palette_dirty {
-            palette::write_lut(queue, &self.lut_texture_a, &self.palette.lut_a_bytes());
-            palette::write_lut(queue, &self.lut_texture_b, &self.palette.lut_b_bytes());
-            self.palette_dirty = false;
-        }
+        self.luts.flush(queue);
 
         let params = Params {
             // `aspect` is the argument the chain hands down for the target this

@@ -474,11 +474,10 @@ struct Resources {
     init_bg: wgpu::BindGroup,
     present_bg_a: wgpu::BindGroup,
     present_bg_b: wgpu::BindGroup,
-    /// The shared gradient LUT textures (A/B) the present pass samples + crossfades
-    /// (ADR-0021); uploaded from the scene's baked palette on the first frame after
-    /// a (re)build and on a preset switch.
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
+    /// The shared gradient LUT pair (A/B) the present pass samples + crossfades
+    /// (ADR-0021). A fresh pair is dirty, so a (re)build uploads on its first
+    /// frame; a preset switch re-`set`s it through the scene's `set_palette`.
+    luts: palette::LutPair,
 }
 
 impl Resources {
@@ -581,11 +580,7 @@ impl Resources {
         });
         // Shared gradient LUTs (ADR-0021): two 256×1 textures (A/B) + a repeat
         // sampler, in the present bind group alongside the field.
-        let lut_texture_a = palette::lut_texture(device, "rd-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "rd-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        let luts = palette::LutPair::new(device, "rd");
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-present-layout"),
             entries: &[
@@ -603,9 +598,7 @@ impl Resources {
             field.view_a(),
             &sampler,
             &present_uniform,
-            &lut_view_a,
-            &lut_view_b,
-            &lut_sampler,
+            &luts,
         );
         let present_bg_b = present_bind_group(
             device,
@@ -613,9 +606,7 @@ impl Resources {
             field.view_b(),
             &sampler,
             &present_uniform,
-            &lut_view_a,
-            &lut_view_b,
-            &lut_sampler,
+            &luts,
         );
         let present_pipeline = gpu::fullscreen_pipeline(
             device,
@@ -643,8 +634,7 @@ impl Resources {
             init_bg,
             present_bg_a,
             present_bg_b,
-            lut_texture_a,
-            lut_texture_b,
+            luts,
         }
     }
 
@@ -724,10 +714,11 @@ pub struct ReactionDiffusionScene {
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
     /// `reset_params` leaves it alone.
     occlude: f32,
-    /// The active baked palette pair; uploaded to the present LUT textures when
-    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    /// The active baked palette. Held here rather than only in the resources'
+    /// [`palette::LutPair`] because the resources build lazily: `set_palette` can
+    /// arrive with `res` still `None`, and this is what seeds the pair when it
+    /// finally exists.
     palette: Palette,
-    palette_dirty: bool,
 }
 
 impl ReactionDiffusionScene {
@@ -779,7 +770,6 @@ impl ReactionDiffusionScene {
             pan_y: DEFAULT_PAN,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
         }
     }
 }
@@ -806,17 +796,15 @@ fn sim_bind_group(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn present_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     input: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
     uniform: &wgpu::Buffer,
-    lut_a: &wgpu::TextureView,
-    lut_b: &wgpu::TextureView,
-    lut_sampler: &wgpu::Sampler,
+    luts: &palette::LutPair,
 ) -> wgpu::BindGroup {
+    let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("rd-present-bg"),
         layout,
@@ -833,18 +821,9 @@ fn present_bind_group(
                 binding: 2,
                 resource: uniform.as_entire_binding(),
             },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::TextureView(lut_a),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::TextureView(lut_b),
-            },
-            wgpu::BindGroupEntry {
-                binding: 5,
-                resource: wgpu::BindingResource::Sampler(lut_sampler),
-            },
+            lut_a,
+            lut_b,
+            lut_sampler,
         ],
     })
 }
@@ -897,7 +876,9 @@ impl Scene for ReactionDiffusionScene {
         // Uploaded to the present LUT textures in `render` (deferred — resources
         // build lazily on first render). Cheap array copy, off the hot path.
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.luts.set(palette);
+        }
     }
 
     fn reset_params(&mut self) {
@@ -967,11 +948,13 @@ impl Scene for ReactionDiffusionScene {
         view: &wgpu::TextureView,
         _aspect: f32,
     ) {
-        // Build GPU resources on first use (module docs). Fresh LUT textures are
-        // empty, so mark the palette dirty to upload it below.
+        // Build GPU resources on first use (module docs). A fresh pair's textures
+        // are empty and hold the default palette, so hand it the one the scene is
+        // actually carrying; the upload happens in the flush below.
         if self.res.is_none() {
-            self.res = Some(Resources::build(&self.device, self.surface_format));
-            self.palette_dirty = true;
+            let mut built = Resources::build(&self.device, self.surface_format);
+            built.luts.set(&self.palette);
+            self.res = Some(built);
         }
         let Self {
             res,
@@ -996,8 +979,6 @@ impl Scene for ReactionDiffusionScene {
             pan_x,
             pan_y,
             occlude,
-            palette,
-            palette_dirty,
             ..
         } = self;
         let Some(res) = res.as_mut() else {
@@ -1006,11 +987,7 @@ impl Scene for ReactionDiffusionScene {
 
         // Upload the active palette LUTs (A + B) on a preset switch or a fresh
         // build — off the hot path, once per change.
-        if *palette_dirty {
-            palette::write_lut(queue, &res.lut_texture_a, &palette.lut_a_bytes());
-            palette::write_lut(queue, &res.lut_texture_b, &palette.lut_b_bytes());
-            *palette_dirty = false;
-        }
+        res.luts.flush(queue);
 
         queue.write_buffer(
             &res.present_uniform,
