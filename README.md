@@ -304,8 +304,10 @@ says what each flag is *for*, which is the part a roster line has no room for.
   `diagnostics.log` names the adapter and says whether a flag pinned it. A named adapter that
   cannot drive the window is a startup error rather than a quiet fall-back to another GPU.
 - `--preset <name>` — hold one scene and disable rotation. Works in the window as well as under
-  `--stream`; an unknown name is a startup error and no window opens. Hotkeys still browse the
-  roster, so this pins where a run *starts* and turns the dwell timer off.
+  `--stream`. The name is the preset's **display name** — `Clifford`, `Rose Window` — as the browse
+  overlay and `--preset`'s own error listing spell it, not the `.toml` filename, so most of them
+  need quoting. An unknown name is a startup error that lists the roster, and **no window opens**.
+  Hotkeys still browse, so this pins where a run *starts* and turns the dwell timer off.
 - `--input loopback|line-in` — where audio comes from, overriding `config.toml`'s `[input] mode`.
   `loopback` taps whatever the system is playing; `line-in` captures an input endpoint (an audio
   interface, a mixer feed). Windows-only. A value that is neither is a usage error and the app

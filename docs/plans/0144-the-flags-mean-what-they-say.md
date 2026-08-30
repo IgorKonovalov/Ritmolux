@@ -324,8 +324,8 @@ pub struct RendererOptions {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The roster states a dependency | dev | done | 1b29936 |
-| 2 — `--gpu` reaches the window | dev | done | committed with this row |
-| 3 — `--preset` holds a scene in the window | dev | | |
+| 2 — `--gpu` reaches the window | dev | done | 3872605 |
+| 3 — `--preset` holds a scene in the window | dev | done | committed with this row |
 | 4 — The broken literal becomes a scanned class | dev | | |
 | 5 — The dead attribute goes and the last skip blocks fold in | dev | | |
 | 6 — `cargo doc` becomes a gate | dev | | |

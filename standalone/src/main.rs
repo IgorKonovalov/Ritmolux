@@ -306,6 +306,7 @@ impl AppState {
         downbeat_log_path: Option<PathBuf>,
         tier: Option<Tier>,
         adapter: AdapterChoice,
+        held_preset: Option<String>,
         input: config::Input,
         osc: Option<OscSink>,
     ) -> Self {
@@ -346,6 +347,20 @@ impl AppState {
         let preset_dir = startup_preset_dir();
         reload_presets(&mut renderer, &preset_dir);
         let preset_sig = dir_signature(&preset_dir);
+
+        // `--preset` holds one scene for the run. The name was checked against
+        // this same roster before the window was created, so a miss here means
+        // the directory changed underneath the launch; say so rather than
+        // starting on an arbitrary scene (ADR-0155).
+        if let Some(name) = held_preset.as_deref() {
+            if renderer.select_preset_by_name(name) {
+                eprintln!("preset: '{name}', held for the run - rotation is off");
+            } else {
+                eprintln!(
+                    "--preset `{name}`: gone from the preset directory since startup; rotating instead"
+                );
+            }
+        }
 
         // Collect rolling frame-time stats from the first frame so the title
         // shows live fps/p99 (the overlay itself stays off until F3 — Plan 0011).
@@ -389,7 +404,12 @@ impl AppState {
             preset_dir,
             preset_sig,
             last_preset_poll: start,
-            director: Director::from_config(&config.rotate),
+            // A held preset opts out of the dwell timer entirely; without one
+            // the operator's config decides, unchanged.
+            director: Director::from_config(&config::Rotate {
+                auto: config.rotate.auto && held_preset.is_none(),
+                ..config.rotate.clone()
+            }),
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
             downbeat_log: downbeat_log_path.map(DownbeatLog::new),
@@ -2203,6 +2223,9 @@ struct App {
     /// beside `config` like the other per-launch flags, so it pins this run
     /// without persisting itself.
     adapter: AdapterChoice,
+    /// The preset `--preset` holds for this run, already checked against the
+    /// roster this launch will load. `None` rotates on the operator's config.
+    held_preset: Option<String>,
     /// The capture selection, already resolved across `--input` / `--device` /
     /// `[input]` (Plan 0130). Held beside `config` rather than written into it,
     /// so a flag pins this launch without persisting itself on the next save.
@@ -2254,6 +2277,7 @@ impl ApplicationHandler for App {
                         self.downbeat_log_path.take(),
                         self.tier,
                         std::mem::take(&mut self.adapter),
+                        self.held_preset.take(),
                         std::mem::take(&mut self.input),
                         self.osc.take(),
                     );
@@ -2442,6 +2466,32 @@ fn startup_preset_dir() -> PathBuf {
     }
 }
 
+/// The preset names this launch will end up with, resolved **without seeding
+/// and without printing**, so `--preset` can be judged before a window exists.
+///
+/// Mirrors `reload_presets`'s own rule rather than approximating it: a
+/// directory that yields at least one preset **replaces** the embedded set, so
+/// the answer is one list or the other and never their union. A first run has
+/// not seeded yet and reads as embedded, which is the same set seeding is about
+/// to write.
+///
+/// The directory is read twice on a launch that uses this — once here and once
+/// in `AppState::new`. That is a few dozen TOML parses on a startup path, and
+/// it buys a refusal that costs the operator no window.
+fn startup_preset_names() -> Vec<String> {
+    let dir = match resolve_preset_dir() {
+        PresetDir::Override(dir) | PresetDir::Default(dir) => dir,
+        PresetDir::Unresolved => PathBuf::new(),
+    };
+    let from_dir = lmv_core::preset::load_dir(&dir).presets;
+    let set = if from_dir.is_empty() {
+        lmv_core::preset::default_presets()
+    } else {
+        from_dir
+    };
+    set.into_iter().map(|preset| preset.name).collect()
+}
+
 /// Resolve `diagnostics.log` under the per-user app dir (alongside the shared
 /// `presets` dir). `None` if the OS data root can't be resolved — the logger
 /// then silently no-ops (degrade, never crash — NFR 10).
@@ -2594,7 +2644,7 @@ const FLAGS: &[FlagSpec] = &[
     FlagSpec {
         name: "--preset",
         takes_value: true,
-        requires: Some("--stream"),
+        requires: None,
         help: "<name> hold one scene and disable rotation",
     },
     FlagSpec {
@@ -3420,6 +3470,30 @@ fn main() {
         }
     };
 
+    // Judged here, against the set this launch will actually hold, so an
+    // unknown name costs no window (ADR-0155). Rotation stays on the operator's
+    // config when the flag is absent.
+    let held_preset = match windowed_flag("--preset") {
+        Ok(None) => None,
+        Ok(Some(name)) => {
+            let roster = startup_preset_names();
+            if !roster.contains(&name) {
+                eprintln!("--preset `{name}`: no preset by that name");
+                eprintln!("this launch holds {} preset(s): {}", roster.len(), {
+                    let mut sorted = roster;
+                    sorted.sort();
+                    sorted.join(", ")
+                });
+                std::process::exit(2);
+            }
+            Some(name)
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    };
+
     let mut app = App {
         config,
         config_path,
@@ -3427,6 +3501,7 @@ fn main() {
         downbeat_log_path,
         tier,
         adapter,
+        held_preset,
         input,
         osc,
         console_flag: parse_console_flag(),
@@ -3967,6 +4042,38 @@ mod tests {
             orphaned(&["--device=--stream", "--fps", "30"]),
             Some(("--fps", "--stream")),
             "`--stream` inside an `=` value is text, not a flag occurrence"
+        );
+    }
+
+    /// **A held preset turns the dwell timer off, and only a held one does.**
+    /// Rotation is the operator's config in every other case, including a
+    /// config that already has `auto = false` — `--preset` narrows the setting
+    /// and never widens it — and the dwell bounds stay theirs either way.
+    #[test]
+    fn a_held_preset_is_the_only_thing_that_disables_rotation() {
+        let base = config::Rotate {
+            auto: true,
+            ..config::Rotate::default()
+        };
+        // The rule `AppState::new` applies, read back here as a value.
+        let resolved = |auto: bool, held: Option<&str>| config::Rotate {
+            auto: auto && held.is_none(),
+            ..base.clone()
+        };
+
+        assert!(resolved(true, None).auto, "no flag leaves the config alone");
+        assert!(
+            !resolved(true, Some("attractor_clifford")).auto,
+            "a held preset turns rotation off"
+        );
+        assert!(
+            !resolved(false, None).auto,
+            "a config with rotation already off stays off"
+        );
+        assert_eq!(
+            resolved(true, Some("attractor_clifford")).min_dwell_secs,
+            base.min_dwell_secs,
+            "the dwell bounds stay the operator's even when rotation is off"
         );
     }
 
