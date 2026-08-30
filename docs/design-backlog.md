@@ -4199,3 +4199,39 @@ is Alternative C again and loses for the same reason.
 
 - **Verified 2026-08-30** - the early return is still what makes the six unread: `present: if !args.iter\(\).any\(\|arg\| arg == "--stream"\) in: standalone/src/stream.rs`
 - **Verified 2026-08-30** - and `FlagSpec` still has no way to state the dependency: `absent: requires in: standalone/src/main.rs`
+
+## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
+
+> **Filed 2026-08-30** while pushing the Plan 0134 close. Found because the gate went from green
+> to 490 findings between two pushes twenty minutes apart, with no commit in between touching it.
+
+`scripts/check-comment-hygiene.mjs` enumerates with `readdirSync` from the repo root and skips a
+hardcoded `SKIP_DIRS` set. **It never asks git what is tracked.** A gitignored directory is
+therefore absent from CI's fresh clone - so the CI job is green by construction - and present in
+every working tree, where it is scanned in full.
+
+Two such trees exist here, both third-party, both gitignored, neither ours to judge:
+
+- `.venv/` (`.gitignore:68`) - the Python virtualenv `tools/sd-filter` installs into. Its
+  `site-packages` ship torch, numpy and markupsafe C and C++ headers: **419 findings**, all
+  `plan-relative narration` on words like `used to` and `no longer` in vendor comments.
+- `plugin-foobar/sdk/` (`.gitignore:15`) - the foobar2000 SDK. **71 findings**, same class.
+
+**Impact.** It blocks `git push` outright, for everyone whose working tree has either directory,
+with a diagnostic pointing at files no one in this project wrote. The natural escape is
+`--no-verify`, which is what makes it worth recording: a gate that fires on vendor code teaches its
+users to skip the gate that fires on theirs. The immediate instances are patched by name at Plan
+0134's close (`SKIP_DIRS` gained `.venv`, a new `VENDORED_TREES` holds the SDK path), which fixes
+these two and not the class - the next `pip install` or unpacked SDK re-breaks it.
+
+**What a fix looks like:** enumerate from `git ls-files` rather than `readdirSync`, which makes
+"code we own" and "code the gate judges" the same set by construction and costs one call. The one
+thing to preserve is the seeded bite check - `node scripts/check-comment-hygiene.mjs scripts/fixtures`
+must still report its 10 findings, and those fixtures are tracked, so `ls-files` reaches them. Worth
+checking whether the sibling gates share the shape: `check-doc-links.mjs` walks markdown the same
+way and is green today only because neither vendored tree happens to carry a relative-linked `.md`.
+
+- **Verified 2026-08-30** - the walk is a filesystem walk with no git in it: `present: readdirSync\(dir, \{ withFileTypes: true \}\) in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - nothing consults git's ignore rules: `absent: check-ignore in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - the by-name patch this entry says is not the fix is present: `present: const VENDORED_TREES = new Set in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - and both ignore rules that make the trees invisible to CI still stand: `present: plugin-foobar/sdk/ in: .gitignore`
