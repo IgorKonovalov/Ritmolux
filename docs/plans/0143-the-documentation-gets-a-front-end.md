@@ -112,17 +112,18 @@ Two entrances, per the interview. A file not listed here does **not** join the s
 | C ABI contract | `docs/specs/0001-c-abi.md` |
 | Ring determinism | `docs/specs/0002-ring-determinism.md` |
 
-**Excluded by default, flagged for the user's call:** `docs/content-brief.md` (the curation brief —
-reads as internal intent rather than reader documentation) and `docs/roadmap-visual-richness.md`
-(forward planning, which dates badly in public). Both are one line of config to add if wanted.
+**Excluded — decided 2026-08-30 by the user, not an open question:** `docs/content-brief.md` (the
+curation brief — internal intent rather than reader documentation) and `docs/roadmap-visual-richness.md`
+(forward planning, which dates badly in public). Links into both are rewritten to GitHub like any
+other off-site target. `dev` should not re-raise this.
 
 ## Implementation phases
 
 ### Phase 1 — the site renders the published set from one source
 - **Owner skill:** dev
 - **What:** An Astro Starlight project under `site/`, wired to read the published set **in place**
-  from `docs/`, `docs/specs/` and `presets/README.md`, with `base` set to `/lmv/` from the first
-  build and the two-entrance sidebar structure in place.
+  from `docs/`, `docs/specs/` and `presets/README.md`, with `site: 'https://igorkonovalov.github.io'`
+  and `base: '/lmv/'` set from the first build, and the two-entrance sidebar structure in place.
 - **Files touched:** `site/package.json`, `site/astro.config.mjs`, `site/src/content.config.ts`,
   `site/README.md`, `.gitignore`.
 - **Notes for `dev`:** prefer an Astro content-layer `glob` loader pointed at the repo's own
@@ -167,14 +168,28 @@ reads as internal intent rather than reader documentation) and `docs/roadmap-vis
 
 ### Phase 4 — the demo goes live on the personal site
 - **Owner skill:** human
-- **What:** Copy the built `dist/` into a `lmv/` subdirectory of the
-  `IgorKonovalov/IgorKonovalov.github.io` working copy, commit and push it there, and report the URL.
-- **Notes:** that repository is public and its default branch is **`master`**, not `main`. Nothing in
-  this phase touches this repository, so the `workflow` OAuth scope is not involved. If the pages
-  render but every asset 404s, `base` in `site/astro.config.mjs` does not match the subdirectory
-  name — that is the expected failure and the only one to look for first.
+- **What:** Copy this repository's built `site/dist/` into **`public/lmv/`** of the
+  `IgorKonovalov/IgorKonovalov.github.io` working copy, add one `.prettierignore` line there, commit
+  and push to `master`, and report the URL.
+- **Notes — verified against that repository on 2026-08-30:**
+  - It is itself an **Astro 5.17.3** static site (MDX + sitemap, i18n `en`/`ru`), deployed by
+    `.github/workflows/deploy.yml` on push to `main` or `master`, which runs `yarn build` and
+    uploads `dist/` via `actions/upload-pages-artifact`. Its Pages `build_type` is `workflow`.
+  - **The destination must be `public/`, not the repository root.** Pages there serves the *build
+    artifact*, not the repository tree, and `public/**` is the only directory Astro copies verbatim
+    into `dist/`. A folder dropped at the root would be committed and never published.
+  - **No `.nojekyll` is needed and none should be added.** Jekyll never runs on a `workflow`-type
+    Pages site, so Astro's `_astro/` asset directory is safe — the usual underscore trap does not
+    apply here.
+  - **One change is required in that repository:** add `public/lmv/` to its `.prettierignore`. Husky
+    + lint-staged run `prettier --write` over `*.{js,css,…}` on commit, which would reformat the
+    minified `_astro` bundle. ESLint is already safe — its flat config ignores `public/` outright.
+  - Its `public/CNAME` contains `igorkonovalov.github.io`, the default Pages domain, and the Pages
+    API reports `cname: null` — so there is no custom domain to account for.
+  - Nothing in this phase touches *this* repository, so the `workflow` OAuth scope is not involved.
 - **Done when:** `https://igorkonovalov.github.io/lmv/` serves the landing page, the roster page
-  loads, and typing a parameter name into the site search returns the roster entry for it.
+  loads, typing a parameter name into the site search returns the roster entry for it, and the
+  personal site's own pages still render — the demo must not disturb its host.
 
 ### Phase 5 — the gallery covers everything that ships
 - **Owner skill:** dev
@@ -230,8 +245,11 @@ reads as internal intent rather than reader documentation) and `docs/roadmap-vis
 - **First npm tree in this repository.** Every existing gate is a dependency-free `.mjs`. A lockfile
   and transitive dependencies are new maintenance, and a site build can break for reasons unrelated
   to any documentation change. ADR-0154 records this as the price of the generator choice.
-- **Open question for the user:** `docs/content-brief.md` and `docs/roadmap-visual-richness.md` are
-  excluded by default. One line of config each if they should be in.
+- **The demo's host is a real site, not a scratch space.** `public/lmv/` lands inside a live personal
+  site with its own build, lint and format hooks. The `.prettierignore` line is the known
+  interaction; the general risk is that a large committed build directory slows or annoys that
+  repository's own workflow. Phase 5's per-preset gallery makes this materially worse — if the demo
+  is still the only home by then, prefer bringing Phases 6-7 forward over growing the copy.
 
 ## What this plan does NOT do
 
