@@ -720,12 +720,11 @@ impl AppState {
     }
 
     fn redraw(&mut self) {
-        self.poll_input_lost();
-        self.pump_audio();
-
-        // Measure wall-clock dt for the scene director (shell frame pacing;
-        // core analysis stays clock-free). Update the marker even while hidden
-        // so the first visible frame after a gap gets a small, clamped dt.
+        // Measure wall-clock dt for the scene director and the recovery policy's
+        // settle window (shell frame pacing; core analysis stays clock-free).
+        // Update the marker even while hidden so the first visible frame after a
+        // gap gets a small, clamped dt. It is the first thing the frame does
+        // because the recovery poll below measures a duration, not a frame count.
         #[allow(
             clippy::disallowed_methods,
             reason = "shell frame pacing: measures dt for the scene director; core analysis stays clock-free"
@@ -736,6 +735,9 @@ impl AppState {
             .as_secs_f32()
             .min(MAX_DT);
         self.last_frame = now;
+
+        self.poll_input_lost(dt);
+        self.pump_audio();
 
         if self.hidden() {
             return;
@@ -1043,9 +1045,15 @@ impl AppState {
             self.input_lost = false;
         }
 
+        self.input_recovery.on_restart(persist);
+
         // The running selection follows even when the start failed: it is what
-        // was asked for, so the row shows it while the verdict says it is not
-        // delivering.
+        // was asked for, and the verdict is what says it is not delivering. The
+        // two settings rows then disagree about it. `Input mode` reads the pick,
+        // but a failed start leaves `capture_endpoint` at `None`, so
+        // `device_row_index` falls to the roster's leading slot and
+        // `Input device` reads `default` while `self.input.device` still holds
+        // the endpoint the operator named.
         self.input = input.clone();
         if persist == Persist::Yes {
             self.config.input = input.clone();
@@ -1072,11 +1080,11 @@ impl AppState {
     /// window is occluded or minimized nothing redraws and a loss is not seen
     /// until it comes back. Accepted — there is no show to interrupt behind a
     /// hidden window.
-    fn poll_input_lost(&mut self) {
+    fn poll_input_lost(&mut self, dt: f32) {
         if capture_lost(self._capture.as_ref()) {
             self.input_lost = true;
         }
-        match self.input_recovery.poll(self.input_lost) {
+        match self.input_recovery.poll(self.input_lost, dt) {
             Recovery::Hold => {}
             Recovery::Reopen(attempt) => {
                 eprintln!(
@@ -1916,19 +1924,31 @@ enum Persist {
 /// than the silence would have.
 const INPUT_RECOVERY_ATTEMPTS: u32 = 3;
 
-/// Consecutive live frames before a recovered input is judged settled and its
-/// retry budget restored.
+/// How long a recovered input must keep delivering before it is judged settled
+/// and its retry budget restored.
 ///
-/// Without it a single live frame restores the budget, so a stream that opens
-/// and dies immediately — a flapping USB interface, a driver resetting in a loop
-/// — gets a fresh three attempts every cycle and reopens for the rest of the
-/// show. That is the blocking device activation per frame [`INPUT_RECOVERY_ATTEMPTS`]
-/// exists to bound, reached by a different road. A stream that survives this many
-/// frames is delivering rather than merely constructed: an invalidated endpoint
-/// reports itself on the first packet call after start, well inside it. The cost
-/// is that a genuine second unplug within the window inherits the first
-/// incident's remaining budget instead of a full one.
-const INPUT_RECOVERY_SETTLE_FRAMES: u32 = 60;
+/// Without a window a single live frame restores the budget, so a stream that
+/// opens and dies immediately — a flapping USB interface, a driver resetting in
+/// a loop — gets a fresh three attempts every cycle and reopens for the rest of
+/// the show. That is the blocking device activation per frame
+/// [`INPUT_RECOVERY_ATTEMPTS`] exists to bound, reached by a different road. A
+/// stream that survives this long is delivering rather than merely constructed:
+/// an invalidated endpoint reports itself on the first packet call after start,
+/// well inside it.
+///
+/// **In seconds, because a frame count is a different guarantee on every
+/// display.** 0.36 s is what the 60-frame window it replaces bought on the
+/// 165 Hz box it was written on — the fast end, where a reader assuming "about
+/// a second" was wrong by nearly 3x. The same 60 frames spanned ~2 s at 30 Hz
+/// and ~250 ms at 240 Hz, so the flap it guards against was bounded on one
+/// display and unbounded on another.
+///
+/// The cost is that a genuine second unplug within the window inherits the first
+/// incident's remaining budget instead of a full one — for a *recovery's* own
+/// reopen. An operator picking an input resets the policy instead
+/// ([`RecoveryPolicy::on_restart`]), because a human judging that the situation
+/// changed is not the flap this window guards against.
+const INPUT_RECOVERY_SETTLE_SECS: f32 = 0.36;
 
 /// What the shell should do about the capture stream this frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1947,19 +1967,42 @@ enum Recovery {
 /// Pure and WASAPI-free: the shell hands it whether the input is lost and does
 /// what it says, which is what makes the bound assertable without an audio
 /// device to unplug.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 struct RecoveryPolicy {
     attempts: u32,
     announced: bool,
-    /// Consecutive live frames since the last loss, counted only while a budget
-    /// is actually spent — an input that has never been lost has nothing to
-    /// restore and never enters the window.
-    settled: u32,
+    /// Seconds of unbroken delivery since the last loss, counted only while a
+    /// budget is actually spent — an input that has never been lost has nothing
+    /// to restore and never enters the window.
+    settled: f32,
 }
 
 impl RecoveryPolicy {
-    /// Advance one frame.
-    fn poll(&mut self, lost: bool) -> Recovery {
+    /// Fold a capture restart into the policy: an operator's choice begins a new
+    /// incident, a recovery's own reopen continues the one in progress.
+    ///
+    /// Without this an operator who picks a working input after a give-up leaves
+    /// `attempts` at the bound and `announced` set, so a stream that dies inside
+    /// the settle window takes the `Hold` arm — no reopen, which is intended, and
+    /// **no token rewrite**, which is not: the `capture` column and the F3
+    /// overlay go on reading `live` while nothing is delivering.
+    ///
+    /// Restoring the retry budget is a deliberate consequence rather than a side
+    /// effect. It is the exact case [`INPUT_RECOVERY_SETTLE_SECS`] gives up, and
+    /// giving it up is only defensible for the flap that constant guards
+    /// against, not for a human who has just judged that the situation changed.
+    fn on_restart(&mut self, persist: Persist) {
+        if persist == Persist::Yes {
+            *self = Self::default();
+        }
+    }
+
+    /// Advance one frame, given the seconds it covered.
+    ///
+    /// `dt` is the shell's own frame time, already clamped to [`MAX_DT`], so a
+    /// stalled or resumed window cannot hand the accumulator a jump large enough
+    /// to settle a stream that never delivered.
+    fn poll(&mut self, lost: bool, dt: f32) -> Recovery {
         if !lost {
             if self.attempts == 0 {
                 return Recovery::Hold;
@@ -1968,13 +2011,13 @@ impl RecoveryPolicy {
             // rather than the remainder of the first — but only once the stream
             // has proved it is delivering, or a flap would restore the budget
             // faster than the bound can spend it.
-            self.settled += 1;
-            if self.settled >= INPUT_RECOVERY_SETTLE_FRAMES {
+            self.settled += dt;
+            if self.settled >= INPUT_RECOVERY_SETTLE_SECS {
                 *self = Self::default();
             }
             return Recovery::Hold;
         }
-        self.settled = 0;
+        self.settled = 0.0;
         if self.attempts < INPUT_RECOVERY_ATTEMPTS {
             self.attempts += 1;
             return Recovery::Reopen(self.attempts);
@@ -2397,6 +2440,224 @@ fn resolve_log_path() -> Option<PathBuf> {
 /// config then loads defaults and hotkey changes apply live but don't persist.
 fn resolve_config_path() -> Option<PathBuf> {
     preset_data_root().map(|root| root.join(APP_DIR_NAME).join("config.toml"))
+}
+
+/// One command-line flag this binary recognizes.
+///
+/// The roster is a second copy of a fact the scanners below already encode, and
+/// `every_scanner_flag_is_rostered` is what holds the two in step rather than
+/// discipline (ADR-0148). Keep an entry beside the scanner that reads it.
+struct FlagSpec {
+    /// Including the leading dashes, and without any `=value` suffix.
+    name: &'static str,
+    /// Whether the argument after this one is its value rather than a flag of
+    /// its own. A following argument that is itself flag-shaped is **not**
+    /// consumed: that is the rule `--soak` and `--downbeat-log` already use for
+    /// their optional paths, and it is what keeps `--tier --ocs 1.2.3.4:9000`
+    /// reporting the typo instead of swallowing it as a tier name. The cost is
+    /// that an endpoint or sender name genuinely spelled `--something` is
+    /// refused rather than passed through, which is the cheaper of the two
+    /// mistakes: every value-taking flag is otherwise a place a typo can hide.
+    takes_value: bool,
+    /// One line, printed by `--help`.
+    help: &'static str,
+}
+
+/// Every flag the binary accepts, in the order `--help` prints them.
+///
+/// Unconditional, including the `--stream` family: `stream::parse` compiles on
+/// every platform and a build without the `spout` feature refuses `--stream`
+/// with its own named reason, so a roster that hid those entries behind a `cfg`
+/// would turn a documented flag into an unrecognized argument on the builds
+/// that explain themselves best.
+const FLAGS: &[FlagSpec] = &[
+    FlagSpec {
+        name: "--help",
+        takes_value: false,
+        help: "print this roster and exit",
+    },
+    FlagSpec {
+        name: "--console",
+        takes_value: false,
+        help: "open the operator console at launch",
+    },
+    FlagSpec {
+        name: "--list-devices",
+        takes_value: false,
+        help: "print the audio capture endpoints and exit (Windows-only)",
+    },
+    FlagSpec {
+        name: "--list-adapters",
+        takes_value: false,
+        help: "print the renderer and Spout adapter rosters and exit",
+    },
+    FlagSpec {
+        name: "--input",
+        takes_value: true,
+        help: "<loopback|line-in> where audio comes from",
+    },
+    FlagSpec {
+        name: "--device",
+        takes_value: true,
+        help: "<name> which capture endpoint to open (see --list-devices)",
+    },
+    FlagSpec {
+        name: "--tier",
+        takes_value: true,
+        help: "<floor|rich> pin the quality tier instead of letting the engine pick",
+    },
+    FlagSpec {
+        name: "--osc",
+        takes_value: true,
+        help: "<host:port> publish analyzer telemetry as OSC over UDP",
+    },
+    FlagSpec {
+        name: "--soak",
+        takes_value: true,
+        help: "[path] write a long-run frame-time trace; bare, it uses a default path",
+    },
+    FlagSpec {
+        name: "--downbeat-log",
+        takes_value: true,
+        help: "[path] write the per-beat downbeat decomposition; bare, a default path",
+    },
+    FlagSpec {
+        name: "--stream",
+        takes_value: false,
+        help: "run headless and publish every frame as a Spout sender",
+    },
+    FlagSpec {
+        name: "--size",
+        takes_value: true,
+        help: "<WxH> --stream frame size (default 1280x720)",
+    },
+    FlagSpec {
+        name: "--fps",
+        takes_value: true,
+        help: "<n> --stream frame rate (default 60)",
+    },
+    FlagSpec {
+        name: "--gpu",
+        takes_value: true,
+        help: "<name|index> which adapter --stream renders and sends on",
+    },
+    FlagSpec {
+        name: "--sender",
+        takes_value: true,
+        help: "<name> the published Spout sender name (default lmv)",
+    },
+    FlagSpec {
+        name: "--preset",
+        takes_value: true,
+        help: "<name> hold one scene for --stream and disable rotation",
+    },
+    FlagSpec {
+        name: "--frames",
+        takes_value: true,
+        help: "<n> stop --stream after this many frames",
+    },
+];
+
+/// Print the flag roster to stdout.
+///
+/// Called as the **first** statement in `main`, before the event loop, the
+/// renderer and any capture client exist. That ordering is the contract: a guard
+/// shelling out to `--help` to discover the flag surface must get an answer and
+/// an exit, not a window (ADR-0148). `standalone/tests/help_cli.rs` asserts it
+/// from outside the process, which is the only place the absence of a window is
+/// observable.
+fn print_help() {
+    print!("{}", help_text());
+}
+
+/// The roster as `--help` renders it, built as a value so its content is
+/// assertable without a process. The *exit* is not — that is what
+/// `standalone/tests/help_cli.rs` spawns the binary for.
+///
+/// The name column is sized to the longest entry (`--list-adapters`) plus a
+/// gap, so adding a longer flag needs the width moved with it.
+fn help_text() -> String {
+    let mut text = String::from("lmv — a real-time music visualizer\n\nusage: lmv [flags]\n\n");
+    for spec in FLAGS {
+        text.push_str(&format!("  {:<17} {}\n", spec.name, spec.help));
+    }
+    text.push_str("\n-h is a synonym for --help.\n");
+    text.push_str("A flag takes its value as `--flag value` or `--flag=value`.\n");
+    text.push_str("README.md says what each one is for; config.toml is the persistent form.\n");
+    text
+}
+
+/// The flag name in `arg` — `--osc` for both `--osc` and `--osc=1.2.3.4:9000` —
+/// or `None` when `arg` is not flag-shaped at all.
+///
+/// A value and a bare `--` are both `None`: the app takes no positionals, so the
+/// only thing worth judging is a token that reads as a long flag, and `--` names
+/// nothing.
+fn flag_name(arg: &str) -> Option<&str> {
+    let name = arg.split('=').next().unwrap_or(arg);
+    (name.starts_with("--") && name.len() > 2).then_some(name)
+}
+
+/// Levenshtein distance between two ASCII flag names.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut row = vec![0usize; b.len() + 1];
+    for (i, &ca) in a.iter().enumerate() {
+        row[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            row[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(row[j] + 1);
+        }
+        std::mem::swap(&mut prev, &mut row);
+    }
+    prev[b.len()]
+}
+
+/// The roster entry closest to `name`, or `None` when nothing is near enough to
+/// be worth guessing at.
+///
+/// Two edits is the bar because that is what a transposition costs — `--ocs` for
+/// `--osc` is the typo this exists for — and a looser bar starts naming a flag
+/// that merely shares three letters with a word.
+fn nearest_flag(name: &str) -> Option<&'static FlagSpec> {
+    FLAGS
+        .iter()
+        .map(|spec| (edit_distance(name, spec.name), spec))
+        .filter(|&(distance, _)| distance <= 2)
+        .min_by_key(|&(distance, _)| distance)
+        .map(|(_, spec)| spec)
+}
+
+/// The first `--`-prefixed argument no scanner will claim, with the nearest
+/// roster entry to it.
+///
+/// One pass in front of the scanners, which are each a full walk of the argument
+/// list looking for a single shape and therefore cannot see an argument nobody
+/// wanted (ADR-0148). A rostered flag's value is stepped over rather than judged,
+/// so a device or sender name that happens to be flag-shaped is still its flag's
+/// value.
+fn unrecognized_flag(
+    args: impl Iterator<Item = String>,
+) -> Option<(String, Option<&'static FlagSpec>)> {
+    let mut args = args.peekable();
+    while let Some(arg) = args.next() {
+        let Some(name) = flag_name(&arg) else {
+            continue;
+        };
+        let Some(spec) = FLAGS.iter().find(|spec| spec.name == name) else {
+            return Some((arg.clone(), nearest_flag(name)));
+        };
+        // The `=` spelling carries its value inside the same argument, so there
+        // is nothing after it to step over.
+        if spec.takes_value
+            && !arg.contains('=')
+            && args.peek().is_some_and(|next| flag_name(next).is_none())
+        {
+            args.next();
+        }
+    }
+    None
 }
 
 /// The soak-log path if `--soak` was passed (`--soak <path>` / `--soak=<path>`,
@@ -2851,6 +3112,31 @@ fn list_adapters_and_exit() {
 }
 
 fn main() {
+    // Ahead of the roster gate: someone asking what the flags are is the one
+    // caller to answer rather than refuse, so `--help` wins over a typo sharing
+    // the command line with it.
+    if std::env::args()
+        .skip(1)
+        .any(|arg| arg == "--help" || arg == "-h")
+    {
+        print_help();
+        return;
+    }
+
+    // Refuse an argument no scanner will claim, before any scanner runs
+    // (ADR-0148). Without this the app starts normally while doing less than it
+    // was asked to, which on a show floor presents as a cable or controller
+    // fault rather than as a typo. Exit 2 is what this file already uses for an
+    // argument list that is wrong in shape, against 1 for a recognized flag
+    // whose value or effect failed.
+    if let Some((arg, nearest)) = unrecognized_flag(std::env::args().skip(1)) {
+        eprintln!("unrecognized argument `{arg}`");
+        if let Some(spec) = nearest {
+            eprintln!("did you mean `{}`? {}", spec.name, spec.help);
+        }
+        std::process::exit(2);
+    }
+
     // Startup aid: print the enumerable audio endpoints and exit, so the
     // operator can copy a friendly name into `input.device` (Plan 0009 Phase 2).
     if std::env::args().skip(1).any(|arg| arg == "--list-devices") {
@@ -3005,10 +3291,16 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
-        RecoveryPolicy, config, console, device_row_index, output_modal, parse_input_args_from,
-        parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
+        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, InputSource, Modal, Persist,
+        Recovery, RecoveryPolicy, config, console, device_row_index, help_text, output_modal,
+        parse_input_args_from, parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
+        unrecognized_flag,
     };
+
+    /// One frame at 60 Hz, for the cases where the *rate* is not what is under
+    /// test — the bound, the flap and the give-up latch all count events rather
+    /// than seconds, so any frame time exercises them the same way.
+    const A_FRAME: f32 = 1.0 / 60.0;
 
     /// **A live input costs nothing and never reopens.** The policy runs every
     /// frame of every show, so the overwhelmingly common answer has to be `Hold`.
@@ -3016,7 +3308,7 @@ mod tests {
     fn a_live_input_is_never_reopened() {
         let mut policy = RecoveryPolicy::default();
         for _ in 0..1000 {
-            assert_eq!(policy.poll(false), Recovery::Hold);
+            assert_eq!(policy.poll(false, A_FRAME), Recovery::Hold);
         }
         assert_eq!(policy, RecoveryPolicy::default(), "a live input kept state");
     }
@@ -3031,15 +3323,15 @@ mod tests {
         let mut policy = RecoveryPolicy::default();
         for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
             assert_eq!(
-                policy.poll(true),
+                policy.poll(true, A_FRAME),
                 Recovery::Reopen(attempt),
                 "attempt {attempt} did not reopen"
             );
         }
-        assert_eq!(policy.poll(true), Recovery::GiveUp);
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::GiveUp);
         for _ in 0..500 {
             assert_eq!(
-                policy.poll(true),
+                policy.poll(true, A_FRAME),
                 Recovery::Hold,
                 "the policy kept talking after it gave up"
             );
@@ -3050,33 +3342,58 @@ mod tests {
     /// An interface unplugged twice in one show is two incidents, not one long
     /// one, so the second must not inherit the remainder of the first. What the
     /// window buys is that "recovered" means a stream that kept delivering, not
-    /// one that merely got constructed; the frame the window closes on is
-    /// asserted from both sides, because an off-by-one here is the difference
-    /// between this rule and the one below it.
+    /// one that merely got constructed; it is asserted from both sides, because
+    /// an off-by-one here is the difference between this rule and the one below
+    /// it.
+    ///
+    /// **Swept over three refresh rates**, which is the property a frame count
+    /// could not state: 30 Hz and 240 Hz are the ends where 60 frames meant
+    /// about 2 s and about 250 ms, and the window has to be the same length of
+    /// time at both.
     #[test]
-    fn a_recovery_restores_the_full_budget_once_it_has_settled() {
-        let mut policy = RecoveryPolicy::default();
-        assert_eq!(policy.poll(true), Recovery::Reopen(1));
-        assert_eq!(policy.poll(true), Recovery::Reopen(2));
+    fn the_settle_window_is_one_duration_on_every_display() {
+        // The two ends where the frame-count version gave different guarantees,
+        // plus the 165 Hz box whose 60 frames the constant is derived from.
+        for hz in [30.0_f32, 165.0, 240.0] {
+            let dt = 1.0 / hz;
+            let mut policy = RecoveryPolicy::default();
+            assert_eq!(policy.poll(true, dt), Recovery::Reopen(1));
+            assert_eq!(policy.poll(true, dt), Recovery::Reopen(2));
 
-        // One frame short of the window, the budget is still spent.
-        for _ in 0..INPUT_RECOVERY_SETTLE_FRAMES - 1 {
-            assert_eq!(policy.poll(false), Recovery::Hold);
+            // Up to the last frame that still lands inside the window, the
+            // budget is spent.
+            let mut elapsed = 0.0_f32;
+            while elapsed + dt < INPUT_RECOVERY_SETTLE_SECS {
+                assert_eq!(policy.poll(false, dt), Recovery::Hold);
+                elapsed += dt;
+            }
+            assert_ne!(
+                policy,
+                RecoveryPolicy::default(),
+                "at {hz} Hz the budget came back after {elapsed} s, inside the window"
+            );
+
+            // The frame that completes it restores everything.
+            assert_eq!(policy.poll(false, dt), Recovery::Hold);
+            elapsed += dt;
+            assert_eq!(
+                policy,
+                RecoveryPolicy::default(),
+                "at {hz} Hz the budget had not come back after {elapsed} s"
+            );
+
+            // The point of the change: the window closes at the same *time* on
+            // every display, to within the one frame no policy can subdivide.
+            assert!(
+                elapsed >= INPUT_RECOVERY_SETTLE_SECS && elapsed < INPUT_RECOVERY_SETTLE_SECS + dt,
+                "at {hz} Hz the window closed at {elapsed} s, which is not within one frame of the window"
+            );
+
+            for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+                assert_eq!(policy.poll(true, dt), Recovery::Reopen(attempt));
+            }
+            assert_eq!(policy.poll(true, dt), Recovery::GiveUp);
         }
-        assert_ne!(
-            policy,
-            RecoveryPolicy::default(),
-            "the budget came back before the stream had settled"
-        );
-
-        // The frame that completes it restores everything.
-        assert_eq!(policy.poll(false), Recovery::Hold);
-        assert_eq!(policy, RecoveryPolicy::default());
-
-        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
-            assert_eq!(policy.poll(true), Recovery::Reopen(attempt));
-        }
-        assert_eq!(policy.poll(true), Recovery::GiveUp);
     }
 
     /// **A flapping endpoint cannot outrun the bound.** A stream that opens and
@@ -3091,11 +3408,11 @@ mod tests {
         let mut reopens = 0;
         let mut gave_up = 0;
         for _ in 0..10_000 {
-            match policy.poll(true) {
+            match policy.poll(true, A_FRAME) {
                 Recovery::Reopen(_) => {
                     reopens += 1;
                     // The reopen "worked" — for exactly one frame.
-                    assert_eq!(policy.poll(false), Recovery::Hold);
+                    assert_eq!(policy.poll(false, A_FRAME), Recovery::Hold);
                 }
                 Recovery::GiveUp => gave_up += 1,
                 Recovery::Hold => {}
@@ -3436,5 +3753,252 @@ mod tests {
             true,
             true
         ));
+    }
+
+    /// [`unrecognized_flag`] with the matched spec reduced to its name, so an
+    /// expectation reads as the pair the operator is shown.
+    fn refused(args: &[&str]) -> Option<(String, Option<&'static str>)> {
+        let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        unrecognized_flag(argv.into_iter()).map(|(arg, near)| (arg, near.map(|spec| spec.name)))
+    }
+
+    /// **The reduction from the entry that produced this gate.** A misspelt
+    /// `--osc` is a running visualizer with a dark rig, so the refusal has to
+    /// name the flag that was meant, not merely reject the one that was typed.
+    #[test]
+    fn a_misspelt_flag_is_refused_and_the_nearest_one_named() {
+        assert_eq!(
+            refused(&["--ocs", "127.0.0.1:9000"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--teir=floor"]),
+            Some(("--teir=floor".to_owned(), Some("--tier")))
+        );
+
+        // Nothing in the roster is within two edits of this, so a guess would
+        // name a flag sharing nothing with what was typed.
+        assert_eq!(
+            refused(&["--definitely-not-a-flag"]),
+            Some(("--definitely-not-a-flag".to_owned(), None))
+        );
+    }
+
+    /// **Every rostered flag is claimed, in both spellings.** The gate is
+    /// additive: a roster that refuses one of its own flags stops a working
+    /// invocation, which is a worse failure than the silence it replaces.
+    #[test]
+    fn every_rostered_flag_is_claimed_in_both_spellings() {
+        for spec in FLAGS {
+            let spaced: Vec<String> = if spec.takes_value {
+                vec![spec.name.to_owned(), "value".to_owned()]
+            } else {
+                vec![spec.name.to_owned()]
+            };
+            assert_eq!(
+                unrecognized_flag(spaced.into_iter()).map(|(arg, _)| arg),
+                None,
+                "the roster refused its own `{}`",
+                spec.name
+            );
+            if spec.takes_value {
+                let inline = vec![format!("{}=value", spec.name)];
+                assert_eq!(
+                    unrecognized_flag(inline.into_iter()).map(|(arg, _)| arg),
+                    None,
+                    "the roster refused `{}=value`",
+                    spec.name
+                );
+            }
+        }
+    }
+
+    /// **A value is stepped over; a flag-shaped token never is.** An endpoint
+    /// name is operator-supplied text and must not be judged as a flag, but a
+    /// token that reads as one is judged even where a value was expected —
+    /// otherwise the value-taking flags, which are most of the roster, would
+    /// each be a place a typo could hide.
+    #[test]
+    fn a_value_is_stepped_over_and_a_flag_shaped_token_is_still_judged() {
+        assert_eq!(
+            refused(&[
+                "--device",
+                "Line (ZOOM AMS-22 Audio)",
+                "--ocs",
+                "127.0.0.1:9000"
+            ]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--device", "--ocs"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--console", "--weird-endpoint-name"]),
+            Some(("--weird-endpoint-name".to_owned(), None))
+        );
+    }
+
+    /// **A bare `--tier` does not swallow the flag after it.** The scanners take
+    /// an optional value by refusing a flag-shaped one, and a gate that consumed
+    /// unconditionally would hide exactly the typo it exists to report.
+    #[test]
+    fn an_omitted_value_does_not_hide_the_next_typo() {
+        assert_eq!(
+            refused(&["--tier", "--ocs", "127.0.0.1:9000"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(refused(&["--soak", "--console"]), None);
+    }
+
+    /// **Only long flags are judged.** The app takes no positionals, so a bare
+    /// word is not an argument to reject, and `--` names nothing.
+    #[test]
+    fn a_positional_and_a_bare_double_dash_are_not_flags() {
+        assert_eq!(refused(&["nonsense", "--"]), None);
+    }
+
+    /// Every flag name a scanner compares an argument against, read out of the
+    /// module's own source.
+    ///
+    /// A flag literal is the **whole** string — `"--osc"`, or the `=` spelling
+    /// `"--tier="` — which is what separates a comparison from prose that
+    /// mentions a flag (`"--stream: no preset named …"`, and `stream.rs`'s line
+    /// saying `--list-presets` is not a flag). The scan stops at the test module,
+    /// where a `--`-prefixed literal is an input rather than a flag the binary
+    /// claims.
+    fn scanner_flag_literals(source: &str) -> Vec<String> {
+        let body = source.split("#[cfg(test)]").next().unwrap_or(source);
+        let bytes = body.as_bytes();
+        let mut found = Vec::new();
+        let mut i = 0;
+        while let Some(offset) = body[i..].find("\"--") {
+            // Past the opening quote; the name itself starts at the dashes.
+            let start = i + offset + 1;
+            let mut end = start;
+            while end < bytes.len()
+                && (bytes[end] == b'-'
+                    || bytes[end].is_ascii_lowercase()
+                    || bytes[end].is_ascii_digit())
+            {
+                end += 1;
+            }
+            let mut close = end;
+            if close < bytes.len() && bytes[close] == b'=' {
+                close += 1;
+            }
+            // A bare `"--"` is the scanners' own test for "the next argument is
+            // a flag, so it is not my value", not a flag name.
+            if end > start + 2 && close < bytes.len() && bytes[close] == b'"' {
+                found.push(body[start..end].to_owned());
+            }
+            i = start + 2;
+        }
+        found
+    }
+
+    /// **ADR-0148's drift gate.** The roster is a second copy of a fact the
+    /// scanners encode, and this is what keeps them in step: a flag added to a
+    /// scanner and not to the roster fails here rather than shipping as an
+    /// argument the binary accepts and `--help` does not mention.
+    ///
+    /// One-directional by construction — it cannot assert that every roster
+    /// entry is still reachable, so a retired flag can linger in `--help`.
+    #[test]
+    fn every_scanner_flag_literal_is_rostered() {
+        let sources = [
+            ("main.rs", include_str!("main.rs")),
+            ("stream.rs", include_str!("stream.rs")),
+        ];
+        for (file, source) in sources {
+            let literals = scanner_flag_literals(source);
+            // A lexer that silently stopped matching would make this test pass
+            // by finding nothing, which is the one way a drift gate fails
+            // quietly.
+            assert!(
+                literals.len() >= 5,
+                "the scan found only {} flag literals in {file}; it has stopped reading the source",
+                literals.len()
+            );
+            for literal in literals {
+                let name = literal.trim_end_matches('=');
+                assert!(
+                    FLAGS.iter().any(|spec| spec.name == name),
+                    "`{name}` is compared against an argument in {file} and is not in FLAGS, \
+                     so the binary accepts a flag --help does not mention"
+                );
+            }
+        }
+    }
+
+    /// **`--help` prints the whole roster.** The roster is what an operator
+    /// reaches for to check a spelling, so an entry it does not print is an
+    /// entry that does not exist as far as anyone outside the source is
+    /// concerned.
+    #[test]
+    fn the_help_text_prints_every_rostered_flag() {
+        let text = help_text();
+        for spec in FLAGS {
+            assert!(
+                text.contains(spec.name),
+                "--help does not mention `{}`",
+                spec.name
+            );
+            assert!(
+                text.contains(spec.help),
+                "--help does not carry the help line for `{}`",
+                spec.name
+            );
+        }
+        assert!(text.contains("-h"), "--help does not name its own synonym");
+    }
+
+    /// A policy that has spent its budget and announced the give-up — the state
+    /// an operator reaches for the `S` menu in.
+    fn given_up() -> RecoveryPolicy {
+        let mut policy = RecoveryPolicy::default();
+        for _ in 0..INPUT_RECOVERY_ATTEMPTS {
+            policy.poll(true, A_FRAME);
+        }
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::GiveUp);
+        policy
+    }
+
+    /// **An operator's choice is a new incident.** After a give-up, a swap to a
+    /// working input, and a death inside the settle window, the spent latch
+    /// returns `Hold` — and `Hold` writes no token, so the `capture` column and
+    /// the F3 overlay would go on reading `live` about a stream delivering
+    /// nothing. The reset is what makes that loss reach `GiveUp` again and
+    /// rewrite the verdict to `lost`.
+    #[test]
+    fn an_operator_swap_makes_the_next_loss_write_its_own_verdict() {
+        let mut inherited = given_up();
+        assert_eq!(
+            inherited.poll(true, A_FRAME),
+            Recovery::Hold,
+            "a spent policy is silent, which is the failure"
+        );
+
+        let mut reset = given_up();
+        reset.on_restart(Persist::Yes);
+        for attempt in 1..=INPUT_RECOVERY_ATTEMPTS {
+            assert_eq!(reset.poll(true, A_FRAME), Recovery::Reopen(attempt));
+        }
+        assert_eq!(
+            reset.poll(true, A_FRAME),
+            Recovery::GiveUp,
+            "the loss after an operator swap wrote no verdict"
+        );
+    }
+
+    /// **A recovery's own reopen still inherits.** The bound exists to stop a
+    /// flapping endpoint handing itself a fresh budget every cycle, and nothing
+    /// about a reopen the shell asked for itself says the situation changed.
+    #[test]
+    fn a_recoverys_own_restart_does_not_reset_the_policy() {
+        let mut policy = given_up();
+        policy.on_restart(Persist::No);
+        assert_eq!(policy.poll(true, A_FRAME), Recovery::Hold);
+        assert_ne!(policy, RecoveryPolicy::default());
     }
 }

@@ -1,9 +1,18 @@
 # 0135 — The show-night surfaces stop lying
 
-> **Status:** approved
+> **Status:** done — closed 2026-08-30 on Phases 1-4 (`915fc74`, `c937026`, `e0fd1a7`,
+> `6c717d5`). Mode 4 review: **no blockers, one major, five minors.** Verified at the close:
+> `fmt` clean, `clippy --workspace --all-targets` clean, `nextest --workspace` **1211 passed /
+> 5 skipped**, and ADR-0148's drift gate **convicted under mutation** — dropping `--osc` from
+> the roster failed `every_scanner_flag_literal_is_rostered` by name, which is the check Phase 2's
+> done-when asked for and the log did not state. **Phase 5 (`human`) did not run** and is carried,
+> not abandoned: it needs a removable audio interface, which the box does not have. It lives in
+> [`docs/on-device-validation.md`](../../on-device-validation.md)'s unplug item and as a Standing
+> bullet in [the plans index](../README.md); **design-backlog 0154 stays live** with a dated update
+> saying so.
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (proposed)
+> **Related ADRs:** [0148](../../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (accepted)
 > **Closes:** design-backlog 0159, 0156, 0155. **0154 is carried, not closed** — see Phase 5.
 
 ## TL;DR
@@ -17,7 +26,7 @@ buys is ~1 s on a 60 Hz display and ~250 ms on a 240 Hz one. The first visible b
 
 ## Context & problem
 
-Three of these four entries were filed at [Plan 0130](done/0130-the-audio-input-becomes-an-operator-surface.md)'s
+Three of these four entries were filed at [Plan 0130](0130-the-audio-input-becomes-an-operator-surface.md)'s
 Mode 4 review and the fourth on the pinned 2026-08-29 show build, while hardening the live lighting
 path. They are grouped here because they share files (`standalone/src/main.rs`,
 `standalone/src/capture_win.rs`), share a failure class, and share an audience — the operator
@@ -26,19 +35,19 @@ reading a surface mid-show, who has no source access and no time.
 The class is worth naming precisely, because it is what makes four low-severity entries worth one
 plan. **None of these is a crash and none renders wrong.** Every one of them is a surface that
 states the opposite of what is happening, on a path reachable only when something has already gone
-wrong. [Plan 0083](done/0083-the-build-says-why-it-hears-nothing.md) built `CaptureVerdict` to
-prevent exactly that, and [Plan 0130](done/0130-the-audio-input-becomes-an-operator-surface.md)
+wrong. [Plan 0083](0083-the-build-says-why-it-hears-nothing.md) built `CaptureVerdict` to
+prevent exactly that, and [Plan 0130](0130-the-audio-input-becomes-an-operator-surface.md)
 added the `Lost` variant for the single job of distinguishing a run that had audio and lost it from
 one that never had any. Backlog 0156 is the path where that variant states the opposite.
 
-The forcing function is [Plan 0133](0133-the-engine-drives-the-lights.md): once `standalone` drives
+The forcing function is [Plan 0133](../0133-the-engine-drives-the-lights.md): once `standalone` drives
 physical fixtures, the room is the only evidence a flag took effect, and a lying surface costs a
 show rather than a debugging session.
 
 **What this plan does not assume.** Backlog 0154 (a COM `REGDB_E_CLASSNOTREG` on one activation in
 22) names three candidate fixes and says plainly that choosing between them *"wants the unplug
 evidence rather than more reasoning"*. That evidence has never been gathered —
-[`docs/on-device-validation.md`](../on-device-validation.md)'s unplug item has never run. This plan
+[`docs/on-device-validation.md`](../../on-device-validation.md)'s unplug item has never run. This plan
 therefore gathers it and does **not** pre-commit to a repair.
 
 ## Decision
@@ -82,7 +91,7 @@ flowchart TB
 ### Phase 1 — The binary knows its own flags
 - **Owner skill:** dev
 - **What:** Add the `FlagSpec` roster and the single pre-scanner pass that refuses an unclaimed
-  `--`-prefixed argument, per [ADR-0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md).
+  `--`-prefixed argument, per [ADR-0148](../../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md).
   No scanner changes shape.
 - **Files touched:** `standalone/src/main.rs`.
 - **Notes for the implementer:**
@@ -158,7 +167,7 @@ flowchart TB
 
 ### Phase 5 — The unplug gate (evidence only, no repair)
 - **Owner skill:** human
-- **What:** Run [`docs/on-device-validation.md`](../on-device-validation.md)'s unplug item, which has
+- **What:** Run [`docs/on-device-validation.md`](../../on-device-validation.md)'s unplug item, which has
   never run, and record what the recovery path actually does against a real endpoint removal.
 - **Files touched:** `docs/design-backlog.md` (a dated update on entry 0154),
   `docs/on-device-validation.md` (the item's result).
@@ -195,8 +204,8 @@ impl RecoveryPolicy {
 ## Risks & open questions
 
 - **Phase 1 is a behavior change on the startup path, and `main.rs` is contended.**
-  [Plan 0131](done/0131-the-operator-gets-a-console.md) is being built directly on `main` inside this
-  file and [Plan 0126](0126-the-large-files-split-along-their-seams.md) Phase 7 splits it. Sequence
+  [Plan 0131](0131-the-operator-gets-a-console.md) is being built directly on `main` inside this
+  file and [Plan 0126](../0126-the-large-files-split-along-their-seams.md) Phase 7 splits it. Sequence
   this behind 0126 if both are live, or expect a merge. The roster is additive and localized, which
   is the mitigation.
 - **A hard exit will surface stale flags in the user's own shortcuts** on the first run after the
@@ -217,6 +226,61 @@ impl RecoveryPolicy {
 - **It does not fix backlog 0154.** Phase 5 gathers evidence; the repair is a later plan's, with an
   ADR if the evidence supports a structural change.
 - **It does not touch the Art-Net or OSC paths themselves.** Those are
-  [Plan 0133](0133-the-engine-drives-the-lights.md)'s. This plan only makes a misspelt flag reaching
+  [Plan 0133](../0133-the-engine-drives-the-lights.md)'s. This plan only makes a misspelt flag reaching
   them impossible to miss.
 - **It adds no CLI dependency.** See ADR-0148 Alternative B.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0135` on `plan-0135-show-night-surfaces`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The binary knows its own flags | dev | done | `915fc74` |
+| 2 — `--help` prints the roster and exits | dev | done | `c937026` |
+| 3 — An operator's choice is a new incident | dev | done | `e0fd1a7` |
+| 4 — The settle window is in seconds | dev | done | `6c717d5` |
+| 5 — The unplug gate (evidence only) | human | not started | |
+
+### Notes
+
+- **One file beyond the plan's list**, in Phase 2 (`c937026`): `standalone/tests/help_cli.rs`.
+  The phase's done-when asks for the exit to be asserted rather than the output, and a window,
+  a wgpu device or a capture client on that path is not observable from inside the process that
+  would be creating them. `CARGO_BIN_EXE_lmv` resolves the binary in an integration test and not
+  in the bin's own unit tests, so the assertion has nowhere else to live.
+  `standalone/tests/shot_cli.rs` is the crate's existing precedent for spawning a CLI.
+- The roster covers `standalone/src/stream.rs`'s seven flags as well as `main.rs`'s, and the
+  drift test scans both files. The plan's file list named only `main.rs`; a roster holding half
+  the flags would have refused `--sender` and its siblings, which Phase 1's second done-when
+  forbids.
+- **Backlog 0156's probe cannot see its own repair.** The entry's reduction is
+  `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`, and the fix landed as
+  `RecoveryPolicy::on_restart` called from `restart_capture` rather than as a direct assignment,
+  so the probe still reads `absent` and the gate still counts the entry as live.
+- `standalone/tests/help_cli.rs` carries a file-level
+  `#![allow(clippy::disallowed_methods, reason = ...)]` for the one-second exit bound. The
+  repo-wide ban is a determinism rule for analysis code; `core/tests/arc_cost.rs` and six
+  siblings use the same escape for the same reason.
+- The two comment corrections named in Phase 3 both landed in `e0fd1a7`; the settle constant's
+  own comment was corrected there too, since resetting the policy changes what it documents.
+- Not acted on: `TITLE_UPDATE_FRAMES` in `standalone/src/main.rs` is still a frame count. It
+  paces the window-title refresh and is not in the recovery path, so Phase 4's second done-when
+  does not reach it.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0159 (Phases 1-2), 0156 (Phase 3), 0155 (Phase 4).
+  0154 is carried, and Phase 5 has not run.
+- **What shipped:** feature (`--help`, and a startup refusal that did not exist) plus two fixes.
+- **Operator docs touched:** `README.md` — the `Flags & environment` section gained a lead-in
+  naming `--help` as the authority and a `--help` / `-h` entry; the per-flag prose is unchanged.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, two broken, both
+  entry 0155 — `present: INPUT_RECOVERY_SETTLE_FRAMES` and `present: Consecutive live frames`,
+  the constant and comment Phase 4 retires. The other four node gates exit 0.
+- **Outstanding `human` phases:** Phase 5, the unplug gate. It has not run, and it needs a
+  removable audio interface on the box.
