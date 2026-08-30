@@ -13,6 +13,74 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0124 — The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md)
+  — closed 2026-08-30. Five `dev` commits in the `lmv-plan-0124` worktree: `709544f` (the shared
+  `core/tests/common/` harness), `cf8c47a` (six rejoined literals plus the `#[allow]` move),
+  `fdb0fed` (the widened hygiene gate and 72 rewritten comments), `7c87aad` (the ABI clause) and
+  `4780f9e` (the unwired scripts). **Phase 4 produced no commit** — it had landed out of band on
+  2026-08-29 during a documentation audit and the plan block said so; `dev` verified it rather than
+  redoing it, which is the right reading.
+
+  **Review: no blockers, one major, five minors, two nits.** Re-verified on the lane after
+  `git merge main`: `fmt` clean, `clippy --workspace --all-targets -D warnings` clean,
+  `cargo nextest run --workspace` 1212 passed / 5 skipped, golden green **unblessed**, all five Node
+  gates exit 0, and `node scripts/check-comment-hygiene.mjs scripts/fixtures` reports exactly ten
+  findings across four files, matching `scripts/fixtures/README.md` row for row. Two claims were
+  checked mechanically rather than taken: outside the new fixture files every `+`/`-` line in Phase
+  3's `.rs`/`.cpp` diff is a comment line (filtered count: zero non-comment lines), and the only
+  non-comment change under `core/src/render/` across the whole lane is the `#[allow]` move Phase 2
+  asked for — so *"no file under `core/src/render/` changes a pixel"* holds structurally as well as
+  behaviourally.
+
+  **The major — the defect Phase 2 fixed is a class, and the guard it shipped is an enumeration.**
+  `operator_messages_carry_no_run_of_spaces` names six surfaces by hand, and the identical
+  multiple-space defect survives in roughly twenty more string literals, three of them reaching a
+  human at runtime: `standalone/src/stream.rs:393` (a `--stream` CLI error), `milkconv/src/convert.rs:430`
+  (a converter report line) and `core/src/dsp/mod.rs:57` (a `const _: () = assert!` message). `dev`
+  named only the last of the three as a followup. The asymmetry inside the plan is the point: Phase
+  3 turned its gate into a repo-wide lexer walk, Phase 2 left its guard as a six-item list.
+  Filed as **design-backlog 0168**.
+
+  **The five minors.** (1) The `## Implementation log` runs 121 lines against the plan's own 96-line
+  `## Implementation phases` — the report outweighs the contract, which nothing gates. (2) Phase 1
+  extracted the 27 `fn headless` copies but left **eleven** inline ADR-0016 skip blocks in files whose
+  skip sits inside a bespoke `capture_at`-shaped function; `dev` disclosed the list, and the harness
+  is therefore not yet the single place the skip lives — which is what Plans 0125 and 0126 inherit.
+  (3) The widened `ELAPSED` pattern's bare `pre-` branch is `pre-(?:plan\s+|adr\s+|phase\s+)?\d+`,
+  so it convicts `pre-1.0` — this project's own phrase for the ADR-0005 compat rule — as narration;
+  `pre-\d{4}` for the bare form keeps `pre-0070` and drops the false positive. (4) `any more`
+  joined `VOCABULARY` with no silence pinned for the comparative idiom `any more than`, which is
+  ordinary English and not narration; `dev` hit it once and reworded rather than escaped, so the
+  class is real and unrecorded — `any more(?! than)` plus a SILENT fixture case closes it.
+  (5) Phase 2's done-when required clippy to **fail** with the `#[allow(clippy::indexing_slicing)]`
+  removed; it does not. `dev` probed it twice (a control `unwrap()` in the same position did fire, so
+  the deny reaches the function) and reported the attribute inert in its old position too. The
+  falsification is `dev`'s, correctly disclosed and correctly not acted on; the dead attribute is
+  still in the tree.
+
+  **The two nits.** Nine plan citations (`0025`, `0038`, `0040`, `0062`, `0065`, `0073`, `0082`,
+  `0095`, `0099`) were dropped by the Phase 3 rewrites rather than converted to the bare form the
+  phase promised — all nine remain cited elsewhere in source, so nothing became unreachable, but
+  `lines/spectrum.rs`'s `DEFAULT_SPAN` and `DEFAULT_BASELINE` no longer point at Plan 0038 Phase 2.
+  And `plugin-foobar/foo_lmv.cpp:982` still opens *"v3 is forward-compatible"* while
+  `LMV_ABI_VERSION` is `6` — the spec clause Phase 5 rewrote now cites that comment as its
+  justification, so the stale version number is load-bearing in a way it was not before.
+
+  **Phase 6 deviates on the user's instruction**, given before Phase 1: `milk-softness.mjs` and
+  `softness-sheets.mjs` are **kept** rather than `git rm`'d, and `CLAUDE.md` names all five unwired
+  renderers. The done-when is met by its first branch for all ten `.mjs`. Two costs the deletion
+  would have carried, both real: closed Plan 0114 references the pair at nine places, and
+  design-backlog 0161 holds a live `unprobeable:` verification on them.
+
+  **Curation: not triggered** — `git diff --name-only e6028bd..704a0e2 -- presets/` is empty, and
+  the plan fixed no engine defect a preset could have been written around.
+
+  **Still parked, deliberately:** the plan's own open question — `core/src` measured at 37 % comment
+  lines with three files above 1:1 — is untouched. ADR-0127 drew the mechanism/decision line and this
+  plan widened its gate; whether a *ratio* should be gated is an ADR question the user has not been
+  asked. Also filed at this close: **design-backlog 0169**, `cargo doc --workspace --no-deps` emits 64
+  intra-doc-link warnings over 31 files and neither `pre-push` nor CI runs `cargo doc`.
+
 - [0135 — The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md)
   — closed 2026-08-30. Four `dev` phases in the `lmv-plan-0135` worktree: `915fc74` (the roster
   gate), `c937026` (`--help`), `e0fd1a7` (an operator swap resets the incident) and `6c717d5` (the
@@ -5658,7 +5726,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0084]: done/0084-two-gates-stop-lying-about-what-they-check.md
 [0087]: done/0087-the-line-renderer-draws-a-curve.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
-[0124]: 0124-the-review-fixes-that-move-no-pixels.md
+[0124]: done/0124-the-review-fixes-that-move-no-pixels.md
 [0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
