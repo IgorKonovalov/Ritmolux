@@ -211,6 +211,20 @@ footprint so the vendor spread is on record.
       and never sets the flag. If that is what happens, the honest fix is a silence-duration
       heuristic and that is a worse mechanism worth its own ADR — not a quiet addition. Report which
       of the two you saw.
+
+      **Plan 0135 Phase 5 joined this item at that plan's close (2026-08-30), for the same reason:
+      no removable interface on the box.** It adds three questions and **changes what is under
+      test** — the policy is now the repaired one, so run this against a build at v0.95.0 or later:
+      the settle window is `INPUT_RECOVERY_SETTLE_SECS = 0.36` rather than 60 frames, and an
+      operator-initiated swap resets the incident instead of inheriting a spent latch. Report
+      **(d)** whether `CoCreateInstance` ever returns `REGDB_E_CLASSNOTREG` during a *real* loss, as
+      opposed to the menu-speed churn where it was seen once; **(e)** how many of the three attempts
+      a real unplug consumes; and **(f)** whether the verdict that lands names the right cause —
+      `lost …` for a gone endpoint, not a COM failure wearing the same string. **(d) is the one
+      that matters most**: design-backlog 0154 names three candidate fixes and says explicitly that
+      choosing between them wants this evidence, so a run answering it is what unblocks that ADR.
+      **A run that reproduces nothing is a result worth recording** — one activation in 22 is a
+      single sample, not a rate. _(Plan 0135 Phase 5, carried at that plan's close.)_
 - [ ] **A 96 kHz interface, if one is to hand.** Both analysis windows are sized in samples
       (`WINDOW_SIZE`, `LOW_WINDOW_SIZE` in `core/src/dsp/mod.rs`), so a 96 kHz stream loses roughly
       a third of the band axis to one-bin resolution. This is the stated trigger of
