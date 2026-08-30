@@ -29,7 +29,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. |
-| [0124](0124-the-review-fixes-that-move-no-pixels.md) | The review fixes that move no pixels | approved | dev | First of three from the 2026-08-28 review. Six mechanical, golden-neutral fixes, incl. a shared `core/tests/common/` harness. **Goes first** — 0125/0126 write tests against it. |
 | [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three. Five helpers retire ~800-1000 pasted lines across 12 scenes, one per phase, **golden-identical unblessed on both adapters at every commit**. ADR-0058 constrains it. |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
@@ -331,16 +330,25 @@ would revert most quietly.
    ([backlog 0110](../design-backlog.md)).
 
 **Added 2026-08-28, from a whole-codebase review (layering, god modules, hot-path safety, doc
-drift): [0124](0124-the-review-fixes-that-move-no-pixels.md) →
+drift): [0124](done/0124-the-review-fixes-that-move-no-pixels.md) →
 [0125](0125-the-scenes-share-their-gpu-boilerplate.md) →
 [0126](0126-the-large-files-split-along-their-seams.md), in that order and not in parallel.** The
 review found no blocker — layering, the audio callbacks, the C ABI and determinism all came back
 clean — so these are a maintenance lane, not a feature one, and they **interleave with the roster
-above rather than displacing it**: 0124 is a day and can go any time; 0125 and 0126 rewrite the
-scene files and must not run alongside a plan that also touches them (0092 on `shape_field`, 0123
-Phase 3 on `schema.rs`). The three are ordered so each inherits the previous one's instrument —
-0124's harness and widened gate, then 0125's helpers, then 0126's splits of the now-smaller files.
-Every phase in all three is golden-identical unblessed; a bless anywhere in this lane is a finding.
+above rather than displacing it**: 0125 and 0126 rewrite the scene files and must not run alongside
+a plan that also touches them (0092 on `shape_field`, 0123 Phase 3 on `schema.rs`). The three are
+ordered so each inherits the previous one's instrument — 0124's harness and widened gate, then
+0125's helpers, then 0126's splits of the now-smaller files. Every phase in all three is
+golden-identical unblessed; a bless anywhere in this lane is a finding.
+
+**[0124] closed 2026-08-30, so 0125 is next in this lane and its instrument is live.** Two things
+0125 and 0126 inherit that are not what the plan promised. `core/tests/common/` holds the ADR-0016
+skip once, but **eleven** files still carry an inline copy inside a bespoke `capture_at`-shaped
+function (`arc_cost`, `attractor`, `backdrop_palette`, `backdrop_ramp`, `background_composite`,
+`beat`, `collage_cost`, `field_cost`, `mark_cost`, `palette_contour`, `reaction_diffusion`) — so a
+new test can still be written by pasting. And `check-comment-hygiene.mjs` now walks `.c/.h/.cc/.cpp/.hpp`
+as well as `.rs`, which puts `foo_lmv.cpp` under the gate for the first time; 0126's Phase on that
+file is the one that meets it.
 
 ### What this sequence assumes
 
@@ -952,6 +960,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0124 - The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md) - closed 2026-08-30. Review: **no blockers, one major, five minors, two nits.** Version: **0.95.1** (patch). Filed [backlog 0168 + 0169](../design-backlog.md). [Write-up](README-archive.md).
 - [0135 - The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md) - closed 2026-08-30. Review: **no blockers, one major, five minors.** Version: **0.95.0**. Archived [backlog 0155 + 0156 + 0159](../design-backlog-archive.md). Phase 5 carried - see Standing. [Write-up](README-archive.md).
 - [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md) - closed 2026-08-30. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Revoked ADR-0141's store half. [Write-up](README-archive.md).
 - [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md) — closed 2026-08-30. Review: **no blockers, two majors, five minors, two nits.** Version: **0.94.0** (minor). Filed [backlog 0164 + 0165](../design-backlog.md). Phase 6 part-run. [Write-up](README-archive.md).
@@ -1145,7 +1154,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
-[0124]: 0124-the-review-fixes-that-move-no-pixels.md
+[0124]: done/0124-the-review-fixes-that-move-no-pixels.md
 [0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md

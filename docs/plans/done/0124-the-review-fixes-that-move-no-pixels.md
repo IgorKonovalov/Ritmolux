@@ -1,9 +1,18 @@
 # 0124 — The review fixes that move no pixels
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-30. Phases 1, 2, 3, 5, 6 landed as `709544f`, `cf8c47a`,
+> `fdb0fed`, `7c87aad`, `4780f9e`; Phase 4 had landed out of band and was verified, not redone.
+> Mode 4 review: **no blockers, one major, five minors, two nits.** Verified on the lane after
+> `git merge main`: `fmt` clean, `clippy --workspace --all-targets -D warnings` clean,
+> `nextest --workspace` 1212 passed / 5 skipped, the golden suite green **unblessed**, all five
+> Node gates exit 0, and the comment-hygiene fixture bite reports exactly ten findings across
+> four files. Confirmed by reading the diff: outside the new fixture files, Phase 3 changed
+> **only** comment lines, and the sole non-comment change under `core/src/render/` is the
+> `#[allow]` move Phase 2 asked for. The major: the broken-literal defect survives outside
+> `schema.rs` — filed as design-backlog 0168.
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) (the hygiene gate this widens), [ADR-0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the crate this maps), [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md) (the skip shape the shared harness keeps)
+> **Related ADRs:** [ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) (the hygiene gate this widens), [ADR-0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the crate this maps), [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md) (the skip shape the shared harness keeps)
 
 **Drafted without an interview at the user's request.** The guesses: (1) no new ADR — every
 item here is a mechanism fix under a decision that already exists; (2) the ABI-check
@@ -26,8 +35,8 @@ under `core/src/render/` changes a pixel, and the golden suite proves it.**
 
 The review ran four lenses over the tree (layering, god modules, hot-path safety, doc/test
 drift). Layering, real-time safety and the ABI came back clean; what it found was maintenance
-debt and a few plain defects. Plans [0125](0125-the-scenes-share-their-gpu-boilerplate.md) and
-[0126](0126-the-large-files-split-along-their-seams.md) take the structural half. This plan takes
+debt and a few plain defects. Plans [0125](../0125-the-scenes-share-their-gpu-boilerplate.md) and
+[0126](../0126-the-large-files-split-along-their-seams.md) take the structural half. This plan takes
 what needs no design and no judgement, so that it can go first and so that the other two inherit a
 harness and a gate that already work.
 
@@ -212,8 +221,8 @@ pub fn decode(path: &Path) -> CaptureImage
 
 ## What this plan does NOT do
 
-- No GPU helper, no scene edit, no file split — [0125](0125-the-scenes-share-their-gpu-boilerplate.md)
-  and [0126](0126-the-large-files-split-along-their-seams.md).
+- No GPU helper, no scene edit, no file split — [0125](../0125-the-scenes-share-their-gpu-boilerplate.md)
+  and [0126](../0126-the-large-files-split-along-their-seams.md).
 - Does not move `new_from_win32_hwnd` out of `core` or the `shot` thread-local diagnostic off
   the scene renderer — both are seam moves and belong to 0126.
 - Does not touch the comment **weight** question; see the open item above.

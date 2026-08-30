@@ -9,7 +9,7 @@
 acceptance oracle for every phase — a helper that changes one pixel is a wrong helper, so no
 bless is permitted anywhere in this plan; (2) helpers are `pub(crate)` in `render::gpu` /
 `render::palette` and are **not** added to the `Scene` trait, because ADR-0002 keeps that trait to
-the preset engine's vocabulary; (3) the plan runs in a worktree after [0124](0124-the-review-fixes-that-move-no-pixels.md)
+the preset engine's vocabulary; (3) the plan runs in a worktree after [0124](done/0124-the-review-fixes-that-move-no-pixels.md)
 and before [0126](0126-the-large-files-split-along-their-seams.md), because 0126 splits the very
 files this plan shrinks and a split of duplicated code is duplicated splitting.
 
