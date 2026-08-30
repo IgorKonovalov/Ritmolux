@@ -578,14 +578,14 @@ fn a_fitted_motif_is_a_g1_chain_rather_than_a_polygon() {
         );
         assert!(
             m.instances() < was,
-            "{}: a fitted chain must cost less than the polyline it replaces,              got {} against {was}",
+            "{}: a fitted chain must cost less than the polyline it replaces, got {} against {was}",
             m.name(),
             m.instances()
         );
         assert_eq!(
             m.segments(),
             0,
-            "{}: these three outlines are curves everywhere, so the fit has no              straight run to emit",
+            "{}: these three outlines are curves everywhere, so the fit has no straight run to emit",
             m.name()
         );
 
@@ -643,7 +643,7 @@ fn a_fitted_motif_is_a_g1_chain_rather_than_a_polygon() {
         }
         assert!(
             breaks * 4 <= was,
-            "{}: {breaks} tangent discontinuities left, against {was} the              polyline had — that is not a collapse",
+            "{}: {breaks} tangent discontinuities left, against {was} the polyline had — that is not a collapse",
             m.name()
         );
     }

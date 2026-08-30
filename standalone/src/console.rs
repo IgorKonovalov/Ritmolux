@@ -447,7 +447,7 @@ pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
             format!("next up  -  {name}  (auto off)      dwell {min}-{max} s")
         }
         (None, _) => format!(
-            "next up  -  nothing to rotate to; the roster holds one preset                   dwell {min}-{max} s"
+            "next up  -  nothing to rotate to; the roster holds one preset      dwell {min}-{max} s"
         ),
     };
     Line::new(

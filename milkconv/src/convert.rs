@@ -427,7 +427,7 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
             warnings.push(Warning {
                 section: "",
                 message: format!(
-                    "writes `{input}`, which the host supplies and overwrites every                      frame — the assignment survives only until the next frame"
+                    "writes `{input}`, which the host supplies and overwrites every frame — the assignment survives only until the next frame"
                 ),
                 class: "writes-input",
             });
@@ -442,7 +442,7 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
             warnings.push(Warning {
                 section: "per_frame",
                 message: format!(
-                    "reads `{input}` in per-frame code, where it is a per-VERTEX                      variable — it holds whatever the previous frame's last vertex                      left it at"
+                    "reads `{input}` in per-frame code, where it is a per-VERTEX variable — it holds whatever the previous frame's last vertex left it at"
                 ),
                 class: "vertex-input-in-frame",
             });

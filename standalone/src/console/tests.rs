@@ -583,7 +583,7 @@ fn the_random_cut_never_returns_the_preset_already_showing() {
                 assert!(picked < count, "{picked} is off a roster of {count}");
                 assert_ne!(
                     picked, active,
-                    "count {count}, active {active}, seed {seed}: the random cut                      returned the preset already on screen"
+                    "count {count}, active {active}, seed {seed}: the random cut returned the preset already on screen"
                 );
             }
         }

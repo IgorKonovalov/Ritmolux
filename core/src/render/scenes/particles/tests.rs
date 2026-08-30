@@ -862,7 +862,7 @@ fn continuity_is_pinned_per_family() {
         assert_eq!(
             canonical(family).projection.1 == 3.0,
             continuous,
-            "{family:?}: the dim/continuity coincidence has broken, which is                  allowed - update this note, do NOT key `is_continuous` off `dim`"
+            "{family:?}: the dim/continuity coincidence has broken, which is allowed - update this note, do NOT key `is_continuous` off `dim`"
         );
     }
 }
@@ -895,7 +895,7 @@ fn a_segment_starts_where_the_last_one_ended() {
     for (i, ((pos, prev), was)) in after.iter().zip(before.iter()).enumerate() {
         assert_eq!(
             prev, was,
-            "particle {i}: this frame's segment starts at {prev:?}, but last                  frame ended at {was:?} - the stroke has a gap"
+            "particle {i}: this frame's segment starts at {prev:?}, but last frame ended at {was:?} - the stroke has a gap"
         );
         if pos != prev {
             moved += 1;
@@ -905,7 +905,7 @@ fn a_segment_starts_where_the_last_one_ended() {
     // a statement about a moving cloud and not about a stalled one.
     assert!(
         moved * 2 > after.len(),
-        "only {moved} of {} particles moved in a frame - a stalled cloud would              satisfy the endpoint check trivially",
+        "only {moved} of {} particles moved in a frame - a stalled cloud would satisfy the endpoint check trivially",
         after.len()
     );
 }
@@ -930,7 +930,7 @@ fn only_continuous_families_ask_for_a_segment() {
     // rather than whatever a later edit last left it at.
     #[expect(
         clippy::assertions_on_constants,
-        reason = "the constancy is the point: this pins a provisional default                       that Phase 4 owns flipping"
+        reason = "the constancy is the point: this pins a provisional default that Phase 4 owns flipping"
     )]
     {
         assert!(
@@ -990,7 +990,7 @@ fn total_deposited_light_is_invariant_across_density() {
         let total = f64::from(active) * f64::from(deposit_scale(active));
         assert!(
             (total - reference).abs() < 1e-6 * reference,
-            "density {density} draws {active} particles for total light {total},                  against {reference} at full density"
+            "density {density} draws {active} particles for total light {total}, against {reference} at full density"
         );
     }
     // Non-vacuity: the counts genuinely differ, so the constancy above is a
@@ -1041,7 +1041,7 @@ fn the_tail_beyond_the_active_count_never_moves() {
         .count();
     assert!(
         moved * 2 > active,
-        "only {moved} of {active} active particles moved - the dispatch did not run,              so the inert tail proves nothing"
+        "only {moved} of {active} active particles moved - the dispatch did not run, so the inert tail proves nothing"
     );
 }
 
