@@ -1,9 +1,9 @@
 # ADR-0147 — The shared artifact store is revoked, and the linker stays
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-30 (Plan 0134) - carries an `Outcome`
 > **Date:** 2026-08-29
 > **Supersedes in part:** [ADR-0141](0141-one-artifact-store-serves-every-lane.md)
-> **Related plan(s):** [0134](../plans/0134-the-lanes-stop-sharing-a-store.md)
+> **Related plan(s):** [0134](../plans/done/0134-the-lanes-stop-sharing-a-store.md)
 
 ## Context
 
@@ -125,6 +125,42 @@ provenance and nothing can attribute them after the fact.
   `standalone/tests/shot_cli.rs`'s `scratch()` — become correct again by accident rather than by
   repair. Backlog **0160** and **0161** record them and stay live: they are wrong about a redirect
   that could return, and asking `cargo metadata` is right either way.
+
+## Outcome (2026-08-30, Plan 0134)
+
+The revocation holds, and it was verified in the only way that can settle it - by asking two lanes
+whether they compile different things.
+
+- **The config is as this ADR specifies.** `WORK/.cargo/config.toml` holds the
+  `[target.x86_64-pc-windows-msvc]` linker block and nothing else, with a header naming this ADR and
+  saying the redirect is not to be put back; `WORK/.lmv-target` - **16.07 GB** - is gone;
+  `cargo metadata --no-deps` reports a `target_directory` inside the worktree it is run from, in
+  every live lane.
+- **Two lanes report different test counts against the same command:** `cargo nextest run
+  --workspace` gives **1155 tests** in `lmv-plan-0115` and **1138** on `main`, a difference of 17.
+  Under the store those two runs were indistinguishable by construction. Both are green, including
+  `standalone/tests/frame_tap_memory.rs`, whose `no method named open_tap` failure was the loud
+  instance this ADR was written from - so the run Plan 0115's `dev` session discarded as
+  unattributable now has an answer.
+- **No golden moved on `main`** with `LMV_BLESS` unset, which was the finding that would have meant
+  a baseline was blessed against a foreign core.
+- **The Plan 0104 arm was answered by that lane's own close**, a day before Plan 0134 Phase 2 went
+  looking for it: the lane rebuilt cold into its own `target/` and confirmed 72 presets with
+  `include_str!` paths under `lmv-plan-0104`. Plan 0134 recorded the arm as unrunnable, the worktree
+  having been removed; the evidence exists, in `docs/plans/README-archive.md`.
+
+**One hazard this ADR did not name, found executing its own Decision.** Deleting the store is a
+recursive delete of a directory other sessions may be *building into*. A `nextest --workspace` run
+had started about a minute earlier; the delete removed `debug/.fingerprint` and `debug/build` before
+failing `Access to the path 'animation-...exe' is denied` on a live test binary, with five test
+processes accumulating CPU. The lock is the only thing that reported the problem. **A recursive
+delete of a build directory needs a check for processes rooted in it, not an existence check** - the
+same shape as ADR-0053's `git worktree remove` hazard, one level down, and it applies to any future
+store-scale cleanup rather than to this one-time act.
+
+The cold-build cost this ADR accepts - 105 s per new lane - was not re-measured here and stays as
+Plan 0129 Phase 1 recorded it. Alternative B (`sccache`) remains unexercised and remains the answer
+if that cost turns out to hurt.
 
 ## Alternatives considered
 

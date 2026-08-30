@@ -13,6 +13,132 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md)
+  — closed 2026-08-30. Five `dev` phases on `main`, no worktree: `9ab7726` (Phases 1 + 3 in one
+  commit), `b9edb61` (two defects found by driving it), `f0760bb` (Phase 2), `03b4b01` (Phases 4 + 5
+  in one commit) and `eaba5b0` (an operator-feedback round). Phase 6 (`human`) is **part-run** and
+  its remainder lives on the on-device checklist. Review: **no blockers, two majors, five minors,
+  two nits.** Version **0.94.0** (minor). Closed no backlog entry; filed 0164 and 0165. Curation not
+  triggered — `presets/` untouched across every commit in the plan's range.
+
+  **It delivers, and the delivery was re-verified rather than read off the log.** `C` opens a second
+  window on another display carrying the preset browser, the settings menu, a seven-control
+  transport strip, a "next up" staging line and a live preview of the show. The close gate is clean
+  on `fmt`, `clippy --workspace --all-targets` and `cargo nextest run --workspace` at **1199 tests,
+  5 skipped**, with `git status` clean afterwards — so no golden moved, which is what the plan
+  demanded of a phase that touches the render path. The C ABI is untouched, no dependency was added,
+  and no windowing or platform type reached `core`: `attach_aux` takes an
+  `impl Into<wgpu::SurfaceTarget<'static>>` and the shell hands it an `Arc<Window>` through wgpu's
+  own conversion.
+
+  **The strongest thing in it is the ADR-0037 test.** `preview_rect` takes its aspect from the
+  output render target and its unit tests run at three deliberately disagreeing aspects — a wide
+  output, a tall console, a square one — with a portrait-output control whose whole job is that it
+  and the primary case cannot both pass if a container's shape reached the picture. This project has
+  shipped the other reading twice, both times behind tests written at 16:9 into 16:9; this is the
+  first test here constructed so that pass cannot happen. The byte-identity claim beside it is
+  asserted exactly, carries a vacuity guard (`is_flat`), and the log records a non-vacuity control —
+  shortening the copy extent by 8 columns made it fail at a named byte, then reverted.
+
+  **Both majors are the same measurement.** Phase 6 recorded **61.7 fps console-closed against 33.1
+  fps console-open**, `frame_ms_p99_steady` 18.6 ms against 47.3 ms, frame counts agreeing
+  independently, with `Mailbox` confirmed as the mode actually negotiated — so the non-blocking
+  present mode alone is **not** sufficient, which is precisely what ADR-0143 argued it would be. Two
+  comments assert the property that measurement denies: `main.rs`'s *"the console is a monitor and
+  must not delay the frame it reports on"* and `aux_target.rs`'s *"a console that stalls or drops a
+  frame cannot alter what the show displays."* Being after this frame's present does not stop the
+  console delaying the next one — same thread, same loop, same queue, `desired_maximum_frame_latency
+  = 1`, undecimated. What holds is narrower: the show's **pixels** are unaffected, asserted
+  byte-exactly; its **cadence** is not. Both halves went to [backlog 0164](../design-backlog.md), and
+  ADR-0143 was accepted **with an Outcome** recording the falsified claim rather than with the claim
+  left standing.
+
+  **The reading is bounded twice, and the second bound is its own finding.** It is an **integrated**
+  GPU — the windowed path requests an adapter with default power preference and `RenderContext::new`
+  takes no adapter choice, so `--gpu` reaches `--stream` only (ADR-0146) and every windowed
+  frame-time figure this project has ever quoted on this machine is an iGPU figure. Nothing said so
+  until the startup adapter note this plan added, which is what makes any of these numbers
+  attributable at all (ADR-0071). That is [backlog 0165](../design-backlog.md), and it is also why
+  the console's dual-GPU degrade path — built, logged, non-fatal — **has still never executed**.
+
+  **Three minors are the same shape: a criterion whose instrument is narrower than its wording.**
+  Phase 2's draw-call criterion says "asserted rather than argued" and nothing reads `draw_calls`
+  (it is true by construction — the copy is not a draw call and the blit is on the console's own
+  encoder). Its release-on-close criterion says the resident set "returns to its console-closed
+  baseline"; the test computes that baseline, prints it, and asserts only the same 64 MB tripwire
+  the open-preview test uses, which cannot separate released from held — the real instrument is
+  `preview_state() == None`, which is sound. And
+  `closing_the_preview_returns_the_renderer_to_its_direct_path` ends by comparing a **fresh**
+  renderer against the original, which is cross-renderer reproducibility, not the close. In each
+  case the property is genuinely held; what is missing is the assertion the plan bought.
+
+  **One minor is a change nobody wrote a criterion for.** `RenderContext::from_surface` now sets
+  `config.usage |= COPY_DST` **unconditionally**, for every run, console or not. Phase 2's "with the
+  console closed the renderer costs exactly what it costs today" names two things — no intermediate
+  allocated, no copy encoded — and both hold; the third, permanent change to how the swapchain is
+  configured is covered by neither the criterion nor the log. No cost is observable here (the closed
+  arm measured 61.7 fps), which is exactly why it is worth writing down.
+
+  **What outlived the plan.** A general secondary-present seam in `core` that knows nothing about
+  consoles — attach a surface, present into it, detach — which the plan's own Followups note could
+  serve a confidence monitor or a second projector. `resolve_monitor` generalized into
+  `resolve_display`, so `[output]` and `[console]` answer the display question through one rule
+  rather than two. And the `is_synthetic` filter on keyboard input in **both** windows: winit
+  replays held keys at a window gaining focus, the console gains focus while `C` is still down, and
+  the replay ran the toggle again — which read as an intermittent flicker rather than as a bug. Any
+  future console binding inherits that exposure.
+
+- [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md)
+  - closed 2026-08-30. Three phases of three, taken on `main` with no worktree because the plan
+  changes one machine-local file and no repository code: `2c15cc2` (Phase 2) and `d9ee224`
+  (Phase 3), plus `713893f`, which landed Phase 3's file edits out of band the previous evening.
+  Review: **no blockers, one major, four minors.** Version **none** - docs/chore-only, deliberate
+  under ADR-0005, and it also avoids colliding with the Plan 0131 close running in parallel. Closed
+  no backlog entry. Curation: not triggered - `presets/` untouched.
+
+  **The revocation is verified, not read off the log.** `WORK/.cargo/config.toml` holds the
+  `rust-lld` block and nothing else, with a header naming ADR-0147 and forbidding the redirect's
+  return; `WORK/.lmv-target` - 16.07 GB - is gone; `cargo metadata --no-deps` reports a
+  `target_directory` inside the worktree it runs from. The evidence that matters is that
+  `cargo nextest run --workspace` now gives **1155 tests in `lmv-plan-0115` against 1138 on `main`**,
+  a difference of 17 that the shared store made structurally invisible. Both green, both including
+  `standalone/tests/frame_tap_memory.rs` - the `no method named open_tap` failure that found the
+  defect - and no golden moved on `main` with `LMV_BLESS` unset. ADR-0147 accepted with a dated
+  `Outcome` carrying these.
+
+  **The major is that Plan 0129 still hands a reader the redirect.** Phase 3's done-when says
+  *"nothing in the repository still tells a reader to point `target-dir` anywhere"*, and
+  `plans/done/0129` does exactly that in three places - Phase 3's `How`, its `Done when`, and the
+  Data-shapes config snippet - with nothing on the page pointing at the revocation. `dev` found this,
+  reported it as a deviation and correctly declined to amend a closed plan; the repair is
+  architect-owned bookkeeping and was done here as an **append**: a revocation blockquote at 0129's
+  header, one at Phase 3, one line above the snippet, plus a pointer on its index bullet and on its
+  write-up above. The plan still records what was done and why; what it no longer does is instruct.
+
+  **`dev`'s Phase 2 deviation is resolved by evidence it did not know to look for.** The
+  `lmv-plan-0104` arm - 72 embedded presets, not 54 - was recorded unrunnable because that worktree
+  had closed and been removed before the phase started. It had in fact already been run, a day
+  earlier, by that lane's own close: rebuilt cold into its own `target/`, 72 presets confirmed with
+  `include_str!` paths under `lmv-plan-0104`, precisely because ADR-0147 landed mid-review and no
+  earlier green run was attributable. The write-up for 0104 above carries it. All three of Phase 2's
+  arms are therefore answered; only two of them were answered by this plan.
+
+  **One hazard was found executing Phase 1 and is now recorded where it can be acted on.** Deleting
+  the store is a recursive delete of a directory other sessions may be *building into*: a
+  `nextest --workspace` run had started a minute before, and the delete removed `debug/.fingerprint`
+  and `debug/build` before failing on a locked, running test binary - the lock being the only thing
+  that reported the collision, with five test processes live. **A recursive delete of a build
+  directory needs a check for processes rooted in it, not an existence check.** It lived only in a
+  plan about to be closed; it is now in ADR-0147's `Outcome`, beside ADR-0053's `git worktree remove`
+  hazard, which is the same shape one level down.
+
+  **What the plan deliberately did not repair, and it is right.** Backlog 0160 and 0161 stay live -
+  the committed scripts that resolve cargo output under `<repo>/target` became correct again by
+  accident, not by repair, and `cargo metadata` is the right question under either configuration.
+  Both entries gained a dated line at this close saying the redirect is revoked, so a reader is not
+  sent to ADR-0141 as though it were current. `plugin-foobar/build.ps1:32` still cites ADR-0141 for
+  a mechanism ADR-0147 took back; its behaviour is correct either way and 0161 covers the class.
+
 - [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md)
   — closed 2026-08-30. Seven planned phases plus a `dev`-added Phase 3b, in the `lmv-plan-0115`
   lane, `b50592a`..`7e870aa` plus the close block and the out-of-band auto-rotate fix `64758ad`.
@@ -146,6 +272,15 @@ were superseded orderings of the active roster.
   is what the plan asked for), `b17d8cc`..`952d5c3` plus the close's `6371136`. Review: **no
   blockers, one major, four minors.** Version **0.91.1** (patch). Closed no backlog entry; filed
   0160 + 0161. Curation: not triggered — `presets/` untouched.
+
+  **The store half was revoked the next day.**
+  [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) (Plan 0134)
+  removed the `[build] target-dir` redirect Phases 3 and 7 installed and deleted the store, because
+  the worktree path is not in cargo's fingerprint and one lane was served another's compiled
+  `lmv-core` as fresh. **The linker half — Phase 2, and the 171 s to 145 s it measured — is not
+  implicated and stands**, as does Phase 6's `opt-level` finding. Plan 0129's own page now carries
+  the revocation at its header, at Phase 3 and at the Data-shapes snippet, appended at Plan 0134's
+  close; this note exists because the write-up above is the other place a reader meets the redirect.
 
   **It delivers, and the delivery was re-verified at the close rather than read off the log.** A
   worktree that has never built compiles **3 workspace crates in 23.6 s with zero dependencies

@@ -33,9 +33,7 @@ place. The plan file carries the real link.
 | [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three. Five helpers retire ~800-1000 pasted lines across 12 scenes, one per phase, **golden-identical unblessed on both adapters at every commit**. ADR-0058 constrains it. |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
-| [0131](0131-the-operator-gets-a-console.md) | The operator gets a console | in-progress | dev, human | **Being built directly on `main`, no worktree.** ADR-0143 (proposed): a second winit window on the renderer's existing device. Ordering is 0126 Phase 7 and 0130; Phase 6 is a `human` gate. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0134](0134-the-lanes-stop-sharing-a-store.md) | The lanes stop sharing a store | in-progress | dev, human | **Take this before either live lane builds again.** ADR-0147 (proposed): the worktree path is not in cargo's fingerprint, so one lane is served another's `lmv-core`. Phase 1 is `human`. |
 | [0135](0135-the-show-night-surfaces-stop-lying.md) | The show-night surfaces stop lying | approved | dev, human | Backlog 0159 + 0156 + 0155 (**0154 carried**). ADR-0148: the CLI refuses an unclaimed flag, so a misspelt `--osc` fails loudly instead of darkening the rig. Phase 5 is a `human` unplug gate. |
 | [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
 | [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
@@ -192,9 +190,9 @@ Sequencing:
   markdown and one shell script; only Phases 7-8 render. It also repairs the instruments the other
   two are verified with — `check-index-rows.mjs` currently cannot fail, so a detector matching
   nothing exits 0 at all three call sites.
-- **[0135] contends hard on `standalone/src/main.rs`** with [0115], [0133], [0131] and [0126]
-  Phase 7. It is additive and localized, but it is the fifth plan wanting that file. Take it after
-  [0126] Phase 7 reduces it to shell glue, or expect a rebase.
+- **[0135] contends hard on `standalone/src/main.rs`** with [0133] and [0126] Phase 7 ([0115] and
+  [0131] have since closed **into** that file). It is additive and localized, but it is the fifth
+  plan to want it. Take it after [0126] Phase 7 reduces it to shell glue, or expect a rebase.
 - **[0137] contends with nothing** and shares no file with the current roster —
   `core/src/render/metrics.rs` plus two test files. Its Phases 4 and 6 are prose and need no
   adapter at all.
@@ -213,13 +211,10 @@ Sequencing:
   hard-depends on. Note what the ordering does and does not buy: Phases 1 to 7 of 0133 — the
   lights themselves — depend on nothing in 0115, so this sequence buys the **picture** path, not
   the lighting path.
-- **Three of the four contend on `standalone/src/main.rs`.** [0115] adds `--stream` to it, [0133]
-  edits it in Phases 1 and 6, and [0131] edits it heavily. Run them in series in that lane, **0133
-  before 0131** — it is the live-critical one, and it is the smaller edit to rebase onto.
-- **[0131]'s own stated ordering constraint is not in this sequence.** It is [0126] Phase 7, which
-  turns `main.rs` into shell glue. Taking 0131 first is allowed — the constraint is contention, not
-  correctness — but it means 0126 Phase 7 later rebases onto 0131's edits instead of 0131 landing
-  on a file already reduced to glue.
+- ~~**Three of the four contend on `standalone/src/main.rs`.** Run them in series, **0133 before
+  0131**~~ — **discharged 2026-08-30.** [0115] and [0131] both closed on `main` rather than in that
+  lane, and neither ran through [0126] Phase 7 first. `main.rs` is now 3,440 lines and carries the
+  console, so **[0126] Phase 7 rebases onto both**, which is the cost the bullet below predicted.
 - ~~**[ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) applies to both open lanes.**
   The shared artifact store serializes on cargo's lock~~ — **withdrawn 2026-08-29.**
   [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked the
@@ -938,9 +933,11 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md) - closed 2026-08-30. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Revoked ADR-0141's store half. [Write-up](README-archive.md).
+- [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md) — closed 2026-08-30. Review: **no blockers, two majors, five minors, two nits.** Version: **0.94.0** (minor). Filed [backlog 0164 + 0165](../design-backlog.md). Phase 6 part-run. [Write-up](README-archive.md).
 - [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md) — closed 2026-08-30. Review: **no blockers, two majors, three minors.** Version: **0.93.0** (minor). [Write-up](README-archive.md).
 - [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md) — closed 2026-08-29. Review: **one blocker, three majors, three minors, two nits.** Version: **0.92.0** (minor). Corrected [backlog 0038](../design-backlog.md). [Write-up](README-archive.md).
-- [0129 - The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md) - closed 2026-08-29. Review: **no blockers, one major, four minors.** Version: **0.91.1** (patch). Filed [backlog 0160 + 0161](../design-backlog.md). [Write-up](README-archive.md).
+- [0129 - The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md) - closed 2026-08-29. Review: **no blockers, one major, four minors.** Version: **0.91.1** (patch). Store half revoked by ADR-0147. Filed [backlog 0160 + 0161](../design-backlog.md). [Write-up](README-archive.md).
 - [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md) — closed 2026-08-29. Review: **no blockers, one major, three minors, two nits.** Version: **0.91.0** (minor). [Write-up](README-archive.md).
 - [0127 — The picture stops depending on the volume slider](done/0127-the-picture-stops-depending-on-the-volume-slider.md) — closed 2026-08-28. Review: **no blockers, no majors, four minors.** Version: **0.90.0** (minor). Archived [backlog 0122 + 0123](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0130 — The audio input becomes an operator surface](done/0130-the-audio-input-becomes-an-operator-surface.md) — closed 2026-08-28. Review: **no blockers, two majors, two minors, two nits.** Version: **0.89.0** (minor). Filed [backlog 0154-0156](../design-backlog.md). [Write-up](README-archive.md).
@@ -1133,7 +1130,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
-[0131]: 0131-the-operator-gets-a-console.md
+[0131]: done/0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
 [0135]: 0135-the-show-night-surfaces-stop-lying.md
 [0136]: 0136-the-gates-can-convict.md
