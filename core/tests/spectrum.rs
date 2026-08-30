@@ -10,7 +10,9 @@
 
 use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
 use lmv_core::preset::Preset;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::metrics::frame_diff;
+
+mod common;
 
 const SIZE: u32 = 96;
 const FRAMES: u32 = 12;
@@ -24,23 +26,6 @@ const MATERIAL: f32 = 0.05;
 /// fullscreen field's does. This is still an order of magnitude above adapter
 /// noise, which measures below `1e-4` between identical renders.
 const MATERIAL_LINE: f32 = 0.01;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// A frame whose band energy sits in one narrow region: `lit` bands starting at
 /// `from`, every other band silent.
@@ -72,7 +57,7 @@ fn banded(from: usize, lit: usize) -> AnalysisFrame {
 /// makes this a test of `bin` rather than of the two frames.
 #[test]
 fn a_bin_bound_param_reaches_a_scene_and_tracks_its_own_region() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -134,7 +119,7 @@ fn a_bin_bound_param_reaches_a_scene_and_tracks_its_own_region() {
 /// measures is the *variation across elements*, not a brightness change.
 #[test]
 fn a_per_element_binding_paints_a_figure_a_scalar_cannot() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     // Broadband energy, so every element has something to draw.

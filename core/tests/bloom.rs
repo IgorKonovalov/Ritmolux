@@ -31,9 +31,10 @@
 //! for this stage does live there — this is the behavioural half beside it. Skips
 //! with no adapter per ADR-0016.
 
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
+use lmv_core::render::{CaptureImage, Renderer, Tier};
+
+mod common;
 
 /// Capture size. **Square, and load-bearing** — see the module docs. It is also
 /// exactly the post grid's quantization step, so the internal grid is 256x256 and
@@ -65,24 +66,6 @@ const CORE_MARGIN: f32 = 1.3;
 /// measurement, not taste: the shipped kernel reads ~1.00 and the source-texel bug
 /// this guards read ~2.0, so a bound of 1.15 sits far from both.
 const ROUNDNESS_TOL: f32 = 1.15;
-
-fn headless(tier: Tier) -> Option<Renderer> {
-    match Renderer::new_headless_tiered(
-        HeadlessOptions {
-            width: SIZE,
-            height: SIZE,
-            prefer_software: true,
-        },
-        tier,
-    ) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// The fixture with its three `bloom_*` bindings replaced by these.
 ///
@@ -139,19 +122,6 @@ fn fixture_exposed(brightness: f32, amount: f32, threshold: f32, exposure: Optio
         toml.push_str(&format!("exposure = \"{exposure}\"\n"));
     }
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("bloom fixture parses: {e}"))
-}
-
-/// The fixed frame every capture is taken under — the same one `composite.rs`
-/// blesses its baselines at.
-fn fixed_frame() -> AnalysisFrame {
-    AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    }
 }
 
 /// Per-pixel luma in bytes, and the pixel's offset from the frame's centre in
@@ -243,7 +213,7 @@ fn halo_spread(img: &CaptureImage, core: f32) -> (f32, f32) {
 fn capture(renderer: &mut Renderer, amount: f32, threshold: f32, radius: f32) -> CaptureImage {
     renderer.set_presets(vec![fixture_with(amount, threshold, radius)]);
     renderer
-        .capture_preset(FIXTURE_NAME, &fixed_frame(), FRAMES)
+        .capture_preset(FIXTURE_NAME, &common::fixed_frame(), FRAMES)
         .unwrap_or_else(|e| panic!("capture bloom fixture at amount {amount}: {e}"))
 }
 
@@ -255,7 +225,7 @@ fn capture(renderer: &mut Renderer, amount: f32, threshold: f32, radius: f32) ->
 /// re-render that reference three times and put four GPU devices in one binary.
 #[test]
 fn the_halo_follows_its_params_and_is_round() {
-    let Some(mut renderer) = headless(Tier::Floor) else {
+    let Some(mut renderer) = common::headless_tiered(SIZE, SIZE, Tier::Floor) else {
         return;
     };
 
@@ -340,7 +310,7 @@ fn the_halo_follows_its_params_and_is_round() {
 /// the neutral stop is not exactly the identity here, every baseline moves.
 #[test]
 fn the_bright_pass_thresholds_exposed_light() {
-    let Some(mut renderer) = headless(Tier::Floor) else {
+    let Some(mut renderer) = common::headless_tiered(SIZE, SIZE, Tier::Floor) else {
         return;
     };
     let mut shoot = |brightness: f32, amount: f32, threshold: f32, exposure: Option<f32>| {
@@ -348,7 +318,7 @@ fn the_bright_pass_thresholds_exposed_light() {
             brightness, amount, threshold, exposure,
         )]);
         renderer
-            .capture_preset(FIXTURE_NAME, &fixed_frame(), FRAMES)
+            .capture_preset(FIXTURE_NAME, &common::fixed_frame(), FRAMES)
             .unwrap_or_else(|e| panic!("capture at threshold {threshold}: {e}"))
     };
 
@@ -428,7 +398,7 @@ fn the_bright_pass_thresholds_exposed_light() {
 #[test]
 fn a_deeper_pyramid_throws_the_halo_further() {
     let reach = |tier: Tier| -> Option<f32> {
-        let mut renderer = headless(tier)?;
+        let mut renderer = common::headless_tiered(SIZE, SIZE, tier)?;
         let img = capture(&mut renderer, 1.0, 1.0, 1.0);
         Some(median_radius(&img))
     };

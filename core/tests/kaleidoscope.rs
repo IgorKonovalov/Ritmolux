@@ -101,7 +101,9 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
+
+mod common;
 
 /// Capture size. **Height must stay even** — that is what puts `uv.y = 0.5`, the
 /// -x ray, exactly between two pixel rows so the pair straddles the branch cut.
@@ -161,21 +163,6 @@ fn fixture_with(extra: &str) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("kaleido fixture parses: {e}"))
 }
 
-fn headless(width: u32, height: u32) -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width,
-        height,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// Mean per-channel difference (0..255) between the two pixel rows immediately
 /// above and below the horizontal midline, over the left half's measured stretch.
 ///
@@ -208,7 +195,7 @@ fn midline_seam(img: &CaptureImage) -> f32 {
 
 #[test]
 fn fractional_fold_order_does_not_tear_the_minus_x_ray() {
-    let Some(mut renderer) = headless(WIDTH, HEIGHT) else {
+    let Some(mut renderer) = common::headless(WIDTH, HEIGHT) else {
         return;
     };
     let frame = AnalysisFrame {
@@ -414,7 +401,7 @@ fn beyond_disc(img: &CaptureImage, factor: f32) -> (u8, usize, usize) {
 /// not what it can detect.
 #[test]
 fn the_falloff_treatment_paints_nothing_outside_its_disc() {
-    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+    let Some(mut renderer) = common::headless(FIELD_W, FIELD_H) else {
         return;
     };
     let frame = AnalysisFrame {
@@ -540,7 +527,7 @@ fn capture_folded(
 /// assertion that makes it true.
 #[test]
 fn the_falloff_lands_on_the_backdrop_not_on_black() {
-    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+    let Some(mut renderer) = common::headless(FIELD_W, FIELD_H) else {
         return;
     };
     let frame = AnalysisFrame {
@@ -607,7 +594,7 @@ fn the_falloff_lands_on_the_backdrop_not_on_black() {
 /// untouched backdrop and is therefore *identical* however the fold axis moves.
 #[test]
 fn the_backdrop_is_not_folded_so_it_does_not_move_with_the_fold_axis() {
-    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+    let Some(mut renderer) = common::headless(FIELD_W, FIELD_H) else {
         return;
     };
     let frame = AnalysisFrame {
@@ -780,7 +767,7 @@ const FILL_STRUCTURE: f32 = 0.15;
 /// assumed.
 #[test]
 fn the_fill_treatments_cover_the_out_of_disc_region_without_smearing() {
-    let Some(mut renderer) = headless(FIELD_W, FIELD_H) else {
+    let Some(mut renderer) = common::headless(FIELD_W, FIELD_H) else {
         return;
     };
     let frame = AnalysisFrame {

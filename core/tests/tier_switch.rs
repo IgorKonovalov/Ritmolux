@@ -21,26 +21,12 @@
 //!
 //! Skips with no adapter per ADR-0016.
 
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer, Tier, TierConfig};
+use lmv_core::render::{Tier, TierConfig};
+
+mod common;
 
 /// Small: nothing here reads a pixel, so the capture size only has to be legal.
 const SIZE: u32 = 64;
-
-/// `None` on a runner with no GPU adapter at all (ADR-0016).
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 /// **ADR-0045's by-construction guarantee, defended against the mutator ADR-0054
 /// adds.** A capture path cannot leave the floor, whatever a caller asks for.
@@ -53,7 +39,7 @@ fn headless() -> Option<Renderer> {
 /// are still the floor's", spelled out rather than left to the reader.
 #[test]
 fn a_headless_renderer_refuses_every_tier_change() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     assert_eq!(r.tier(), Tier::Floor, "new_headless pins the floor");
@@ -101,7 +87,7 @@ fn a_headless_renderer_refuses_every_tier_change() {
 /// demotion has always taken — and is confirmed eyes-on in Phase 6.
 #[test]
 fn a_tier_change_leaves_the_roster_and_the_active_preset_alone() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     let names: Vec<String> = r.preset_names().map(str::to_owned).collect();

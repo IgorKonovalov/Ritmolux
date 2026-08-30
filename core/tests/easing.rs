@@ -29,11 +29,13 @@ use lmv_core::render::metrics::{
     StepResponse, frame_diff, frames_to_settle, segment_settled, step_response,
 };
 
+mod common;
+
 /// The evenness a pure exponential fall reads, and therefore what a one-pole
 /// measures whichever side of it a `curve` sits on: `ln 2 / ln 10`, which is
 /// `log10(2)` and so already in `std` rather than spelled out as a literal.
 const LN2_OVER_LN10: f32 = std::f32::consts::LOG10_2;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
 
 const SIZE: u32 = 96;
 
@@ -68,21 +70,6 @@ const SETTLE_TOL: f32 = 0.02;
 const SCALAR: &str = include_str!("fixtures/easing_scalar.toml");
 const ASYMMETRIC: &str = include_str!("fixtures/easing_asymmetric.toml");
 const SPECTRUM: &str = include_str!("fixtures/spectrum.toml");
-
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 fn preset(src: &str) -> Preset {
     Preset::from_toml_str(src).unwrap_or_else(|e| panic!("easing fixture parses: {e}"))
@@ -171,7 +158,7 @@ fn the_two_fixtures_differ_only_in_their_smoothing_table() {
 
 #[test]
 fn a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
 
@@ -273,7 +260,7 @@ fn a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not() 
 /// would be identical before and after the step.
 #[test]
 fn the_step_stimulus_lights_the_band_array_not_only_the_scalars() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     let p = preset(SPECTRUM);
@@ -470,7 +457,7 @@ fn the_two_curve_arms_differ_only_in_their_spectrum_smoothing() {
 /// allowed to mean anything.
 #[test]
 fn at_curve_one_the_pre_eased_arm_matches_the_engine() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     let linear = |src: &str| src.replace(CURVE_LINE, "curve      = \"1.0\"");
@@ -517,7 +504,7 @@ fn at_curve_one_the_pre_eased_arm_matches_the_engine() {
 ///   times as long, because curving after the smoother stretches the decay.
 #[test]
 fn the_two_curve_orderings_differ_in_speed_and_not_in_shape() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     let raw = curve_stimulus();
@@ -593,7 +580,7 @@ fn the_two_curve_orderings_differ_in_speed_and_not_in_shape() {
 /// new method reproduces the old method's Nth frame exactly.
 #[test]
 fn holding_one_stimulus_reproduces_capture_preset() {
-    let Some(mut r) = headless() else {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
         return;
     };
     let p = preset(SCALAR);

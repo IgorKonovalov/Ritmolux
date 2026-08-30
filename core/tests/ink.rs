@@ -22,7 +22,9 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::CaptureImage;
+
+mod common;
 
 const SIZE: u32 = 96;
 /// Enough frames for the static rose to be fully drawn; the fixture is
@@ -38,21 +40,6 @@ const FIXTURE_NAME: &str = "fixture_parametric_curve";
 fn fixture_with(extra: &str) -> Preset {
     let toml = format!("{FIXTURE}{extra}");
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("ink fixture parses: {e}"))
-}
-
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
 }
 
 /// Rec. 709 luminance (0..255) of one RGBA pixel — the same weights the remap
@@ -88,7 +75,7 @@ fn mask_where(img: &CaptureImage, pred: impl Fn(f32) -> bool) -> Vec<bool> {
 
 #[test]
 fn ink_remap_inverts_tone_and_is_passthrough_when_off() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
     let frame = AnalysisFrame {

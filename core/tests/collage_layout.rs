@@ -40,7 +40,9 @@ use std::path::PathBuf;
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
+
+mod common;
 
 /// Sample-sheet render size. 1080p, because these are judged by eye at
 /// full size, and a composition read at thumbnail scale is a different
@@ -104,23 +106,6 @@ fn cell(layout: u32, seed: u32) -> Preset {
     Preset::from_toml_str(&toml).expect("the sample-sheet cell parses")
 }
 
-/// A headless renderer at `size`, or `None` (a logged skip) on a runner with no
-/// GPU — macOS has no software Metal fallback (ADR-0016).
-fn headless(width: u32, height: u32, software: bool) -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width,
-        height,
-        prefer_software: software,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// Capture one cell.
 fn capture(renderer: &mut Renderer, layout: u32, seed: u32) -> CaptureImage {
     let preset = cell(layout, seed);
@@ -141,7 +126,7 @@ fn capture(renderer: &mut Renderer, layout: u32, seed: u32) -> CaptureImage {
 /// testing.
 #[test]
 fn a_seed_and_a_grammar_both_reach_the_frame() {
-    let Some(mut renderer) = headless(PROBE, PROBE, true) else {
+    let Some(mut renderer) = common::headless_on(PROBE, PROBE, true) else {
         return;
     };
 
@@ -218,7 +203,7 @@ fn the_sample_sheet_renders() {
     let dir = PathBuf::from(dir);
     std::fs::create_dir_all(&dir).expect("create the sample directory");
 
-    let Some(mut renderer) = headless(WIDTH, HEIGHT, false) else {
+    let Some(mut renderer) = common::headless_on(WIDTH, HEIGHT, false) else {
         return;
     };
     eprintln!(

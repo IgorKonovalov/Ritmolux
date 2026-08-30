@@ -28,8 +28,10 @@
 use lmv_core::audio::{self, AudioFormat, FormatError, SampleConsumer};
 use lmv_core::dsp::Analyzer;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, metrics::frame_diff};
+use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 use lmv_core::signal::{bass_sine, noise};
+
+mod common;
 
 const SIZE: u32 = 128;
 
@@ -81,24 +83,6 @@ hue   = "clamp(treb * 20, 0, 1)"
 glow  = "0.15 + clamp(treb * 20, 0, 1) * 0.85"
 flash = "0"
 "#;
-
-/// Build a headless renderer on the software adapter, or `None` (a logged skip)
-/// when the runner exposes no adapter — the guard `golden.rs` already uses, reused
-/// rather than reinvented.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
 
 fn probe_preset() -> Preset {
     Preset::from_toml_str(PROBE).expect("probe preset parses")
@@ -188,10 +172,14 @@ fn bright_pcm() -> Vec<f32> {
 fn band_routing_survives_the_ring_seam() {
     const FLOOR: f32 = 0.05;
 
-    let Some(a) = headless() else { return };
+    let Some(a) = common::headless(SIZE, SIZE) else {
+        return;
+    };
     let bass = run_chain(a, &bass_pcm());
 
-    let Some(b) = headless() else { return };
+    let Some(b) = common::headless(SIZE, SIZE) else {
+        return;
+    };
     let bright = run_chain(b, &bright_pcm());
 
     let diff = frame_diff(&bass, &bright);
@@ -211,10 +199,14 @@ fn band_routing_survives_the_ring_seam() {
 /// that test measures is entirely attributable to the stimulus.
 #[test]
 fn the_chain_is_deterministic_across_the_ring() {
-    let Some(a) = headless() else { return };
+    let Some(a) = common::headless(SIZE, SIZE) else {
+        return;
+    };
     let first = run_chain(a, &bass_pcm());
 
-    let Some(b) = headless() else { return };
+    let Some(b) = common::headless(SIZE, SIZE) else {
+        return;
+    };
     let second = run_chain(b, &bass_pcm());
 
     assert_eq!(

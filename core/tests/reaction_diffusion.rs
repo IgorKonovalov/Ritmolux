@@ -21,6 +21,8 @@ use lmv_core::render::{
     metrics::{coverage, frame_diff, quadrant_spread},
 };
 
+mod common;
+
 const SIZE: u32 = 96;
 /// The RD preset shipped in the embedded set. Mitosis is the family's
 /// beat-driven world (its `inject` stamps a cell per beat), which the
@@ -42,24 +44,6 @@ fn rd_view_preset(name: &str, extra: &str) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} preset parses: {e}"))
 }
 
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
 /// The top-left pixel, taken as the scene's background colour.
 fn background(img: &CaptureImage) -> [u8; 4] {
     [
@@ -72,7 +56,7 @@ fn background(img: &CaptureImage) -> [u8; 4] {
 
 #[test]
 fn reaction_diffusion_contract() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
 

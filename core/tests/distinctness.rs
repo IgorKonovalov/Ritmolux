@@ -16,56 +16,18 @@
 //! stateful-feedback one, and both cost more per frame than the six line and
 //! fragment families that were already here.
 
-use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::{SystemKind, default_presets};
 use lmv_core::render::{
-    CaptureImage, HeadlessOptions, RenderError, Renderer,
+    CaptureImage,
     metrics::{frame_diff, struct_diff},
 };
+
+mod common;
 
 const SIZE: u32 = 128;
 const FRAMES: u32 = 60;
 /// A `struct_diff` below this flags a pair as near-duplicate geometry.
 const NEAR_DUP_STRUCT: f32 = 0.08;
-
-/// Build a headless `Renderer`, or `None` (a logged skip) when the runner
-/// exposes no GPU adapter — macOS has no software Metal fallback (ADR-0016).
-/// Any other build error still panics loudly.
-fn headless() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(r) => Some(r),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
-}
-
-/// One representative non-silent frame, shared by every capture so the only
-/// variable across a family is the preset. Carries a falling band profile as
-/// well as the three scalars (Plan 0034 Phase 2), so a spectrum preset draws
-/// something to compare.
-fn fixed_frame() -> AnalysisFrame {
-    let mut frame = AnalysisFrame {
-        bass: 0.6,
-        mid: 0.5,
-        treb: 0.6,
-        onset: 0.4,
-        bar: 0.25,
-        ..Default::default()
-    };
-    let bands = frame.spectrum.len() as f32;
-    for (i, band) in frame.spectrum.iter_mut().enumerate() {
-        let t = i as f32 / bands;
-        *band = (0.9 - 0.7 * t) * (0.75 + 0.25 * (t * 17.0).sin());
-    }
-    frame
-}
 
 fn print_matrix(
     title: &str,
@@ -89,10 +51,10 @@ fn print_matrix(
 
 #[test]
 fn report_family_distinctness() {
-    let Some(mut renderer) = headless() else {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
-    let frame = fixed_frame();
+    let frame = common::fixed_frame_spectrum();
 
     // THIS LIST IS CURATED, NOT EXHAUSTIVE. It is a plain array rather than a
     // match over `SystemKind`, so adding a scene does not force a decision here
