@@ -123,6 +123,16 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
 /// The silence this replaces was a running visualizer doing less than it was
 /// asked; the refusal has to arrive the way `--help` does, from a process that
 /// never opened a window (ADR-0155).
+///
+/// **No elapsed-time bound here, unlike the `--help` cases above**, and the
+/// difference is the number of spawns. `RESPONDS_WITHIN` is sized against one
+/// cold process; this case spawns four in a loop, and on a saturated runner —
+/// this suite puts 1223 tests through one machine — the first can exceed a
+/// second while behaving perfectly. That would be a reading about the load on
+/// the box rather than about the code (ADR-0071). The property is carried
+/// without it: `output()` waits for exit, so a process that opened a window
+/// never returns here at all, and the exit code and named companion are what is
+/// actually under test.
 #[test]
 fn a_stream_only_flag_without_stream_exits_without_starting() {
     for args in [
@@ -131,12 +141,8 @@ fn a_stream_only_flag_without_stream_exits_without_starting() {
         ["--sender=rig"].as_slice(),
         ["--frames", "100"].as_slice(),
     ] {
-        let (code, _, stderr, elapsed) = run_both(args);
+        let (code, _, stderr, _) = run_both(args);
         assert_eq!(code, Some(2), "`lmv {args:?}` did not exit 2: {stderr:?}");
-        assert!(
-            elapsed < RESPONDS_WITHIN,
-            "`lmv {args:?}` took {elapsed:?}, long enough to have built something"
-        );
         assert!(
             stderr.contains("--stream"),
             "`lmv {args:?}` did not name the missing companion: {stderr:?}"
@@ -168,14 +174,15 @@ fn the_two_windowed_flags_are_not_refused_for_a_missing_stream() {
 /// **An unknown `--preset` costs no window.** The name is judged against the
 /// roster this launch would load, before the event loop exists, so the failure
 /// is a message rather than a window that opens on an arbitrary scene.
+///
+/// Bound-free for the reason given above, and with one of its own: this path
+/// reads and parses the whole preset directory to build the roster it refuses
+/// against, which is real work whose duration is a property of that directory's
+/// size rather than of whether a window opened.
 #[test]
 fn an_unknown_preset_exits_without_opening_a_window() {
-    let (code, _, stderr, elapsed) = run_both(&["--preset", "definitely-not-a-preset"]);
+    let (code, _, stderr, _) = run_both(&["--preset", "definitely-not-a-preset"]);
     assert_eq!(code, Some(2), "expected a usage error: {stderr:?}");
-    assert!(
-        elapsed < RESPONDS_WITHIN,
-        "took {elapsed:?}, which is long enough to have built a renderer"
-    );
     // The roster is listed so the operator can see what they could have meant.
     assert!(
         stderr.contains("this launch holds"),
