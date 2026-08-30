@@ -31,9 +31,12 @@
 //! **Software adapter** (`prefer_software`), like the other GPU suites
 //! (ADR-0016), so this runs on CI rather than only where a GPU happens to be.
 
+/// The shared ADR-0016 skip and headless constructors.
+mod common;
+
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use lmv_core::render::{CaptureImage, Renderer};
 
 /// Capture size. Small on purpose: every assertion counts pixels over the whole
 /// frame, and none of the properties vary with resolution.
@@ -92,18 +95,7 @@ fn smooth() -> String {
 /// Build a software headless renderer, or `None` (a logged skip) when the runner
 /// exposes no adapter at all (ADR-0016).
 fn renderer() -> Option<Renderer> {
-    match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: true,
-    }) {
-        Ok(renderer) => Some(renderer),
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            None
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
-    }
+    common::headless(SIZE, SIZE)
 }
 
 fn capture(renderer: &mut Renderer, palette: &str, steps: u32, contour: f32) -> CaptureImage {

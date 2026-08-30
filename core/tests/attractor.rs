@@ -19,7 +19,7 @@ use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
 use lmv_core::render::scenes::particles::trail_grid_size;
 use lmv_core::render::{
-    CaptureImage, HeadlessOptions, RenderError, Renderer,
+    CaptureImage,
     metrics::{coverage, frame_diff, quadrant_spread},
 };
 
@@ -887,18 +887,7 @@ const ASPECT_FRAMES: u32 = 90;
 /// so only one WARP device is ever live (the file docs' constraint). `None` is the
 /// no-adapter skip (ADR-0016).
 fn capture_at(size: (u32, u32), preset: &str, frame: &AnalysisFrame) -> Option<CaptureImage> {
-    let mut renderer = match Renderer::new_headless(HeadlessOptions {
-        width: size.0,
-        height: size.1,
-        prefer_software: true,
-    }) {
-        Ok(r) => r,
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            return None;
-        }
-        Err(e) => panic!("headless renderer build failed at {size:?}: {e}"),
-    };
+    let mut renderer = common::headless(size.0, size.1)?;
     let img = renderer
         .capture_preset(preset, frame, ASPECT_FRAMES)
         .unwrap_or_else(|e| panic!("capture {preset} at {size:?}: {e}"));

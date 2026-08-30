@@ -17,7 +17,7 @@
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
 use lmv_core::render::{
-    CaptureImage, HeadlessOptions, RenderError, Renderer,
+    CaptureImage,
     metrics::{coverage, frame_diff, quadrant_spread},
 };
 
@@ -258,24 +258,16 @@ fn reaction_diffusion_contract() {
 fn long_run_past_the_old_ceiling() {
     const LONG_RUN: u32 = 6_000;
 
-    let mut renderer = match Renderer::new_headless(HeadlessOptions {
-        width: SIZE,
-        height: SIZE,
-        prefer_software: false,
-    }) {
-        Ok(r) if r.adapter_is_software() => {
-            eprintln!(
-                "skipped: the {LONG_RUN}-frame unpolled-stretch check needs a hardware \
-                 adapter — the defect it pins does not reproduce on WARP"
-            );
-            return;
-        }
-        Ok(r) => r,
-        Err(RenderError::RequestAdapter(_)) => {
-            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
-            return;
-        }
-        Err(e) => panic!("headless renderer build failed: {e}"),
+    let Some(mut renderer) = common::headless_hardware_for(
+        SIZE,
+        SIZE,
+        None,
+        &format!(
+            "the {LONG_RUN}-frame unpolled-stretch check needs a hardware adapter; \
+             the defect it pins does not reproduce on WARP"
+        ),
+    ) else {
+        return;
     };
 
     let lively = AnalysisFrame {

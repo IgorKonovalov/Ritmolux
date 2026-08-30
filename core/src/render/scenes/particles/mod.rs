@@ -1064,10 +1064,6 @@ impl AttractorScene {
     /// so there is no resolved table to ask. Phase 3's continuous respawn targets
     /// the live resolved table, which is what carries the fill to wherever a
     /// bound `morph` has taken the figure — within one particle lifetime.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "spread/centre/pos index fixed [f32; 3] at constant offsets, always in-bounds"
-    )]
     fn seed(
         family: AttractorFamily,
         seed_box: ([f32; 3], [f32; 3]),
