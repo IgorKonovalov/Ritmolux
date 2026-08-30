@@ -67,9 +67,12 @@ reversing it: still no promotional landing page, still no domain, and the reposi
 place a stranger arrives.
 
 **Hosting arrives in two stages, and the first is deliberately manual.** The demo is published by
-copying a local build into a subdirectory of the existing personal user site
-(`IgorKonovalov/IgorKonovalov.github.io`, public, default branch `master`), which needs no Pages
-configuration on this repository and no `.github/workflows/` edit at all. Only once the site has
+copying a local build into `public/lmv/` of the existing personal user site
+(`IgorKonovalov/IgorKonovalov.github.io` — public, default branch `master`, and itself an Astro 5
+static site deployed by its own workflow). That site's Pages deployment serves a build artifact
+rather than the repository tree, and `public/**` is the one directory Astro copies verbatim into it,
+so a prebuilt subdirectory published this way needs **no Pages configuration on this repository, no
+change to the host's workflow, and no `.github/workflows/` edit anywhere**. Only once the site has
 earned its place does it move to a Pages deployment on the project repository under CI. Both stages
 are GitHub Pages; the difference is who runs the build and how often. The subpath forces Astro's
 `base` to be configured from the very first build, which is the same thing the eventual project-site
