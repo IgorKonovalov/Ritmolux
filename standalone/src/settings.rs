@@ -9,11 +9,13 @@
 //! module from holding a `Renderer`, a `Window` or a `Config` — and what makes
 //! the dwell clamps and the row/action mapping assertable as values.
 //!
-//! Two config *enums* do cross the seam — [`Tier`] and
+//! Two *enums* do cross the seam — [`Tier`] and
 //! [`InputMode`](crate::config::InputMode) — because the rows carrying them are
 //! switches over a closed set, and a row that re-spelled the value could
-//! disagree with what `config.toml` holds. They are `Copy` value types, not the
-//! `Config` struct, so nothing here reads or writes a file.
+//! disagree with what `config.toml` holds. Only one of the two is a config type:
+//! `Tier` is `lmv_core::render::Tier`, a core type a config key happens to name.
+//! Both are `Copy` value types, not the `Config` struct, so nothing here reads
+//! or writes a file.
 //!
 //! # Why not one `ui` module shared with the browser
 //!

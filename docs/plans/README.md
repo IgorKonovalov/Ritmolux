@@ -34,7 +34,6 @@ place. The plan file carries the real link.
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0135](0135-the-show-night-surfaces-stop-lying.md) | The show-night surfaces stop lying | approved | dev, human | Backlog 0159 + 0156 + 0155 (**0154 carried**). ADR-0148: the CLI refuses an unclaimed flag, so a misspelt `--osc` fails loudly instead of darkening the rig. Phase 5 is a `human` unplug gate. |
 | [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
 | [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
@@ -190,9 +189,12 @@ Sequencing:
   markdown and one shell script; only Phases 7-8 render. It also repairs the instruments the other
   two are verified with — `check-index-rows.mjs` currently cannot fail, so a detector matching
   nothing exits 0 at all three call sites.
-- **[0135] contends hard on `standalone/src/main.rs`** with [0133] and [0126] Phase 7 ([0115] and
-  [0131] have since closed **into** that file). It is additive and localized, but it is the fifth
-  plan to want it. Take it after [0126] Phase 7 reduces it to shell glue, or expect a rebase.
+- ~~**[0135] contends hard on `standalone/src/main.rs`**~~ — **closed 2026-08-30 on Phases 1-4**,
+  taken *before* [0126] Phase 7 rather than after it, and the predicted rebase never happened:
+  `main` was already an ancestor of the lane at the close. It landed ~690 lines into `main.rs`, so
+  **[0126] Phase 7 and [0133] now split or contend with a larger file than either was sized
+  against** — the roster, the `--help` renderer and the four scan helpers are one contiguous,
+  self-contained block beside the config helpers, which is the seam to move them on.
 - **[0137] contends with nothing** and shares no file with the current roster —
   `core/src/render/metrics.rs` plus two test files. Its Phases 4 and 6 are prose and need no
   adapter at all.
@@ -795,6 +797,23 @@ the rows above.
 
 ## Standing (not a plan)
 
+- **Plan [0135] Phase 5 — the unplug gate. Blocked on hardware, not on judgement** (2026-08-30).
+  The plan is `done` on Phases 1-4 and the policy this would test is the **repaired** one — seconds
+  instead of frames, and an operator swap now resets the incident. The phase did not run because
+  **there is no removable audio interface on the box**, which is the same reason
+  [Plan 0130](done/0130-the-audio-input-becomes-an-operator-surface.md)'s own Phase 5 skipped it.
+  **It is one item, and it lives in
+  [`docs/on-device-validation.md`](../on-device-validation.md)'s unplug checkbox** — not restated
+  here, because a duty recorded twice drifts in one of the two. That item now carries Plan 0135's
+  three extra questions alongside Plan 0130's original three.
+
+  **What is waiting on it:** [backlog 0154](../design-backlog.md) is **live and carried**, and its
+  own text says picking between its three candidate fixes *"wants the unplug evidence rather than
+  more reasoning"*. So this gate is the input to a later ADR, and nothing else is blocked on it —
+  every capability Plan 0135 shipped is in `main` and tested. **A run that reproduces nothing is a
+  result**, not a failed phase: `REGDB_E_CLASSNOTREG` was one activation in 22 under menu-speed
+  churn, which is a single sample and not a rate.
+
 - **Plan [0091] Phase 6 — the figure at frame scale** (2026-08-16). The plan is `done` on Phases
   1-5; this is its `human` look gate, and it is **item 6 in
   [`docs/content-brief.md`](../content-brief.md)** where the three questions and four riders live.
@@ -933,6 +952,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0135 - The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md) - closed 2026-08-30. Review: **no blockers, one major, five minors.** Version: **0.95.0**. Archived [backlog 0155 + 0156 + 0159](../design-backlog-archive.md). Phase 5 carried - see Standing. [Write-up](README-archive.md).
 - [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md) - closed 2026-08-30. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Revoked ADR-0141's store half. [Write-up](README-archive.md).
 - [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md) — closed 2026-08-30. Review: **no blockers, two majors, five minors, two nits.** Version: **0.94.0** (minor). Filed [backlog 0164 + 0165](../design-backlog.md). Phase 6 part-run. [Write-up](README-archive.md).
 - [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md) — closed 2026-08-30. Review: **no blockers, two majors, three minors.** Version: **0.93.0** (minor). [Write-up](README-archive.md).
@@ -1132,7 +1152,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 [0131]: done/0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
-[0135]: 0135-the-show-night-surfaces-stop-lying.md
+[0135]: done/0135-the-show-night-surfaces-stop-lying.md
 [0136]: 0136-the-gates-can-convict.md
 [0137]: 0137-the-metrics-measure-light.md
 [0138]: 0138-the-colour-surface-stops-misleading-its-authors.md

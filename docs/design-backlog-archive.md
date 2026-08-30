@@ -6843,3 +6843,136 @@ volume, which is most of the MilkDrop corpus's light source, and it silently inv
 gate run at an unpinned volume — see Plan 0111 Phase 6, amended for exactly this.
 
 ---
+
+## 0155 — the input-recovery settle window is counted in frames, so the flap it guards against is bounded on a 60 Hz display and unbounded on a 240 Hz one
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`INPUT_RECOVERY_SETTLE_FRAMES = 60` (`standalone/src/main.rs`) decides when a recovered input has
+proved it is delivering and may have its retry budget back. The property it buys is real and its
+own tests pin it: a stream that opens and dies immediately must not restore three attempts every
+cycle and reopen for the rest of the show, because that is the per-frame blocking device activation
+`INPUT_RECOVERY_ATTEMPTS` exists to prevent, reached by a different road.
+
+The property is stated in **frames**, and this app does not run at a fixed frame rate. The window it
+actually buys spans
+
+| refresh | window |
+|---|---|
+| 30 Hz | ~2 s |
+| 60 Hz | ~1 s |
+| 165 Hz (the dev box's own reference baseline) | ~360 ms |
+| 240 Hz | ~250 ms |
+
+so a flapping endpoint whose open-to-death cycle lands between those figures is bounded on one
+display and unbounded on another — and the machine the constant was written on is at the fast end,
+where a reader assuming "about a second" is wrong by nearly 3x.
+
+**This project already decided this question once.** Plan 0014 retired `SCENE_DT` for an injected
+real `dt` precisely so behaviour would be identical on every device, and the standalone's `redraw`
+computes that `dt` eleven lines below the `poll_input_lost()` call that runs the policy. A seconds
+window is available at the call site for the cost of threading one `f32` into `RecoveryPolicy::poll`.
+
+**Impact:** low. The comment's own floor argument — an invalidated endpoint reports itself on the
+first packet call after start, well inside any of these windows — means the margin is generous
+everywhere; what is wrong is that the guarantee is not the same guarantee on two machines.
+
+**What a fix looks like:** `poll(lost, dt)` accumulating seconds against an
+`INPUT_RECOVERY_SETTLE_SECS`, and the existing settle test asserting the window from both sides in
+seconds. If a frame count is deliberate instead, the comment should say the window is
+refresh-rate-dependent and name the range, so the next reader is not misled by the round number.
+
+- **Verified 2026-08-28** — the window is still a frame count: `present: INPUT_RECOVERY_SETTLE_FRAMES in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and it is still described as one, with no refresh-rate caveat: `present: Consecutive live frames in: standalone/src/main.rs`
+
+---
+
+## 0156 — after a give-up, a fresh loss inside the settle window rewrites no surface, so the capture verdict says `live` while nothing is delivering
+
+> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+
+`RecoveryPolicy` keeps `announced` and a spent `attempts` for `INPUT_RECOVERY_SETTLE_FRAMES` frames
+after a recovery, which is deliberate and named in that constant's comment: *"a genuine second
+unplug within the window inherits the first incident's remaining budget instead of a full one."*
+What the comment does not name is that the inherited state also silences the **verdict**.
+
+The sequence: three failed reopens spend the budget, `Recovery::GiveUp` writes `CaptureVerdict::Lost`
+and sets `announced`. The operator picks a working input from the `S` menu; `restart_capture` clears
+`self.input_lost` and writes a `live …` token, but leaves the policy spent. If that stream dies
+inside the window, `poll(true)` finds `attempts` at the bound and `announced` already true, and
+returns `Recovery::Hold` — no reopen, which is the accepted half, **and no token rewrite**, which is
+not. `diagnostics.log`'s `capture` column and the F3 overlay both keep reading `live WASAPI …`.
+
+**Why that is the wrong half to inherit.** The `Lost` variant was added by Plan 0130 for exactly one
+job: distinguishing a run that had audio and lost it from a start that never worked, so a remote
+tester's log cannot read silence as success. This is the single path where the verdict states the
+opposite of what is happening, and it is reachable only after the recovery has already proved the
+input is unreliable — the run most likely to be the one someone is reading the log about.
+
+**Impact:** narrow (it needs a give-up, then a successful manual swap, then a death inside the
+window) but the failure is a surface that lies, which is the class Plan 0083 built `CaptureVerdict`
+to prevent.
+
+**What a fix looks like:** either reset the policy on a `Persist::Yes` restart — an operator
+choosing an input is a new incident by definition, and it is the one restart that carries an
+explicit human judgement that the situation changed — or have the `Hold`-while-lost arm still write
+the `Lost` token once. The first is one line and also removes the surprise that a manual swap does
+not restore the retry budget.
+
+**Two comment corrections in the same file, cheap enough to ride along.** Neither is behavioural.
+`restart_capture`'s *"it is what was asked for, so the row shows it"* is true of the `Input mode`
+row and false of `Input device`: a failed start leaves `capture_endpoint` as `None`, so
+`device_row_index` returns the roster's leading slot and the row reads `default` while
+`self.input.device` still holds the endpoint the operator picked. And `settings.rs`'s new header
+calls `Tier` and `InputMode` *"two config enums"*; `Tier` is `lmv_core::render::Tier`, a core type a
+config key happens to name.
+
+- **Verified 2026-08-28** — the give-up latch is still what silences the arm: `present: self.announced in: standalone/src/main.rs`
+- **Verified 2026-08-28** — and the operator-initiated restart still does not reset the policy: `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`
+
+---
+
+## 0159 - an unrecognized flag is silently ignored and there is no `--help`, so a typo on a show night is indistinguishable from a network fault
+
+> **Filed 2026-08-29** while hardening the live lighting path, from a guard that was written wrong
+> and hung on the way to finding this.
+
+Each CLI flag is parsed by its own scanner that walks the whole argument list looking for the one
+shape it cares about - `parse_soak_arg`, `parse_tier_arg`, `parse_input_args_from` and their siblings, each a
+`while let Some(arg) = args.next()` over a fresh iterator. **Nothing anywhere holds the set of
+recognized flags**, so nothing can notice an argument that no scanner claimed.
+
+**Measured on the pinned 2026-08-29 show build**, both starting the app normally rather than
+exiting:
+
+- `lmv --definitely-not-a-flag` - starts, draws, no diagnostic.
+- `lmv --ocs 127.0.0.1:9000` - starts, draws, **publishes no telemetry**, no diagnostic.
+
+The second is the one that matters. A misspelt `--osc` is a running visualizer with a dark rig, and
+on a show floor that presents exactly as a cable, a subnet or a controller fault - the three things
+an operator will check first, none of which is wrong. The individual scanners *are* strict about
+their own values (`--osc=` and a bare `--osc` are both refused, with tests), which makes the outcome
+sharper rather than softer: the app is careful about the flags it recognizes and silent about the
+ones it does not.
+
+**There is also no `--help`.** `lmv --help` does not print usage and does not exit; it falls through
+every scanner unclaimed and starts the visualizer, so there is no way to check a flag's spelling
+short of reading `README.md` or the source. A guard written for the lighting runner tried to probe
+the flag list by shelling out to `--help` and **hung the runner instead**, which is how this was
+found; it now reads the binary image for the string.
+
+**Impact.** Low for a desktop user who sees a window and can retype. High for exactly the case this
+project has been building toward for four plans - a headless or long-running show configuration
+where the only evidence a flag took effect is a physical thing in the room being lit.
+
+**What a fix looks like:** one scanner-agnostic pass that collects every `--`-prefixed argument no
+scanner consumed and refuses to start, or warns loudly, naming them. That needs the scanners to
+report what they claimed, which they currently do not - the smaller version is a single list of
+recognized flag names checked before the scanners run, which duplicates a roster and can drift, and
+is still strictly better than silence. A `--help` that prints the same roster and exits falls out of
+either shape and is the part an operator actually reaches for.
+
+- **Verified 2026-08-29** - flags are still scanned one at a time with no roster: `present: fn parse_soak_arg() in: standalone/src/main.rs`
+- `unprobeable:` that no unclaimed argument is rejected is a negative about the whole of `main`'s argument handling, not a match countable in one file; the two commands above are the reduction, and they are re-runnable against any build.
+
+---

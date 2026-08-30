@@ -1,8 +1,8 @@
 # ADR-0148 — The CLI refuses an argument no scanner claimed, against one gated roster
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-30 (Plan 0135)
 > **Date:** 2026-08-29
-> **Related plan(s):** [0135](../plans/0135-the-show-night-surfaces-stop-lying.md)
+> **Related plan(s):** [0135](../plans/done/0135-the-show-night-surfaces-stop-lying.md)
 
 ## Context
 

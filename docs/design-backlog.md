@@ -309,6 +309,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0148 | A hard-ink palette cannot reach any additive scene, confining limited ink to 4 of 12 systems | [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) + [Plan 0123](plans/done/0123-a-gate-a-latch-and-an-ink.md) Phases 7-9, as `stroke_blend`; see 0153. **Closed 2026-08-28** |
 | 0122 | A mode-6 or -7 wave trace is normalized to the frame's height, so it covers `1/aspect` of its width | [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) Phase 2. **Closed 2026-08-28** |
 | 0123 | The waveform is the one un-normalized output, so the volume slider changes the picture | [ADR-0139](adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) + [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) Phase 1; see 0120. **Closed 2026-08-28** |
+| 0155 | The input-recovery settle window is counted in frames, so its guarantee differs on every display | [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phase 4, as `INPUT_RECOVERY_SETTLE_SECS`. **Closed 2026-08-30** |
+| 0156 | After a give-up, a loss inside the settle window rewrites no surface, so the verdict reads `live` while nothing delivers | [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phase 3, as `RecoveryPolicy::on_restart`. **Closed 2026-08-30** |
+| 0159 | An unrecognized flag is silently ignored and there is no `--help` | [ADR-0148](adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) + [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phases 1-2; see 0167. **Closed 2026-08-30** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3616,89 +3619,28 @@ evidence rather than more reasoning:
 - **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
   `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/main.rs`
 
-## 0155 — the input-recovery settle window is counted in frames, so the flap it guards against is bounded on a 60 Hz display and unbounded on a 240 Hz one
+**Update 2026-08-30, at Plan 0135's close — still live, still unevidenced.** That plan gathered the
+three fixes whose shape was settled and left this one deliberately unfixed: its Phase 5 was a
+`human` unplug gate whose whole deliverable was the evidence this entry asks for, and **it did not
+run**, for the same reason Plan 0130's Phase 5 did not — there is no removable audio interface on
+the box. Nothing about the three candidate shapes has changed and none is preferred; the entry is
+carried, not stalled.
 
-> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
+**Two things Plan 0135 did change under it**, both worth knowing before anyone re-reads the reasoning
+above. The reopen budget is unchanged — still `INPUT_RECOVERY_ATTEMPTS = 3` spent on **consecutive
+frames**, so the *fastest churn the design can produce* is still what this entry says it is, and it
+is still refresh-rate-dependent even though the *settle* window beside it is now in seconds
+(`INPUT_RECOVERY_SETTLE_SECS`, backlog 0155, archived). And an operator-initiated restart now resets
+the policy (backlog 0156, archived), so the swap that drew the original 1-in-22 observation returns
+a full budget where it used to inherit a spent one — which makes a repeat observation *more*
+likely to be visible, not less.
 
-`INPUT_RECOVERY_SETTLE_FRAMES = 60` (`standalone/src/main.rs`) decides when a recovered input has
-proved it is delivering and may have its retry budget back. The property it buys is real and its
-own tests pin it: a stream that opens and dies immediately must not restore three attempts every
-cycle and reopen for the rest of the show, because that is the per-frame blocking device activation
-`INPUT_RECOVERY_ATTEMPTS` exists to prevent, reached by a different road.
-
-The property is stated in **frames**, and this app does not run at a fixed frame rate. The window it
-actually buys spans
-
-| refresh | window |
-|---|---|
-| 30 Hz | ~2 s |
-| 60 Hz | ~1 s |
-| 165 Hz (the dev box's own reference baseline) | ~360 ms |
-| 240 Hz | ~250 ms |
-
-so a flapping endpoint whose open-to-death cycle lands between those figures is bounded on one
-display and unbounded on another — and the machine the constant was written on is at the fast end,
-where a reader assuming "about a second" is wrong by nearly 3x.
-
-**This project already decided this question once.** Plan 0014 retired `SCENE_DT` for an injected
-real `dt` precisely so behaviour would be identical on every device, and the standalone's `redraw`
-computes that `dt` eleven lines below the `poll_input_lost()` call that runs the policy. A seconds
-window is available at the call site for the cost of threading one `f32` into `RecoveryPolicy::poll`.
-
-**Impact:** low. The comment's own floor argument — an invalidated endpoint reports itself on the
-first packet call after start, well inside any of these windows — means the margin is generous
-everywhere; what is wrong is that the guarantee is not the same guarantee on two machines.
-
-**What a fix looks like:** `poll(lost, dt)` accumulating seconds against an
-`INPUT_RECOVERY_SETTLE_SECS`, and the existing settle test asserting the window from both sides in
-seconds. If a frame count is deliberate instead, the comment should say the window is
-refresh-rate-dependent and name the range, so the next reader is not misled by the round number.
-
-- **Verified 2026-08-28** — the window is still a frame count: `present: INPUT_RECOVERY_SETTLE_FRAMES in: standalone/src/main.rs`
-- **Verified 2026-08-28** — and it is still described as one, with no refresh-rate caveat: `present: Consecutive live frames in: standalone/src/main.rs`
-
-## 0156 — after a give-up, a fresh loss inside the settle window rewrites no surface, so the capture verdict says `live` while nothing is delivering
-
-> **Filed 2026-08-28** at the Plan 0130 Mode 4 review.
-
-`RecoveryPolicy` keeps `announced` and a spent `attempts` for `INPUT_RECOVERY_SETTLE_FRAMES` frames
-after a recovery, which is deliberate and named in that constant's comment: *"a genuine second
-unplug within the window inherits the first incident's remaining budget instead of a full one."*
-What the comment does not name is that the inherited state also silences the **verdict**.
-
-The sequence: three failed reopens spend the budget, `Recovery::GiveUp` writes `CaptureVerdict::Lost`
-and sets `announced`. The operator picks a working input from the `S` menu; `restart_capture` clears
-`self.input_lost` and writes a `live …` token, but leaves the policy spent. If that stream dies
-inside the window, `poll(true)` finds `attempts` at the bound and `announced` already true, and
-returns `Recovery::Hold` — no reopen, which is the accepted half, **and no token rewrite**, which is
-not. `diagnostics.log`'s `capture` column and the F3 overlay both keep reading `live WASAPI …`.
-
-**Why that is the wrong half to inherit.** The `Lost` variant was added by Plan 0130 for exactly one
-job: distinguishing a run that had audio and lost it from a start that never worked, so a remote
-tester's log cannot read silence as success. This is the single path where the verdict states the
-opposite of what is happening, and it is reachable only after the recovery has already proved the
-input is unreliable — the run most likely to be the one someone is reading the log about.
-
-**Impact:** narrow (it needs a give-up, then a successful manual swap, then a death inside the
-window) but the failure is a surface that lies, which is the class Plan 0083 built `CaptureVerdict`
-to prevent.
-
-**What a fix looks like:** either reset the policy on a `Persist::Yes` restart — an operator
-choosing an input is a new incident by definition, and it is the one restart that carries an
-explicit human judgement that the situation changed — or have the `Hold`-while-lost arm still write
-the `Lost` token once. The first is one line and also removes the surprise that a manual swap does
-not restore the retry budget.
-
-**Two comment corrections in the same file, cheap enough to ride along.** Neither is behavioural.
-`restart_capture`'s *"it is what was asked for, so the row shows it"* is true of the `Input mode`
-row and false of `Input device`: a failed start leaves `capture_endpoint` as `None`, so
-`device_row_index` returns the roster's leading slot and the row reads `default` while
-`self.input.device` still holds the endpoint the operator picked. And `settings.rs`'s new header
-calls `Tier` and `InputMode` *"two config enums"*; `Tier` is `lmv_core::render::Tier`, a core type a
-config key happens to name.
-
-- **Verified 2026-08-28** — the give-up latch is still what silences the arm: `present: self.announced in: standalone/src/main.rs`
-- **Verified 2026-08-28** — and the operator-initiated restart still does not reset the policy: `absent: input_recovery = RecoveryPolicy in: standalone/src/main.rs`
+**Where the evidence is now owed from:** the unplug checkbox in
+[`docs/on-device-validation.md`](on-device-validation.md), which carries Plan 0135's three extra
+questions (**(d)** does `REGDB_E_CLASSNOTREG` appear during a *real* loss, **(e)** how many attempts
+a real unplug consumes, **(f)** does the verdict name the right cause) alongside Plan 0130's
+original three, and a Standing bullet in [the plans index](plans/README.md). Run against v0.95.0 or
+later, or the policy under test is not the repaired one.
 
 ## 0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand
 
@@ -3776,49 +3718,6 @@ the grid.
 
 - **Verified 2026-08-29** - the search range is still 60-200 with no octave resolution: `present: const MAX_BPM: f32 = 200.0 in: core/src/dsp/tempo.rs`
 - **Verified 2026-08-29** - and the estimator still declines to settle the octave: `present: does not settle the octave in: core/src/dsp/tempo.rs`
-
-## 0159 - an unrecognized flag is silently ignored and there is no `--help`, so a typo on a show night is indistinguishable from a network fault
-
-> **Filed 2026-08-29** while hardening the live lighting path, from a guard that was written wrong
-> and hung on the way to finding this.
-
-Each CLI flag is parsed by its own scanner that walks the whole argument list looking for the one
-shape it cares about - `parse_soak_arg`, `parse_tier_arg`, `parse_input_args_from` and their siblings, each a
-`while let Some(arg) = args.next()` over a fresh iterator. **Nothing anywhere holds the set of
-recognized flags**, so nothing can notice an argument that no scanner claimed.
-
-**Measured on the pinned 2026-08-29 show build**, both starting the app normally rather than
-exiting:
-
-- `lmv --definitely-not-a-flag` - starts, draws, no diagnostic.
-- `lmv --ocs 127.0.0.1:9000` - starts, draws, **publishes no telemetry**, no diagnostic.
-
-The second is the one that matters. A misspelt `--osc` is a running visualizer with a dark rig, and
-on a show floor that presents exactly as a cable, a subnet or a controller fault - the three things
-an operator will check first, none of which is wrong. The individual scanners *are* strict about
-their own values (`--osc=` and a bare `--osc` are both refused, with tests), which makes the outcome
-sharper rather than softer: the app is careful about the flags it recognizes and silent about the
-ones it does not.
-
-**There is also no `--help`.** `lmv --help` does not print usage and does not exit; it falls through
-every scanner unclaimed and starts the visualizer, so there is no way to check a flag's spelling
-short of reading `README.md` or the source. A guard written for the lighting runner tried to probe
-the flag list by shelling out to `--help` and **hung the runner instead**, which is how this was
-found; it now reads the binary image for the string.
-
-**Impact.** Low for a desktop user who sees a window and can retype. High for exactly the case this
-project has been building toward for four plans - a headless or long-running show configuration
-where the only evidence a flag took effect is a physical thing in the room being lit.
-
-**What a fix looks like:** one scanner-agnostic pass that collects every `--`-prefixed argument no
-scanner consumed and refuses to start, or warns loudly, naming them. That needs the scanners to
-report what they claimed, which they currently do not - the smaller version is a single list of
-recognized flag names checked before the scanners run, which duplicates a roster and can drift, and
-is still strictly better than silence. A `--help` that prints the same roster and exits falls out of
-either shape and is the part an operator actually reaches for.
-
-- **Verified 2026-08-29** - flags are still scanned one at a time with no roster: `present: fn parse_soak_arg() in: standalone/src/main.rs`
-- `unprobeable:` that no unclaimed argument is rejected is a negative about the whole of `main`'s argument handling, not a match countable in one file; the two commands above are the reduction, and they are re-runnable against any build.
 
 ## 0160 - the test suite re-creates a `target/` inside the worktree that no redirect reaches, and its own comment says it cannot
 
@@ -4178,3 +4077,51 @@ table region.
 - **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`
+
+## 0167 - six flags do nothing without `--stream`, and the roster that was built to end silently-ignored flags does not say so
+
+> **Filed 2026-08-30** at Plan 0135's Mode 4 review. The plan closed the general case; this is the
+> specific case it left standing, inside the structure it built.
+
+[ADR-0148](adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) makes `lmv` refuse *"an
+argument no scanner claimed"*, and Plan 0135 shipped it: a misspelt `--osc` is now a startup error
+naming `--osc`. **Six flags are claimed conditionally and fall outside that guarantee.** `--size`,
+`--fps`, `--gpu`, `--sender`, `--preset` and `--frames` exist only in `FLAGS` and in
+`standalone/src/stream.rs`'s `parse`, whose first statement is
+
+```rust
+if !args.iter().any(|arg| arg == "--stream") {
+    return Ok(None);
+}
+```
+
+so without `--stream` every one of them is walked past by the roster gate as recognized, never read
+by anything, and never mentioned again. `lmv --preset attractor_clifford` starts the app, rotates
+presets normally, and says nothing. `lmv --gpu 1` renders on whatever adapter it would have picked
+anyway.
+
+**This is design-backlog 0159's own failure class**, one level down: *"a running visualizer doing
+less than it was asked, with no diagnostic."* `--gpu` is the sharpest of the six — an operator who
+believes they pinned an adapter and did not has the identical debugging experience 0159 describes,
+and [backlog 0165](design-backlog.md) says every windowed frame-time figure this project has quoted
+is an integrated-GPU figure, which is exactly the confusion a silently-ignored `--gpu` sustains.
+
+**What is already mitigating it, and why that is not enough.** All six help lines name `--stream`
+(`<n> --stream frame rate (default 60)`), so `--help` does disclose the coupling to anyone who
+reads it. That is disclosure, not refusal, and ADR-0148's Alternative C is the recorded argument
+against exactly that trade: *"a warning on a show floor is a line in a scrollback nobody is
+reading."* The roster also makes this **cheaper to fix than it was to file** — the structure that
+would carry the constraint now exists and did not before.
+
+**Impact:** low frequency, and it is not a regression — the behavior predates Plan 0135 unchanged.
+It is filed because the roster's existence makes the gap *look* closed, which is the property that
+gets a class of bug forgotten.
+
+**What a fix looks like:** one more field on `FlagSpec` — `requires: Option<&'static str>` — and
+one more arm in `unrecognized_flag`, refusing a flag whose `requires` is not also present with the
+same "did you mean" shape. Roughly ten lines, gated by the same roster test that already exists. The
+alternative shape, which costs nothing and buys less, is to let the six be accepted and warn; that
+is Alternative C again and loses for the same reason.
+
+- **Verified 2026-08-30** - the early return is still what makes the six unread: `present: if !args.iter\(\).any\(\|arg\| arg == "--stream"\) in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - and `FlagSpec` still has no way to state the dependency: `absent: requires in: standalone/src/main.rs`
