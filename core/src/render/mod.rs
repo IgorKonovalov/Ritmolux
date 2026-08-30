@@ -40,10 +40,16 @@ pub mod capture;
 mod capture_api;
 pub mod context;
 pub mod feedback;
+// The program preview's intermediate and its letterbox geometry (ADR-0143).
+// NOT feature-gated with `aux_target`: the console that consumes a preview
+// draws text, but the intermediate is a render path, and the property that
+// matters about it is asserted on the headless capture path — which compiles
+// glyphon out.
 pub(crate) mod gpu;
 pub(crate) mod grid;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
+pub mod preview;
 // The `over`-join blend pass (ADR-0090 / Plan 0076 Phase 3) — driven by the
 // `PostChain`, whose walk knows the junction; nothing else reaches it.
 pub(crate) mod layer_blend;
@@ -1143,6 +1149,12 @@ pub struct Renderer {
     /// so the `None` case is the whole cost of the feature while unused.
     #[cfg(feature = "text")]
     aux: Option<AuxTarget>,
+    /// The program preview's intermediate (ADR-0143), `None` unless a shell has
+    /// opened one. While it is `Some` the frame is drawn into it and reaches the
+    /// real destination by an exact copy; while it is `None` nothing is
+    /// allocated, no copy is encoded and the frame path is what it was — which
+    /// is what makes the console free when it is closed.
+    preview: Option<preview::PreviewTarget>,
     /// The now-playing banner (ADR-0110): a string a shell pushes in, plus the
     /// `dt`-driven envelope that fades it. Present in every build — a plugin
     /// build without the `text` feature holds the state and draws nothing.
@@ -1258,6 +1270,7 @@ impl Renderer {
             text_layer,
             #[cfg(feature = "text")]
             aux: None,
+            preview: None,
             now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
@@ -1512,6 +1525,52 @@ impl Renderer {
     /// Reconfigure the surface for a new window size.
     pub fn resize(&mut self, width: u32, height: u32) {
         self.ctx.resize(width, height);
+        // The intermediate's copy extent is fixed at construction, so a live
+        // preview is rebuilt at the new size rather than left disagreeing with
+        // the destination it copies into.
+        if self.preview.is_some() {
+            self.preview = Some(preview::PreviewTarget::new(
+                &self.ctx.device,
+                self.ctx.surface_format(),
+                self.ctx.config.width,
+                self.ctx.config.height,
+            ));
+        }
+    }
+
+    /// Open the program preview: the frame starts being drawn into an
+    /// intermediate and copied to its destination, so a second consumer can
+    /// sample the same pixels the show is getting.
+    ///
+    /// Fails when the destination surface does not accept `COPY_DST`, which is
+    /// the one thing that makes the copy exact. Reported rather than degraded
+    /// to a sampling blit: a preview is worth less than a show whose encoded
+    /// values silently changed.
+    ///
+    /// Idempotent in effect — an already-open preview is rebuilt at the current
+    /// size, which is also how a caller follows a resize it did not see.
+    pub fn open_preview(&mut self) -> Result<(), RenderError> {
+        if !self.ctx.can_copy_to_target() {
+            return Err(RenderError::UnsupportedSurface);
+        }
+        self.preview = Some(preview::PreviewTarget::new(
+            &self.ctx.device,
+            self.ctx.surface_format(),
+            self.ctx.config.width,
+            self.ctx.config.height,
+        ));
+        Ok(())
+    }
+
+    /// Release the intermediate. Idempotent, and the frame path returns to
+    /// drawing straight at its destination on the very next frame.
+    pub fn close_preview(&mut self) {
+        self.preview = None;
+    }
+
+    /// The open preview's size and identity, or `None` when closed.
+    pub fn preview_state(&self) -> Option<((u32, u32), u64)> {
+        self.preview.as_ref().map(|p| (p.size(), p.generation()))
     }
 
     /// Replace the preset roster (the standalone's hot-reload path). An empty
@@ -1675,7 +1734,7 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
         match self.aux.as_mut() {
-            Some(aux) => aux.present(&self.ctx, runs),
+            Some(aux) => aux.present(&self.ctx, runs, self.preview.as_ref()),
             None => Ok(()),
         }
     }
@@ -1969,18 +2028,26 @@ impl Renderer {
         self.queue_now_playing();
 
         let (width, height) = (self.ctx.config.width, self.ctx.config.height);
+        // Moved out of `self` for the draw, which takes `&mut self`; put back
+        // below. With no preview open this is `None` and the frame is drawn
+        // straight at the swapchain view, exactly as it was.
+        let preview = self.preview.take();
         // The one live call site: a preset that asked for `seed = "random"` gets
         // the salt it drew at load (ADR-0051). Every other caller of `draw_frame`
         // is a capture and pins.
         let draw_calls = self.draw_frame(
             frame,
             &mut encoder,
-            &view,
+            preview.as_ref().map_or(&view, |p| &p.view),
             width,
             height,
             dt,
             SaltMode::Live,
         );
+        if let Some(p) = preview.as_ref() {
+            p.record_copy_to(&mut encoder, &surface_tex.texture);
+        }
+        self.preview = preview;
 
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         self.ctx.queue.present(surface_tex);
@@ -2048,6 +2115,9 @@ impl Renderer {
             now_playing: _,
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
+            // The caller decided which view this frame draws into and owns the
+            // copy out of it; from in here the intermediate is just the target.
+            preview: _,
             series_scratch,
             vertex_scratch,
             param_smoother,

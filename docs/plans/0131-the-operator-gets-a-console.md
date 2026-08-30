@@ -348,10 +348,10 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The console window opens | dev | done | `9ab7726` |
-| 2 — The program preview | dev | **not taken** — out of this session's scope | |
+| 2 — The program preview | dev | done | committed with this row |
 | 3 — The modals move to the console | dev | done | `9ab7726` |
-| 4 — Transport, staging and the mouse | dev | **not taken** — out of this session's scope | |
-| 5 — Persistence, the flag, and the docs | dev | **not taken** — out of this session's scope | |
+| 4 — Transport, staging and the mouse | dev | not started | |
+| 5 — Persistence, the flag, and the docs | dev | not started | |
 | 6 — The on-device gate | human | not started | |
 
 ### Notes
@@ -430,6 +430,41 @@ reachable from the pure tests, and both are worth carrying into Phase 2 and Phas
   binding wants one — and the toggle additionally ignores key repeat, since holding the key would
   build and tear down a swapchain per repeat. **Phase 4 adds more console bindings and inherits
   this**: any new one is exposed to the same replay.
+
+**Phase 2 — the instrument the phase named cannot be built here, and four deviations.**
+
+- **THE PHASE'S DONE-WHENS ARE WORDED AGAINST AN OPEN CONSOLE AND NOTHING IN THIS REPOSITORY CAN
+  OPEN ONE FROM A TEST.** Three of the six — the byte-identity comparison, the 300-frame residency
+  and the release-on-close — say "with the console open", which is a second winit window on a real
+  display. There is no windowed test harness: `winit`, `create_surface` and `EventLoop` appear
+  nowhere under `core/tests/` or `standalone/tests/`. **The user was asked and chose to assert it
+  headlessly.** What is asserted instead is the property the criterion protects — that the
+  intermediate and its copy change no pixel — through `capture_frame`, which now routes through the
+  same intermediate by the same three recorded commands as `render`. The window wiring is uncovered
+  and stays with Phase 6.
+- **`core/src/render/preview.rs`, not the phase's `aux.rs`.** `AUX` is a reserved DOS device name
+  (the same wall Phase 1 hit), and the intermediate must sit **outside** the `text` feature gate:
+  `aux_target.rs` is text-gated, and `core`'s own test suite compiles glyphon out, so a preview
+  inside that gate could not be reached by any core test.
+- **`core/src/render/context.rs` and `core/src/render/capture.rs` were edited and the phase lists
+  neither.** `copy_texture_to_texture` into a swapchain image requires `COPY_DST`, which the surface
+  was not configured with; it is now added **only where `get_capabilities` offers it**, and
+  `open_preview` returns `UnsupportedSurface` where it does not rather than degrading to a sampling
+  blit. `create_target` gained `COPY_DST` for the same reason — without it no capture path could
+  exercise the copy at all, and the only instrument left would need a window.
+- **The residency test is `standalone/tests/console_preview_memory.rs`, not `core/tests/`.**
+  `ResidentSet` reads a per-OS working set, which is platform code `core` may not hold, and `core`
+  cannot dev-depend on the standalone without a cycle. Plan 0115 Phase 2 hit this and resolved it
+  the same way.
+
+Readings, asserted against nothing: 300 frames through an open preview at 64x48 on the software
+adapter printed `resident set 83 MB, growth +4.0 MB across 300 frames after a +31.6 MB warm-up`;
+the closed-preview control across 30 frames printed `growth +0.0 MB` before and after an
+open/close cycle. **Non-vacuity control:** shortening the copy extent by 8 columns made the
+byte-identity test fail at `byte 352 (pixel 88,0 channel 0): Some(69) vs Some(0)`; reverted.
+
+**The whole workspace is green at 1179 tests with every golden unblessed**, and `git status` after
+the run named only source files.
 
 **Not verified on two displays.** The dev box's second-display behaviour, the present mode actually
 negotiated, and the cost of a second swapchain to the output are all unmeasured; the plan puts them

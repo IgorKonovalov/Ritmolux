@@ -25,7 +25,145 @@
 
 use super::RenderError;
 use super::context::RenderContext;
+use super::gpu;
+use super::preview::{PreviewTarget, preview_rect};
 use super::text::{TextLayer, TextRun};
+
+/// The program preview's blit: one positioned quad sampling the intermediate.
+///
+/// A quad and not a fullscreen triangle, because the preview is letterboxed
+/// into a corner of the console rather than filling it — the rectangle arrives
+/// as a uniform in NDC and the vertex shader interpolates the corners across it.
+///
+/// **Only the console samples the intermediate.** The show's own copy out of it
+/// is a `copy_texture_to_texture` with no shader in the path, which is what
+/// keeps the output exact; this side is a monitor and a resample is what it is
+/// for.
+struct Blit {
+    pipeline: wgpu::RenderPipeline,
+    layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    rect: wgpu::Buffer,
+    /// The bound intermediate's identity and the group built against it. Rebuilt
+    /// only when the renderer hands over a different intermediate — a resize or
+    /// a close/reopen — so the per-frame path creates no GPU resource.
+    bound: Option<(u64, wgpu::BindGroup)>,
+}
+
+/// The blit's shader. `rect` is `(x0, y0, x1, y1)` in NDC, with `y0` the top
+/// edge; `uv` runs `0..1` across the quad, which is already the texture's
+/// top-left-origin convention, so no flip is applied anywhere.
+const BLIT_WGSL: &str = r#"
+struct Rect { ndc: vec4<f32> };
+@group(0) @binding(0) var<uniform> rect: Rect;
+@group(0) @binding(1) var src: texture_2d<f32>;
+@group(0) @binding(2) var samp: sampler;
+
+struct VsOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
+    var corners = array<vec2<f32>, 6>(
+        vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0),
+        vec2<f32>(1.0, 0.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 1.0),
+    );
+    let c = corners[vi];
+    var out: VsOut;
+    out.pos = vec4<f32>(
+        mix(rect.ndc.x, rect.ndc.z, c.x),
+        mix(rect.ndc.y, rect.ndc.w, c.y),
+        0.0,
+        1.0,
+    );
+    out.uv = c;
+    return out;
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(textureSample(src, samp, in.uv).rgb, 1.0);
+}
+"#;
+
+impl Blit {
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("lmv-console-blit-layout"),
+            entries: &[
+                gpu::uniform(0, wgpu::ShaderStages::VERTEX),
+                gpu::texture(1, true),
+                gpu::sampler(2),
+            ],
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("lmv-console-blit"),
+            source: wgpu::ShaderSource::Wgsl(BLIT_WGSL.into()),
+        });
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&layout],
+            format,
+            wgpu::BlendState::REPLACE,
+            "lmv-console-blit",
+        );
+        Self {
+            pipeline,
+            layout,
+            sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("lmv-console-blit-sampler"),
+                // Linear: the preview is a heavy minification of the show and a
+                // nearest sample of it aliases into unreadable noise. Exactness
+                // is the output copy's job, not this one's.
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            }),
+            rect: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("lmv-console-blit-rect"),
+                size: std::mem::size_of::<[f32; 4]>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
+            bound: None,
+        }
+    }
+
+    /// The bind group for `preview`, rebuilt only when the intermediate's
+    /// identity has changed.
+    ///
+    /// `Option` rather than an infallible reference so the caller skips the
+    /// preview on the one path that cannot produce a group; this file denies
+    /// panics, and a console frame is worth nothing next to the show.
+    fn bind(&mut self, device: &wgpu::Device, preview: &PreviewTarget) -> Option<&wgpu::BindGroup> {
+        let generation = preview.generation();
+        if self.bound.as_ref().is_none_or(|(g, _)| *g != generation) {
+            let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("lmv-console-blit-group"),
+                layout: &self.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.rect.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&preview.view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                ],
+            });
+            self.bound = Some((generation, group));
+        }
+        self.bound.as_ref().map(|(_, group)| group)
+    }
+}
 
 /// The background the secondary surface clears to before its text is
 /// composited. Near-black rather than black so an operator can tell a live
@@ -73,6 +211,7 @@ pub struct AuxTarget {
     config: wgpu::SurfaceConfiguration,
     text: TextLayer,
     mode: AuxPresentMode,
+    blit: Blit,
 }
 
 impl AuxTarget {
@@ -121,11 +260,13 @@ impl AuxTarget {
         surface.configure(&ctx.device, &config);
 
         let text = TextLayer::new(&ctx.device, &ctx.queue, config.format);
+        let blit = Blit::new(&ctx.device, config.format);
         Ok(Self {
             surface,
             config,
             text,
             mode,
+            blit,
         })
     }
 
@@ -160,6 +301,7 @@ impl AuxTarget {
         &mut self,
         ctx: &RenderContext,
         runs: &[TextRun<'_>],
+        preview: Option<&PreviewTarget>,
     ) -> Result<(), RenderError> {
         use wgpu::CurrentSurfaceTexture as C;
         let frame = match self.surface.get_current_texture() {
@@ -192,6 +334,29 @@ impl AuxTarget {
         let (width, height) = (self.config.width, self.config.height);
         let drew = self.text.prepare(&ctx.device, &ctx.queue, width, height);
 
+        // The preview's rectangle, in this surface's NDC. Its aspect comes from
+        // the intermediate — which is the *output* render target's size — so the
+        // console window's own shape never reaches the picture (ADR-0037).
+        // `None` here means no preview is open, or this console is too small to
+        // show one; either way the pass below just clears and draws text.
+        let quad = preview.and_then(|p| {
+            let rect = preview_rect(p.size(), (width, height))?;
+            let (w, h) = (width as f32, height as f32);
+            let ndc = [
+                rect.x / w * 2.0 - 1.0,
+                1.0 - rect.y / h * 2.0,
+                (rect.x + rect.width) / w * 2.0 - 1.0,
+                1.0 - (rect.y + rect.height) / h * 2.0,
+            ];
+            ctx.queue
+                .write_buffer(&self.blit.rect, 0, bytemuck::cast_slice(&ndc));
+            self.blit.bind(&ctx.device, p).is_some().then_some(())
+        });
+        // Re-borrowed immutably below rather than held across the pass: `bind`
+        // takes `&mut self.blit` to refresh its cache, and the pass needs the
+        // pipeline from the same field.
+        let quad = quad.and(self.blit.bound.as_ref().map(|(_, group)| group));
+
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("lmv-console-pass"),
@@ -209,6 +374,13 @@ impl AuxTarget {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
+            // The preview first, the text over it: the modal list is what the
+            // operator is reading and the monitor must not cover it.
+            if let Some(group) = quad {
+                pass.set_pipeline(&self.blit.pipeline);
+                pass.set_bind_group(0, group, &[]);
+                pass.draw(0..6, 0..1);
+            }
             if drew {
                 self.text.render(&mut pass);
             }

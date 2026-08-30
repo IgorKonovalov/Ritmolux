@@ -74,16 +74,27 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("lmv-capture-frame"),
             });
-        capture::record_clear(&mut encoder, &view);
+        // The preview intermediate, when one is open, sits between the draw and
+        // the destination here exactly as it does on the present path — same
+        // clear, same draw, same `copy_texture_to_texture`. That is what lets
+        // the intermediate's one real claim — that a frame routed through it is
+        // byte-identical to one drawn straight at the target — be asserted with
+        // no window, in `core/tests/console_preview.rs`.
+        let preview = self.preview.take();
+        capture::record_clear(&mut encoder, preview.as_ref().map_or(&view, |p| &p.view));
         let _ = self.draw_frame(
             frame,
             &mut encoder,
-            &view,
+            preview.as_ref().map_or(&view, |p| &p.view),
             width,
             height,
             scenes::FALLBACK_DT,
             SaltMode::Pinned,
         );
+        if let Some(p) = preview.as_ref() {
+            p.record_copy_to(&mut encoder, &texture);
+        }
+        self.preview = preview;
         capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
 
