@@ -235,15 +235,11 @@ struct Params {
 
 /// Fullscreen domain-warped fragment field, driven by named preset parameters.
 pub struct FragmentFieldScene {
-    pipeline: wgpu::RenderPipeline,
-    uniforms: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    /// The LUT textures + sampler bind group (group 1), kept distinct from the
-    /// uniform group so the pipeline layout does not match the kaleidoscope's.
-    lut_bind_group: wgpu::BindGroup,
-    /// The 256×1 gradient LUT pair (A/B) the fragment samples + crossfades for
-    /// colour (ADR-0021), with the baked palette awaiting upload.
-    luts: palette::LutPair,
+    /// The pipeline, the uniform buffer, the 256×1 gradient LUT pair (A/B) the
+    /// fragment samples + crossfades for colour (ADR-0021), and the two bind
+    /// groups. The LUT group is **group 1**, separate from the uniform group, so
+    /// this pipeline's layout does not match the kaleidoscope's.
+    gpu: gpu::FullscreenScene,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// This frame's elapsed real time, stored by `advance` and consumed by
@@ -290,16 +286,8 @@ impl FragmentFieldScene {
             gpu::FULLSCREEN_VS_NDC,
             SHADER,
         );
-        let uniforms = gpu::uniform_buffer(
-            device,
-            "fragment-field-params",
-            std::mem::size_of::<Params>(),
-        );
-        // Seeded with the default `spectrum` (the prior cosine): the renderer
-        // calls `set_palette` before the first frame with the active preset's
-        // palette, and `render` uploads it. Seeding here keeps the textures valid
-        // even if `set_palette` were never called.
-        let luts = palette::LutPair::new(device, "fragment-field");
+        let parts =
+            gpu::FullscreenParts::new(device, "fragment-field", std::mem::size_of::<Params>());
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("fragment-field-uniform-layout"),
             entries: &[gpu::uniform(0, wgpu::ShaderStages::FRAGMENT)],
@@ -315,34 +303,31 @@ impl FragmentFieldScene {
                 gpu::sampler(2),
             ],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let uniform_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("fragment-field-uniform-bg"),
             layout: &uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: uniforms.as_entire_binding(),
+                resource: parts.uniforms().as_entire_binding(),
             }],
         });
-        let lut_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let lut_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("fragment-field-lut-bg"),
             layout: &lut_layout,
-            entries: &luts.bind_entries(0, 1, 2),
+            entries: &parts.luts().bind_entries(0, 1, 2),
         });
-        let pipeline = gpu::fullscreen_pipeline(
-            device,
-            &shader,
-            &[&uniform_layout, &lut_layout],
-            surface_format,
-            wgpu::BlendState::REPLACE,
-            "fragment-field",
-        );
 
         Self {
-            pipeline,
-            uniforms,
-            bind_group,
-            lut_bind_group,
-            luts,
+            gpu: parts.finish(
+                device,
+                &shader,
+                &[&uniform_layout, &lut_layout],
+                uniform_bg,
+                Some(lut_bg),
+                surface_format,
+                wgpu::BlendState::REPLACE,
+                "fragment-field",
+            ),
             time: 0.0,
             dt: crate::render::scenes::FALLBACK_DT,
             fold_phase: Phase::default(),
@@ -413,7 +398,7 @@ impl Scene for FragmentFieldScene {
     fn set_palette(&mut self, palette: &Palette) {
         // Store the baked LUT; `render` uploads it (deferred so scenes with lazy
         // GPU resources share this seam). Cheap array copy, off the hot path.
-        self.luts.set(palette);
+        self.gpu.set_palette(palette);
     }
 
     fn reset_params(&mut self) {
@@ -469,7 +454,7 @@ impl Scene for FragmentFieldScene {
     ) {
         // Upload the active palette LUTs (A + B) if a preset switch changed them
         // (off the hot path — once per switch, not per frame).
-        self.luts.flush(queue);
+        self.gpu.flush_palette(queue);
 
         let params = Params {
             a: [self.time, aspect.max(0.1), self.warp, self.colour.hue],
@@ -488,15 +473,12 @@ impl Scene for FragmentFieldScene {
             ],
             e: [self.fold_phase.get(), self.field_phase.get(), 0.0, 0.0],
         };
-        queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
+        self.gpu.write_uniform(queue, &params);
 
         // Load over the engine backdrop (ADR-0018); this fullscreen field is
         // opaque, so it covers the backdrop as before.
-        let mut pass = gpu::color_pass(encoder, "fragment-field-pass", view, wgpu::LoadOp::Load);
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_bind_group(1, &self.lut_bind_group, &[]);
-        pass.draw(0..3, 0..1);
+        self.gpu
+            .draw(encoder, "fragment-field-pass", view, wgpu::LoadOp::Load);
     }
 }
 

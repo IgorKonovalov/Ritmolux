@@ -368,12 +368,10 @@ struct Params {
 /// A fullscreen signed-distance figure from the shared mark roster, coloured
 /// through the shared palette.
 pub struct ShapeFieldScene {
-    pipeline: wgpu::RenderPipeline,
-    uniforms: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    /// The 256x1 gradient LUT pair (A/B) the fragment samples + crossfades for
-    /// colour (ADR-0021), with the baked palette awaiting upload.
-    luts: palette::LutPair,
+    /// The pipeline, the uniform buffer, the 256x1 gradient LUT pair (A/B) the
+    /// fragment samples + crossfades for colour (ADR-0021), and the one bind
+    /// group this scene binds.
+    gpu: gpu::FullscreenScene,
     /// The silhouette and its point count, raw as the preset bound them —
     /// `marks::mark_shape` / `mark_points` quantize on the way to the uniform,
     /// which is where a selector's precondition belongs (the `kaleido_edge`
@@ -424,12 +422,7 @@ impl ShapeFieldScene {
             gpu::FULLSCREEN_VS_NDC,
             &source,
         );
-        let uniforms =
-            gpu::uniform_buffer(device, "shape-field-params", std::mem::size_of::<Params>());
-        // Seeded with the default `spectrum`; the renderer calls `set_palette`
-        // before the first frame and `render` uploads it, so the textures are
-        // valid even if `set_palette` were never called.
-        let luts = palette::LutPair::new(device, "shape-field");
+        let parts = gpu::FullscreenParts::new(device, "shape-field", std::mem::size_of::<Params>());
         // One group, sampler first and uniform last — see the WGSL's note for
         // why this shape and not `fragment_field`'s two-group split. The uniform
         // entry is a full literal rather than `gpu::uniform` because that helper
@@ -457,7 +450,7 @@ impl ShapeFieldScene {
         });
         // This layout binds the sampler first and the two textures after it, so
         // the pair's role-ordered array is destructured into binding order here.
-        let [lut_a, lut_b, lut_sampler] = luts.bind_entries(1, 2, 0);
+        let [lut_a, lut_b, lut_sampler] = parts.luts().bind_entries(1, 2, 0);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("shape-field-bind-group"),
             layout: &bind_layout,
@@ -467,24 +460,22 @@ impl ShapeFieldScene {
                 lut_b,
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: uniforms.as_entire_binding(),
+                    resource: parts.uniforms().as_entire_binding(),
                 },
             ],
         });
-        let pipeline = gpu::fullscreen_pipeline(
-            device,
-            &shader,
-            &[&bind_layout],
-            surface_format,
-            wgpu::BlendState::REPLACE,
-            "shape-field",
-        );
 
         Self {
-            pipeline,
-            uniforms,
-            bind_group,
-            luts,
+            gpu: parts.finish(
+                device,
+                &shader,
+                &[&bind_layout],
+                bind_group,
+                None,
+                surface_format,
+                wgpu::BlendState::REPLACE,
+                "shape-field",
+            ),
             shape: marks::DEFAULT_SHAPE,
             points: marks::DEFAULT_POINTS,
             star_valley: marks::DEFAULT_STAR_VALLEY,
@@ -631,7 +622,7 @@ impl Scene for ShapeFieldScene {
     }
 
     fn set_palette(&mut self, palette: &Palette) {
-        self.luts.set(palette);
+        self.gpu.set_palette(palette);
     }
 
     fn reset_params(&mut self) {
@@ -688,7 +679,7 @@ impl Scene for ShapeFieldScene {
         // the shader will: the `ring` refusal is a fact about the SELECTED arm,
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
-        self.luts.flush(queue);
+        self.gpu.flush_palette(queue);
 
         let params = Params {
             // `aspect` is the argument the chain hands down for the target this
@@ -719,12 +710,9 @@ impl Scene for ShapeFieldScene {
                 0.0,
             ],
         };
-        queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&params));
-
-        let mut pass = gpu::color_pass(encoder, "shape-field-pass", view, wgpu::LoadOp::Load);
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.draw(0..3, 0..1);
+        self.gpu.write_uniform(queue, &params);
+        self.gpu
+            .draw(encoder, "shape-field-pass", view, wgpu::LoadOp::Load);
     }
 }
 

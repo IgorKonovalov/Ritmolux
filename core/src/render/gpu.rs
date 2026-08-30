@@ -167,6 +167,20 @@ pub(crate) const ADDITIVE_LIGHT_SATURATING_COVERAGE: wgpu::BlendState = wgpu::Bl
 // Buffers
 // ---------------------------------------------------------------------------
 
+/// A `STORAGE | COPY_DST` buffer of `size` bytes, unmapped.
+///
+/// Read-only on the GPU side is a property of the **layout entry**, not of the
+/// buffer, so this says nothing about a bind-group shape (ADR-0058) — see
+/// [`uniform_buffer`].
+pub(crate) fn storage_buffer(device: &wgpu::Device, label: &str, size: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some(label),
+        size: size as u64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
 /// A `UNIFORM | COPY_DST` buffer of `size` bytes, unmapped.
 ///
 /// `size` is `usize` because every call site passes `size_of::<T>()` for the
@@ -302,6 +316,180 @@ pub(crate) fn fullscreen_shader(
         label: Some(label),
         source: wgpu::ShaderSource::Wgsl(format!("{vertex_prelude}{body}").into()),
     })
+}
+
+// ---------------------------------------------------------------------------
+// The fullscreen SDF scene's wgpu graph
+// ---------------------------------------------------------------------------
+
+/// The wgpu graph a fullscreen signed-distance scene draws through: its
+/// pipeline, its uniform buffer, its palette LUT pair, an optional storage
+/// buffer, and the one or two bind groups it binds.
+///
+/// `fragment_field`, `shape_field` and `shape_collage` each held those five as
+/// separate fields and each spelled the same render tail. What they keep is
+/// everything that makes them different scenes — the uniform struct they pack,
+/// what goes in the storage buffer, and the WGSL — plus, crucially, the
+/// **bind-group layouts**, which they still declare themselves.
+///
+/// # It cannot be handed a layout to build, and that is deliberate
+///
+/// ADR-0058 forbids two layouts that can be live in one frame from sharing a
+/// shape without recorded evidence, and these three are live together routinely
+/// (a layered preset, an A/B dissolve). Their layouts are *already* distinct on
+/// purpose — a two-group split in one, a declared `min_binding_size` in the
+/// next, a fragment-visible storage entry in the third — and each carries a
+/// comment saying so. A constructor that built layouts from parameters would put
+/// that distinctness behind an argument nobody reads.
+///
+/// It would also make those layouts **invisible to the guard**:
+/// `no_two_layouts_share_a_shape_without_recorded_evidence` enumerates every
+/// layout in `core/src` by scanning the source for `create_bind_group_layout`
+/// with literal entries, and asserts the enumeration has not shrunk. A layout
+/// built here from arguments would drop three rows off that list and weaken
+/// every assertion made on it. So the scene builds its own layout and its own
+/// bind groups, and hands the finished groups over.
+pub(crate) struct FullscreenScene {
+    pipeline: wgpu::RenderPipeline,
+    uniforms: wgpu::Buffer,
+    /// The per-element array the collage reads; `None` for the two scenes that
+    /// evaluate their field analytically.
+    storage: Option<wgpu::Buffer>,
+    luts: super::palette::LutPair,
+    /// Bind group 0, always bound.
+    group0: wgpu::BindGroup,
+    /// Bind group 1 — the fragment field's LUT group, which it keeps separate to
+    /// hold its pipeline layout off the kaleidoscope's shape. `None` for the two
+    /// scenes that bind everything in one group.
+    group1: Option<wgpu::BindGroup>,
+}
+
+/// The buffers and the LUT pair, before the scene has declared its layouts.
+///
+/// The two-step build exists because the bind groups need the buffers and the
+/// pipeline needs the layouts: the scene takes these, spells its own layout and
+/// bind groups against them, and hands both back to
+/// [`finish`](FullscreenParts::finish).
+pub(crate) struct FullscreenParts {
+    uniforms: wgpu::Buffer,
+    storage: Option<wgpu::Buffer>,
+    luts: super::palette::LutPair,
+}
+
+impl FullscreenParts {
+    /// The uniform buffer and the LUT pair, both labelled from `stem`.
+    pub(crate) fn new(device: &wgpu::Device, stem: &str, uniform_bytes: usize) -> Self {
+        Self {
+            uniforms: uniform_buffer(device, &format!("{stem}-params"), uniform_bytes),
+            storage: None,
+            // Seeded with the default `spectrum`; the renderer calls
+            // `Scene::set_palette` before the first frame and the first `render`
+            // uploads it, so the textures are valid even if it never does.
+            luts: super::palette::LutPair::new(device, stem),
+        }
+    }
+
+    /// Hand over the storage buffer this scene's shader reads.
+    ///
+    /// The buffer is the **scene's** to create — its size and what goes in it are
+    /// scene-specific, and its bind-group entry is spelled beside the layout that
+    /// declares it — so this takes a finished one rather than a byte count. Pass
+    /// it after building the bind group that binds it.
+    pub(crate) fn with_storage(mut self, storage: wgpu::Buffer) -> Self {
+        self.storage = Some(storage);
+        self
+    }
+
+    /// The uniform buffer, for the scene's own bind-group entry.
+    pub(crate) fn uniforms(&self) -> &wgpu::Buffer {
+        &self.uniforms
+    }
+
+    /// The LUT pair, for [`bind_entries`](super::palette::LutPair::bind_entries).
+    pub(crate) fn luts(&self) -> &super::palette::LutPair {
+        &self.luts
+    }
+
+    /// Build the pipeline over the scene's layouts and take ownership of its
+    /// bind groups.
+    ///
+    /// `layouts` is a slice for the same reason [`fullscreen_pipeline`] takes
+    /// one, and its length must match how many groups are passed: two layouts
+    /// with a `None` `group1` is a pipeline whose second group is never bound.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn finish(
+        self,
+        device: &wgpu::Device,
+        shader: &wgpu::ShaderModule,
+        layouts: &[&wgpu::BindGroupLayout],
+        group0: wgpu::BindGroup,
+        group1: Option<wgpu::BindGroup>,
+        target_format: wgpu::TextureFormat,
+        blend: wgpu::BlendState,
+        stem: &str,
+    ) -> FullscreenScene {
+        debug_assert_eq!(
+            layouts.len(),
+            1 + usize::from(group1.is_some()),
+            "a pipeline layout group with no bind group is never bound"
+        );
+        FullscreenScene {
+            pipeline: fullscreen_pipeline(device, shader, layouts, target_format, blend, stem),
+            uniforms: self.uniforms,
+            storage: self.storage,
+            luts: self.luts,
+            group0,
+            group1,
+        }
+    }
+}
+
+impl FullscreenScene {
+    /// Hold `palette` for upload on the next
+    /// [`flush_palette`](Self::flush_palette).
+    pub(crate) fn set_palette(&mut self, palette: &super::palette::Palette) {
+        self.luts.set(palette);
+    }
+
+    /// Upload the held palette if it changed. Call once at the top of `render`.
+    pub(crate) fn flush_palette(&mut self, queue: &wgpu::Queue) {
+        self.luts.flush(queue);
+    }
+
+    /// Write this frame's uniform struct.
+    pub(crate) fn write_uniform<T: bytemuck::Pod>(&self, queue: &wgpu::Queue, value: &T) {
+        queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(value));
+    }
+
+    /// Write this frame's storage array. A no-op when the scene asked for no
+    /// storage buffer — which is a caller bug, so it trips in debug builds.
+    pub(crate) fn write_storage<T: bytemuck::Pod>(&self, queue: &wgpu::Queue, values: &[T]) {
+        debug_assert!(
+            self.storage.is_some(),
+            "write_storage on a scene built without a storage buffer"
+        );
+        if let Some(storage) = self.storage.as_ref() {
+            queue.write_buffer(storage, 0, bytemuck::cast_slice(values));
+        }
+    }
+
+    /// Encode the draw: one load-preserving pass, the pipeline, the bind groups,
+    /// and the fullscreen triangle.
+    pub(crate) fn draw(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        label: &str,
+        view: &wgpu::TextureView,
+        load: wgpu::LoadOp<wgpu::Color>,
+    ) {
+        let mut pass = color_pass(encoder, label, view, load);
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.group0, &[]);
+        if let Some(group1) = self.group1.as_ref() {
+            pass.set_bind_group(1, group1, &[]);
+        }
+        pass.draw(0..3, 0..1);
+    }
 }
 
 // ---------------------------------------------------------------------------
