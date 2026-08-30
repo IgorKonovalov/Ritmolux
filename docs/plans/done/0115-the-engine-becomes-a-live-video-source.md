@@ -1,13 +1,23 @@
 # 0115 — The engine becomes a live video source
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-30
 > **Created:** 2026-08-25
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed),
-> [0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) (proposed),
-> [0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
-> [0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md),
-> [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
+> **Related ADRs:** [0125](../../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (accepted, Outcome),
+> [0146](../../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) (accepted, Outcome),
+> [0115](../../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
+> [0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md),
+> [0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
+>
+> **Closed 2026-08-30.** Eight phases including the added 3b, `b50592a`..`7e870aa` plus the close
+> block's `bbbb5eb` and the out-of-band auto-rotate fix `64758ad`. Mode 4 review: **no blockers,
+> two majors, three minors.** Verified at the close on the post-merge tree, not read off the log:
+> `cargo fmt --all --check`, `cargo clippy --workspace --all-targets` and `cargo nextest run
+> --workspace` all clean after `main` merged in, and the byte-identity and 300-frame residency
+> tests were opened and read against the phases that named them. The two majors — the sender's
+> adapter match being handed the description rather than the bare name, and `--stream` driving an
+> unclamped `dt` where the window clamps at `MAX_DT` — are recorded in ADR-0146's Outcome and in
+> Followups, and neither blocks the ship.
 
 ## TL;DR
 
@@ -23,14 +33,14 @@ there, reacting to whatever is playing.
 The user wants this engine's video inside TouchDesigner, running on **the same Windows machine**,
 with **no window** on our side. The engine becomes a headless source feeding somebody else's
 composite — one step further out than
-[NFR §10](../nfr.md#10-live-performance-added-in-the-2026-07-21-follow-up-interview)'s "renders to
+[NFR §10](../../nfr.md#10-live-performance-added-in-the-2026-07-21-follow-up-interview)'s "renders to
 a projector", and the same live-show use.
 
 Two things the engine already has make this small. `shot --render`
-([ADR-0114](../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md), Plan 0101)
+([ADR-0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md), Plan 0101)
 walks a clip headless, rendering through the same `draw_frame` the window presents through and
 reading each frame back — with memory behaviour proven over 14,400 consecutive frames (Plan 0099).
-And the foobar component ([ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md))
+And the foobar component ([ADR-0115](../../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md))
 already establishes how this repo takes on a third-party C++ SDK: fetched against a pinned hash,
 never committed, staged by a script that CI and a developer run identically.
 
@@ -42,7 +52,7 @@ source must give up — and the frames have nowhere to go but a pipe.
 TouchDesigner on another machine over WiFi it is a bandwidth problem, and h.264 through `ffmpeg`
 beats NDI by an order of magnitude. On one machine there is no link, no bandwidth problem, and no
 reason to run a codec at all.
-[ADR-0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) records the
+[ADR-0125](../../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) records the
 decision, the three alternatives it beat, and the remote case that stays deferred.
 
 ## Decision
@@ -60,7 +70,7 @@ bookkeeping: it is what makes the tap transport-agnostic, so the deferred remote
 
 Two non-obvious calls, both stated in ADR-0125 with their exits. We take the **CPU pixel path, not
 zero-copy** texture sharing, because zero-copy means unsafe `wgpu-hal` interop against a raw D3D12
-device at the one seam [ADR-0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) keeps abstract —
+device at the one seam [ADR-0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) keeps abstract —
 and if measurement convicts the two copies, that is the known fix and nothing here has to move to
 adopt it. And we add a **tap** rather than reusing `Renderer::capture_stream`, because that entry
 point takes one fixed `dt` for a whole run (so a machine that falls behind would run the animation
@@ -180,7 +190,7 @@ flowchart LR
 
 > **Added 2026-08-29, after Phase 3.** Phase 3 found that a Spout sender must live on the receiver's
 > GPU and that a console process does not get it by default. The plan had no phase for choosing a
-> GPU, and Phase 4 cannot be written without one. [ADR-0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
+> GPU, and Phase 4 cannot be written without one. [ADR-0146](../../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
 > is the decision: **one `--gpu <name>`, and each side matches it against its own roster.**
 >
 > **Read ADR-0146's Context before starting.** The two adapters are *not* coupled on the CPU pixel
@@ -388,9 +398,9 @@ void      lmv_spout_destroy(LmvSpout *);
   mapped while the next is drawn — and it is deliberately **not** in scope, because a plan that
   builds it before measuring has guessed.
 - **Colour is the likeliest way this ships looking wrong.** The tap reads back `Rgba8UnormSrgb` —
-  display-referred, dithered in the encoded domain ([ADR-0096](../adrs/0096-the-display-write-dithers.md))
+  display-referred, dithered in the encoded domain ([ADR-0096](../../adrs/0096-the-display-write-dithers.md))
   — and Spout publishes unlabelled 8-bit. This project has shipped a wash-out defect before
-  ([Plan 0111](done/0111-the-milkdrop-import-stops-washing-out.md)), and no instrument here can see
+  ([Plan 0111](0111-the-milkdrop-import-stops-washing-out.md)), and no instrument here can see
   it. Phase 1 answers it with a reference image before we build, Phase 3 re-checks it on our own
   sender, and Phase 6 checks the real picture against a `shot` PNG. Three passes, because it is
   cheap to check and expensive to miss.
@@ -636,6 +646,29 @@ close rather than acted on.
   user for time, and is bounded above by the receiver's 1280x1280 licence cap regardless.
 
 ## Followups (after this lands)
+
+**Added at the close, 2026-08-30, from the Mode 4 review — the two majors and one minor, none of
+which blocks the ship:**
+
+- **The sender's name match is fed the description, not the name.** `gpu::follow_renderer` takes
+  `Renderer::adapter_description()`, which is `describe_adapter`'s detail string, while the sender's
+  roster holds bare DXGI names — so its exact-equality arm can never fire and the no-flag default
+  rides entirely on the reverse-containment tolerance below it. `AdapterDescription` already
+  separates `name` from `detail` for exactly this reason; the repair is to carry the bare name on
+  `RenderContext` beside the description and match against that, which also makes the equality arm
+  testable. Recorded in ADR-0146's Outcome.
+- **`--stream` integrates an unclamped `dt`.** The window clamps at `MAX_DT = 0.25` so a long gap
+  cannot dump a huge step into the dwell timer; the stream mode drives the same
+  `Director::advance` and `render_tapped` with a raw measured delta, and it is the mode that runs
+  unattended for hours next to a Windows console whose QuickEdit suspends the process on a click.
+  **ADR-0152 and Plan 0140 own the general repair** — sanitizing `dt` at the scene seam — and this
+  is a note that `standalone/src/stream.rs` is a second site, added after that plan's scope was
+  written.
+- **`stream.rs::parse` ignores an unrecognized flag** (`_ => {}`), so a misspelt `--sise 1920x1080`
+  streams silently at the default size. Same shape as backlog 0159 / ADR-0148 / **Plan 0135**,
+  whose scope predates this file — worth folding in there rather than fixing separately.
+
+**From the original plan:**
 
 - **The remote sink**, when TouchDesigner moves to another machine: ADR-0114's `ffmpeg` pipe
   attached to the same frame tap, h.264 over SRT or RTSP into a Video Stream In TOP. The user has

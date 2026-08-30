@@ -146,7 +146,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0122](0122-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | accepted 2026-08-25 (Plan 0106) |
 | [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | accepted 2026-08-26 (Plan 0113), Outcome |
 | [0124](0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) | The line stroke carries a solid core and a pixel-wide edge, and its softness is authorable | accepted 2026-08-26 (Plan 0114), Outcome |
-| [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | proposed 2026-08-25 (Plan 0115) |
+| [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | accepted 2026-08-30 (Plan 0115), Outcome, refined by 0146 |
 | [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
 | [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | accepted 2026-08-27 (Plan 0118) |
 | [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes - not implementable at Plan 0116, implemented at 0119; completed by 0129, implemented by 0130 |
@@ -167,7 +167,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | proposed 2026-08-28 (Plan 0131) |
 | [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | accepted 2026-08-29 (Plan 0132), Outcome, superseded in part by 0145 |
 | [0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md) | The engine drives the fixtures directly over Art-Net | proposed 2026-08-29 (Plan 0133), supersedes 0144 in part |
-| [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115) |
+| [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115), Outcome, refines 0125 |
 | [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | proposed 2026-08-29 (Plan 0134), supersedes 0141 in part |
 | [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | proposed 2026-08-29 (Plan 0135) |
 | [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |

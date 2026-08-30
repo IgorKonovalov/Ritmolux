@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0143** (ADRs are a separate sequence — next free there is **0154**; 0146 is claimed by the live 0115 lane.)
+**Next free number: 0143** (ADRs are a separate sequence — next free there is **0154**.)
 
 ## Active roster
 
@@ -29,7 +29,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. |
-| [0115](0115-the-engine-becomes-a-live-video-source.md) | The engine becomes a live video source | approved | dev, human | **Lane is live** at `lmv-plan-0115`. A headless **Spout** source (ADR-0125, proposed). Phase 1 is a `human` stop gate before `dev`; Phase 2's `core` frame tap outlives a failed Phase 1. |
 | [0124](0124-the-review-fixes-that-move-no-pixels.md) | The review fixes that move no pixels | approved | dev | First of three from the 2026-08-28 review. Six mechanical, golden-neutral fixes, incl. a shared `core/tests/common/` harness. **Goes first** — 0125/0126 write tests against it. |
 | [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three. Five helpers retire ~800-1000 pasted lines across 12 scenes, one per phase, **golden-identical unblessed on both adapters at every commit**. ADR-0058 constrains it. |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
@@ -938,6 +937,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md) — closed 2026-08-30. Review: **no blockers, two majors, three minors.** Version: **0.93.0** (minor). [Write-up](README-archive.md).
 - [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md) — closed 2026-08-29. Review: **one blocker, three majors, three minors, two nits.** Version: **0.92.0** (minor). Corrected [backlog 0038](../design-backlog.md). [Write-up](README-archive.md).
 - [0129 - The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md) - closed 2026-08-29. Review: **no blockers, one major, four minors.** Version: **0.91.1** (patch). Filed [backlog 0160 + 0161](../design-backlog.md). [Write-up](README-archive.md).
 - [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md) — closed 2026-08-29. Review: **no blockers, one major, three minors, two nits.** Version: **0.91.0** (minor). [Write-up](README-archive.md).
@@ -1125,7 +1125,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
-[0115]: 0115-the-engine-becomes-a-live-video-source.md
+[0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: 0124-the-review-fixes-that-move-no-pixels.md
 [0125]: 0125-the-scenes-share-their-gpu-boilerplate.md

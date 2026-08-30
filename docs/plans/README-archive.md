@@ -13,6 +13,61 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md)
+  — closed 2026-08-30. Seven planned phases plus a `dev`-added Phase 3b, in the `lmv-plan-0115`
+  lane, `b50592a`..`7e870aa` plus the close block and the out-of-band auto-rotate fix `64758ad`.
+  Review: **no blockers, two majors, three minors.** Version **0.93.0** (minor). Closed no backlog
+  entry. Curation: not triggered — `presets/` untouched.
+
+  **It delivers, and the delivery was re-verified at the close rather than read off the log.**
+  `lmv --stream` publishes a Spout sender that TouchDesigner picks up with a `Syphon Spout In` TOP,
+  reacting live to loopback audio, with presets rotating on the operator config's dwell timer. The
+  post-merge gate — the first moment this lane's `core/src/render/context.rs` work met Plan 0131's
+  console changes to the same file — is clean on `fmt`, `clippy --workspace --all-targets` and
+  `nextest --workspace` at 1171 tests. The frame tap's byte-identity test was opened and read: it
+  asserts **exactly**, as the phase demanded, and carries a vacuity guard (`is_flat`) so a flat
+  reference cannot pass a tap wired to nothing. Phase 6's own reading holds: **108,000 frames in
+  1800.00 s wall against 1799.99 s scene at 1280x720/60**, +2.0 MB resident across the run.
+
+  **The two majors are both cases of a value sourced from a place that agrees with the right one on
+  this machine.** First, `gpu::follow_renderer` — the whole of the no-flag default — is handed
+  `Renderer::adapter_description()`, which is the *detail* string (name plus backend, device type
+  and driver), while the sender's roster holds bare names. `AdapterDescription` was introduced in
+  this very plan with two fields to keep those apart, and its own doc comment says `detail` "would
+  wreck a match". The exact-equality arm is therefore structurally unreachable and the resolution
+  survives only on the reverse-containment tolerance beneath it. It resolves correctly here and
+  wherever the description contains the bare name, and no test can tell the two arms apart while
+  the wrong string is passed. Second, `--stream` drives both `Director::advance(dt, …)` and
+  `render_tapped(…, dt)` with an **unclamped** `dt`, where the window clamps at `MAX_DT = 0.25` for
+  a stated reason — a long gap "would otherwise dump a huge step into the dwell timer and rotate on
+  return". The stream is the mode that runs unattended for hours, and a Windows console has
+  QuickEdit: a click in the window suspends the process until a keypress. ADR-0152 and Plan 0140
+  already own the general repair; what this close adds is that `stream.rs` is a second site.
+
+  **Three things the plan's own instruments could not see, all recorded by `dev` rather than found
+  here.** A Spout receiver that loses its sender **keeps presenting the last texture**, so the
+  Phase 3b control first read as a false negative — a static probe image makes a live feed and a
+  frozen frame identical, and the probe now stamps a stepping liveness marker. Phase 4's "no
+  capture device fails with a named error" was **not exercised**, because an unmatched device name
+  degrades to the default endpoint and reaching the state means disabling the machine's audio.
+  Phase 6 item 2's **largest** size and rate was **not swept** — deferred for time, and bounded
+  above regardless by the receiving install being TouchDesigner Non-Commercial, which caps the TOP
+  at 1280x1280, so ADR-0125's 1920x1080 bandwidth figures were never confirmed end to end.
+
+  **Two things outlived the plan and are worth more than the feature.** Phase 5 found that
+  **auto-rotate had not rotated in the shipped windowed app since 2026-07-26** — the shell's branch
+  called `on_preset_switched()`, which is bookkeeping *about* a switch and performs none; fixed in
+  `64758ad`, and the reason it shipped is that `AppState` needs a real window, so nothing in the
+  suite can assert what the event loop's branch calls. And this lane is where the **shared artifact
+  store** was caught serving one worktree another's compiled `lmv-core` (`no method named open_tap`
+  against source that defines it), which became ADR-0147 and Plan 0134.
+
+  Also settled: the CPU pixel path is **not** the limit — 3.67–7.82 ms render+readback against
+  0.27–0.58 ms send — so ADR-0125's stated exit to zero-copy is measured and not taken. The `spout`
+  feature costs **178,688 bytes**, and the shipped binary now sits at **9.70 MB against NFR §4's
+  ~10 MB soft cap**, which is close whether or not this feature is in the build and is raised here
+  rather than acted on.
+
 - [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md)
   — closed 2026-08-29. Six phases plus a `dev`-added Phase 4b, in the `lmv-plan-0104` lane,
   `7561492`..`be385c9` plus the close. Review: **one blocker, three majors, three minors, two nits.**
