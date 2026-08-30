@@ -1,6 +1,6 @@
 # 0135 — The show-night surfaces stop lying
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (proposed)
@@ -220,3 +220,29 @@ impl RecoveryPolicy {
   [Plan 0133](0133-the-engine-drives-the-lights.md)'s. This plan only makes a misspelt flag reaching
   them impossible to miss.
 - **It adds no CLI dependency.** See ADR-0148 Alternative B.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0135` on `plan-0135-show-night-surfaces`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The binary knows its own flags | dev | done | committed with this row |
+| 2 — `--help` prints the roster and exits | dev | not started | |
+| 3 — An operator's choice is a new incident | dev | not started | |
+| 4 — The settle window is in seconds | dev | not started | |
+| 5 — The unplug gate (evidence only) | human | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Outstanding `human` phases:**
