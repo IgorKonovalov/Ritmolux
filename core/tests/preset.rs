@@ -2618,3 +2618,75 @@ fn the_ring_coordinate_warning_is_silent_on_everything_else() {
         animated.warnings
     );
 }
+
+/// Every operator-facing message this file's schema builds reads as one
+/// sentence — no run of two or more spaces anywhere in it.
+///
+/// The trap is a `format!` literal broken across source lines. A Rust string
+/// keeps the newline **and** the continuation line's indentation unless the
+/// break carries a trailing `\`, so a message that looks correctly wrapped in
+/// the source reaches the operator with twenty-odd spaces in the middle of it.
+/// Nothing else catches this: the message still compiles, still matches a
+/// `contains` assertion on either half, and is only wrong where it is read.
+#[test]
+fn operator_messages_carry_no_run_of_spaces() {
+    /// The offending run is two spaces; `\n` and `\t` would be the same defect
+    /// reaching the same reader, so they fail here too.
+    fn check(label: &str, text: &str) {
+        assert!(
+            !text.contains("  ") && !text.contains('\n') && !text.contains('\t'),
+            "{label}: message is not a single clean sentence: {text:?}"
+        );
+    }
+
+    // A `[params]` binding naming a per-vertex variable with no `[per_vertex]`
+    // table, and the same reach from inside a `[layer]`.
+    let warned =
+        Preset::from_toml_str("system = \"warp_mesh\"\nname = \"w\"\n[params]\nzoom = \"rad\"\n")
+            .expect("a per-vertex reach warns rather than failing");
+    let vertex = warned
+        .warnings
+        .iter()
+        .find(|w| w.contains("per-vertex variable"))
+        .expect("the per-vertex warning fires");
+    check("per-vertex reach", vertex);
+
+    let layered = Preset::from_toml_str(
+        "system = \"fragment_field\"\nname = \"l\"\n[params]\nzoom = \"0.6\"\n\
+         [layer]\nsystem = \"warp_mesh\"\n[layer.params]\nzoom = \"rad\"\n",
+    )
+    .expect("a layer's per-vertex reach warns rather than failing");
+    let layer_vertex = layered
+        .warnings
+        .iter()
+        .find(|w| w.contains("per-vertex variable"))
+        .expect("the layer per-vertex warning fires");
+    check("layer per-vertex reach", layer_vertex);
+
+    // The four `[particles]` tuple-path rejections, which reach the operator as
+    // load errors rather than warnings.
+    let base = "system = \"attractor\"\nname = \"t\"\n[particles]\n";
+    let rejections: [(&str, &str); 4] = [
+        (
+            "near end with no far end",
+            "family = \"de_jong\"\ntuple_from = 1\n",
+        ),
+        (
+            "a map-only path on an IFS",
+            "family = \"barnsley\"\ntuple_to = 2\n",
+        ),
+        (
+            "an index past the roster",
+            "family = \"de_jong\"\ntuple_from = 0\ntuple_to = 99\n",
+        ),
+        (
+            "both ends the same entry",
+            "family = \"de_jong\"\ntuple_from = 2\ntuple_to = 2\n",
+        ),
+    ];
+    for (label, table) in rejections {
+        let err = Preset::from_toml_str(&format!("{base}{table}"))
+            .expect_err(&format!("{label} is rejected"));
+        check(label, &err.to_string());
+    }
+}

@@ -926,17 +926,6 @@ impl AttractorScene {
         }
     }
 
-    /// The deterministic initial particle set: a seeded scatter in a small box,
-    /// each with a per-particle hue jitter. Points converge onto the attractor
-    /// within a few iterations, so the starting positions only need to differ.
-    ///
-    /// The `x`/`y`/`seed` draws come first (their order matches the earlier 2D
-    /// scatter, so De Jong/Clifford stay byte-identical across the 3D upgrade),
-    /// then `z` is drawn in a second pass for the 3D families.
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "spread/centre/pos index fixed [f32; 3] at constant offsets, always in-bounds"
-    )]
     /// Build the GPU resources on the first frame, and re-allocate the
     /// grid-dependent half when `set_target_size` asked for a different grid than
     /// the live one (Plan 0027 Phase 2). In the steady state — every frame of a
@@ -1046,7 +1035,13 @@ impl AttractorScene {
         Some(out)
     }
 
-    /// The CPU-side initial fill.
+    /// The CPU-side initial fill: a seeded scatter in a small box, each particle
+    /// carrying a hue jitter of its own. Points converge onto the attractor
+    /// within a few iterations, so the starting positions only need to differ.
+    ///
+    /// The `x`/`y`/`seed` draws come first — that order is what keeps De Jong
+    /// and Clifford byte-identical against the 2D scatter the 3D families
+    /// generalized — and `z` is drawn in a second pass for the 3D families.
     ///
     /// The box is the **active roster entry's** (ADR-0093), handed in rather
     /// than read off the family: a wild tuple's figure can be twice the
@@ -1075,6 +1070,10 @@ impl AttractorScene {
     /// so there is no resolved table to ask. Phase 3's continuous respawn targets
     /// the live resolved table, which is what carries the fill to wherever a
     /// bound `morph` has taken the figure — within one particle lifetime.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "spread/centre/pos index fixed [f32; 3] at constant offsets, always in-bounds"
+    )]
     fn seed(
         family: AttractorFamily,
         seed_box: ([f32; 3], [f32; 3]),

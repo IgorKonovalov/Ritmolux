@@ -803,7 +803,8 @@ impl Preset {
         for binding in &params {
             if binding.expr.uses_vertex() {
                 warnings.push(format!(
-                    "parameter '{}' names a per-vertex variable (x/y/rad/ang), which                      reads 0 outside a [per_vertex] table",
+                    "parameter '{}' names a per-vertex variable (x/y/rad/ang), which \
+                     reads 0 outside a [per_vertex] table",
                     binding.name
                 ));
             }
@@ -1138,7 +1139,8 @@ fn build_layer(
     for binding in &params {
         if binding.expr.uses_vertex() {
             warnings.push(format!(
-                "[layer] parameter '{}' names a per-vertex variable (x/y/rad/ang),                  which reads 0 outside a [layer.per_vertex] table",
+                "[layer] parameter '{}' names a per-vertex variable (x/y/rad/ang), \
+                 which reads 0 outside a [layer.per_vertex] table",
                 binding.name
             ));
         }
@@ -1938,7 +1940,8 @@ impl RawParticles {
         let Some(to) = self.tuple_to else {
             if self.tuple_from.is_some() {
                 return Err(PresetError::Config(
-                    "[particles] tuple_from names the near end of a path, but there is no                      tuple_to naming the far end"
+                    "[particles] tuple_from names the near end of a path, but there is no \
+                     tuple_to naming the far end"
                         .to_string(),
                 ));
             }
@@ -1946,7 +1949,8 @@ impl RawParticles {
         };
         if matches!(family, AttractorFamily::Ifs(_)) {
             return Err(PresetError::Config(format!(
-                "[particles] tuple_to is only meaningful for a map family, but family is                  '{}' — an IFS travels between figures through morph_to instead",
+                "[particles] tuple_to is only meaningful for a map family, but family is \
+                 '{}' — an IFS travels between figures through morph_to instead",
                 self.family
             )));
         }
@@ -1955,7 +1959,8 @@ impl RawParticles {
         for (label, index) in [("tuple_from", from), ("tuple_to", to)] {
             if index >= len {
                 return Err(PresetError::Config(format!(
-                    "[particles] {label} = {index} is past '{}'s roster, which has {len}                      entries (0..={})",
+                    "[particles] {label} = {index} is past '{}'s roster, which has {len} \
+                     entries (0..={})",
                     self.family,
                     len.saturating_sub(1)
                 )));
@@ -1963,7 +1968,8 @@ impl RawParticles {
         }
         if from == to {
             return Err(PresetError::Config(format!(
-                "[particles] tuple_from and tuple_to are both {from} — a path needs two                  different entries"
+                "[particles] tuple_from and tuple_to are both {from} — a path needs two \
+                 different entries"
             )));
         }
         Ok(Some((from, to)))

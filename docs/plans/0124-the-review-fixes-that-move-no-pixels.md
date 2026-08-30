@@ -232,8 +232,8 @@ shorter than the placeholder above guessed).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One harness for forty test files | dev | done | committed with this row |
-| 2 — Four strings, one attribute | dev | not started | |
+| 1 — One harness for forty test files | dev | done | 709544f |
+| 2 — Four strings, one attribute | dev | done | committed with this row |
 | 3 — The gate learns the narration shape that survives | dev | not started | |
 | 4 — The maps name every crate | dev | not started | |
 | 5 — The spec says what the shim does | dev | not started | |
@@ -262,6 +262,38 @@ different argument lists. They share a name and nothing else, so there was nothi
 `field_cost`, `mark_cost`, `palette_contour` and `reaction_diffusion` still spell the ADR-0016
 block out inside a bespoke `capture_at`-shaped function rather than in a `fn headless`. They were
 outside the phase's stated set (the 27 files defining `headless()`) and are untouched.
+
+**Phase 2, six strings rather than four.** The phase names four broken `format!` literals at
+`schema.rs:756/982/1762/1787`. The tree carries **six**, all the same defect and all in the named
+file: the two per-vertex warnings (`:806`, `:1141`) and the four `[particles]` tuple-path
+rejections (`:1941`, `:1949`, `:1958`, `:1966`). All six are rejoined. A seventh of the same shape
+sits at `core/src/dsp/mod.rs:57` and is **untouched** — outside the phase's file list; it is in the
+followups below.
+
+**Phase 2, the negative clippy check does not fail.** The phase asks `dev` to remove the
+`#[allow(clippy::indexing_slicing, ...)]` once and state the lint it saw. Removing it from `seed`
+leaves `cargo clippy --workspace --all-targets -- -D warnings` **green**, so the attribute is
+inert where it now sits — and was equally inert on `rebuild_if_stale`. The mechanism: the module
+denies the lint at `mod.rs:49-54`, but `indexing_slicing` does not fire on a constant index into a
+fixed-size array, which is exactly the case the attribute's own reason string describes
+("index fixed [f32; 3] at constant offsets"). Two probes pin this down — `spread[0] + center[0]`
+inserted into `seed` with the attribute absent produced no diagnostic, while `Some(1u32).unwrap()`
+in the same position produced `error: used unwrap() on Some value ... note: the lint level is
+defined here --> mod.rs:49`, so the deny does reach the function. Both probes were removed. The
+attribute is moved as the phase says and **not** deleted: whether a dead `#[allow]` should stay is
+a call this phase does not authorize.
+
+**Phase 2, `rebuild_if_stale` needed no new doc.** The phase asks for "the one-line doc it
+actually needs". It already had its own correct doc block sitting *below* the misplaced one; only
+the orphaned prose and the attribute moved, and nothing was written for it.
+
+**Phase 2, the test covers all six, not one.** `operator_messages_carry_no_run_of_spaces` in
+`core/tests/preset.rs` walks both per-vertex warnings and all four tuple-path errors rather than
+the single `rad` case the phase names, since a test guarding one of six rejoined strings leaves
+five unguarded. It rejects `
+` and `	` alongside a two-space run. Bite check: re-breaking the
+first literal fails it with `per-vertex reach: message is not a single clean sentence: "... which
+                      reads 0 ..."`; the string was then restored.
 
 **Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
 `HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite
