@@ -444,8 +444,8 @@ impl Report {
         if rendered {
             let blank: Vec<&Row> = self.rows.iter().filter(|r| r.blank == Some(true)).collect();
             // Split by whether the source carries HLSL. Both halves are real
-            // findings now: since Phase 6 an MD2 preset renders WITH its
-            // translated shaders, so a blank one is a translation-fidelity item
+            // findings: an MD2 preset renders WITH its translated shaders,
+            // so a blank one is a translation-fidelity item
             // rather than "the picture is in the missing shader".
             let shader_blank = blank.iter().filter(|r| r.milkdrop2).count();
             let plain_blank = blank.len() - shader_blank;

@@ -101,8 +101,7 @@ const DEFAULT_BASE: f32 = 0.06;
 /// Inner radius of the radial ring (ignored by the other two layouts).
 const DEFAULT_RADIUS: f32 = 0.35;
 /// World-space **half-width** the readout spans, so the figure is `2 * span`
-/// wide — `1.0` is the constant this scene was pinned to before Plan 0038
-/// Phase 2 bound it.
+/// wide — `1.0` is what an unbound preset gets.
 ///
 /// It is a **world** quantity, not a screen one. The renderer divides x by the
 /// target aspect on the GPU, so this scene never sees an aspect and cannot take
@@ -115,9 +114,9 @@ const DEFAULT_RADIUS: f32 = 0.35;
 /// instead — the mirror image of `radius` already being a no-op on the
 /// other two.
 const DEFAULT_SPAN: f32 = 1.0;
-/// World-space y the bars and the polyline rest on — the constant this scene
-/// was pinned to before Plan 0038 Phase 2 bound it. Also a **no-op on
-/// [`SpectrumLayout::RadialRing`]**, whose spokes start on the ring.
+/// World-space y the bars and the polyline rest on — what an unbound preset
+/// gets. Also a **no-op on [`SpectrumLayout::RadialRing`]**, whose spokes start
+/// on the ring.
 ///
 /// `baseline = 0` is what makes `mirror_reflect` mean what it means everywhere
 /// else: the mirror reflects across the **x-axis**, so a figure standing on the
@@ -126,8 +125,7 @@ const DEFAULT_SPAN: f32 = 1.0;
 /// edge (design-backlog 0018).
 const DEFAULT_BASELINE: f32 = -0.85;
 /// Level-shaping exponent (ADR-0040). `1.0` is exactly linear — `powf(x, 1.0) ==
-/// x`, the map this scene had before Plan 0038 Phase 3 — `0.5` is a square root,
-/// and lower values compress harder.
+/// x` — `0.5` is a square root, and lower values compress harder.
 ///
 /// It applies to the **downsampled level, before the per-element smoother**, so
 /// `[spectrum] smoothing` eases the displayed quantity the way meter ballistics

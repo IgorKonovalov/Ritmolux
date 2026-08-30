@@ -158,7 +158,7 @@ struct Row {
 /// Walk one preset, returning its distribution rows and its failures.
 ///
 /// The walk covers the `[layer]`'s bindings too — its params and its bindable
-/// `mix` — since Plan 0076 Phase 4: they are the same `Binding` machinery, and
+/// `mix` (Plan 0076 Phase 4): they are the same `Binding` machinery, and
 /// a layer clamp pinned at its bound is the same defect in another namespace.
 /// Layer rows are labeled `[layer] <param>`; an `[occupancy] exempt` entry
 /// matches the **raw** param name in either namespace, since the table

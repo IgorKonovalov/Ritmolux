@@ -135,9 +135,8 @@ pub struct DownbeatTerms {
     /// Whether these terms publish — the evidence floor **and** the gate.
     pub locked: bool,
     /// **The counter the fold buckets by**, as of the most recent
-    /// [`DownbeatTracker::process`] — the [`grid`](super::grid)'s beat count
-    /// since Plan 0095, and `beat_index` only while the grid warms up
-    /// (ADR-0109). [`Self::scores`], [`Self::best`] and [`Self::held`] are all
+    /// [`DownbeatTracker::process`] — the [`grid`](super::grid)'s beat count,
+    /// and `beat_index` only while the grid warms up (ADR-0109). [`Self::scores`], [`Self::best`] and [`Self::held`] are all
     /// indexed in *this* counter's space, and it is reported here because
     /// nothing downstream retains it: the shell's log had no way to name the
     /// quantity its own alignment columns were expressed in, which is what let
@@ -211,8 +210,8 @@ impl DownbeatTracker {
     /// **normalized** levels; `beat_phase` is the `0..1` position through the
     /// current beat, which becomes the sub-beat part of `bar_phase`.
     ///
-    /// **`beat_count` is the counter this folds over, and since Plan 0095 it is
-    /// not `beat_index`.** It is the [`grid`](super::grid)'s beat count, which is
+    /// **`beat_count` is the counter this folds over, and it is not
+    /// `beat_index`.** It is the [`grid`](super::grid)'s beat count, which is
     /// driven by the tempo estimate; `beat_index` counts transients, at 1.35x to
     /// 2.10x per musical beat, so folding over it spanned well under a bar and a
     /// bar-locked accent precessed across all four alignments instead of
@@ -523,7 +522,7 @@ mod tests {
     ///
     /// Three places documented it as monotone and it is not: `bar_index` is
     /// `(beat count - alignment) / BEATS_PER_BAR` — the [`grid`](super::grid)'s
-    /// beat count since Plan 0095, `beat_index` only while the grid warms up — so
+    /// beat count, `beat_index` only while the grid warms up — so
     /// the beat the estimator locks
     /// onto a non-zero alignment subtracts up to three beats and the counter can
     /// step back by one bar. Plan 0049 chose to soften those docs rather than

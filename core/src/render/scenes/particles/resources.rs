@@ -29,8 +29,8 @@ use super::*;
 /// each: the jitter reads and writes the same storage buffer through the same
 /// bind-group layout, so only the uniform's contents differ.
 ///
-/// **192 bytes since Plan 0073**, 160 since Plan 0062 and 32 before that, for
-/// every family including the four that ignore the new fields — negligible in
+/// **192 bytes**, for every family including the four that ignore the trailing
+/// fields — negligible in
 /// bandwidth, and noted because it is a struct four families share. ADR-0075
 /// predicted 144 for the Plan 0062 shape; the extra 16 is the alignment padding
 /// [`step_index`](Self::step_index) forces, because the scalar block ahead of the

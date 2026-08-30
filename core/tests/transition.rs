@@ -640,7 +640,7 @@ fn the_heavy_pair_dissolves_on_the_freeze_fallback() {
         span > 0.05,
         "the heavy pair must actually look different across the dissolve: {span}"
     );
-    // 0.15, not 0.2, since Plan 0045 Phase 3. This pair is deliberately lopsided
+    // 0.15, not 0.2 (Plan 0045 Phase 3). This pair is deliberately lopsided
     // — the attractor's accumulation is far brighter than the diffusion field —
     // so a linear-light crossfade already sits nearer the bright side at t =
     // 0.5, and the float composite moves it nearer still: on an 8-bit composite

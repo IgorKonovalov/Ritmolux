@@ -20,9 +20,9 @@
 //!
 //! **160x100, and not a square.** The post stages round each grid axis up to a
 //! 256 px step, so 160x100 takes a **256x256** grid: aspect 1.0 against the
-//! target's 1.6. Composing a stage therefore stretched the picture by **1.6x**
-//! before Phase 1 — stronger than the 1.28x at 1280x800 that is the worst
-//! ordinary case, at a sixty-fourth of the pixels.
+//! target's 1.6. A stage that took its aspect from that grid would therefore
+//! stretch the picture by **1.6x** here — stronger than the 1.28x at 1280x800
+//! that is the worst ordinary case, at a sixty-fourth of the pixels.
 //!
 //! A square or 16:9 capture size would defeat this guard entirely: the policy
 //! returns those aspect-exact, which is precisely why the defect was invisible at
@@ -74,8 +74,8 @@ const MAX_OUTLIER: u8 = 48;
 ///
 /// One per stage — `trails` is the stage with cross-frame state, `kaleido_*` the
 /// one that computes geometry, `bloom_*` (Plan 0045 Phase 4) the one with an
-/// internal pyramid — plus, since Plan 0045 Phase 3, one that binds no stage at
-/// all and exercises the composite's **arithmetic** instead: a dense additive rose
+/// internal pyramid — plus one that binds no stage at all (Plan 0045 Phase 3)
+/// and exercises the composite's **arithmetic** instead: a dense additive rose
 /// whose self-crossings would clip to flat white on 8-bit intermediates and roll
 /// off through the tonemap here.
 ///

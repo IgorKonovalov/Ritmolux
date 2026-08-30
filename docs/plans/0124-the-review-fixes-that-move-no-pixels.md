@@ -233,8 +233,8 @@ shorter than the placeholder above guessed).
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — One harness for forty test files | dev | done | 709544f |
-| 2 — Four strings, one attribute | dev | done | committed with this row |
-| 3 — The gate learns the narration shape that survives | dev | not started | |
+| 2 — Four strings, one attribute | dev | done | cf8c47a |
+| 3 — The gate learns the narration shape that survives | dev | done | committed with this row |
 | 4 — The maps name every crate | dev | not started | |
 | 5 — The spec says what the shim does | dev | not started | |
 | 6 — The unwired scripts get a line or get deleted | dev | not started | |
@@ -294,6 +294,45 @@ five unguarded. It rejects `
 ` and `	` alongside a two-space run. Bite check: re-breaking the
 first literal fails it with `per-vertex reach: message is not a single clean sentence: "... which
                       reads 0 ..."`; the string was then restored.
+
+**Phase 3, 72 comments rather than the ~14 the phase sized.** The vocabulary the phase specifies
+reports 72 findings across 45 files on the live tree — 40 in non-test `core/src` + `standalone/src`,
+30 in test files, 2 in `foo_lmv.cpp`. All 72 are rewritten in the gate's own commit. The user was
+asked before Phase 3 started and chose to rewrite all of them rather than re-scope.
+
+**Phase 3, one false positive, resolved by rewriting rather than by an escape.**
+`core/src/render/scenes/particles/tests.rs` read *"the fixed-point diameter is not a lower bound on
+the attractor's reach any more than it is an upper one"* — the comparative idiom, not the residue
+phrase. It now reads *"is no more a lower bound ... than it is an upper one"*. **Zero
+`hygiene-allow` escapes were added**, so the phase's "more than three escapes means the pattern
+over-reaches" signal did not fire; the single over-reach is recorded here instead.
+
+**Phase 3, the walk covers `.c`/`.h`/`.cc`/`.cpp`/`.hpp` repo-wide, not only `plugin-foobar/`.**
+The repo holds three C/C++ files — `plugin-foobar/foo_lmv.cpp`, `core-cabi/include/lmv_core.h` and
+`standalone/src/spout/shim.cpp` — all hand-written and all ours, and restricting the walk by
+directory would have left the fixture tree's own `.cpp` unreachable when `scripts/fixtures` is the
+root. Only `foo_lmv.cpp` reported (`:328`, `:548`).
+
+**Phase 3, fixtures: four files, ten findings.** `seeded-elapsed.rs` (five, one per preposition in
+the alternation), `seeded-residue.rs` (one), `seeded.cpp` (two), and the pre-existing `seeded.rs`
+(two — one line was reworded so it no longer seeds a third class incidentally). `seeded.cpp` pins
+the three places the C lexer must not use Rust's rules: non-nesting block comments, the
+`R"tag(...)tag"` raw string, and `'` always opening a char literal.
+
+**Phase 3, `scripts/fixtures/README.md` was edited, and it is outside the phase's file list.** The
+phase lists `scripts/fixtures/comment-hygiene/*`; the README one level up carries the expected-count
+table for that directory and said "exactly two findings". Leaving it would have shipped the
+doc/test drift this plan exists to remove.
+
+**Phase 3, the binary-hash check in the done-when is void on this machine.** The phase offers
+"a `cargo build` that emits the same binary hash before and after" as the cheap proof that no
+non-comment line moved. `cargo build --release -p standalone` run **twice over identical source**
+produced `E1D367...` and then `82290BD...`, so the release build is not bit-reproducible here and
+the check cannot distinguish a comment edit from anything else. What replaced it: every `+`/`-`
+line in `git diff -- '*.rs' '*.cpp'` for the rewrite is a comment line (`///`, `//!`, `//`, `*`) —
+zero non-comment lines, mechanically filtered — and `cargo doc --workspace --no-deps` emits **64**
+intra-doc-link warnings both before and after, so no rustdoc link was broken by the rewording.
+`cargo nextest run --workspace`: 1200 passed, 5 skipped.
 
 **Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
 `HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite

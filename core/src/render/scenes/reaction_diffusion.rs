@@ -1116,11 +1116,11 @@ impl Scene for ReactionDiffusionScene {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     // Load over the engine backdrop (ADR-0018). The present is
-                    // **not** opaque: since Plan 0025 it writes premultiplied
-                    // alpha, with the V-field's `structure` term as coverage, so
-                    // the coral's voids reveal the `bg_*` gradient underneath.
-                    // Over the default black backdrop that equals the old opaque
-                    // REPLACE, which is why the golden did not move.
+                    // **not** opaque: it writes premultiplied alpha, with the
+                    // V-field's `structure` term as coverage, so the coral's
+                    // voids reveal the `bg_*` gradient underneath. Over the
+                    // default black backdrop a premultiplied Load is arithmetically
+                    // an opaque REPLACE, which is why the golden does not move.
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
                 },

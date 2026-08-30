@@ -4,8 +4,8 @@
 //! the petal tips. Connecting each contact point to its two neighbouring tips
 //! traces the interlaced star.
 //!
-//! **Since Plan 0054 / ADR-0060 this runs from `Scene::update`, not only from
-//! `configure`.** `variant` is a continuous contact angle, so a bound param
+//! **This runs from `Scene::update`, not only from `configure`** (Plan 0054,
+//! ADR-0060). `variant` is a continuous contact angle, so a bound param
 //! reaches this construction during playback; `star.rs`'s hysteresis cache bounds
 //! the rate (one rebuild per `STEP_DEG` of travel, measured at 0.34 us for the
 //! reachable `n = 12`), but the call itself is on the hot path and the panic

@@ -62,8 +62,8 @@ const FORMAT: AudioFormat = AudioFormat {
 /// gets the same settling time it always got.
 ///
 /// **This is the gate's cost knob and it was chosen by measurement, not taste.**
-/// It has not moved since Plan 0067 and Plan 0084 did not renegotiate it — only
-/// the wasted rendering around it went. **16 was tried and rejected** back when
+/// Plan 0067 chose it and Plan 0084 did not renegotiate it — only the wasted
+/// rendering around it went. **16 was tried and rejected** back when
 /// every hop rasterized: it brought that sweep to 120 s, but the tightest preset
 /// in the library then (`Squall`) fell from 0.0270 to 0.0220 against a 0.020
 /// floor — 10 % headroom, one content tweak from a false failure. Those two

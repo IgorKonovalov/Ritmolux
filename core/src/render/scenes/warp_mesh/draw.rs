@@ -625,9 +625,10 @@ fn waveform_figure(
         // the relationship mode 5 has to mode 2, so the pair is consistent with
         // the pair above it rather than being two names for one figure.
         6 | 7 => {
-            // **`time * 0.05` was here until Plan 0109 Phase 2** (design-backlog
-            // 0115). It rotated the figure a full turn every ~126 s, so a trace
-            // authored horizontal was horizontal only at the instants
+            // **No `time` term here, deliberately** (Plan 0109 Phase 2,
+            // design-backlog 0115). A `time * 0.05` addend turns the figure a
+            // full turn every ~126 s, so a trace authored horizontal would be
+            // horizontal only at the instants
             // `mystery * PI + time * 0.05` happened to be a multiple of `pi`.
             // Plan 0108 Phase 4 named it a suspect and deliberately left it in,
             // because removing it moves every mode-6 and mode-7 preset and

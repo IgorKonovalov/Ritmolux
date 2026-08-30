@@ -205,7 +205,7 @@ pub struct StarPatternScene {
     /// The ring ornament (ADR-0079): [`rings`](Self::rings) placed, under the
     /// motion it was last built at. **Empty is the signal** that this preset
     /// declared no `rings`, and every ring-aware branch below keys off it, so a
-    /// rings-less preset takes exactly the path it took before Plan 0065.
+    /// rings-less preset takes the ring-free path end to end.
     ring_segments: Vec<SegmentInstance>,
     /// The ornament's **arcs** — the circular motifs, one instance each
     /// (ADR-0098). A ring of `circle` or `arc` puts nothing in
@@ -567,8 +567,8 @@ impl RosetteCache {
     /// Called when a preset switch changes the construction under the cache.
     pub(crate) fn invalidate(&mut self) {
         self.order = 0;
-        // `order = 0` alone is not enough to force a rebuild any more: a
-        // rings-only preset asks for order 0 (`tiling = "none"`), which would
+        // `order = 0` alone does not force a rebuild: a rings-only preset
+        // asks for order 0 (`tiling = "none"`), which would
         // match a just-invalidated cache and reuse its *empty* segment list at
         // whatever angle happened to be held. A non-finite built angle fails
         // every comparison, so the next request always rebuilds.
@@ -721,8 +721,8 @@ pub enum Motif {
     /// **This is the primitive the user chose over an approximation of it**
     /// (Plan 0065 Phase 2, design-backlog 0071). Shown a ring of overlapping
     /// [`Arc`](Motif::Arc) motifs faking a continuous boundary side by side with
-    /// the real thing, they picked the real thing, and until Plan 0087 gave the
-    /// renderer an arc instance there was no way to build one.
+    /// the real thing, they picked the real thing — and building one needs the
+    /// renderer's arc instance (Plan 0087).
     ///
     /// **It reads the ring's own fields, and each keeps its spirit** — see
     /// [`build_rings`]. `count` is the **lobe count** rather than a copy count,
@@ -874,10 +874,10 @@ impl Motif {
 
     /// **Segments** one copy of this motif contributes.
     ///
-    /// **Zero for the two circular members since Plan 0087**: they are drawn as
-    /// one [`ArcInstance`] each and contribute no segments at all, which is
-    /// where ADR-0098's order of magnitude of tier headroom comes from — a
-    /// `circle` cost `SMOOTH_SAMPLES` of this budget and now costs one of
+    /// **Zero for the two circular members**: they are drawn as one
+    /// [`ArcInstance`] each and contribute no segments at all, which is where
+    /// ADR-0098's order of magnitude of tier headroom comes from — sampling a
+    /// `circle` costs `SMOOTH_SAMPLES` of this budget, one arc costs one of
     /// [`arcs`](Self::arcs). **A fitted member contributes whatever straight
     /// runs its chain contains**, which for all three of them is none.
     pub fn segments(self) -> usize {

@@ -254,7 +254,7 @@ fn the_packing_puts_each_map_where_the_shader_reads_it() {
 /// scatter and by the CPU transcription of the draw shader — frames every
 /// figure at the reference aspect.
 ///
-/// The render path does not go through here since Phase 4; what it uses is
+/// The render path does not go through here; what it uses is
 /// asserted by `every_shipped_pair_stays_framed_at_both_aspects`. This
 /// stays because the fallback is what sizes the seed box, and a figure
 /// seeded outside its own attractor takes visibly longer to converge.
@@ -607,8 +607,8 @@ fn the_chaos_reference_is_deterministic_and_measures_the_figure() {
     );
 
     // And it agrees with the measured literals `frame`/`seed_box` are built
-    // from — the two must not drift, since Phase 4 replaces those literals
-    // with this function's output.
+    // from — the two must not drift, those literals being this function's
+    // own output.
     for figure in IfsFigure::ALL {
         let measured = chaos_extent(&figure.table(), 200_000);
         let ([hx, hy, _], [cx, cy, _]) = figure.seed_box();

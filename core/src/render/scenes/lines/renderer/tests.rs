@@ -1254,8 +1254,8 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
         if softness == SOFT_PROFILE {
             // `1.0` is still the pre-Plan-0114 fragment, term for term — that is
             // what the golden corpus rests on, and it is a value a preset can
-            // still bind. It is NOT the default any more (Plan 0114 Phase 5
-            // moved that to 0.25), so this arm names the number it is about.
+            // still bind. It is NOT the default — that is 0.25 (Plan 0114
+            // Phase 5) — so this arm names the number it is about.
             let worst = rows.iter().fold(0.0f32, |acc, row| {
                 let d = (ndc_y(*row) - RADIUS).abs();
                 let falloff = 1.0 - d / WIDTH;

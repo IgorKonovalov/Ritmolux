@@ -430,8 +430,8 @@ impl IfsFigure {
     /// `(world scale, centre)` — the projection's framing for this figure at the
     /// reference aspect, **as a fallback**.
     ///
-    /// Since Phase 4 the render path takes its framing from [`FitLut`] instead,
-    /// which follows the morph and knows the target's aspect. This survives for
+    /// The render path takes its framing from [`FitLut`] instead, which follows
+    /// the morph and knows the target's aspect. This survives for
     /// the two callers that have neither: the seeded scatter, and the CPU
     /// transcription of the draw shader that the projection tests run.
     ///

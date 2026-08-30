@@ -349,10 +349,10 @@ mod tests {
         assert!(config.hud.now_playing);
     }
 
-    /// **A `[hud]` section written before Plan 0097** has `preset_name` and
-    /// nothing else. The new key has to default rather than fail the section
-    /// that already exists — the same rule the missing-section case above
-    /// asserts, one level down.
+    /// **A `[hud]` section carrying `preset_name` and nothing else** — the
+    /// shape Plan 0097 added `now_playing` to. The added key has to default
+    /// rather than fail the section that already exists — the same rule the
+    /// missing-section case above asserts, one level down.
     #[test]
     fn a_hud_section_without_the_banner_key_keeps_the_banner_on() {
         let config: Config = toml::from_str("[hud]\npreset_name = false\n")

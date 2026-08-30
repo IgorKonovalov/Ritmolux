@@ -2,9 +2,9 @@
 //! hue corners, the roam vectors, the `rot_*` matrices and the procedural noise.
 //!
 //! None of this needs a GPU, and that is the point. `shader.rs` is built only
-//! for a bundle that carries WGSL, so until Plan 0110 nothing in the crate
-//! reached it on any adapter — yet more than half the file is arithmetic that a
-//! plain `cargo test` can hold to its documented contract. What is asserted here
+//! for a bundle that carries WGSL, so no adapter is involved here at all — yet
+//! more than half the file is arithmetic that a plain `cargo test` can hold to
+//! its documented contract (Plan 0110 Phase 1). What is asserted here
 //! is **properties, not frozen numbers** (ADR-0071): each one is either exact
 //! because the mechanism makes it exact (a channel divided by its own maximum is
 //! 1.0), or carries a tolerance derived from the mechanism (Rodrigues' formula

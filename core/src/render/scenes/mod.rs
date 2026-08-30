@@ -524,7 +524,7 @@ pub(crate) fn create_all(
     // line pipelines with byte-identical vertex layouts also mis-render on the
     // DX12 WARP software adapter the capture tests use; one renderer avoids it.)
     // `new_with_arcs`, not `new`: `star_pattern`'s circular motifs are one arc
-    // instance each since Plan 0087 (ADR-0098), and the arc buffer holds
+    // instance each (ADR-0098), and the arc buffer holds
     // `max_segments` because the two kinds share **one** budget — everything
     // that passes `build_rings`'s cap check must reach the GPU, or a cap would
     // be silently cutting geometry, which ADR-0007 forbids.

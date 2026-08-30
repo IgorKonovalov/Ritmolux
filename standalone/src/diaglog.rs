@@ -249,8 +249,8 @@ mod tests {
     /// A live-capture token, for the rows whose subject is a different column.
     const LIVE: &str = "live WASAPI 48000/2";
 
-    /// The eight columns that existed before Plan 0049, in order. **Frozen** —
-    /// anything already parsing this file reads them by index.
+    /// The eight legacy columns, in order (Plan 0049 appended past them).
+    /// **Frozen** — anything already parsing this file reads them by index.
     const LEGACY_COLUMNS: [&str; 8] = [
         "unix_ms",
         "fps",

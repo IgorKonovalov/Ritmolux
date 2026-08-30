@@ -107,8 +107,8 @@ fn the_jitter_selector_sits_past_every_family() {
 /// the one place the ADR's arithmetic was off: 160 rather than 144, because
 /// `step_index` forced the scalar block up to the next multiple of 16.
 ///
-/// **192 since Plan 0073**, the extra two `vec4` being ADR-0087's four
-/// respawn targets. The binding *count* is what matters for the ADR-0058
+/// **192**, the last two `vec4` being ADR-0087's four respawn
+/// targets. The binding *count* is what matters for the ADR-0058
 /// collision surface and it has not moved — one storage, one uniform.
 #[test]
 fn the_step_uniform_carries_the_ifs_table_in_one_binding() {
@@ -2492,8 +2492,8 @@ fn after_six_hundred_steps_the_population_holds_every_age() {
 ///
 /// **What it asserts, and what it deliberately only prints.** The claim
 /// originally read "spans at least 90 % of `[0, 1]`"; that is false on four
-/// of the five figures, because the fixed-point diameter is not a *lower*
-/// bound on the attractor's reach any more than it is an upper one. The
+/// of the five figures, because the fixed-point diameter is no more a *lower*
+/// bound on the attractor's reach than it is an upper one. The
 /// **ceiling is therefore measured and printed, never asserted** — it is a
 /// property of each figure's invariant measure rather than of this code, and
 /// a threshold on it would be a frozen number asserted universally, the

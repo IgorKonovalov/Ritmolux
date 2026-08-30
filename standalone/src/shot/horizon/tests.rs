@@ -400,7 +400,7 @@ fn a_truncated_run_reports_itself_where_the_table_would_be() {
         "the resident set it died at:\n{text}"
     );
     // The levers, and specifically NOT --interval: the capture path polls every
-    // frame since Plan 0099, so the interval does not govern reclaim.
+    // frame, so the interval does not govern reclaim.
     assert!(text.contains("--size"), "{text}");
     assert!(
         text.contains("--interval is NOT a lever"),
