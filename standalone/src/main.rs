@@ -2399,6 +2399,190 @@ fn resolve_config_path() -> Option<PathBuf> {
     preset_data_root().map(|root| root.join(APP_DIR_NAME).join("config.toml"))
 }
 
+/// One command-line flag this binary recognizes.
+///
+/// The roster is a second copy of a fact the scanners below already encode, and
+/// `every_scanner_flag_is_rostered` is what holds the two in step rather than
+/// discipline (ADR-0148). Keep an entry beside the scanner that reads it.
+struct FlagSpec {
+    /// Including the leading dashes, and without any `=value` suffix.
+    name: &'static str,
+    /// Whether the argument after this one is its value rather than a flag of
+    /// its own. A following argument that is itself flag-shaped is **not**
+    /// consumed: that is the rule `--soak` and `--downbeat-log` already use for
+    /// their optional paths, and it is what keeps `--tier --ocs 1.2.3.4:9000`
+    /// reporting the typo instead of swallowing it as a tier name. The cost is
+    /// that an endpoint or sender name genuinely spelled `--something` is
+    /// refused rather than passed through, which is the cheaper of the two
+    /// mistakes: every value-taking flag is otherwise a place a typo can hide.
+    takes_value: bool,
+    /// One line, printed by `--help`.
+    help: &'static str,
+}
+
+/// Every flag the binary accepts, in the order `--help` prints them.
+///
+/// Unconditional, including the `--stream` family: `stream::parse` compiles on
+/// every platform and a build without the `spout` feature refuses `--stream`
+/// with its own named reason, so a roster that hid those entries behind a `cfg`
+/// would turn a documented flag into an unrecognized argument on the builds
+/// that explain themselves best.
+const FLAGS: &[FlagSpec] = &[
+    FlagSpec {
+        name: "--console",
+        takes_value: false,
+        help: "open the operator console at launch",
+    },
+    FlagSpec {
+        name: "--list-devices",
+        takes_value: false,
+        help: "print the audio capture endpoints and exit (Windows-only)",
+    },
+    FlagSpec {
+        name: "--list-adapters",
+        takes_value: false,
+        help: "print the renderer and Spout adapter rosters and exit",
+    },
+    FlagSpec {
+        name: "--input",
+        takes_value: true,
+        help: "<loopback|line-in> where audio comes from",
+    },
+    FlagSpec {
+        name: "--device",
+        takes_value: true,
+        help: "<name> which capture endpoint to open (see --list-devices)",
+    },
+    FlagSpec {
+        name: "--tier",
+        takes_value: true,
+        help: "<floor|rich> pin the quality tier instead of letting the engine pick",
+    },
+    FlagSpec {
+        name: "--osc",
+        takes_value: true,
+        help: "<host:port> publish analyzer telemetry as OSC over UDP",
+    },
+    FlagSpec {
+        name: "--soak",
+        takes_value: true,
+        help: "[path] write a long-run frame-time trace; bare, it uses a default path",
+    },
+    FlagSpec {
+        name: "--downbeat-log",
+        takes_value: true,
+        help: "[path] write the per-beat downbeat decomposition; bare, a default path",
+    },
+    FlagSpec {
+        name: "--stream",
+        takes_value: false,
+        help: "run headless and publish every frame as a Spout sender",
+    },
+    FlagSpec {
+        name: "--size",
+        takes_value: true,
+        help: "<WxH> --stream frame size (default 1280x720)",
+    },
+    FlagSpec {
+        name: "--fps",
+        takes_value: true,
+        help: "<n> --stream frame rate (default 60)",
+    },
+    FlagSpec {
+        name: "--gpu",
+        takes_value: true,
+        help: "<name|index> which adapter --stream renders and sends on",
+    },
+    FlagSpec {
+        name: "--sender",
+        takes_value: true,
+        help: "<name> the published Spout sender name (default lmv)",
+    },
+    FlagSpec {
+        name: "--preset",
+        takes_value: true,
+        help: "<name> hold one scene for --stream and disable rotation",
+    },
+    FlagSpec {
+        name: "--frames",
+        takes_value: true,
+        help: "<n> stop --stream after this many frames",
+    },
+];
+
+/// The flag name in `arg` — `--osc` for both `--osc` and `--osc=1.2.3.4:9000` —
+/// or `None` when `arg` is not flag-shaped at all.
+///
+/// A value and a bare `--` are both `None`: the app takes no positionals, so the
+/// only thing worth judging is a token that reads as a long flag, and `--` names
+/// nothing.
+fn flag_name(arg: &str) -> Option<&str> {
+    let name = arg.split('=').next().unwrap_or(arg);
+    (name.starts_with("--") && name.len() > 2).then_some(name)
+}
+
+/// Levenshtein distance between two ASCII flag names.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut row = vec![0usize; b.len() + 1];
+    for (i, &ca) in a.iter().enumerate() {
+        row[0] = i + 1;
+        for (j, &cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            row[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(row[j] + 1);
+        }
+        std::mem::swap(&mut prev, &mut row);
+    }
+    prev[b.len()]
+}
+
+/// The roster entry closest to `name`, or `None` when nothing is near enough to
+/// be worth guessing at.
+///
+/// Two edits is the bar because that is what a transposition costs — `--ocs` for
+/// `--osc` is the typo this exists for — and a looser bar starts naming a flag
+/// that merely shares three letters with a word.
+fn nearest_flag(name: &str) -> Option<&'static FlagSpec> {
+    FLAGS
+        .iter()
+        .map(|spec| (edit_distance(name, spec.name), spec))
+        .filter(|&(distance, _)| distance <= 2)
+        .min_by_key(|&(distance, _)| distance)
+        .map(|(_, spec)| spec)
+}
+
+/// The first `--`-prefixed argument no scanner will claim, with the nearest
+/// roster entry to it.
+///
+/// One pass in front of the scanners, which are each a full walk of the argument
+/// list looking for a single shape and therefore cannot see an argument nobody
+/// wanted (ADR-0148). A rostered flag's value is stepped over rather than judged,
+/// so a device or sender name that happens to be flag-shaped is still its flag's
+/// value.
+fn unrecognized_flag(
+    args: impl Iterator<Item = String>,
+) -> Option<(String, Option<&'static FlagSpec>)> {
+    let mut args = args.peekable();
+    while let Some(arg) = args.next() {
+        let Some(name) = flag_name(&arg) else {
+            continue;
+        };
+        let Some(spec) = FLAGS.iter().find(|spec| spec.name == name) else {
+            return Some((arg.clone(), nearest_flag(name)));
+        };
+        // The `=` spelling carries its value inside the same argument, so there
+        // is nothing after it to step over.
+        if spec.takes_value
+            && !arg.contains('=')
+            && args.peek().is_some_and(|next| flag_name(next).is_none())
+        {
+            args.next();
+        }
+    }
+    None
+}
+
 /// The soak-log path if `--soak` was passed (`--soak <path>` / `--soak=<path>`,
 /// or a bare `--soak` for the default under the per-user dir), else `None` so
 /// the soak sampler is never created and the render loop is unchanged.
@@ -2851,6 +3035,20 @@ fn list_adapters_and_exit() {
 }
 
 fn main() {
+    // Refuse an argument no scanner will claim, before any scanner runs
+    // (ADR-0148). Without this the app starts normally while doing less than it
+    // was asked to, which on a show floor presents as a cable or controller
+    // fault rather than as a typo. Exit 2 is what this file already uses for an
+    // argument list that is wrong in shape, against 1 for a recognized flag
+    // whose value or effect failed.
+    if let Some((arg, nearest)) = unrecognized_flag(std::env::args().skip(1)) {
+        eprintln!("unrecognized argument `{arg}`");
+        if let Some(spec) = nearest {
+            eprintln!("did you mean `{}`? {}", spec.name, spec.help);
+        }
+        std::process::exit(2);
+    }
+
     // Startup aid: print the enumerable audio endpoints and exit, so the
     // operator can copy a friendly name into `input.device` (Plan 0009 Phase 2).
     if std::env::args().skip(1).any(|arg| arg == "--list-devices") {
@@ -3005,9 +3203,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
+        FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_FRAMES, InputSource, Modal, Recovery,
         RecoveryPolicy, config, console, device_row_index, output_modal, parse_input_args_from,
-        parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc,
+        parse_osc_arg_from, preset_name_visible, resolve_input, resolve_osc, unrecognized_flag,
     };
 
     /// **A live input costs nothing and never reopens.** The policy runs every
@@ -3436,5 +3634,108 @@ mod tests {
             true,
             true
         ));
+    }
+
+    /// [`unrecognized_flag`] with the matched spec reduced to its name, so an
+    /// expectation reads as the pair the operator is shown.
+    fn refused(args: &[&str]) -> Option<(String, Option<&'static str>)> {
+        let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        unrecognized_flag(argv.into_iter()).map(|(arg, near)| (arg, near.map(|spec| spec.name)))
+    }
+
+    /// **The reduction from the entry that produced this gate.** A misspelt
+    /// `--osc` is a running visualizer with a dark rig, so the refusal has to
+    /// name the flag that was meant, not merely reject the one that was typed.
+    #[test]
+    fn a_misspelt_flag_is_refused_and_the_nearest_one_named() {
+        assert_eq!(
+            refused(&["--ocs", "127.0.0.1:9000"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--teir=floor"]),
+            Some(("--teir=floor".to_owned(), Some("--tier")))
+        );
+
+        // Nothing in the roster is within two edits of this, so a guess would
+        // name a flag sharing nothing with what was typed.
+        assert_eq!(
+            refused(&["--definitely-not-a-flag"]),
+            Some(("--definitely-not-a-flag".to_owned(), None))
+        );
+    }
+
+    /// **Every rostered flag is claimed, in both spellings.** The gate is
+    /// additive: a flag that regresses to being refused is a worse failure than
+    /// the silence it replaces, because it stops a show that used to run.
+    #[test]
+    fn every_rostered_flag_is_claimed_in_both_spellings() {
+        for spec in FLAGS {
+            let spaced: Vec<String> = if spec.takes_value {
+                vec![spec.name.to_owned(), "value".to_owned()]
+            } else {
+                vec![spec.name.to_owned()]
+            };
+            assert_eq!(
+                unrecognized_flag(spaced.into_iter()).map(|(arg, _)| arg),
+                None,
+                "the roster refused its own `{}`",
+                spec.name
+            );
+            if spec.takes_value {
+                let inline = vec![format!("{}=value", spec.name)];
+                assert_eq!(
+                    unrecognized_flag(inline.into_iter()).map(|(arg, _)| arg),
+                    None,
+                    "the roster refused `{}=value`",
+                    spec.name
+                );
+            }
+        }
+    }
+
+    /// **A value is stepped over; a flag-shaped token never is.** An endpoint
+    /// name is operator-supplied text and must not be judged as a flag, but a
+    /// token that reads as one is judged even where a value was expected —
+    /// otherwise the value-taking flags, which are most of the roster, would
+    /// each be a place a typo could hide.
+    #[test]
+    fn a_value_is_stepped_over_and_a_flag_shaped_token_is_still_judged() {
+        assert_eq!(
+            refused(&[
+                "--device",
+                "Line (ZOOM AMS-22 Audio)",
+                "--ocs",
+                "127.0.0.1:9000"
+            ]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--device", "--ocs"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(
+            refused(&["--console", "--weird-endpoint-name"]),
+            Some(("--weird-endpoint-name".to_owned(), None))
+        );
+    }
+
+    /// **A bare `--tier` does not swallow the flag after it.** The scanners take
+    /// an optional value by refusing a flag-shaped one, and a gate that consumed
+    /// unconditionally would hide exactly the typo it exists to report.
+    #[test]
+    fn an_omitted_value_does_not_hide_the_next_typo() {
+        assert_eq!(
+            refused(&["--tier", "--ocs", "127.0.0.1:9000"]),
+            Some(("--ocs".to_owned(), Some("--osc")))
+        );
+        assert_eq!(refused(&["--soak", "--console"]), None);
+    }
+
+    /// **Only long flags are judged.** The app takes no positionals, so a bare
+    /// word is not an argument to reject, and `--` names nothing.
+    #[test]
+    fn a_positional_and_a_bare_double_dash_are_not_flags() {
+        assert_eq!(refused(&["nonsense", "--"]), None);
     }
 }
