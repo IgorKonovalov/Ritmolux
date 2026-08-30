@@ -222,7 +222,7 @@ fn scenes_match_golden_baselines() {
 /// **The one baseline that can see the `warp_mesh` stroke profile still can**
 /// (Plan 0114 Phase 9).
 ///
-/// ADR-0124 pins `warp_mesh` to the pre-0114 stroke profile because it answers
+/// ADR-0124 pins `warp_mesh` to a stroke profile of its own, because it answers
 /// to `foo_vis_milk2` rather than to the line families' look gate. Nothing in
 /// the repo held that pin: a change to the shared line fragment could alter
 /// every MilkDrop stroke and no baseline would move. `warp_mesh_stroke.toml`

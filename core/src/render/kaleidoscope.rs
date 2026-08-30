@@ -515,8 +515,8 @@ fn edge_sample_radius(edge: f32, m: f32) -> f32 {
 /// exact arithmetic rather than pixels, and asserting them here says what is
 /// guaranteed instead of measuring what a rasterizer happened to produce:
 ///
-/// - offsetting `zoom` by exactly **1** — one ring, since Plan 0064 Phase 4 made
-///   the ring the authored unit — is the **identity**, which is why a driven
+/// - offsetting `zoom` by exactly **1** — one ring, the authored unit (Plan 0064
+///   Phase 4) — is the **identity**, which is why a driven
 ///   `kaleido_zoom` is an endless tunnel with no reset;
 /// - the map agrees at `θ` and `θ + 2π` for every **integer** winding number and
 ///   disagrees for a fractional one, which is why [`fold_spiral`] rounds.
@@ -795,8 +795,8 @@ impl Resources {
         // wrapping the far edge in. Built unconditionally so the layout shape does
         // not depend on a param value.
         //
-        // Since Plan 0055 Phase 3 this is the sampler the DEFAULT reads through, so
-        // it is on the path of every fold-bearing preset rather than an opt-in.
+        // This is the sampler the DEFAULT reads through (Plan 0055 Phase 3), so it
+        // is on the path of every fold-bearing preset rather than an opt-in.
         let sampler_tile = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("kaleido-sampler-tile"),
             address_mode_u: wgpu::AddressMode::MirrorRepeat,
@@ -817,10 +817,10 @@ impl Resources {
             gpu::FULLSCREEN_VS_UV_FLIPPED,
             SHADER,
         );
-        // `[Uniform, Texture, Sampler, Sampler]` since ADR-0061 added `tile`'s
-        // second address mode. Re-derived after Plan 0055 Phase 3 deleted `mirror`
-        // and `vignette` rather than carried over: neither of those needed a
-        // sampler, `tile` survived, so the shape is unchanged from Phase 1.
+        // `[Uniform, Texture, Sampler, Sampler]`: ADR-0061's `tile` treatment needs
+        // a second address mode, and it is the only treatment here that needs a
+        // sampler of its own — `falloff` and `squash` are shader arithmetic over
+        // the one sampler above (Plan 0055 Phase 3).
         //
         // That is one entry longer than the `[Uniform, Texture, Sampler]` shape
         // ADR-0058 records this layout under — a shape it shared with
@@ -1696,8 +1696,8 @@ mod tests {
     }
 
     /// The inner cutoff is a fraction of `r_max`, clamped, with a broken binding
-    /// falling back to the **default** — which since Plan 0064 Phase 4 is 0.06 and
-    /// not the identity, so "clamped" and "defaulted" are two different answers
+    /// falling back to the **default** — 0.06 and not the identity (Plan 0064
+    /// Phase 4), so "clamped" and "defaulted" are two different answers
     /// here the way they already are for `kaleido_edge`.
     #[test]
     fn fold_inner_is_a_clamped_fraction_of_r_max() {

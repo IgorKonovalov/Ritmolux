@@ -11,8 +11,8 @@
 //! locked or not, and one confidence number. That is what measured the 6.0 %
 //! publish rate (ADR-0082), and it is also why the *cause* of that rate is still
 //! inferred: three different failures fit the same outcome, and telling them apart
-//! needs the terms, per beat, on real material. [`DownbeatTerms`] has existed
-//! since Plan 0068 for exactly this and nothing outside the tests has read it.
+//! needs the terms, per beat, on real material. [`DownbeatTerms`] exists for
+//! exactly this (Plan 0068) and nothing outside the tests reads it.
 //!
 //! ## What it costs the estimator: nothing
 //!

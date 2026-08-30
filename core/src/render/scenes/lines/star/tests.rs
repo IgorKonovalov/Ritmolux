@@ -330,8 +330,8 @@ fn mandala_roster() -> Vec<RingSpec> {
 /// **The roster is three families now, and every roster-wide assertion below
 /// picks the one it is about** rather than iterating [`Motif::ALL`] and meaning
 /// only a third of it. Sampled polylines (`diamond`, `chevron`); exact single
-/// arcs since Plan 0087 Phase 3 (`circle`, `arc`); and fitted G1 arc chains
-/// since Phase 5 (`petal`, `teardrop`, `trefoil`).
+/// arcs (`circle`, `arc`); and fitted G1 arc chains (`petal`, `teardrop`,
+/// `trefoil`). ADR-0098 and Plan 0087 Phases 3 and 5.
 fn polyline_motifs() -> Vec<Motif> {
     Motif::ALL
         .iter()
@@ -857,7 +857,7 @@ fn the_cap_truncates_and_the_drop_is_counted_without_being_surfaced() {
     );
     // One maximum ring stays under the floor tier's cap on its own, and it now
     // does so with a third more room than the 18 432 instances the same ring
-    // cost before Plan 0087 Phase 5 fitted the trefoil.
+    // costs with an unfitted trefoil in it (Plan 0087 Phase 5).
     let ceiling = widest * MAX_RING_COUNT as usize;
     assert!(
         ceiling < 18_432,
@@ -1444,8 +1444,8 @@ fn the_ring_levers_are_bindable_and_default_to_the_static_configuration() {
 /// mandala uses is the whole figure.
 #[test]
 fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
-    // The polyline family only. The circular motifs have no vertices to join
-    // since Plan 0087 Phase 3 and the fitted ones none since Phase 5 — which
+    // The polyline family only. Neither the circular motifs nor the fitted
+    // ones have interior vertices to join — which
     // `a_circular_motif_is_one_arc_with_no_interior_joint` and
     // `a_fitted_motif_is_a_g1_chain_rather_than_a_polygon` assert directly;
     // iterating the whole roster here would silently assert nothing about them.

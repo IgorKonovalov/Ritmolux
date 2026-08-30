@@ -50,7 +50,7 @@
 //! # The write dithers (Plan 0082, ADR-0096)
 //!
 //! Being the one 8-bit boundary makes this the one place a **dither** belongs,
-//! and since Plan 0082 it carries one: `±1` **encoded** LSB of triangular noise,
+//! and it carries one: `±1` **encoded** LSB of triangular noise,
 //! hashed from the fragment's integer coordinates, added just before the write.
 //! It is not a look and not a parameter — it is what the display write is
 //! supposed to do, so it is always on, exactly like the curve above it.

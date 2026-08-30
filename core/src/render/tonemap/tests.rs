@@ -1148,10 +1148,10 @@ const RIG: &str = "2026-08-09, DX12 hardware vs WARP, 160x100/40 frames";
 const ALLOWED: &[AllowedCollision] = &[
     // --- `[Uniform:FRAGMENT]`: the fullscreen scenes' single uniforms ---
     //
-    // `background-bind-layout` was a member of this group and is NOT any more:
-    // Phase 3 measured that collision rendering the wrong picture on WARP, and
-    // `background.rs` now declares an explicit `min_binding_size`. See its
-    // comment for the before/after. What is left is the two scenes, plus the
+    // `background-bind-layout` is deliberately NOT a member: that collision
+    // was measured rendering the wrong picture on WARP, and `background.rs`
+    // declares an explicit `min_binding_size` against it. See its comment for
+    // the measurement. What is left is the two scenes, plus the
     // test-only disc.
     AllowedCollision {
         a: "fragment-field-uniform-layout",

@@ -333,9 +333,9 @@ fn luma(px: &[u8]) -> f32 {
 // ---------------------------------------------------------------------------
 
 /// The reference tone [`modal_ground`] returns for a frame that has no ground —
-/// black, which is what every caller passed before Plan 0116.
+/// black, the same value a caller with no ground of its own supplies.
 ///
-/// A groundless frame is therefore measured exactly as it always was, so the
+/// A groundless frame is therefore measured against black either way, so the
 /// fallback is a no-op rather than a second behaviour to reason about.
 pub const NO_GROUND: [u8; 4] = [0, 0, 0, 255];
 

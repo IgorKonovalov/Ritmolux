@@ -214,8 +214,8 @@ pub(super) fn upload_uniforms(
                 inputs.hue,
                 spin_phase(inputs.spin_time),
             ],
-            // `w.z` is unused since Plan 0062 — the centre grew to three
-            // components and moved to `ctr` below.
+            // `w.z` is unused — the centre is three components and lives in
+            // `ctr` below.
             w: [scale, dim, 0.0, deposit],
             u: [
                 inputs.hue_spread,

@@ -303,10 +303,10 @@ static GLOBAL: CountingAlloc = CountingAlloc;
 /// `compose` calls [`Element::build`] for **every live element on every frame**
 /// (`advance` -> `step` -> `compose`, unconditionally), so an allocation in any
 /// arm is one per element per frame on the render thread, against the
-/// no-allocation-in-the-render-path rule. The `segment`/`arc` arm held a
-/// `Vec::with_capacity(9)` for its hull candidates until Plan 0113 Phase 9, so
-/// `collage_onwhite` paid roughly five heap allocations a frame; it is a fixed
-/// `[[f32; 2]; 9]` plus a length now.
+/// no-allocation-in-the-render-path rule. The `segment`/`arc` arm's hull
+/// candidates are a fixed `[[f32; 2]; 9]` plus a length, not a `Vec`: a
+/// `Vec::with_capacity(9)` there cost `collage_onwhite` roughly five heap
+/// allocations a frame (Plan 0113 Phase 9).
 ///
 /// **[`a_thousand_recompositions_never_reallocate`] cannot see this**, which is
 /// why this test exists rather than an extension of that one: it measures the

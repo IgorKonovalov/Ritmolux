@@ -325,7 +325,7 @@ void remember_current_preset(LmvHandle *h) {
 
 // Restore the remembered preset onto a freshly loaded roster. Called after the
 // window is attached and the library is loaded - the roster does not exist
-// before either. A name that no longer resolves leaves the roster's own default
+// before either. A name that fails to resolve leaves the roster's own default
 // showing, which is the documented degrade.
 void restore_remembered_preset(LmvHandle *h) {
     const pfc::string8 name = g_cfg_preset.get();
@@ -545,10 +545,10 @@ void VizSession::pump() {
 // Whether `host` is really on screen with a drawable client area.
 //
 // GROUND TRUTH, asked of the window rather than accumulated from messages.
-// `visible` used to be a latch driven only by WM_SIZE / WM_SHOWWINDOW edges, and
-// an edge that never arrived (or arrived while another host owned the session)
-// left it stuck - with a killed render timer and no way back. Deriving the
-// answer means a wrong value can only survive until the next watchdog tick.
+// A latch driven only by WM_SIZE / WM_SHOWWINDOW edges sticks: an edge that
+// never arrives (or arrives while another host owns the session) leaves it
+// wrong - with a killed render timer and no way back. Deriving the answer means
+// a wrong value can only survive until the next watchdog tick.
 bool host_is_showing(HWND host) {
     if (host == nullptr || IsWindowVisible(host) == FALSE) return false;
     if (IsIconic(host) != FALSE) return false;

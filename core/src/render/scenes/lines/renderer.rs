@@ -577,8 +577,8 @@ pub fn set_extent_diagnostic(on: bool) {
 ///
 /// A frame usually holds one line draw ([`scenes::shares_resources`] forbids
 /// two *roster* line scenes in a frame), and then "the most recent draw" is
-/// "this frame's figure". Since Plan 0076 a preset may layer a second line
-/// scene through its own per-preset `LineRenderer`
+/// "this frame's figure". A preset may layer a second line scene (Plan 0076)
+/// through its own per-preset `LineRenderer`
 /// ([`scenes::create_layer_scene`]) — the layer draws **after** the main
 /// scene, so on a layered line-on-line preset this slot holds the *layer's*
 /// figure. The harness reads this around single-figure captures; a consumer

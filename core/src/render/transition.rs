@@ -824,8 +824,8 @@ impl Renderer {
         // only objects two sides can share are the two main scenes (and, for
         // line mains, their one shared renderer) — exactly what
         // `shares_resources` answers; a construction the registry could not
-        // satisfy live would have to surface as sharing, and since Phase 2
-        // none can. The budget half is unchanged: layered content simply
+        // satisfy live would have to surface as sharing, and none can. The
+        // budget half is no different: layered content simply
         // weighs more per frame, so the governor's latch freezes it more often
         // — ADR-0090's accepted Negative, not a special case here.
         let shares = match systems {

@@ -12,7 +12,7 @@
 //!
 //! # The disc guard is a property of **one treatment**, not of the fold (ADR-0061)
 //!
-//! Since Plan 0055 the out-of-disc region is a per-preset choice: `kaleido_edge`
+//! The out-of-disc region is a per-preset choice (Plan 0055): `kaleido_edge`
 //! picks `falloff` (0), `tile` (1) or `squash` (2), and **two of the three fill it
 //! on purpose**. So [`the_falloff_treatment_paints_nothing_outside_its_disc`] is a
 //! property of `falloff` alone. It is not a rule about folding, and a fill
@@ -589,7 +589,7 @@ fn the_falloff_lands_on_the_backdrop_not_on_black() {
 /// Rendering the backdrop into the first active stage's *input* would put it
 /// inside the texture the kaleidoscope folds: `bg_vignette`'s radial darkening
 /// replicated into the wedges, around an axis that — the fold centre being
-/// bindable since Phase 1 — need not be the vignette's centre at all. With the
+/// bindable — need not be the vignette's centre at all. With the
 /// backdrop underneath the chain (ADR-0055), the region outside the disc is
 /// untouched backdrop and is therefore *identical* however the fold axis moves.
 #[test]

@@ -281,8 +281,8 @@ struct AppState {
     chrome_scratch: Vec<console::Line>,
 }
 
-/// Narrow alias so the non-Windows build (no capture until Phase 9) compiles
-/// the same struct shape.
+/// Narrow alias so the non-Windows build, which has no capture, compiles the
+/// same struct shape.
 mod capture_handle {
     #[cfg(target_os = "macos")]
     pub type Handle = crate::capture_mac::CaptureHandle;

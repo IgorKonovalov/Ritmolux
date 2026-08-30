@@ -586,9 +586,9 @@ fn system_name(system: SystemKind) -> &'static str {
 /// "Every band up" includes the `spectrum` array itself (Plan 0034 Phase 2). A
 /// frame with `bass = mid = treb = 1.0` and 64 silent log-bands is not a frame
 /// any audio could produce, and under it a spectrum readout would correctly draw
-/// almost nothing — the floor would be measuring the fixture, not the scene. No
-/// pre-0034 scene reads `spectrum`, so every other preset's capture is
-/// unchanged.
+/// almost nothing — the floor would be measuring the fixture, not the scene.
+/// Filling it moves only what a `spectrum`-reading scene draws; every other
+/// preset's capture is untouched by it.
 ///
 /// `beat` and `bar` are held **constant** across levels (Plan 0058 Phase 3): the
 /// excitation ratio has to vary one thing, and a beat-latched figure that appears
@@ -908,8 +908,8 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
 
     let floor = coverage_floor(SystemKind::ParametricCurve);
 
-    // (1) The lens as it stood before Plan 0116 Phase 3, on the same frozen
-    // fixture. This is the demonstration `MAX_TONAL_FLATNESS` was added for and
+    // (1) The purely areal lens, without `MAX_TONAL_FLATNESS`, on the same
+    // frozen fixture. This is the demonstration that lens was added for and
     // it is kept rather than described: against a constant black reference the
     // blot passes every areal check — full coverage, four quadrants, every
     // radial shell — and only the tonal question convicts it.
@@ -1336,9 +1336,9 @@ density = "clamp(bass - 0.5, 0, 0.5) * 2"
     .expect("the emptying-canvas fixture parses")
 }
 
-/// **Plan 0116 Phase 6, on the real family since Plan 0113 Phase 6b.** A canvas
-/// with nothing left on it is convicted, and the predicate this gate used until
-/// Plan 0116 Phase 3 calls the same frame completely full.
+/// **Plan 0116 Phase 6, on the real family (Plan 0113 Phase 6b).** A canvas
+/// with nothing left on it is convicted, where the purely areal predicate calls
+/// the same frame completely full.
 ///
 /// # Why both excitations are here
 ///
@@ -1937,9 +1937,9 @@ fn ground_black(_img: &CaptureImage) -> [u8; 4] {
 /// band. Tabled because "already falsified" is a claim this harness must be
 /// able to check rather than inherit.
 ///
-/// **Since Phase 3 it delegates to the production one**, so this column tables
-/// what the gate actually does rather than a reproduction of it that can drift
-/// from it. The only behaviour that adds is [`NO_GROUND`] on a frame with no
+/// **It delegates to the production estimator**, so this column tables what
+/// the gate actually does rather than a reproduction of it that can drift from
+/// it. The only behaviour that adds is [`NO_GROUND`] on a frame with no
 /// dominant band, and no shipped preset reaches it (see [`MIN_GROUND_SHARE`]),
 /// so the table is unchanged from the one Phase 2 read.
 ///

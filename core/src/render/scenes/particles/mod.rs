@@ -477,7 +477,7 @@ const CHURN_LIFETIME_SPREAD: [f32; 2] = [0.5, 1.5];
 /// figure. Without it the churn is four blobs; with it the churn is invisible,
 /// which is the whole intent.
 ///
-/// Bindable since Plan 0074 Phase 4, and **for ADR-0087's reason rather than the
+/// Bindable (Plan 0074 Phase 4), and **for ADR-0087's reason rather than the
 /// colour one**: a ramp sufficient at `fade = 0.86` may not be at `0.94`,
 /// because a longer trail integrates the four restart points over more frames.
 /// The *other* motivation for exposing it — letting the age gradient show — died
@@ -530,12 +530,6 @@ fn churn_lifetime(seed: f32) -> f32 {
     let [lo, hi] = CHURN_LIFETIME_SPREAD;
     CHURN_LIFETIME * (lo + hash_unit(seed.to_bits() ^ LIFETIME_SALT) * (hi - lo))
 }
-
-// `churn_max_lifetime()` lived here until Plan 0074 Phase 3. It was the longest
-// lifetime any particle could draw, and the ONLY thing that read it was the age
-// colour channel's normalizer (`em.z`). Retiring `age_tint`/`age_hue` left it
-// with no caller, so it went with them rather than sitting as dead code that
-// reads like a live invariant.
 
 /// Salt separating the lifetime draw from every other hash on the particle's
 /// seed — the map choice, the reseed kick, and the respawn slot each use their

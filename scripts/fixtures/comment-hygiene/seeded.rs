@@ -22,8 +22,10 @@
 // defect is reachable from a bound expression.
 pub const SEEDED_KNEE: f32 = 0.6;
 
-/// SEEDED, class 2 — plan-relative narration. There is no "this plan" any more;
-/// there is only the code.
+/// SEEDED, class 2 — plan-relative narration. Once a session closes there is no
+/// "this plan" to resolve against; there is only the code. Exactly one finding
+/// on this line: every other rejected phrase is seeded in a file of its own, so
+/// a count that moves names which form moved.
 pub const SEEDED_SPAN: f32 = 1.0;
 
 // SILENT — an escaped false positive. The word list has them, and the escape

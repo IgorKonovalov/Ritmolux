@@ -188,7 +188,7 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 /// place of a miter limit, and this fixture is sharp enough to show it — which is
 /// the point. It is recorded here rather than discovered later.
 ///
-/// Since Plan 0040 Phase 1 this is the **first** of the capture's three duties;
+/// This is the **first** of the capture's three duties;
 /// [`compare_against_baseline`] is the last, and the module docs say why it runs
 /// after rather than before.
 ///

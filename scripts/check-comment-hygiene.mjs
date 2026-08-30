@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Reject the two mechanical rot classes in Rust comments: a relative link, and
-// plan-relative narration.
+// Reject the two mechanical rot classes in comments: a relative link, and
+// plan-relative narration. Rust and C/C++ sources are both read.
 //
 // Rationale: a relative link in a `.rs` comment fails silently in three ways at
 // once. It breaks when a plan moves to docs/plans/done/, which is a routine step
@@ -9,16 +9,29 @@
 // is emitted as written and resolves against the generated HTML tree. Eleven were
 // broken on main when ADR-0127 was written. Plan-relative narration — `this
 // plan`, `used to`, `no longer` — is written from inside a session and stops
-// being legible at its close: there is no "this plan" any more, there is only the
+// being legible at its close: there is no "this plan" left, there is only the
 // code. See ADR-0127 for the decision and its four rejected alternatives.
+//
+// The vocabulary covers TWO shapes, and the second is the one that survives a
+// rewrite of the first. `this plan` is easy to spot and easy to cut. `before
+// Plan 0038 Phase 2 bound it` reads like a citation, passes a word list built
+// out of `this plan`, and is narration all the same: it dates the code against
+// an event, so a reader has to reconstruct a history to decode a sentence about
+// the present. An elapsed-time preposition in front of a numbered citation —
+// before / since / until / pre- / after — is therefore reported, while the bare
+// citation it decorates is not.
+//
+// C and C++ sources are walked for the same two classes. The shim is compiled
+// separately from the core and drifts the same way; a gate that reads only the
+// Rust half convicts one lane of a two-lane codebase.
 //
 // Usage:  node scripts/check-comment-hygiene.mjs [root]
 // Exit 0 = no finding. Exit 1 = they are listed as `file:line -> reason`, which
 // is clickable in most terminals. The optional `root` scans some other directory
-// — used to run this against the committed fixture tree, following
+// — the way this is run against the committed fixture tree, following
 // check-doc-links.mjs: `node scripts/check-comment-hygiene.mjs scripts/fixtures`
-// expects exit 1 and exactly two findings, one per class. CI and the pre-push
-// hook pass nothing and get the repo.
+// expects exit 1, and scripts/fixtures/README.md carries the per-file roster of
+// what it should report. CI and the pre-push hook pass nothing and get the repo.
 //
 // What is NOT a finding, and each silence is load-bearing:
 //
@@ -63,16 +76,32 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // core/tests/fixtures/ there.
 const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
 
-/** Every `.rs` file under the root, as paths relative to it. */
-function rustFiles(dir = REPO, found = []) {
+// Which lexer an extension gets. The two dialects differ in three places that
+// matter to a comment scanner — Rust block comments nest and C's do not, the raw
+// string syntaxes are unrelated, and Rust's `'` is a lifetime far more often
+// than a char literal — so the extension picks the rules rather than one lexer
+// guessing.
+const LANGS = new Map([
+  [".rs", "rust"],
+  [".c", "c"],
+  [".h", "c"],
+  [".cc", "c"],
+  [".cpp", "c"],
+  [".hpp", "c"],
+]);
+
+/** Every source file under the root, as `[relative path, lang]` pairs. */
+function sourceFiles(dir = REPO, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      rustFiles(full, found);
-    } else if (entry.name.endsWith(".rs")) {
-      found.push(relative(REPO, full));
+      sourceFiles(full, found);
+    } else {
+      const dot = entry.name.lastIndexOf(".");
+      const lang = dot < 0 ? undefined : LANGS.get(entry.name.slice(dot));
+      if (lang) found.push([relative(REPO, full), lang]);
     }
   }
   return found;
@@ -81,12 +110,16 @@ function rustFiles(dir = REPO, found = []) {
 /**
  * The comment text of each line, indexed by 0-based line number.
  *
- * Rust is lexed rather than grepped because `"https://x"` holds a `//` that is
- * not a comment and `// a "quote` holds a `"` that opens nothing. Block comments
- * nest in Rust, hence the depth counter; a raw string's terminator is its own
- * hash count, hence the hash group; and `'` is a lifetime far more often than a
- * char literal, so it only opens one when a closing `'` sits where a char
- * literal's would.
+ * Source is lexed rather than grepped because `"https://x"` holds a `//` that
+ * is not a comment and `// a "quote` holds a `"` that opens nothing.
+ *
+ * `lang` selects between the two dialects at the three points they differ.
+ * Block comments nest in Rust and do not in C, hence the depth counter running
+ * to at most 1 for C. A Rust raw string's terminator is its own hash count
+ * (`r#"…"#`), hence the hash group; C's carries a caller-chosen delimiter
+ * (`R"tag(…)tag"`). And Rust's `'` is a lifetime far more often than a char
+ * literal, so it only opens one when a closing `'` sits where a char literal's
+ * would — in C every `'` opens one.
  *
  * The scanner emits character SPANS and the line number is derived afterwards
  * from an index. Counting newlines as the scanner walks is the same computation
@@ -95,7 +128,7 @@ function rustFiles(dir = REPO, found = []) {
  * inside a string, consumed as an escape pair — misreports every line below it
  * in the file.
  */
-function commentSpans(source) {
+function commentSpans(source, lang) {
   const spans = [];
   let i = 0;
   const n = source.length;
@@ -112,13 +145,15 @@ function commentSpans(source) {
       continue;
     }
 
-    // Block comment, nesting, possibly multi-line.
+    // Block comment, possibly multi-line. Rust's nest and C's do not, so the
+    // depth counter only ever climbs on the Rust path — in C the first `*/`
+    // closes, which is what an inner `/*` in a C comment means.
     if (c === "/" && source[i + 1] === "*") {
       let depth = 1;
       let j = i + 2;
       const start = j;
       while (j < n && depth > 0) {
-        if (source[j] === "/" && source[j + 1] === "*") {
+        if (lang === "rust" && source[j] === "/" && source[j + 1] === "*") {
           depth++;
           j += 2;
         } else if (source[j] === "*" && source[j + 1] === "/") {
@@ -133,10 +168,14 @@ function commentSpans(source) {
       continue;
     }
 
-    // Raw string: r"..." / r#"..."# / br#"..."#.
-    const raw = /^b?r(#*)"/.exec(source.slice(i, i + 40));
+    // Raw string. Rust: r"..." / r#"..."# / br#"..."#, terminated by its own
+    // hash count. C++11: R"tag(...)tag", terminated by its own delimiter — the
+    // delimiter is whatever sits between the `R"` and the `(`, and it exists so
+    // a literal can hold `)"`.
+    const rawPattern = lang === "rust" ? /^b?r(#*)"/ : /^(?:u8|u|U|L)?R"([^()\\ ]*)\(/;
+    const raw = rawPattern.exec(source.slice(i, i + 40));
     if (raw && (i === 0 || !/[A-Za-z0-9_]/.test(source[i - 1]))) {
-      const terminator = '"' + raw[1];
+      const terminator = lang === "rust" ? '"' + raw[1] : ")" + raw[1] + '"';
       let j = i + raw[0].length;
       while (j < n && source.slice(j, j + terminator.length) !== terminator) j++;
       i = j + terminator.length;
@@ -158,7 +197,8 @@ function commentSpans(source) {
       continue;
     }
 
-    // A char literal, or a lifetime. `'\n'` and `'a'` close; `'a` does not.
+    // A char literal, or — in Rust only — a lifetime. `'\n'` and `'a'` close;
+    // Rust's `'a` does not, and C has no such form.
     if (c === "'") {
       const escaped = source[i + 1] === "\\";
       const close = escaped ? source.indexOf("'", i + 2) : i + 2;
@@ -168,6 +208,13 @@ function commentSpans(source) {
       }
       if (escaped && close !== -1 && close - i <= 8) {
         i = close + 1;
+        continue;
+      }
+      if (lang !== "rust") {
+        // Not a lifetime here, so an unterminated `'` is a stray apostrophe in
+        // code we do not own the shape of; step over it rather than swallowing
+        // the rest of the file as a literal.
+        i++;
         continue;
       }
       i++; // a lifetime
@@ -181,7 +228,7 @@ function commentSpans(source) {
 }
 
 /** The comment text of each line, indexed by 0-based line number. */
-function commentLines(source) {
+function commentLines(source, lang) {
   const out = new Map();
   const add = (line, text) => out.set(line, (out.get(line) ?? "") + text);
 
@@ -201,7 +248,7 @@ function commentLines(source) {
     return lo;
   };
 
-  for (const [start, end] of commentSpans(source)) {
+  for (const [start, end] of commentSpans(source, lang)) {
     let line = lineOf(start);
     let from = start;
     while (from < end) {
@@ -226,7 +273,19 @@ const INLINE = /\]\((\.\.?\/[^)\s]+)\)/g;
 // `the plan` is exempt in front of a number, because `the Plan 0045 Phase 4b
 // defect` is a bare-number citation — the form ADR-0127 asks for — and a gate
 // that convicted it would be sending authors back to the links.
-const VOCABULARY = /\b(this plan|the plan(?![ \t]+\d)|used to|no longer|is new|previously)\b/gi;
+const VOCABULARY = /\b(this plan|the plan(?![ \t]+\d)|used to|no longer|is new|previously|any more)\b/gi;
+
+// The second shape, and the one a rewrite of the first tends to produce. A bare
+// citation is the wanted form and stays silent; the same citation with an
+// elapsed-time preposition in front of it is narration, because it dates the
+// code against an event instead of describing it. `since Plan 0095 it is the
+// counter this folds over` asks the reader to know what happened at 0095 to
+// decode a claim about today; `it is the counter this folds over (Plan 0095)`
+// does not.
+//
+// `pre-` is spelled without the trailing separator the others need, since it
+// attaches directly: `pre-0070 behaviour`, `pre-Plan 0087`.
+const ELAPSED = /\b(?:before|since|until|after)\s+(?:plan|adr|phase)\s+\d+|\bpre-(?:plan\s+|adr\s+|phase\s+)?\d+/gi;
 
 // `hygiene-allow: <reason>` — the reason is what makes it an escape rather than
 // a silencer, so it is required.
@@ -235,9 +294,9 @@ const ESCAPE = /hygiene-allow:\s*(\S.*)?$/;
 const findings = [];
 let escapes = 0;
 
-for (const file of rustFiles()) {
+for (const [file, lang] of sourceFiles()) {
   const show = file.split(sep).join("/");
-  const comments = commentLines(readFileSync(join(REPO, file), "utf8"));
+  const comments = commentLines(readFileSync(join(REPO, file), "utf8"), lang);
 
   // An escape covers its own line and the one after it, so a marker can sit
   // above the sentence it is excusing rather than inside it.
@@ -268,11 +327,19 @@ for (const file of rustFiles()) {
     for (const m of text.matchAll(VOCABULARY)) {
       findings.push(`${show}:${line + 1} -> plan-relative narration \`${m[1]}\``);
     }
+
+    ELAPSED.lastIndex = 0;
+    for (const m of text.matchAll(ELAPSED)) {
+      findings.push(`${show}:${line + 1} -> narration against an event \`${m[0]}\` (cite it bare)`);
+    }
   }
 }
 
 if (findings.length === 0) {
-  console.log(`comment hygiene: OK (no relative links, no plan-relative narration; ${escapes} escapes in use)`);
+  console.log(
+    `comment hygiene: OK (no relative links, no plan-relative narration; ` +
+      `${escapes} escapes in use)`,
+  );
   process.exit(0);
 }
 

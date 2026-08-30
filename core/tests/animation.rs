@@ -68,8 +68,8 @@ const FRAME_B: u32 = 48;
 ///
 /// **Re-derived against the footprint statistic at Plan 0077 Phase 1
 /// (ADR-0091), from the same measurement the sweep above prints on every run.**
-/// The pre-0077 whole-frame floor was also 0.01; the number surviving is a
-/// coincidence of the derivation, not the old constant kept. The derivation,
+/// The whole-frame floor this replaces was also 0.01; the number surviving is
+/// a coincidence of the derivation, not a constant carried over. The derivation,
 /// per ADR-0071:
 ///
 /// - The shipped library's minimum under the new statistic is **0.0205**
@@ -221,8 +221,8 @@ struct Motion {
     /// at [`FRAME_B`]**: the picture the music alone makes, which
     /// [`DRIVEN_FLOOR`] gates.
     driven: f32,
-    /// The pre-0077 whole-frame mean over the silent pair — printed, never
-    /// gated, and what the ladder at the bottom of this file stays pinned to.
+    /// The whole-frame mean over the silent pair — printed, never gated, and
+    /// what the ladder at the bottom of this file stays pinned to.
     whole: f32,
 }
 

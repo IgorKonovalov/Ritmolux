@@ -1,8 +1,8 @@
 //! The diagnostics debug overlay (Plan 0011): a final compositing pass that,
 //! when enabled, paints a translucent panel over the scene with a frame-time
-//! sparkline, a GPU-footprint bar, a numeric fps / frame-ms / MB readout, and —
-//! since Plan 0049 — the analysis block: the four normalized levels and the
-//! downbeat estimator's lock state.
+//! sparkline, a GPU-footprint bar, a numeric fps / frame-ms / MB readout, and
+//! the analysis block (Plan 0049): the four normalized levels and the downbeat
+//! estimator's lock state.
 //!
 //! **The analysis levels are meters, not just numbers, and that is the point.**
 //! Plan 0048 Phase 6 asks whether the levels "ride the music without pumping or

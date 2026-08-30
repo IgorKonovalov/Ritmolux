@@ -1661,8 +1661,8 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
         let row = report
             .lines()
             // `fixture_easing_*` is longer than the report's name column, and
-            // since Plan 0121 Phase 2 an over-long name is elided in the MIDDLE
-            // (`fixture~scalar`) rather than truncated, so the row is found by
+            // an over-long name is elided in the MIDDLE (`fixture~scalar`)
+            // rather than truncated (Plan 0121 Phase 2), so the row is found by
             // the head the elision keeps.
             .find(|l| l.trim_start().starts_with("fixture"))
             .unwrap_or_else(|| panic!("no fixture row in the report:\n{report}"));

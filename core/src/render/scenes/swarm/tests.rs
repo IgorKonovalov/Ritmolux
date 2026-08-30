@@ -276,7 +276,7 @@ fn a_resize_rescales_the_field_rather_than_wrapping_it() {
 }
 
 /// The default hue band (`center = 0.5`, `spread = 1`, `hue = 0`) reduces to
-/// `particle_hue`, so the swarm's colour is unchanged from before Plan 0020.
+/// `particle_hue`, so the band leaves the swarm's colour alone (Plan 0020).
 #[test]
 fn default_hue_band_is_the_prior_full_wheel() {
     for &ph in &[0.0, 0.2, 0.5, 0.73, 0.99] {

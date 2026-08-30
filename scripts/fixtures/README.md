@@ -77,35 +77,50 @@ rows carry real relative links, and a row shaped like a real row has to point so
 node scripts/check-comment-hygiene.mjs scripts/fixtures
 ```
 
-Expect **exit 1 and exactly two findings**, one per class the checker rejects. Note the root: like
-the two above, this checker is pointed at `scripts/fixtures` rather than at its own subdirectory,
-so the run also asserts that `backlog-claims/core/src/tier.rs` — the tree's other `.rs` file — is
-hygiene-clean. Keep it that way; a seeded finding outside `comment-hygiene/` would make the count
-below wrong for the wrong reason.
+Expect **exit 1 and exactly ten findings, across four files**. Note the root: like the two above,
+this checker is pointed at `scripts/fixtures` rather than at its own subdirectory, so the run also
+asserts that `backlog-claims/core/src/tier.rs` — the tree's other `.rs` file — is hygiene-clean.
+Keep it that way; a seeded finding outside `comment-hygiene/` would make the counts below wrong for
+the wrong reason.
 
-| Class | Seeded as | Expected |
-|-------|-----------|----------|
-| 1 — a relative link in a `.rs` comment | a `[label]: ../../../docs/adrs/…` definition | reported, naming the target |
-| 2 — plan-relative narration | the phrase `this plan` in a doc comment | reported, naming the phrase |
+**One rejected form per file, and the counts are the instrument.** A file that stopped biting shows
+up as a number that moved rather than as a silence nobody noticed, which is the whole reason the
+totals are written down here instead of being re-derived.
 
-The five silences are the load-bearing half, because a gate that cries wolf gets escaped rather
-than obeyed ([ADR-0127](../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md),
+| File | Findings | Seeded as |
+|------|---------:|-----------|
+| `seeded.rs` | 2 | class 1, a relative link definition; class 2, the phrase `this plan` |
+| `seeded-elapsed.rs` | 5 | one line per elapsed-time preposition in front of a numbered citation — `before` / `since` / `until` / `after` / `pre-` |
+| `seeded-residue.rs` | 1 | the residue phrase, in a sentence explaining why something is absent |
+| `seeded.cpp` | 2 | the same two classes as `seeded.rs`, in the dialect the foobar shim is written in |
+
+`seeded-elapsed.rs` seeds five rather than one because the pattern is an alternation and a
+dropped branch is exactly the regression a single seeded line cannot see.
+
+The silences are the load-bearing half, because a gate that cries wolf gets escaped rather than
+obeyed ([ADR-0127](../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md),
 Negative 3):
 
-| Case | Seeded as | Expected |
+| Case | Seeded in | Expected |
 |------|-----------|----------|
-| a rustdoc intra-doc link | `[Seeded::render]` and `[the renderer](crate::render::Renderer)` | not reported — `rustc` resolves these, so they cannot rot silently |
-| a bare-number citation | `Plan 0045 Phase 3` in prose that also says "the plans README" | not reported — this is the form the links are replaced *with* |
-| the same citation as a sentence's subject | `the Plan 0045 Phase 4b defect` | not reported — `the plan` is exempt in front of a number, or the gate would convict its own fix |
-| an escaped false positive | `hygiene-allow: <reason>` above a line carrying two rejected phrases | not reported — the escape covers its own line and the next |
-| a comment marker inside a string | `"https://…/../not/a/link"`, a raw string, and an escaped `"` | not reported — the checker lexes Rust rather than grepping lines |
+| a rustdoc intra-doc link | `seeded.rs` — `[Seeded::render]`, `[the renderer](crate::render::Renderer)` | not reported — `rustc` resolves these, so they cannot rot silently |
+| a bare-number citation | `seeded.rs`, `seeded-elapsed.rs`, `seeded.cpp` | not reported — this is the form the links and the datings are replaced *with* |
+| the same citation as a sentence's subject | `seeded.rs` — `the Plan 0045 Phase 4b defect` | not reported — `the plan` is exempt in front of a number, or the gate would convict its own fix |
+| a preposition with no citation behind it | `seeded-elapsed.rs` — `after the warp and before the blur chain` | not reported — describing pass order has to stay legal, which is why the pattern requires plan / adr / phase and a number |
+| the two words adjacent across a phrase boundary | `seeded-residue.rs` — `any input with more stops` | not reported — a pattern that dropped the space would fire here |
+| an escaped false positive | `seeded.rs`, `seeded-elapsed.rs`, `seeded.cpp` — `hygiene-allow: <reason>` | not reported — the escape covers its own line and the next |
+| a comment marker inside a string | all four — a URL, both raw-string spellings, an escaped `"` | not reported — the checker lexes source rather than grepping lines |
+| a C block comment, which does not nest | `seeded.cpp` | not reported, and the rest of the file still is — Rust's nesting rules applied here would swallow the file and report nothing at all |
+| a C char literal | `seeded.cpp` — `'"'` and `'''` | not reported — C has no lifetimes, so every `'` opens one, which Rust's rule gets wrong in the other direction |
 
-The last of those is why this checker is a lexer and not a `grep`: `//` inside a URL literal and
-`"` inside a comment both defeat the line-oriented form, and the fixture pins all three spellings
-(ordinary, raw, and escape-carrying) so a future simplification back to `grep` fails here loudly.
+The last three are why this checker is a lexer and not a `grep`, and why it takes the dialect as an
+argument rather than guessing: `//` inside a URL literal and `"` inside a comment both defeat the
+line-oriented form, and the three places C and Rust disagree — nesting, raw-string syntax, and what
+a `'` opens — each have a silence pinned above so a shared lexer cannot quietly serve one dialect
+by mis-reading the other.
 
 An escape with **no reason after the colon** is itself a finding. That is not seeded — it would
-make the count above three — but it is asserted by the checker's own header and is the reason an
+make the counts above wrong — but it is asserted by the checker's own header and is the reason an
 escape cannot silently become a silencer.
 
 ## `index-rows/` — for `check-index-rows.mjs`

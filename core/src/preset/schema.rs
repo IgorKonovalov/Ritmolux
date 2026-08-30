@@ -189,7 +189,7 @@ fn variant_roster_reminder(system: SystemKind) {
 /// `exposure`, `ink_*`/`paper_*`). Gathered from each stage's own declared
 /// vocabulary so there is no third copy to drift.
 ///
-/// "The renderer routes to" was true when this was written and is not any more:
+/// **These do not all route through the renderer**, whatever the name suggests:
 /// `trails` and `kaleido_*` are offered by the `PostChain` (ADR-0031),
 /// `exposure` by the tonemap (ADR-0046) and `ink_*`/`paper_*` by the terminal ink
 /// pass (ADR-0032); only `bg_*` goes to a pass the renderer drives directly. The
@@ -518,7 +518,7 @@ pub struct Preset {
     pub palette_b: Option<PaletteConfig>,
     /// The salt this preset's `hash()`/`noise()` calls mix into their argument
     /// **in the live app** (ADR-0051): folded at load from the `[generator] seed`
-    /// key that had been reserved and inert since Plan 0010, or drawn once from
+    /// key (Plan 0010 reserved it, Plan 0047 gave it meaning), or drawn once from
     /// OS entropy where the preset declares `seed = "random"`. `0` when it
     /// declares nothing — a perfectly good salt, and the one the whole shipped
     /// library used before any preset asked for another.
@@ -2163,9 +2163,9 @@ struct RawGenerator {
     /// The preset's random salt — what the grammar's `hash()`/`noise()` mix into
     /// their argument (ADR-0051): a number, or `"random"` for a salt drawn per
     /// app launch. **Not** an L-system key despite living in the L-system's
-    /// table: it was reserved here in Plan 0010 and stayed inert until Plan 0047
-    /// gave it a meaning, and the expansion is still deterministic and still
-    /// ignores it. Any system's preset may declare one.
+    /// table, where Plan 0010 reserved it and Plan 0047 gave it a meaning. The
+    /// expansion is deterministic and ignores it. Any system's preset may
+    /// declare one.
     #[serde(default)]
     seed: Option<RawSeed>,
     /// Star pattern: the regular tiling (e.g. `"6.6.6"` / `"hexagon"` / `"12"`).

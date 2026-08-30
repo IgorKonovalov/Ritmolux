@@ -113,8 +113,8 @@ use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 /// catalogues, and the reason a bright-pass had nothing correct to bloom from.
 ///
 /// `Rgba16Float` rather than 32-bit because it is the format
-/// [`PingPongField`](feedback::PingPongField) has shipped on since Plan 0014 —
-/// already proven blendable and filterable on both backends — and because half
+/// [`PingPongField`](feedback::PingPongField) ships on (Plan 0014) — proven
+/// blendable and filterable on both backends — and because half
 /// the bandwidth matters on the floor tier (`tier::TierConfig::post_cap`).
 ///
 /// Note the arithmetic did **not** change: an 8-bit *sRGB* target already blends
@@ -900,7 +900,7 @@ fn evaluate_layer(
 /// through the same `ViewTransform` aspect, so the two layers share every
 /// downstream stage and fuse into one substance. One extra draw — no new pass,
 /// no new target — and a layerless side encodes exactly what this function
-/// always encoded. The scene lives on `side` (per-preset since Phase 2), so
+/// always encoded. The scene lives on `side`, one per preset, so
 /// whichever side is drawn brings the right layer with it.
 fn composite_into(
     ctx: &RenderContext,
