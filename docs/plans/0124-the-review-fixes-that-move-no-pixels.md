@@ -236,8 +236,8 @@ shorter than the placeholder above guessed).
 | 2 — Four strings, one attribute | dev | done | cf8c47a |
 | 3 — The gate learns the narration shape that survives | dev | done | fdb0fed |
 | 4 — The maps name every crate | dev | landed out of band, verified | (none — see notes) |
-| 5 — The spec says what the shim does | dev | done | committed with this row |
-| 6 — The unwired scripts get a line or get deleted | dev | not started | |
+| 5 — The spec says what the shim does | dev | done | 7c87aad |
+| 6 — The unwired scripts get a line or get deleted | dev | done, with a deviation | committed with this row |
 
 ### Notes
 
@@ -350,6 +350,20 @@ justification (the size-guarded `lmv_get_metrics` is what makes a newer core saf
 the shim does on refusal — logs to the console, disables preset loading and diagnostics, leaves
 the render path alone. `LMV_ABI_VERSION` and the `extern "C"` surface are untouched; all fifteen
 names in `core-cabi/include/lmv_core.h` still appear in the spec.
+
+**Phase 6 deviates from the plan, on the user's instruction given before Phase 1 started.** The
+phase says to `git rm` `scripts/milk-softness.mjs` and `scripts/softness-sheets.mjs` and re-point
+the Plan 0114 references at the commit that held them. **Both files are kept**, and the
+"Renderers, not gates" line in `CLAUDE.md` names all five unwired scripts rather than three. The
+done-when is satisfied by its first branch for every file — `for f in scripts/*.mjs` shows each of
+the ten either wired into `.githooks/pre-push` and `.github/workflows/ci.yml` (the five gates) or
+named in `CLAUDE.md` (the five renderers). `node scripts/check-doc-links.mjs` exits 0.
+
+Two things the deletion would have cost, noted for the reviewer rather than as an argument: the
+closed plan `docs/plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md` references the two
+scripts at **nine** places, not two; and design-backlog **0161** carries a live `unprobeable:`
+verification on them (*"the two render scripts still assume the old layout"*), which a deletion
+would have left pointing at nothing.
 
 **Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
 `HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite

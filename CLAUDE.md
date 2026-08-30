@@ -119,8 +119,15 @@ scripts/             # Repo maintenance. Five Node gates, all run by pre-push an
                      #   (ADR-0116); check-backlog-claims.mjs re-runs each live backlog entry's
                      #   probe (ADR-0108); check-filter-figures.mjs keeps the diffusion filter's
                      #   cost figures on one page; check-comment-hygiene.mjs rejects relative links
-                     #   and plan-relative narration in .rs comments (ADR-0127).
+                     #   and plan-relative narration in .rs and .cpp/.h comments (ADR-0127).
                      #   scripts/fixtures/ holds their seeded bite checks.
+                     #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
+                     #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact
+                     #   sheets) and milk-softness.mjs + softness-sheets.mjs (the stroke-profile
+                     #   judging sheets). Nothing runs these - an author does, by hand, and the
+                     #   output lands under target/ uncommitted. They are here so that "every
+                     #   .mjs is wired into pre-push or CI" reads as a rule with five named
+                     #   exceptions rather than as a claim that is simply false.
 ```
 
 ## Machine setup: the linker override (opt-in, and inert if skipped)
