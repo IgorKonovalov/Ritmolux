@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0144** (ADRs are a separate sequence — next free there is **0155**.)
+**Next free number: 0145** (ADRs are a separate sequence — next free there is **0156**.)
 
 ## Active roster
 
@@ -41,6 +41,7 @@ place. The plan file carries the real link.
 | [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
+| [0144](0144-the-flags-mean-what-they-say.md) | The flags mean what they say | draft | dev | Backlog 0167 + 0168 + 0169. ADR-0155 (proposed): four `--stream` flags get refused, `--gpu` and `--preset` reach the window. Phase 2 makes an on-device checklist line false — rewrite it there. |
 <!-- roster:end -->
 
 **Added 2026-08-19, from a MilkDrop backlog round after
