@@ -247,6 +247,8 @@ pub enum Button {
     Prev,
     /// Cut to the roster's successor.
     Next,
+    /// Cut to a preset picked at random, never the one already showing.
+    Random,
     /// Rotate now, as the director's own timer would have.
     RotateNow,
     /// Turn hands-off rotation on or off.
@@ -259,9 +261,10 @@ pub enum Button {
 
 /// The strip in display order. Exhaustive and ordered here so the labels, the
 /// rectangles and the hit test cannot disagree about which control is third.
-pub const BUTTONS: [Button; 6] = [
+pub const BUTTONS: [Button; 7] = [
     Button::Prev,
     Button::Next,
+    Button::Random,
     Button::RotateNow,
     Button::ToggleAuto,
     Button::DwellDown,
@@ -274,6 +277,7 @@ impl Button {
         match self {
             Button::Prev => "< prev",
             Button::Next => "next >",
+            Button::Random => "random",
             Button::RotateNow => "rotate",
             Button::ToggleAuto => "auto",
             Button::DwellDown => "dwell -",
@@ -343,6 +347,8 @@ pub fn hit_test(width: f32, height: f32, x: f32, y: f32) -> Option<Button> {
 pub enum ConsoleAction {
     Prev,
     Next,
+    /// Cut to a preset chosen at random.
+    Random,
     RotateNow,
     Settings(crate::settings::SettingsAction),
 }
@@ -353,6 +359,7 @@ pub fn action_for(button: Button, view: &crate::settings::SettingsView) -> Conso
     match button {
         Button::Prev => ConsoleAction::Prev,
         Button::Next => ConsoleAction::Next,
+        Button::Random => ConsoleAction::Random,
         Button::RotateNow => ConsoleAction::RotateNow,
         // Delegated, never restated: `edit` is the one place a row's change is
         // decided, including the clamping the dwell rows apply against each
@@ -387,6 +394,28 @@ pub fn next_up<'a>(names: &[&'a str], active: usize) -> Option<&'a str> {
     names.get((active + 1) % names.len()).copied()
 }
 
+/// A roster position picked from `seed`, never the one already showing.
+///
+/// Drawn out of the caller's own state rather than from a clock or an added
+/// dependency: the operator wants *a different scene*, and the only property
+/// that matters is that it is not the one on screen. Picking within the
+/// `count - 1` positions that are not `active` and then stepping past `active`
+/// makes "never the current one" structural, so no retry loop can spin on a
+/// one-preset roster.
+///
+/// `None` when there is nothing else to go to.
+pub fn random_index(count: usize, active: usize, seed: u32) -> Option<usize> {
+    if count < 2 {
+        return None;
+    }
+    let pick = (seed as usize) % (count - 1);
+    Some(if pick >= active % count {
+        pick + 1
+    } else {
+        pick
+    })
+}
+
 /// The predecessor's index, wrapped — what the `prev` control selects.
 ///
 /// Computed here rather than asked of the core: `Renderer` exposes a forward
@@ -406,11 +435,20 @@ pub fn previous_index(count: usize, active: usize) -> Option<usize> {
 /// Says *why* there is nothing to name rather than naming a guess: a roster of
 /// one has no successor, and an operator reading "next: —" needs to know which
 /// of the two states they are in.
-pub fn staging_line(next: Option<&str>, auto: bool) -> Line {
+pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
+    // The dwell bounds ride here because the two nudge controls change a number
+    // with no other reading on the surface: a `dwell -` that reports nothing
+    // leaves an operator unable to tell a press that landed from one that hit a
+    // clamp. It is the same pair the settings menu's Min/Max dwell rows show.
+    let (min, max) = dwell;
     let body = match (next, auto) {
-        (Some(name), true) => format!("next up  -  {name}"),
-        (Some(name), false) => format!("next up  -  {name}  (auto off)"),
-        (None, _) => "next up  -  nothing to rotate to; the roster holds one preset".to_owned(),
+        (Some(name), true) => format!("next up  -  {name}      dwell {min}-{max} s"),
+        (Some(name), false) => {
+            format!("next up  -  {name}  (auto off)      dwell {min}-{max} s")
+        }
+        (None, _) => format!(
+            "next up  -  nothing to rotate to; the roster holds one preset                   dwell {min}-{max} s"
+        ),
     };
     Line::new(
         body,

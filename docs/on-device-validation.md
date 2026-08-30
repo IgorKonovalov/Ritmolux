@@ -256,6 +256,30 @@ footprint so the vendor spread is on record.
       preview at the size the console actually opens. _(Plan 0131 Phase 6, extracted at that plan's
       close.)_
 
+      > **PART-RUN 2026-08-30 on one display; the rest is DEFERRED to ~2026-09-06, when a second
+      > monitor is available.** What ran: two 95 s release runs differing only by `--console`.
+      > **The console cost the output about half its frame rate — 61.7 fps against 33.1 fps,
+      > `frame_ms_p99_steady` 18.6 ms against 47.3 ms**, with the console's present mode confirmed
+      > as `Mailbox`. That is a finding for `architect`, not something to tune here. It was measured
+      > **on the integrated GPU** (see below) and with **both surfaces on one display**, which is
+      > exactly the configuration this entry says cannot separate the two pacing sources — so the
+      > cross-refresh run is still owed and now matters more. Resident set: flat closed, +1.2 MB
+      > across 90 s open.
+      >
+      > **Still owed, all of it needing the second monitor:** the two-display cross-refresh
+      > measurement with the console on the slower panel; the cadence verdict that rides on it; and
+      > the **dual-GPU degrade path**, which this hybrid box still cannot reach because one display
+      > puts both windows on one adapter. Also owed and needing nobody: a legibility judgement at
+      > desk distance.
+      >
+      > **A second finding came out of it and is not about the console at all.** The windowed app
+      > renders on `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)` on this machine, which also has
+      > an RTX 3080 — `request_adapter` with a default power preference hands a hybrid laptop the
+      > power-saving GPU, and **`--gpu` reaches `--stream` only** (ADR-0146), so the window cannot
+      > ask for the discrete one. Every windowed frame-time figure ever quoted on this machine is
+      > therefore an iGPU figure. The startup note that says which adapter is running was added in
+      > the same session and is what makes any of these numbers attributable.
+
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 
 **This one is not hardware-gated.** Every item above waits on a box the user does not have; this
