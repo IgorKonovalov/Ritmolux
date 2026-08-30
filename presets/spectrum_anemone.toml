@@ -1,0 +1,123 @@
+# Anemone - the spectrum printed, not lit: twelve flat ink wedges radiating off
+# a small hub on cream paper (Plan 0104 Phase 2). Authored fresh-slate
+# (ADR-0089).
+#
+# IT SHARES A LAYOUT WITH `spectrum_halo` AND NOTHING ELSE, AND THAT IS
+# DELIBERATE. The system offers three layouts and the family needs four worlds,
+# so one layout carries two of them; the pair is separated on every other axis
+# the scene has. Halo is 48 thin luminous spokes standing on a wide ring over a
+# dark violet field, drawn through the ADDITIVE seam. This is 12 heavy wedges on
+# a small hub over cream paper, drawn through the OVER seam. Halo's silhouette
+# is an annulus with a fringe; this one's is a starburst whose spokes are the
+# figure. If the advisory distinctness report ever pairs them, that is the
+# shared layout talking and this paragraph is the answer.
+#
+# `stroke_blend` = 1 IS THE WHOLE WORLD. At 0 the batch is additive light and
+# overlapping strokes sum - which is what every other line preset in the library
+# wants and what makes a two-ink print impossible, because the third colour
+# appears wherever two strokes cross. At 1 the batch composites OVER: a stroke
+# laid on another REPLACES the interior of what it covers, so the inks stay the
+# inks. That puts this preset in the limited-ink class, and the class has a
+# duty attached - every later stage that could put a fourth colour in the frame
+# is switched off below, by name, rather than left at a default that happens to
+# be quiet today.
+#
+# TURNING THE SEAM ON COSTS BRIGHTNESS, AND IT IS PAID HERE. Additive light
+# builds up where a figure crosses itself and a dense rosette leans on that;
+# under OVER it does not, so the same level reads flatter and darker. The
+# spokes are opaque ink at full strength for that reason, not because the world
+# is bright.
+system = "spectrum"
+name   = "Anemone"
+
+[generator]
+seed = 3
+
+[spectrum]
+elements = 12
+layout = "radial_ring"
+# Slower than a meter and on purpose: heavy wedges snapping at analysis cadence
+# read as flicker, where thin spokes read as sparkle. The release is what makes
+# twelve blocks of ink move like a printed thing.
+smoothing = { attack = 0.05, release = 0.45 }
+
+[palette]
+# FOUR INKS AND THE PAPER, as flat plateaus with hard edges - not a gradient
+# with steps applied. `hue_spread` below stops at 0.75 so the spokes take the
+# first three and the cream is reserved for the ground.
+stops = [
+  { at = 0.00, color = "#16283c" },  # navy
+  { at = 0.24, color = "#16283c" },
+  { at = 0.26, color = "#c1452f" },  # vermilion
+  { at = 0.50, color = "#c1452f" },
+  { at = 0.52, color = "#dfa32b" },  # ochre
+  { at = 0.74, color = "#dfa32b" },
+  { at = 0.76, color = "#2f6b52" },  # pine
+  { at = 0.94, color = "#2f6b52" },
+  { at = 0.96, color = "#f3ead6" },  # cream - the paper, not a spoke
+  { at = 1.00, color = "#f3ead6" },
+]
+
+[params]
+# A seeded rest per wedge, so the rosette at silence is a printed ornament with
+# unequal arms rather than a symmetric star. Pinned seed, not "random": this is
+# a look, and every capture path pins the seed to 0 anyway, so a random one
+# would mean the thing you judge is never the thing that ships.
+# The `noise` term is the resting drift, offset by `index` so the wedges move
+# out of step - without it the world is frozen in a silence, since a rosette's
+# slow turn alone moves too few pixels to read as alive.
+# THE RESTING ORNAMENT IS SMALLER THAN IT LOOKS IT SHOULD BE, TO LEAVE THE
+# MUSIC SOMEWHERE TO GO. The first draft rested at 0.30-0.58 and multiplied the
+# band level by 0.85, so the audio moved about a quarter of what the seeded rest
+# already drew and the world measured 0.0194 on its best band against the
+# suite's 0.02 floor - a spectrum preset that barely read the spectrum. Rest and
+# readout traded places: the ornament is now 0.20-0.42 and the band term carries
+# the figure.
+base = "0.20 + hash(index * 23) * 0.12 + noise(time * 1.8 + index * 9) * 0.10"
+
+# `scale` multiplies each element's OWN band level, which is the only route the
+# spectrum has into this world - there is no `bin()` term anywhere in the file,
+# and mid and treble reach the frame through nothing else. presets/README.md
+# says useful values sit well above 1 and the first draft sat below it, which is
+# why mid measured 0.0036 and treble 0.0008: not damped, simply never spent.
+curve = "0.6"
+scale = "1.55"
+
+# The hub. Small, so the wedges dominate - the opposite proportion from Halo,
+# where the ring is the body and the spokes are its fringe.
+radius = "0.2 + clamp(bass * 0.235, 0, 0.20)"
+
+# Heavy wedges: 12 spokes around a circle is a 30-degree slot each, and 16 fills
+# roughly half of one at the hub. `softness` 0 is a solid stroke with a
+# one-pixel antialiased edge - anything above it puts a gradient inside the ink,
+# which is the one thing a print cannot have.
+thickness = "16 + clamp(onset * 8.33, 0, 5.0)"
+softness  = "0"
+stroke_blend = "1"
+glow      = "1.0"
+brightness = "1.0"
+
+# The figure turns slowly. On a rosette this is the natural motion and it is the
+# figure turning, not the camera.
+rotation = "time * 0.11"
+
+hue        = "0"
+hue_spread = "0.75"
+saturation = "1.0"
+
+# THE PAPER. `bg_hue` is a coordinate in this preset's own palette, so 0.98
+# lands on the cream plateau reserved above - a value copied from another preset
+# would arrive at whatever colour that gradient holds there instead.
+bg_hue      = "0.98"
+bg_bright   = "0.8"
+bg_vignette = "0.1"
+
+# THE LIMITED-INK SWITCHES, NAMED RATHER THAN LEFT AT THEIR DEFAULTS. Each of
+# these would put light between the inks: bloom smears a fifth colour off every
+# edge, trails leave a tinted ghost, and a partial ink_amount blends toward a
+# near-black source and greys the paper (it is a transition, not a resting
+# value - so it is 0, not 0.1).
+bloom_amount = "0"
+trails       = "0"
+ink_amount   = "0"
+exposure     = "1.0"

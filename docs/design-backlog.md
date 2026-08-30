@@ -453,9 +453,26 @@ point this entry is the starting measurement rather than a fresh investigation.
   gradient. **This entry is about mid-tone figure luminance on attractor presets**, measured as
   `attractor_clifford` 82.54 → 75.91 mean luma, and no backdrop measurement speaks to it. The two
   were conflated because both mention the tonemap.
-- **Re-verified 2026-08-13:** exactly **one** shipped preset binds `exposure`
-  (`lsystem_vellum.toml:60`), so the lever this entry names as the one-line fix is still essentially
-  unused across the library.
+- **Verified 2026-08-29** at the Plan 0104 close — **the "lever is unused" half of this entry is
+  falsified, and the retune it asks for is not.** The reduction that now stands for this entry is
+  that its own measured subject is still untouched:
+  `absent: ^exposure in: presets/attractor_clifford.toml` — red the day someone retunes the
+  preset whose −8.0 % opened this entry, which is exactly when it should be re-read. This entry said twice (2026-08-13, 2026-08-15)
+  that exactly **one** shipped preset binds `exposure` (`lsystem_vellum.toml:60`). **Sixteen do**,
+  and fifteen of them landed in [Plan 0104](plans/done/0104-the-library-stops-being-lopsided.md):
+  its Phase 2 found that a branching or line figure has too little area for a level term to
+  register on the stroke, and moved the level response to a whole-frame stage — `exposure` or
+  `bg_bright` — on cohort after cohort. So `exposure` is now a routine authoring lever rather
+  than an unused one, and any argument here resting on its rarity is void.
+- **What survives that correction is the whole of the ask.** None of the fifteen new binders is in
+  the population this entry names — *the attractor family, the softer `fragment_*`, `swarm_drift`*
+  — which is the set of presets with no over-range peak, and not one of them was touched by
+  Plan 0104. The measured −8.0 % on `attractor_clifford` is unaddressed. **The entry stays live.**
+- **Why no gate caught this, which is the reusable part.** The claim is carried as
+  `unprobeable: ... the grammar deliberately has no count verb (ADR-0108, Notes)`, so
+  `scripts/check-backlog-claims.mjs` reported green across every run of the plan that falsified it.
+  This is the case the close ceremony prints the `unprobeable:` roster for: the roster is the set of
+  claims nothing checks, and a claim in it decays silently until a human reads it against the tree.
 - **ROUTED, and now scheduled:** it is §4 of [`content-brief.md`](content-brief.md), paired with Plan
   0071's standing `occlude` retune as one pass over the shipped set. That brief also records the
   other correction this entry's routing carries — the plan text says to run it "with 0038 and 0058",
@@ -463,10 +480,12 @@ point this entry is the starting measurement rather than a fresh investigation.
   three-way pass is a two-way pass.
 - **Raised:** 2026-07-31, from `architect`, at Plan 0045's Mode 4 review.
 - **Verified against code:** yes — measured, not inferred (numbers below).
-- **Verified 2026-08-15** — the one binding this entry names is still the only one a retune has
-  to start from: `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it does
-  not reduce — `unprobeable: exactly one shipped preset binds exposure is a claim about how many
-  files match, and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
+- **Verified 2026-08-15, and its headline claim is superseded above — sixteen presets bind
+  `exposure`, not one.** What that dated check still establishes stands: the original binding is
+  present — `present: ^exposure in: presets/lsystem_vellum.toml`. The count around it never
+  reduced, and that is why the falsification went unseen for a whole plan:
+  `unprobeable: exactly one shipped preset binds exposure is a claim about how many files match,
+  and the grammar deliberately has no count verb (ADR-0108, Notes)`. The document this
   entry corrects still carries the sentence it corrects: `present: tonemap-knee in: docs/plans/README.md`
   — which goes red when that paragraph is next rewritten, and that is the moment to re-read whether
   the correction is still owed.
@@ -1140,6 +1159,23 @@ named that this run could not reproduce, remains the strongest untested candidat
 **Low.** It blocks nothing, nothing ships broken, and it becomes load-bearing only when someone
 opens the governor. It is filed because that is exactly the moment the correction would otherwise
 be missing.
+
+### Update 2026-08-30 — a show-length run exists now, and it neither discharges nor contradicts this
+
+The 2026-08-29 live set ran **8h08m / 3,505,083 frames with zero dropped**, at 120.0 fps flat, on
+the show notebook with real audio and a real rotation. That is **17x** run 3's 200,667 frames and
+the first data this project has at show length rather than in minutes, so it is worth naming here:
+**the tail never became a drop.** The entry's "not currently a defect" reading survives a horizon
+two orders of magnitude past the one it was written on.
+
+**It does not close the entry, because the one column that would is missing.** The summary that
+survives the night records fps, frames, dropped, `rss_bytes`, `gpu_bytes`, handles and threads —
+and **not** `frame_ms_p99`. No soak or `diagnostics.log` from the set is findable on this machine
+as of 2026-08-30. So the cheap discriminator "What a fix would be" asks for — a run with the
+per-frame series retained — was within reach on the night and was not captured. The practical
+lesson is for the *next* show rather than for the governor: a set that runs this long is the
+cheapest instrument this project will ever get for the p99 question, and it costs one `--soak`
+path on the command line.
 
 ---
 
@@ -3867,5 +3903,123 @@ looking.
 `renders/README.md` saying they assume the pre-ADR-0141 layout.
 
 - **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
-- **Verified 2026-08-29** - the two render scripts still assume the old layout: `present: SHOT=target/release/examples/shot\.exe in: renders/plan-0106-p6/run.sh`
+- **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
+
+## 0162 - the claim gate resolves a probe path against the working tree, so a path inside `.gitignore` verifies locally and can only ever fail on CI
+
+> **Filed 2026-08-29** from a red CI `links` job whose one broken probe was entry 0161's own,
+> written hours earlier by the close that filed it and green on the machine that wrote it.
+
+`runProbe` resolves `<path>` with `existsSync` against the working tree and asks nothing further. A
+path that exists but is **not in the repo** is indistinguishable from one that is, so a probe
+pointing into gitignored territory - `renders/`, `target/`, `spike/` - passes at every call site
+that runs on the authoring machine and fails only at the one that does not.
+
+Two of the three call sites are on that machine: the `pre-push` hook and the architect close
+ceremony both read a full working tree, ignored files included. The third is the CI `links` job,
+which [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) names the
+un-bypassable one, and it checks out a clone that by definition contains no ignored file. So the
+gate is green wherever the fix would still be cheap and red only once the push has happened.
+
+**The instance.** Entry 0161's second bullet probed `renders/plan-0106-p6/run.sh`. `renders/` is
+ignored in full, so that script exists on the authoring machine and in no checkout anywhere. It
+went green at the close that filed it and green at pre-push, then broke the `links` job on the
+first push that carried it - which was a push of 12 accumulated commits, so the breakage surfaced
+against an unrelated fix rather than against the close that caused it. Repaired in place by taking
+the `unprobeable:` opt-out, which is the honest reduction here: nothing in a checkout can see it.
+
+**Impact.** Low severity, and it recurs by construction rather than by accident. The cost is not
+the one broken entry - it is that the local gate whose entire purpose is to pre-empt a red CI
+reports OK, so the author learns from a runner, after pushing, that a claim they verified does not
+verify. The lag is unbounded: an unpushed close can sit for days before a push exposes it.
+
+**What a fix looks like:** one git question beside the `existsSync`. `git ls-files -- <path>`
+returns nothing for a path the repo does not track and handles directories, which probe paths often
+are, so a non-empty result is the whole test; `git check-ignore -q` answers it from the other side.
+Either lets the probe report *"probe path is not tracked"* rather than today's *"does not exist"*,
+which is the message a CI reader currently gets for a file sitting in front of them in their own
+tree. One invocation covering the whole probe set keeps it to a single process, the way the
+staleness advisory already batches its `git log`.
+
+- **Verified 2026-08-29** - the probe path is resolved against the filesystem and nothing else: `present: if \(!existsSync\(pathAbs\)\) in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nothing asks git whether that path is ignored: `absent: check-ignore in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nor whether it is tracked: `absent: ls-files in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - `renders/` is ignored in full, so nothing beneath it reaches a checkout: `present: ^renders/$ in: .gitignore`
+- **Verified 2026-08-29** - the local call site that goes green regardless: `present: check-backlog-claims in: .githooks/pre-push`
+
+## 0163 - `level/bass` reads exactly 1.0 on every local peak by construction, so the lighting consumer that read it as a dimmer value saw pinned dynamics, and the recorded diagnosis blamed an input gain that cannot move it
+
+> **Filed 2026-08-30** from the 2026-08-29 live set, the first full show driven end to end by this
+> app. Filed with its own originating diagnosis **falsified** - see "What the night concluded, and
+> why it is wrong" below. **Owner if taken:** `architect`, and it is largely a documentation ask.
+
+### The observation
+
+Over the 8h08m set the `bass` term reached `1.0000` repeatedly, and the room read as flat: the
+band factor in the bridge's `level = (glow + depth * band) * master` sat at its ceiling, so `depth`
+stopped modulating and every fixture ran at `glow + depth` until the release curve pulled it down.
+The operator reached for master and the mic gain, neither of which is the lever.
+
+### The mechanism, and why the gain is not the lever
+
+`bass` is levelled by `PeakNormalizer` (ADR-0049): instant attack, a 2.5 s exponential release, and
+the reading is `(clean / p).clamp(0.0, 1.0)` against **its own** running peak. So `bass == 1.0` does
+not mean "loud" and does not mean "clipped". It means **this hop is the loudest bass since the peak
+last released** - which on four-on-the-floor material is *every kick*, by design, at any input
+level. At 120 BPM the peak is re-adopted every 0.5 s against a 2.5 s release, so the term spends
+most of its life in the top of its range and touches its ceiling once per kick.
+
+**The reading is scale-invariant.** `raw / peak` is unchanged when the input is halved, because both
+terms halve. Gain portability is the entire purpose of ADR-0049 - `> 0.5` is meant to mean the same
+thing on every track at every gain setting - so turning the mic down, or up, moves this value by
+exactly nothing. That property is a feature everywhere else in the project and is the specific trap
+for a lighting consumer, which wants a level and is handed a normalized excitation.
+
+### What the night concluded, and why it is wrong
+
+The finding was recorded as *"the mic level was hot enough to saturate the band term"*, with the
+implied repair being input gain. The code above falsifies that: no input gain reaches this number.
+The entry is filed with the correction attached rather than the symptom alone, because the wrong
+diagnosis is the expensive part - it sends the next operator to a control that provably cannot help,
+during a show, which is exactly when there is no time to discover that.
+
+### What is actually missing
+
+**Nothing is broken in the analyzer, and the information the consumer needed was already on the
+wire.** `/lmv/v1/raw/bass` is published beside `/lmv/v1/level/bass` and is the absolute twin;
+`README.md` documents both. What no surface anywhere states is the property above - that `level/*`
+is *designed* to touch 1.0 regularly on periodic material - and the word "level" invites precisely
+the reading that failed here. A consumer picking a term off the telemetry table has no way to learn
+this short of reading `core/src/dsp/gain.rs`.
+
+There is also no live surface for it. Clamp occupancy (ADR-0062) is the project's saturation
+instrument, and it is **capture-time only**: `core/tests/saturation.rs` and the `occ` column of
+`shot --report`, both walking `clamp()` nodes in an embedded preset. It answers a different
+question - "is this authored expression a constant?" - and nothing equivalent runs while the app is
+performing. This half is smaller than it looks now that the mechanism is understood, because the
+number an operator would want on screen is not occupancy but headroom, and `raw/*` is already it.
+
+### Impact
+
+Low, and confined to consumers that read a band term as a magnitude. It reached the room only
+because a lighting look is the first consumer this project has had that multiplies a band term into
+a physical output with no further shaping. **[Plan 0133](plans/0133-the-engine-drives-the-lights.md)
+brings that look in-house in the same expression grammar and will meet this on its first evening**,
+which is the reason to have it written down before that plan is built rather than after.
+
+### What a fix looks like
+
+The cheap and probably sufficient shape is prose: one sentence in `README.md`'s telemetry table
+saying what `level/*` is normalized against and that it reaches 1.0 on every local peak, and the
+same note wherever Plan 0133's look grammar names its bindable terms. Beyond that there is a real
+design question that this entry does **not** answer - whether a lighting consumer wants a
+differently-shaped term (a slower level, a headroom reading, or `raw/*` scaled by an operator
+control) - and that is an ADR if it is ever wanted, not a patch.
+
+- **Verified 2026-08-30** - the band scalar is a ratio against its own running peak, hence invariant under input gain: `present: \(clean / p\)\.clamp\(0\.0, 1\.0\) in: core/src/dsp/gain.rs`
+- **Verified 2026-08-30** - the release is seconds-scale, so the ceiling is re-touched every kick rather than once a set: `present: RELEASE_TAU_SECS: f32 = 2\.5 in: core/src/dsp/gain.rs`
+- **Verified 2026-08-30** - `bass` is levelled by that normalizer at the published frame boundary: `present: bass_gain\.normalize in: core/src/dsp/mod.rs`
+- **Verified 2026-08-30** - the absolute twin the consumer needed is already published: `present: "/lmv/v1/raw/bass" in: standalone/src/osc.rs`
+- **Verified 2026-08-30** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /lmv/v1/raw/bass in: README.md`
+- `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `README.md`, `docs/` and the OSC table, not a match countable in one file

@@ -638,16 +638,53 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    **on the branch**. The version is chosen against what `main` actually reached, not against the
    branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the
    `vX.Y.Z` tag lands on the commit that becomes `main`'s tip.
-4. **Fast-forward `main` from the main checkout**, without leaving the worktree:
-   `git -C <main checkout> merge --ff-only <branch>`. By construction this is clean.
-5. **The user pushes** — branch and tag. You never push.
+4. **Fast-forward `main` from the main checkout** — `git -C <main checkout> merge --ff-only <branch>`.
+   By construction this is clean.
 
-Two standing hazards worth naming, both in ADR-0053's Negative section. The **stash stack is shared
-across every worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry —
-prefer a WIP commit. And each worktree carries its own `target/` (one lane held ~8 GB in
-`target/debug/incremental` and filled the disk mid-session), so **remove a finished lane's
-worktree**; on Windows `git worktree remove` fails with `Permission denied` while any shell still
-has its working directory inside it.
+   **A worktree-isolated session cannot run this.** Since Plan 0101's close the harness rejects any
+   `git -C <main checkout> …` issued from a lane — *"a worktree-isolated session's git operations must
+   target its own worktree"* — and the same guard rejects any compound command it cannot statically
+   prove stays inside the worktree. So from the lane you **finish at the tag and hand steps 4–7 to the
+   user as one block**; from a session opened in the main checkout you run them yourself.
+
+   **`main` can move during the close, not just before it.** At Plan 0099 a parallel session landed two
+   doc commits while the bookkeeping was being written and the `--ff-only` was refused twice. Recovery
+   is cheap but has one non-obvious step: after each re-`git merge main`, the `vX.Y.Z` tag is stranded
+   on a commit that is no longer the branch tip, so `git tag -d vX.Y.Z && git tag vX.Y.Z` **before**
+   retrying the fast-forward.
+5. **The user pushes** — `main` and the tag. You never push.
+6. **Remove the lane's worktree — the same session the plan closes, not "later".** Each worktree carries
+   its own `target/`, and since [ADR-0147](../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+   revoked the shared artifact store that cost is per-lane again, with nothing gating it. ADR-0053
+   records ~8 GB and a build broken by a full disk mid-session; the real figure is worse — closing Plans
+   0054 and 0056 together reclaimed **32 GB** (14 + 18). Two idle lanes can plausibly fill the disk.
+
+   ```sh
+   git worktree remove ../lmv-plan-NNNN   # from the main checkout, never from inside the lane
+   git worktree prune                     # drops registrations whose directory is already gone
+   ```
+
+   On Windows this fails with `Permission denied` while **any** process holds the directory — a shell
+   whose working directory is inside it is enough, and the session that just ran the close is usually
+   exactly that shell. Move every shell out first. A partly-failed removal can leave an empty directory
+   git has already unregistered: delete it by hand, then `git worktree prune`.
+7. **Delete the lane branch** — after step 6, because git refuses to delete a branch that is checked out
+   in a worktree.
+
+   ```sh
+   git branch -d plan-NNNN-<slug>   # -d, never -D
+   ```
+
+   **`-d` is the safety property, not a formality.** It refuses an unmerged branch, so a refusal here
+   means step 4's fast-forward did not actually land and the lane's commits are reachable from nothing
+   else. Investigate; never reach for `-D`. Only `main` and the tag are pushed, so there is normally no
+   `origin` copy of the lane branch to delete — if the user pushed one, removing it there is theirs.
+
+   A lane that is **abandoned** rather than closed takes steps 6 and 7 alone, with `-D` and a deliberate
+   note of what is being discarded — that is the one case where the branch is knowingly unmerged.
+
+One standing hazard is left, from ADR-0053's Negative section: the **stash stack is shared across every
+worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry — prefer a WIP commit.
 
 ---
 

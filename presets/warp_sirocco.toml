@@ -1,0 +1,130 @@
+# Sirocco - a DIRECTIONAL field: the past drifts sideways in bands that shear
+# against each other, with no centre and no radius anywhere in the program
+# (Plan 0104 Phase 4b). Authored fresh-slate (ADR-0089).
+#
+# EVERY OTHER WORLD IN THIS FAMILY IS RADIAL, AND THAT IS THE GAP THIS FILLS.
+# `warp_wellhead` expands on `rad`, `warp_millrace` shears on `rad`,
+# `warp_cauldron` boils about the frame centre - all three are figures with a
+# middle. This one binds `dx` and `dy` against `y` and `x` instead, so the field
+# has a DIRECTION rather than an origin: horizontal bands travelling at
+# different speeds, sliding past one another the way wind does over sand. There
+# is no eye to look at, which is what makes it read as weather rather than as an
+# object.
+#
+# THE DRIFT VOCABULARY IS ISOTROPIC. `dx` and `dy` are both in frame-HEIGHTS per
+# second, so `dx = 1` crosses a 16:9 frame in 1.78 s while `dy = 1` crosses it in
+# 1.0 s. That is deliberate and it is what makes a diagonal drift a straight line
+# rather than a shear on a wide display - the aspect is reconciled for you
+# (ADR-0037) and an author never should.
+#
+# `wrap` IS OFF, AND THE ARGUMENT FOR TURNING IT ON WAS FALSIFIED. This file was
+# drafted with `wrap = 1` and a paragraph here saying the flag was structural: a
+# purely translational field must empty, since everything leaves by one edge and
+# nothing arrives at the other. That is true of the field and false of the
+# picture, because the deposit keeps feeding it. Measured both ways over ten
+# simulated minutes, the two are within a couple of percent on every statistic
+# (coverage 0.9987 against 0.9652, peak/mean 1.95 against 2.23). So the toroidal
+# read buys nothing here and is switched off, which removes recirculation as a
+# long-run accumulation route entirely rather than leaving it to be bounded by
+# the decay.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45:
+#
+#   coverage    0.1804 ->  0.9652   delta +0.7847   monotone 0.45
+#   peak/mean  11.0357 ->  2.2272   delta -8.8085   monotone 0.55
+#   footprint   0.2642 ->  0.1847   delta -0.0795   monotone 0.37
+#
+# READ THE ROWS, NOT THE DELTA. The 0 s row is the field before it has filled -
+# a `warp_mesh` world starts empty by construction - and by the 30 s row every
+# statistic is already at its steady value. The remaining nineteen rows hold
+# coverage between 0.955 and 0.987 and peak/mean between 1.94 and 2.69, wandering
+# with no march in either direction. The whole delta is warm-up.
+#
+# WHAT IT WARMS UP INTO IS WORTH KNOWING BEFORE JUDGING A SHORT CAPTURE. In the
+# first couple of seconds this world is a plume: one bright streak arriving from
+# the source and crossing. By half a minute it has become broad horizontal belts
+# - a banded atmosphere - and that is what runs on stage. Both are the same
+# mechanism at different fills, and a two-second still shows only the first.
+#
+# THE DEPOSIT IS OFF-CENTRE, for the same reason. A ring at the middle of a
+# frame that is being blown sideways draws a streak from the middle out - which
+# looks like a leak. Put the source at the upwind edge and the streak is the
+# whole picture, arriving and crossing.
+#
+# WHAT DRIVES WHAT. Bass drives the wind speed, mid feeds the source, treble
+# tightens the banding, onset brightens. The `[per_vertex]` audio terms are kept
+# small: `[smoothing]` cannot ease a per-vertex binding, so they arrive
+# unsmoothed and a large one would read as a jolt.
+system = "warp_mesh"
+name   = "Sirocco"
+
+[mesh]
+# Finer in y than the default, because the bands are horizontal and it is the
+# vertical direction the program varies fastest in - the grid is a resolution,
+# not a shape (ADR-0037), so this refines sampling and changes nothing else.
+# 48x48 is inside the floor tier's 64x48 ceiling on both axes.
+x = 48
+y = 48
+
+[per_vertex]
+# THE WIND. Three bands across the frame's height, each moving at its own speed
+# and two of them backward - `sin` over `y` is what makes them shear against
+# each other instead of travelling as one sheet.
+dx = "0.16 + sin(y * 18.85) * 0.13 + clamp(bass * 0.047, 0, 0.04)"
+# A slow sag, modulated across x so the bands are not perfectly straight.
+dy = "0.02 + sin(x * 12.57) * 0.025"
+# Held at 1: any zoom at all turns this back into a radial world, which is the
+# one thing it is not.
+zoom = "1.0"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#2a1608" },  # dune shadow
+  { at = 0.28, color = "#8a5320" },  # ochre
+  { at = 0.56, color = "#d69a42" },  # sand
+  { at = 0.80, color = "#f0cf90" },  # haze
+  { at = 1.00, color = "#fff6e4" },  # sky
+]
+
+[params]
+wrap = "0"
+
+# Longer than the radial worlds want, because here the tail IS the band: a mark
+# has to survive its whole crossing or the wind has nothing in it.
+decay = "0.55 + clamp(bass * 0.118, 0, 0.1)"
+
+# THE SOURCE, upwind (see header). A narrow ring rather than a blob so the
+# bands have an edge to smear.
+deposit        = "1.5 + clamp(mid * 1.06, 0, 0.9) + clamp(onset * 0.67, 0, 0.4)"
+deposit_x      = "0.14"
+deposit_y      = "0.5"
+deposit_radius = "0.34"
+deposit_width  = "0.09"
+deposit_arms   = "4"
+deposit_twist  = "0.6"
+deposit_spin   = "0.3"
+
+# Off. A dark disc in the middle of a directional field is a hole in the wind -
+# it is there to stop a ZOOMING loop saturating at its fixed point, and this
+# world has no fixed point.
+darken_center = "0"
+
+hue           = "0.04"
+color_span    = "0.8"
+color_center  = "time * 0.006"
+saturation    = "0.95 + clamp(treb * 0.167, 0, 0.1)"
+palette_steps = "5"
+brightness    = "0.55 + clamp(mid * 0.141, 0, 0.12)"
+
+exposure     = "0.78 + clamp(bass * 0.235, 0, 0.2)"
+bloom_amount = "0.22 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "0.95"
+bloom_radius = "1.5"
+
+[smoothing]
+decay        = 0.5
+deposit      = { attack = 0.04, release = 0.55 }
+brightness   = 0.3
+saturation   = 0.3
+exposure     = { attack = 0.05, release = 0.4 }
+bloom_amount = { attack = 0.03, release = 0.4 }

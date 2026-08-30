@@ -1,0 +1,119 @@
+# Aperture - nested hexagons receding into the frame, travelling inward forever
+# (Plan 0104 Phase 2). Authored fresh-slate (ADR-0089). It takes the one arm of
+# the mark roster no `shape_field` world in the library uses - the POLYGON - and
+# the one gesture none of them makes: the palette coordinate does not sit still.
+# Contour Mono is a star woodcut, Facet a crystalline star, Pulse a nested
+# heart; all three are figures. This one is a corridor.
+#
+# coord_mode = 1 IS WHAT MAKES IT A CORRIDOR RATHER THAN A GROOVE. Under the
+# default distance coordinate a contour is an OFFSET of the outline, and an
+# inward offset is an erosion - the rings would round off toward a disc as they
+# travel in, so the hexagon would dissolve into a circle at the vanishing point.
+# Under `1` the coordinate is r / r_boundary(theta) and every contour is a
+# SCALED COPY of the outline, so the innermost ring is the same hexagon as the
+# outermost, smaller. On a regular polygon the two modes agree INSIDE the figure
+# (eroding a regular polygon moves every edge in by the same amount) and differ
+# outside it, where the distance rounds each vertex into an arc - and the
+# outside is most of this frame, so the mode is doing visible work here.
+#
+# THE PALETTE IS CYCLIC AND IT HAS TO BE. `color_center` slides the palette
+# coordinate, which is what makes the rings travel; the LUT wraps at 1, so
+# unless the gradient's last stop is its first colour again the wrap is a hard
+# edge crossing the frame once per cycle. The last stop below is the first stop
+# repeated, exactly, for that reason - not as a flourish.
+#
+# WHAT DRIVES WHAT. `mid` is the library's dead band and it drives the travel:
+# the corridor pulls in faster on a loud mid passage. Treble sharpens the key
+# lines between rings, bass widens the aperture, and onset lights the whole
+# thing through the bloom. The rings are ADDED to, not counted on - a beat-driven
+# `palette_steps` was tried and rejected here: a band count is a global change to
+# every pixel at once, which is the shape a strobe has, and on a corridor it
+# reads as the walls jumping rather than as a hit.
+system = "shape_field"
+name   = "Aperture"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#05101f" },  # deep navy
+  { at = 0.18, color = "#0a3a4a" },  # teal
+  { at = 0.38, color = "#16624f" },  # sea green
+  { at = 0.56, color = "#a8761f" },  # amber
+  { at = 0.74, color = "#7d1f37" },  # crimson
+  { at = 0.88, color = "#23103a" },  # violet
+  { at = 1.00, color = "#05101f" },  # deep navy again - THE CYCLE CLOSES HERE
+]
+
+[params]
+shape      = "2"     # polygon
+points     = "6"     # hexagon
+coord_mode = "1"     # scaled copies, not offsets - see header
+
+# The aperture opens on the low end. Modest: this is the corridor's WIDTH, and a
+# large swing on it reads as the camera lurching rather than as the frame
+# breathing.
+scale = "0.55 + clamp(bass * 0.153, 0, 0.13) + 0.03 * sin(time * 0.17)"
+
+# The hexagon turns about its own centre. `rotation` and not `kaleido_*`: the
+# screen-space fold multiplies the finished frame about a screen-centred axis,
+# which is a different thing from turning the figure and would fight any pan.
+rotation = "time * 0.06 + clamp(mid * 0.212, 0, 0.18)"
+
+# THE TRAVEL. Negative, so the rings run INWARD and the corridor recedes. The
+# audio term is an OFFSET added to the clock, never a multiplier on it: a bound
+# rate would jump the phase by (new_rate - old_rate) * time the instant it
+# changed, which a hundred seconds into a set is a teleport rather than an
+# acceleration.
+color_center = "0 - time * 0.1 - clamp(mid * 0.129, 0, 0.11)"
+
+# How much gradient the figure's interior spans. It DOES NOT TRANSFER between
+# the two coordinate modes - under 0 the exterior is divided by the shape's
+# inradius, under 1 it grows linearly in r - so this value belongs to
+# coord_mode 1 and re-tuning is part of any switch.
+#
+# IT IS A RING-COUNT DECISION HERE, NOT A COLOUR ONE, AND IT RUNS THE WAY ROUND
+# THE NAME DOES NOT SUGGEST. Under mode 1 the coordinate keeps growing linearly
+# in r outside the figure, and `color_span` multiplies it - so a LARGER span
+# fits MORE cycles of the gradient between the hexagon and the frame corner, not
+# fewer. Measured on this world: 0.8 gives about thirty rings and 2.6 gives
+# about forty, both of which read as op-art rather than as depth; 0.22 gives
+# eight. 0.35 puts roughly one full traverse of the gradient across the frame,
+# so the ring count is `palette_steps` again, which is where it belongs.
+color_span = "0.35"
+
+# Fourteen rings, held still (see header on why the count is not a beat target).
+palette_steps = "14"
+
+# The key lines between rings. Treble is the band that reads as edge detail, so
+# it is the one that sharpens them.
+palette_contour = "0.3 + clamp(treb * 0.583, 0, 0.35)"
+
+# BELOW 1 TIGHTENS THE RINGS TOWARD THE CENTRE, which is the direction that
+# reads as depth: a band boundary sits at (k/n)^(1/gamma), so the exponent is
+# inverted on its way to a position. 0.72 crowds the far end of the corridor
+# without collapsing it into a solid core.
+#
+# IT IS ALSO WHERE THE TRANSIENT LANDS, and that is the answer to the strobe
+# problem the header records. A hit cannot go on `palette_steps` - a band count
+# is a global change to every pixel at once. `gamma` moves the same rings
+# CONTINUOUSLY: the far end of the corridor stretches and relaxes on a hit while
+# the ring count never changes, so it reads as the corridor breathing.
+gamma = "0.72 + clamp(onset * 0.233, 0, 0.14)"
+
+saturation = "1.05 + clamp(treb * 0.25, 0, 0.15)"
+
+# The rings' own crossings do not go over range - this scene hands the LUT
+# colour to the composite untouched but for the contour term - so the bloom has
+# only the palette's brightest band to work with, and a hit warms the corridor
+# rather than blowing it out.
+bloom_amount    = "0.15 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "0.9"
+bloom_radius    = "1.2"
+
+[smoothing]
+scale           = 0.45
+rotation        = 0.35
+color_center    = { attack = 0.08, release = 0.6 }
+palette_contour = 0.3
+gamma           = { attack = 0.04, release = 0.4 }
+saturation      = 0.3
+bloom_amount    = 0.18

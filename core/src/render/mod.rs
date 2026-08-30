@@ -23,6 +23,14 @@
 // stages that run after the scene, behind one trait in one fixed-order chain
 // (ADR-0031); the engine-wide passes stay outside it (ADR-0032) — `background`
 // is the pre-pass that owns the clear, `ink` the terminal tone remap.
+// The secondary present target (ADR-0143): a second surface on this same
+// device, carrying text the shell queues for it. Feature-gated with the text
+// layer it draws through — see the module docs.
+//
+// NOT `aux.rs`: `AUX` is a reserved DOS device name, so on Windows that path
+// cannot be opened by the compiler even though the file creates fine.
+#[cfg(feature = "text")]
+pub mod aux_target;
 pub(crate) mod background;
 pub(crate) mod bloom;
 pub mod capture;
@@ -65,6 +73,10 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::{
     Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
 };
+#[cfg(feature = "text")]
+pub use aux_target::AuxPresentMode;
+#[cfg(feature = "text")]
+use aux_target::AuxTarget;
 use background::Background;
 pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
@@ -1126,6 +1138,11 @@ pub struct Renderer {
     /// `text` feature (ADR-0009); absent from the plugin/default build.
     #[cfg(feature = "text")]
     text_layer: TextLayer,
+    /// The secondary present target (ADR-0143), `None` until a shell attaches
+    /// one and again the moment it detaches. Holds a swapchain and a text atlas,
+    /// so the `None` case is the whole cost of the feature while unused.
+    #[cfg(feature = "text")]
+    aux: Option<AuxTarget>,
     /// The now-playing banner (ADR-0110): a string a shell pushes in, plus the
     /// `dt`-driven envelope that fades it. Present in every build — a plugin
     /// build without the `text` feature holds the state and draws nothing.
@@ -1239,6 +1256,8 @@ impl Renderer {
             overlay,
             #[cfg(feature = "text")]
             text_layer,
+            #[cfg(feature = "text")]
+            aux: None,
             now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
@@ -1594,6 +1613,71 @@ impl Renderer {
         };
         self.select_preset_instantly(index);
         true
+    }
+
+    /// Attach a **secondary present target** — a second window's surface, on
+    /// this renderer's existing device (ADR-0143).
+    ///
+    /// The core learns nothing about what that window is for. It presents the
+    /// runs it is handed and nothing else; the shell decides their meaning.
+    /// Returns the present mode the surface negotiated, so the caller can log
+    /// which arm ran.
+    ///
+    /// An already-attached target is replaced. An `Err` means this adapter
+    /// cannot drive that surface — the dual-GPU case — and the caller is
+    /// expected to degrade rather than treat it as fatal: the show is on the
+    /// primary surface, which is unaffected.
+    #[cfg(feature = "text")]
+    pub fn attach_aux(
+        &mut self,
+        target: impl Into<wgpu::SurfaceTarget<'static>>,
+        width: u32,
+        height: u32,
+    ) -> Result<AuxPresentMode, RenderError> {
+        let aux = AuxTarget::new(&self.ctx, target, width, height)?;
+        let mode = aux.present_mode();
+        self.aux = Some(aux);
+        Ok(mode)
+    }
+
+    /// Release the secondary target, its swapchain and its text atlas. Idempotent.
+    #[cfg(feature = "text")]
+    pub fn detach_aux(&mut self) {
+        self.aux = None;
+    }
+
+    /// Whether a secondary target is currently attached.
+    #[cfg(feature = "text")]
+    pub fn aux_attached(&self) -> bool {
+        self.aux.is_some()
+    }
+
+    /// Resize the secondary target's swapchain. No-op with none attached.
+    #[cfg(feature = "text")]
+    pub fn resize_aux(&mut self, width: u32, height: u32) {
+        if let Some(aux) = self.aux.as_mut() {
+            aux.resize(&self.ctx.device, width, height);
+        }
+    }
+
+    /// The secondary target's size in physical pixels, or `None` when detached.
+    #[cfg(feature = "text")]
+    pub fn aux_size(&self) -> Option<(u32, u32)> {
+        self.aux.as_ref().map(AuxTarget::size)
+    }
+
+    /// Draw `runs` on the secondary target and present it. No-op with none
+    /// attached.
+    ///
+    /// Deliberately **not** called from [`render`](Self::render): the two
+    /// surfaces present independently, so a console that stalls cannot pace the
+    /// show, and a frame the output drops does not have to cost the console one.
+    #[cfg(feature = "text")]
+    pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
+        match self.aux.as_mut() {
+            Some(aux) => aux.present(&self.ctx, runs),
+            None => Ok(()),
+        }
     }
 
     /// Queue text runs to composite over the next rendered frame; the queue is
@@ -1985,6 +2069,11 @@ impl Renderer {
             frame_budget_secs: _,
             // Switch-site policy state (the kind rotation) — not a per-frame concern.
             transitions_started: _,
+            // The secondary surface presents on its own encoder in `present_aux`,
+            // never from inside a frame encode: the output's pixels must not
+            // depend on whether a console is attached (ADR-0143).
+            #[cfg(feature = "text")]
+                aux: _,
         } = self;
 
         // The analysis snapshot for the overlay and the 1 Hz log (ADR-0052).

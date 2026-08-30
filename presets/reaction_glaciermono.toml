@@ -26,8 +26,64 @@ stops = [
 ]
 
 [params]
+# -- THE REGIME WAS OUTSIDE THE PATTERN-FORMING REGION, AND THAT IS WHY THIS
+# -- WORLD KEPT GOING BLACK ------------------------------------------------------
+#
+# It shipped at feed 0.0140 against kill 0.0450, which is past the edge of the
+# Gray-Scott plane where patterns sustain: at that pair the field decays to
+# uniform solvent and the frame is SOLID BLACK. It did not always do so, which is
+# exactly what made it hard to see - `feed` carries a `mid` term, so whether the
+# world lived depended on the music, and the whole margin was about 0.00005.
+# Rendered at one stimulus it was a full mandala and at another, five hundredths
+# of a band away, there was no picture at all.
+#
+# Two earlier repairs to this file were aimed at the wrong thing because of it.
+# The establishing boost was raised on the theory that the world was merely slow
+# to develop, and the fast colour bindings were added on the theory that it was
+# merely slow to react. Both were real improvements and neither could fix a
+# regime that dies.
+#
+# Swept at (feed, kill) = (0.0140, 0.0450) / (0.0200, 0.0480) / (0.0260, 0.0510)
+# / (0.0320, 0.0550) / (0.0380, 0.0600) / (0.0545, 0.0620), all at 700 frames
+# under a held stimulus: the shipped pair is the ONLY dead one, and every other
+# pair holds a pattern. 0.0200 / 0.0480 is the sparsest of the living set, which
+# is the one that still reads as a glacier rather than as a reef.
+#
+# DO NOT NUDGE THESE TOWARD THE OLD VALUES. The F/K pair is not a look control
+# with a safe neighbourhood - it selects which member of the family this is, and
+# one edge of it is a blank frame.
+#
+# -- WHY THE FAST REACTIVITY IS ALL ON THE COLOUR, AND NONE OF IT ON THE FIELD --
+#
+# Judged against music this world read as SLOW TO REACT, and it was: every audio
+# term it carried went into `feed` and `flow`, which are the chemistry. A
+# Gray-Scott field integrates - a change to either alters how the pattern GROWS,
+# so the picture answers over seconds and not on the hit, and both were smoothed
+# on top of that (`feed` at 1.5 s, `flow` with a 0.8 s attack). Meanwhile every
+# parameter that acts on THIS frame - `color_center`, `palette_contour`, `glow`,
+# `saturation` - was pinned to a constant.
+#
+# The split below is the repair, and it is the right shape for this system
+# rather than a workaround: the FIELD is slow because a reaction-diffusion field
+# is slow, and that is the look. The COLOUR MAPPING is a per-pixel lookup of the
+# field that already exists, so it answers immediately and costs the chemistry
+# nothing. Slow structure, fast surface.
+#
+# `color_center` is the strong one. With `color_span` at 6.0 the palette repeats
+# six times across the field's range, so a shift of 0.05 moves the banding by a
+# whole band and every contour in the frame travels at once - growth you can see
+# on the beat, drawn on a field that has not moved yet.
+#
+# THE SPARSE FRAMES ARE THE CHEMISTRY, NOT THIS TERM, and that was checked
+# rather than assumed. A filmstrip against a click track shows the picture
+# swinging from a full white mandala to nearly all black, which looks exactly
+# like a colour term throwing too far - so the throw was halved and the strip
+# re-rendered. It came back INDISTINGUISHABLE. The field itself passes through
+# dense and sparse states as it evolves, at a rate no `[params]` binding here
+# sets, so the throw was restored to full. If those empty stretches ever need
+# fixing the lever is `feed`/`kill` - the regime - and not the palette.
 palette_steps   = "20"
-palette_contour = "0.45"
+palette_contour = "0.40 + clamp(onset * 0.667, 0, 0.40)"
 
 # Coral regime. Tiny moves only - the F/K pair IS the pattern family.
 # THE SPARSE REGIME, AND IT IS ON A CLIFF. At F 0.0140 / k 0.0450 the reaction
@@ -42,8 +98,8 @@ palette_contour = "0.45"
 # be unremarkable anywhere else takes this regime off the cliff and the world
 # does not come back on its own. Nudge, never sweep: the total audio excursion
 # is 0.0006, about 4 % of the base.
-feed = "0.0140 + noise(time * 0.008) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
-kill = "0.0450"
+feed = "0.0200 + noise(time * 0.008) * 0.0004 + clamp(mid * 1.18, 0, 1) * 0.0006"
+kill = "0.0480"
 # The `max(0, ...)` term is a WARM-UP, not a look: this regime establishes
 # slowly, so the first five seconds run fast and it decays to nothing by t=5.
 # SETTLED RATE 0.22, ABOUT A QUARTER OF THE FAST TWIN'S. Three separate things
@@ -54,10 +110,34 @@ kill = "0.0450"
 # The warm-up now decays over ~17 s rather than 5. It has to: at a settled 0.22
 # this regime establishes slowly, and the boost is what buys the pattern its
 # first minute without making the rest of the set run at that speed.
-flow   = "0.22 + max(0, 1.0 - time * 0.06) + clamp(bass * 0.165, 0, 0.14) + clamp(onset * 0.100, 0, 0.06)"
+# THE ESTABLISHING BOOST, AND IT IS SIZED FOR A ROTATION RATHER THAN A SOAK.
+# A Gray-Scott field starts as noise, and this world runs its chemistry slower
+# than any other in the library - which is the whole point of it, and also why
+# it was unusable live. Measured at 200x200 under a held stimulus: at 2 s it is
+# a black blob with one ring, at 10 s barely more, and it does not resolve into
+# coral until about a MINUTE in. A preset switch re-seeds the simulation, so in
+# a rotation this world was essentially never seen as itself.
+#
+# The `max(0, ...)` term front-loads the rate and then gets out of the way: it
+# adds 1.20 at t=0 and reaches zero at 45 s, so the field resolves into coral
+# within about ten seconds and the glacial pace it is named for takes over once
+# there is something to move slowly. The old term added 1.0 and expired at
+# 16.7 s - not enough boost, and gone before it had done anything.
+#
+# 1.20 IS A CEILING, NOT A PREFERENCE. `flow` is the simulation RATE, and
+# Gray-Scott has a stability limit: too large a step and the field DIVERGES to
+# uniform solvent, which prints as a completely black frame. A draft of this fix
+# used 2.2 and did exactly that - worse than the slow warm-up it was repairing.
+# Swept at 0.60 / 0.90 / 1.20 / 1.50 against a ten-second render; all four are
+# stable and 1.20 develops fastest. Do not raise it without rendering.
+flow   = "0.22 + max(0, 1.20 - time * 0.027) + clamp(bass * 0.165, 0, 0.14) + clamp(onset * 0.100, 0, 0.06)"
 # 0.62 fired on most detections, and every one stamps a fresh growth - which is
 # what made a slow simulation still look busy. At 0.88 only the hardest hits seed.
-inject = "onset > 0.88"
+# 0.62, not 0.88. Since ADR-0049 each band is a fraction of its own recent peak
+# and the real-music onset mean is about 0.20, so a 0.88 gate fires only on the
+# very hardest hits in a track - this world went whole passages with no fresh
+# disturbance at all, which on a slow field means nothing new to look at.
+inject = "onset > 0.62"
 
 # Verdigris' plain 8-fold fold, and for its reason: the fold is what turns a
 # field into a FIGURE. It folds about a screen-centred axis, which is why this
@@ -66,11 +146,11 @@ kaleido_order = "8"
 kaleido_angle = "0"
 contour = "0"
 hatch   = "0"
-glow    = "1.0"
+glow    = "1.00 + clamp(mid * 0.494, 0, 0.42) + clamp(bass * 0.235, 0, 0.20)"
 
 # RD's field only reaches ~0..0.4, so the span has to be ~2.4 to walk the palette.
 color_span   = "6.00"
-color_center = "sin(time * 0.013) * 0.02"
+color_center = "sin(time * 0.013) * 0.02 + clamp(bass * 0.0118, 0, 0.010) + clamp(onset * 0.0100, 0, 0.006)"
 saturation   = "1.0"
 
 # SPARSITY IS MAGNIFICATION HERE, NOT REGIME. The obvious move - push `feed`
@@ -94,6 +174,7 @@ bloom_amount = "0"
 trails       = "0"
 
 [smoothing]
-flow = { attack = 0.80, release = 2.50 }
+flow = { attack = 0.25, release = 1.20 }
 feed = 1.50
-color_center = 0.60
+color_center = 0.12
+palette_contour = 0.08

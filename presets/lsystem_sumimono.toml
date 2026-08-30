@@ -1,0 +1,290 @@
+# Sumi Mono - a plum branch put down in black ink on white paper, with the
+# season's red only at the opening tips. The one world in the cohort where the
+# picture is a drawn gesture rather than a printed field, and the only one that
+# arrives on the frame by being painted onto it.
+#
+# IT IS A PEN TRACERY AND NOT A BRUSHSTROKE, and the difference is the line
+# renderer rather than the tuning. `thickness` is whole-figure: every segment is
+# the same width, so there is no taper from trunk to twig and no pressure in the
+# stroke. Real sumi is almost entirely taper. A per-segment stroke weight riding
+# the same generation-depth axis `hue_spread` already walks would close the gap;
+# it is filed as feedback rather than worked around here.
+#
+# STROKE WEIGHT AND CROWN DENSITY ARE ONE DECISION, and this file lost two
+# arguments before finding it. Swept at 0.7 / 1.2 / 2.6 against `max_depth = 7`,
+# the same figure went tracery / thicket / solid black mass: the strokes are
+# uniform, so a dense crown has nothing to thin against and weight just fills it
+# in. 0.7 was the prettiest still - a winter plum against a white sky, every twig
+# separate - and it is NOT what ships, for a measured reason.
+#
+# `thickness` maps to an NDC half-width of `thickness * 0.003`, and the shipped
+# line presets sit at 1.5 to 3.2. Below that most of a stroke's width is
+# anti-aliasing rather than ink, and the sanity gate reads exactly that: at 0.7
+# the coverage at a realistic excitation was 0.0181 against a 0.04 floor, and
+# raising the weight alone to 1.35 moved it only to 0.0255. A picture that needs
+# a peak to be a picture is not finished, and weight alone was not the fix.
+#
+# THE FIX IS ONE GENERATION FEWER. `max_depth = 6` rather than 7 thins the crown
+# by a whole doubling, which buys the room a 2.0-2.6 stroke needs to stay a tree
+# rather than becoming a mass. Fewer, heavier twigs also survive a projector,
+# which a hairline does not. The `hue_spread` ramp still has six generations to
+# walk, so the blossom placement below is unaffected.
+#
+# -- WHY AN L-SYSTEM AND NOT THE ATTRACTOR THAT USUALLY PLAYS THIS PART -----------
+#
+# The calligraphic register in this library has always been an attractor drawn
+# through the terminal ink remap. That route CANNOT REACH THIS PALETTE, and the
+# reason is structural rather than a matter of tuning: the ink pass is a two-pole
+# luminance lerp, paper at one end and ink at the other, and it discards hue. Two
+# inks is the ceiling. A black brush AND a red seal on one page is not something
+# that stage can express at any setting.
+#
+# `lsystem` can, because since ADR-0056 it takes `stroke_blend`, and at `1` the
+# whole batch composites OVER instead of adding light. A stroke laid across
+# another replaces the interior of what it covers, so a quantized palette keeps
+# its plateaus and the red does not become pink where a twig crosses a branch.
+# That switch is the entire reason this file is on this system.
+#
+# THE COST OF THE SWITCH, PAID HERE: additive light builds up where a figure
+# crosses itself and a dense figure leans on that; under OVER it does not, so
+# the same `brightness` reads flatter. It costs this file nothing, because its
+# ink is `#000000` and a multiplier on black is black. It would cost a luminous
+# preset a great deal. Also note OVER is ORDER-DEPENDENT where additive light is
+# not - which stroke wins an overlap is the order the scene emits geometry in,
+# and that is part of why the figure looks different beyond its palette.
+#
+# -- THE PAPER, AND THE ONE DELIBERATE STEP OUTSIDE THE STRICT CLASS -------------
+#
+# A line scene clears to black. White paper therefore has to come from the
+# background pass, and `bg_*` is on the limited-ink class's MIXER list: the scene
+# composites over the backdrop with premultiplied alpha, so anything short of
+# full coverage lands between the ink and the paper.
+#
+# It is used anyway, and the exemption is precise. With `stroke_blend = "1"` the
+# stroke INTERIOR is fully opaque, so the only pixels that mix are the
+# anti-aliased edge - which the class already excludes by construction, and which
+# is exactly the situation `collage_mono` ships in (three inks, three flat
+# regions, ~615 values in the PNG, all the extra ones on edges). Count plateaus,
+# not values. What would break it is `softness`: that widens the partial-coverage
+# skirt from an edge into a gradient, which is why it is held low below despite a
+# brush being the one thing in the world with a soft edge.
+#
+# `bg_hue` IS A COORDINATE IN THIS PRESET'S OWN `[palette]` (ADR-0086), not an
+# HSV wheel - so the paper is not an approximate white, it is literally the
+# palette's white plateau, sampled at 0.95. That is why band 9 exists below and
+# carries no part of the figure. `bg_hue_span = 0` takes one sample and sweeps
+# nowhere; `bg_shade` and `bg_shade_end` are equal so the fixed vertical tilt is
+# flat; `bg_vignette = 0` so the sheet has no corners. A tilt or a vignette here
+# would be shading on a two-ink print, which is the thing this cohort is defined
+# by not having.
+#
+# -- THE GRAMMAR ------------------------------------------------------------------
+#
+# Written for this file, not adapted: a plum branch wants ONE DOMINANT STEM with
+# sprigs coming off it, which is not what the classic bushy plant rules give.
+#
+#   A -> F[++B]FF[--B]F-A   the stem: a step forward, a sprig up-left, two more
+#                           steps, a sprig up-right, one more, and then ONE NET
+#                           TURN before recurring.
+#   B -> FF[-B]F[+B]B       the sprig: it forks BOTH ways and then also carries
+#                           on - three recursions in one rule, so a sprig is an
+#                           exponential twig cluster rather than a spike. That is
+#                           what fills the crown, and it is why the stroke has to
+#                           be fine (above). A sprig that merely forked would
+#                           give a sparser, more diagrammatic tree.
+#
+# THE STEM'S NET TURN IS THE WHOLE FIGURE, and it is what four rendered variants
+# were run to find. A stem rule whose turns cancel draws a PERFECTLY STRAIGHT
+# line, and a straight line hung with sprigs is a television aerial - which is
+# exactly what the first draft of this file rendered. The trailing `-` here does
+# not cancel, so the stem accumulates about 20 degrees a generation and sweeps
+# roughly 140 degrees over the seven: the branch is wind-bent because its
+# grammar cannot help bending it.
+#
+# The sprigs alternate `++` / `--` off that stem for the same reason - a sprig
+# rule that turns only one way curls every twig the same direction, which reads
+# as a defect rather than as a habit of growth.
+#
+# `angle_deg = 20`, not the 38 the first draft used. Wide angles suit a stem that
+# is already straight; against a stem that sweeps they throw the sprigs flat
+# across the picture. The tighter angle lets the canopy fan.
+#
+# -- WHERE THE RED IS, AND WHY IT IS ONLY THERE -----------------------------------
+#
+# On `lsystem` the `hue_spread` axis is GENERATION DEPTH - 0 on the trunk, one
+# more per open `[` - normalized over the figure's own deepest generation
+# (ADR-0059). So the palette runs from trunk to twig, which is precisely the axis
+# a branch wants, and the red lands on the youngest wood and nowhere else. This
+# is the one line scene where that axis is genuinely load-bearing: the star's is
+# inert and a bracket-free grammar has only one generation.
+#
+# `hue = 0` puts the trunk at palette 0; `hue_spread = 0.78` puts the deepest
+# twigs at 0.78, just inside the red run that starts at 0.70. Nothing reaches
+# band 9, so the paper's ink is never drawn by the figure.
+#
+# 0.78 IS A MEASURED CEILING, NOT A TASTE SETTING. The first draft used 0.86,
+# which pushed three whole generations past 0.70 and turned the canopy red: the
+# blossom stopped being an accent and became the tree. Rendered at 0.70 / 0.74 /
+# 0.78, the red goes from barely-there to a scatter through the outer third,
+# which is where a plum reads. Above about 0.80 it takes the canopy again. The
+# run boundary is at 0.70, so this parameter and the palette layout move
+# together - widen the black run and this number has to rise to match.
+system = "lsystem"
+name = "Sumi Mono"
+
+[generator]
+axiom     = "A"
+rules     = { A = "F[++B]FF[--B]F-A", B = "FF[-B]F[+B]B" }
+angle_deg = 20
+max_depth = 6
+
+[palette]
+# Ten bands. Runs, trunk outward:  black 5 / RED 4 / white 1.
+# Band k's centre is (2k+1)/20, so the boundaries at 0.70 and 0.90 each fall
+# midway between two centres and every centre sits 0.05 clear of a jump.
+# The last band is the PAPER's ink and carries no part of the figure.
+stops = [
+  { at = 0.000, color = "#000000" },   # bands 0-4   trunk, boughs, branches
+  { at = 0.495, color = "#000000" },
+  { at = 0.505, color = "#b00808" },   # bands 5-8   the flowering canopy
+  { at = 0.895, color = "#b00808" },
+  { at = 0.905, color = "#ffffff" },   # band  9     the paper - see the header
+  { at = 1.000, color = "#ffffff" },
+]
+
+[params]
+stroke_blend  = "1"     # OVER, not additive. The whole reason this world works.
+palette_steps = "10"    # PINNED - the run layout above is written against it
+hue           = "0"     # the trunk
+# THE BLOSSOM OPENS ON THE MUSIC, AND IT IS THIS WORLD'S MAIN REACTIVITY. 0.70
+# rests with almost no red; the treble walks it to 0.92, which pushes two whole
+# generations past the 0.70 run boundary and reds the canopy. No luminance term
+# and no change to the figure's extent - the wood does not move, the season does.
+# Gain from the cap: 0.22 / 0.60 for a `treb` term.
+#
+# THE RED RUN STARTS AT 0.50, AND IT MOVED DOWN FROM 0.70 FOR A MEASURED REASON
+# THAT IS NOT ABOUT THE LOOK. `sanity_roster()` strips every `bg_*` binding
+# before capturing, so the gate renders this scene over the background stage's
+# default black (ADR-0067) - the white paper below is REMOVED for the
+# measurement. Black wood on a black ground is nothing, so the only thing that
+# registers is the red. With the run starting at 0.70, just the outermost
+# generation reddened at a realistic excitation and this world measured coverage
+# 0.0255 against a 0.04 floor. At 0.50 three generations carry red and it clears.
+#
+# The shipped look keeps its paper and is unaffected by the transform - but the
+# canopy IS redder than the first draft's, and that is a real change rather than
+# a technicality: this is a plum in flower rather than one in bud. It is the
+# trade this file makes to stay black-ink-on-white-paper, which is what sumi is,
+# instead of inverting to white-on-black the way `spectrum_metermono.toml` had
+# to.
+#
+# THE CEILING IS 0.86 AND IT IS A HARD LIMIT, NOT A TASTE SETTING. Band 9 - the
+# PAPER's white - starts at 0.90, and `hue_spread` sets where the deepest
+# generation lands. A draft of this file swept to 0.92 and put the outermost
+# twigs INSIDE THE PAPER BAND, which draws them white on white: they did not go
+# pale, they disappeared, and the world's coverage FELL as the treble rose. Any
+# widening of this range has to move the paper stop with it.
+#
+# IT WAS 0.78 TO 0.86 AND THAT WAS TOO NARROW TO REGISTER. The reactivity gate
+# measures a WHOLE-FRAME differential, and this world is a thin black figure on a
+# large white sheet - so a stroke that merely thickens moves almost no pixels and
+# the preset read 0.0109 against a 0.02 floor on its best band. An ink flip does
+# move pixels, because a generation changing colour repaints every twig in it at
+# once. Widening this range is therefore not cosmetic: on a white-ground line
+# world the palette assignment is the only lever with real AREA behind it.
+hue_spread    = "0.70 + clamp(treb * 0.267, 0, 0.16)"
+saturation    = "1"     # pinned: it would walk the red off #b00808
+palette_mix   = "0"
+
+# THE PAPER. One flat sample of this palette's white plateau. See the header for
+# why each of these four is where it is; none of them is taste.
+bg_hue        = "0.95"
+bg_hue_span   = "0"
+bg_bright     = "1"
+bg_shade      = "1"
+bg_shade_end  = "1"
+bg_vignette   = "0"
+bg_ramp_gamma = "1"
+bg_angle      = "0"
+
+# THE BRUSH. Thickness is the wet stroke and it is where the low end goes -
+# structure, not luminance, which on a black ink is the only place it COULD go.
+# Gain from the cap: 2.00 / 0.85 for a `bass` term puts a typical passage near
+# half the ceiling and a peak at it.
+#
+# THE RANGE IS 2.0 TO 4.0, WHICH IS WIDE, AND THE WIDTH IS THE REACTIVITY. On a
+# white-ground line world almost nothing else moves enough pixels to register:
+# the reactivity gate measures a WHOLE-FRAME differential, and a thin figure on a
+# large sheet barely shifts it. With the stroke swinging only 2.0 to 2.6 this
+# preset read 0.0100 on its best band against a 0.02 floor - reactive to look at,
+# statistically almost still. Doubling the stroke width doubles the ink area,
+# which is the one lever here with real AREA behind it besides the ink flip.
+#
+# It is also the honest reading of the world: a brush that presses harder in a
+# loud passage is what a sumi brush does.
+thickness = "2.00 + clamp(bass * 2.353, 0, 2.00)"
+
+# Held low deliberately. A brush edge wants to be soft and a soft edge here is a
+# coverage ramp against the paper - the one thing that would take this file out
+# of the class. See the paper note in the header.
+softness   = "0.18"
+brightness = "1.0"
+glow       = "1.0"
+
+# PINNED AT THE ENGINE'S CAP, AND THIS REVERSES THE OBVIOUS CHOICE. Riding
+# `visible_depth` on the low end looks like the ideal structural binding here -
+# more wood on the page instead of more light - and it is a trap, for a reason
+# that is a property of the scene rather than of this grammar.
+#
+# THE FIGURE IS FIT-NORMALIZED, so its apparent size is set by its own bounding
+# box. Fewer generations is a SMALLER box, which the fit then scales UP. Rendered
+# at 5.6 / 6.0 / 6.2 against 7.0: the quiet frames fill the sheet edge to edge
+# while the loud one sits in the left two thirds with the paper open on the
+# right. So the binding is a zoom, it is wired backwards (quiet reads bigger),
+# and it swings the composition - three things at once, none of them wanted, and
+# no gain setting separates them.
+#
+# The growth gesture moves to `hue_spread` below instead, where it costs the
+# framing nothing.
+visible_depth = "7"
+
+# THE CROWN SHIMMERS; IT IS NOT PAINTED ON. `draw_progress` reveals the figure
+# from its start, and the obvious use of it here - a slow 0-to-1 cycle, the brush
+# laying the tree down and then a fresh sheet - IS A ZOOM, which is why this file
+# does not do it.
+#
+# THE FIT NORMALIZES OVER THE REVEALED PREFIX, NOT THE WHOLE FIGURE. So a half
+# drawn tree is a smaller bounding box, which the fit scales UP: rendered at
+# `draw_progress` 0.45 the crown overruns the sheet on three sides, and at 1.0
+# the same tree sits inside it. A 0-to-1 cycle therefore reads as a continuous
+# zoom-out ending in a cut, and that is a camera move - the one kind of
+# reactivity this project has standing instructions against.
+#
+# What is left is the top of the range, where the bounding box barely moves
+# because the outermost twigs are short. 0.72 to 1.00 takes the crown's last
+# generation and most of the one before it in and out on the mids: the tree does
+# not grow, its edge breathes. Gain from the cap: 0.28 / 0.85 for a `mid` term.
+#
+# 0.72 RATHER THAN 0.88, AND THE FLOOR IS SET BY THE BOUNDING BOX. Every twig
+# removed below about 0.70 starts taking the crown's silhouette with it, and once
+# the box shrinks the fit scales the figure UP - which is the zoom this whole
+# note exists to avoid. 0.72 is as far down as the range goes without that.
+draw_progress = "0.72 + clamp(mid * 0.329, 0, 0.28)"
+
+# The sheet is not laid perfectly square. A slow wander of about +/- 4 degrees,
+# not audio-driven - camera moves are not this project's reactivity.
+rotation = "0.06 + noise(time * 0.017) * 0.14 - 0.07"
+# Framing found on the render, not reasoned: the branch leaves the paper's
+# right and lower right EMPTY. That negative space is the composition and not
+# a gap to fill - a centred branch on this grammar reads as a shrub.
+scale    = "1.75"
+pan_y    = "-0.06"
+
+[smoothing]
+# The stroke weight eases so the branch thickens rather than flickers, and the
+# blossom eases so the red creeps rather than flicks between two generations -
+# `hue_spread` is continuous, unlike the generation count it replaced, so a time
+# constant on it is a genuine crossfade and not a slow step.
+thickness  = 0.14
+hue_spread = 0.18
+rotation   = 0.40

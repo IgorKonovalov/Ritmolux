@@ -1,0 +1,189 @@
+# Fern Mono - the Barnsley fern as white light on black. The cohort's PLANT, and
+# the only world in it whose figure is something a room already knows the name
+# of before the music starts.
+#
+# `lsystem_sumimono.toml` also grows, and the two are not the same idea: that one
+# is a DRAWN branch, black ink on white paper, built one stroke at a time by a
+# grammar. This is a fern that CONDENSES - four affine maps, one drawn at random
+# per particle per step, a hundred thousand points settling onto the figure at
+# once. Ink against light, drawn against precipitated.
+#
+# -- IT IS AN IFS, WHICH CHANGES THE AUTHORING SURFACE ---------------------------
+#
+# `fern` is an iterated function system rather than a strange attractor
+# (ADR-0075), and the consequence that matters is that `a` `b` `c` `d` ARE INERT
+# here. An IFS's shape lives in its affine table, not in four scalars. The levers
+# are `morph` `curl` `vigor` `lean` `bias`, plus the four colour channels and
+# `emergence` - and all ten are equally inert on the four map families, so
+# nothing in this file transfers to a De Jong world or vice versa.
+#
+# YOU CANNOT BREAK THE FIGURE WITH THEM, AND THAT PROMISE IS NARROWER THAN IT
+# SOUNDS. The maps are carried as the singular value decomposition of their
+# linear parts, so every reachable value is a converging system and there is no
+# cliff of the kind `a`..`d` have on a chaotic map. What it guarantees is that
+# the figure SETTLES. It does not guarantee that what it settles onto is still a
+# fern - see the range note in `[params]`, which is the one thing in this file
+# worth reading before editing it.
+#
+# -- THE THREE NUMBERS THAT ARE NOT TASTE ----------------------------------------
+#
+# `vigor` HAS A SILENT CEILING AND THIS FILE SITS UNDER IT. Every map's
+# contraction is held below 0.97 and the fern's largest is already 0.851, so the
+# usable headroom is a factor of about 1.14 - and asking for more returns
+# SILENCE rather than an error. Past the ceiling every value renders identically,
+# so a binding that ranged to 1.5 would look like a dead parameter rather than a
+# clamped one. The range below tops out at 1.05, well short of it - legibility
+# binds long before the ceiling does.
+#
+# `spin` IS ZERO, and the fern is the one figure that would have survived it.
+# The fit measures an AXIS-ALIGNED box which the projection then rotates, so a
+# figure only stays in frame at every angle if it is at least 1.85x taller than
+# wide - and of the five IFS figures only the fern is (0.49 against a bound of
+# 0.54; `spiral` overruns by 79 %). It is pinned anyway, because a turning plant
+# reads as a turntable and because this library has just been reminded on a wall
+# that a figure with an obvious upright axis must keep it (see
+# `shape_heartmono.toml`, which lost a 1.6-degree wander for the same reason).
+#
+# `zoom` IS A FRAMING VALUE, NOT A LOOK. The fit's guarantee is "inside
+# the frame at neutral levers and zero rotation" and it deliberately does NOT
+# re-frame for the levers - a fit that did would cancel `vigor` exactly, the
+# figure surging and the frame shrinking it back for a net zero. So a hard
+# `vigor` push can walk the tips off the edge, and the static crop is the
+# recourse. All three shipped 2-D IFS worlds pay a crop below 1.0 for it.
+#
+# THIS FILE PAYS MORE OF IT THAN THEY DO - 0.68 - AND THE REASON IS THE ASPECT
+# RATIO RATHER THAN THE ROTATION. Pinning `spin` removes the need for rotational
+# margin, and a draft accordingly cropped IN to 1.15 on the reasoning that the
+# margin was now free. Rendered at 16:9 under full drive, the fern lost its tip
+# off the top of the frame: this figure is 1.85x taller than wide and the frame
+# is 1.78x wider than tall, so height is the binding dimension twice over, and
+# what little the levers add at peak goes straight past the edge the fit never
+# re-measured. 0.58 with `pan_y` at -0.06 holds the whole plant in frame from
+# silence to full drive, verified at 16:9 under a held full stimulus.
+#
+# JUDGE THIS FRAMING AT 16:9 AND NOWHERE ELSE. A square render flatters it badly
+# - three drafts of this number looked correct in a contact-sheet tile and
+# clipped the frond tip on a real frame. The figure ends up occupying about a
+# third of the frame width, which looks timid in a thumbnail and reads as a plant
+# standing in a dark field at projection size. That negative space is the
+# composition, not a shortfall.
+#
+# -- WHY `morph` IS ABSENT -------------------------------------------------------
+#
+# It is a TRAVEL knob, not a little-life knob, and its visible rate is steepest
+# near zero: measured on fern -> dragon, the figure's lit width goes 0.248 at
+# `morph = 0` to 0.448 by 0.05. By a twentieth of the range the fern is half
+# again as wide and reads as a curl rather than a plant, because a few degrees of
+# per-map rotation compounds through the recursion. A cross that stayed
+# recognisably a fern would have to live under about 0.03, which is not a lever.
+# This world is meant to BE a fern, so it does not travel.
+#
+# -- WHERE THE MUSIC GOES --------------------------------------------------------
+#
+#   curl   the fronds curl and uncurl - radians on every map's rotation. The
+#          most legible of the four and it takes the mids.
+#   bias   moves sampling weight from the trunk maps to the branch maps. GEOMETRY
+#          IS UNTOUCHED; only the density distribution moves, so the plant
+#          thickens into its fronds without changing shape. Structural
+#          reactivity with no luminance term, which is the right kind here.
+#   vigor  a bushier, deeper figure on the low end - under the ceiling above.
+#   lean   a slow autonomous bend, not audio. A plant that answers the beat by
+#          leaning reads as a metronome.
+system = "attractor"
+name = "Fern Mono"
+
+[particles]
+family  = "fern"
+# An IFS converges onto a FIGURE rather than a filigree, so this is the plant's
+# solidity rather than a stroke count. Far above the 0.02 the pen-drawing worlds
+# use - those want each trajectory separable, this wants a leaf. Swept at 0.55 /
+# 0.18 / 0.06: the densest reads as static rather than as foliage, and 0.18 is
+# where the pinnae separate.
+density = 0.18
+
+[palette]
+# White light on black. The scene draws additively onto the engine's own black
+# clear, so there is no ink pass and no `bg_*` here - the ground is simply where
+# nothing was deposited. A near-black first stop rather than pure black keeps the
+# sparsest deposits from vanishing into the ground entirely.
+stops = [
+  { at = 0.00, color = "#0c0c0c" },
+  { at = 0.35, color = "#6f6f6f" },
+  { at = 0.72, color = "#d4d4d4" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# THE FIGURE. See the header before moving `spin` or `zoom` - both are framing
+# constraints rather than preferences.
+spin = "0"
+zoom  = "0.58"
+pan_y = "-0.06"
+
+# THE FRONDS. `curl` is radians added to every map's rotation, so the whole plant
+# furls and unfurls together.
+#
+# EVERY RANGE IN THIS BLOCK IS TINY, AND THAT IS THE FINDING THIS FILE EXISTS TO
+# RECORD. The roster page says of these levers that you "cannot break the figure
+# with them" and that you may "drive them as hard as you like" - which is true
+# and means something narrower than it reads. It is a guarantee about
+# CONVERGENCE: every reachable value is still a contracting system that settles
+# onto something. It is NOT a guarantee that the something is still a fern.
+#
+# A first draft took it at face value and bound `curl` to 0.30, `bias` to 0.39
+# and `vigor` to 1.12. The render was a blown-out noise cloud overrunning the
+# frame with no fronds in it at all - perfectly convergent, and not a plant. A
+# few degrees of per-map rotation COMPOUNDS through the recursion, the same
+# mechanism the `morph` note describes, and it applies to all four levers.
+#
+# Rendered at neutral against curl 0.05 / bias 0.06 / vigor 1.02: even that is a
+# visibly fuller and more upright plant. So 0.05 is not a small move here, it is
+# most of the usable range, and the audio terms below ride on top of it in
+# hundredths.
+curl = "0.050 + clamp(mid * 0.047, 0, 0.040)"
+
+# THE DENSITY DISTRIBUTION - sampling weight moves from the trunk maps to the
+# branch maps and the geometry does not change at all, so the plant thickens into
+# its fronds without altering shape. Still a hundredths-scale lever; see above.
+bias = "0.060 + clamp(bass * 0.071, 0, 0.060)"
+
+# Bushier under the low end. The silent ceiling is about 1.14 and this ranges to
+# 1.05 - the ceiling was never the binding constraint here, legibility was.
+vigor = "1.020 + clamp(bass * 0.035, 0, 0.030)"
+
+# A slow autonomous bend. NOT audio-driven: a plant that leans on the beat reads
+# as a metronome rather than as something growing.
+lean = "noise(time * 0.019) * 0.030 - 0.015"
+
+# THE LIGHT. `brightness` is a plain multiplier on the light each particle
+# deposits and the deposit is already normalized by particle count, so it
+# composes with `density` rather than fighting it (ADR-0080).
+brightness = "1.30 + clamp(mid * 0.176, 0, 0.15)"
+size       = "0.22 + clamp(treb * 0.083, 0, 0.05)"
+fade       = "0.90 - clamp(bass * 0.035, 0, 0.03)"
+
+# COLOUR ACROSS THE FIGURE. `root_tint` walks the palette coordinate by distance
+# from the skeleton, so the stem sits at one end of the ramp and the frond edges
+# at the other - which on this palette means a bright spine with the outer tips
+# falling toward grey. It is the palette-coordinate route and it rides the
+# `[palette]` above for free.
+root_tint = "0.34"
+hue        = "0.30"
+hue_spread = "0.55"
+saturation = "0"      # neutral: this world is white light, not tinted light
+
+# Depth, without a camera move.
+perspective = "0.10"
+depth_fade  = "0.28 + clamp(mid * 0.118, 0, 0.10)"
+
+# Fresh disturbance on a hard hit only - the fern re-settles within a second or
+# two, so this reads as the plant being knocked rather than replaced.
+reseed = "onset > 0.72"
+
+[smoothing]
+# The two shape levers ease so the plant furls rather than snapping; `bias` eases
+# slower because a density redistribution that jumps reads as a flicker.
+curl  = 0.35
+bias  = 0.55
+vigor = 0.40
+size  = 0.20

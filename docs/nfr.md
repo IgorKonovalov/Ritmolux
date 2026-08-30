@@ -376,6 +376,22 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
   hard **~327 MB private-commit** floor number on the split above. It confirms ADR-0010's diagnosis: the
   cost is the driver stack, not our code. Does not change ADR-0010.
+- **A show configuration is a different workload, and it plateaus near ~800 MB (measured
+  2026-08-29/30, the first full live set).** 8h08m, 3,505,083 frames, **zero dropped**, 120.0 fps
+  flat end to end, on the show notebook — **not** the reference AMD iGPU box — at Rich tier with the
+  operator console open and 18 presets rotating from an `LMV_PRESET_DIR`. Working set was 678 MB
+  early, climbed to ~795 MB, then went **flat**: three consecutive half-hours at 795.4 MB, later
+  settling 799.5 → 808.3 MB in discrete steps with flat stretches between. Handles pinned at exactly
+  370 across six hours, threads at 5, `gpu_bytes` at 15.8 MB from first sample to last. The
+  step-then-flat shape is a resource claimed on a preset's first pass through the rotation and then
+  cached. **This does not move the ~350 MB soft ceiling above, which is scoped to the reference box
+  and stays a single-machine tripwire** — it is a second point on the vendor/workload spread, and the
+  first one taken at show length rather than in minutes.
+- **Do not call a leak on a window shorter than two flat half-hours.** The same run was read
+  mid-session as a linear leak at **+0.87 MB/min**, on a 20-minute window, and that reading was
+  wrong: it was warm-up. This app's growth is step-then-flat, so any short window through a step
+  fits a convincing line. The discipline is to hold the measurement until two consecutive
+  half-hours agree.
 
 Measurement method (repeatable): PowerShell `Get-Process lmv` → `WorkingSet64` vs `PrivateMemorySize64`,
 `.Modules` by mapped size, and which backend loader DLLs are mapped. The private-vs-working-set split is

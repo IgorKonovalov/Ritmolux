@@ -1,0 +1,163 @@
+# Meter Mono - the band array as a three-ink SUNBURST: fifty-six black spokes
+# radiating from an open centre, each one a band, and the red reserved for the
+# spokes that are actually loud. The cohort's INSTRUMENT. Every other world here
+# answers the music by changing what it looks like; this one answers by telling
+# you what the music is doing, and a room reads it as reactive without being told
+# to.
+#
+# IT WAS A BAR CHART AND THE LAYOUT CHANGE IS NOT COSMETIC. `layout = "bars"`
+# puts every element on a line along the bottom of the frame, which means a
+# readout on a white page is mostly page: rendered at the sanity gate's realistic
+# excitation it covered 0.0000 of the frame against a 0.04 floor - a row of stubs
+# in the lower eighth and nothing else anywhere. That is not a threshold being
+# unkind, it is what a bottom-aligned bar chart IS, and no amount of `base` or
+# `thickness` fixes the three quarters of the frame the layout never reaches.
+#
+# `radial_ring` puts the same 56 elements around a circle, so the figure has a
+# centre, a radius and a rim, and the readout occupies the frame instead of
+# lining its edge. Swept at 40 / 56 spokes against thickness 5.0 / 6.5 / 9.0: 40
+# leaves gaps that read as a broken comb, 9.0 fuses the spokes into a disc, and
+# the pair below is where each spoke is separately legible while the figure still
+# reads as one object from the back of a room.
+#
+# IT EXISTS BECAUSE THE COHORT COULD NOT HEAR TREBLE. Measured across the eight
+# mono worlds with `shot --report`, four read `treb 0.000` and a fifth reads
+# 0.076 - the set answers the low end and the onset and essentially nothing
+# above. That is a property of what those worlds ARE (a banded field responds to
+# the level driving its coordinate, not to a band) rather than of their tuning,
+# so the repair is a different mechanism rather than a retune. `spectrum` reads
+# the 64-band array directly and is the only system in the library that does.
+#
+# `stroke_blend = "1"` PUTS IT IN THE LIMITED-INK CLASS. At the default `0` this
+# scene draws additive light, so a bar crossing the baseline sums with it and the
+# overlap goes pink. At `1` the batch composites OVER and a stroke replaces the
+# interior of what it covers, so the plateaus survive.
+#
+# -- THE PART THAT WILL BITE WHOEVER VERIFIES THIS FILE ---------------------------
+#
+# `--set` CANNOT DRIVE THIS PRESET. `apply_set` writes the frame scalars and
+# there is deliberately no key for the 64-band array, so every `bin()` term reads
+# ZERO in a `--set` still and every spoke renders at its `base` length.
+# That is the stimulus, not the preset - the shipped `spectrum_ridge` has the
+# same property and its header says so. VERIFY THIS FILE WITH `--signal` OR
+# `--audio`. `--report` and the contact sheets are fine since `ca99cb1`; their
+# frames light the log-band slice each named band summarises.
+#
+# -- HOW THE THREE INKS ARE ASSIGNED ----------------------------------------------
+#
+# The palette is sampled PER ELEMENT (this is the only line system that reads
+# `[palette]` at all - the other three colour from the built-in cosine), and the
+# axis `hue_spread` walks is BAND INDEX: element 0 is the bottom of the spectrum
+# and the last is the top - so on the ring the spectrum runs once around the
+# circle. THAT IS THE WRONG AXIS FOR THIS IDEA, because it colours by WHERE a
+# spoke sits rather than by HOW LONG it is - one arc of the ring black and the
+# opposite arc red, whatever either is actually doing.
+#
+# So `hue_spread` is 0 - one flat ink across the figure - and the colour goes on
+# `hue` instead, bound PER ELEMENT through `index`. A binding whose text names
+# `index` is evaluated once per element with `index` at that element's 0..1
+# position, so `bin(index)` is THAT element's own band level and a spoke turns
+# from white to red when its own band is loud. `palette_steps = 8` quantizes the result, so a spoke
+# is one ink or the other and never between.
+#
+# THE THRESHOLD IS THE WHOLE DESIGN AND IT IS EASY TO GET BACKWARDS. Since
+# ADR-0049 each band is a fraction of its own slowly-decaying recent peak, so a
+# threshold BELOW the typical level fires always and the readout is solid red.
+# The `smoothstep(0.52, 0.78, ...)` sits above the real-music mean and under the
+# peak, so red stays an event. `smoothstep` rather than a bare comparison so a
+# spoke sitting on the boundary does not chatter between inks.
+#
+# -- IT DRAWS ON BLACK, AND THAT IS A CORRECTION RATHER THAN A PREFERENCE --------
+#
+# This world shipped its first draft as dark spokes on a white sheet, with the
+# paper taken from `bg_hue` as a coordinate in its own palette. That is
+# UNMEASURABLE, and the reason is worth knowing before anyone reaches for a
+# `bg_*` ground on a line scene again.
+#
+# `sanity_roster()` STRIPS EVERY `bg_*` BINDING before it captures, so the gate
+# renders the scene over the background stage's default black (ADR-0067). That is
+# a deliberate test-side transform - without it every coverage floor in that file
+# would be measuring a vignette instead of a figure. But it means a world whose
+# GROUND comes from `bg_*` and whose INK is dark gets measured as black on black,
+# which is nothing: this preset read coverage 0.0000 at a realistic excitation
+# and 0.4775 at full drive, and that jump is not a discontinuity in the readout.
+# It is the point at which a spoke crosses the red threshold and becomes the only
+# thing on screen.
+#
+# So the readout is inverted: WHITE spokes at rest, RED when a band is loud, on
+# the engine's own black clear, with no `bg_*` at all. Three things fall out of
+# that and all three are improvements - the gate now measures what a room sees,
+# the world joins the register most of this cohort already lives in
+# (`shape_contourmono`, `fragment_tiledmono` and both reaction worlds are all
+# black-ground), and a dark venue stops taking a full-frame white flash every
+# time this preset comes up in the rotation.
+system = "spectrum"
+name = "Meter Mono"
+
+[spectrum]
+elements = 56
+layout   = "radial_ring"
+# Per-element easing. Without it every spoke snaps frame to frame and the readout
+# strobes. This is the RIGHT place for it: `[smoothing]` on a per-element binding
+# is a surfaced warning rather than an effect.
+smoothing = 0.09
+
+[palette]
+# Eight bands in three runs: black 6 / RED 1 / white 1. Band k's centre is
+# (2k+1)/16, so the boundaries at 0.750 and 0.875 each fall midway between two
+# centres and every centre sits clear of a jump.
+stops = [
+  { at = 0.000, color = "#ffffff" },   # bands 0-5   a resting spoke
+  { at = 0.745, color = "#ffffff" },
+  { at = 0.755, color = "#b00808" },   # bands 6-7   a band that is loud
+  { at = 1.000, color = "#b00808" },
+]
+
+[params]
+stroke_blend  = "1"
+palette_steps = "8"
+palette_mix   = "0"
+saturation    = "1"
+hue_spread    = "0"     # flat across the figure - see the header
+
+# PER ELEMENT. Under the threshold this lands at 0.30, deep inside the white run;
+# over it, at 0.80, inside the red.
+hue = "0.30 + smoothstep(0.52, 0.78, bin(index)) * 0.50"
+
+# THE READOUT. `base` is the length every spoke has before any audio, in world
+# units against a frame two units tall. Deliberately NOT zero: at zero the figure
+# vanishes in a silence and reads as a broken preset rather than a quiet one.
+# 0.15 rather than the 0.06 a first draft used, because at 0.06 the resting row
+# is a line of ticks a few pixels long - which reads as a broken readout rather
+# than a quiet one, which is the same defect the non-zero default exists to
+# avoid, just further down the scale. On the ring it also sets the SPOKE LENGTH
+# at rest, so it is what keeps an open centre from swallowing the figure.
+#
+# EVERY WHOLE-FIGURE PARAM HERE WAS A CONSTANT, AND THAT WAS A REAL DEFECT
+# RATHER THAN A GATE ARTIFACT. All the reactivity lived in the PER-ELEMENT `hue`
+# and in each bar's own length, so when the analyzer drove one band only two or
+# three of twenty-eight bars moved - a few hundred pixels - and the preset read
+# bass 0.0000 and treb 0.0000 exactly against the gate's whole-frame
+# differential. A readout whose baseline, span and weight never answer the music
+# is a readout that looks the same in a breakdown as in a chorus, which is not
+# what this world is for. `base`, `scale` and `thickness` now take a band each:
+# the row lifts, the peaks reach further, and the strokes fatten on a hit.
+base  = "0.40 + clamp(bass * 0.294, 0, 0.25)"
+scale = "1.90 + clamp(mid * 0.706, 0, 0.60)"
+# The level-shaping exponent, applied before the easing. Below 1 compresses, so
+# the quiet bars are legible instead of stubbed - a dB-like readout rather than a
+# linear one.
+curve = "0.62"
+span  = "1.72"
+
+thickness  = "6.5 + clamp(onset * 2.500, 0, 1.5)"
+softness   = "0.10"
+brightness = "1.0"
+glow       = "1.0"
+baseline   = "0"
+
+# THE PAPER. Band 7, sampled flat. See the header before moving any of these.
+
+[smoothing]
+# Whole-figure params only - the per-element easing lives in `[spectrum]` above.
+span = 0.30

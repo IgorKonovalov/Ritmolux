@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0134** (ADRs are a separate sequence — next free there is **0146**.)
+**Next free number: 0143** (ADRs are a separate sequence — next free there is **0154**; 0146 is claimed by the live 0115 lane.)
 
 ## Active roster
 
@@ -14,19 +14,38 @@ most two sentences of **live constraint**: what a reader needs to decide whether
 to pick this plan up. Anything longer belongs in the plan file, which is where
 someone who picked it up is reading.
 
+**These rows are now inside a `roster:begin cap=320` region and
+`scripts/check-index-rows.mjs` holds them to it** — the convention above stood
+alone until 2026-08-29 and the rows had regrown to a 893-byte mean, 2.8x the cap
+the closed-plan bullets below were already held to in this same file. That is
+ADR-0116's own argument, and the repair was to extend its markers rather than to
+restate the rule. **Cite ADRs by bare number here** (`ADR-0131`, not a link): the
+slug filenames run past 100 bytes and are what pushed rows over in the first
+place. The plan file carries the real link.
+
+<!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | Carries [ADR-0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) (proposed): a third capture arm on PulseAudio's simple API, an `ubuntu-latest` CI arm, a fourth release artifact. **Phase 1 is a `human` stop gate running before `dev`** — two probes on the real box, separating three outcomes; only the first lets `dev` start, the others amend the ADR. Touches no `core/`; the third `cfg` arm it compiles has never been built by anything. |
-| [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | **Its hard dependency is discharged — [0091](done/0091-the-figure-fills-the-frame.md) closed 2026-08-16 and `shape_field` is the scene this draws into.** Soft-depends on [0087](done/0087-the-line-renderer-draws-a-curve.md) — the plan states that disagreement openly: a polyline distance field is complete alone, arcs only lower the arity, so **this is takeable even if 0087 ends at ADR-0098's Alternative C**, and Phase 4 may legitimately be empty. Phase 2's arity ceiling is a **measurement**, not [ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)'s construction estimate. Expect morph degeneracy — Plan 0079 refused 4 of 20 swept pairs by measurement. |
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **Amended 2026-08-16: a new Phase 1 fixes backlog [0102](../design-backlog.md) + [0103](../design-backlog.md) before anything advertises the component**, which Plan 0102's Phase 5 found starves foobar2000's own UI until playback starts. That phase is a surface-lifetime design pass, is ADR-worthy, and its fix only reaches users on the next tag — so the release must be green before Phase 5 submits. The rest is outreach whose done-whens are **artifacts, not outcomes**. Phase 3's soft want [0101](done/0101-the-engine-renders-a-music-video.md) **closed 2026-08-17 — motion can be recorded now, but its Phase 5 found a 1080p render reads as an upscale ([backlog 0110](../design-backlog.md)), so demo material made before that lands shows the engine at its grainiest.** |
-| [0104](0104-the-library-stops-being-lopsided.md) | The library stops being lopsided | approved | dev, human | **Corrected 2026-08-17: eleven systems, not ten — `warp_mesh` ships with ZERO worlds and was invisible to a census counted from `presets/*.toml`, so 22 → 61 is the honest arithmetic and ~~its four wait on [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md) Phase 1~~ — **that wait is discharged: 0108 Phase 1 landed 2026-08-17, so the four `warp_mesh` worlds are authorable now.** **The census is the plan: `attractor` has 17 worlds; `lsystem`, `shape_field`, `spectrum` and `star_pattern` have exactly one each.** Brings every system to a floor of four — 18 presets, 39 → 57 — under [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md)'s cohort rules. Phase 1 can revise that arithmetic before Phase 2 starts, by asking whether the 17 are seventeen worlds or a family that converged. Phase 2 partly waits on [0098](done/0098-the-figure-nests-properly.md) (`shape_field`) and **Phase 4 wholly on [0087](done/0087-the-line-renderer-draws-a-curve.md)** — authoring `star_pattern` before that settles buys a cohort that has to be redone. Every `human` phase is a **`preset-author` session**; that the owner vocabulary has no word for it is a filed followup. |
-| [0115](0115-the-engine-becomes-a-live-video-source.md) | The engine becomes a live video source | approved | dev, human | **Approved 2026-08-25. Phase 1 is a `human` stop gate and it runs BEFORE `dev` starts** — the transport was decided twice, and the first answer was wrong. `lmv --stream` becomes a headless **Spout** source that TouchDesigner picks up with a Spout In TOP on the same machine; carries [ADR-0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) (proposed). **The transport was re-decided mid-interview**: NDI lost on WiFi bandwidth, then the machine turned out to be the same one, which voided that argument and left Spout — BSD, no codec, no runtime install — against NDI, TD's Shared Mem In TOP, and ADR-0114's `ffmpeg` pipe. **Phase 1 is a human stop gate that writes no code**: it stages the SDK and puts Spout's own demo sender into a TOP, checking the licence, the `SpoutDX` CPU entry point and the colour handling that ADR-0125 flags as the likeliest way this ships looking wrong. **Phase 2 — a transport-agnostic frame tap in `core` — survives a Phase 1 that kills the rest**, and is what the deferred remote sink attaches to. Spout stays behind a default-off cargo feature so CI, macOS and every ordinary `cargo build` need no SDK and no C++ step. Windows-only by construction. |
-| [0124](0124-the-review-fixes-that-move-no-pixels.md) | The review fixes that move no pixels | approved | dev | First of three from the 2026-08-28 whole-codebase review; **drafted without an interview**. Six mechanical, golden-neutral fixes: a shared `core/tests/common/` harness (27 copies of `headless()`), four mangled warning strings, a misattached `#[allow]`, the comment-hygiene gate widened to `before/until Plan NNNN` and to `.cpp`, `milkconv/` mapped in `CLAUDE.md` + both skill contexts, the ABI spec's compatibility clause reconciled with the shim. **Goes first** — 0125/0126 write tests against its harness. Parks one ADR question (comment weight, 37 % of `core/src`). |
-| [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three; **drafted without an interview**. Five shared helpers (`gpu::color_pass`, `palette::LutPair`, `scenes::common::PaletteParams`, `gpu::FullscreenScene`, `marks::InstancedQuads`) retiring ~800-1000 pasted lines across the 12 scenes, one helper per phase, **golden-identical unblessed on both adapters at every commit**. **The constraint is [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md)**: a helper takes the layout shape as input and never adds an allowlist row. Runs after 0124, before 0126. |
-| [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | draft | dev, human | Takes backlog 0110 + 0130, and probes 0125. Carries [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed): the attractor's drawn count becomes a density against the render target — 0.651 particles/px at 640x360 against 0.072 at 1080p is the whole "looks like Leviathan upscaled" verdict. **Anchored so it can only ever add samples**, which is what keeps the 128x128 goldens byte-identical and unblessed; any baseline that moves is a finding. `REFERENCE_PX` and both ceilings are **Phase 1 measurements, not values the plan chose**. Two `human` phases (the 1080p look gate and 0125's `fast`-vs-`quality` side-by-side) are best run in one sitting. **Gates [0103](0103-the-project-gets-an-audience.md)'s demo material.** |
-| [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three; **drafted without an interview**. One phase per file — `warp_mesh` (two 400-line fns), `render/mod.rs` (429-line `draw_frame`), `schema.rs` (five parallel `SystemKind` tables become one), `star.rs`, `standalone/main.rs`, `foo_lmv.cpp` — every phase a pure move gated on golden. Also closes the one OCP hole (`GeneratorConfig` matched in four scenes) and moves two leaked seams home (`new_from_win32_hwnd` to `core-cabi`, the `shot` thread-local to `metrics`). **Phase 3 contended with [0123](done/0123-a-gate-a-latch-and-an-ink.md) on `schema.rs`** — 0123 closed 2026-08-28, so it is clear to start. |
-| [0131](0131-the-operator-gets-a-console.md) | The operator gets a console | approved | dev, human | **Approved 2026-08-29.** Carries [ADR-0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) (proposed): a second winit window on the operator's display, its surface attached to the renderer's **existing** device — the frame is drawn once, copied exactly to the output swapchain and blitted scaled into the console, so no dissolve is double-advanced and nothing reads back to the CPU. **The Plan 0115 dependency named in the interview is withdrawn**: that plan's tap re-renders through `draw_frame` and returns pixels on the CPU, so it cannot serve a display-loop thumbnail — the ordering constraints are [0126](0126-the-large-files-split-along-their-seams.md) Phase 7 (`main.rs` becomes shell glue) and [0130](done/0130-the-audio-input-becomes-an-operator-surface.md), **which closed 2026-08-28** having rewritten `settings.rs` and `main.rs` — `SettingsRow` is twelve rows now, and `AppState` carries the input selection, its roster cache and a recovery policy. Mirrors the two existing modals rather than rewriting them, and **adds no core primitive** — blackout, freeze and a cue monitor are all explicitly out. Phase 6 is a `human` gate and the only evidence the plan gets for what a second swapchain costs the output, and for the dual-GPU surface path CI has one adapter and cannot see. |
-| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Approved 2026-08-29.** **Supersedes the architecture of [0132](done/0132-the-lighting-rig-follows-the-visuals.md), which a live set on 2026-08-29 bypassed entirely.** Carries [ADR-0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) (proposed): `standalone` emits **Art-Net straight to the fixtures**, no Arena, no second machine, no NDI - the user rejected the second machine outright. ADR-0144's Alternative E was refused because *"it makes us a lighting console"* on the premise Arena owned the patch; **this rig has no console**, so that premise is false, not merely inconvenient. **The starting point is not zero:** the `/lmv/v1` OSC sink is shipped (0132 Phase 2) and a Python bridge already produced a room the user approved. The rig is a **24 x 170 raster** (universe index tracks height), which is why the sink goes in-process: the later picture path is then a downsample, not a transport problem. Fixture map is **config**, looks are **TOML in the expression grammar**, coupling to preset rotation is **opt-in and off**. Phase 2 closes [backlog 0157 + 0158](../design-backlog.md) - the bar grid the engine already computes is unpublished, and the tempo octave is unsettled by design. Phase 8 hard-depends on [0115](0115-the-engine-becomes-a-live-video-source.md) Phase 2's frame tap; Phases 1-7 do not. |
+| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
+| [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
+| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. |
+| [0115](0115-the-engine-becomes-a-live-video-source.md) | The engine becomes a live video source | approved | dev, human | **Lane is live** at `lmv-plan-0115`. A headless **Spout** source (ADR-0125, proposed). Phase 1 is a `human` stop gate before `dev`; Phase 2's `core` frame tap outlives a failed Phase 1. |
+| [0124](0124-the-review-fixes-that-move-no-pixels.md) | The review fixes that move no pixels | approved | dev | First of three from the 2026-08-28 review. Six mechanical, golden-neutral fixes, incl. a shared `core/tests/common/` harness. **Goes first** — 0125/0126 write tests against it. |
+| [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three. Five helpers retire ~800-1000 pasted lines across 12 scenes, one per phase, **golden-identical unblessed on both adapters at every commit**. ADR-0058 constrains it. |
+| [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
+| [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
+| [0131](0131-the-operator-gets-a-console.md) | The operator gets a console | in-progress | dev, human | **Being built directly on `main`, no worktree.** ADR-0143 (proposed): a second winit window on the renderer's existing device. Ordering is 0126 Phase 7 and 0130; Phase 6 is a `human` gate. |
+| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
+| [0134](0134-the-lanes-stop-sharing-a-store.md) | The lanes stop sharing a store | in-progress | dev, human | **Take this before either live lane builds again.** ADR-0147 (proposed): the worktree path is not in cargo's fingerprint, so one lane is served another's `lmv-core`. Phase 1 is `human`. |
+| [0135](0135-the-show-night-surfaces-stop-lying.md) | The show-night surfaces stop lying | approved | dev, human | Backlog 0159 + 0156 + 0155 (**0154 carried**). ADR-0148: the CLI refuses an unclaimed flag, so a misspelt `--osc` fails loudly instead of darkening the rig. Phase 5 is a `human` unplug gate. |
+| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
+| [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
+| [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
+| [0139](0139-the-render-path-validates-before-it-spends.md) | The render path validates before it spends | approved | dev | Backlog 0111 + 0112. A typo in `--preset` spawns ffmpeg and a GPU device first, leaving a playable 262-byte MP4. Three `dev` phases, no human gate. |
+| [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
+| [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
+| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
+<!-- roster:end -->
 
 **Added 2026-08-19, from a MilkDrop backlog round after
 [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
@@ -142,6 +161,50 @@ evening — 0133 Phase 1 needs an evening with the rig patched and 0115 Phase 1 
 staged. **The set runs on the external Python bridge** (`WORK/lmv-lighting-probes/`, outside version
 control), unmodified. Approving the plans starts the work; it changes nothing about the show.
 
+**Added 2026-08-29, second promotion round: [0138], [0139], [0140], [0141] and [0142], all `draft`.**
+The sweep was re-run with a corrected filter — the first pass's regex was greedy and over-counted
+claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; three entries were
+**declined on their own instructions** rather than promoted:
+
+- **[0141] is the one with no contention.** It is the only cluster touching `plugin-foobar/`, which
+  no plan on this roster otherwise enters. Its Phase 1 is the exception: backlog 0117 calls itself a
+  natural pickup for [0103] Phase 1, which rewrites the same handler.
+- **[0138] belongs immediately after [0137]** — same linear-light seam one layer up. Taking them
+  together is one coherent pass; six weeks apart is two half-passes. [0138] also makes backlog 0038
+  measurable for the first time, using the level statistic [0137] adds.
+- **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
+  GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
+- **[0140] contends with [0125]** (all twelve scenes' boilerplate) and edits five of them. Series.
+- **Declined, and the record is the reason.** Backlog 0038 is routed to `preset-author` as a content
+  pass — *"no engine change and no ADR"* — and is §4 of `content-brief.md`. Backlog 0075's remaining
+  half is ADR-0102, **proposed with no plan by the user's call**, holding until a look asks for the
+  clamp. Backlog 0109 (1,826 files, 88.7 % of conversion failures) **forbids being taken now**:
+  *"Do not take it before Plan 0108's Phase 2"*, whose verdict has twice read "still merely
+  different" — so [0142] Phase 6 decides whether it is buyable, and does not take it.
+
+**Added 2026-08-29, from a backlog-promotion round: [0135], [0136] and [0137], all `draft`.** The
+round swept the 58 live entries, found **26 already claimed by some plan** and promoted three
+clusters out of what remained. Deliberately filed *behind* the existing roster — the user's call —
+because eleven plans were already active and the roster, not the work, was becoming the bottleneck.
+Sequencing:
+
+- **[0136] is the one to take first, and it is takeable during a show.** Phases 1-6 are Node,
+  markdown and one shell script; only Phases 7-8 render. It also repairs the instruments the other
+  two are verified with — `check-index-rows.mjs` currently cannot fail, so a detector matching
+  nothing exits 0 at all three call sites.
+- **[0135] contends hard on `standalone/src/main.rs`** with [0115], [0133], [0131] and [0126]
+  Phase 7. It is additive and localized, but it is the fifth plan wanting that file. Take it after
+  [0126] Phase 7 reduces it to shell glue, or expect a rebase.
+- **[0137] contends with nothing** and shares no file with the current roster —
+  `core/src/render/metrics.rs` plus two test files. Its Phases 4 and 6 are prose and need no
+  adapter at all.
+- **Two entries were corrected rather than promoted.** [Backlog 0160](../design-backlog.md)'s
+  premise was falsified by ADR-0147 the same morning it was filed, and 0161's severity dropped with
+  it; [0136] Phase 6 corrects both in place rather than planning work on a false premise.
+- **The round also found archive debt**: Plan 0111 closed 2026-08-20 declaring it closes backlog
+  0119 and 0120, and neither was ever archived. Not taken by any plan here — it is close-ceremony
+  bookkeeping, and it needs a judgement about whether they were genuinely discharged.
+
 - **Two lanes open now, in worktrees.** **[0104]** in a `preset-author` lane — it touches
   `presets/*.toml` only, so it contends with no Rust lane on this roster. **[0115]** in a `dev`
   lane — its Phase 1 is a `human` stop gate that writes no code, so the lane opens before any
@@ -157,9 +220,12 @@ control), unmodified. Approving the plans starts the work; it changes nothing ab
   turns `main.rs` into shell glue. Taking 0131 first is allowed — the constraint is contention, not
   correctness — but it means 0126 Phase 7 later rebases onto 0131's edits instead of 0131 landing
   on a file already reduced to glue.
-- **[ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) applies to both open lanes.**
-  The shared artifact store serializes on cargo's lock, so 0104's `shot` runs and 0115's builds
-  wait on each other. Still worth running in parallel — what serializes is the build, not the work.
+- ~~**[ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) applies to both open lanes.**
+  The shared artifact store serializes on cargo's lock~~ — **withdrawn 2026-08-29.**
+  [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked the
+  store, so lanes no longer serialize and no longer share artifacts. What comes back with it is
+  ADR-0053's disk cost: each lane carries its own `target/` again, so **remove a finished lane's
+  worktree**.
 
 **Added 2026-08-28, from a "what next, functionally" round after the whole-codebase review's three
 plans ([0124]/[0125]/[0126], which move no pixels): [0127](done/0127-the-picture-stops-depending-on-the-volume-slider.md)
@@ -308,7 +374,7 @@ renderer, and they sort into two groups that barely interact:
   belongs to 0103 rather than to 0102: the component now ships carrying two filed `Medium` defects
   a new user meets first ([backlog 0102](../design-backlog.md) and
   [0103](../design-backlog.md)), and announcing a channel is a poor moment to discover them.
-  [0104](0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
+  [0104](done/0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
   no engine lane. **[0101](done/0101-the-engine-renders-a-music-video.md) closed 2026-08-17**, so
   the `standalone/src/shot/` lane is free and the engine can render a music video today.
   [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
@@ -872,6 +938,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md) — closed 2026-08-29. Review: **one blocker, three majors, three minors, two nits.** Version: **0.92.0** (minor). Corrected [backlog 0038](../design-backlog.md). [Write-up](README-archive.md).
 - [0129 - The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md) - closed 2026-08-29. Review: **no blockers, one major, four minors.** Version: **0.91.1** (patch). Filed [backlog 0160 + 0161](../design-backlog.md). [Write-up](README-archive.md).
 - [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md) — closed 2026-08-29. Review: **no blockers, one major, three minors, two nits.** Version: **0.91.0** (minor). [Write-up](README-archive.md).
 - [0127 — The picture stops depending on the volume slider](done/0127-the-picture-stops-depending-on-the-volume-slider.md) — closed 2026-08-28. Review: **no blockers, no majors, four minors.** Version: **0.90.0** (minor). Archived [backlog 0122 + 0123](../design-backlog-archive.md). [Write-up](README-archive.md).
@@ -1057,7 +1124,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0101]: done/0101-the-engine-renders-a-music-video.md
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md
-[0104]: 0104-the-library-stops-being-lopsided.md
+[0104]: done/0104-the-library-stops-being-lopsided.md
 [0115]: 0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: 0124-the-review-fixes-that-move-no-pixels.md
@@ -1067,3 +1134,11 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 [0131]: 0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
+[0135]: 0135-the-show-night-surfaces-stop-lying.md
+[0136]: 0136-the-gates-can-convict.md
+[0137]: 0137-the-metrics-measure-light.md
+[0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
+[0139]: 0139-the-render-path-validates-before-it-spends.md
+[0140]: 0140-every-rate-integrates-for-real.md
+[0141]: 0141-the-plugin-seams-stop-drifting.md
+[0142]: 0142-the-milkdrop-import-earns-its-verdict.md

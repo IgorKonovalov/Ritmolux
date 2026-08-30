@@ -277,6 +277,18 @@ pub struct RenderContext {
     pub(crate) device: wgpu::Device,
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
+    /// The instance the primary surface came from, and the adapter the device
+    /// was requested on. Both are retained solely so a *secondary* surface can
+    /// be created later on this same device (ADR-0143): a surface is only
+    /// usable with a device whose adapter came from the same instance, and
+    /// `get_default_config` needs the adapter to negotiate a format. Retaining
+    /// them costs two handles and no GPU memory.
+    ///
+    /// Both are `Some` on the on-surface path. The headless path leaves them
+    /// filled too — it has both in hand — but nothing there attaches an
+    /// auxiliary surface.
+    pub(crate) instance: wgpu::Instance,
+    pub(crate) gpu: wgpu::Adapter,
     /// Whether the selected adapter is a CPU/software rasterizer (WARP on DX12,
     /// llvmpipe on Vulkan). The headless capture path forces this for
     /// reproducibility; visual-QA tests read it to skip checks the software
@@ -357,14 +369,16 @@ impl RenderContext {
 
         let info = adapter.get_info();
         let is_software = info.device_type == wgpu::DeviceType::Cpu;
-        let adapter = describe_adapter(&info);
+        let description = describe_adapter(&info);
         Ok(Self {
             surface: Some(surface),
             device,
             queue,
             config,
             is_software,
-            adapter,
+            adapter: description,
+            instance: instance.clone(),
+            gpu: adapter,
         })
     }
 
@@ -418,14 +432,16 @@ impl RenderContext {
 
         let info = adapter.get_info();
         let is_software = info.device_type == wgpu::DeviceType::Cpu;
-        let adapter = describe_adapter(&info);
+        let description = describe_adapter(&info);
         Ok(Self {
             surface: None,
             device,
             queue,
             config,
             is_software,
-            adapter,
+            adapter: description,
+            instance,
+            gpu: adapter,
         })
     }
 

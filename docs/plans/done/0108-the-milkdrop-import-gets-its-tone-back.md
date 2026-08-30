@@ -282,7 +282,7 @@ fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
   the repository or a release, and the import path stays the converter plus a user-supplied
   `LMV_PRESET_DIR`.
 - **MilkDrop `textures/` support**, per-vertex evaluation on a compute shader, and a `warp_mesh`
-  content cohort ([Plan 0104](../0104-the-library-stops-being-lopsided.md) owns the last).
+  content cohort ([Plan 0104](0104-the-library-stops-being-lopsided.md) owns the last).
 - **Any move on the engine-wide HDR chain.** ADR-0046's linear-light ordering and ADR-0096's display
   dither are inputs here, not subjects.
 
@@ -369,7 +369,7 @@ handed forward, each of which needs the reference on screen and can be answered 
    open half. Reproduce with any preset whose custom wave has an odd sample count and a `flip`
    counter.
 
-Also discharged by Phase 1 landing: [Plan 0104](../0104-the-library-stops-being-lopsided.md)'s four
+Also discharged by Phase 1 landing: [Plan 0104](0104-the-library-stops-being-lopsided.md)'s four
 `warp_mesh` worlds were waiting on it.
 
 ## The look gate — Phases 2 and 6, run 2026-08-17

@@ -1,0 +1,148 @@
+# Cauldron - a bilaterally symmetric bloom, stirred from the inside and folded
+# down its own middle by a mirrored echo (Plan 0104 Phase 4b). Authored
+# fresh-slate (ADR-0089).
+#
+# `warp` IS THE ONLY MOTION HERE, AND IT IS THE ONE OUTPUT THAT IS NOT AN
+# AFFINE. The other eight per-vertex outputs are a transform - scale, turn,
+# stretch, drift - so any world built from them moves the past along smooth
+# streamlines. `warp` is four sinusoids whose own frequencies drift, which means
+# it never settles into a visible standing pattern: there is no fixed point to
+# find and no direction to follow. That is what makes this world churn where
+# `warp_wellhead` streams and `warp_sirocco` blows.
+#
+# THE WARP NEEDS SOMETHING TO STIR, AND THAT IS THE THING TO KNOW BEFORE TUNING
+# IT. Drafted with a broad soft two-armed deposit and a long tail, the frame
+# came back as a perfectly smooth two-tone horizon: a wobble applied to a
+# featureless gradient moves it and changes nothing you can see. Ten twisted
+# arms and a short `decay` give the field spokes to distort, and only then does
+# the warp have any visible work to do. On this system the deposit is not just
+# fuel - it is the texture the motion is legible against.
+#
+# `warp_speed` INTEGRATES A PHASE (ADR-0132), so it is safe to bind to audio -
+# which matters more here than anywhere, because this world's whole gesture is
+# the boil rate. Until Plan 0121 it multiplied the shared clock, where a swing
+# from 1 to 1.5 a hundred seconds into a set would have moved the pattern's
+# phase by fifty seconds in a single frame. No shipped preset bound it, which is
+# the only reason nobody found that; this one does.
+#
+# THE ECHO IS THE STRUCTURE. A boiling field is by construction shapeless, and
+# `echo_alpha` with `echo_orient = 1` blends the frame toward a left-right
+# mirrored copy of itself - so the boil comes out bilaterally symmetric, a
+# Rorschach that keeps changing. Three things make it the right tool rather than
+# a gimmick: it BLENDS toward the copy rather than adding it
+# (ADR-0119), so it can never brighten the frame past what the frame already
+# holds; it reads the field after the warp and the deposit and writes nothing
+# back, so it does not accumulate; and because both arms evolve the same field
+# the mirror is exact rather than approximate.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45:
+#
+#   coverage   0.7762 -> 0.9202   delta +0.1441   monotone 0.60
+#   peak/mean  3.2308 -> 2.4876   delta -0.7432   monotone 0.45
+#   footprint  0.2380 -> 0.0728   delta -0.1652   monotone 0.53
+#
+# The smallest deltas of the four, because this world's short tail and central
+# source fill the frame fastest - the fill is nearly over by the 0 s row rather
+# than dominating it (see `warp_wellhead`'s header for the family-wide reading).
+# The `echo` is worth naming here as a thing that CANNOT accumulate: it reads
+# the field after the warp and the deposit and writes nothing back, so what the
+# next frame warps is untouched by it (ADR-0119). The only accumulation route in
+# this world is `decay`, and it is bounded well under 1.
+#
+# WHAT DRIVES WHAT. Mid feeds the pot, bass deepens the wobble, treble drives
+# the boil rate, and onset opens the mirror - a hit snaps the frame from
+# asymmetric to symmetric and lets it relax, which is a gesture nothing else in
+# the library makes.
+system = "warp_mesh"
+name   = "Cauldron"
+
+[mesh]
+# Coarser than its siblings on purpose. The wobble is a smooth field with no
+# sharp feature in it, so there is nothing here for a fine grid to resolve -
+# and every vertex costs one evaluation of every binding below on the render
+# thread. 32x24 is the engine's own default and it is enough.
+x = 32
+y = 24
+
+[per_vertex]
+# THE BOIL. Strongest in the middle and easing off toward the rim, so the pot
+# has an inside - a uniform warp reads as the whole picture wobbling, which is
+# a camera fault rather than a liquid.
+warp = "1.5 * (1.0 - smoothstep(0.15, 1.0, rad)) + clamp(bass * 0.353, 0, 0.3)"
+# A crawl, not a tunnel: just enough that the surface is never twice the same,
+# far too little to read as a zoom.
+zoom = "1.012"
+rot  = "0.05"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#12061c" },  # cold iron
+  { at = 0.26, color = "#4a1050" },  # aubergine
+  { at = 0.52, color = "#a01840" },  # crimson
+  { at = 0.76, color = "#e06818" },  # flame
+  { at = 1.00, color = "#ffd47a" },  # gold
+]
+
+[params]
+# The wobble's own two scalars, and they are NOT per-vertex - they are
+# properties of the pattern rather than of a vertex, so the table above cannot
+# take them.
+warp_scale = "2.2"
+warp_speed = "0.55 + clamp(treb * 0.83, 0, 0.5)"
+
+# No wrap. A boiling pot that wrapped would show its own opposite edge stirred
+# in, which is the one thing that would give the surface a direction.
+wrap = "0"
+
+decay = "0.22 + clamp(bass * 0.094, 0, 0.08)"
+
+# TEN TWISTED ARMS, WHICH IS THE TEXTURE THE WARP STIRS (see header). The tail
+# is short so the spokes stay distinct long enough to be distorted rather than
+# averaging into a wash.
+deposit        = "2.4 + clamp(mid * 1.41, 0, 1.2) + clamp(onset * 0.83, 0, 0.5)"
+deposit_radius = "0.30"
+deposit_width  = "0.06"
+deposit_arms   = "10"
+deposit_twist  = "1.6"
+deposit_spin   = "0.25"
+
+darken_center = "0.06"
+
+# THE MIRROR (see header). It rests slightly open so the symmetry is always
+# faintly there, and a transient takes it most of the way - `echo_orient` 1 is
+# left-right, and it is ROUNDED to the nearest of the four orientations, so a
+# smoothed or computed value can never land between them.
+echo_alpha  = "0.18 + clamp(onset * 0.75, 0, 0.45)"
+echo_zoom   = "1.0"
+echo_orient = "1"
+
+# Lifts the shadows, which on a field this dark is what lets the boil's
+# structure show at all rather than sitting in the bottom of the ramp. Note the
+# remaps here operate on LINEAR light where MilkDrop applied them to 8-bit
+# display-referred pixels - the same gesture, not the same arithmetic.
+brighten = "1"
+
+hue           = "0.05"
+color_span    = "0.85"
+color_center  = "time * 0.007"
+saturation    = "1.05"
+palette_steps = "0"       # smooth: a boil has no plateaus, and steps would band it
+brightness    = "0.5 + clamp(mid * 0.141, 0, 0.12)"
+
+exposure     = "0.72 + clamp(bass * 0.235, 0, 0.2)"
+bloom_amount = "0.25 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "0.95"
+bloom_radius = "1.6"
+
+[smoothing]
+# Scalars only - a line naming `warp`, `zoom` or `rot` would be ignored with a
+# warning, since all three are bound per vertex above. `warp_speed` and
+# `echo_alpha` are scalars and can be eased, which is why the two audio terms
+# that most needed easing were put on them.
+warp_speed   = 0.5
+echo_alpha   = { attack = 0.04, release = 0.7 }
+decay        = 0.45
+deposit      = { attack = 0.04, release = 0.5 }
+brightness   = 0.3
+exposure     = { attack = 0.05, release = 0.4 }
+bloom_amount = { attack = 0.03, release = 0.4 }

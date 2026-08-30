@@ -1,0 +1,252 @@
+# Thomas on Red - the Thomas flow walked between two roster entries and drawn as
+# a WHITE-HOT KNOT ON A DEEP RED GROUND. The cohort's poster: the one world here
+# whose ground is the accent colour instead of the paper, and the one that reads
+# as light rather than as ink.
+#
+# -- IT IS A DUOTONE, AND THAT IS A CEILING RATHER THAN A CHOICE ------------------
+#
+# THIS FILE IS NOT IN THE LIMITED-INK CLASS AND CANNOT BE. `attractor` draws
+# through an additive deposit - there is no opacity-preserving seam in that
+# renderer, so `stroke_blend` (which is what puts the line scenes in the class)
+# has no equivalent here. The only route to flat ink on this system is the
+# terminal remap, and that stage is a two-pole luminance lerp: every pixel is
+# placed on the paper-to-ink axis by how bright it was. TWO INKS IS THE CEILING.
+# A black figure AND a red accent on a white page is not expressible on this
+# system at any setting, and no amount of palette work changes it - the remap
+# discards hue on its way through.
+#
+# So the third ink is spent on the GROUND instead, which is the one place a
+# two-pole stage can put it. Read this world as the cohort's red poster rather
+# than as a member of its three-ink set, and expect it to sit differently in a
+# colour count: three flat regions is not what it offers.
+#
+# -- THE PAGE ---------------------------------------------------------------------
+#
+# `paper_*` takes the DARK input and `ink_*` takes the BRIGHT input, so the
+# attractor's void becomes the page and its glowing figure becomes the drawing.
+# That inversion is the whole mechanism (ADR-0028) and it is why the backdrop
+# below is absent rather than red: a lit `bg_*` raises the frame's floor
+# luminance, which the remap reads as INK, and the page greys over. The red
+# ground here is the remap's paper pole and nothing else is painting it.
+#
+# THE INK POLE IS WHITE, NOT BLACK, AND THAT IS THE ONLY WAY TO GET LIGHT OUT OF
+# THIS STAGE. The remap has exactly two colours and no highlight of its own, so
+# "brighter" cannot be added on top of a black drawing - there is nowhere for it
+# to go. It has to come from moving a POLE. Setting `ink_bright` to 1 makes the
+# densest strokes white, so the figure stops being a drawing laid on the page and
+# becomes the light coming through it, while the page stays red because
+# `paper_*` never moved.
+#
+# `paper_bright` DROPS TO 0.500 IN THE SAME CHANGE, and the pair is one decision.
+# White on the old 0.690 red read washed out - two light colours competing - and
+# deepening the ground is what gives the white something to be bright against.
+# Rendered at ink white against paper 0.690 and 0.500, and at `ink_gamma` 1.8 /
+# 2.6 / 3.4: the bright paper blows out, 3.4 thins the figure to hairlines, and
+# the pair below is where the knot is luminous and its loops are still separable.
+#
+# The paper is `#b00808` converted into the HSV the stage takes: hue 0,
+# saturation 0.955, value 0.690. It will not come back out of a screengrab as
+# that exact triple - the value sits just above the tonemap's 0.6 knee, so the
+# shoulder compresses it slightly, and the display dither speckles any plateau
+# that is not at a rail. It reads as the cohort's red, which is the thing that
+# matters; see the remap list in docs/preset-palettes.md on why a limited-ink
+# frame almost never carries the palette's literal RGB.
+#
+# `ink_amount` RESTS AT A POLE AND NEVER TRAVELS. A partial amount crossfades
+# toward the untouched source, which is a near-black frame - so a dipped amount
+# is not a fainter drawing, it is a dirty grey page with the strokes losing
+# contrast at the same time. If this world should ever punch to the glowing
+# source on a hit, that is a TRAVEL between 0 and 1, not a rest between them.
+#
+# -- THE FIGURE -------------------------------------------------------------------
+#
+# `density = 0.090`. This is the structural half of the drawing and NOT a level
+# control - the deposit is normalized by particle count (ADR-0065), so total
+# light is invariant and only its distribution changes. At the full population
+# the lattice is a fog, and a luminance-keyed remap turns a bright fog into a
+# dark one: a solid black blot with the figure lost inside it. Sparse is what
+# makes each trajectory a separate stroke that the segment joins end to end.
+#
+# SWEPT AT 0.025 / 0.050 / 0.090 AGAINST A ROOM RATHER THAN A THUMBNAIL, and
+# then brought back DOWN to 0.060 once the strokes started glowing. The two
+# numbers trade: 0.090 was chosen when each stroke was a narrow un-haloed line
+# and the figure needed repeated passes to read at distance. A glowing stroke
+# already carries further, so the same density reads as a solid mass - the
+# count comes down to let the red back in between the strands.
+#
+# THE BLOT TRAP GOVERNS `fade`, WHICH IS THE SENSITIVE KNOB. It sets how many
+# frames of deposit pile up - roughly 1/(1-fade) - and on a sparse trace those
+# frames ARE the line rather than the density. Too short and the drawing is a
+# scribble; too long and it floods the page.
+#
+# HORIZON VERDICT, 2026-08-29 (`shot --horizon 10 --size 96x96`, held at
+# bass 0.6 / mid 0.45): THE PAGE STAYS INKED. This check was not optional here.
+# The one other world in this library built on an ink-remapped attractor,
+# `attractor_ink`, DRIES OUT over a set - coverage 0.199 -> 0.002 between minute
+# one and minute ten, silhouette intact and density gone (Plan 0085 Phase 2) -
+# and this file is built on that same mechanism with a `morph` redistributing
+# its points, which is the suspected cause there.
+#
+# It does not reproduce. Over ten simulated minutes:
+#
+#     coverage    0.1226 -> 0.1230   delta +0.0004   monotone 0.55
+#     peak/mean  15.6327 -> 13.4432  delta -2.1895   monotone 0.50
+#     footprint   0.2039 -> 0.2465   delta +0.0426   monotone 0.68
+#
+# Coverage wanders inside a band (0.10 to 0.20) and ends where it started, and
+# concentration falls slightly rather than climbing - the opposite sign to the
+# failure. A monotone near 0.50 IS the shape of breathing: half the steps went
+# each way. The footprint's 0.68 is the only mild slope on the page and it is
+# upward, which is the drawing spreading rather than collecting into specks.
+#
+# THE STATIC CONTROL IS WHAT MAKES THAT READABLE, and it was run at the same
+# horizon: a `star_pattern` world with no `time`, no audio term and no feedback
+# printed delta 0.0000 / monotone 0.00 on all three. No shipped preset is a
+# usable control - they are all built to move - so that was a throwaway.
+#
+# No threshold was applied and this is not a gate (ADR-0099). Re-run it if
+# `fade`, `density` or `morph` moves; those three are what the reading is about.
+#
+# THE WALK. `tuple_from = 5` to `tuple_to = 8` is a measured pick, not a fresh
+# guess: swept across the roster at Plan 0079 Phase 6 it was the strongest
+# survivor, because Thomas reads ONE coefficient and a walk along a single axis
+# reorganises the knot rather than dissolving it. `morph` runs a full round trip
+# in about 52 s, slow enough that no single look is ever the look.
+#
+# NO SPIN. The attractor family's default is a full revolution per ~35 s, and
+# the standing verdict across this library is that it costs more than it buys -
+# a rotating figure reads as a turntable and the flow's own structure stops
+# being legible. Pinned at 0, the change comes from the walk.
+system = "attractor"
+name = "Thomas on Red"
+
+[particles]
+family     = "thomas"
+density    = 0.060
+tuple_from = 5
+tuple_to   = 8
+
+[palette]
+# The remap discards hue, so this gradient does NOT set the colour on screen -
+# it sets which parts of the frame are BRIGHT, and therefore which parts become
+# ink. Kept neutral so that luminance ramp stays honest; a saturated palette here
+# would bias which strands ink without changing what colour they end up.
+stops = [
+  { at = 0.00, color = "#1a1a1a" },
+  { at = 0.45, color = "#7a7a7a" },
+  { at = 0.80, color = "#d0d0d0" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+# THE PRESS. White ink, deep red page. The two brightness values are ONE
+# decision - see the header before moving either.
+ink_amount   = "1"
+paper_hue    = "0"
+paper_sat    = "0.955"
+paper_bright = "0.500"
+ink_hue      = "0"
+ink_sat      = "0"
+ink_bright   = "1"
+
+# How fast a pixel travels from paper to ink. Above 1 thins the mid-tones toward
+# the paper; below 1 inks them. Neither pole moves at any value.
+#
+# 1.3 - JUST ABOVE THE IDENTITY - AND IT IS THE GLOW CONTROL RATHER THAN A TONE
+# CONTROL.
+# Each stroke is a soft radial falloff, so the gamma decides how much of that
+# skirt reaches white: high, and only the core prints, which is a crisp filament
+# with no light around it. At the identity the whole skirt travels, which is what
+# a halo IS on a two-pole stage that has no highlight colour of its own. It is
+# also what lets the bloom below register at all - see the note there.
+#
+# The figure does not get FATTER as a result, because `size` came down from 0.70
+# to 0.22 in the same change: a narrow core with a wide soft skirt reads as a
+# thin line that glows, where the old wide core with a tight skirt read as a
+# broad flat stroke.
+ink_gamma = "1.3"
+
+# THE WALK - a full round trip in about 22 s, with the low end nudging it along
+# so a heavy passage arrives at the far figure sooner. Gain 0.094 / 0.85.
+#
+# IT WAS 52 s AND THAT WAS TOO SLOW TO BE ALIVE. With `spin` pinned at 0 this
+# walk is the ONLY continuous motion in the world, and at a 52 s period it moved
+# the knot by 0.024 over the 0.4 s the animation gate watches - which read as
+# FROZEN (whole-frame 0.0015 in silence, against a 0.02 floor) and would have
+# read the same way to a room during a quiet passage. Pinning the spin is still
+# right; paying for it with a faster walk is the price.
+morph = "clamp(0.5 - 0.5 * cos(time * 0.285) + clamp(bass * 0.094, 0, 0.08), 0, 1)"
+
+# THE PEN. `size` is the nib and it takes the treble - detail sharpens the line
+# rather than brightening it. Gain 0.10 / 0.60 for a `treb` term.
+#
+# 0.22, DOWN FROM 0.70, because at the wider nib the knot read as a set of broad
+# flat ribbons rather than as a drawing. The width lost here is given back as
+# light rather than as ink - see `ink_gamma` and the bloom below, which are what
+# turn a narrow core into a filament that glows instead of a hairline that
+# disappears. The three numbers move together.
+size = "0.22 + clamp(treb * 0.167, 0, 0.10)"
+
+# THE WET LINE. `fade` runs long because on a sparse trace the accumulated frames
+# ARE the stroke. It shortens under bass, which thins the drawing on a heavy
+# passage instead of flooding it - the opposite of the instinct, and the right
+# way round against a luminance-keyed remap that blots when it is over-inked.
+fade = "0.87 - clamp(bass * 0.047, 0, 0.04)"
+
+# Held where the strands stay separate lines. Every stroke over the ink pole
+# draws at full ink, so an over-hot figure floods the page into a solid white
+# mass - this is a ceiling, not a taste setting.
+brightness = "1.25"
+saturation = "0.15"
+
+# THE FIELD IS SHAKEN ON A CLOCK, NOT ONLY ON A HIT. `reseed` is edge-triggered
+# (ADR-0066): a rise past 0.5 disturbs the population where it is by a seeded
+# kick of about 6 % of the domain per axis, so the drawing is stirred rather than
+# erased and the flow re-gathers it within a few seconds. The `mod` term fires it
+# once every 4 s REGARDLESS OF AUDIO, which is deliberate - an onset gate alone
+# leaves this world motionless in silence, which is the defect above by another
+# route. The onset arm rides on top so a hit stirs it early.
+reseed = "max(mod(time, 4.0) < 0.06, onset > 0.62)"
+
+# Depth, without a camera move. `perspective` gives the knot its near/far
+# without turning it, and `depth_fade` lets the far strands sit back into the
+# page - which on a duotone is the only depth cue available, since the remap
+# will not give a far strand a different colour.
+# THE HALO. Bloom is a mixer and this world is already outside the limited-ink
+# class, so it costs nothing here that was not already spent - which is exactly
+# why the glow lives on this preset and not on one of the three-ink worlds.
+#
+# IT ONLY WORKS BECAUSE `ink_gamma` CAME DOWN WITH IT. The remap is TERMINAL, so
+# a halo added before it is re-flattened onto the two-colour ramp on the way out:
+# at 2.6 the gamma thinned every bloomed pixel straight back to paper and the
+# bloom was invisible at any amount. Rendered at gamma 2.6 / 1.4 / 1.0 against
+# bloom 0 / 0.9 / 1.3, the glow does not appear until the gamma is near 1. The
+# two are one control on this system, not two.
+bloom_amount    = "0.75"
+bloom_threshold = "0.30"
+bloom_radius    = "2.40"
+
+spin        = "0"
+
+# A CONSTANT, AND ON THIS FAMILY IT MOVES THE CAMERA IN. `zoom` is inverted
+# between families - on the fields a higher value shows MORE - so this is a crop.
+# 1.50 rather than the 2.1 an earlier draft used: at the tighter crop the knot
+# ran to every edge, and a figure that touches all four sides reads as LARGE
+# whatever its strokes are doing. Backing the crop off leaves red around it,
+# which is what makes the glow legible as light rather than as fill. It is
+# deliberately not bound to anything: a zoom that answers the music is the camera
+# move this project does not want.
+zoom        = "1.50"
+perspective = "0.26"
+depth_fade  = "0.42 + clamp(mid * 0.176, 0, 0.15)"
+
+# DELIBERATELY ABSENT: every `bg_*` (a lit backdrop greys the page - see the
+# header), `trails` (the attractor's own `fade` is already the accumulation),
+# `bloom_*` and `kaleido_*` (both re-sample the deposit, and a softer source
+# blots where a crisp one hatches).
+
+[smoothing]
+# The nib and the depth ease; `fade` and `morph` are already slow by
+# construction and a time constant on either would only lag the walk.
+size       = 0.20
+depth_fade = 0.45

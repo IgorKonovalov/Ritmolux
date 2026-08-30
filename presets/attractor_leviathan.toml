@@ -25,9 +25,17 @@ name = "ember"
 
 [params]
 # GLOW - the figure is authored to sit UNDER the tonemap knee, so only the
-# densest filaments cross 1.0 and bloom picks out exactly those. Authoring
-# at the ceiling instead is what made this preset a flat mass at `rich`,
-# where 3x the particles deposit into the same texels (design-backlog 0047).
+# densest filaments cross 1.0 and bloom picks out exactly those.
+#
+# THE TIER HAZARD THAT ARGUMENT WAS WRITTEN AGAINST IS GONE, and the tuning is
+# kept for its own sake rather than for that reason (Plan 0104 Phase 5 sweep).
+# This line used to say that authoring at the ceiling is what made the preset a
+# flat mass at `rich`, where 3x the particles deposit into the same texels
+# (design-backlog 0047). ADR-0065 - Plan 0057 Phase 2 - normalizes the additive
+# deposit by particle count, so `rich` now buys less shot noise in the same
+# picture instead of three stops of brightness, and the two tiers match in
+# luminance. Sitting under the knee is still the right place for this figure;
+# it is no longer a tier workaround.
 bloom_amount    = "1.4"
 bloom_threshold = "0.9"
 bloom_radius    = "1.4"
