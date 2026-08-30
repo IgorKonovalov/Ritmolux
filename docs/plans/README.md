@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0135** (ADRs are a separate sequence — next free there is **0148**; 0146 is claimed by the live 0115 lane.)
+**Next free number: 0143** (ADRs are a separate sequence — next free there is **0154**; 0146 is claimed by the live 0115 lane.)
 
 ## Active roster
 
@@ -37,6 +37,14 @@ place. The plan file carries the real link.
 | [0131](0131-the-operator-gets-a-console.md) | The operator gets a console | in-progress | dev, human | **Being built directly on `main`, no worktree.** ADR-0143 (proposed): a second winit window on the renderer's existing device. Ordering is 0126 Phase 7 and 0130; Phase 6 is a `human` gate. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0134](0134-the-lanes-stop-sharing-a-store.md) | The lanes stop sharing a store | draft | dev, human | **Take this before either live lane builds again.** ADR-0147 (proposed): the worktree path is not in cargo's fingerprint, so one lane is served another's `lmv-core`. Phase 1 is `human`. |
+| [0135](0135-the-show-night-surfaces-stop-lying.md) | The show-night surfaces stop lying | approved | dev, human | Backlog 0159 + 0156 + 0155 (**0154 carried**). ADR-0148: the CLI refuses an unclaimed flag, so a misspelt `--osc` fails loudly instead of darkening the rig. Phase 5 is a `human` unplug gate. |
+| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
+| [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
+| [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
+| [0139](0139-the-render-path-validates-before-it-spends.md) | The render path validates before it spends | approved | dev, human | Backlog 0111 + 0112 (**0125 carried**). A typo in `--preset` spawns ffmpeg and a GPU device first, leaving a playable 262-byte MP4. Phase 4 needs a free machine. |
+| [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
+| [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
+| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 <!-- roster:end -->
 
 **Added 2026-08-19, from a MilkDrop backlog round after
@@ -153,6 +161,50 @@ evening — 0133 Phase 1 needs an evening with the rig patched and 0115 Phase 1 
 staged. **The set runs on the external Python bridge** (`WORK/lmv-lighting-probes/`, outside version
 control), unmodified. Approving the plans starts the work; it changes nothing about the show.
 
+**Added 2026-08-29, second promotion round: [0138], [0139], [0140], [0141] and [0142], all `draft`.**
+The sweep was re-run with a corrected filter — the first pass's regex was greedy and over-counted
+claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; three entries were
+**declined on their own instructions** rather than promoted:
+
+- **[0141] is the one with no contention.** It is the only cluster touching `plugin-foobar/`, which
+  no plan on this roster otherwise enters. Its Phase 1 is the exception: backlog 0117 calls itself a
+  natural pickup for [0103] Phase 1, which rewrites the same handler.
+- **[0138] belongs immediately after [0137]** — same linear-light seam one layer up. Taking them
+  together is one coherent pass; six weeks apart is two half-passes. [0138] also makes backlog 0038
+  measurable for the first time, using the level statistic [0137] adds.
+- **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
+  GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
+- **[0140] contends with [0125]** (all twelve scenes' boilerplate) and edits five of them. Series.
+- **Declined, and the record is the reason.** Backlog 0038 is routed to `preset-author` as a content
+  pass — *"no engine change and no ADR"* — and is §4 of `content-brief.md`. Backlog 0075's remaining
+  half is ADR-0102, **proposed with no plan by the user's call**, holding until a look asks for the
+  clamp. Backlog 0109 (1,826 files, 88.7 % of conversion failures) **forbids being taken now**:
+  *"Do not take it before Plan 0108's Phase 2"*, whose verdict has twice read "still merely
+  different" — so [0142] Phase 6 decides whether it is buyable, and does not take it.
+
+**Added 2026-08-29, from a backlog-promotion round: [0135], [0136] and [0137], all `draft`.** The
+round swept the 58 live entries, found **26 already claimed by some plan** and promoted three
+clusters out of what remained. Deliberately filed *behind* the existing roster — the user's call —
+because eleven plans were already active and the roster, not the work, was becoming the bottleneck.
+Sequencing:
+
+- **[0136] is the one to take first, and it is takeable during a show.** Phases 1-6 are Node,
+  markdown and one shell script; only Phases 7-8 render. It also repairs the instruments the other
+  two are verified with — `check-index-rows.mjs` currently cannot fail, so a detector matching
+  nothing exits 0 at all three call sites.
+- **[0135] contends hard on `standalone/src/main.rs`** with [0115], [0133], [0131] and [0126]
+  Phase 7. It is additive and localized, but it is the fifth plan wanting that file. Take it after
+  [0126] Phase 7 reduces it to shell glue, or expect a rebase.
+- **[0137] contends with nothing** and shares no file with the current roster —
+  `core/src/render/metrics.rs` plus two test files. Its Phases 4 and 6 are prose and need no
+  adapter at all.
+- **Two entries were corrected rather than promoted.** [Backlog 0160](../design-backlog.md)'s
+  premise was falsified by ADR-0147 the same morning it was filed, and 0161's severity dropped with
+  it; [0136] Phase 6 corrects both in place rather than planning work on a false premise.
+- **The round also found archive debt**: Plan 0111 closed 2026-08-20 declaring it closes backlog
+  0119 and 0120, and neither was ever archived. Not taken by any plan here — it is close-ceremony
+  bookkeeping, and it needs a judgement about whether they were genuinely discharged.
+
 - **Two lanes open now, in worktrees.** **[0104]** in a `preset-author` lane — it touches
   `presets/*.toml` only, so it contends with no Rust lane on this roster. **[0115]** in a `dev`
   lane — its Phase 1 is a `human` stop gate that writes no code, so the lane opens before any
@@ -168,9 +220,12 @@ control), unmodified. Approving the plans starts the work; it changes nothing ab
   turns `main.rs` into shell glue. Taking 0131 first is allowed — the constraint is contention, not
   correctness — but it means 0126 Phase 7 later rebases onto 0131's edits instead of 0131 landing
   on a file already reduced to glue.
-- **[ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) applies to both open lanes.**
-  The shared artifact store serializes on cargo's lock, so 0104's `shot` runs and 0115's builds
-  wait on each other. Still worth running in parallel — what serializes is the build, not the work.
+- ~~**[ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md) applies to both open lanes.**
+  The shared artifact store serializes on cargo's lock~~ — **withdrawn 2026-08-29.**
+  [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked the
+  store, so lanes no longer serialize and no longer share artifacts. What comes back with it is
+  ADR-0053's disk cost: each lane carries its own `target/` again, so **remove a finished lane's
+  worktree**.
 
 **Added 2026-08-28, from a "what next, functionally" round after the whole-codebase review's three
 plans ([0124]/[0125]/[0126], which move no pixels): [0127](done/0127-the-picture-stops-depending-on-the-volume-slider.md)
@@ -1079,3 +1134,11 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 [0131]: 0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
+[0135]: 0135-the-show-night-surfaces-stop-lying.md
+[0136]: 0136-the-gates-can-convict.md
+[0137]: 0137-the-metrics-measure-light.md
+[0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
+[0139]: 0139-the-render-path-validates-before-it-spends.md
+[0140]: 0140-every-rate-integrates-for-real.md
+[0141]: 0141-the-plugin-seams-stop-drifting.md
+[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
