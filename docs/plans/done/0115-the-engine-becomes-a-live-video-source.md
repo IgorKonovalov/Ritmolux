@@ -664,9 +664,12 @@ which blocks the ship:**
   **ADR-0152 and Plan 0140 own the general repair** — sanitizing `dt` at the scene seam — and this
   is a note that `standalone/src/stream.rs` is a second site, added after that plan's scope was
   written.
-- **`stream.rs::parse` ignores an unrecognized flag** (`_ => {}`), so a misspelt `--sise 1920x1080`
-  streams silently at the default size. Same shape as backlog 0159 / ADR-0148 / **Plan 0135**,
-  whose scope predates this file — worth folding in there rather than fixing separately.
+- ~~**`stream.rs::parse` ignores an unrecognized flag** (`_ => {}`), so a misspelt `--sise
+  1920x1080` streams silently at the default size.~~ **DISCHARGED by Plan 0135 (closed
+  2026-08-30)**, and by the folding-in this bullet asked for rather than by a separate fix: the
+  ADR-0148 roster gate runs in `main` *before* `stream::parse`, so `--sise` never reaches the
+  `_ => {}` arm — it exits 2 naming `--size` as the nearest roster entry. The `_ => {}` arm is
+  still there and is now unreachable for unrecognized input.
 
 **From the original plan:**
 

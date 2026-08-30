@@ -13,6 +13,70 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0135 — The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md)
+  — closed 2026-08-30. Four `dev` phases in the `lmv-plan-0135` worktree: `915fc74` (the roster
+  gate), `c937026` (`--help`), `e0fd1a7` (an operator swap resets the incident) and `6c717d5` (the
+  settle window in seconds). **Phase 5 is `human` and did not run** — no removable audio interface
+  on the box — so it is carried to the on-device unplug checkbox and a Standing bullet, and
+  design-backlog 0154 stays live with a dated update saying so. Review: **no blockers, one major,
+  five minors.** Version **0.95.0** (minor: `--help` and a startup refusal are new capability).
+
+  **Verified at the close, not taken from the log.** `fmt` clean; `clippy --workspace --all-targets`
+  clean; `cargo nextest run --workspace` **1211 passed / 5 skipped**. `main` was already an ancestor
+  of the lane, so the merge step was a no-op and the predicted `main.rs` rebase never happened.
+  All five Node gates green after the bookkeeping; `check-backlog-claims.mjs` was **red on arrival
+  with two breaks, both entry 0155**, which is the probe-goes-red-on-delivery class — that entry's
+  reduction named the very constant Phase 4 retired, and archiving it is the repair.
+
+  **The one check the log did not state, run here instead.** Phase 2's done-when asks `dev` to state
+  the check that proves ADR-0148's drift gate can fail. It did not, so the close ran it: dropping
+  the `--osc` entry from `FLAGS` fails `every_scanner_flag_literal_is_rostered` with
+  *"`--osc` is compared against an argument in main.rs and is not in FLAGS"*, and takes
+  `a_misspelt_flag_is_refused_and_the_nearest_one_named` down with it. **The gate convicts.** That
+  matters more than usual here — backlog 0166 and Plan 0136 exist because this repo already shipped
+  a gate that could not fail, and the test's own `literals.len() >= 5` floor is the guard against
+  the same lexer-stopped-matching failure.
+
+  **What outlived the plan.** Three properties are now pinned that were not: the settle window is
+  one duration on every display (swept at 30, 165 and 240 Hz in one test, which is the assertion a
+  frame count could not make); an operator's input choice is a new recovery incident, so the `Lost`
+  verdict Plan 0083 built can no longer be silenced by a spent latch; and `lmv --help` answers and
+  exits without a window, asserted from **outside** the process in `standalone/tests/help_cli.rs`,
+  which is the only place the absence of a window is observable. It also **discharged a followup
+  Plan 0115 had carried** without either plan noticing at the time: `stream.rs::parse`'s `_ => {}`
+  arm made a misspelt `--sise 1920x1080` stream silently at the default size, and the roster gate
+  now runs before `stream::parse`, so that argument exits 2 naming `--size`.
+
+  **The major, and why it did not block.** Six flags — `--size`, `--fps`, `--gpu`, `--sender`,
+  `--preset`, `--frames` — are claimed *conditionally*: `stream::parse` returns `Ok(None)` on its
+  first line when `--stream` is absent, so without it they are walked past as recognized and never
+  read. `lmv --gpu 1` renders on whatever adapter it would have picked anyway, with no diagnostic —
+  which is backlog 0159's own failure class surviving inside the roster built to end it. It is out
+  of ADR-0148's stated scope (these arguments *are* claimed) and is not a regression, so it was
+  filed as **backlog 0167** rather than fixed at the close. The reason it is a `major` and not a
+  `minor` is that the roster's existence makes the gap look closed; the reason it is not worse is
+  that all six help lines name `--stream`, so `--help` does disclose the coupling.
+
+  **The five minors, in the order they matter.** (1) `--ocs` is exactly two edits from **both**
+  `--osc` and `--fps`, and `min_by_key` breaks the tie by roster order — so the plan's headline
+  behavior rests on a field whose own doc comment calls the order presentational. A Damerau
+  transposition (cost 1) would make it distance 1 and unambiguous; the existing test does pin the
+  current answer, so a reorder goes red, but the failure would not say why. (2) `MAX_DT = 0.25 <
+  INPUT_RECOVERY_SETTLE_SECS = 0.36` is a real safety relationship — it is what makes
+  `RecoveryPolicy::poll`'s claim true that a resumed window cannot hand the accumulator a settling
+  jump — and nothing gates it, at 1.44x of margin; a `const _: () = assert!(...)` is one line.
+  (3) `help_cli.rs`'s one-second bound **cannot catch the failure its own comment names**: a process
+  that opened a window never returns from `Command::output()`, so `elapsed` is never reached, and
+  with no `terminate-after` in `.config/nextest.toml` that failure is a hung job rather than a red
+  test — leaving the bound's only reachable effect a flake on a slow runner. (4) Phase 4's second
+  done-when (*"no remaining constant in the recovery path is expressed in frames"*) holds for named
+  constants, but the retry **cadence** is still one reopen per frame, so give-up latency remains
+  refresh-rate-dependent; that is the surviving half of 0155's class and it is already named inside
+  backlog 0154, which stays live. (5) The done-when gap in Phase 2's log, discharged above.
+  **Nit:** the drift gate scans `main.rs` and `stream.rs` only, and nothing states that set is
+  complete — it is correct today (the `"--x"` literals in `gpu.rs` and `lib.rs` are a test assertion
+  and a display string), but a scanner in a third file would be invisible to it.
+
 - [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md)
   — closed 2026-08-30. Five `dev` phases on `main`, no worktree: `9ab7726` (Phases 1 + 3 in one
   commit), `b9edb61` (two defects found by driving it), `f0760bb` (Phase 2), `03b4b01` (Phases 4 + 5
