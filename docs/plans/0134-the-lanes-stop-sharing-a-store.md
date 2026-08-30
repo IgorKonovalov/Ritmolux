@@ -1,6 +1,6 @@
 # 0134 — The lanes stop sharing a store
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) (proposed),

@@ -2,10 +2,9 @@
 
 > **Status:** approved
 > **Created:** 2026-08-29
-> **Owner skill(s):** dev, human
-> **Related ADRs:** none — both engine entries state *"No ADR needed"*. Phase 4 gathers the evidence
-> an ADR on backlog 0125 would need.
-> **Closes:** design-backlog 0111, 0112. **0125 is carried, not closed** — see Phase 4.
+> **Owner skill(s):** dev
+> **Related ADRs:** none — both entries state *"No ADR needed"*.
+> **Closes:** design-backlog 0111, 0112.
 
 ## TL;DR
 
@@ -40,13 +39,13 @@ This plan exists in front of Plan 0103's outreach phases, which need demo materi
 
 ## Decision
 
-**Fix the two cheap defects, and treat backlog 0125 as an evidence problem rather than a design
-one.** Phases 1-2 are the validation and the `--crf` lever, both small and both explicitly ADR-free
-by their own entries. Phase 3 is the doc sweep. Phase 4 is a `human` look gate rendering the *same
-clip* at both diffusion profiles, because backlog 0125's own text says the cheap first move is a
-side-by-side still at both budgets, **not a design** — the clip that drew the *"resolution would be
-higher"* verdict was rendered at `fast` (680x384), and `quality` is 2.25x the pixels and **has never
-been rendered on a real track**.
+**Fix the two cheap defects and nothing else.** Phases 1-2 are the validation and the `--crf` lever,
+both small and both explicitly ADR-free by their own entries. Phase 3 is the doc sweep. The plan is
+three `dev` phases with no human gate, which is what makes it takeable in any spare session.
+
+**Backlog 0125's evidence gate is deliberately not here — [Plan 0128](0128-the-rendered-file-stops-looking-upscaled.md)
+Phase 5 already owns it**, describes it better, and pairs it with that plan's own Phase 4 look gate
+in one sitting. Duplicating it would have put the same `human` render on two roster rows.
 
 We rejected folding backlog 0126 into this plan, because that entry says so in as many words: *"Do
 not fold this into a resolution plan. It shares a verdict with backlog 0125 and nothing else — one
@@ -119,32 +118,11 @@ flowchart TB
     writes nothing — because the old behaviour left artifacts people may have on disk.
 - **Done when:** `--crf` and the validation behaviour are both documented in the `--render` section.
 
-### Phase 4 — The resolution look gate (evidence only, no design)
-- **Owner skill:** human
-- **What:** Render the same clip through the diffusion filter at both profiles and record the
-  verdict against backlog 0125.
-- **Files touched:** `docs/design-backlog.md` (a dated update on entry 0125).
-- **Notes for the implementer:**
-  - **This phase designs nothing and changes no code.** Backlog 0125's own text: the clip that drew
-    the *"it would obviously be great if resolution would be higher"* verdict was rendered at
-    **`fast`** — a 262,144 px budget, 680x384 at 16:9, resampled to 1920x1080. **`quality` is
-    1024x576, 2.25x the pixels, and has never been rendered on a real track.** So an unknown and
-    possibly large share of the complaint is a profile choice rather than a wall.
-  - **This is expensive and it needs a free machine.** Phase 2b measured 2.721 s/frame at the
-    `quality` budget; a 4-minute track measures ~5.9 h before Plan 0106 Phase 7d's 1.406x scope
-    correction. **Do not start it during a show.** A shorter representative slice is a legitimate
-    substitute and should be stated as such.
-  - What to record: whether `quality` alone answers the ask, and if not, by how much it falls short.
-  - **The walls, so nobody reads a verdict as a mandate:** SD1.5 duplicates or mirrors content above
-    roughly 768²; SDXL plus ControlNet is ~7.5 GB against an 8 GB card with the spike already at
-    5.68 GB; cost scales with pixels.
-- **Done when:** backlog 0125 carries a dated update stating what `quality` looks like on real
-  material and whether the ask survives it.
-
 ## Risks & open questions
 
-- **Phase 4 may not resolve backlog 0125 at all**, and that is an acceptable outcome. If `quality`
-  does not answer the ask, the next step is an ADR reopening
+- **Plan 0128 Phase 5 may not resolve backlog 0125 at all**, and that is an acceptable outcome that
+  lands on this area rather than on that plan. If `quality` does not answer the ask, the next step is
+  an ADR reopening
   [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)'s
   Alternative C — *diffuse at a smaller budget and upscale*, which **this same user rejected in the
   design interview** on the ground that generated detail is worth its price against inferred detail.
@@ -166,4 +144,6 @@ flowchart TB
   area, not a phase of this one.
 - **It does not change the default `-crf`.** Archival-grade is the deliberate default; this adds a
   lever beside it.
-- **It does not touch the diffusion filter's profiles.** Phase 4 renders what already exists.
+- **It does not touch the diffusion filter at all**, and it does not carry backlog 0125. That
+  entry's evidence gate is [Plan 0128](0128-the-rendered-file-stops-looking-upscaled.md) Phase 5,
+  which owned it first.
