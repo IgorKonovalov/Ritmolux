@@ -27,6 +27,48 @@ pub struct Config {
     pub quality: Quality,
     pub hud: Hud,
     pub osc: Osc,
+    pub console: Console,
+}
+
+/// `[console]` — the operator console, a second window on a second display
+/// (ADR-0143).
+///
+/// **Off by default**, for the reason every optional surface here is: a config
+/// that has never heard of a console must produce exactly today's app — one
+/// window, one surface, no intermediate render target and no extra copy per
+/// frame. `--console` opens it for a run without writing itself into the file,
+/// the shape `--input` / `--device` / `--osc` already follow (ADR-0142).
+///
+/// Its display is resolved by the **same** name-over-index rule the show's own
+/// display uses, and deliberately not by a second one: winit's monitor ordering
+/// is not stable across boot or hotplug, so a stored index alone can point at
+/// the wrong screen, and two answers to that question would drift.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Console {
+    /// Open the console at launch. False out of the box.
+    pub enabled: bool,
+    /// Preferred monitor identity for the console, matched by name before the
+    /// index — exactly as `[output] display_name` is. Empty means "use the
+    /// index".
+    pub display_name: Option<String>,
+    /// Fallback monitor index when no `display_name` matches.
+    ///
+    /// The default is **1, not 0**: a console's whole point is to be on a
+    /// display other than the show's, and the show defaults to 0. On a
+    /// single-monitor machine this falls back to the only monitor there is,
+    /// which is the correct degrade rather than a failure.
+    pub display: usize,
+}
+
+impl Default for Console {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            display_name: None,
+            display: 1,
+        }
+    }
 }
 
 /// `[osc]` — the lighting telemetry sink (ADR-0144).
@@ -294,7 +336,7 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
+    use super::{Config, Console};
 
     /// **An existing `config.toml` predates `[hud]`**, so the section missing
     /// entirely has to mean today's behavior rather than a parse failure — the
@@ -320,6 +362,60 @@ mod tests {
             config.hud.now_playing,
             "the key that was not must default on"
         );
+    }
+
+    /// **A config that has never heard of a console produces exactly today's
+    /// app.** Asserted on the `Default` impl and not merely observed in a fresh
+    /// file, because that is what an upgrading operator gets: their file
+    /// predates the section entirely, and a default that opened a second window
+    /// would move a show onto a screen nobody asked for.
+    #[test]
+    fn the_console_is_off_by_default_and_an_absent_section_keeps_it_off() {
+        assert!(
+            !Console::default().enabled,
+            "the Default impl must leave the console closed"
+        );
+
+        let config: Config = toml::from_str(
+            "[output]
+fullscreen = true
+",
+        )
+        .expect("a config with no [console] section must still parse");
+        assert!(
+            !config.console.enabled,
+            "an absent section opened the console"
+        );
+        // And the fallback index is the *second* display, not the show's: a
+        // console defaulting onto display 0 would open on top of the output on
+        // every multi-monitor machine.
+        assert_eq!(config.console.display, 1);
+        assert_eq!(config.console.display_name, None);
+    }
+
+    /// Both `[console]` keys survive the write/read the settings row performs,
+    /// which is what lets a console reopen on the display it was left on.
+    #[test]
+    fn the_console_choice_and_its_display_round_trip() {
+        let mut config = Config::default();
+        config.console.enabled = true;
+        config.console.display_name = Some("DELL U2720Q".to_owned());
+        config.console.display = 2;
+
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+
+        assert!(
+            back.console.enabled,
+            "the open choice did not survive a save"
+        );
+        assert_eq!(
+            back.console.display_name.as_deref(),
+            Some("DELL U2720Q"),
+            "the named display did not survive a save, so the console would \
+             reopen wherever the index happened to point"
+        );
+        assert_eq!(back.console.display, 2);
     }
 
     /// The operator's "off" survives the write/read the settings row performs —

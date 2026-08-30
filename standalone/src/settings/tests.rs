@@ -22,6 +22,7 @@ fn view() -> SettingsView {
         input_editable: true,
         preset_name: true,
         now_playing: true,
+        console: false,
         preset_dir: r"C:\Users\x\AppData\Roaming\light-music-visualizer\presets".to_owned(),
     }
 }
@@ -143,7 +144,7 @@ fn the_presets_row_emits_nothing() {
 /// as a count: every other test here reaches its row through `ALL`, which means
 /// a reordering would move them all in step and go unnoticed.
 #[test]
-fn the_rows_are_the_twelve_the_menu_promises_in_order() {
+fn the_rows_are_the_thirteen_the_menu_promises_in_order() {
     assert_eq!(
         SettingsRow::ALL,
         [
@@ -158,6 +159,7 @@ fn the_rows_are_the_twelve_the_menu_promises_in_order() {
             SettingsRow::InputDevice,
             SettingsRow::PresetName,
             SettingsRow::NowPlaying,
+            SettingsRow::Console,
             SettingsRow::Presets,
         ]
     );
@@ -447,4 +449,64 @@ fn repeat_reaches_the_editing_keys_but_not_the_modal_ones() {
     for key in [SettingsKey::Toggle, SettingsKey::Escape] {
         assert!(!key.is_nav(), "{key:?} must not accept key repeat");
     }
+}
+
+/// **Toggling the console off from the console's own S-menu leaves that menu
+/// open**, so the next frame's routing draws it on the output.
+///
+/// This is the one interaction where the modal move has to reverse
+/// mid-keystroke, and the obvious implementation loses the menu along with the
+/// window. Asserted here at the state machine, which is where "the menu is
+/// still open" is decidable without a window: the row's action is
+/// `ToggleConsole` and **not** `Close`, and the state is still open after the
+/// key that produced it. The routing half — that an open modal with no console
+/// draws on the output — is `console::tests`'
+/// `console_closed_draws_everything_on_the_output`.
+#[test]
+fn closing_the_console_from_its_own_menu_leaves_the_menu_open() {
+    let mut state = opened();
+    let view = view();
+
+    // Walk to the console row the way an operator does, so this covers the row
+    // being reachable as well as the action it produces.
+    let mut guard = 0;
+    while SettingsRow::ALL.get(state.row()) != Some(&SettingsRow::Console) {
+        state.handle_key(SettingsKey::Down, &view);
+        guard += 1;
+        assert!(
+            guard <= SettingsRow::ALL.len(),
+            "the console row is not reachable by walking the menu"
+        );
+    }
+
+    let action = state.handle_key(SettingsKey::Right, &view);
+    assert_eq!(
+        action,
+        SettingsAction::ToggleConsole,
+        "the console row must ask the shell to toggle the window, and nothing else"
+    );
+    assert_ne!(
+        action,
+        SettingsAction::Close,
+        "the row must not close the menu — the operator would lose it along \
+         with the window it just closed"
+    );
+    assert!(
+        state.is_open(),
+        "the menu closed itself when the console was toggled, so an operator \
+         closing the console from the console loses the menu entirely"
+    );
+}
+
+/// The console row reports the live window, not the stored preference: a
+/// console opened by the hotkey or by `--console` reads as on here.
+#[test]
+fn the_console_row_reports_whether_a_console_is_open() {
+    let mut open_view = view();
+    open_view.console = true;
+    assert_eq!(SettingsRow::Console.value(&open_view), "on");
+
+    let mut shut_view = view();
+    shut_view.console = false;
+    assert_eq!(SettingsRow::Console.value(&shut_view), "off");
 }

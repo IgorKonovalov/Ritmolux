@@ -238,6 +238,24 @@ footprint so the vendor spread is on record.
       frames, not from the fact that something is on screen. _(Plan 0115 Phase 6 item 2, extracted
       at that plan's close.)_
 
+- [ ] **The operator console on two displays (Plan 0131 Phase 6).** `C` opens a second window on
+      another display carrying the modals, the transport strip and a live preview of the output.
+      **Two things here are structurally invisible to CI** and nothing else will answer them.
+      **(a) What the second swapchain costs the show.** Record the output's frame time
+      **console-closed and console-open**, on two displays of *different* refresh rates, with the
+      console on the **slower** one. Report it as a measurement naming the machine, both refresh
+      rates, the GPU and **which present mode the console negotiated** — it is written to
+      `diagnostics.log` on open as a `#`-prefixed note (ADR-0071). Same-refresh displays cannot
+      answer this: that is exactly the configuration where the two pacing sources agree.
+      **"It costs the output frames" is a valid outcome** and routes back to architect rather than
+      being tuned away. **(b) The dual-GPU path.** On a hybrid laptop, say whether the console
+      surface configured on the renderer's adapter or fell to the no-preview path — the degrade
+      exists, is logged, and **has never been exercised**; nothing on a single-GPU box can reach it.
+      If no such machine is available, say so: an untested path honestly named beats a guess.
+      Also report a legibility judgement at desk distance — the rows, the transport labels and the
+      preview at the size the console actually opens. _(Plan 0131 Phase 6, extracted at that plan's
+      close.)_
+
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 
 **This one is not hardware-gated.** Every item above waits on a box the user does not have; this

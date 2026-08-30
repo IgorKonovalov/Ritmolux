@@ -207,6 +207,252 @@ pub fn header(preset: &str) -> Line {
 /// label rather than as content.
 const HEADER_COLOR: [f32; 4] = [0.55, 0.62, 0.74, 0.9];
 
+// ---------------------------------------------------------------------------
+// The transport strip
+// ---------------------------------------------------------------------------
+
+/// A rectangle in the console surface's device pixels, origin top-left.
+///
+/// The console's own geometry type rather than the core's: this describes where
+/// an operator may click, which is a shell question, and nothing here should
+/// couple the button layout to a render target's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Rect {
+    /// Whether `(x, y)` is inside, treating the left and top edges as in and
+    /// the right and bottom as out.
+    ///
+    /// Half-open on purpose: adjacent buttons share an edge coordinate, and a
+    /// closed test would make that column belong to both — the last one checked
+    /// silently winning.
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
+}
+
+/// One clickable control on the console's transport strip.
+///
+/// Text with a hit rectangle around it, not a widget: the console draws through
+/// the same glyph seam as every other surface here, and a toolkit is out of
+/// scope (NFR 4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Button {
+    /// Cut to the roster's predecessor.
+    Prev,
+    /// Cut to the roster's successor.
+    Next,
+    /// Rotate now, as the director's own timer would have.
+    RotateNow,
+    /// Turn hands-off rotation on or off.
+    ToggleAuto,
+    /// Shorten the maximum dwell by one step.
+    DwellDown,
+    /// Lengthen the maximum dwell by one step.
+    DwellUp,
+}
+
+/// The strip in display order. Exhaustive and ordered here so the labels, the
+/// rectangles and the hit test cannot disagree about which control is third.
+pub const BUTTONS: [Button; 6] = [
+    Button::Prev,
+    Button::Next,
+    Button::RotateNow,
+    Button::ToggleAuto,
+    Button::DwellDown,
+    Button::DwellUp,
+];
+
+impl Button {
+    /// The label drawn in this button's rectangle.
+    pub fn label(self) -> &'static str {
+        match self {
+            Button::Prev => "< prev",
+            Button::Next => "next >",
+            Button::RotateNow => "rotate",
+            Button::ToggleAuto => "auto",
+            Button::DwellDown => "dwell -",
+            Button::DwellUp => "dwell +",
+        }
+    }
+}
+
+/// Button width at [`REFERENCE_HEIGHT`], in device pixels.
+const BUTTON_W: f32 = 104.0;
+/// Button height at [`REFERENCE_HEIGHT`].
+const BUTTON_H: f32 = 32.0;
+/// Gap between adjacent buttons at [`REFERENCE_HEIGHT`].
+const BUTTON_GAP: f32 = 8.0;
+/// Top of the strip at [`REFERENCE_HEIGHT`] — below the standing header, above
+/// the band [`crate::overlay`]'s list starts in.
+const STRIP_TOP: f32 = 44.0;
+
+/// Where each control sits on a console surface of `width` x `height` device
+/// pixels.
+///
+/// Scaled by the same [`scale`] factor the routed modal lines are, so a button's
+/// rectangle and the label drawn in it move together — a hit test against
+/// unscaled rectangles on a scaled console is the defect this shares its factor
+/// to avoid.
+pub fn transport(width: f32, height: f32) -> Vec<(Button, Rect)> {
+    let s = scale(height);
+    let (w, h, gap) = (BUTTON_W * s, BUTTON_H * s, BUTTON_GAP * s);
+    let (left, top) = (crate::overlay::LIST_INSET * s, STRIP_TOP * s);
+    BUTTONS
+        .iter()
+        .enumerate()
+        .map(|(i, button)| {
+            (
+                *button,
+                Rect {
+                    x: left + i as f32 * (w + gap),
+                    y: top,
+                    width: w,
+                    height: h,
+                },
+            )
+        })
+        // A console too narrow to hold a button whole drops it rather than
+        // drawing one that runs off the edge and cannot be clicked.
+        .filter(|(_, rect)| rect.x + rect.width <= width)
+        .collect()
+}
+
+/// The control under `(x, y)`, or `None` in the gaps and everywhere else.
+pub fn hit_test(width: f32, height: f32, x: f32, y: f32) -> Option<Button> {
+    transport(width, height)
+        .into_iter()
+        .find(|(_, rect)| rect.contains(x, y))
+        .map(|(button, _)| button)
+}
+
+/// What a click on the console asks the shell to do.
+///
+/// The variants split on **who owns the rule**. `Prev`, `Next` and `RotateNow`
+/// are the console's own transport. Everything else is something the settings
+/// menu also does, and it is carried as that menu's own
+/// [`SettingsAction`](crate::settings::SettingsAction) — produced by the menu's
+/// own `edit`, not by a second copy of the rule here, so the two surfaces cannot
+/// drift into two behaviours.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConsoleAction {
+    Prev,
+    Next,
+    RotateNow,
+    Settings(crate::settings::SettingsAction),
+}
+
+/// Resolve a button against the live values the settings menu displays.
+pub fn action_for(button: Button, view: &crate::settings::SettingsView) -> ConsoleAction {
+    use crate::settings::SettingsRow;
+    match button {
+        Button::Prev => ConsoleAction::Prev,
+        Button::Next => ConsoleAction::Next,
+        Button::RotateNow => ConsoleAction::RotateNow,
+        // Delegated, never restated: `edit` is the one place a row's change is
+        // decided, including the clamping the dwell rows apply against each
+        // other.
+        Button::ToggleAuto => ConsoleAction::Settings(SettingsRow::AutoRotate.edit(true, view)),
+        Button::DwellDown => ConsoleAction::Settings(SettingsRow::MaxDwell.edit(false, view)),
+        Button::DwellUp => ConsoleAction::Settings(SettingsRow::MaxDwell.edit(true, view)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Staging — what the rotation will take
+// ---------------------------------------------------------------------------
+
+/// The preset a rotation would land on next, given the roster and the active
+/// position.
+///
+/// **The rotation's *which* is the roster's successor, not a director
+/// decision.** [`crate::director::Director`] decides *when* to rotate and
+/// nothing else — it returns a reason and the shell calls `cycle_preset`, which
+/// steps the roster forward and wraps. So the honest source for a "next up" line
+/// is the roster, and the test that keeps it honest compares this against the
+/// name `cycle_preset` then returns rather than against anything the director
+/// holds.
+///
+/// `None` on a roster with fewer than two entries: there is no next, and saying
+/// so is better than naming the preset already on screen.
+pub fn next_up<'a>(names: &[&'a str], active: usize) -> Option<&'a str> {
+    if names.len() < 2 {
+        return None;
+    }
+    names.get((active + 1) % names.len()).copied()
+}
+
+/// The predecessor's index, wrapped — what the `prev` control selects.
+///
+/// Computed here rather than asked of the core: `Renderer` exposes a forward
+/// `cycle_preset` and an indexed `select_preset`, and a wrapped decrement is
+/// arithmetic the shell can do. Widening the core's surface for it would be an
+/// ADR question, not a convenience.
+pub fn previous_index(count: usize, active: usize) -> Option<usize> {
+    if count == 0 {
+        return None;
+    }
+    Some((active + count - 1) % count)
+}
+
+/// The standing line naming what a rotation takes next, and whether hands-off
+/// rotation is even running.
+///
+/// Says *why* there is nothing to name rather than naming a guess: a roster of
+/// one has no successor, and an operator reading "next: —" needs to know which
+/// of the two states they are in.
+pub fn staging_line(next: Option<&str>, auto: bool) -> Line {
+    let body = match (next, auto) {
+        (Some(name), true) => format!("next up  -  {name}"),
+        (Some(name), false) => format!("next up  -  {name}  (auto off)"),
+        (None, _) => "next up  -  nothing to rotate to; the roster holds one preset".to_owned(),
+    };
+    Line::new(
+        body,
+        crate::overlay::LIST_INSET,
+        STRIP_TOP + BUTTON_H + crate::overlay::LIST_INSET,
+        crate::overlay::ROW_SIZE,
+        STAGING_COLOR,
+    )
+}
+
+/// The staging line's colour — brighter than the header, dimmer than a modal
+/// row: it is standing information, not the thing being driven.
+const STAGING_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
+
+/// The transport's labels as lines, at the reference geometry.
+///
+/// Positioned at the reference size like every other line the console draws, so
+/// [`scale_lines`] moves them onto the real window by the same factor
+/// [`transport`] scales the rectangles by.
+pub fn transport_lines(auto: bool) -> Vec<Line> {
+    BUTTONS
+        .iter()
+        .enumerate()
+        .map(|(i, button)| {
+            let lit = !matches!(button, Button::ToggleAuto) || auto;
+            Line::new(
+                button.label().to_owned(),
+                crate::overlay::LIST_INSET + i as f32 * (BUTTON_W + BUTTON_GAP) + BUTTON_GAP,
+                STRIP_TOP + BUTTON_GAP,
+                crate::overlay::ROW_SIZE,
+                if lit { BUTTON_COLOR } else { BUTTON_OFF_COLOR },
+            )
+        })
+        .collect()
+}
+
+/// A live control's label colour.
+const BUTTON_COLOR: [f32; 4] = [0.86, 0.90, 0.96, 1.0];
+/// The `auto` label while hands-off rotation is off — the one control whose
+/// label reports a state as well as offering an action.
+const BUTTON_OFF_COLOR: [f32; 4] = [0.45, 0.48, 0.55, 1.0];
+
 /// Which window an event arrived from, once the raw `WindowId` has been
 /// resolved against the two the app owns.
 ///
