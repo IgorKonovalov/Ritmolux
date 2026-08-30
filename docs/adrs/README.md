@@ -73,7 +73,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) | Downbeat and phrase tracking: bar-aware time variables, gated by a measured confidence with a deterministic counter fallback | accepted (Plan 0048; Outcome) |
 | [0051](0051-seeded-grammar-randomness-with-per-run-opt-in.md) | `hash(x)` and `noise(x)` in the grammar, seeded per preset; an opt-in per-run seed that capture paths always pin | accepted |
 | [0052](0052-analysis-diagnostics-are-native-only.md) | The analysis diagnostics surface is native-only and does not cross the C ABI | accepted (Plan 0049; Outcome) |
-| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 |
+| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 (revoked by 0147); Outcome |
 | [0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md) | A runtime quality-tier change rebuilds the engine's GPU resources on the live context | accepted 2026-08-04 (Plan 0050; Outcome) |
 | [0055](0055-backdrop-leaves-the-post-chain.md) | The backdrop leaves the post chain: the composite carries premultiplied alpha and the backdrop is composited underneath | accepted 2026-07-31 (Plan 0045) |
 | [0056](0056-additive-scenes-emit-premultiplied-alpha.md) | A scene that draws into the chain emits premultiplied alpha equal to its own coverage, and the alpha blend saturates rather than sums | accepted 2026-08-01 (Plan 0051; Outcome) |
