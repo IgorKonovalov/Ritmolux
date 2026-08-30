@@ -237,147 +237,120 @@ shorter than the placeholder above guessed).
 | 3 — The gate learns the narration shape that survives | dev | done | fdb0fed |
 | 4 — The maps name every crate | dev | landed out of band, verified | (none — see notes) |
 | 5 — The spec says what the shim does | dev | done | 7c87aad |
-| 6 — The unwired scripts get a line or get deleted | dev | done, with a deviation | committed with this row |
+| 6 — The unwired scripts get a line or get deleted | dev | done, with a deviation | 4780f9e |
 
 ### Notes
 
-**Phase 1.** `grep -c "fn headless" core/tests/*.rs` is 0. `core/tests/common/mod.rs` holds
-**four** constructors, not the one the done-when names: `headless` / `headless_on` /
-`headless_hardware` / `headless_tiered`. The copies differed in three ways, and only two of them
-are the "size constant, `prefer_software`" the phase anticipated — `layer.rs` also required a
-hardware adapter and skipped on WARP (ADR-0058), and `bloom.rs` called `new_headless_tiered`.
-Those are different behaviour, not different arguments. The ADR-0016 skip block itself **is**
-singular: one private `build()` holds it, the four public entry points delegate, and
-`grep -c 'eprintln!("skipped: no GPU adapter'` over `core/tests/common/mod.rs` is 1.
+**P1 — harness count.** `grep -c "fn headless" core/tests/*.rs` is 0. `common/mod.rs` holds
+**four** constructors, not the one the done-when names: the copies differed in three ways and only
+two are the "size constant, `prefer_software`" the phase anticipated — `layer.rs` also required a
+hardware adapter and skipped on WARP (ADR-0058), `bloom.rs` called `new_headless_tiered`. The
+ADR-0016 skip block itself is singular: one private `build()`, four entry points delegating.
 
-**Phase 1, `probe`/`capture` not extracted.** The phase lists `probe` x7 and `capture` x7 among
-the copies. They are not copies: the seven `probe` functions build seven different presets
-(`arc_cost` a star roster, `palette_contour` a fragment_field, `mark_cost` a swarm, `layer` a
-string substitution returning `String`, ...) and the seven `capture` functions take seven
-different argument lists. They share a name and nothing else, so there was nothing to hoist and
-`common/` holds neither.
+**P1 — `probe`/`capture` were not extractable.** The phase lists them as x7 copies each. They are
+seven *different* functions sharing a name: the `probe`s build seven different presets (one
+returns `String`), the `capture`s take seven different argument lists. `common/` holds neither.
 
-**Phase 1, the eleven remaining inline skip blocks.** `arc_cost`, `attractor`,
-`backdrop_palette`, `backdrop_ramp`, `background_composite`, `beat`, `collage_cost`,
-`field_cost`, `mark_cost`, `palette_contour` and `reaction_diffusion` still spell the ADR-0016
-block out inside a bespoke `capture_at`-shaped function rather than in a `fn headless`. They were
-outside the phase's stated set (the 27 files defining `headless()`) and are untouched.
+**P1 — eleven inline skip blocks remain**, in `arc_cost`, `attractor`, `backdrop_palette`,
+`backdrop_ramp`, `background_composite`, `beat`, `collage_cost`, `field_cost`, `mark_cost`,
+`palette_contour`, `reaction_diffusion`. They sit inside bespoke `capture_at`-shaped functions, not
+a `fn headless`, so the phase's stated set did not reach them.
 
-**Phase 2, six strings rather than four.** The phase names four broken `format!` literals at
-`schema.rs:756/982/1762/1787`. The tree carries **six**, all the same defect and all in the named
-file: the two per-vertex warnings (`:806`, `:1141`) and the four `[particles]` tuple-path
-rejections (`:1941`, `:1949`, `:1958`, `:1966`). All six are rejoined. A seventh of the same shape
-sits at `core/src/dsp/mod.rs:57` and is **untouched** — outside the phase's file list; it is in the
-followups below.
+**P1 — "same test count".** `#[test]` under `core/tests/` is 236 at `HEAD` and 236 in the tree;
+`cargo nextest run --workspace` 1199 passed / 5 skipped; golden green unblessed. The box has a
+hardware GPU, so the CPU-only skip path was not exercised at runtime — what is checked is that its
+branch and notice text are unchanged from the copies they replace.
 
-**Phase 2, the negative clippy check does not fail.** The phase asks `dev` to remove the
-`#[allow(clippy::indexing_slicing, ...)]` once and state the lint it saw. Removing it from `seed`
-leaves `cargo clippy --workspace --all-targets -- -D warnings` **green**, so the attribute is
-inert where it now sits — and was equally inert on `rebuild_if_stale`. The mechanism: the module
-denies the lint at `mod.rs:49-54`, but `indexing_slicing` does not fire on a constant index into a
-fixed-size array, which is exactly the case the attribute's own reason string describes
-("index fixed [f32; 3] at constant offsets"). Two probes pin this down — `spread[0] + center[0]`
-inserted into `seed` with the attribute absent produced no diagnostic, while `Some(1u32).unwrap()`
-in the same position produced `error: used unwrap() on Some value ... note: the lint level is
-defined here --> mod.rs:49`, so the deny does reach the function. Both probes were removed. The
-attribute is moved as the phase says and **not** deleted: whether a dead `#[allow]` should stay is
-a call this phase does not authorize.
+**P2 — six strings, not four.** `schema.rs` carries six of the defect, not the four at the
+line numbers in the phase: `:806`, `:1141`, `:1941`, `:1949`, `:1958`, `:1966`. All six rejoined.
+A seventh at `core/src/dsp/mod.rs:57` is outside the file list and untouched (followup below).
 
-**Phase 2, `rebuild_if_stale` needed no new doc.** The phase asks for "the one-line doc it
-actually needs". It already had its own correct doc block sitting *below* the misplaced one; only
-the orphaned prose and the attribute moved, and nothing was written for it.
+**P2 — the negative clippy check does not fail, and the attribute is inert.** Removing
+`#[allow(clippy::indexing_slicing, …)]` from `seed` leaves `cargo clippy --workspace --all-targets
+-- -D warnings` green. `indexing_slicing` does not fire on a constant index into a fixed-size
+array — exactly what the attribute's reason string describes — so it was inert on
+`rebuild_if_stale` too. Two probes: `spread[0] + center[0]` in `seed` with the attribute absent
+gave no diagnostic; `Some(1u32).unwrap()` in the same position gave `error: used unwrap() on Some
+value … the lint level is defined here --> mod.rs:49`, so the deny does reach the function. Both
+removed. The attribute is moved as the phase says and **not** deleted.
 
-**Phase 2, the test covers all six, not one.** `operator_messages_carry_no_run_of_spaces` in
-`core/tests/preset.rs` walks both per-vertex warnings and all four tuple-path errors rather than
-the single `rad` case the phase names, since a test guarding one of six rejoined strings leaves
-five unguarded. It rejects `
-` and `	` alongside a two-space run. Bite check: re-breaking the
-first literal fails it with `per-vertex reach: message is not a single clean sentence: "... which
-                      reads 0 ..."`; the string was then restored.
+**P2 — `rebuild_if_stale` needed no new doc**; it already had its own correct block below the
+misplaced one. Only the orphaned prose and the attribute moved.
 
-**Phase 3, 72 comments rather than the ~14 the phase sized.** The vocabulary the phase specifies
-reports 72 findings across 45 files on the live tree — 40 in non-test `core/src` + `standalone/src`,
-30 in test files, 2 in `foo_lmv.cpp`. All 72 are rewritten in the gate's own commit. The user was
-asked before Phase 3 started and chose to rewrite all of them rather than re-scope.
+**P2 — the test covers all six**, not the single `rad` case the phase names, and rejects `
+` and
+`	` alongside a two-space run. Bite check: re-breaking the first literal fails it; restored.
 
-**Phase 3, one false positive, resolved by rewriting rather than by an escape.**
-`core/src/render/scenes/particles/tests.rs` read *"the fixed-point diameter is not a lower bound on
-the attractor's reach any more than it is an upper one"* — the comparative idiom, not the residue
-phrase. It now reads *"is no more a lower bound ... than it is an upper one"*. **Zero
-`hygiene-allow` escapes were added**, so the phase's "more than three escapes means the pattern
-over-reaches" signal did not fire; the single over-reach is recorded here instead.
+**P3 — 72 comments across 45 files, not ~14.** The user was asked before Phase 3 started and chose
+to rewrite all of them. 40 in non-test `core/src` + `standalone/src`, 30 in tests, 2 in
+`foo_lmv.cpp`.
 
-**Phase 3, the walk covers `.c`/`.h`/`.cc`/`.cpp`/`.hpp` repo-wide, not only `plugin-foobar/`.**
-The repo holds three C/C++ files — `plugin-foobar/foo_lmv.cpp`, `core-cabi/include/lmv_core.h` and
-`standalone/src/spout/shim.cpp` — all hand-written and all ours, and restricting the walk by
-directory would have left the fixture tree's own `.cpp` unreachable when `scripts/fixtures` is the
-root. Only `foo_lmv.cpp` reported (`:328`, `:548`).
+**P3 — one false positive, rewritten rather than escaped.** *"not a lower bound … any more than it
+is an upper one"* is the comparative idiom; it now reads *"no more a lower bound … than"*. **Zero
+`hygiene-allow` escapes added**, so the phase's "more than three escapes" signal did not fire — the
+single over-reach is recorded here instead.
 
-**Phase 3, fixtures: four files, ten findings.** `seeded-elapsed.rs` (five, one per preposition in
-the alternation), `seeded-residue.rs` (one), `seeded.cpp` (two), and the pre-existing `seeded.rs`
-(two — one line was reworded so it no longer seeds a third class incidentally). `seeded.cpp` pins
-the three places the C lexer must not use Rust's rules: non-nesting block comments, the
-`R"tag(...)tag"` raw string, and `'` always opening a char literal.
+**P3 — the walk is repo-wide, not `plugin-foobar/`-scoped.** `.c/.h/.cc/.cpp/.hpp` everywhere: the
+repo holds three such files, all ours, and a directory-scoped walk would leave the fixture tree's
+own `.cpp` unreachable when `scripts/fixtures` is the root. Only `foo_lmv.cpp` reported.
 
-**Phase 3, `scripts/fixtures/README.md` was edited, and it is outside the phase's file list.** The
-phase lists `scripts/fixtures/comment-hygiene/*`; the README one level up carries the expected-count
-table for that directory and said "exactly two findings". Leaving it would have shipped the
-doc/test drift this plan exists to remove.
+**P3 — `scripts/fixtures/README.md` was edited and is outside the phase's file list.** It carries
+the expected-count table for `comment-hygiene/` and said "exactly two findings"; it now says four
+files, ten findings.
 
-**Phase 3, the binary-hash check in the done-when is void on this machine.** The phase offers
-"a `cargo build` that emits the same binary hash before and after" as the cheap proof that no
-non-comment line moved. `cargo build --release -p standalone` run **twice over identical source**
-produced `E1D367...` and then `82290BD...`, so the release build is not bit-reproducible here and
-the check cannot distinguish a comment edit from anything else. What replaced it: every `+`/`-`
-line in `git diff -- '*.rs' '*.cpp'` for the rewrite is a comment line (`///`, `//!`, `//`, `*`) —
-zero non-comment lines, mechanically filtered — and `cargo doc --workspace --no-deps` emits **64**
-intra-doc-link warnings both before and after, so no rustdoc link was broken by the rewording.
-`cargo nextest run --workspace`: 1200 passed, 5 skipped.
+**P3 — the binary-hash check in the done-when is void on this machine.**
+`cargo build --release -p standalone` run **twice over identical source** gave `E1D367…` then
+`82290BD…`, so the release build is not bit-reproducible here and the check cannot distinguish a
+comment edit from anything else. Replaced by: every `+`/`-` line in `git diff -- '*.rs' '*.cpp'` is
+a comment line (mechanically filtered, zero non-comment lines); `cargo doc --workspace --no-deps`
+emits **64** intra-doc-link warnings both before and after; `cargo nextest run --workspace` 1200
+passed / 5 skipped.
 
-**Phase 4 was verified, not redone**, per the out-of-band note in the phase block. All five
-`[workspace] members` from the root `Cargo.toml` — `core`, `core-cabi`, `lmv-ring`, `milkconv`,
-`standalone` — appear by name in `CLAUDE.md`, `.claude/skills/architect/references/project-context.md`
-and `.claude/skills/dev/references/project-context.md`. `core/src/milk/`, `presets/pending/` and
+**P4 was verified, not redone**, per its out-of-band note, and **produced no commit**. All five
+`[workspace] members` appear by name in all three maps; `core/src/milk/`, `presets/pending/`,
 `tools/sd-filter/` are mapped in all three (`CLAUDE.md:50,67,71`; architect `:31,45,48`; dev
-`:17,36,38`). `grep -n "twelve, and then to thirteen" CLAUDE.md` is empty — the count narration is
-retired. `node scripts/check-doc-links.mjs` exits 0. **This phase produced no commit of its own**;
-there was nothing left to change.
+`:17,36,38`); `grep -n "twelve, and then to thirteen" CLAUDE.md` is empty.
 
-**Phase 5.** The clause read *"letting the shim refuse a core whose ABI it was not built
-against"*; `foo_lmv.cpp:984` is `g_abi_ok = (core_abi >= LMV_ABI_VERSION)`, which refuses only an
-**older** core. The rewritten clause spells the comparison out, carries the shim's own
-justification (the size-guarded `lmv_get_metrics` is what makes a newer core safe) and adds what
-the shim does on refusal — logs to the console, disables preset loading and diagnostics, leaves
-the render path alone. `LMV_ABI_VERSION` and the `extern "C"` surface are untouched; all fifteen
-names in `core-cabi/include/lmv_core.h` still appear in the spec.
+**P5.** The clause said the shim refuses a core it was not built against; `foo_lmv.cpp:984` is
+`core_abi >= LMV_ABI_VERSION`, refusing only an **older** one. Rewritten to the actual comparison
+plus the shim's justification and its degrade-on-refusal. `LMV_ABI_VERSION` and the `extern "C"`
+surface untouched; all fifteen header names still appear in the spec.
 
-**Phase 6 deviates from the plan, on the user's instruction given before Phase 1 started.** The
-phase says to `git rm` `scripts/milk-softness.mjs` and `scripts/softness-sheets.mjs` and re-point
-the Plan 0114 references at the commit that held them. **Both files are kept**, and the
-"Renderers, not gates" line in `CLAUDE.md` names all five unwired scripts rather than three. The
-done-when is satisfied by its first branch for every file — `for f in scripts/*.mjs` shows each of
-the ten either wired into `.githooks/pre-push` and `.github/workflows/ci.yml` (the five gates) or
-named in `CLAUDE.md` (the five renderers). `node scripts/check-doc-links.mjs` exits 0.
-
-Two things the deletion would have cost, noted for the reviewer rather than as an argument: the
-closed plan `docs/plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md` references the two
-scripts at **nine** places, not two; and design-backlog **0161** carries a live `unprobeable:`
-verification on them (*"the two render scripts still assume the old layout"*), which a deletion
-would have left pointing at nothing.
-
-**Phase 1, evidence for "same test count".** `#[test]` attributes under `core/tests/` are 236 at
-`HEAD` and 236 in the tree. `cargo nextest run --workspace`: 1199 passed, 5 skipped, golden suite
-green unblessed. The renderer is hardware on this box, so the CPU-only skip path was not
-exercised at runtime; what is checked is that its branch and notice text are unchanged from the
-copies they replace.
+**P6 deviates, on the user's instruction given before Phase 1.** The phase says to `git rm`
+`milk-softness.mjs` and `softness-sheets.mjs`; **both are kept**, and the `CLAUDE.md` line names
+all five unwired scripts. The done-when is met by its first branch for every file. Two costs the
+deletion would have carried, for the reviewer rather than as an argument: closed plan 0114
+references the pair at **nine** places, and design-backlog **0161** holds a live `unprobeable:`
+verification on them.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no — `git diff --name-only e6028bd..HEAD -- presets/` is empty. 74 files
+  in total.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **What shipped:** one user-facing **fix** (Phase 2 — six operator messages that reached the
+  console with a run of ~20 literal spaces in them), and otherwise **chore + docs**: a test
+  harness, a widened gate, a corrected spec clause and a corrected map. No file under
+  `core/src/render/` changes a pixel; the golden suite is green **unblessed** at every phase.
+- **Operator docs touched:** `docs/specs/0001-c-abi.md` (the ABI compatibility clause, Phase 5),
+  `CLAUDE.md` (the `scripts/` entry, Phase 6) and `scripts/fixtures/README.md` (the
+  comment-hygiene expected-count table, Phase 3). No file under `docs/` other than the spec and
+  this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. All five Node gates exit
+  0 on the tip.
+- **Outstanding `human` phases:** none — every phase was `dev`-owned.
 
 ## Followups (after this lands)
+
+Each is stated once here; the Notes above carry the evidence and do not repeat these.
+
+- **`core/src/dsp/mod.rs:57` carries a seventh broken literal** of Phase 2's defect
+  (`"… cannot be longer      than it"`). Outside Phase 2's file list, untouched, and not reached
+  by the Phase 2 test either.
+- **The `#[allow(clippy::indexing_slicing, …)]` on `Particles::seed` is dead** and was dead in its
+  old position too. Deleting it is a one-line change this plan did not authorize.
+- **The eleven inline ADR-0016 skip blocks** could now fold into `core/tests/common/`.
+- **`cargo doc` emits 64 intra-doc-link warnings** over 31 files, unchanged by this plan and gated
+  by nothing — neither `.githooks/pre-push` nor CI runs `cargo doc`.
+- **The two judging renderers were kept rather than deleted.** If they should still go,
+  design-backlog 0161's verification bullet on them has to move in the same change.
