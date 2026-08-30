@@ -365,6 +365,17 @@ impl RenderContext {
         // default, so the in-flight image count - and its VRAM - is bounded and
         // stated, not implicit.
         config.desired_maximum_frame_latency = 2;
+        // `COPY_DST` where the surface offers it, so a frame drawn into the
+        // preview intermediate can reach this swapchain by an exact
+        // `copy_texture_to_texture` rather than through a sampling blit, which
+        // would round-trip the encoded values ADR-0096 dithers. A usage flag
+        // costs nothing while nothing copies; the caps query is what decides,
+        // and `Renderer::open_preview` reports the refusal rather than
+        // degrading to an inexact path behind the operator's back.
+        let caps = surface.get_capabilities(&adapter);
+        if caps.usages.contains(wgpu::TextureUsages::COPY_DST) {
+            config.usage |= wgpu::TextureUsages::COPY_DST;
+        }
         surface.configure(&device, &config);
 
         let info = adapter.get_info();
@@ -460,6 +471,20 @@ impl RenderContext {
     /// The texture format the surface is configured with.
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.config.format
+    }
+
+    /// Whether this context's frame destination accepts a texture-to-texture
+    /// copy — the requirement the program preview's exact path rests on.
+    ///
+    /// With a surface it is what the swapchain was actually configured with,
+    /// which `from_surface` sets only where the surface's capabilities offer it.
+    /// Headless there is no swapchain and the destination is a capture target,
+    /// which is built with `COPY_DST` unconditionally.
+    pub(crate) fn can_copy_to_target(&self) -> bool {
+        match self.surface {
+            Some(_) => self.config.usage.contains(wgpu::TextureUsages::COPY_DST),
+            None => true,
+        }
     }
 
     /// Whether the active adapter is a CPU/software rasterizer (see the field).

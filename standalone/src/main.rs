@@ -449,8 +449,20 @@ impl AppState {
             .attach_aux(Arc::clone(&window), size.width, size.height)
         {
             Ok(mode) => {
+                // The program preview, opened with the window that consumes it.
+                // A refusal here is not fatal: the swapchain does not accept the
+                // exact copy the preview rests on, so the console runs without a
+                // picture rather than the show running through an inexact path.
+                let preview = match self.renderer.open_preview() {
+                    Ok(()) => "with preview",
+                    Err(err) => {
+                        self.diag_log
+                            .note(&format!("console preview unavailable, text only: {err}"));
+                        "text only"
+                    }
+                };
                 self.diag_log.note(&format!(
-                    "console opened: {}x{}, present mode {}",
+                    "console opened: {}x{}, present mode {}, {preview}",
                     size.width,
                     size.height,
                     mode.as_str()
@@ -471,6 +483,11 @@ impl AppState {
     fn close_console(&mut self) {
         if self.console_window.take().is_some() {
             self.renderer.detach_aux();
+            // Released with the window: while this is open the show is drawn
+            // into an intermediate and copied out, so leaving it behind would
+            // hold both the allocation and the extra copy for a console nobody
+            // is looking at.
+            self.renderer.close_preview();
             self.diag_log.note("console closed");
         }
     }

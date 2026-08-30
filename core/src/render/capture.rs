@@ -56,7 +56,15 @@ pub(crate) fn create_target(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        // `COPY_DST` alongside the two it is drawn and read through, so this
+        // target can stand in for a swapchain image on the preview path — where
+        // the frame is drawn into an intermediate and reaches its destination by
+        // `copy_texture_to_texture`. Without it the capture paths could not
+        // exercise that copy at all, and the only instrument left for it would
+        // need a real window.
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
