@@ -1,8 +1,8 @@
 # ADR-0143 — The operator console is a second surface on the render device, and the shell owns every pixel's meaning
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-30 (Plan 0131)
 > **Date:** 2026-08-28
-> **Related plan(s):** [0131 — The operator gets a console](../plans/0131-the-operator-gets-a-console.md)
+> **Related plan(s):** [0131 — The operator gets a console](../plans/done/0131-the-operator-gets-a-console.md)
 
 ## Context
 
@@ -162,3 +162,24 @@ The three properties in Context were each established by reading the tree, not f
 naming the blocking readback; and the absence of any operator-level blackout or freeze in either
 `core/src/render/mod.rs` or `standalone/src/main.rs` — the `hold` and `freeze` a grep finds are the
 preset-expression latch and the dual-live budget latch, unrelated to an operator's button.
+
+## Outcome — 2026-08-30, at Plan 0131's close
+
+**The design holds and one of its stated properties does not.** The second surface attaches to the
+renderer's existing device, the frame is drawn once, and the show's pixels are unchanged: a frame
+routed through the preview intermediate is asserted **byte-identical** to one drawn straight at the
+target (`core/tests/console_preview.rs`), with a vacuity guard and a recorded non-vacuity control.
+The letterbox rectangle takes its aspect from the output target and is tested at three disagreeing
+aspects, which is the first test in this repository written so a 16:9-into-16:9 pass cannot happen.
+
+**What did not hold is the cadence claim.** This ADR argues the console cannot pace the output
+because its own present is independent — its own encoder, its own submit, its own present, and a
+non-blocking present mode where the surface offers one. Plan 0131 Phase 6 measured **61.7 fps
+console-closed against 33.1 fps console-open** on one machine, with `Mailbox` confirmed as the mode
+actually negotiated, so the non-blocking mode alone is **not** sufficient. Independence of the
+*encoder* is not independence of the *frame loop*: the console presents synchronously on the display
+thread, undecimated, with `desired_maximum_frame_latency = 1`. The reading is bounded — an
+integrated GPU, and both surfaces on one display, which is the configuration the plan says cannot
+separate the two pacing sources — so it convicts the claim without naming the mechanism. Carried as
+[backlog 0164](../design-backlog.md); the cross-refresh measurement that would name it is still owed
+on the checklist.

@@ -226,7 +226,7 @@ flowchart LR
 - **What:** the controls a live set needs. Blackout, master level, look selection.
 - **Files touched:** `standalone/src/main.rs`, the settings surface, `standalone/src/artnet.rs`.
 - **How:** mirror the existing operator surfaces rather than inventing one — the settings modal and
-  the hotkey set are the precedent, and [Plan 0131](0131-the-operator-gets-a-console.md)'s console is
+  the hotkey set are the precedent, and [Plan 0131](done/0131-the-operator-gets-a-console.md)'s console is
   where this eventually belongs if that plan has landed.
   - **Blackout must be reachable in one keystroke**, because its use case is "something is wrong
     right now, in front of an audience".
