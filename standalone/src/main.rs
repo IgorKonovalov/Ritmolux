@@ -29,7 +29,7 @@ use director::Director;
 use downbeatlog::DownbeatLog;
 use lmv_core::audio::{AudioFormat, SampleConsumer};
 use lmv_core::dsp::Analyzer;
-use lmv_core::render::{CapOverflow, Renderer, RendererOptions, Tier};
+use lmv_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
 use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
 use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierState};
 use soak::SoakLog;
@@ -305,18 +305,25 @@ impl AppState {
         soak_path: Option<PathBuf>,
         downbeat_log_path: Option<PathBuf>,
         tier: Option<Tier>,
+        adapter: AdapterChoice,
         input: config::Input,
         osc: Option<OscSink>,
     ) -> Self {
         let size = window.inner_size();
+        let pinned = adapter != AdapterChoice::Default;
         let mut renderer = Renderer::new(
             Arc::clone(&window),
             size.width,
             size.height,
-            RendererOptions { tier },
+            RendererOptions { tier, adapter },
         )
         .unwrap_or_else(|err| {
             eprintln!("renderer init failed: {err}");
+            // An operator who named an adapter and did not get it must not be
+            // left with a window on a different GPU, so the refusal is fatal
+            // rather than a degrade (ADR-0155). Exit 1: the flag was recognized
+            // and its effect failed, against 2 for an argument list wrong in
+            // shape.
             std::process::exit(1);
         });
         // Say which tier the show is running at. The same preset looks different
@@ -411,16 +418,16 @@ impl AppState {
             input_roster: Vec::new(),
             display_index,
         };
-        // **Which GPU is rendering the show**, once, at startup. On a hybrid
-        // machine the windowed path takes whatever `request_adapter` returns for
-        // the surface, which is not necessarily the discrete GPU, and every
-        // frame-time figure taken from this run is a property of that choice
-        // (ADR-0071). The headless `--stream` mode prints both resolved adapters
-        // for the same reason; the window had no equivalent, so a measurement
-        // taken here could not name its own adapter.
+        // **Which GPU is rendering the show**, once, at startup. Unflagged, the
+        // window takes whatever wgpu returns for the surface, which on a hybrid
+        // machine is not necessarily the discrete GPU; every frame-time figure
+        // taken from this run is a property of that choice (ADR-0071). The line
+        // names whether an operator pinned it, so a measurement can say which of
+        // the two it is rather than leaving the reader to guess.
         state.diag_log.note(&format!(
-            "renderer adapter: {}",
-            state.renderer.adapter_description()
+            "renderer adapter: {}{}",
+            state.renderer.adapter_description(),
+            if pinned { " (pinned by --gpu)" } else { "" }
         ));
         state
     }
@@ -2190,6 +2197,12 @@ struct App {
     /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     tier: Option<Tier>,
+    /// Which adapter `--gpu` named, already resolved.
+    /// [`AdapterChoice::Default`] is the unflagged request and is exactly what
+    /// the window asked for before the flag could reach it (ADR-0155). Held
+    /// beside `config` like the other per-launch flags, so it pins this run
+    /// without persisting itself.
+    adapter: AdapterChoice,
     /// The capture selection, already resolved across `--input` / `--device` /
     /// `[input]` (Plan 0130). Held beside `config` rather than written into it,
     /// so a flag pins this launch without persisting itself on the next save.
@@ -2240,6 +2253,7 @@ impl ApplicationHandler for App {
                         self.soak_path.take(),
                         self.downbeat_log_path.take(),
                         self.tier,
+                        std::mem::take(&mut self.adapter),
                         std::mem::take(&mut self.input),
                         self.osc.take(),
                     );
@@ -2568,8 +2582,8 @@ const FLAGS: &[FlagSpec] = &[
     FlagSpec {
         name: "--gpu",
         takes_value: true,
-        requires: Some("--stream"),
-        help: "<name|index> which graphics adapter renders and sends",
+        requires: None,
+        help: "<name|index> which graphics adapter to render on",
     },
     FlagSpec {
         name: "--sender",
@@ -2832,6 +2846,23 @@ fn parse_tier_arg() -> Result<Option<Tier>, String> {
             return Tier::from_name(&value)
                 .map(Some)
                 .ok_or_else(|| format!("--tier `{value}`: expected `floor` or `rich`"));
+        }
+    }
+    Ok(None)
+}
+
+/// The value of a single-valued flag, in both spellings, or `None` when the
+/// flag is absent.
+///
+/// The scanner the windowed `--gpu` and `--preset` share. Both are also read by
+/// `stream::parse` on the headless path; this is the window's reader, and the
+/// two never run in the same process because `--stream` decides which mode this
+/// binary is before either is consulted (ADR-0155).
+fn windowed_flag(name: &'static str) -> Result<Option<String>, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, name, &mut args) {
+            return value.map(Some);
         }
     }
     Ok(None)
@@ -3378,12 +3409,24 @@ fn main() {
         None => None,
     };
 
+    // Resolved before the event loop exists, so a `--gpu` with no value is a
+    // usage error rather than a window that opens and then reports one — the
+    // shape `--tier` and `--osc` already follow.
+    let adapter = match windowed_flag("--gpu") {
+        Ok(wanted) => standalone::gpu::window_choice(wanted.as_deref()),
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    };
+
     let mut app = App {
         config,
         config_path,
         soak_path,
         downbeat_log_path,
         tier,
+        adapter,
         input,
         osc,
         console_flag: parse_console_flag(),

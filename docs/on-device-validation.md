@@ -289,10 +289,16 @@ footprint so the vendor spread is on record.
       > **A second finding came out of it and is not about the console at all.** The windowed app
       > renders on `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)` on this machine, which also has
       > an RTX 3080 — `request_adapter` with a default power preference hands a hybrid laptop the
-      > power-saving GPU, and **`--gpu` reaches `--stream` only** (ADR-0146), so the window cannot
-      > ask for the discrete one. Every windowed frame-time figure ever quoted on this machine is
-      > therefore an iGPU figure. The startup note that says which adapter is running was added in
-      > the same session and is what makes any of these numbers attributable.
+      > power-saving GPU. Every windowed frame-time figure quoted on this machine before
+      > 2026-08-30 is therefore an iGPU figure. The startup note that says which adapter is running
+      > is what makes any of these numbers attributable.
+      >
+      > **`--gpu` now reaches the window** (ADR-0155), and `lmv --gpu 1` has been observed putting
+      > this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` with the
+      > startup line reading `(pinned by --gpu)`. What that unblocks and nobody has yet done: **re-take
+      > the windowed frame-time figures on the discrete adapter and compare them against the iGPU
+      > ones already recorded.** Unflagged behaviour is unchanged by design, so the existing numbers
+      > remain valid for the default and the comparison is a new row rather than a correction.
 
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 

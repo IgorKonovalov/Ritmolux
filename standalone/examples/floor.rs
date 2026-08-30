@@ -21,7 +21,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use lmv_core::render::RenderContext;
+use lmv_core::render::{AdapterChoice, RenderContext};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -63,7 +63,15 @@ impl ApplicationHandler for FloorProbe {
             }
         };
         let size = window.inner_size();
-        match RenderContext::new(Arc::clone(&window), size.width, size.height) {
+        match RenderContext::new(
+            Arc::clone(&window),
+            size.width,
+            size.height,
+            // This probe measures the floor tier's cost on whatever GPU the
+            // window lands on, which is the same adapter the app would take
+            // unflagged.
+            &AdapterChoice::Default,
+        ) {
             Ok(ctx) => {
                 self._ctx = Some(ctx);
                 self._window = Some(window);
