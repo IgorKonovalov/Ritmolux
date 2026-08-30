@@ -1,0 +1,113 @@
+# Loom - the Maurer rose opened off-origin into a woven annulus (Plan 0104
+# Phase 3). Authored fresh-slate (ADR-0089) around the one shape param the
+# family's three shipped worlds all leave near zero.
+#
+# `radial_offset` IS WHAT PUTS A HOLE IN THE MIDDLE, and that is the whole
+# reason this world exists. The curve is `r = sin(n*theta + phase) +
+# radial_offset`, so the offset adds to the radius: at 0 the rose passes through
+# the origin and every petal meets there, and at 1.05 `r` never goes below about
+# 0.05, so nothing is drawn near the centre. What renders is not a smooth
+# annulus but a nest of pentagonal weaves around a clear pentagonal core - the
+# chord walk at n = 5 keeps the figure's own five-fold corners, and the offset
+# hollows it rather than rounding it. Broadside, Ion Wake and Nightbloom are all
+# solid to the centre (0, 0 and 0.06 respectively); none of them has an
+# interior. A figure with a hole reads differently enough from one without that
+# this is a shape difference rather than a tuning one.
+#
+# THE PRICE, WHICH THE README STATES AND IS WORTH REPEATING: a non-zero
+# `radial_offset` makes `r` exceed [-1, 1], so `scale` has to come down in the
+# same edit or the weave leaves the frame. Here `r` tops out near 2.05, and
+# 0.44 puts the outer rim at about 0.90 of the frame's half-height. The renderer
+# clips rather than fitting, so this is arithmetic and not taste.
+#
+# WHAT DRIVES WHAT. Bass opens and closes the annulus - the ring's own width is
+# the structural gesture, and it is where the peak is spent. Mid advances
+# `phase`, which reshapes the petals from the inside rather than rotating the
+# finished figure (that is `spin`, and it is held slow). Treble rides the wire's
+# weight; onset goes to the bloom, where the weave's own crossings are already
+# over range.
+system = "parametric_curve"
+name   = "Loom"
+
+[curve]
+family = "maurer_rose"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0d1b33" },  # iron
+  { at = 0.32, color = "#2c5f8a" },  # steel blue
+  { at = 0.58, color = "#8f9aa8" },  # bright steel
+  { at = 0.80, color = "#c99a4a" },  # brass
+  { at = 1.00, color = "#ffe6a8" },  # gold, at the end of the walk
+]
+
+[params]
+n = "5"
+d = "73"
+samples = "721"
+
+# THE ANNULUS (see header). The cap is small on purpose: this is the ring's
+# width, and a wide swing closes the hole entirely at the bottom of its travel,
+# which is the one thing that would make this world a duplicate of the other
+# three.
+radial_offset = "1.05 + clamp(bass * 0.259, 0, 0.22) + clamp(onset * 0.167, 0, 0.1)"
+scale         = "0.44"
+
+# Two different motions and they are not interchangeable. `phase` advances
+# INSIDE the sine, so the petals re-shape as it moves; `spin` turns the finished
+# figure. `spin` integrates a phase (ADR-0132), so it is safe to bind, but it is
+# held near-constant here - the weave should turn slowly and morph visibly, not
+# the other way round.
+phase = "time * 0.09 + clamp(mid * 0.412, 0, 0.35)"
+spin  = "0.05"
+
+draw_progress = "1"
+
+# A FINE WIRE. 721 chords crossing inside a band means a great many overlaps,
+# and every overlap sums under the additive seam - so the stroke is thin and the
+# level is low. `softness` 0.15 keeps a crisp core: the weave has to read as
+# separate wires or it is a solid ring.
+thickness = "1.6 + clamp(treb * 0.83, 0, 0.5)"
+softness  = "0.15"
+glow      = "0.7"
+# VERY LOW, AND MEASURED RATHER THAN CHOSEN. 721 chords crossing inside one band
+# is the densest self-overlap any line preset in the library asks for, and every
+# overlap sums: at 0.42 the whole weave tonemapped to flat white and the palette
+# - iron through steel to brass - was simply not visible in the frame. At 0.16
+# the crossings still brighten, but they brighten toward gold instead of toward
+# nothing, which is the difference between a lit figure and an erased one.
+brightness = "0.16 + clamp(mid * 0.071, 0, 0.06)"
+
+# The palette walks POSITION ALONG THE TRACED PATH on this system, so the wire
+# runs iron at the start of the walk to gold at its end - which on a Maurer rose
+# means the colour spirals through the weave rather than banding it radially.
+hue        = "0.02 + sin(time * 0.021) * 0.02"
+hue_spread = "1.0"
+saturation = "1.0"
+
+bg_hue       = "0.04"
+bg_bright    = "0.075"
+bg_angle     = "0"
+bg_hue_span  = "0.1"
+bg_shade     = "1.0"
+bg_shade_end = "0.3"
+bg_vignette  = "0.7"
+
+# The whole-frame stop, and where the low end's level response goes rather than
+# onto the wire. A 721-chord figure is still mostly empty frame, so a term on
+# `brightness` alone moves too few pixels to read.
+exposure = "0.72 + clamp(bass * 0.294, 0, 0.25)"
+
+# The crossings are the only thing over range, and they sit in the band - so a
+# hit lights the weave itself and leaves the hole dark.
+bloom_amount    = "0.28 + clamp(onset * 0.83, 0, 0.5)"
+bloom_threshold = "0.85"
+bloom_radius    = "1.3"
+
+[smoothing]
+radial_offset = 0.4
+phase         = 0.3
+thickness     = { attack = 0.02, release = 0.35 }
+brightness    = 0.3
+exposure      = { attack = 0.05, release = 0.4 }
+bloom_amount  = { attack = 0.03, release = 0.35 }

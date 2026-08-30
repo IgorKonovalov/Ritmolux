@@ -111,6 +111,53 @@ would then sit on a commit *after* the plan's own close commit, and because it r
 failure ADR-0005 exists to prevent — a bump that nobody owns, run in whichever session happens to be on
 `main`. Bumping on the branch keeps the version squarely inside the close ceremony, where one skill owns it.
 
+## Outcome (2026-08-30, on a review of the close ceremony)
+
+Recorded here rather than in a superseding ADR because **the decision held in full**. Lanes run in
+worktrees, `main` is merged into the branch before the branch fast-forwards `main`, the gate re-runs
+after that merge, and the version is chosen late. Seventy-seven plans have closed since Plan 0047;
+`main` carries **47 lane merge commits and zero `Merge branch 'plan-… ' into main`**, and no version
+has been issued twice. What did not survive contact is the **completeness** of the five-step sequence,
+plus three supporting claims.
+
+**The sequence is seven steps, not five.** Step 6 (`git worktree remove` + `git worktree prune`) and
+step 7 (`git branch -d plan-NNNN-<slug>`, *after* 6, because git refuses to delete a branch that is
+checked out in a worktree) are now part of the ordered close in `.claude/skills/architect/SKILL.md`.
+They were not missing from this ADR — *"a finished lane's worktree should be removed rather than left
+around"* sits in the Negative section above — but they were stated as a **cost**, not as a **step**,
+and that difference is the whole finding: a duty written into the consequences gets skipped, and a
+duty written into the numbered order gets done. It is the same failure mode the close ceremony's
+backlog-archival step was added to fix, hit a second time on a different duty. The evidence is
+physical: on 2026-08-30 this machine stood at **46 GB free of 954 GB (96 % used)**, with four
+`WORK/lmv-*` leftovers that `git worktree list` does not know about — directories deleted by hand,
+which is exactly what the Positive section's *"a lane can be abandoned by deleting a directory"*
+invites. Abandoning a lane takes the same two steps, with `-D` in place of `-d`.
+
+Three claims to correct:
+
+1. **Step 4 is not executable from where this ADR says the close runs.** Since Plan 0101's close
+   (2026-08-17) the harness rejects any `git -C <main checkout> …` issued from a worktree-isolated
+   session — *"a worktree-isolated session's git operations must target its own worktree"* — and
+   likewise any compound command it cannot statically prove stays inside the lane. The lane session
+   now stops at the tag and hands steps 4-7 over as one block, or they run from a session opened in
+   the main checkout. Steps 1-3 are unaffected.
+2. **"By construction a clean fast-forward" holds only while `main` stands still.** At Plan 0099's
+   close a parallel session landed two doc commits mid-bookkeeping and the `--ff-only` was refused
+   twice. The recovery is cheap but has one non-obvious step: after each re-`git merge main` the
+   `vX.Y.Z` tag is stranded on a commit that is no longer the branch tip, so it must be deleted and
+   re-cut before retrying. The mirror case bites step 3 — at Plan 0118's close `cargo release minor`
+   aborted with `error: tag v0.84.0 already exists`, because the then-live `plan-0098-nested-figure`
+   lane had already run its own `chore: Release` on a commit that never reached `main`. Choosing the
+   version against what `main` reached is necessary and **not sufficient**; `git tag --list 'v0.8*' |
+   sort -V` before writing a number into any document is what closes it. The gap at `v0.84.0` in this
+   repository's tag sequence is that event, and it is permanent.
+3. **"~8 GB" understates the disk cost roughly fourfold.** Closing Plans 0054 and 0056 together
+   (2026-08-03) reclaimed **32 GB** — 14 and 18 respectively. Two idle lanes can plausibly fill this
+   disk, which is why removal moved into the ordered steps rather than staying advice.
+   [ADR-0141](0141-one-artifact-store-serves-every-lane.md) would have removed the cost by pointing
+   every lane at one store, and [ADR-0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+   revoked that half — so the per-lane `target/` is permanent, and nothing gates it.
+
 ## Notes
 
 Written at Plan 0049's close, three plans after the practice began, at the user's request. The gap is

@@ -28,6 +28,8 @@ core/            # Rust library crate — DSP + render engine + scenes + preset 
   src/audio.rs   #   source-agnostic sample intake (validated at boundary)
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
   src/preset/    #   the .toml schema + the pure expression evaluator (expr.rs, schema.rs)
+  src/milk/      #   the MilkDrop RUNTIME (ADR-0113) — bytecode VM + shader emitter. Distinct
+                 #   from milkconv/, the ahead-of-time converter below.
   src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
 core-cabi/       # the C ABI and nothing else (ADR-0072) — the only crate declaring
                  #   cdylib/staticlib, emitted stem `lmv_core_c`. src/lib.rs + include/lmv_core.h
@@ -36,37 +38,52 @@ core-cabi/       # the C ABI and nothing else (ADR-0072) — the only crate decl
 lmv-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
 standalone/      # Rust binary + lib — winit + wgpu surface + loopback capture + the `shot` example
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
+milkconv/        # the MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships and
+                 #   nothing shipped depends on it, so it sits OUTSIDE `default-members` like
+                 #   core-cabi — one more reason `--workspace` is the load-bearing scope.
 presets/         # the curated preset library (*.toml) + README.md (the param roster)
+  pending/       #   authored + approved but NOT shipped, held back by a known engine/harness gap.
+                 #   Non-recursive read_dir in build.rs (ADR-0022) skips it by construction.
+                 #   A plan that closes such a gap owes a look at what this holds.
+tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
+scripts/         # the five Node gates; the first three are yours at every close (see SKILL.md)
 docs/
 ├── adrs/        # ADR-NNNN + README index
 ├── plans/       # plan NNNN + README index + done/
 ├── specs/       # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP)
-└── diagrams/    # standalone mermaid (created on first use)
+└── diagrams/    # standalone mermaid — declared as an output location, never yet created.
+                 #   133 docs carry EMBEDDED mermaid instead; prefer embedding.
 .claude/
 ├── skills/      # architect + dev + preset-author
 ├── hooks/       # block-broad-git-add.js
 └── settings.json
 ```
 
-## The artifact store (machine-local, opt-in)
+## The machine-local cargo config (opt-in)
 
-Lanes still run in git worktrees ([ADR-0053](../../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)),
-but they no longer each carry their own `target/`. A machine-local `WORK/.cargo/config.toml`, one
-directory above every worktree, can redirect `build.target-dir` to a single shared store and point
-the MSVC target at `rust-lld` — **never committed** (CI's `Swatinem/rust-cache` caches `./target`)
-and **inert when absent**. See
-[ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md).
+Lanes run in git worktrees ([ADR-0053](../../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)),
+and **each carries its own `target/`**. The one machine-local override is a `WORK/.cargo/config.toml`
+above every worktree pointing the MSVC target at `rust-lld` — **never committed**, **inert when
+absent**, and worth 171 s -> 145 s on the cold path to every test binary.
+
+There was briefly a second half: [ADR-0141](../../../../docs/adrs/0141-one-artifact-store-serves-every-lane.md)
+redirected `build.target-dir` to one shared store, and
+[ADR-0147](../../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+revoked it the following day. **The worktree path is not in cargo's fingerprint**, so two lanes with
+the same layout and dependency graph were served each other's compiled `lmv-core` as fresh — Plan
+0115's lane compiled against a `core` that does not contain its own methods.
 
 What this changes when you design:
 
-- **A new lane starts warm.** Opening a worktree no longer implies a cold dependency build, so
-  sequencing a plan behind another to reuse its `target/` buys nothing.
-- **ADR-0141 revokes one ADR-0053 positive**: concurrent lanes now serialize on cargo's lock. Plans
-  that assume two lanes building in parallel need a different argument.
-- **`cargo clean` is destructive across every lane**, and no gate prevents it. A plan that tells
-  someone to clean is a plan that wipes the store.
+- **A new lane starts cold**, and opening a worktree implies a full dependency build again. ADR-0141's
+  *"a new lane starts warm"* is withdrawn; do not sequence or cost a plan on it.
+- **ADR-0053's concurrency positive is restored** — two lanes no longer serialize on one cargo lock,
+  so a plan may assume parallel lanes build independently.
+- **ADR-0053's disk Negative is live again**: *"disk cost is severe and recurring."* One lane held
+  ~8 GB in `target/debug/incremental` and filled the disk mid-session. A plan that opens a lane owes
+  the worktree removal at its close.
 - **Nothing may hardcode `<repo>/target`.** `cargo metadata`'s `target_directory` is the answer that
-  holds under both layouts.
+  holds under any layout, and it is what keeps a future redirect from being a breaking change.
 
 ## Canonical commands
 

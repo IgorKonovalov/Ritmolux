@@ -172,7 +172,7 @@ first because every later phase increases the number of people who meet the defe
   This is known and accepted ([NFR §8](../nfr.md#8-distribution-v1)); what it means here is that
   the friction is highest at exactly the moment attention is highest.
 - **The library is small and lopsided** — 39 presets, four systems with exactly one world each
-  ([Plan 0104](0104-the-library-stops-being-lopsided.md)). A visitor who tries it judges the
+  ([Plan 0104](done/0104-the-library-stops-being-lopsided.md)). A visitor who tries it judges the
   content, not the composite. There is a real argument for running 0104 first; that is a
   sequencing call for the roster, not a blocker written into this plan.
 - **This plan cannot promise adoption** and does not. Every done-when is an artifact. **Phase 1 is

@@ -34,7 +34,7 @@ reads as though the whole bound were covered.
 Two forces shape the answer. First, the field is **linear light** (ADR-0046) while the reference
 quantizes in its **gamma-encoded** target, so "8-bit truncation" does not name a number here until
 a domain is chosen. Second, `warp_mesh` is a **native scene** as well as the import's landing
-surface — [Plan 0104](../plans/0104-the-library-stops-being-lopsided.md) will author a cohort onto
+surface — [Plan 0104](../plans/done/0104-the-library-stops-being-lopsided.md) will author a cohort onto
 it — and native authoring has no reason to want 8-bit-era quantization.
 
 ## Decision
@@ -110,7 +110,7 @@ unfixed by a fix that claims to be the mechanism.
 
 **C — quantize every `warp_mesh` scene, no key.** Simplest surface, no new bundle key, one code
 path. Rejected because `warp_mesh` is a native scene with a content cohort coming
-([Plan 0104](../plans/0104-the-library-stops-being-lopsided.md)), and this would hand that cohort an
+([Plan 0104](../plans/done/0104-the-library-stops-being-lopsided.md)), and this would hand that cohort an
 8-bit feedback field it never asked for — forfeiting the HDR range the engine exists to have, in
 order to be faithful to a reference the native presets are not imitating.
 

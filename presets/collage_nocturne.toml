@@ -1,0 +1,146 @@
+# Nocturne - the flat collage on a DARK ground, composed around a subject
+# (Plan 0104 Phase 3). Authored fresh-slate (ADR-0089), and separated from the
+# three shipped canvases on the two axes that decide what this system's picture
+# is: which grammar composes it, and what colour the paper is.
+#
+# `layout = 1` IS UNUSED IN THE LIBRARY UNTIL NOW. Suprematist takes the
+# authored canvas (0); Collage Mono and On White both take diagonal-axis (2),
+# whose picture has a DIRECTION. Anchor-and-satellites gives one or two dominant
+# planes with the rest clustered around them, so the picture has a SUBJECT
+# instead - a different compositional claim, not a different seed of the same
+# one. `size_hierarchy` is pushed to 0.82 to back it: a steep fall from the
+# largest element to the smallest is what makes an anchor read as an anchor.
+#
+# THE PAPER IS DARK, AND THE ARITHMETIC FOR THAT IS NOT THE OBVIOUS ONE. A stop
+# is a LINEAR coefficient with no sRGB decode, so the display byte is that
+# coefficient's sRGB encoding and it is much brighter than the hex: the paper's
+# `#050608` renders about `#272930`, and an element at `#99751f` renders near
+# `#CBB570`. Author by the rendered result. The look's one rule still holds and
+# is what every element stop below is chosen against - keep the palette under
+# linear 0.6 (byte 0x99) and ADR-0046's tonemap is exactly the identity there,
+# so the fill survives the post chain UNSHADED and bloom's threshold sits above
+# it, which is where the hard edges come from. Reach past 0x99 and the flat fill
+# and the hard edge go together, with nothing to say why.
+#
+# THE FAMILY IS ONSET-DEAF AND THIS IS THE FIX. Plan 0104 Phase 1 measured
+# Collage Mono, On White and Suprematist at onset 0.000 all three. The system's
+# only edge-triggered lever is `recompose`, and all three hang it off something
+# deliberately rare - two latches armed for a window every 100 s and 130 s, and
+# a `hash(beat_index)` gate that passes about one detection in fourteen. That is
+# right for a structural event and it is why the column reads zero: a
+# recomposition that happens twice a set cannot show up in a measurement.
+#
+# So the transient response here goes somewhere CONTINUOUS instead. `pump_size`
+# and `pump_alpha` are per-element swells whose phase is offset per element - so
+# the canvas answers a hit without breathing in unison, which is the failure a
+# shared phase produces - and `density` adds elements on a transient, in stable
+# birth order, so an arrival never reorders what is already on the paper. The
+# recompose stays a latch, on a shorter cycle than its siblings' because a dark
+# canvas can carry more change before it reads as churn.
+system = "shape_collage"
+name   = "Nocturne"
+
+[palette]
+# Eight plateaus, hard-edged: a pair of stops a ten-thousandth apart is a hard
+# transition, and a smooth ramp would shade every element by where it happens to
+# sit. Eight is not arbitrary - a layout grammar draws each element's colour
+# from eight evenly spaced band centres (k/8 + 1/16) and reserves the last for
+# the paper, so this palette resolves every generated element exactly.
+stops = [
+  { at = 0.0000, color = "#99958a" },  # bone
+  { at = 0.1249, color = "#99958a" },
+  { at = 0.1251, color = "#99381f" },  # vermilion
+  { at = 0.2499, color = "#99381f" },
+  { at = 0.2501, color = "#99751f" },  # ochre
+  { at = 0.3749, color = "#99751f" },
+  { at = 0.3751, color = "#1f6b99" },  # steel blue
+  { at = 0.4999, color = "#1f6b99" },
+  { at = 0.5001, color = "#1f7a5c" },  # viridian
+  { at = 0.6249, color = "#1f7a5c" },
+  { at = 0.6251, color = "#6b2a70" },  # plum
+  { at = 0.7499, color = "#6b2a70" },
+  { at = 0.7501, color = "#4a4f56" },  # slate
+  { at = 0.8749, color = "#4a4f56" },
+  { at = 0.8751, color = "#050608" },  # THE PAPER - charcoal, and the exception
+  { at = 1.0000, color = "#050608" },
+]
+
+[latch]
+# Armed for eight seconds out of every twenty-four, firing on the first real
+# onset inside the window. Shorter than Collage Mono's 100 s and Suprematist's
+# 130 s cycles because a dark ground hides the seam of a dissolve - the outgoing
+# canvas fades through near-black rather than through cream.
+recut = { arm = "mod(time, 24) > 16", fire = "onset > 0.7", hold = 0 }
+
+[params]
+# The eighth band centre, which is the coordinate the grammar reserves for the
+# ground - so this is the charcoal plateau above and nothing else can land on it.
+paper = "0.9375"
+
+layout         = "1"     # anchor-and-satellites: the picture has a subject
+seed           = "13"
+roster         = "1"     # the Kandinsky set - bars, rings, segments, arcs, checkers
+size_hierarchy = "0.82"  # a steep fall, which is what makes the anchor dominate
+angle_bias     = "14 + sin(time * 0.043) * 9"
+
+# FORTY, NOT TWENTY-SIX, AND THE REASON IS MEASURED. An anchor-and-satellites
+# canvas leaves a great deal of paper showing, which is right for the
+# composition and left the first draft covering 0.169 of the frame against On
+# White's 0.992 - too few lit pixels for any lever to move enough to register.
+# Forty elements keeps the anchor dominant (that is `size_hierarchy`'s job, not
+# the count's) and gives the satellites enough presence to answer the music.
+count = "40"
+
+# THE TRANSIENT'S CONTINUOUS HALF (see header). Elements arrive on a hit and
+# recede after it, in stable birth order - raising `density` only ever adds, so
+# nothing already on the paper moves or changes colour when one appears.
+density = "0.72 + clamp(mid * 0.176, 0, 0.15) + clamp(onset * 0.5, 0, 0.3)"
+
+scale = "1.0 + 0.04 * sin(time * 0.1) + clamp(bass * 0.235, 0, 0.2)"
+# THE PAN RATES ARE FAST FOR THIS FAMILY, AND THAT IS WHERE THE IDLE MOTION
+# COMES FROM. `drift` at 1 crosses the canvas in about a minute, which is
+# invisible over the fraction of a second an animation measure looks at - the
+# first draft rode almost everything on drift and spin and read as a still.
+# On White's own liveliness is its pan, an order faster than its drift, and
+# this follows it.
+pan_x = "0.11 * sin(time * 0.52)"
+pan_y = "0.075 * sin(time * 0.71 + 0.9)"
+
+# Element travel and rotation, both multipliers on velocities drawn from the
+# seed at generation. 1 is about a minute to cross the canvas; an element that
+# reaches the edge wraps.
+drift = "1.3 + clamp(bass * 0.94, 0, 0.8)"
+spin  = "0.7 + clamp(mid * 0.588, 0, 0.5)"
+
+# The rare structural event. `recompose` is edge-triggered - a sustained gate
+# must not re-run the generator every frame - and the latch above is what turns
+# a common onset into an uncommon one.
+recompose       = "recut"
+recompose_blend = "0.75"
+
+# The swells. Phase-offset per element by the engine, so the canvas does not
+# pulse as one sheet; the RATE is the engine's and only the depth is authorable,
+# which is why both of these are bound to the music rather than to a clock.
+pump_size  = "clamp(onset * 0.5, 0, 0.3)"
+pump_alpha = "clamp(onset * 0.583, 0, 0.35)"
+
+opacity       = "1.0"
+edge_softness = "0"      # the hard analytic edge IS the look, not a quality knob
+saturation    = "0.95 + clamp(treb * 0.117, 0, 0.1)"
+
+# Named rather than left at their defaults, for the same reason the ink presets
+# name theirs: each of these would put light between the flat fills, and a flat
+# fill with a halo is a different look wearing this one's palette.
+bloom_amount = "0"
+trails       = "0"
+
+[smoothing]
+density    = 0.3
+drift      = 0.6
+spin       = 0.6
+scale      = 0.5
+saturation = 0.2
+# Short attack, long release on both swells: the pump has to land inside the
+# transient and let go slowly, or it reads as a twitch rather than as a breath.
+pump_size  = { attack = 0.03, release = 0.45 }
+pump_alpha = { attack = 0.03, release = 0.45 }

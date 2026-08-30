@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0147.** *(0120 was reserved for
+**Next free number: 0154.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -73,7 +73,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) | Downbeat and phrase tracking: bar-aware time variables, gated by a measured confidence with a deterministic counter fallback | accepted (Plan 0048; Outcome) |
 | [0051](0051-seeded-grammar-randomness-with-per-run-opt-in.md) | `hash(x)` and `noise(x)` in the grammar, seeded per preset; an opt-in per-run seed that capture paths always pin | accepted |
 | [0052](0052-analysis-diagnostics-are-native-only.md) | The analysis diagnostics surface is native-only and does not cross the C ABI | accepted (Plan 0049; Outcome) |
-| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 |
+| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 (revoked by 0147); Outcome |
 | [0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md) | A runtime quality-tier change rebuilds the engine's GPU resources on the live context | accepted 2026-08-04 (Plan 0050; Outcome) |
 | [0055](0055-backdrop-leaves-the-post-chain.md) | The backdrop leaves the post chain: the composite carries premultiplied alpha and the backdrop is composited underneath | accepted 2026-07-31 (Plan 0045) |
 | [0056](0056-additive-scenes-emit-premultiplied-alpha.md) | A scene that draws into the chain emits premultiplied alpha equal to its own coverage, and the alpha blend saturates rather than sums | accepted 2026-08-01 (Plan 0051; Outcome) |
@@ -162,10 +162,17 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | accepted 2026-08-28 (Plan 0123), Outcome |
 | [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) | The waveform is levelled at the analyzer, and it publishes the gain it removed | accepted 2026-08-28 (Plan 0127) |
 | [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | proposed 2026-08-28 (Plan 0128) |
-| [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | accepted 2026-08-29 (Plan 0129), Outcome |
+| [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | accepted 2026-08-29 (Plan 0129), Outcome, superseded in part by 0147 |
 | [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | accepted 2026-08-28 (Plan 0130), Outcome |
 | [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | proposed 2026-08-28 (Plan 0131) |
 | [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | accepted 2026-08-29 (Plan 0132), Outcome, superseded in part by 0145 |
 | [0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md) | The engine drives the fixtures directly over Art-Net | proposed 2026-08-29 (Plan 0133), supersedes 0144 in part |
-| [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | proposed 2026-08-29 (Plan 0115) |
+| [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115) |
+| [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | proposed 2026-08-29 (Plan 0134), supersedes 0141 in part |
+| [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | proposed 2026-08-29 (Plan 0135) |
+| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |
+| [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | proposed 2026-08-29 (Plan 0137) |
+| [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
+| [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
+| [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
 <!-- roster:end -->

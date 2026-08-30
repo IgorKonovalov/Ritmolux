@@ -1,6 +1,6 @@
 # 0128 — The rendered file stops looking upscaled
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed — the density law this builds), [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (why more samples is not more light), [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (budget vs. active count), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) (what a tier promises), [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (the profile Phase 5 probes)

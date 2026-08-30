@@ -1,0 +1,148 @@
+# Coral - a bracketed growth that SPRAWLS rather than tiles (Plan 0104 Phase 2).
+# Authored fresh-slate (ADR-0089) from the mechanism, not from Vellum: where that
+# world is a closed Gosper meander inked flat onto paper, this one is an open,
+# asymmetric branching grammar rendered as luminous light against deep water.
+# The two share a system and nothing else - figure, seam, palette and driver all
+# differ.
+#
+# WHAT DRIVES WHAT. `mid` is the library's dead band (Plan 0104 Phase 1 measured
+# eleven of eighteen at-or-below-floor presets under 0.010 on it), so the whole
+# growth gesture is built on mid: the colony gains a WHOLE GENERATION on a loud
+# mid passage, 360 segments at rest to 6048 at peak. Treble rides the stroke,
+# bass the level, onset the bloom. Nothing rides the camera - a zoom punch is a
+# last-resort lever here and structure is what the peak is spent on.
+#
+# SEGMENT BUDGET. The rewrite is `X -> F-[[X]+X]+F[+FX]-X`, `F -> FF`, so the
+# drawn count per depth is f(n+1) = 2*f(n) + 3*x(n) with x(n+1) = 4*x(n):
+# depth 4 = 360, depth 5 = 1488, depth 6 = 6048 segments of the floor tier's
+# 20 000. `max_depth` is 6 because that is the deepest visible_depth can reach,
+# and precomputing a seventh nothing displays is dead work.
+#
+# THE PALETTE IS WALKED BY GENERATION, WHICH IS THIS GRAMMAR'S OWN AXIS. Every
+# `[` opens a generation, so an open branching rewrite has real depth for
+# `hue_spread` to ramp along (a bracket-free grammar has one generation and the
+# ramp collapses - the trap `presets/README.md` records against the retired
+# arrowhead). Here the trunk sits at the palette's abyssal indigo and the
+# growing tips at its warm coral, so the colony reads as older-and-colder toward
+# the holdfast.
+system = "lsystem"
+name   = "Coral"
+
+[generator]
+axiom     = "X"
+rules     = { X = "F-[[X]+X]+F[+FX]-X", F = "FF" }
+angle_deg = 22.5
+max_depth = 6
+
+[palette]
+stops = [
+  { at = 0.00, color = "#07142c" },  # abyssal indigo - the holdfast
+  { at = 0.28, color = "#0e4a6b" },  # deep water
+  { at = 0.52, color = "#1a9b8f" },  # verdigris
+  { at = 0.72, color = "#8fd07a" },  # reef green
+  { at = 0.88, color = "#ffc860" },  # amber
+  { at = 1.00, color = "#ff6f61" },  # coral - the growing tips
+]
+
+[params]
+# A WHOLE GENERATION, BOUGHT BY THE MID BAND. Gain from the cap, not by feel:
+# the cap is 2.9 and a real-music mid mean is ~0.42, so a typical passage sits
+# at 1.43 (depth 5) and only a genuine peak (mid ~0.85) reaches 2.9 (depth 6).
+# The floor of 4 is deliberately not lower - depth 3 is 84 segments and reads as
+# a sketch rather than as a colony.
+visible_depth = "4 + floor(clamp(mid * 3.41, 0, 2.9))"
+
+# The colony sways in the current. Slow and small: this is a plant rooted in the
+# frame, not a camera move.
+# THE COLONY IS NEVER STILL, AND THREE TERMS EARN THAT RATHER THAN ONE. A
+# branching figure this fine has very little area, so a gesture that would be
+# obvious on a full-frame scene moves almost no pixels here: measured, a sway of
+# six degrees left this world at a third of the animation gate's floor. A slow
+# continuous drift under the sway, plus a breath on `scale` that moves every
+# outer branch radially, is what puts a silence back above it.
+rotation      = "time * 0.045 + sin(time * 0.19) * 0.09"
+scale         = "0.96 + noise(time * 0.45) * 0.05 + clamp(bass * 0.094, 0, 0.08)"
+# The growing edge never rests: the last few percent of the colony draws and
+# undraws continuously, so a silence still reads as a living thing rather than
+# as a still. Measured, the sway alone left this world under the animation
+# gate's floor - a slow rotation of a figure this fine moves very few pixels.
+draw_progress = "0.95 + noise(time * 0.4) * 0.05"
+
+# TWO FRONDS, NOT ONE, AND THIS IS A COMPOSITION FIX RATHER THAN A FLOURISH.
+# The grammar's plant is tall and narrow - fit-normalized it fills the frame's
+# height and about a third of its width, leaving two dead columns at 16:9. A
+# 2-fold world-space mirror puts the second frond through the frame centre
+# rotated a half turn, so the pair fills the diagonal and the colony reads as a
+# colony. `mirror_reflect` stays off: it doubles the copies again, and 6048 * 4
+# would be truncated against the tier's 20 000-segment cap.
+mirror_order   = "2"
+mirror_reflect = "0"
+
+# THE NIB NARROWS AS THE COLONY GROWS, and that binding is the whole reason the
+# loud frame stays legible. Depth 6 packs 6048 segments into the same normalized
+# box that depth 4 fills with 360, so a stroke wide enough to read at rest welds
+# the peak into one white mass - rendered at a flat 1.8 and rejected. Riding
+# thickness DOWN on the same band that drives the growth holds the line weight
+# per unit of figure roughly constant: a coarse branch at rest, a fine one at
+# full colony. `softness` 0.35 leaves a short lit shoulder either side of a
+# solid core - enough that crossings pool, not so much that they smear.
+thickness  = "2.5 - clamp(mid * 1.06, 0, 0.9) + clamp(treb * 0.5, 0, 0.3)"
+softness   = "0.35"
+glow       = "0.8"
+# HELD ALMOST FLAT, and a third below the first draft. The additive ceiling is
+# the binding constraint on this world, not the palette: a depth-6 colony sums
+# to white wherever branches cross, and at 0.9 the loud frame had LESS legible
+# structure than the quiet one - the inverted failure. The level moves
+# 0.58 -> 0.78 across the whole dynamic range and what is left of the peak is
+# spent on branches.
+brightness = "0.58 + clamp(bass * 0.235, 0, 0.2)"
+
+# Generation shading (see header). The whole ramp drifts a little so the colony
+# is never twice the same colour, but it never leaves the gradient's span.
+# ...and the treble slides the whole ramp, so the reef warms on a bright passage
+# without a single luminance term moving.
+hue        = "0.02 + sin(time * 0.031) * 0.02 + clamp(treb * 0.1, 0, 0.06)"
+hue_spread = "0.95"
+saturation = "1.05"
+
+# THE FRAME'S OWN STOP, AND WHERE THIS WORLD'S BASS RESPONSE ACTUALLY LIVES.
+# `brightness` above is held almost flat because a dense colony welds shut when
+# it is driven; `exposure` is the whole-frame stop instead, so the low end lifts
+# the water and the colony together rather than pushing the crossings further
+# over the additive ceiling. It sits upstream of the tonemap, which is what lets
+# a third of a stop read as the tide coming in rather than as a flash.
+exposure = "0.95 + clamp(bass * 0.412, 0, 0.35)"
+
+# Deep water behind it, lit from the palette's own abyssal end.
+bg_hue      = "0.06"
+bg_bright   = "0.14 + noise(time * 0.6) * 0.04"
+bg_angle    = "3.1416"
+bg_hue_span = "0.12"
+bg_shade    = "0.35"
+bg_shade_end = "1.0"
+bg_vignette = "0.5"
+
+# The one place onset lands, and it lands on light that is already over range
+# rather than on the level: only the crossings of a dense colony clear the
+# threshold, so a hit blooms the interior and leaves the silhouette alone.
+bloom_amount    = "0.22 + clamp(onset * 0.67, 0, 0.4)"
+bloom_threshold = "0.95"
+bloom_radius    = "1.3"
+
+[smoothing]
+# 0.16, and not slower: the scene FLOORS the eased value to pick an iteration,
+# so a long ease parks the param below the flip for its whole travel and the
+# growth never lands (the eased-through-invalid-values trap). At 0.16 a
+# sustained mid passage buys the generation in about a tenth of a second and a
+# single transient does not flicker it.
+visible_depth = 0.16
+thickness     = { attack = 0.04, release = 0.32 }
+brightness    = 0.28
+exposure      = { attack = 0.05, release = 0.4 }
+# Short, because the resting breath rides this same param: a long ease would
+# low-pass the noise term out and take the idle motion with it.
+scale         = 0.15
+hue           = 0.35
+rotation      = 0.4
+bloom_amount  = 0.18
+bg_bright     = 0.5

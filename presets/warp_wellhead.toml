@@ -1,0 +1,138 @@
+# Wellhead - a tunnel that opens outward, fed by a spiralling ring (Plan 0104
+# Phase 4b). Authored fresh-slate (ADR-0089), and the first hand-written
+# `warp_mesh` world in the library: the system shipped at Plan 0100 with ZERO
+# presets, which is also why `shot --report` could not see it - the report
+# prints a section per populated family, so the emptiest system in the library
+# was absent rather than flagged.
+#
+# THIS SYSTEM DRAWS NOTHING OF ITS OWN. Every other scene paints a figure; this
+# one paints light into a feedback field and then MOVES the field. So a world is
+# authored as motion over a seed rather than as a shape: `deposit` is the seed -
+# a ring, optionally with spiralling arms - and `[per_vertex]` is the motion.
+# Turn the deposit off and the frame is black in about a second.
+#
+# WHAT `[per_vertex]` BUYS OVER `fb_zoom`. The `fb_*` vocabulary gives the whole
+# frame ONE affine. Here the frame is a grid and every vertex gets its own, with
+# `x`, `y`, `rad` and `ang` in scope - so the past can expand at the rim and sit
+# still at the centre, which no single affine can say. That is the whole reason
+# this system exists beside `fb_*` rather than inside it (ADR-0113).
+#
+# `smoothstep` RATHER THAN A COMPARISON, AND THAT IS A GRID FACT. The
+# interpolation between vertices is linear, so a program with a sharp feature -
+# `zoom = 1 + (rad > 0.5) * 2` - renders that feature as a POLYGON of the mesh
+# instead of as a circle. A smooth ramp has no edge to facet, costs nothing
+# extra, and is why the mouth of this tunnel is round at 48x36 rather than
+# needing the tier's 64x48 ceiling.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45:
+#
+#   coverage    0.2011 ->  0.8879   delta +0.6868   monotone 0.30
+#   peak/mean  12.0278 ->  2.9750   delta -9.0528   monotone 0.25
+#   footprint   0.2641 ->  0.0880   delta -0.1761   monotone 0.37
+#
+# THE WHOLE DELTA IS WARM-UP, AND IT IS WARM-UP ON EVERY WORLD IN THIS FAMILY.
+# A `warp_mesh` scene starts with an EMPTY field - there is nothing but the
+# deposit on the first frame - so the 0 s row of any horizon here is the picture
+# before it exists, and the first-to-last delta measures the fill rather than a
+# drift. All four worlds authored in this cohort read the same way. What decides
+# the verdict is the monotone column and the rows after the fill: at 0.25 to
+# 0.37 these statistics wander, against the 1.00 that grinding into a corner
+# reads, and the rows hold their band for the remaining nine and a half minutes.
+#
+# WHAT DRIVES WHAT. The low end widens the mouth, mid feeds the ring, treble
+# spins the arms and onset brightens the deposit. Note that `[smoothing]` CANNOT
+# ease a `[per_vertex]` binding - the smoother holds one scalar and a series has
+# no single value - so the audio term inside the table below is deliberately
+# small and rides `bass`, the smoothest band. Everything that wants easing is a
+# scalar.
+system = "warp_mesh"
+name   = "Wellhead"
+
+[mesh]
+# The grid is a RESOLUTION, not a shape (ADR-0037): raising it refines how
+# finely the program below is sampled and changes nothing about what is drawn.
+# 48x36 is under the floor tier's 64x48 ceiling, so this renders identically on
+# every machine rather than being quietly capped on some.
+x = 48
+y = 36
+
+[per_vertex]
+# THE TUNNEL. The centre is nearly still and the rim expands, so content is
+# drawn outward and off the edge - a mouth opening toward the viewer. Above 1
+# expands; below 1 would collapse inward, which is a different world.
+zoom = "1.0 + smoothstep(0.0, 1.0, rad) * (0.30 + clamp(bass * 0.176, 0, 0.15))"
+# ...and it turns as it goes, faster at the rim than at the throat, which is
+# what makes the outgoing content spiral rather than merely recede.
+rot = "0.18 + rad * 0.42"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#07182e" },  # deep shaft
+  { at = 0.32, color = "#0f5d8a" },  # water blue
+  { at = 0.60, color = "#28b0a0" },  # verdigris
+  { at = 0.82, color = "#9ce8c8" },  # pale green
+  { at = 1.00, color = "#f4fff8" },  # the surface
+]
+
+[params]
+# TOROIDAL, WHICH IS WHAT MOST CLASSIC TUNNELS ARE MADE OF: content a zoom pulls
+# off one edge comes back on the other, so the shaft never runs out of material.
+# Off - the default - an off-field read contributes nothing and the tunnel
+# empties into a transparent border.
+wrap = "1"
+
+# About half a second of tail, and SHORT IS THE WHOLE DECISION. `decay` is the
+# fraction surviving per second, so this world's structure lives or dies on it:
+# drafted at 0.5 the ring's light survived its whole journey to the corners and
+# the frame became one smooth teal blob with no figure in it at all. At 0.16 the
+# arms are still legible where they are laid down and fade before they can merge,
+# which is what leaves a throat to see.
+decay = "0.16 + clamp(bass * 0.071, 0, 0.06)"
+
+# THE SEED. A ring with six spiralling arms, laid down AFTER the warp - its
+# light is "now", so it is crisp on the frame it appears and warped from the
+# next frame onward. Deposit before warping and every stroke would be smeared on
+# arrival.
+deposit        = "2.0 + clamp(mid * 1.18, 0, 1.0) + clamp(onset * 0.83, 0, 0.5)"
+deposit_radius = "0.32"
+deposit_width  = "0.05"
+deposit_arms   = "6"
+deposit_twist  = "2.6"
+# Integrates a phase (ADR-0132), so binding it to audio BENDS the arms' rotation
+# instead of teleporting it a hundred seconds into a set.
+deposit_spin   = "0.45 + clamp(treb * 0.5, 0, 0.3)"
+
+# What stops an expanding feedback loop saturating at the middle. In
+# frame-heights, so the disc is round on any display.
+darken_center = "0.15"
+
+# The deposit is coloured BY ANGLE through the shared palette, so the arms come
+# out as coloured spokes rather than as one tint - and `color_center` walks that
+# assignment round the ring over about three minutes.
+#
+# `palette_steps` = 6 QUANTIZES THAT ANGULAR ASSIGNMENT INTO SIX WEDGES, matched
+# to the six arms, so each arm carries one flat colour into the field instead of
+# a gradient smeared across it. On a system whose every edge is a gaussian, a
+# hard colour boundary is the only crisp thing available - it is the reason the
+# throat has six visible points rather than reading as a soft hole.
+hue          = "0.1"
+color_span   = "0.9"
+color_center = "time * 0.0055"
+saturation   = "1.05"
+palette_steps = "6"
+brightness   = "0.6 + clamp(mid * 0.141, 0, 0.12)"
+
+exposure     = "0.8 + clamp(bass * 0.235, 0, 0.2)"
+bloom_amount = "0.3 + clamp(onset * 0.67, 0, 0.4)"
+bloom_threshold = "0.9"
+bloom_radius = "1.4"
+
+[smoothing]
+# Every entry here is a SCALAR. A `[smoothing]` line naming `zoom` or `rot`
+# would be ignored with a warning, because those are bound per vertex above.
+decay        = 0.4
+deposit      = { attack = 0.04, release = 0.5 }
+deposit_spin = 0.5
+brightness   = 0.3
+exposure     = { attack = 0.05, release = 0.4 }
+bloom_amount = { attack = 0.03, release = 0.4 }

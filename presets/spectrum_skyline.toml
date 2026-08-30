@@ -1,0 +1,120 @@
+# Skyline - the frequency axis as a city at dusk, standing in its own water
+# (Plan 0104 Phase 2). Authored fresh-slate (ADR-0089). The library's only other
+# spectrum world is a 48-spoke radial crown on a violet field; this one is the
+# opposite end of the system in every axis it has - the `bars` layout, a fifth
+# as many elements, and a figure that is READ ACROSS rather than around.
+#
+# THE SKYLINE IS SEEDED, NOT AUDIO. `base` is the length an element has BEFORE
+# any audio, and binding it through `hash(index)` gives each bar its own resting
+# height - so the readout at rest is a city silhouette rather than a flat comb,
+# and every bar's music rides on top of its own building. That is the one thing
+# `index` is for on this system: a binding whose text names it is evaluated once
+# per element at that element's 0..1 position along the frequency axis. The
+# seed is the `[generator] seed` below, pinned rather than "random", so the
+# skyline is the same city every load - a look, not a lottery.
+#
+# baseline = 0 IS WHAT MAKES THE MIRROR MEAN SOMETHING. The geometry mirror
+# reflects across the x-axis, so a figure standing on the default -0.85 throws
+# its copy against the top edge, which reads as a bug. Moved onto the axis, the
+# same mirror gives the city and its reflection sharing one waterline through
+# the frame centre. `pan_y` cannot substitute - the mirror runs in world space
+# in update() while the view transform is applied later in the shader, so
+# panning moves the pair together.
+#
+# span 1.78 IS A WORLD QUANTITY AND IT MEANS 16:9. The renderer divides world x
+# by the target aspect, so 1.78 fills a 16:9 frame edge to edge and leaves an
+# ultrawide short. That is correct behaviour for a world quantity (ADR-0037) and
+# there is deliberately no fit mode; this world is composed for 16:9.
+system = "spectrum"
+name   = "Skyline"
+
+[generator]
+seed = 7
+
+[spectrum]
+elements = 18
+# Fast up, slow down - meter ballistics. The bands are the rawest signal in the
+# engine and this is the one easing an expression cannot reach, so it earns its
+# keep here more than anywhere: the attack keeps a transient's shape while the
+# release lets a tower settle instead of strobing on every analysis hop.
+smoothing = { attack = 0.03, release = 0.4 }
+layout = "bars"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0b0f2e" },  # night - the lowest bands, and the top of the sky
+  { at = 0.30, color = "#2a2159" },  # violet
+  { at = 0.55, color = "#7a3f6e" },  # mauve
+  { at = 0.75, color = "#d4693f" },  # burnt orange
+  { at = 0.90, color = "#f2a65a" },  # amber
+  { at = 1.00, color = "#ffe3ab" },  # pale gold - the top bands, and the horizon
+]
+
+[params]
+# THE CITY (see header). Per element, seeded, and deliberately a wide spread:
+# 0.08 to 0.43 world units of resting height is the difference between a shed
+# and a tower, and the eye needs that range to read the row as architecture.
+# The `noise` term is what keeps the city alive through a silence, and it is
+# per element for the same reason the hash is: offsetting the argument by
+# `index` decorrelates the towers, so they breathe out of step instead of the
+# whole row rising and falling as one slab.
+base = "0.08 + hash(index * 17) * 0.35 + noise(time * 2.2 + index * 11) * 0.15"
+
+# dB-like compression so the quiet bands are legible instead of stubbed, and
+# `scale` retuned DOWN in the same edit for it - the two are not independent and
+# the factor is large. Left linear this readout put its loud elements straight
+# out of the top of the frame.
+curve = "0.55"
+scale = "0.62"
+
+# The waterline, and the frame it spans.
+baseline       = "0"
+span           = "1.78"
+mirror_reflect = "1"
+mirror_order   = "1"
+
+# Bars, not filaments: 18 elements across a full 16:9 frame is a 71 px slot each
+# at 1280, and 11 is the weight that fills about three fifths of one. `softness`
+# 0.12 is a solid core with barely more than the one-pixel antialiased edge -
+# these are buildings, and a building has an edge.
+thickness = "11"
+softness  = "0.12"
+glow      = "0.9"
+
+# LIT WINDOWS. Per element again: a band's own level lights its own tower
+# through bin(index), while the whole city holds a flat base level. The gain is
+# small on purpose - the additive ceiling bites hardest on a figure this solid,
+# and a bar at its brightness ceiling has no headroom left through the add/burn
+# half of a preset dissolve.
+brightness = "1.0 + clamp(bin(index) * 3.0, 0, 0.45)"
+
+# Low bands night-indigo, high bands pale gold - so WHERE the energy is reads as
+# a colour temperature across the row without counting positions.
+hue        = "0"
+hue_spread = "1.0"
+saturation = "1.0"
+
+# DUSK, PAINTED THROUGH THE SAME GRADIENT THE BARS ARE COLOURED FROM. The ramp
+# runs top-to-bottom (angle pi), so its START is the top of the frame: night at
+# the zenith travelling 0.86 of the palette down to the amber horizon behind the
+# waterline. Where the horizon sits in the frame is where its colour sits in the
+# gradient - there is no bg_ramp_center, and that is the design.
+bg_hue       = "0.02"
+bg_bright    = "0.24"
+bg_angle     = "3.1416"
+bg_hue_span  = "0.86"
+bg_shade     = "0.32"
+bg_shade_end = "1.0"
+bg_vignette  = "0.35"
+
+# A hit warms the whole sky a little rather than lighting anything - the towers
+# already carry the band response, and a second luminance term on top of them is
+# how a readout turns into a wash.
+exposure     = "1.0 + clamp(bass * 0.235, 0, 0.2)"
+bloom_amount = "0.25 + clamp(onset * 0.5, 0, 0.3)"
+bloom_threshold = "1.0"
+bloom_radius = "1.1"
+
+[smoothing]
+exposure     = { attack = 0.05, release = 0.45 }
+bloom_amount = 0.2

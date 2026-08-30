@@ -1,0 +1,136 @@
+# Corona - three scalloped boundaries and a boss, and the lobes DEEPEN on the
+# beat (Plan 0104 Phase 4). Authored fresh-slate (ADR-0089) around one property
+# of one motif, and it is a property nothing in the library uses.
+#
+# `scallop` IS NOT A BEAD, AND ITS KEYS DO NOT MEAN WHAT THEY MEAN ELSEWHERE.
+# Every other member of the roster is a copy repeated `count` times around a
+# ring; `scallop` is a single closed BOUNDARY - one chain of outward-bulging
+# arcs meeting at cusps - so `count` is its lobe count, `radius` is the base
+# circle the lobes bulge from, and `scale` is the DEPTH of the bulge, which is
+# the only size a lobe has once the count has fixed its width. It is also exact:
+# a scallop genuinely is a chain of circular arcs, so it needs no polyline fit
+# and has no vertex at any scale.
+#
+# THAT DEPTH IS THE GESTURE. At `scale = 0` every lobe is an arc of its own base
+# circle, so the boundary is a plain ring; raising it pushes the lobes out. The
+# sweep through zero is well defined rather than degenerate, which is what makes
+# the depth safe to drive hard from the music. `ring_scale` multiplies all three
+# at once, so an onset takes the whole figure from three quiet circles to three
+# deep rosettes and lets it fall back. **The family had nothing on onset** - both
+# shipped worlds measure 0.007 - and this is a gesture that changes what the
+# figure IS rather than how bright it is.
+#
+# THE ANIMATION IS ON THE RADIAL PAIR, NOT ON THE SPIN, and presets/README.md is
+# explicit about why: a ring mandala is very rotationally symmetric, so a figure
+# with 7-, 13- and 23-fold boundaries turned by any angle lands almost on top of
+# itself. A spin moves few pixels however fast it runs, and both the eye at a
+# distance and the animation gate read it as frozen. `ring_spread` and
+# `ring_scale` change what the figure is at each radius; `ring_phase` gets the
+# ornament and none of the liveness.
+#
+# THE LOBE COUNTS ARE COPRIME - 7, 13, 23 - so the three boundaries never line
+# their cusps up. Counter-rotated against each other by `ring_phase` (which
+# turns alternate rings in OPPOSITE directions), that is a slow moire between
+# the rings rather than three fences moving together.
+system = "star_pattern"
+name   = "Corona"
+
+[generator]
+tiling = "none"          # no interlace at all - the boundaries are the whole figure
+rings = [
+  # 1 + 7 + 13 + 23 = 44 instances. A scallop costs one arc per lobe and a
+  # circle costs one, so this is the cheapest figure in the family by a wide
+  # margin - well under a percent of the floor tier's 20 000.
+  { motif = "circle",  count = 1,  radius = 0.00, scale = 0.22 },
+  { motif = "scallop", count = 7,  radius = 0.34, scale = 0.11 },
+  { motif = "scallop", count = 13, radius = 0.58, scale = 0.085 },
+  { motif = "scallop", count = 23, radius = 0.80, scale = 0.055 },
+]
+
+[palette]
+stops = [
+  { at = 0.00, color = "#3a0d05" },  # ember, at the centre
+  { at = 0.30, color = "#c24a10" },  # copper
+  { at = 0.58, color = "#f0a038" },  # amber
+  { at = 0.82, color = "#ffd98a" },  # pale gold
+  { at = 1.00, color = "#fff4e0" },  # white gold, at the rim
+]
+
+[params]
+# THE GESTURE (see header). The resting 0.85 is a shallow scallop; an onset peak
+# takes it past 2.0, which is a deep rosette, and the release lets it fall back
+# over three quarters of a second. Gain from the cap the onset way (C / 0.60),
+# so a real-music onset mean of ~0.20 sits at 0.28 of the travel and only a
+# genuine hit spends the whole of it.
+ring_scale = "0.85 + sin(time * 0.41) * 0.12 + clamp(onset * 1.83, 0, 1.1) + clamp(mid * 0.235, 0, 0.2)"
+
+# The figure opening and closing - the second half of the liveness, and where
+# the low end goes. Clamped by the engine to 0..4; nothing here approaches that.
+ring_spread = "1.0 + sin(time * 0.27) * 0.06 + clamp(bass * 0.176, 0, 0.15)"
+
+# The ornament, and only the ornament. Alternate rings turn in opposite
+# directions, so the 7-, 13- and 23-lobed boundaries drift against each other.
+ring_phase = "time * 0.075 + clamp(treb * 0.167, 0, 0.1)"
+
+rotation = "time * 0.02"
+# 0.86, AND THE ARITHMETIC IS THE POINT. `ring_spread` and `ring_scale` both
+# push outward and they compound at the peak: the outer boundary sits at
+# 0.80 * 1.15 = 0.92, its lobes add 0.055 * 2.07 = 0.11 on top, and 1.03 of the
+# fit box leaves the frame. Drafted at 1.0 the outer scallop came back
+# flat-topped against the top and bottom edges, which reads as a defect rather
+# than as a figure. 0.86 brings the loudest frame to 0.89 and leaves the quiet
+# one comfortably inside.
+scale    = "0.86"
+zoom     = "1.0"
+
+# A HEAVY, CRISP STROKE. Three boundaries and a boss is forty-four arcs in a
+# whole frame, so there is nothing here to weld shut and the figure can afford
+# weight - which is what makes it read as a seal rather than as a diagram.
+# `softness` 0.1 is nearly solid: an arc's stroke is a distance evaluated per
+# pixel, so a crisp edge stays crisp at any scale and there is no vertex to
+# soften.
+thickness = "3.6 + clamp(bass * 1.29, 0, 1.1) + beat * 0.4"
+softness  = "0.1"
+glow      = "0.95"
+# A crisp stroke reads brighter at the same level than a soft one - more of the
+# footprint sits at full coverage - so this is trimmed rather than matched to
+# the family's two softer worlds.
+brightness = "0.8 + clamp(mid * 0.294, 0, 0.25)"
+
+# The ramp walks RADIUS on this system, and unlike a bare interlace this figure
+# has radii to walk: ember at the boss, white gold at the outer boundary. That
+# is the axis the two shipped worlds cannot use - a Hankin rosette's segments
+# all sit at one radius and the ramp collapses to a flat hue there.
+hue        = "0.02 + sin(time * 0.019) * 0.02"
+hue_spread = "0.95"
+saturation = "1.0"
+
+bg_hue       = "0.03"
+bg_bright    = "0.06"
+bg_angle     = "0"
+bg_hue_span  = "0.06"
+bg_shade     = "1.0"
+bg_shade_end = "0.35"
+bg_vignette  = "0.72"
+
+# The whole-frame stop, and where the low end's LEVEL response goes rather than
+# onto the stroke. Forty-four arcs is a sparse frame however heavy they are, so
+# a term on `brightness` alone moves too few pixels to read as reactive.
+exposure = "0.95 + clamp(bass * 0.353, 0, 0.3)"
+
+# The cusps are where two arcs meet and the light sums, so a hit brightens the
+# points of every lobe - the same feature the depth gesture is moving.
+bloom_amount    = "0.3 + clamp(onset * 0.83, 0, 0.5)"
+bloom_threshold = "0.85"
+bloom_radius    = "1.4"
+
+[smoothing]
+# Snap up, glide down: the depth has to arrive inside the transient and let go
+# slowly, or the lobes twitch instead of breathing.
+ring_scale   = { attack = 0.03, release = 0.75 }
+ring_spread  = 0.35
+ring_phase   = 0.25
+thickness    = { attack = 0.02, release = 0.32 }
+brightness   = 0.3
+exposure     = { attack = 0.05, release = 0.4 }
+bloom_amount = { attack = 0.03, release = 0.4 }

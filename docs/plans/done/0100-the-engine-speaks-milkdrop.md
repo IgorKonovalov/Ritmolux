@@ -712,6 +712,6 @@ re-raised when the fidelity work above makes shipping worth deciding. Recorded i
   converted-but-blank).** The HDR verdict is re-judged after 0106.
 - Per-vertex evaluation on a compute shader, if Phase 1's cap lands low enough to hurt.
 - A `warp_mesh` content cohort — the idiom is native and authorable, and
-  [Plan 0104](../0104-the-library-stops-being-lopsided.md)'s per-system floor will apply to it once it
+  [Plan 0104](0104-the-library-stops-being-lopsided.md)'s per-system floor will apply to it once it
   exists.
 - MilkDrop's `textures/` support, if Phase 5's failure ranking says it is a large class.

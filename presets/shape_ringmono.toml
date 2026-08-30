@@ -1,0 +1,133 @@
+# Ring Mono - concentric offset contours of a ring, in the three inks. The
+# cohort's TARGET: a bullseye that breathes, and the plainest figure in the set
+# by some distance.
+#
+# It is deliberately the simple one. Fifteen worlds is a lot of incident, and a
+# set that is all incident has no floor to it - this is the world to cut to when
+# the last one was busy, and its whole job is to be immediately legible from the
+# back of a room.
+#
+# -- HOW IT DIFFERS FROM THE OTHER TWO `shape_field` MONO WORLDS ------------------
+#
+# `shape_contourmono` draws the STAR arm and `shape_heartmono` the HEART, so the
+# obvious third is a different silhouette from the same closed roster - `shape =
+# "1"` is the ring. But the more interesting difference is the COORDINATE, and
+# this file takes the other one:
+#
+#   `coord_mode = "0"`  the normalized DISTANCE to the figure; a contour is an
+#                       OFFSET of the outline
+#   `coord_mode = "1"`  `r / r_boundary(theta)`; a contour is a SCALED COPY
+#
+# `shape_heartmono` must use mode 1, because an inward offset is an EROSION and
+# erosion rounds a reflex corner - it fills in a heart's top notch and no value
+# of `gamma` or `palette_steps` recovers it (ADR-0111). A ring has NO reflex
+# corner and no corner at all, so the two modes are much closer here, and mode 0
+# is the honest choice for a target: an offset of a circle is a concentric
+# circle, which is exactly the figure wanted, and the offsets stay evenly spaced
+# where scaled copies would crowd toward the centre.
+#
+# So this file is not "the heart preset with a different shape number". It is the
+# other coordinate, on the one silhouette where that coordinate is the right one.
+#
+# -- THE WELDED NUMBERS -----------------------------------------------------------
+#
+# `palette_steps`, the stop boundaries and `color_span` are ONE design, as they
+# are in every quantized world here. `palette_steps = 16` is PINNED: band k's
+# centre sits at (2k+1)/32, every boundary below is a multiple of 0.0625, and so
+# each centre lands 0.03125 clear of a jump. At any other step count the centres
+# move and the run layout silently becomes a different picture.
+#
+# THE PALETTE REPEATS, AND ON THIS FIGURE THAT IS THE WHOLE POINT. The LUT is
+# sampled with `AddressMode::Repeat`, so a coordinate past 1.0 wraps and draws
+# the run again - which is how a figure whose coordinate keeps growing outward
+# fills the frame with rings instead of stopping at one. `shape_heartmono`
+# records the same mechanism at length; it was found there by rendering, after a
+# draft written on the assumption that the coordinate clamped.
+#
+# Because it repeats, the palette's two ENDS are a seam that is on screen. Stop 0
+# is white and stop 1.0 is black, so the seam is an ordinary run boundary with no
+# ramp across it.
+#
+# -- WHAT MOVES -------------------------------------------------------------------
+#
+# `color_span` is the ring COUNT: it sets how much palette the figure's
+# coordinate crosses, so driving it adds and removes rings without moving the
+# figure. That is the structural lever this scene has and it costs the framing
+# nothing, unlike `scale`, which on a fit-normalized figure is a zoom.
+#
+# `scale` is therefore nearly pinned - it carries only a slow breath. The
+# standing preference across this project is that camera-adjacent motion is not
+# reactivity, and a target that pumps in and out on the beat is the most
+# camera-adjacent thing this set could do.
+#
+# `gamma` is where the rings crowd: above 1 they bunch toward the outline and the
+# core opens, below 1 they crowd into the core.
+system = "shape_field"
+name = "Ring Mono"
+
+[palette]
+# Sixteen bands in six runs: white 3 / RED 1 / black 4 / white 3 / RED 1 /
+# black 4. Two identical halves, so the target reads as an even repeat rather
+# than as a sequence that runs out. Boundaries are multiples of 0.0625 and the
+# jumps are 0.008 wide - about two LUT texels - so every band centre sits well
+# clear of one.
+stops = [
+  { at = 0.0000, color = "#ffffff" },   # bands 0-2
+  { at = 0.1835, color = "#ffffff" },
+  { at = 0.1915, color = "#b00808" },   # band  3    key ring
+  { at = 0.2460, color = "#b00808" },
+  { at = 0.2540, color = "#000000" },   # bands 4-7
+  { at = 0.4960, color = "#000000" },
+  { at = 0.5040, color = "#ffffff" },   # bands 8-10
+  { at = 0.6835, color = "#ffffff" },
+  { at = 0.6915, color = "#b00808" },   # band 11    key ring
+  { at = 0.7460, color = "#b00808" },
+  { at = 0.7540, color = "#000000" },   # bands 12-15
+  { at = 1.0000, color = "#000000" },
+]
+
+[params]
+shape      = "1"        # the ring
+coord_mode = "0"        # offsets, not scaled copies - see the header
+
+# PINNED. See the welded numbers in the header before touching this.
+palette_steps = "16"
+
+# THE RING COUNT, and the world's main structural reactivity. More palette
+# crossed is more rings, and the figure does not move to get them. Gain from the
+# cap: 0.13 / 0.85 for a `bass` term.
+#
+# 0.27 AND NOT 1.35, WHICH IS THE NUMBER THAT MAKES THIS A TARGET RATHER THAN A
+# MOIRE. The figure coordinate does not stop at the outline - it keeps growing to
+# about 3.3 at the 16:9 corner, and the palette REPEATS, so the ring count is
+# `span * 3.3 * palette_steps` and not `span * palette_steps`. A first draft used
+# 1.35 on the reasoning that a little over one palette crossing sounded right,
+# and drew roughly FIFTY rings: a fine concentric interference pattern that
+# shimmers and aliases, not a bullseye a room can read. Multiply the three
+# factors before changing this.
+color_span   = "0.27 + clamp(bass * 0.153, 0, 0.13)"
+color_center = "0"
+saturation   = "1"
+
+# WHERE THE RINGS CROWD. Above 1 they bunch toward the outline and the core opens
+# out. The treble walks it either side of even spacing, so detail redistributes
+# the rings without touching a luminance term. Gain 0.20 / 0.60 for `treb`.
+gamma = "0.90 + clamp(treb * 0.333, 0, 0.20)"
+
+# NEARLY PINNED - a slow breath and nothing else. See the header on why this is
+# not where the music goes.
+scale = "0.62 + noise(time * 0.027) * 0.05"
+
+# The key line, at the four run boundaries where two different inks meet. It
+# thickens on activity rather than on level.
+palette_contour = "0.55 + clamp(onset * 0.417, 0, 0.25)"
+
+# The ring is rotationally symmetric, so `rotation` is very nearly a no-op here -
+# it is bound only so a future non-symmetric edit has the term already placed at
+# a value that reads as still.
+rotation = "0"
+
+[smoothing]
+color_span      = 0.28
+gamma           = 0.35
+palette_contour = 0.12

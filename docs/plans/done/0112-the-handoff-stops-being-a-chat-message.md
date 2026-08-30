@@ -90,7 +90,7 @@ fresh-session boundary, which is the point of the seam and is not being automate
 Every phase edits harness markdown only. No Rust, no `presets/`, no `scripts/`. All three are
 tagged `dev` on the [Plan 0067](0067-the-curation-route.md) Phase 4 precedent (`docs(skills):`,
 commit `be7204c`) — the owner vocabulary has no word for a harness-editing phase, which is a known
-wart already filed as a followup by [Plan 0104](../0104-the-library-stops-being-lopsided.md).
+wart already filed as a followup by [Plan 0104](0104-the-library-stops-being-lopsided.md).
 
 Each phase's done-when is a property of the resulting file, checkable by reading it. `node
 scripts/check-doc-links.mjs` must exit 0 at the end of every phase — it covers `.claude/skills/**`

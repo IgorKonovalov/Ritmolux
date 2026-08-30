@@ -1,0 +1,160 @@
+# Zellij - the Hankin interlace and a ring roster in the SAME figure, drawn as
+# flat opaque tilework (Plan 0104 Phase 4). Authored fresh-slate (ADR-0089) to
+# the arc surface: Plan 0087 closed 2026-08-27 and ADR-0098's Alternative C was
+# not taken, so the curved motifs are per-pixel distance fields and the beading
+# this plan hedged against is gone. Every curve below is exact or a G1 chain at
+# any scale.
+#
+# THE COMPOSITE IS THE STRUCTURAL GAP. `star_pattern` can draw an interlace, a
+# ring ornament, or BOTH - and neither shipped world does both. Rose Window is a
+# bare `tiling = "12"` interlace with the screen-space fold on top; Star Mandala
+# Bordered is `tiling = "none"` with five rings and no interlace at all. A
+# composite is a different figure from either: a rosette with an ornamented
+# interior, which is what actual zellij is.
+#
+# AND IT IS WHAT MAKES `hue_spread` MEAN SOMETHING HERE. The spread walks RADIUS
+# on this system, and a Hankin rosette is 2n congruent segments all at the same
+# radius - measured at 1.2e-7 of spread across the whole figure, which is f32
+# noise. On a bare interlace the ramp therefore collapses to the flat `hue`
+# however large it is set. Composited, the interlace still sits at one radius but
+# the rings sit at three others, so the ramp puts the whole interlace at one end
+# of the gradient and spreads the ornament along the rest. That is a way to
+# separate the two figures BY COLOUR rather than by brightness, and it is
+# available only in this arrangement.
+#
+# `stroke_blend = 1` IS THE OTHER HALF. At 0 the batch is additive light and
+# every crossing of an interlace sums - which is what makes Rose Window glow, and
+# what makes flat tilework impossible, since a third colour appears wherever two
+# strands cross. At 1 the batch composites OVER: a stroke laid on another
+# replaces the interior of what it covers, so the strands weave instead of
+# glowing and the inks stay the inks. Opaque strokes are ORDERED, so which strand
+# wins a crossing is the order the scene emits geometry in - the interlace first,
+# then the rings outward - and that ordering is what reads as the ornament lying
+# on top of the weave.
+#
+# WHAT DRIVES WHAT. The family is onset-flat - both shipped worlds report 0.007 -
+# so the transient gets the one lever that changes the interlace's own geometry:
+# `variant` is a continuous contact angle, so a hit re-cuts the crossing angle of
+# every strand at once. Mid grows the ornament, bass opens the rings, treble
+# walks the ink.
+system = "star_pattern"
+name   = "Zellij"
+
+[generator]
+tiling            = "8"      # 4.8.8 - the octagon-and-square tiling zellij is built on
+contact_angle_deg = 34
+rings = [
+  # Cost: 1*24 + 8*1 + 16*22 + 48*1 = 432 instances, plus the interlace's
+  # 2n = 16. Two percent of the floor tier's 20 000 ceiling, which matters
+  # because truncation at that cap is SILENT and drops the outermost rings
+  # first - a mandala missing its boundary is the symptom.
+  # A centre boss. Drafted without one and the composite came back with a hole
+  # through its middle - the interlace at this tiling is a rim figure and the
+  # ring roster starts at 0.40, so nothing occupied the centre at all. `radius`
+  # 0 is the documented single-copy case, and `trefoil` is the roster's densest
+  # member, which is what a boss wants.
+  { motif = "trefoil", count = 1,  radius = 0.00, scale = 0.36 },
+  { motif = "circle",  count = 8,  radius = 0.40, scale = 0.15 },
+  { motif = "petal",   count = 16, radius = 0.66, scale = 0.21, phase = 0.10 },
+  { motif = "scallop", count = 48, radius = 0.89, scale = 0.035 },
+]
+
+[palette]
+# Flat plateaus, not a gradient: under the OVER seam a quantized palette keeps
+# its plateaus, and that is the whole point of drawing this way. The ramp runs
+# from the interlace's end (deep indigo, radius ~0.9 on the rosette) inward
+# through the ornament's three radii.
+stops = [
+  { at = 0.00, color = "#1d3f7a" },  # lapis - the boss
+  { at = 0.19, color = "#1d3f7a" },
+  { at = 0.21, color = "#0f9a92" },  # turquoise
+  { at = 0.39, color = "#0f9a92" },
+  { at = 0.41, color = "#c25a28" },  # terracotta
+  { at = 0.59, color = "#c25a28" },
+  { at = 0.61, color = "#e8dcc0" },  # bone
+  { at = 0.79, color = "#e8dcc0" },
+  # A FIFTH PLATEAU, RESERVED FOR THE GROUND, and the reason is the same one the
+  # collage presets reserve their paper for: `bg_hue` samples this very LUT, so
+  # a ground colour has to BE one of the plateaus. Drafted with four, the
+  # backdrop had to borrow the boss's indigo and the boss then sat invisible on
+  # a field of its own colour. `hue_spread` below stops at 0.72 so no ring can
+  # reach this band, drift included.
+  { at = 0.81, color = "#08111c" },  # charcoal - the ground, and not an ink
+  { at = 1.00, color = "#08111c" },
+]
+
+[params]
+# THE TRANSIENT, AND IT LANDS ON THE WEAVE ITSELF. `variant` is a continuous
+# contact angle in 0..2, not an index, so this is the strands' crossing angle
+# re-cutting rather than a figure being swapped. The family had nothing on
+# onset; this is the lever that reads.
+variant = "0.85 + clamp(onset * 0.5, 0, 0.3) + sin(time * 0.037) * 0.12"
+
+# The radial pair carries the liveness, and `ring_phase` carries the gesture.
+# That order is deliberate: a ring mandala is very rotationally symmetric, so a
+# spin lands almost on top of itself and moves few pixels however fast it runs,
+# while the radial pair changes what the figure IS at each radius.
+ring_phase  = "time * 0.055 + clamp(treb * 0.25, 0, 0.15)"
+ring_spread = "1.0 + sin(time * 0.31) * 0.045 + clamp(bass * 0.129, 0, 0.11)"
+ring_scale  = "1.0 + sin(time * 0.47) * 0.08 + clamp(mid * 0.235, 0, 0.20)"
+
+rotation = "time * 0.03"
+scale    = "0.98"
+zoom     = "1.0"
+
+# FLAT INK: a solid stroke with a one-pixel antialiased edge, and nothing softer.
+# Any `softness` above about 0.1 puts a gradient inside the ink, which is the one
+# thing tilework cannot have.
+stroke_blend = "1"
+softness     = "0.02"
+thickness    = "4.2 + clamp(bass * 1.18, 0, 1.0)"
+glow         = "1.0"
+# TURNING THE SEAM ON COSTS BRIGHTNESS AND IT IS PAID HERE. Additive light builds
+# up where a figure crosses itself and a dense interlace leans on that; under
+# OVER it does not, so the same level reads flatter and darker. 1.15 is the
+# opaque equivalent of the ~0.9 an additive world of this density would take.
+brightness = "1.15"
+
+# The interlace at the gradient's indigo end, the ornament spread along the rest
+# (see header). The treble walks the whole ramp, so the ink set shifts without
+# any luminance moving.
+# The four rings land one per ink, which is arithmetic rather than luck: the
+# ramp normalizes over the figure's own radii (0, 0.40, 0.66, 0.89), so at
+# `hue_spread` 0.70 they sit at 0.02, 0.33, 0.54 and 0.72 - lapis boss,
+# turquoise beads, terracotta petals, bone boundary - and the interlace joins
+# the boundary at 0.69. The treble walks the whole set a little without any
+# luminance moving.
+#
+# 0.70 AND NOT 0.76, WHICH IS WHERE IT WAS DRAFTED. At 0.76 the outermost ring
+# landed at 0.78, a hundredth inside the bone plateau's 0.79 edge - so the
+# treble term pushed it over onto the reserved GROUND band and the scalloped
+# boundary turned charcoal on charcoal at exactly the moments it should have
+# been brightest. A ring's colour has to survive its own drift, so leave the
+# outermost one a plateau's width of headroom rather than parking it on a seam.
+hue        = "0.02 + clamp(treb * 0.05, 0, 0.03)"
+hue_spread = "0.70"
+saturation = "1.0"
+
+# The ground, and it is the reserved fifth plateau (see the palette). `bg_hue`
+# is a coordinate in THIS palette, so 0.9 lands on the charcoal - a value copied
+# from another preset would arrive at whatever colour that gradient holds there
+# instead.
+bg_hue      = "0.9"
+bg_bright   = "0.5"
+bg_vignette = "0.55"
+
+# The limited-ink switches, named rather than left at their defaults: each would
+# put light between the flat inks, and flat ink with a halo is a different look
+# wearing this one's palette.
+bloom_amount = "0"
+trails       = "0"
+ink_amount   = "0"
+exposure     = "1.0"
+
+[smoothing]
+variant     = { attack = 0.03, release = 0.4 }
+ring_phase  = 0.25
+ring_spread = 0.35
+ring_scale  = 0.40
+thickness   = { attack = 0.03, release = 0.35 }
+hue         = 0.35
