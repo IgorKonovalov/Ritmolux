@@ -212,8 +212,8 @@ worktree.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Cut the redirect and destroy the store | human | done 2026-08-29 | none — the file is outside the repository |
-| 2 — Prove each lane compiles what it contains | dev | done | committed with this row |
-| 3 — The record says what happened | dev | not started | |
+| 2 — Prove each lane compiles what it contains | dev | done | `2c15cc2` |
+| 3 — The record says what happened | dev | done | landed out of band; verified and recorded with this row |
 
 **Phase 1 — done, and it found a hazard the phase did not anticipate.**
 
@@ -271,3 +271,42 @@ inflating that plan's own per-frame cost.
   unrun and unrunnable as written. The phase's own note calls it a confirmation rather than a
   conviction, and the merged result is on `main`, but nothing here re-established that lane
   independently.
+
+**Phase 3 — the file edits landed out of band; what this phase ran is the verification, plus one
+row.**
+
+- `node scripts/check-doc-links.mjs` exit 0. `node scripts/check-index-rows.mjs` exit 0 — 2 regions
+  and 116 rows in `docs/plans/README.md`, none over cap.
+- `docs/plans/README.md`'s roster row for this plan read `approved` against a plan header saying
+  `in-progress`; the cell is now `in-progress`. That is the only edit this phase made to a file.
+- **DEVIATION — the `lmv-target` grep does not return only the three allowlisted documents.**
+  `grep -rn "lmv-target" --include="*.md" .` also matches
+  `docs/plans/done/0129-the-build-stops-being-paid-three-times.md` (5 lines, one of them the literal
+  `target-dir = "C:/Users/Igor Konovalov/WORK/.lmv-target"` in its Phase 3 body) and
+  `docs/plans/README-archive.md` (0129's close write-up). Both are append-only records of the same
+  event ADR-0141 records, and **neither was edited** — a closed plan is not `dev`'s to amend. A
+  reader who opens Plan 0129 Phase 3 is still handed an instruction to create the redirect, with
+  nothing on that page pointing at ADR-0147.
+- **`plugin-foobar/build.ps1` still cites ADR-0141 as live** at its `cargo metadata` call. Its
+  behaviour is unaffected — it asks cargo for `target_directory` rather than assuming a path, which
+  is correct with or without a redirect — and the file is not in this phase's Files-touched list, so
+  it was left alone.
+
+### Notes
+
+Both `dev` phases carried a done-when that could not be met as written, and both are recorded above
+rather than worked around: Phase 2's third lane is gone, and Phase 3's grep matches two append-only
+records this lane will not edit.
+
+### Close triggers
+
+- **`presets/` touched:** none.
+- **Plan header `Closes:`** none — the header carries no `Closes:` line.
+- **What shipped:** docs-chore-only. No production code changed in either phase; Phase 2 is two test
+  runs and Phase 3 is one roster cell.
+- **Operator docs touched:** none by these phases. `CLAUDE.md` and the two skill
+  `references/project-context.md` files were corrected out of band before this session, as the
+  Phase 3 block records.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. It reports 7 stale stamps
+  (0149, 0154, 0155, 0156) and 7 unprobeable claims, all pre-existing and none naming this plan.
+- **Outstanding `human` phases:** none. Phase 1 was the only one and it is done.
