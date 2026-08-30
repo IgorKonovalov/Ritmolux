@@ -352,7 +352,7 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 | 3 — The modals move to the console | dev | done | `9ab7726` |
 | 4 — Transport, staging and the mouse | dev | done | committed with this row, jointly with 5 |
 | 5 — Persistence, the flag, and the docs | dev | done | committed with this row, jointly with 4 |
-| 6 — The on-device gate | human | not started | |
+| 6 — The on-device gate | human | **part-run 2026-08-30** — one display; the rest deferred | |
 
 ### Notes
 
@@ -595,7 +595,7 @@ finished.
   runs).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 127 stated reductions hold
   across all 59 live entries, 7 unprobeable, none naming this plan.
-- **Outstanding `human` phases:** **Phase 6, the on-device gate, and it is not a formality.** Two
+- **Outstanding `human` phases:** **Phase 6, part-run 2026-08-30 on one display and not finished.** Two
   things it settles are structurally invisible to every test here: what the second swapchain costs
   the output, measurable only on two displays of *different* refresh rates; and whether the console
   surface configures on a dual-GPU laptop, whose degrade path is built, logged, and **has never been
