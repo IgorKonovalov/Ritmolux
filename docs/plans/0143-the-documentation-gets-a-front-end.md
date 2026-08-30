@@ -1,11 +1,18 @@
 # 0143 — The documentation gets a front end
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-30
+> **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
 > **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`
 > and the repository front door; **this plan does not touch `README.md`**
+> **Lane guidance:** build on `main` directly, **not** in a worktree. ADR-0053's default does not pay
+> here: every phase but 5 is JavaScript, markdown and config, and a fresh worktree would buy a cold
+> `target/` — ADR-0147 puts a lane at 8-18 GB — purely so Phase 5 can run `shot --release` once.
+> Phases 1-4 and 6-7 touch no Rust at all. A parallel lane is live in `standalone/` on `main`, and
+> this plan's paths (`site/`, `scripts/`, `docs/images/`, `.github/workflows/`) are disjoint from it
+> — so stage by explicit path, as the hook already requires, and the two do not collide.
 
 ## TL;DR
 
