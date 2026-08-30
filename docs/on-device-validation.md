@@ -221,6 +221,22 @@ footprint so the vendor spread is on record.
       **backlog update on 0032**, not a fix: sizing the windows in seconds re-opens ADR-0049 and is
       ADR territory by that entry's own argument. _(Plan 0130 Phase 5 bullet 4, extracted at that
       plan's close.)_
+- [ ] **The live video-out's size ceiling (Plan 0115 Phase 6, item 2 — the one item that phase did
+      not answer).** `lmv --stream` is proved steady at **1280x720 at 60 fps**: 108,000 frames in
+      1800.00 s wall against 1799.99 s scene, +2.0 MB resident, per-stage 3.67-7.82 ms
+      render+readback against 0.27-0.58 ms Spout send, on the RTX 3080. **The largest size and rate
+      that hold was deferred for time and is still unmeasured**, which matters because ADR-0125
+      states its bandwidth figures (8.29 MB/frame, ~498 MB/s) at 1920x1080 and **nothing has
+      confirmed that size end to end** — the receiving install is TouchDesigner **Non-Commercial**,
+      which caps the TOP at **1280x1280**. So this item needs either a commercial TouchDesigner
+      licence or a different Spout receiver. Run `--stream --size WxH --fps N --frames N` upward
+      from 1280x720, read the per-stage cost line, and report the largest that holds and **which
+      GPU rendered it** — the mode prints both resolved adapters at startup, and a frame-rate figure
+      that does not name its adapter is worthless on a two-adapter box (ADR-0071, ADR-0146).
+      **Trap:** a Spout receiver that loses its sender keeps presenting the last texture it
+      received, so a still-looking picture is not evidence of a live one. Judge from motion in the
+      frames, not from the fact that something is on screen. _(Plan 0115 Phase 6 item 2, extracted
+      at that plan's close.)_
 
 ## Runnable now — the `Rich` tier calibration (Plan 0044 Phase 4)
 

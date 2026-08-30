@@ -1,8 +1,8 @@
 # ADR-0125 — The live video-out is a Spout sender fed by a headless frame tap
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-30
 > **Date:** 2026-08-25
-> **Related plan(s):** [0115](../plans/0115-the-engine-becomes-a-live-video-source.md)
+> **Related plan(s):** [0115](../plans/done/0115-the-engine-becomes-a-live-video-source.md)
 
 ## Context
 
@@ -171,3 +171,36 @@ link, and it is recorded as the follow-on rather than as a rejection.
   flags, and TouchDesigner's colour handling of an unlabelled 8-bit Spout texture are all
   **unverified in this repo**. Plan 0115's first phase establishes all four with the SDK's own
   demo sender and no engine code written, so a wrong belief here costs an hour rather than a plan.
+
+## Outcome — 2026-08-30, at Plan 0115's close
+
+The decision stands and shipped. Five things this ADR left open are now answered, and one thing it
+asserted is wrong.
+
+- **The stated exit was measured and is not taken.** Over a 30-minute run at 1280x720/60 the two
+  stages read **3.67–7.82 ms render+readback against 0.27–0.58 ms Spout send**. The sink is an
+  order of magnitude off being the limit, so Alternative A's zero-copy path is not convicted and
+  stays unbuilt. That measurement is on this machine's RTX 3080 and does not travel (ADR-0071).
+- **The CPU path costs the two copies budgeted, not three.** A pixel-format hypothesis — that Spout
+  wanted BGRA, needing a per-frame `rgba2bgra` — was tried, published, and **refused by the
+  receiver anyway**; the real cause was the adapter (ADR-0146). `R8G8B8A8_UNORM` with no conversion
+  is correct.
+- **Colour needs no setting on either side.** The receiving TOP and a `Movie File In` TOP of the
+  same reference PNG are indistinguishable, and so is the streamed picture against a
+  `shot --frame-at` PNG of the same preset and size. The hazard this ADR said nothing in the repo
+  could catch did not materialize.
+- **The licence is Simplified BSD**, and clause 2 binds the release archive because Spout links
+  **statically** — no DLL travels, so the notice does. The release zip carries and verifies
+  `spout-license.txt`.
+- **Four `extern "C"` entry points became six.** `resize` is unnecessary — `SendImage` carries the
+  dimensions and resizes in place under the same sender name — while `name`, and the two adapter
+  functions ADR-0146 needs, are not.
+- **WRONG IN THIS ADR: the receiving operator is `Syphon Spout In`, not `Spout In`.** No TOP by the
+  latter name exists; Derivative ships Spout and Syphon as one operator. The name appears
+  throughout this document and is left as written, per the append-only rule — the docs a reader
+  follows (`README.md`, `docs/capturing.md`) say `Syphon Spout In`.
+
+Two figures this ADR states at 1920x1080 — 8.29 MB/frame and ~498 MB/s — were **never confirmed end
+to end**, because the receiving install is TouchDesigner Non-Commercial and caps the TOP at
+1280x1280. Phase 6's "largest size and rate" sweep was deferred for time and is bounded above by
+that cap regardless, so the size ceiling of this transport remains unmeasured on this machine.

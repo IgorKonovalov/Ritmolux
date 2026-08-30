@@ -254,7 +254,7 @@ flowchart LR
 ### Phase 8 — The picture drives the lamps
 
 - **Owner skill:** dev
-- **Depends on:** [Plan 0115](0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
+- **Depends on:** [Plan 0115](done/0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
   the frame tap. **This plan does not build that tap.** If 0115 has not reached Phase 2, this phase
   waits and Phases 1 to 7 do not.
 - **What:** resolve the rendered frame down to the rig's raster in linear light, so the lamps show

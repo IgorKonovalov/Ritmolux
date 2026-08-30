@@ -61,7 +61,7 @@ NDI ones gate only the NDI phases.
 
 **The two halves have very different dependency weight, and the phase order is built on that.** The
 OSC half is a UDP socket and a message encoder in the shell. The NDI half needs
-[Plan 0115](../0115-the-engine-becomes-a-live-video-source.md)'s frame tap, which is **approved and not
+[Plan 0115](0115-the-engine-becomes-a-live-video-source.md)'s frame tap, which is **approved and not
 started**, plus a third-party SDK whose licence terms nobody here has read. Interleaving them would
 put the cheap, certain half behind the expensive, uncertain one.
 
@@ -253,7 +253,7 @@ flowchart LR
 > own 24 x 170 raster instead of onto an NDI frame.
 
 - **Owner skill:** dev
-- **Depends on:** [Plan 0115](../0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
+- **Depends on:** [Plan 0115](0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
   the frame tap. **This plan does not build that tap.** If 0115 has not reached Phase 2 when this
   plan is taken up, this phase and the two after it wait; Phases 1 to 4 do not.
 - **What:** add a GPU-side reduction to the tap that resolves the show-size render down to the

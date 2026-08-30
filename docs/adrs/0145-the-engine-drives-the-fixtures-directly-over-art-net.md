@@ -83,7 +83,7 @@ resurrected in a smaller form, and that ADR is a record of how expensive that qu
 the sink in-process now costs nothing and makes the later step a downsample instead of a protocol.
 
 **Telemetry-driven looks ship first and the picture is the follow-on**, because
-[Plan 0115](../plans/0115-the-engine-becomes-a-live-video-source.md)'s frame tap is approved and
+[Plan 0115](../plans/done/0115-the-engine-becomes-a-live-video-source.md)'s frame tap is approved and
 unstarted, and because the telemetry look that ran tonight is already good.
 
 ### The resolve, when it comes, happens in linear light

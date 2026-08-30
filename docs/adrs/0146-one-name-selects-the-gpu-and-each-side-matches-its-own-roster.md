@@ -1,8 +1,8 @@
 # ADR-0146 — One name selects the GPU, and each side matches its own roster
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-30
 > **Date:** 2026-08-29
-> **Related plan(s):** [0115](../plans/0115-the-engine-becomes-a-live-video-source.md)
+> **Related plan(s):** [0115](../plans/done/0115-the-engine-becomes-a-live-video-source.md)
 > **Refines:** [ADR-0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md)
 
 ## Context
@@ -174,3 +174,33 @@ device in that call.
 `wgpu::Instance::enumerate_adapters(Backends)` exists at the pinned `=30.0.0` and returns a future
 resolving to `Vec<Adapter>`, so both halves of the name lookup are available without a new
 dependency.
+
+## Outcome — 2026-08-30, at Plan 0115's close
+
+The decision stands and shipped: `--gpu` resolves both sides, the control run separates them
+(`"Radeon"` gives an empty texture in the receiver, `"RTX 3080"` gives the picture), and the
+fallback prints rather than reverting silently. Three findings outlived the plan.
+
+- **The heuristic held, and the enumerations are demonstrably independent.** Both rosters print
+  byte-identical names for the two shared adapters. They are **not** the same enumeration: wgpu
+  lists **three** (the two plus `Microsoft Basic Render Driver`) against the sender's **two**.
+  Positions 0 and 1 happen to agree here, so nothing on this machine would catch an index handed to
+  the wrong API — the extra entry is what proves the orders are independent, and it is the reason
+  this ADR matches by name and not by index.
+- **The byte-identity the no-flag default rests on is not what the code actually tests.**
+  `AdapterDescription` was introduced with two fields for exactly this reason — `name` is the match
+  key, `detail` adds backend, device type and driver "and would wreck a match" — but `follow_renderer`
+  is handed `Renderer::adapter_description()`, which is the **detail** string. Its exact-equality
+  arm is therefore structurally unreachable, and the resolution succeeds only through the
+  reverse-containment tolerance beneath it. It resolves correctly on this machine and on any
+  machine where the detail string contains the bare name, which is every machine wgpu describes
+  this way — but the match is looser than this ADR designed, and no test can distinguish the two
+  arms while the wrong string is passed. **The repair is to carry the bare name alongside the
+  description on `RenderContext` and match against that**; it is filed as a followup, not fixed at
+  the close.
+- **The instrument gave a false negative before it gave a verdict.** A Spout receiver that loses
+  its sender keeps presenting the last texture it received, so a static test image makes a live
+  feed and a frozen frame identical. The probe now stamps a stepping liveness marker. Three
+  symptoms mean three different things and are worth knowing apart: an **empty texture** is the
+  wrong GPU, **`No Active Sender Found`** is the wrong sender name, and a **correct-looking
+  picture** may be either live or frozen.
