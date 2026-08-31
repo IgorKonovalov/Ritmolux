@@ -54,7 +54,7 @@ pub const WAVE_SAMPLES: usize = 512;
 // runtime one, because the failure would be a silently shorter waveform.
 const _: () = assert!(
     WAVE_SAMPLES <= WINDOW_SIZE,
-    "the waveform is the tail of the short analysis window and cannot be longer      than it"
+    "the waveform is the tail of the short analysis window and cannot be longer than it"
 );
 /// Second, longer FFT window feeding the bands below the crossover (~171 ms at
 /// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against one rule — 4096

@@ -292,6 +292,19 @@ mod capture_handle {
     pub type Handle = ();
 }
 
+/// The rotation config the director is built from, given the operator's
+/// `[rotate]` block and whatever `--preset` held.
+///
+/// A held preset opts out of the dwell timer and changes nothing else: the
+/// bounds stay the operator's, and `auto` is only ever narrowed — a config with
+/// `auto = false` and no flag is already the answer (ADR-0155).
+fn rotate_for(config: &config::Rotate, held_preset: Option<&str>) -> config::Rotate {
+    config::Rotate {
+        auto: config.auto && held_preset.is_none(),
+        ..config.clone()
+    }
+}
+
 impl AppState {
     #[allow(
         clippy::too_many_arguments,
@@ -356,8 +369,12 @@ impl AppState {
             if renderer.select_preset_by_name(name) {
                 eprintln!("preset: '{name}', held for the run - rotation is off");
             } else {
+                // `rotate_for` has already turned the dwell timer off on the
+                // strength of the flag, so the fallback is the startup scene
+                // held for the run, not rotation. Hotkeys still move off it.
                 eprintln!(
-                    "--preset `{name}`: gone from the preset directory since startup; rotating instead"
+                    "--preset `{name}`: gone from the preset directory since startup; \
+                     holding the startup scene instead - rotation is still off"
                 );
             }
         }
@@ -404,12 +421,7 @@ impl AppState {
             preset_dir,
             preset_sig,
             last_preset_poll: start,
-            // A held preset opts out of the dwell timer entirely; without one
-            // the operator's config decides, unchanged.
-            director: Director::from_config(&config::Rotate {
-                auto: config.rotate.auto && held_preset.is_none(),
-                ..config.rotate.clone()
-            }),
+            director: Director::from_config(&rotate_for(&config.rotate, held_preset.as_deref())),
             last_frame: start,
             soak: soak_path.map(SoakLog::new),
             downbeat_log: downbeat_log_path.map(DownbeatLog::new),
@@ -2737,6 +2749,16 @@ fn nearest_flag(name: &str) -> Option<&'static FlagSpec> {
 enum Claimed {
     /// A token matching a roster entry.
     Known(&'static FlagSpec),
+    /// A token matching a roster entry that takes no value, spelled with an
+    /// `=value` suffix the scanner for that flag will never see.
+    ///
+    /// Every scanner claiming a valueless flag compares the whole argument
+    /// (`arg == "--stream"`), so `--stream=1` matches nothing while
+    /// [`flag_name`] still reduces it to a rostered name. That combination is
+    /// exactly the silence ADR-0148 exists to end: the roster walks it past as
+    /// recognized, the mode it names never starts, and every flag that depends
+    /// on that mode is then read by nothing either.
+    Valued(&'static FlagSpec),
     /// A `--`-prefixed token no roster entry names, kept verbatim so the
     /// refusal can echo what was typed rather than a normalized form.
     Unknown(String),
@@ -2760,6 +2782,10 @@ fn walk_flags(args: impl Iterator<Item = String>) -> Vec<Claimed> {
             seen.push(Claimed::Unknown(arg.clone()));
             continue;
         };
+        if !spec.takes_value && arg.contains('=') {
+            seen.push(Claimed::Valued(spec));
+            continue;
+        }
         seen.push(Claimed::Known(spec));
         // The `=` spelling carries its value inside the same argument, so there
         // is nothing after it to step over.
@@ -2794,8 +2820,27 @@ fn missing_companion(
             .requires
             .filter(|companion| !present(companion))
             .map(|companion| (*spec, companion)),
-        Claimed::Unknown(_) => None,
+        // A malformed occurrence satisfies nothing and asks for nothing: it is
+        // refused before this runs, and counting it as present would let
+        // `--stream=1 --fps 30` past on the strength of the very token that is
+        // wrong.
+        Claimed::Valued(_) | Claimed::Unknown(_) => None,
     })
+}
+
+/// The first rostered flag that takes no value but was given one.
+///
+/// See [`Claimed::Valued`] for why this is a silence rather than a parse error
+/// anywhere downstream. Returned as the spec so the refusal names the flag
+/// rather than the token, which is what tells the operator that the flag exists
+/// and the `=` is the mistake.
+fn valued_valueless_flag(args: impl Iterator<Item = String>) -> Option<&'static FlagSpec> {
+    walk_flags(args)
+        .into_iter()
+        .find_map(|claimed| match claimed {
+            Claimed::Valued(spec) => Some(spec),
+            Claimed::Known(_) | Claimed::Unknown(_) => None,
+        })
 }
 
 /// The first `--`-prefixed argument no scanner will claim, with the nearest
@@ -2814,7 +2859,7 @@ fn unrecognized_flag(
                 let nearest = flag_name(&arg).and_then(nearest_flag);
                 Some((arg, nearest))
             }
-            Claimed::Known(_) => None,
+            Claimed::Known(_) | Claimed::Valued(_) => None,
         })
 }
 
@@ -3312,6 +3357,20 @@ fn main() {
         std::process::exit(2);
     }
 
+    // A valueless flag given a value, refused for the same reason and in the
+    // same shape. Ahead of the companion check because it is the cause and that
+    // one would report the symptom: `--stream=1 --fps 30` has a well-formed
+    // `--fps` and a `--stream` that will not be seen, so blaming `--fps` sends
+    // the operator to the wrong token.
+    if let Some(spec) = valued_valueless_flag(std::env::args().skip(1)) {
+        eprintln!(
+            "`{}` takes no value, so `{}=...` is read by nothing",
+            spec.name, spec.name
+        );
+        eprintln!("drop the `=` and its value: `{}`", spec.name);
+        std::process::exit(2);
+    }
+
     // A rostered flag whose companion is absent, refused for the same reason
     // and in the same shape (ADR-0155). Second, because a misspelt flag is the
     // worse diagnosis and should be the one reported: `--fpz 30` is an
@@ -3519,7 +3578,7 @@ mod tests {
         FLAGS, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, InputSource, Modal, Persist,
         Recovery, RecoveryPolicy, config, console, device_row_index, help_text, missing_companion,
         output_modal, parse_input_args_from, parse_osc_arg_from, preset_name_visible,
-        resolve_input, resolve_osc, unrecognized_flag,
+        resolve_input, resolve_osc, rotate_for, unrecognized_flag, valued_valueless_flag,
     };
 
     /// One frame at 60 Hz, for the cases where the *rate* is not what is under
@@ -4033,6 +4092,68 @@ mod tests {
         assert_eq!(orphaned(&["--fps", "30", "--stream"]), None);
     }
 
+    /// **`--gpu` and `--preset` carry no dependency**, because both reach the
+    /// windowed path (ADR-0155). A regression putting either back behind
+    /// `--stream` is a flag refused on a working invocation, and it is
+    /// unfalsifiable anywhere else: `help_cli.rs` spawns the binary for
+    /// `--preset` only, and a `--gpu` that has to open a wgpu device to prove
+    /// itself is not a unit test.
+    #[test]
+    fn the_two_windowed_flags_carry_no_dependency() {
+        assert_eq!(orphaned(&["--gpu", "1"]), None);
+        assert_eq!(orphaned(&["--preset", "Clifford"]), None);
+    }
+
+    /// [`valued_valueless_flag`] reduced to the name the operator is shown.
+    fn over_valued(args: &[&str]) -> Option<&'static str> {
+        let argv = args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        valued_valueless_flag(argv.into_iter()).map(|spec| spec.name)
+    }
+
+    /// **A valueless flag given a value is the silence both other gates miss.**
+    /// `--stream=1` reduces to a rostered name, so it is not unrecognized, and
+    /// it counts as a `--stream` occurrence, so the companion check passes it
+    /// too — while every scanner that claims `--stream` compares the whole
+    /// argument and sees nothing. The app then starts windowed and ignores the
+    /// rest of the stream family without a word, which is the exact failure
+    /// ADR-0155 exists to end.
+    #[test]
+    fn a_valueless_flag_given_a_value_is_refused() {
+        for name in [
+            "--stream",
+            "--help",
+            "--console",
+            "--list-devices",
+            "--list-adapters",
+        ] {
+            assert_eq!(
+                over_valued(&[&format!("{name}=1")]),
+                Some(name),
+                "`{name}=1` was not refused"
+            );
+        }
+
+        // The whole shape from the review. `unrecognized_flag` cannot see it:
+        // the token reduces to a rostered name. `missing_companion` sees only
+        // the consequence — `--fps` with no usable `--stream` — which names the
+        // wrong token, and is why `main` runs this check first.
+        assert_eq!(
+            over_valued(&["--stream=1", "--fps", "30"]),
+            Some("--stream")
+        );
+        assert_eq!(refused(&["--stream=1", "--fps", "30"]), None);
+        assert_eq!(
+            orphaned(&["--stream=1", "--fps", "30"]),
+            Some(("--fps", "--stream")),
+            "a malformed `--stream` must not satisfy another flag's dependency"
+        );
+
+        // A value-taking flag is unaffected in either spelling, and a correct
+        // valueless flag is not convicted by a `=` somewhere else on the line.
+        assert_eq!(over_valued(&["--stream", "--fps=30"]), None);
+        assert_eq!(over_valued(&["--stream", "--fps", "30"]), None);
+    }
+
     /// A flag-shaped **value** is not its own flag, so it cannot satisfy
     /// another flag's dependency. `--device` refuses to swallow a flag-shaped
     /// token, so the `--stream` here is a real occurrence; a `--device=--stream`
@@ -4052,28 +4173,30 @@ mod tests {
     /// and never widens it — and the dwell bounds stay theirs either way.
     #[test]
     fn a_held_preset_is_the_only_thing_that_disables_rotation() {
-        let base = config::Rotate {
+        let on = config::Rotate {
             auto: true,
             ..config::Rotate::default()
         };
-        // The rule `AppState::new` applies, read back here as a value.
-        let resolved = |auto: bool, held: Option<&str>| config::Rotate {
-            auto: auto && held.is_none(),
-            ..base.clone()
+        let off = config::Rotate {
+            auto: false,
+            ..config::Rotate::default()
         };
 
-        assert!(resolved(true, None).auto, "no flag leaves the config alone");
         assert!(
-            !resolved(true, Some("attractor_clifford")).auto,
+            rotate_for(&on, None).auto,
+            "no flag leaves the config alone"
+        );
+        assert!(
+            !rotate_for(&on, Some("attractor_clifford")).auto,
             "a held preset turns rotation off"
         );
         assert!(
-            !resolved(false, None).auto,
+            !rotate_for(&off, None).auto,
             "a config with rotation already off stays off"
         );
         assert_eq!(
-            resolved(true, Some("attractor_clifford")).min_dwell_secs,
-            base.min_dwell_secs,
+            rotate_for(&on, Some("attractor_clifford")).min_dwell_secs,
+            on.min_dwell_secs,
             "the dwell bounds stay the operator's even when rotation is off"
         );
     }

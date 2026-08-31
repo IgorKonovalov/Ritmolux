@@ -360,8 +360,10 @@ literal the way rustc does before judging it.
 **P4 — the rule is a threshold and the user chose it.** Presented as three options with counts; the
 chosen shape is a run of 12+ spaces in a single-line literal, which yields **zero false positives
 and zero `hygiene-allow` escapes**. It is silent on narrow instances, of which one existed at six
-spaces (`core/src/dsp/mod.rs`, repaired here). The rejected alternative was a threshold of four with
-roughly thirty escapes. The cost is written into the script beside the constant.
+spaces (`core/src/dsp/mod.rs`) and was **left unrepaired by this phase** — the note here and the one
+in the script both said it had been repaired, and neither was true until the review-fix commit below
+joined it by hand. The rejected alternative was a threshold of four with roughly thirty escapes. The
+cost is written into the script beside the constant.
 
 **P4 — 15 convictions repaired**, and four comments written by this plan's own earlier phases
 tripped the pre-existing narration rules and were rewritten.
@@ -391,6 +393,26 @@ live and its count is stale by 7.
 failed once at 1.086 s in a full `--workspace` run while behaving correctly — a reading about load on
 the box, not about the code (ADR-0071). Both new spawning tests drop the bound; `output()` waiting
 for exit is what carries the no-window property, and the exit code and message are what is asserted.
+
+**Review fixes — four items from the Mode 4 review, one commit.** (1) `core/src/dsp/mod.rs`'s
+six-space literal joined by hand, and the two places that said it already had been corrected — the
+note above and the comment beside `LITERAL_RUN`. (2) `--flag=value` on a `takes_value: false` flag is
+now refused: `flag_name` reduces `--stream=1` to a rostered name so `unrecognized_flag` cannot see it,
+while every scanner claiming a valueless flag compares the whole argument and finds nothing — so
+`lmv --stream=1 --fps 30` started windowed and ignored `--fps`. A third `Claimed` variant carries it
+out of `walk_flags`, and `main` refuses it **ahead of** `missing_companion`, which sees only the
+consequence and names `--fps`. (3) `the_two_windowed_flags_carry_no_dependency` pins
+`--gpu`/`--preset` at `requires: None`; `help_cli.rs`'s doc comment claimed its own test covered
+`--gpu` and it never did — it spawns `--preset` only. (4) `rotate_for` extracted from `AppState::new`
+and called from both it and the test that used to redeclare the rule as a closure.
+
+**The `--preset` miss message named the wrong outcome.** `rotate_for` has already turned the dwell
+timer off by the time the roster is consulted, so a name that vanished between the startup check and
+the window gets the startup scene held, not rotation. It said `rotating instead`.
+
+**A pre-existing `dead_code` warning is live on `main`.** `RenderContext`'s `instance` and `gpu`
+fields are never read under `cargo check -p lmv-core --lib`; `--workspace --all-targets` unifies
+features and it disappears. Reproduced on `main` at `da38c09`, untouched here.
 
 ### Close triggers
 
