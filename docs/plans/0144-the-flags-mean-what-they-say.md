@@ -339,102 +339,77 @@ pub struct RendererOptions {
 not stand. Ten call sites, none of which relied on copy semantics.
 
 **P2 — `standalone/examples/floor.rs` is outside the phase's file list and was edited.** The
-`RenderContext::new` signature change breaks it, and `cargo build --workspace` does not compile
-examples, so only `--all-targets` reports it.
+`RenderContext::new` signature change breaks it, and only `--all-targets` reports it.
 
 **P2 — the windowed dGPU reading was taken.** `--gpu 1` resolved to
 `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` and `--gpu 0` to
-`AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, each with `(pinned by --gpu)` in
-`diagnostics.log`. Unflagged behaviour was not re-measured and by design did not change.
+`AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, each `(pinned by --gpu)` in `diagnostics.log`.
+Unflagged behaviour was not re-measured and by design did not change.
 
 **P3 — `--preset` takes the display name, not the filename.** `Clifford`, not
-`attractor_clifford`; this is what `select_preset_by_name` already matched on the `--stream` path,
-so the two agree. Most names need quoting and `README.md` now says so. Two presets in the shipped
-set are both named `Coral`, so one of them is unreachable by name from either path — not touched
-here, and not a defect this plan introduced.
+`attractor_clifford` — what `select_preset_by_name` already matched on the `--stream` path. Most
+names need quoting and `README.md` now says so. Two shipped presets are both named `Coral`, so one
+is unreachable by name from either path — pre-existing, not touched here.
 
 **P4 — the first implementation was wrong, and the volume is what showed it.** Judging the raw
-source slice convicted **1184** sites, essentially every correctly-wrapped literal in the tree,
-because a `\` continuation is still present in the source it reads. The check now decodes the
-literal the way rustc does before judging it.
+source slice convicted **1184** sites — essentially every correctly-wrapped literal in the tree,
+because a `\` continuation is still present in the source. The check now decodes the literal the way
+rustc does before judging it.
 
 **P4 — the rule is a threshold and the user chose it.** Presented as three options with counts; the
-chosen shape is a run of 12+ spaces in a single-line literal, which yields **zero false positives
-and zero `hygiene-allow` escapes**. It is silent on narrow instances, of which one existed at six
-spaces (`core/src/dsp/mod.rs`) and was **left unrepaired by this phase** — the note here and the one
-in the script both said it had been repaired, and neither was true until the review-fix commit below
-joined it by hand. The rejected alternative was a threshold of four with roughly thirty escapes. The
-cost is written into the script beside the constant.
+chosen shape is a run of 12+ spaces in a single-line literal, which yields **zero false positives and
+zero `hygiene-allow` escapes**. The rejected alternative was a threshold of four with roughly thirty
+escapes. It is silent on narrow instances, of which one existed at six spaces
+(`core/src/dsp/mod.rs`) and was **left unrepaired by this phase** — this note and the one in the
+script both said otherwise until `a2f7627` joined it by hand.
 
 **P4 — 15 convictions repaired**, and four comments written by this plan's own earlier phases
 tripped the pre-existing narration rules and were rewritten.
 
-**P5 — the eleven do not share one skip reason, so the fold is parameterised.** Four distinct
-justifications are live for refusing a software adapter (frame-time meaninglessness, ADR-0058 layout
-aliasing, a mis-rendered scene-over-background, a defect that does not reproduce on WARP).
-`headless_hardware_for(w, h, tier, reason)` holds the mechanism and takes the reason; collapsing
-them would print an aliasing argument at a timing skip.
+**P5 — the eleven do not share one skip reason, so the fold is parameterised.** Four justifications
+are live for refusing a software adapter (frame-time meaninglessness, ADR-0058 layout aliasing, a
+mis-rendered scene-over-background, a defect that does not reproduce on WARP).
+`headless_hardware_for(w, h, tier, reason)` takes the reason; collapsing them would print an
+aliasing argument at a timing skip.
 
 **P5 — this phase's done-when named a grep that matches nothing.**
-`grep -rn "DeviceType::Cpu" core/tests/*.rs` returns empty on the tree as it stood *before* the
-phase, so it would have passed without the phase running. `RenderError::RequestAdapter` is the shape
-these blocks actually match and is what was used; it now appears only in `core/tests/common/mod.rs`.
+`grep -rn "DeviceType::Cpu" core/tests/*.rs` was already empty *before* the phase, so it would have
+passed without it running. `RenderError::RequestAdapter` is what these blocks actually match and is
+what was used; it now appears only in `core/tests/common/mod.rs`.
 
 **P5 — `#[test]` under `core/tests/` is 237 before and 237 after.** Plan 0124's log recorded 236;
 the difference is `main` moving between that close and this branch, not this phase.
 
-**P6 — deferred once, then run after `plan-0125` merged.** At the first attempt the count was **71**
-real warnings, not the 64 Plan 0124's log recorded, and 51 of them sat in `core/src/render/**`, which
-the live `plan-0125` lane was restructuring — ten in files it had already committed changes to. The
-user was given the collision and chose to defer. `plan-0125` has since closed and merged into this
-branch; the count on the merged tree is the same **71 over 31 files**, so nothing moved them.
+**P6 — deferred once, run after `plan-0125` merged, and the count did not move:** **71** over 31
+files, the same 71 the deferral was argued from and not the 64 Plan 0124's log recorded.
 
-**P6 — the 71 fall into four classes, and only two of them were link *errors*.**
+**P6 — four classes, and only two of them are link *errors*.** 52 `private_intra_doc_links` (the
+target is `pub(crate)`/`pub(super)`/private, so the link never rendered without
+`--document-private-items` — all 52 reduce to a code span); 8 `broken_intra_doc_links` from renames
+and removals, **five of which resolve** while three name things gone under every name; 2 more broken
+because the target is `#[cfg(test)]`; 7 `redundant_explicit_links`. **Nothing was feature-gated** —
+the fourth class this could have had. Per-item detail is in `2c5dc2a`'s message.
 
-| class | count | repair |
-|---|---|---|
-| `private_intra_doc_links` — a public item's docs link to a `pub(crate)`/private/`pub(super)` target | 52 | reduced to a code span; the link never rendered without `--document-private-items` |
-| `broken_intra_doc_links` — renamed, moved or removed | 8 | five resolved to the item's real path or owner, three reduced |
-| `broken_intra_doc_links` — the target is `#[cfg(test)]`, so rustdoc never compiles it | 2 | reduced (`console::route`, `emitter`'s parabola test) |
-| `redundant_explicit_links` — `[`X`](X)` | 7 | explicit target dropped, keeping the link |
-
-Nothing was feature-gated. The five that resolved: `film::total_hops` needed `super::`;
-`Report::blank` is `Row::blank`; `MAX_LOOP_ITERATIONS` (×3) is now `Budget::loops`. Two more named
-items that no longer exist under any name — `UNCONSUMED_OUTPUTS` is the private `OUTPUTS`,
-`curves::maurer_rose_arcs` is the private `maurer_rose_pieces` — so the prose now names what is
-there. `AttractorFamily::projection` is a field of `Basis`, not of `AttractorFamily`.
-
-**P6 — the bulk pass is scripted and one of its rewrites needed a hand repair.**
-`shape_collage.rs` carried `[`KNEE`](…)` followed immediately by a second code span, so stripping the
-link produced `` `KNEE`` = 0.6` `` — two adjacent spans, which markdown does not read. Joined into
-one. That is the only rewrite the script got wrong, and it was found by scanning the diff for
-adjacent backticks rather than by any gate.
-
-**P6 — the strip leaves some lines short of their paragraph's wrap width and they were not
-re-wrapped.** Markdown reflows, so no rendered page changes, and one changed line per warning is what
-keeps the diff reviewable.
+**P6 — one scripted rewrite was wrong, and no gate would have caught it.** `shape_collage.rs` carried
+a link followed immediately by a second code span, so stripping the brackets left two adjacent spans,
+which markdown does not read. Found by scanning the diff for adjacent backticks. **The strip also
+leaves some lines short of their paragraph's wrap width and they were not re-wrapped** — markdown
+reflows, so no rendered page changes.
 
 **A test this plan added was flaky and is now bound-free.**
 `a_stream_only_flag_without_stream_exits_without_starting` asserted a 1-second wall-clock bound and
-failed once at 1.086 s in a full `--workspace` run while behaving correctly — a reading about load on
-the box, not about the code (ADR-0071). Both new spawning tests drop the bound; `output()` waiting
-for exit is what carries the no-window property, and the exit code and message are what is asserted.
+failed once at 1.086 s while behaving correctly — a reading about load on the box, not about the code
+(ADR-0071). Both new spawning tests drop the bound; `output()` waiting for exit is what carries the
+no-window property.
 
-**Review fixes — four items from the Mode 4 review, one commit.** (1) `core/src/dsp/mod.rs`'s
-six-space literal joined by hand, and the two places that said it already had been corrected — the
-note above and the comment beside `LITERAL_RUN`. (2) `--flag=value` on a `takes_value: false` flag is
-now refused: `flag_name` reduces `--stream=1` to a rostered name so `unrecognized_flag` cannot see it,
-while every scanner claiming a valueless flag compares the whole argument and finds nothing — so
-`lmv --stream=1 --fps 30` started windowed and ignored `--fps`. A third `Claimed` variant carries it
-out of `walk_flags`, and `main` refuses it **ahead of** `missing_companion`, which sees only the
-consequence and names `--fps`. (3) `the_two_windowed_flags_carry_no_dependency` pins
-`--gpu`/`--preset` at `requires: None`; `help_cli.rs`'s doc comment claimed its own test covered
-`--gpu` and it never did — it spawns `--preset` only. (4) `rotate_for` extracted from `AppState::new`
-and called from both it and the test that used to redeclare the rule as a closure.
-
-**The `--preset` miss message named the wrong outcome.** `rotate_for` has already turned the dwell
-timer off by the time the roster is consulted, so a name that vanished between the startup check and
-the window gets the startup scene held, not rotation. It said `rotating instead`.
+**Review fixes (`a2f7627`) — four items, one of them a defect this plan shipped.**
+`lmv --stream=1 --fps 30` passed both gates, started windowed and ignored `--fps`: `flag_name`
+reduces `--stream=1` to a rostered name, while every scanner claiming a valueless flag compares the
+whole argument. A third `Claimed` variant carries it out of `walk_flags`, refused **ahead of**
+`missing_companion`, which sees only the consequence and names `--fps`. Also the `dsp` literal, a
+test pinning `--gpu`/`--preset` at `requires: None`, and `rotate_for` extracted so the test stops
+asserting against its own closure. **The `--preset` miss message named the wrong outcome** — it said
+`rotating instead`, but `rotate_for` has already turned the dwell timer off.
 
 **A pre-existing `dead_code` warning is live on `main`.** `RenderContext`'s `instance` and `gpu`
 fields are never read under `cargo check -p lmv-core --lib`; `--workspace --all-targets` unifies
