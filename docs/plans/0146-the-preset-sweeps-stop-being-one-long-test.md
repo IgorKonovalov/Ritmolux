@@ -225,7 +225,7 @@ fn animation_attractor_leviathan() {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Spike: split the worst sweep | dev | done | committed with this row |
+| 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
 | 2 — Split the remaining per-preset sweeps | dev | not started | |
 | 3 — Split `distinctness` per family | dev | not started | |
 | 4 — The `representative` key and its floor | dev | not started | |
