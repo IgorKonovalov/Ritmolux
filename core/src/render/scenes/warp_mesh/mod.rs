@@ -156,8 +156,8 @@ pub fn vertex_position(col: u32, row: u32, mesh: (u32, u32), aspect: f32) -> (f3
 }
 
 /// The nine outputs a `[per_vertex]` table may bind, in the order this scene
-/// stores them. **Keep in step with [`PER_VERTEX_DEFAULTS`] and
-/// [`WarpMeshScene::set_per_vertex`].**
+/// stores them. **Keep in step with `PER_VERTEX_DEFAULTS` and
+/// `WarpMeshScene::set_per_vertex`.**
 ///
 /// The same nine names are ordinary scalar [`PARAMS`] as well, and that is the
 /// design: a scalar sets the output for the whole mesh, and a `[per_vertex]`

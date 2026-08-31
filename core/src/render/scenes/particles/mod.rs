@@ -107,7 +107,7 @@ const TRAIL_GRID_STEP: u32 = 256;
 
 /// The trail accumulation grid for a render target of `width` x `height` — this
 /// scene's **cap and step** over the one shared policy
-/// ([`grid::grid_size`](crate::render::grid::grid_size)).
+/// (`grid::grid_size`).
 ///
 /// A thin wrapper on purpose (Plan 0035 Phase 3). A line-for-line copy of this
 /// arithmetic in `post.rs` is how the aspect lesson this scene had already paid for

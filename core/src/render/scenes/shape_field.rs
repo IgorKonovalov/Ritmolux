@@ -46,7 +46,7 @@
 //!
 //! # It shares the shape vocabulary rather than restating it
 //!
-//! The silhouettes come from [`marks`](super::marks) — the same WGSL chunk
+//! The silhouettes come from `marks` — the same WGSL chunk
 //! `swarm` and `emitter` splice in, and the same CPU-side quantizers for the
 //! `shape` selector and the `points` count. So a mark a particle can wear and a
 //! figure this scene can be cannot drift apart, and the roster stays closed at

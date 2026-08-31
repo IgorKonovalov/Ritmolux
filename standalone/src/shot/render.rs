@@ -21,7 +21,7 @@
 //! the clip's sample rate sets one — 93.75 Hz for 48 kHz audio — and `--fps` sets
 //! the other. [`hops_through`] is the map between them, in integer arithmetic so
 //! it cannot drift over a four-minute clip, and the hops-per-clip division itself
-//! is [`film::total_hops`], not a second copy of it.
+//! is [`film::total_hops`](super::film::total_hops), not a second copy of it.
 //!
 //! ## The wire format
 //!

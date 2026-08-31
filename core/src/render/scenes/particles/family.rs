@@ -926,7 +926,7 @@ pub(super) fn step_once(family: AttractorFamily, coeffs: [f32; 4], p: [f32; 3]) 
 }
 
 /// The plane a 3D attractor family is projected into (ADR-0068), as chosen by
-/// [`AttractorFamily::basis`].
+/// `AttractorFamily::basis`.
 ///
 /// The spin always rotates `x` against the *other* horizontal axis and leaves the
 /// vertical alone, so a basis is fully described by naming that pair.

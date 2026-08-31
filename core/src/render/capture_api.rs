@@ -168,10 +168,10 @@ impl Renderer {
     /// pixels are read, which makes the result identical for any `[smoothing]`
     /// constant (ADR-0039). `capture_preset` is left exactly as it was — four
     /// suites and `--report` consume it — and this is its sibling, sharing the
-    /// same [`reset_for_capture`](Self::reset_for_capture) seed so both are pure
+    /// same `reset_for_capture` seed so both are pure
     /// functions of their arguments.
     ///
-    /// The clock advances one [`FALLBACK_DT`](scenes::FALLBACK_DT) per entry, so
+    /// The clock advances one `FALLBACK_DT` per entry, so
     /// index `i` is second `i * dt` of the response. An empty `stimulus` yields
     /// no images. Errors if `name` is not in the roster.
     ///
@@ -248,7 +248,7 @@ impl Renderer {
     ///
     /// Deterministic on the same terms as its siblings: scenes are rebuilt to
     /// their seed, the clock resets to `0.0`, and the step is a fixed
-    /// [`FALLBACK_DT`](scenes::FALLBACK_DT) — so a row at index *k* does not
+    /// `FALLBACK_DT` — so a row at index *k* does not
     /// depend on how far the run was asked to go. Images come back in
     /// `at_frames` order; a repeated index yields the same frame twice rather
     /// than rendering it twice. An empty `at_frames` renders nothing.
@@ -341,7 +341,7 @@ impl Renderer {
     /// 14,400-frame render is the same as a 100-frame one.
     ///
     /// It is also the only capture entry point whose step is **not** the fixed
-    /// [`FALLBACK_DT`](scenes::FALLBACK_DT). A render at `--fps 30` advances the
+    /// `FALLBACK_DT`. A render at `--fps 30` advances the
     /// scene by 1/30 s a frame, or the visuals would run at half speed against
     /// their own soundtrack; that `dt` is the caller's, exactly as it is for the
     /// live frontend (ADR-0013). At 60 fps `dt` *is* `FALLBACK_DT`, which is what
@@ -364,7 +364,7 @@ impl Renderer {
     /// long run allocates no GPU resources mid-sequence.
     ///
     /// A `sink` error stops the run and comes back as
-    /// [`RenderError::Sink`](RenderError::Sink) carrying the consumer's own
+    /// [`RenderError::Sink`] carrying the consumer's own
     /// message.
     pub fn capture_stream(
         &mut self,
@@ -463,7 +463,7 @@ impl Renderer {
     ///
     /// A warm-up hop still pushes its samples, still publishes its
     /// [`AnalysisFrame`], and still advances the scene clock by one
-    /// [`FALLBACK_DT`](scenes::FALLBACK_DT) — the hop happened, it just did not
+    /// `FALLBACK_DT` — the hop happened, it just did not
     /// draw. What it skips is the render pass, which is why a caller that only
     /// needs the analyzer warm (`core/tests/reactivity.rs` drives
     /// `WARMUP_HOPS` of them per capture, at silence, and reads none of them
@@ -674,7 +674,7 @@ impl Renderer {
     /// falls behind the wall clock yields fewer, correctly-timed frames rather
     /// than a picture running slow against the music.
     ///
-    /// Draws under [`SaltMode::Live`], because a tap is a live render path and
+    /// Draws under `SaltMode::Live`, because a tap is a live render path and
     /// not a capture: a preset declaring `seed = "random"` (ADR-0051) must vary
     /// per launch here exactly as it does in the window. Both salts are equal for
     /// every preset that declares anything else, which is why a tapped frame and
@@ -682,7 +682,7 @@ impl Renderer {
     /// clock are still byte-identical (`core/tests/frame_tap.rs`).
     ///
     /// **Blocks on the readback**, as every path through
-    /// [`capture::read_back`](capture::read_back) does. That is what bounds a
+    /// `capture::read_back` does. That is what bounds a
     /// long run's memory — the poll retires each frame's submission before the
     /// next is encoded (the retention Plan 0099 measured) — and it is why this is
     /// a *source* entry point and not a display one: there is no present deadline

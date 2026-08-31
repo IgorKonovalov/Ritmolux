@@ -303,13 +303,13 @@ impl MilkBundle {
     /// sections.
     ///
     /// **Its own register file, not the bundle's** — an element's programs share
-    /// a scope with each other and with nothing else (see [`ElementRuntime`]), so
+    /// a scope with each other and with nothing else (see `ElementRuntime`), so
     /// the roster check here is *within* the element and there is deliberately no
     /// comparison against `per_frame`'s. Only `q1`-`q32` cross, by copy.
     ///
     /// Silently over-count is not an option: `count` and `instances` are what the
     /// draw layer's buffers were sized from, so they are clamped to the format's
-    /// own limits by [`ElementRuntime::spec`] on the way out rather than trusted.
+    /// own limits by `ElementRuntime::spec` on the way out rather than trusted.
     #[allow(clippy::too_many_arguments)]
     pub fn push_element(
         &mut self,
@@ -606,7 +606,7 @@ impl MilkRuntime {
     /// converted from MilkDrop's per-frame rates to this engine's per-second ones
     /// (module docs).
     ///
-    /// Returns `(outputs, decay)`, positionally with [`OUTPUT_NAMES`]. `decay` is
+    /// Returns `(outputs, decay)`, positionally with `OUTPUT_NAMES`. `decay` is
     /// `None` when the program never names it, so the scene keeps its own default
     /// rather than being handed a zero.
     pub fn run_frame(

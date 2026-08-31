@@ -13,7 +13,7 @@
 //! between and `[smoothing]` has something to interpolate.
 //!
 //! The cache stays, keyed on the built angle with **hysteresis**: a request more
-//! than [`STEP_DEG`] from the built angle rebuilds, anything nearer reuses. That
+//! than `STEP_DEG` from the built angle rebuilds, anything nearer reuses. That
 //! is what keeps generator work off the hot path (ADR-0007) now that a bound
 //! param can reach it.
 //!
@@ -39,7 +39,7 @@
 //! ## The colour axis: **radius from the rosette centre** (ADR-0059)
 //!
 //! This scene honours `[palette]` / `[palette_b]` / `palette_mix` / `hue_spread`
-//! / `saturation` through the shared [`ColorRamp`], on a **normalized radius**
+//! / `saturation` through the shared `ColorRamp`, on a **normalized radius**
 //! axis: a Hankin rosette is rotationally symmetric about the frame centre, so
 //! radius is the only ordering the construction itself supplies.
 //!
@@ -90,10 +90,10 @@
 //!
 //! ## The rings move: three levers, and why two of them are radial
 //!
-//! The roster stays structural; what moves is a [`RingMotion`] applied to it.
+//! The roster stays structural; what moves is a `RingMotion` applied to it.
 //! `ring_phase` turns **alternate rings in opposite directions**, `ring_spread`
 //! multiplies every radius about the centre, and `ring_scale` multiplies every
-//! motif's size. All three default to [`RingMotion::STATIC`], the exact identity
+//! motif's size. All three default to `RingMotion::STATIC`, the exact identity
 //! (`+ 0`, `* 1`, `* 1`), so a preset that binds none of them draws the static
 //! ornament bit for bit.
 //!
@@ -109,11 +109,11 @@
 //! the ornamental gesture rather than the liveness.
 //!
 //! Like the rosette, the ornament is **rebuilt under hysteresis**: a motion
-//! further than one step ([`RING_PHASE_STEP`] and friends) from what is held
+//! further than one step (`RING_PHASE_STEP` and friends) from what is held
 //! rebuilds, anything nearer reuses. A preset binding none of the three never
 //! rebuilds after `configure` — but one that *animates* a lever re-places its
 //! ornament on most frames, which is affordable rather than free. See
-//! [`RING_PHASE_STEP`] for the measurement.
+//! `RING_PHASE_STEP` for the measurement.
 
 // Hot-path panic-denial pragma: `update`/`render` run every displayed frame.
 // `configure` (the Hankin construction) is build-time but colocated, so it
@@ -660,7 +660,7 @@ const RADIAL_FLOOR: f32 = 1e-4;
 /// **Local convention, and every outline below obeys it:** a motif is authored
 /// about its own centre, spanning roughly one unit, with **outward** (away from
 /// the frame centre) along `+x`. Placement is then one rotation for both the
-/// orientation and the position — see [`build_rings`].
+/// orientation and the position — see `build_rings`.
 ///
 /// **The roster closed at seven on 2026-08-06** (Plan 0065 Phase 3), picked from
 /// the rendered sample sheets rather than from names. Two of the nine provisional
@@ -712,7 +712,7 @@ pub enum Motif {
     /// renderer's arc instance (Plan 0087).
     ///
     /// **It reads the ring's own fields, and each keeps its spirit** — see
-    /// [`build_rings`]. `count` is the **lobe count** rather than a copy count,
+    /// `build_rings`. `count` is the **lobe count** rather than a copy count,
     /// because the lobes are one chain and there is nothing to repeat; `radius`
     /// is the base circle they bulge from, which is exactly the ring a boundary
     /// sits on; `scale` is the **depth** of the bulge, which is the only size a

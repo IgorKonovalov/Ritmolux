@@ -42,7 +42,7 @@
 ///
 /// **Exactly four, always** — a figure with fewer duplicates one at probability
 /// `0`. The shader's map choice is an unrolled four-way branch (the reason
-/// [`Basis::masks`](super::Basis::masks) uses one-hot selectors rather than
+/// `Basis::masks` uses one-hot selectors rather than
 /// indices: WGSL will not dynamically index outside addressable storage and the
 /// backends disagree about the rest), so the count is structural rather than a
 /// convenience.
@@ -436,7 +436,7 @@ impl IfsFigure {
     /// transcription of the draw shader that the projection tests run.
     ///
     /// The fern is the reason
-    /// [`projection`](super::AttractorFamily::projection) carries a full
+    /// `Basis::projection` carries a full
     /// three-component centre rather than a z-centre: it spans `y ∈ [0, 10]` and
     /// is not origin-centred, so a projection that subtracts nothing puts its
     /// root on the bottom edge and its canopy off the top.
@@ -1029,7 +1029,7 @@ fn fixed_point(map: &IfsMap) -> [f32; 2] {
 /// unconditionally: no branch, and no knowledge of the probability table.
 ///
 /// The `p > 0` test survives the levers: `bias` is multiplicative and bounded by
-/// [`BIAS_DEPTH`], so it can neither zero a drawn map nor revive a pad.
+/// `BIAS_DEPTH`, so it can neither zero a drawn map nor revive a pad.
 pub fn fixed_points(table: &IfsTable) -> [[f32; 2]; MAPS] {
     let mut drawn = [[0.0f32; 2]; MAPS];
     let mut count = 0usize;

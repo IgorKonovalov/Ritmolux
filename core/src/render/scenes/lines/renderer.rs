@@ -581,13 +581,12 @@ pub fn set_extent_diagnostic(on: bool) {
 /// two *roster* line scenes in a frame), and then "the most recent draw" is
 /// "this frame's figure". A preset may layer a second line scene (Plan 0076)
 /// through its own per-preset `LineRenderer`
-/// ([`scenes::create_layer_scene`]) — the layer draws **after** the main
+/// (`scenes::create_layer_scene`) — the layer draws **after** the main
 /// scene, so on a layered line-on-line preset this slot holds the *layer's*
 /// figure. The harness reads this around single-figure captures; a consumer
 /// measuring a layered preset must know which draw it is measuring.
 ///
 /// [`scenes::shares_resources`]: crate::render::scenes
-/// [`scenes::create_layer_scene`]: crate::render::scenes::create_layer_scene
 pub fn take_draw_extent() -> Option<DrawExtent> {
     LAST_EXTENT.with(|slot| slot.take())
 }
@@ -807,7 +806,7 @@ impl LineRenderer {
     /// [`new`](Self::new), plus the second pipeline
     /// [`draw_split`](Self::draw_split) needs. Only a scene that actually splits
     /// its batch by blend mode should call this — see
-    /// [`over_pipeline`](Self::over_pipeline) for why building it unconditionally
+    /// `over_pipeline` for why building it unconditionally
     /// is not free.
     pub fn new_split(
         device: &wgpu::Device,
@@ -841,7 +840,7 @@ impl LineRenderer {
     /// arc buffer ([`ArcInstance`], ADR-0098).
     ///
     /// Only a scene that actually draws arcs should call this — see
-    /// [`arc_pipeline`](Self::arc_pipeline) for why building it unconditionally
+    /// `arc_pipeline` for why building it unconditionally
     /// is not free. `arc_capacity` is its own budget rather than a share of
     /// `capacity`: an arc replaces many segments, so the two counts are not the
     /// same order and sizing one from the other would waste most of it.
@@ -1066,7 +1065,7 @@ impl LineRenderer {
     /// 3 — the background pass owns the clear). Segments beyond `capacity` are
     /// dropped defensively (the scene is responsible for capping at load).
     ///
-    /// `softness` is the across-the-stroke profile ([`PROFILE_WGSL`], ADR-0124):
+    /// `softness` is the across-the-stroke profile (`PROFILE_WGSL`, ADR-0124):
     /// `1.0` is the pre-Plan-0114 quadratic falloff, `0` a solid stroke with a
     /// one-pixel edge. **There is no default here** — one uniform serves every
     /// entry point, so each caller names the constant it answers to:

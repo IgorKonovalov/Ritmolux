@@ -24,7 +24,7 @@
 //! arithmetic checkable: an object launched with vertical speed `v0` against
 //! gravity `g` reaches its apex at `t = v0 / g` and at height `v0^2 / (2 g)`, on
 //! any cadence. See
-//! [`an_object_follows_the_closed_form_parabola`](tests::an_object_follows_the_closed_form_parabola).
+//! `an_object_follows_the_closed_form_parabola`.
 //!
 //! **Retirement is a closed form too, and that is not decoration.** Sampling "is
 //! this object outside the frame?" once per frame would make the *population* a
@@ -46,7 +46,7 @@
 //! frame so an absurd `spawn_rate` costs bounded work rather than a stall.
 //!
 //! Objects draw through the swarm's sprite idiom — `vec4(colour * g, g)` on
-//! [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`] — so this is the **third** pipeline
+//! `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE` — so this is the **third** pipeline
 //! that writes directly into the post chain's input and it owes the third
 //! lit-backdrop guard (ADR-0056).
 

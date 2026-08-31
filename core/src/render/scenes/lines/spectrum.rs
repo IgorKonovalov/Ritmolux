@@ -4,12 +4,12 @@
 //! This is a **fourth consumer of the existing line idiom**, not a fifth render
 //! idiom: N bars, an N-point polyline and a radial ring of N spokes are all
 //! segment lists, and they go out through the same shared
-//! [`LineRenderer`](super::LineRenderer) the three other line scenes draw
+//! [`LineRenderer`] the three other line scenes draw
 //! through (ADR-0007). Nothing new is uploaded, no new pipeline is built, and
 //! the `Scene` trait is untouched — `update` already receives the whole
 //! [`AnalysisFrame`], bands included.
 //!
-//! The per-frame work is a chain of small pure steps — [`downsample`], the
+//! The per-frame work is a chain of small pure steps — `downsample`, the
 //! per-element ease, then one of the three [`SpectrumLayout`] builders — all
 //! free functions over preallocated buffers. They are separate from the scene so
 //! the claims that matter (low elements track low frequencies; the 64 → N

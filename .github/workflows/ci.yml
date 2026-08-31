@@ -93,6 +93,18 @@ jobs:
       - run: cargo test --workspace --doc
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo fmt --all --check
+      # ADR-0127 keeps rustdoc intra-doc links as its ONE exempted link form, on
+      # the stated grounds that rustc checks them. Nothing asked it to: neither
+      # this workflow nor .githooks/pre-push ran cargo doc, and 71 warnings had
+      # accumulated over 31 files - private targets, renamed and removed items,
+      # cfg(test) items and redundant explicit targets. This is what turns that
+      # exemption from a claim into a property.
+      #
+      # NOT in the pre-push hook: that budget is ~28 s and a full cargo doc does
+      # not fit. Deliberate, not an oversight.
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
 
   # Doc-link gate (Plan 0061 Phase 2c). Every relative markdown link in the repo
   # must resolve - across docs/, README.md and .claude/skills/**.

@@ -16,7 +16,7 @@
 //! - A fullscreen scene emitting alpha 1 **holds the backdrop out entirely** —
 //!   not darkened, absent. So a scene covering every pixel owns its own ground.
 //! - The tonemap is **exactly the identity** below
-//!   [`KNEE`](crate::render::tonemap::KNEE)` = 0.6` (ADR-0046), so an element at
+//!   `KNEE = 0.6` (ADR-0046), so an element at
 //!   or under it leaves the post chain **unshaded**. Below the knee the pipeline
 //!   is a no-op — flatness is not argued for against it.
 //! - Bloom's threshold sits **above** that knee, so a canvas living under it gets
