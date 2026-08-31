@@ -255,7 +255,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 
 ## What this plan does NOT do
 
-- No shared GPU helper — [0125](0125-the-scenes-share-their-gpu-boilerplate.md), which lands first.
+- No shared GPU helper — [0125](done/0125-the-scenes-share-their-gpu-boilerplate.md), which lands first.
 - No comment rewrite beyond what a move forces (a moved item keeps its doc; a deleted duplicate
   loses its copy). The comment-weight question is an ADR, parked in 0124.
 - Does not touch `kaleidoscope.rs` or `expr.rs` — the review rated both splits `minor` and
