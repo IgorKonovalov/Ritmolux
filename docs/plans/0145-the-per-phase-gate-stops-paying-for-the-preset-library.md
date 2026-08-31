@@ -286,8 +286,8 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
 | 1 — Take the baseline on a quiet box | dev | done | `8b1d7b0` |
 | 2 — Define the filter once, as a nextest profile | dev | done | `f5431dc` |
 | 3 — Point the hook and CI at the profile | dev | done | `975c31b` |
-| 4 — Give the per-phase loop its tier | dev | done | committed with this row |
-| 5 — Make the full-suite run a recorded fact | dev | not started | |
+| 4 — Give the per-phase loop its tier | dev | done | `b90e382` |
+| 5 — Make the full-suite run a recorded fact | dev | done | committed with this row |
 | 6 — Re-measure, and do the per-plan arithmetic | dev | not started | |
 
 ### Measurements

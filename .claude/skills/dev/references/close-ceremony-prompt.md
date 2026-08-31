@@ -70,7 +70,9 @@ it, copy the skeleton in rather than skipping the log.
   bullet per conditional close step, and **no recommendation in any of them**. `presets/` touched
   (which files); the plan header's `**Closes:** design-backlog NNNN` entries; what shipped
   (feature / fix-only / docs-chore-only); which operator docs moved, from Mode 4's sweep table; the
-  exit of `node scripts/check-backlog-claims.mjs` and any entry it named; which `human` phases
+  exit of `node scripts/check-backlog-claims.mjs` and any entry it named; the **full suite**
+  (`cargo nextest run --workspace`, not `-P fast`) with its exit code and pass/skip counts, plus any
+  suite run under an upward override at an earlier phase (ADR-0156); which `human` phases
   remain. **No suggested version bump** — the level is architect's, per
   [ADR-0005](../../../../docs/adrs/0005-versioning-and-release-cadence.md), and a suggestion in
   writing is an anchor.

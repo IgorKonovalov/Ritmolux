@@ -110,6 +110,10 @@ version bump: the level is architect's call per ADR-0005.)_
   `docs/presets.md`, `docs/preset-palettes.md`, `docs/capturing.md`, `docs/on-device-validation.md`,
   `docs/nfr.md` — or none)_
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** _(exit code, and any entry named)_
+- **Full suite:** _(the command as run — `cargo nextest run --workspace`, not `-P fast` — its exit
+  code, and the pass/skip counts off nextest's `Summary` line. This is the once-per-plan run
+  ADR-0156 owes at the last phase, and the only record that the nine deferred GPU suites ran
+  against the finished tree. Name any suite run under an upward override at an earlier phase too.)_
 - **Outstanding `human` phases:** _(which, or none)_
 
 ## Followups (after this lands)
