@@ -81,6 +81,7 @@ headroom as headroom.
 ```toml
 system = "parametric_curve"   # which built-in system (see the table below)
 name   = "My Rose"            # optional; defaults to the system name
+representative = true         # optional; default false - see "The representative flag"
 
 [curve]                       # or [generator] — structural config (line systems)
 family = "maurer_rose"
@@ -90,6 +91,29 @@ n     = "6"
 scale = "0.7 + bass * 0.4"
 hue   = "0.5 + time * 0.02 + treb * 0.3"
 ```
+
+## The representative flag
+
+A preset may declare `representative = true`. It marks the preset as one of its
+family's samples for the **per-phase** test tier the `dev` lane runs while
+implementing a plan (ADR-0157). Absent means `false`.
+
+**It does not change what ships, what the preset looks like, or what gates it.**
+The plan-close run and CI render the **whole** library exactly as before, so the
+behavioral suite that lets this lane land presets without `dev` couriering them
+(ADR-0081) keeps its full strength. The only thing the flag moves is *when* a
+defect in a non-representative preset is noticed: at the close rather than at the
+phase that caused it.
+
+**The floor is gated; staleness is not.** A test fails if any family carries
+fewer than two representatives, naming the family — so the sample cannot decay to
+nothing as content lands. Nothing checks whether the two are still *representative*
+of a family that has grown around them. That is a curation duty at the plan-close
+cadence, with no gate behind it, and it is said here rather than assumed.
+
+**Flipping the flag renames that preset's generated tests** (they carry a `rep_`
+marker so a static nextest filter can select the sample), which is worth knowing
+before bisecting across a change to it.
 
 ## The expression language
 

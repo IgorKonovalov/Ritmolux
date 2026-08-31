@@ -2738,3 +2738,51 @@ fn operator_messages_carry_no_run_of_spaces() {
         check(label, &err.to_string());
     }
 }
+
+/// The `representative` key parses, defaults to absent-means-false, and rejects
+/// a non-boolean the way every other mistyped scalar in the schema is rejected
+/// (ADR-0157).
+///
+/// The **floor** this key is subject to — every family carries at least two —
+/// is asserted separately, over the shipped set rather than over fixtures.
+#[test]
+fn the_representative_key_defaults_to_false_and_rejects_a_non_boolean() {
+    let bare = "system = \"swarm\"\nname = \"Bare\"\n";
+    assert!(
+        !Preset::from_toml_str(bare)
+            .expect("a preset without the key loads")
+            .representative,
+        "an absent `representative` must mean false, not a load error"
+    );
+
+    for (src, expected) in [
+        (
+            "system = \"swarm\"\nname = \"Yes\"\nrepresentative = true\n",
+            true,
+        ),
+        (
+            "system = \"swarm\"\nname = \"No\"\nrepresentative = false\n",
+            false,
+        ),
+    ] {
+        assert_eq!(
+            Preset::from_toml_str(src)
+                .expect("a preset declaring the key loads")
+                .representative,
+            expected,
+            "`representative` must round-trip the value it declares"
+        );
+    }
+
+    // A non-boolean is a load-time error and never a silent `false`: reading
+    // `"true"` as false would drop a preset out of the sample without saying so.
+    for src in [
+        "system = \"swarm\"\nname = \"Str\"\nrepresentative = \"true\"\n",
+        "system = \"swarm\"\nname = \"Num\"\nrepresentative = 1\n",
+    ] {
+        assert!(
+            Preset::from_toml_str(src).is_err(),
+            "a non-boolean `representative` must be rejected at load: {src}"
+        );
+    }
+}
