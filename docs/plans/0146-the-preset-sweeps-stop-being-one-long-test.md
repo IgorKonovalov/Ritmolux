@@ -98,23 +98,46 @@ flowchart TB
   the wall of `-E 'binary(animation)'` before and after, the summed test-wall both ways, and the
   **per-test device-creation cost** derived from the difference. `cargo nextest list` shows one test
   per shipped preset.
-- **Stop condition, and it is a real one:** each sweep builds **one** headless renderer today and
-  reuses it for all 81 presets, while nextest runs each test in its own process — so the split pays
-  81 device creations against 1. If the summed test-wall rises by more than it saves in elapsed, or
-  the binary's wall does not fall, **stop, record both numbers, and route back to architect.**
-  ADR-0157 Alternative B (split only, no sampling) and Alternative A (sample only, no split) are both
-  live fallbacks and neither needs this phase to have succeeded.
+- **Stop condition — evaluated 2026-08-31, and DISCHARGED. Do not re-apply it.** As written it was
+  *"if the summed test-wall rises by more than it saves in elapsed, or the binary's wall does not
+  fall, stop"*. The measurement tripped the first clause (+127.7 s of work against 67.9 s of binary
+  elapsed and 5.8 s of suite elapsed) and `dev` correctly stopped. **The condition was wrong, not
+  the result**: it convicts the design at exactly the phase ADR-0157 says cannot pay for itself,
+  because splitting one sweep promotes the next rather than shortening the tail. It also compares
+  added work against saved elapsed, which is not a test any redistribution can pass.
+
+  **What decided it instead, measured at 4 and 16 logical CPUs on the same tree:** the monolith runs
+  **133.5 s on 4 cores and 133.7 s on 16** — it cannot use the machine, whatever the machine is —
+  while the split runs **89.5 s on 4** and **65.8 s on 16**, beating it 1.49x and 2.03x. That is the
+  property the spike existed to establish, it holds on a small runner as well as a large one, and
+  the plan continues on it. The replacement claim is Phase 2's.
 
 ### Phase 2 — Split the remaining per-preset sweeps
 - **Owner skill:** dev
-- **What:** The same generation for `reactivity`'s roster test and `sanity`'s two.
+- **What:** The same generation for `reactivity`'s roster test and `sanity`'s loudness test, both
+  **per preset** — and `sanity`'s shape test **per family**, which is a correction to this plan made
+  2026-08-31 and explained below.
 - **Files touched:** `core/build.rs`, `core/tests/reactivity.rs`, `core/tests/sanity.rs`.
-- **Done when:** all four sweeps are generated per preset with their assertions unchanged; the full
-  suite's average concurrency, recomputed as summed-test-wall over elapsed, is **higher than the 9.2
-  measured at `fd7f55b`** — this is the phase's real claim, and it is a property rather than a
-  threshold, since the packing floor depends on the machine. Record the new elapsed beside it.
-  `sanity`'s two tests keep their **reports** as well as their gates: the coverage distribution and
-  the loud/moderate ratio are printed today and must still be printed, per ADR-0071.
+- **`every_preset_draws_a_real_shape` splits per family, not per preset.** It carries a genuinely
+  cross-preset **assertion**, not only a report: `report_coverage_distribution` returns a failure
+  when a family's coverage floor sits more than `MAX_FLOOR_SLACK` below that family's lowest
+  preset, which is a claim about a *family's distribution* and has no per-preset form. A per-preset
+  split would either drop that gate or re-render the roster a second time to keep it. A per-family
+  split preserves the gate and the printed distribution exactly, and still takes the test off the
+  critical path, because the largest family is 19 presets rather than 81. `dev` found this while
+  reading ahead at Phase 1; it is a defect in this plan, not in the code.
+- **Done when:** `reactivity`'s roster test and `sanity`'s loudness test are generated per preset and
+  `sanity`'s shape test per family, with **every assertion unchanged** — including the floor-slack
+  gate, which must still fail on a family whose floor has been left behind. The reports survive too,
+  per ADR-0071: the coverage distribution stays whole inside its family's test, and the loud/moderate
+  ratio is printed per preset rather than as one sorted table, which is the one report this split
+  does change and must be called out in the log.
+- **The claim, and it replaces the retired concurrency anchor:** the plan's `9.2 at fd7f55b` came
+  from a superseded measurement arm, and `dev` re-derived **8.98** on this tree, so the number is
+  reproduced but is not the right test either — average concurrency counts *processes*, and a single
+  sweep test uses about four logical CPUs, so the figure understates the machine's real occupancy.
+  **State the property instead: the four split sweeps no longer appear among the last tests to
+  finish, and the suite's elapsed falls.** Record elapsed before and after beside it.
 
 ### Phase 3 — Split `distinctness` per family
 - **Owner skill:** dev
