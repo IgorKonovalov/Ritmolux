@@ -82,21 +82,42 @@ specification `core` did not match any packages". The directory and the package 
 | Build all                    | `cargo build` |
 | Run the standalone           | `cargo run -p standalone` |
 | Test all / just core         | `cargo test --workspace` / `cargo test -p lmv-core` |
-| Test via nextest             | `cargo nextest run --workspace` (what plan closes verify with) |
+| **Test, per phase**          | `cargo nextest run --workspace -P fast` — the narrowed set (ADR-0156) |
+| **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, owed once per plan |
 | Lints (errors)               | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format check / apply         | `cargo fmt --all --check` / `cargo fmt --all` |
 | Build C-ABI artifacts        | `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib` / `.dll`) |
 | Headless render check        | `cargo run -p standalone --example shot -- <flags>` (`docs/capturing.md`) |
 
-**`--workspace` is load-bearing on the test and clippy rows, not a stylistic flourish** (ADR-0072).
-`lmv-core-cabi` sits outside the workspace `default-members`, which is what makes a bare `cargo
-build` stop re-emitting ~550 MB of artifacts nothing links — and the same exclusion means a bare
-`cargo nextest run` silently skips the ABI conformance suite and a bare `cargo clippy` silently
-stops linting the C ABI. Both come back green while covering nothing. `.githooks/pre-push` and
-`ci.yml` both pass `--workspace` for this reason; match them.
+**`--workspace` is load-bearing on BOTH test rows and on the clippy row, not a stylistic
+flourish** (ADR-0072). `lmv-core-cabi` sits outside the workspace `default-members`, which is what
+makes a bare `cargo build` stop re-emitting ~550 MB of artifacts nothing links — and the same
+exclusion means a bare `cargo nextest run` silently skips the ABI conformance suite and a bare
+`cargo clippy` silently stops linting the C ABI. Both come back green while covering nothing.
+`-P fast` narrows which **binaries** run and does nothing about `default-members`, so dropping
+`--workspace` from the narrowed row loses the C ABI exactly as it always did. `.githooks/pre-push`
+and `ci.yml` both pass `--workspace` for this reason; match them.
 
-All four of build / test / clippy / fmt-check must be green before you commit a phase, unless the
-phase's done-when says otherwise.
+**The test step is tiered (ADR-0156), and the tier is about *when*, not about coverage.** Every
+phase owes `cargo build`, `cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo fmt --all --check` and the **narrowed** `cargo nextest run --workspace -P fast`, all green
+before you commit it. The **full** `cargo nextest run --workspace` is owed **once per plan**, at
+the last phase, before the close handoff. Nothing is skipped, only deferred: the nine GPU suites
+`-P fast` holds back sweep the shipped preset library or every scene through a real adapter, so
+their price is set by the `preset-author` lane's output rather than by the change under test.
+
+**Two overrides are yours, and both go upward:**
+
+- a phase whose own `Done when` names one of the nine runs that suite regardless of the default;
+- a phase that changes what those suites measure — a scene, the composite, the preset engine, or
+  the embedded preset set — runs the affected suite.
+
+The default narrows; it never caps. **No gate enforces either override**: it rests on your
+judgement of blast radius, which is the price ADR-0156 accepts for deferring the nine. The cost of
+getting it wrong is that a `golden` or `sanity` regression surfaces at the last phase rather than
+at the phase that caused it, and bisecting it costs a full suite per candidate commit.
+
+A phase's done-when still wins over all of this when it says otherwise.
 
 `shot` is how you eyeball a render change without launching the app — worth running when a phase
 touches scenes, the composite, or the preset engine, since a green test suite doesn't prove the

@@ -108,9 +108,17 @@ For **each phase in order**:
    code outside that scope, **stop and surface it** — get explicit approval to expand, or route it
    back to architect as a plan-update. Silent scope expansion is how plans rot.
 3. **Run the phase's done-when checks before moving on.** The done-when list is the gate. Use the
-   canonical commands (`references/project-context.md`): `cargo build`, `cargo test`,
-   `cargo clippy --all-targets -- -D warnings`, `cargo fmt --all --check`, and whatever the phase
-   names (a `cargo run` smoke, a C smoke program linking the C ABI, the plugin loading in foobar).
+   canonical commands (`references/project-context.md`): `cargo build`,
+   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`, the
+   **narrowed** `cargo nextest run --workspace -P fast`, and whatever the phase names (a
+   `cargo run` smoke, a C smoke program linking the C ABI, the plugin loading in foobar).
+
+   **The test step is tiered (ADR-0156).** `-P fast` is the per-phase default; the **full**
+   `cargo nextest run --workspace` is owed **once per plan**, at the last phase, before the close
+   handoff. Two overrides are yours and both go upward: a phase whose own `Done when` names one of
+   the nine deferred GPU suites runs it regardless, and a phase that changes what those suites
+   measure — a scene, the composite, the preset engine, or the embedded preset set — runs the
+   affected suite. The default narrows; it never caps, and no gate enforces either override.
 
    **Tests are part of done-when, not adjacent to it.** When a phase names a test, "passes" is not
    a green `cargo test` exit code — **open the test and read the assertion body**. A test passes
@@ -186,13 +194,18 @@ Rules that compound across phases:
 
 Once the **final** phase's done-when is verified and its commit landed:
 
+0. **Run the full suite — `cargo nextest run --workspace`, not `-P fast`.** This is the
+   once-per-plan moment ADR-0156 defers the nine GPU suites to, and it happens **before** the close
+   block is written, because the close block records its result. If it is red, you are not at
+   Step 4: fix it, or surface it per "When the plan is wrong".
 1. **Complete the close block in the plan's `## Implementation log`, and commit it** — as a
    `docs(plans): …` commit, staged by explicit path. Backfill the final phase's real SHA into its
    row, write the `### Notes` (deviations, unmet done-whens, followups noticed and not acted on —
    and nothing else; empty is a valid answer), and fill every `### Close triggers` bullet:
    `presets/` touched, the plan header's `Closes:` entries, what shipped (feature / fix-only /
    docs-chore-only), which operator docs moved, the exit of
-   `node scripts/check-backlog-claims.mjs`, and which `human` phases remain. Those are raw
+   `node scripts/check-backlog-claims.mjs`, which `human` phases remain, and the **full suite**
+   run at step 0 — its command, exit code and pass/skip counts. Those are raw
    `git`-derived facts and they carry **no recommendation** — in particular **no suggested version
    bump**, which is architect's call per
    [ADR-0005](../../../docs/adrs/0005-versioning-and-release-cadence.md). Strip any resume
