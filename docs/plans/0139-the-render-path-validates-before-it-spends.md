@@ -158,8 +158,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Validate the preset name before spending anything | dev | done | `5cf50bc` |
-| 2 — A size lever on the convenience path | dev | done | committed with this row |
-| 3 — The capture doc says what the levers are | dev | not started | |
+| 2 — A size lever on the convenience path | dev | done | `fa211e0` |
+| 3 — The capture doc says what the levers are | dev | done | committed with this row |
 
 ### Notes
 
