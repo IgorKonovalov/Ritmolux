@@ -225,172 +225,57 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 | 2 — `palette::LutPair` | dev | done | 672cd85 |
 | 3 — `scenes::common::{PaletteParams, PanParams}` | dev | done | c7dab47 |
 | 4 — `gpu::FullscreenScene` | dev | done | 60f57a7 |
-| 5 — `marks::InstancedQuads` | dev | committed with this row | |
+| 5 — `marks::InstancedQuads` | dev | done | 1310de3 |
 
 ### Notes
 
-**Phase 1.** The plan counts 33 `RenderPassDescriptor` sites; there were **40**
-(35 in shipped source, 5 in `#[cfg(test)]` modules under `render/`). All 40 matched the
-canonical shape byte-for-byte, so all 40 migrated and the "list what differs" half of the
-done-when has an empty list. The `grep` now returns only `gpu.rs`.
-
-`gpu::uniform_buffer` took **25** `UNIFORM | COPY_DST` sites. One buffer was left: the blur-step
-uniform at `core/src/render/scenes/warp_mesh/shader.rs` is a `create_buffer_init` with
-`UNIFORM` alone — no `COPY_DST`, contents written once at creation — so it is a different
-descriptor, not the same one spelled again. `bloom::small_uniform` was kept as a
-one-line wrapper (it supplies the `V4` size to its four call sites) rather than deleted.
-
-Comments that sat inside the descriptor's `ops` block were hoisted above the call and
-re-wrapped; none was dropped.
-
-**Phase 2.** There are **seven** owners of the LUT pair, not six: `render/background.rs` carries
-`lut_texture_a`/`palette_dirty` too. It is not in this phase's *Files touched* and it is a
-composite stage rather than a scene, so it was left alone and the done-when grep is clean as
-written — but its flush is `if fresh || self.palette_dirty`, a third condition `LutPair` does not
-model, so adopting it there is a decision rather than a sweep.
-
-**The six split into two shapes, and `LutPair` went where the textures already were** so that no
-allocation moved (a WARP hazard in its own right). `fragment_field`, `shape_field` and
-`shape_collage` own theirs directly, and lost `palette` and `palette_dirty` outright.
-`reaction_diffusion`, `warp_mesh` and the attractor keep the textures inside a lazily-built
-`Resources`, so the pair went there and **the scene still holds a `Palette`** — `set_palette` can
-arrive while `res` is `None`, and that field is what seeds the pair when it is finally built. Those
-three now carry two copies of a 6 KB `Palette` while resources exist. `palette_dirty` is gone from
-all six.
-
-`bind_entries` takes **all three binding numbers** rather than the plan's single `base_binding`:
-the six bind this triple at (0,1,2), (1,2,3), (3,4,5) and — for the two `shape_*` scenes — with
-the sampler at 0 ahead of the textures. A `base_binding` would have decided part of the layout
-shape, which the plan's own Decision forbids.
-
-`flush` returns `bool` (did it upload). That is what the new
-`the_lut_pair_uploads_once_per_set_and_never_otherwise` test in `palette.rs` reads; the six scenes
-ignore it. The suite is 860 tests where Phase 1 ran 859.
-
-`reaction_diffusion::present_bind_group` lost its `#[allow(clippy::too_many_arguments)]` — three
-LUT arguments collapsed into one.
-
-**Phase 3. A file outside *Files touched* had to change: `core/tests/preset.rs`.**
-`declared_params_match_set_param` reads each scene's `set_param` **match arms out of the source
-text** and asserts they equal its `PARAMS`. Delegation makes the eight shared names invisible to
-that scan, so the phase cannot land without it — the guard failed on the first full run. That test
-already carries the precedent: the `fb_*` seven are filtered out of it for exactly this reason
-(both sinks delegate to `feedback::Transform::set_param`) and the coverage is replaced
-programmatically in `feedback.rs`. The same shape was used here — the eight names are filtered,
-the guard now additionally asserts that **a file declaring one of them carries the delegation**,
-and `common.rs` adds `each_block_answers_exactly_its_roster` and
-`every_system_that_declares_a_shared_name_uses_the_shared_spelling`.
-
-**No number moved, and the plan's budget of three was untouched.** The plan expected clamp
-disagreements between scenes. There are none on these names: every scene's `set_param` stores the
-value raw, and the read sites pass it through unchanged — the range decisions live downstream, in
-the shaders, in `marks`, and in the one `finite(self.brightness, ...)` in the emitter's read.
-
-**Only four of the eight names have a universal resting value.** `saturation` (1.0),
-`palette_mix` (0.0) and `pan_x`/`pan_y` (0.0) are the ones `common` now owns outright.
-`DEFAULT_HUE` takes **five** distinct values across the twelve (0.0, and 0.3 / 0.5 / 0.55 / 0.6 on
-the four line families) and the swarm rests at `brightness = 0.8` against 1.0 everywhere else, so
-`PaletteParams::new(hue_rest, brightness_rest)` takes those two from the scene and `reset` returns
-to them. `common::DEFAULT_BRIGHTNESS` is the 1.0 that eleven of the twelve pass.
-
-**The block is wider than three scenes' rosters.** `set` answers all six palette names, so
-`shape_collage` (which declares only `saturation` and `palette_mix`), `shape_field` (no `hue` or
-`brightness`) and `fragment_field` (no `brightness`) now store names their `PARAMS` does not
-declare. Nothing reads them, `is_known_param` is untouched, and `shot --presets presets --report`
-prints zero unknown-param warnings before and after — but it is a widening of what `set_param`
-accepts, and it is the plan's "delegates first" instruction taken literally.
-
-**The field is `colour`, not `palette`**: `reaction_diffusion`, `warp_mesh`, the attractor and the
-four line scenes already carry a `palette: Palette`. `PanParams` is a second type rather than two
-more fields on `PaletteParams` because `warp_mesh` has no `pan_*` at all.
-
-The rosters `PALETTE_PARAMS` / `PAN_PARAMS` in `common.rs` are `#[cfg(test)]`: `set` keeps its
-`match` (it runs once per bound param per frame), so the roster is a second statement of the
-vocabulary that the test holds the match to — the shape `feedback::PARAMS` uses.
-
-**Phase 4. The "each under 60 lines" done-when is not met, and the reason is the phase's own
-constraint.** Measured from `pub fn new(` to its closing brace:
-
-| scene | constructor | of which the `Self { … }` scene-state literal | of which the layout + bind group |
-|---|---|---|---|
-| `fragment_field` | 66 | 27 | 21 |
-| `shape_field` | 81 | 26 | 40 |
-| `shape_collage` | 129 | 48 | 62 |
-
-What is left after the helper is the `Self { … }` field list — scene state no GPU helper can
-shrink — and the **bind-group layout plus the bind group that pairs with it**, which this phase is
-forbidden to absorb twice over: ADR-0058 wants each of the three layouts visibly distinct, and
-`no_two_layouts_share_a_shape_without_recorded_evidence` finds layouts by **scanning `core/src`
-for `create_bind_group_layout` with literal entries**, so a parameterised one would drop three
-rows off an enumeration `assert_scan_is_whole` holds at 25 or more. `shape_collage`'s layout alone
-is 32 lines of literal entries because both its buffer entries declare a `min_binding_size`. The
-number was not gamed to reach 60.
-
-For the same reason no `gpu::uniform_sized(binding, visibility, size)` entry helper was added,
-which is the one edit that would have shortened `shape_field` and `shape_collage` materially: the
-scan recognizes entries by their **spelling** and asserts the count it recognized equals the count
-in the source, so a new spelling fails it until `MARKERS` is taught — a change to the guard this
-phase must not weaken.
-
-`FullscreenParts` is a two-step build because the bind groups need the buffers and the pipeline
-needs the layouts. The storage buffer is created by the scene through a new `gpu::storage_buffer`
-and handed over with `with_storage`, rather than being asked for by byte count: an
-`Option<&Buffer>` returned to the call site cannot be unwrapped under `scenes/`'s
-`clippy::expect_used` pragma.
-
-The layout guard prints **35 layouts walked and 4 allowed pairs, all of them pre-existing** — no
-new allowlist row. The `docs/capturing.md` adapter check was run at 512x512 on the three SDF
-fixtures as well as at the golden's 128: hardware and WARP agree, and both are byte-identical to
-`main`.
-
-**Phase 5. The type is not "parameterised by label, visibility and `min_binding_size`" as the
-phase describes it — it takes a finished layout.** Label yes; the other two stay in each scene's
-own literal `create_bind_group_layout`, for the reason recorded above and one that is sharper
-here than in Phase 4: *this* pair is ADR-0058's third recorded instance. Building the layout from
-a visibility mask and a size would put the emitter's `VERTEX_FRAGMENT` + declared size behind two
-arguments, and would take both layouts out of the enumeration the guard scans. The guard still
-prints them as distinct shapes — `swarm-bind-layout [Uniform:VERTEX]`, `emitter-bind-layout
-[Uniform:VERTEX_FRAGMENT+size]` — 35 layouts walked, the same four pre-existing allowlist rows,
-none added. The 25-line comment in `emitter.rs` that records the measurement still sits directly
-above the layout it explains.
-
-**The two `Instance` structs were byte-identical but not semantically identical.** Same four
-fields in the same order, and the fourth is the swarm's *depth parallax* and the emitter's *sprite
-orientation in radians*. The shared `marks::QuadInstance` therefore names it `attr` and the type
-docs say whose it is at each scene; the field docs also pin it **last**, because
-`vertex_attr_array!` assigns offsets by declaration order. `Misc` was identical in both and is now
-`marks::QuadUniform`. Both scenes' WGSL still declares its own `struct Misc` — those are shader
-text, not Rust.
-
-**A fourth file changed, outside the phase's three:** `core/src/render/scenes/emitter/tests.rs`
-imported `Instance` by name and asserts `size_of::<Instance>() == 28` against `docs/nfr.md`
-section 12. It now imports `marks::QuadInstance`; the assertion and the number are unchanged.
-
-Two behavioural details preserved deliberately. `InstancedQuads::draw` **begins the pass even at
-`count == 0`** — the emitter did, and dropping it would change what an idle frame's command buffer
-contains. `write_instances` returns early on an empty slice, which the emitter had inline and the
-swarm did not need (its instance vector is never empty).
-
-**The first full run of this phase's suite is void: the machine entered modern standby part way
-through** (Kernel-Power 506/507, ~22:17 onward). Every test in the cohort that was live reports
-~7740 s, and two `transition` tests failed with `headless capture readback failed`. The clean
-re-run is the one recorded below.
-
-**A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
-`no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning
-`core/src` source text** for `create_bind_group_layout` with a literal label and literal
-entries, and `assert_scan_is_whole` holds the count at or above 25. A helper that builds a
-bind-group layout from parameters is invisible to that scan and would both shrink the
-enumeration and blind the collision check. So `FullscreenScene` and `InstancedQuads` must take
-a layout the scene still spells literally, never build one.
+- **The layout guard reads source text** — `create_bind_group_layout` with literal entries,
+  entries recognized by spelling, count held at 25+. So Phases 4 and 5 take a finished layout and
+  add no entry-helper spelling. It ends at 35 layouts, the same four allowlist rows, none added.
+- **Phase 1:** 40 pass sites, not 33 (35 shipped, 5 in `#[cfg(test)]`); all matched, so the "list
+  what differs" half of the done-when is empty. 25 uniform buffers migrated; `warp_mesh/shader.rs`'s
+  blur step stayed — `create_buffer_init`, `UNIFORM` alone.
+- **Phase 2:** **seven** LUT-pair owners, not six — `render/background.rs` is the seventh, is not
+  a scene, is not in *Files touched*, and flushes on `fresh || palette_dirty`. Left alone.
+  `bind_entries` takes all three binding numbers, not a `base_binding`: the six bind the triple at
+  three ranges and two orders. The pair went where each scene already kept its textures, so no
+  allocation moved, leaving the three lazy-resource scenes a second `Palette`.
+- **Phase 3 changed `core/tests/preset.rs`, outside *Files touched*.** Its drift guard reads
+  `set_param`'s arms from source, so delegation hid the eight names and it failed. Followed that
+  test's own `fb_*` precedent: filter them, and assert instead that a declaring file carries the
+  delegation.
+- **Phase 3 moved no number** — no clamp disagreements existed; every scene stores these raw. Only
+  four of the eight rest at a shared value: `DEFAULT_HUE` has five across the twelve and the swarm
+  rests at `brightness = 0.8`, so `PaletteParams::new` takes both from the scene. `set` answers all
+  six palette names, so `shape_collage`, `shape_field` and `fragment_field` now **store names their
+  `PARAMS` does not declare** — unread, roster unchanged, `--report` warnings zero. The field is
+  `colour`: seven scenes already carry a `palette: Palette`.
+- **Phase 4's "each under 60 lines" is not met:** 66 / 81 / 129 lines, of which 27 / 26 / 48 are
+  the `Self { … }` scene-state literal and 21 / 40 / 62 the layout plus its bind group — both what
+  the phase forbids absorbing.
+- **Phase 5's type is not parameterised by visibility and `min_binding_size`** — label only; those
+  two stay in each scene's literal layout, this pair being ADR-0058's third recorded instance. The
+  two `Instance` structs were byte-identical but not semantically so (parallax vs sprite angle), so
+  the shared field is `attr`, pinned last. `emitter/tests.rs` is a fourth file, outside the three;
+  `draw` begins the pass at zero instances, as the emitter did. **Its first suite run is void** —
+  the machine entered modern standby mid-run (Kernel-Power 506/507), every live test reports
+  ~7740 s and two `transition` tests failed on capture readback; the clean re-run is recorded.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no — only `core/src/render/`, `core/tests/preset.rs` and this plan.
+- **Plan header `Closes:`** none. **Operator docs touched:** none.
+- **What shipped:** no feature, no fix, no doc — a refactor, 40 files, `+1934 / -1918`. Each phase
+  gated on both adapters: the suite unblessed on WARP, all 63 `core/tests/fixtures` byte-identical
+  to `main` on hardware (the three SDF fixtures also at 512x512).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, one broken probe, caused
+  by this plan.** Entry **0146** greps `palette::band_steps\(self\.palette_steps\)` in
+  `warp_mesh/mod.rs`; Phase 3 renamed the field, so the call is now
+  `palette::band_steps(self.colour.steps)` (`warp_mesh/mod.rs:2032`). The claim holds, only the
+  spelling moved: the fix is `self\.colour\.steps` in that regex. `docs/design-backlog.md` is
+  architect-owned, so it is left for the review — **pre-push and CI's `links` job fail as the
+  branch stands.** Green on `main`; the four other Node gates, `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` are green.
+- **Outstanding `human` phases:** none. All five were `dev`.
 
 ## Followups (after this lands)
