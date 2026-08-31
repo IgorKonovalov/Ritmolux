@@ -1,16 +1,16 @@
 # 0125 — The scenes share their GPU boilerplate
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-31
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the `Scene` trait stays thin — these helpers sit beside it, not on it), [ADR-0058](../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (**two layouts that can be live in one frame may not share a shape without allowlist evidence — the constraint every helper here is designed around**, see Decision and Risks), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
+> **Related ADRs:** [ADR-0002](../../adrs/0002-layered-preset-architecture.md) (the `Scene` trait stays thin — these helpers sit beside it, not on it), [ADR-0058](../../adrs/0058-bind-group-layout-collisions-carry-evidence.md) (**two layouts that can be live in one frame may not share a shape without allowlist evidence — the constraint every helper here is designed around**, see Decision and Risks), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)
 
 **Drafted without an interview at the user's request.** The guesses: (1) the golden suite is the
 acceptance oracle for every phase — a helper that changes one pixel is a wrong helper, so no
 bless is permitted anywhere in this plan; (2) helpers are `pub(crate)` in `render::gpu` /
 `render::palette` and are **not** added to the `Scene` trait, because ADR-0002 keeps that trait to
-the preset engine's vocabulary; (3) the plan runs in a worktree after [0124](done/0124-the-review-fixes-that-move-no-pixels.md)
-and before [0126](0126-the-large-files-split-along-their-seams.md), because 0126 splits the very
+the preset engine's vocabulary; (3) the plan runs in a worktree after [0124](0124-the-review-fixes-that-move-no-pixels.md)
+and before [0126](../0126-the-large-files-split-along-their-seams.md), because 0126 splits the very
 files this plan shrinks and a split of duplicated code is duplicated splitting.
 
 ## TL;DR
@@ -202,7 +202,7 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 
 ## What this plan does NOT do
 
-- Does not split any file — [0126](0126-the-large-files-split-along-their-seams.md).
+- Does not split any file — [0126](../0126-the-large-files-split-along-their-seams.md).
 - Does not touch the `Scene` trait, the C ABI, or `standalone/`.
 - Does not add a shared uniform header (the per-scene `[f32; 4]` lane packing is deliberate for
   WGSL alignment and the review flagged it as a choice, not a paste).
@@ -279,3 +279,55 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 - **Outstanding `human` phases:** none. All five were `dev`.
 
 ## Followups (after this lands)
+
+Written by `architect` at the close. None blocks anything; each is a loose end this plan's own
+scope created or declined.
+
+- **`render/background.rs` is the last holdout, and the plan's *Files touched* excluded it.** It is
+  the seventh LUT-pair owner and the only remaining declarer of `DEFAULT_PALETTE_MIX` and
+  `DEFAULT_SATURATION`. It is not a scene, it flushes on `fresh || palette_dirty` rather than on
+  `dirty` alone, and its layout carries a measured `min_binding_size` that must not be tidied
+  (ADR-0058). Migrating it is a separate small phase, not an oversight to fix in passing.
+- **Seven scenes still declare `const DEFAULT_BRIGHTNESS: f32 = 1.0`** while four siblings pass
+  `common::DEFAULT_BRIGHTNESS` for the same value. Only the swarm's `0.8` makes the constructor
+  argument necessary. Two spellings of one idea; pick one.
+- **`gpu::storage_buffer` has one caller and no prospect of a second** — the crate's only other
+  storage buffer carries a different usage mask. Either inline it back into `shape_collage` or let
+  the next storage buffer justify it.
+- **The `preset.rs` drift guard's replacement proves a string exists, not that it runs.**
+  `text.contains("self.colour.set(name, value)")` would pass on a delegation placed below an early
+  return. The `scenes::common` roster tests cover what the block answers; nothing covers that each
+  scene reaches it.
+
+## Close review (2026-08-31)
+
+**No blockers, no majors.** Four minors, four nits; two of the minors are faults in this plan's own
+done-when wording rather than in the implementation.
+
+The acceptance oracle held and was verified independently of the log: `core/tests/golden/` and
+`core/tests/fixtures/` are byte-identical to `main` — **nothing was blessed**. The diff moves 23
+`LoadOp::Clear` and 13 `LoadOp::Load` out and the same counts back in, with clear colours balancing
+exactly (1 `CLEAR`, 15 `BLACK`, 7 `TRANSPARENT` each side); no `BindGroupLayoutEntry` or
+`BindingType::` line changed anywhere; and `create_bind_group_layout` counts are identical per file,
+so every scene still declares its own layout and the ADR-0058 enumeration lost no rows. Phase 1's
+`RenderPassDescriptor` grep returns zero sites outside `gpu.rs`. `QuadInstance` preserves both
+originals' field order with `attr` pinned last. `cargo nextest run --workspace` after merging `main`:
+**1217 passed, 5 skipped**, including `golden`, `distinctness`, `animation`, `reactivity`, `sanity`
+and `no_two_layouts_share_a_shape_without_recorded_evidence`.
+
+The two done-whens this plan got wrong:
+
+- **Phase 4's "each under 60 lines" was unearnable by construction.** The phase forbids absorbing the
+  `Self { … }` state literal and the layout plus its bind group; for `shape_collage` those two alone
+  are 48 + 62 = 110 lines. The achieved reductions are 103 -> 66, 106 -> 81, 153 -> 129. A property
+  ("the wgpu graph leaves the constructor") was checkable; the threshold was not.
+- **Phase 3's `grep -rn "DEFAULT_PALETTE_MIX" core/src/render/scenes` returns one site" counts uses,
+  not declarations**, so it returns seven. The property it wanted — one declaration — is met at
+  `scenes/common.rs:46`.
+
+One deviation not disclosed in the log: `palette::LutPair` is `pub`, where guess (2) in this plan's
+header said `pub(crate)`. Every use is a private or `pub(super)` field, so `pub(crate)` compiles.
+
+Backlog **0146**'s second probe was falsified by Phase 3's field rename and repaired in place at this
+close — the claim was intact, only `self.palette_steps` became `self.colour.steps` in the same
+`DepositUniform` write. `check-backlog-claims.mjs` is green again.
