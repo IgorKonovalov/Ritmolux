@@ -252,8 +252,8 @@ fn animation_attractor_leviathan() {
 | 2 — Split the remaining per-preset sweeps | dev | done | `e2f84cf` |
 | 3 — Split `distinctness` per family | dev | done | `1c52867` |
 | 4 — The `representative` key and its floor | dev | done | `5107d8e` |
-| 5 — Seed the representatives | dev | done | committed with this row |
-| 6 — Hang the sample on the per-phase tier | dev | not started | |
+| 5 — Seed the representatives | dev | done | `4e596c0` |
+| 6 — Hang the sample on the per-phase tier | dev | done | committed with this row |
 | 7 — Measure, and state what it cost | dev | not started | |
 
 ### Measurements
@@ -414,6 +414,25 @@ to overrule any of it from.
 *"Attractor ships 19 preset(s) and declares 1 representative(s) ([\"Leviathan\"]), under the floor of
 2"*. It also prints every family's count on a pass, so the sample's shape is visible without a
 special run.
+
+**Phase 6's list diff.** `cargo nextest list --workspace` enumerates **1491** and
+`-P fast` **1277**. The fast set is a strict subset — nothing is in it that is not in the full run —
+and the 214 it defers are exactly the nine binaries' remainder: `animation` 59, `reactivity` 59,
+`sanity` 74, `distinctness` 9, plus 13 across `attractor`, `golden`, `ink`, `background_composite`
+and `reaction_diffusion`. The 72 admitted are 24 presets across each of `animation`, `reactivity`
+and `sanity_loudness`. Every one of the 81 shipped stems still appears in the full list, checked per
+stem rather than by count.
+
+**The per-phase gate got slower, and that is what this phase buys.** `-P fast` goes **~150 s to
+198.8 s** (1203 tests to 1277). ADR-0156 had excluded all nine binaries outright, so the tier
+rendered **no** preset at all; it now renders 24. The plan's framing of Phase 6 as hanging a sample
+on the tier is right, but the effect is added coverage at added cost, not a saving — recorded here
+because the plan's TL;DR reads the other way.
+
+**It also changes the pre-push hook and CI's `check` job, which the plan does not mention.** Both
+cite `-P fast` by design (ADR-0156), so both gain the same 72 tests and the same ~47 s. CI's
+`coverage` job runs everything and is untouched, so ADR-0081's curation gate is unaffected — but
+three consumers moved here, not one.
 
 **A counting trap worth recording, because it nearly entered these numbers.** `grep -c '^system'`
 over `presets/*.toml` returns **85** for 81 files: `fragment_interferencemono`, `fragment_nebula`,

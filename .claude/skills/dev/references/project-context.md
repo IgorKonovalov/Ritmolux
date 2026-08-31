@@ -82,8 +82,8 @@ specification `core` did not match any packages". The directory and the package 
 | Build all                    | `cargo build` |
 | Run the standalone           | `cargo run -p standalone` |
 | Test all / just core         | `cargo test --workspace` / `cargo test -p lmv-core` |
-| **Test, per phase**          | `cargo nextest run --workspace -P fast` — the narrowed set (ADR-0156) |
-| **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, owed once per plan |
+| **Test, per phase**          | `cargo nextest run --workspace -P fast` — the narrowed set, plus **2 presets per family** (ADR-0156, ADR-0157) |
+| **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, **all 81 presets**, owed once per plan |
 | Lints (errors)               | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format check / apply         | `cargo fmt --all --check` / `cargo fmt --all` |
 | Build C-ABI artifacts        | `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib` / `.dll`) |
@@ -105,6 +105,14 @@ before you commit it. The **full** `cargo nextest run --workspace` is owed **onc
 the last phase, before the close handoff. Nothing is skipped, only deferred: the nine GPU suites
 `-P fast` holds back sweep the shipped preset library or every scene through a real adapter, so
 their price is set by the `preset-author` lane's output rather than by the change under test.
+
+**Which scope renders which presets (ADR-0157).** `-P fast` renders the **representatives** — the
+two presets per family that declare `representative = true`, so **24 of 81** through `animation`,
+`reactivity` and `sanity`'s loudness gate. The bare `--workspace` run renders **all 81**, and also
+adds `sanity`'s per-family shape gate and `distinctness`, neither of which is ever sampled. So a
+defect in one of the other 57 presets waits for the close rather than failing the phase that caused
+it — that is the deliberate trade, and it is why the once-per-plan full run is not optional. The
+close and CI paths are unchanged, so ADR-0081's curation gate still sees the whole library.
 
 **Two overrides are yours, and both go upward:**
 
