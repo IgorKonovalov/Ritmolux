@@ -76,6 +76,27 @@ others, same tree. Not diagnosed here; Phase 1 should name it if it recurs.
 were live and two other sessions were running suites against it, so every figure was an upper bound
 of unknown looseness. It is recorded in ADR-0156's Notes rather than used.
 
+### Running this alongside other lanes
+
+**Phases 2–5 are parallel-safe and can start immediately.** This plan touches `.config/`,
+`.githooks/`, `.github/` and `.claude/skills/` and nothing else; checked 2026-08-31, the only live
+lane (0144) touches **none** of those four paths, so the file-level conflict set is empty. Neither
+needs a GPU, so neither contends for the one adapter.
+
+**Phases 1 and 6 are the exception, and they are not blocking.** They need an idle box — three
+attempts on 2026-08-31 were contaminated by other sessions' suites. The scheduling relief is that
+**Phase 1 does not gate Phases 2–5**: the "before" arm is `cargo nextest run --workspace`, which this
+plan never removes, so both arms stay measurable forever. Run the whole measurement as one
+back-to-back pair in an announced quiet window whenever one is available — before Phases 2–5, after
+them, or in the middle. The `## Implementation log` records when it was taken.
+
+Two ordering notes rather than blockers. Phase 3 edits `.githooks/pre-push`, and each worktree uses
+its own copy, so a live lane keeps the old hook until it merges `main` — the exposure starts at that
+merge, which is what Phase 3's list-diff done-when is for. And Plan 0144 modifies 13 files under
+`core/tests/` (the shared harness) while **adding and deleting no test binary**, so it moves per-test
+cost without moving the binary count; if the measurement is taken before that merges, say so, because
+the link figure belongs to the tree it was taken on.
+
 ## Decision
 
 Adopt ADR-0156: the per-phase gate is `build` + `clippy` + `fmt` + a **narrowed** nextest run; the
@@ -209,9 +230,13 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
   push is rejected after the commits are already made. Known trap on this machine.
 - **A custom nextest profile may not inherit `[[profile.default.overrides]]`.** Phase 2's done-when
   tests this rather than assuming it, and states the fallback.
-- **Phase 1 and Phase 6 need the other lanes idle.** Three worktrees are live (0092, 0125, 0144) and
-  the GPU suites serialize on one adapter, so a concurrent lane inflates any reading. Both phases
-  verify and record the condition instead of asserting it held.
+- **Phase 1 and Phase 6 need the other lanes idle**, and the GPU suites serialize on one adapter, so
+  a concurrent lane inflates any reading. Both phases verify and record the condition instead of
+  asserting it held. They do **not** gate the rest of the plan — see "Running this alongside other
+  lanes" above.
+- **Plan 0144's merge can move the baseline.** It modifies 13 files under `core/tests/`, including
+  the shared harness, adding and deleting no binary. A measurement taken across that merge is a
+  measurement of two trees; name which tree each reading belongs to.
 - **Open:** whether once-per-plan is the right cadence for a plan of 9+ phases, or whether the full
   run should also fire at a midpoint. Deliberately not decided here — Phase 6's arithmetic is the
   evidence to decide it from, and ADR-0156 Alternative D is the fallback if it proves too coarse.
