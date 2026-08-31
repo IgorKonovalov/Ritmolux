@@ -2475,23 +2475,8 @@ impl Renderer {
         #[cfg(feature = "text")]
         {
             if text_layer.prepare(&ctx.device, &ctx.queue, width, height) {
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("lmv-text-pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            // Load: composite over the scene already in the view.
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
+                // Load: composite over the scene already in the view.
+                let mut pass = gpu::color_pass(encoder, "lmv-text-pass", view, wgpu::LoadOp::Load);
                 text_layer.render(&mut pass);
                 draw_calls += 1;
             }

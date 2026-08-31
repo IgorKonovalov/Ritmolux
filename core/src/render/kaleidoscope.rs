@@ -805,12 +805,7 @@ impl Resources {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("kaleido-uniform"),
-            size: std::mem::size_of::<K>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniform = gpu::uniform_buffer(device, "kaleido-uniform", std::mem::size_of::<K>());
         let shader = gpu::fullscreen_shader(
             device,
             "kaleido-shader",
@@ -1114,22 +1109,7 @@ impl PostStage for Kaleidoscope {
                 n: [fold_inner(self.inner), 0.0, 0.0, 0.0],
             }),
         );
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("kaleido-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: out,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: fold.load_op(),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "kaleido-pass", out, fold.load_op());
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.draw(0..3, 0..1);

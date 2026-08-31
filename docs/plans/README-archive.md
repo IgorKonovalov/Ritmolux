@@ -13,6 +13,72 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0125 — The scenes share their GPU boilerplate](done/0125-the-scenes-share-their-gpu-boilerplate.md)
+  — closed 2026-08-31. Five `dev` commits in the `lmv-plan-0125` worktree, one per phase: `8d2d590`
+  (`gpu::color_pass` + `gpu::uniform_buffer`), `672cd85` (`palette::LutPair`), `c7dab47`
+  (`scenes::common::{PaletteParams, PanParams}`), `60f57a7` (`gpu::FullscreenScene`) and `1310de3`
+  (`marks::InstancedQuads`), plus `30d87cd` for the log. 40 files, `+1934 / -1918`.
+
+  **Review: no blockers, no majors, four minors, four nits.** The plan's whole acceptance oracle was
+  *golden-identical, unblessed, at every commit*, and that was verified against the tree rather than
+  the log: `core/tests/golden/` and `core/tests/fixtures/` are **byte-identical to `main`** — nothing
+  was blessed anywhere in the plan. Three further mechanical checks, each chosen because it can
+  falsify the refactor without rendering anything: the diff moves 23 `LoadOp::Clear` and 13
+  `LoadOp::Load` out and the identical counts back in, with clear colours balancing exactly (1
+  `CLEAR`, 15 `BLACK`, 7 `TRANSPARENT` on each side); **no `BindGroupLayoutEntry` or `BindingType::`
+  line changed anywhere in the diff**; and `create_bind_group_layout` counts are identical per file,
+  so every scene still declares its own layout and the ADR-0058 enumeration lost no rows. Phase 1's
+  `RenderPassDescriptor` grep returns **zero** sites outside `gpu.rs`, so its "list what differs"
+  half is genuinely empty. `cargo nextest run --workspace` after `git merge main`: **1217 passed, 5
+  skipped**, including `golden`, `distinctness`, `animation`, `reactivity`, `sanity` and
+  `no_two_layouts_share_a_shape_without_recorded_evidence`; `fmt` and
+  `clippy --workspace --all-targets -D warnings` clean; all five Node gates exit 0.
+
+  **ADR-0058 was the plan's stated hazard and the implementation refused it structurally rather than
+  by measurement.** The plan allowed a helper to take a distinguishing parameter; `dev` went further
+  and let no helper build a layout at all — `FullscreenScene` and `InstancedQuads` are handed
+  finished bind groups, and `LutPair::bind_entries` takes all three binding numbers because the six
+  owners bind the triple at three ranges in two orders. That preserves something a parameterised
+  constructor would have destroyed silently: the guard enumerates layouts by *scanning source text*
+  for `create_bind_group_layout` with literal entries, so a layout built from arguments would have
+  dropped three rows off the list and weakened every assertion made on it. The allowlist ends
+  unchanged at four rows.
+
+  **Two done-whens in this plan were wrong, and both faults are the plan's.** Phase 4's "each
+  constructor under 60 lines" was **unearnable by construction** — the phase forbids absorbing the
+  `Self { … }` state literal and the layout plus its bind group, and for `shape_collage` those two
+  alone are 48 + 62 = 110 lines. The achieved reductions are real (103 -> 66, 106 -> 81, 153 -> 129)
+  and `dev` disclosed the miss rather than tuning toward it. Phase 3's
+  `grep -rn "DEFAULT_PALETTE_MIX" core/src/render/scenes` **counts uses, not declarations**, so it
+  returns seven; the property it wanted — one declaration — is met at `scenes/common.rs:46`. This is
+  the second close in a row to find a numeric done-when the architect had not done the arithmetic on;
+  the skill's own remedy applies — state the property when the threshold cannot be earned.
+
+  **The minors.** (1) The `core/tests/preset.rs` drift guard's replacement,
+  `text.contains("self.colour.set(name, value)")`, proves a string exists rather than that the
+  delegation runs — it would pass on a call placed below an early return. (2) `palette::LutPair` is
+  `pub` where this plan's header guess said `pub(crate)`; every one of its fourteen uses is a private
+  or `pub(super)` field, so the narrower spelling compiles. (3) and (4) are the two done-whens above.
+  The nits: `gpu::storage_buffer` has one caller and no prospect of a second; seven scenes still
+  declare `const DEFAULT_BRIGHTNESS: f32 = 1.0` while four siblings pass `common::DEFAULT_BRIGHTNESS`
+  for the same value; rustfmt mangled three assert messages into runs of interior spaces; and the
+  implementation log is 70 lines against the phases section's 69.
+
+  **Backlog 0146's second probe was falsified by this plan and repaired in place**, not archived: the
+  claim — that the banding constants ride the deposit uniform rather than the present one — is
+  intact, and only `self.palette_steps` became `self.colour.steps` in the same `DepositUniform`
+  write. This is the class ADR-0108 anticipated, where a rename breaks a `present:` probe without
+  touching what it asserts.
+
+  **What outlived the plan.** `render/background.rs` is the seventh LUT-pair owner and the last
+  declarer of `DEFAULT_PALETTE_MIX` and `DEFAULT_SATURATION`; the plan's *Files touched* excluded it
+  deliberately (it is not a scene, it flushes on `fresh || palette_dirty`, and its layout carries a
+  measured `min_binding_size`), so the consolidation is one scene-stage short of total. `dev` also
+  recorded a voided first run of Phase 5's suite — the machine entered modern standby mid-run
+  (Kernel-Power 506/507), every live test reported ~7740 s, and two `transition` tests failed on
+  capture readback; the clean re-run is the one recorded. That disclosure is worth keeping: it is the
+  shape a machine-caused red takes on this box.
+
 - [0124 — The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md)
   — closed 2026-08-30. Five `dev` commits in the `lmv-plan-0124` worktree: `709544f` (the shared
   `core/tests/common/` harness), `cf8c47a` (six rejoined literals plus the `#[allow]` move),
@@ -5727,7 +5793,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0087]: done/0087-the-line-renderer-draws-a-curve.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: done/0124-the-review-fixes-that-move-no-pixels.md
-[0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
+[0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md

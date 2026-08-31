@@ -16,6 +16,7 @@
 )]
 
 use super::RenderError;
+use crate::render::gpu;
 
 /// Bytes per pixel of [`HEADLESS_FORMAT`](super::context::HEADLESS_FORMAT).
 const BYTES_PER_PIXEL: u32 = 4;
@@ -92,22 +93,12 @@ pub(crate) fn create_readback(
 /// Clear the capture target to opaque black before the scene draws, so an empty
 /// or `Load`-op scene still yields defined, non-transparent pixels.
 pub(crate) fn record_clear(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("lmv-capture-clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    gpu::color_pass(
+        encoder,
+        "lmv-capture-clear",
+        view,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
 }
 
 /// Record the texture→buffer copy honoring the padded row stride.

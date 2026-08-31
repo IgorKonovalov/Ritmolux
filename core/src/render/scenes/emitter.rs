@@ -60,10 +60,10 @@
     clippy::unreachable
 )]
 
+use super::common;
 use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
-use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
@@ -193,11 +193,8 @@ const MAX_PREWARM: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
 const DEFAULT_HUE_CENTER: f32 = 0.5;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // The shared mark silhouette (ADR-0084). `disc` is this scene's glint, exactly
 // as it was, so an unbound emitter is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
@@ -299,32 +296,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color * g, g);
 }
 "#;
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Instance {
-    center: [f32; 2],
-    size: f32,
-    color: [f32; 3],
-    /// The sprite's orientation in radians, resolved on the CPU from the
-    /// object's seeded base angle and `spin` times its age (Plan 0052 Phase 2),
-    /// so the shader needs no per-object state and no spin constants.
-    angle: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Misc {
-    v: [f32; 4],
-    /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
-    /// (ADR-0084), padded to a second `vec4` by WGSL's uniform layout rule.
-    m: [f32; 4],
-    /// `[star_valley, star_curve, star_jitter, 0]` — the star arm's three shape
-    /// params, conditioned on the way in (Plan 0091 Phase 5). A third `vec4`
-    /// rather than a wider `m` because WGSL's uniform layout rule packs in
-    /// 16-byte rows; the layout SHAPE is unchanged, so ADR-0058 is untouched.
-    s: [f32; 4],
-}
 
 /// One thrown object. Everything here is fixed at spawn — the path is decided
 /// once and never re-steered (ADR-0057: no drag, no flow field, no collision).
@@ -824,12 +795,15 @@ pub const PARAMS: &[&str] = &[
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).
 pub struct EmitterScene {
-    pipeline: wgpu::RenderPipeline,
-    instances: wgpu::Buffer,
-    uniforms: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    /// The instance buffer, the view/silhouette uniform, the bind group over the
+    /// layout declared below, and the instanced-quad pipeline (ADR-0007).
+    quads: marks::InstancedQuads,
     field: Field,
-    instance_data: Vec<Instance>,
+    /// This frame's marks, rebuilt in place every `update` — the fourth attribute
+    /// is this scene's **sprite orientation** in radians, resolved on the CPU
+    /// from the object's seeded base angle and `spin` times its age (Plan 0052
+    /// Phase 2), so the shader needs no per-object state.
+    instance_data: Vec<marks::QuadInstance>,
     /// How many of `instance_data`'s slots this frame's draw uses.
     draw_count: usize,
     /// Shared scene clock (seconds), set by the renderer each frame.
@@ -863,22 +837,15 @@ pub struct EmitterScene {
     size_spread: f32,
     spin: f32,
     twinkle: f32,
-    brightness: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     /// The active baked palette (ADR-0021), sampled per object on the CPU.
     palette: Palette,
-    hue: f32,
     hue_spread: f32,
     hue_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
     /// are quantized on the way to the uniform, not here, so a `[smoothing]`-eased
     /// binding still eases — it just steps at the midpoints
@@ -918,18 +885,6 @@ impl EmitterScene {
                 .into(),
             ),
         });
-        let instances = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("emitter-instances"),
-            size: (capacity * std::mem::size_of::<Instance>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("emitter-misc"),
-            size: std::mem::size_of::<Misc>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
         // **This layout is deliberately not the swarm's, and that is load-bearing
         // on the software adapter** (design-backlog 0039, the surface Plan 0053
         // is about).
@@ -962,74 +917,30 @@ impl EmitterScene {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: std::num::NonZeroU64::new(std::mem::size_of::<Misc>() as u64),
+                    min_binding_size: std::num::NonZeroU64::new(std::mem::size_of::<
+                        marks::QuadUniform,
+                    >() as u64),
                 },
                 count: None,
             }],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("emitter-bind-group"),
-            layout: &bind_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniforms.as_entire_binding(),
-            }],
-        });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("emitter-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("emitter-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Instance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32,
-                        2 => Float32x3,
-                        3 => Float32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // Additive light, saturating coverage (ADR-0056) — shared
-                    // with the swarm and the line renderer so the three cannot
-                    // drift.
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
 
         Self {
-            pipeline,
-            instances,
-            uniforms,
-            bind_group,
+            quads: marks::InstancedQuads::new(
+                device,
+                "emitter",
+                capacity,
+                &shader,
+                &bind_layout,
+                surface_format,
+            ),
             field: Field::new(capacity),
             instance_data: vec![
-                Instance {
+                marks::QuadInstance {
                     center: [0.0, 0.0],
                     size: 0.0,
                     color: [0.0, 0.0, 0.0],
-                    angle: 0.0,
+                    attr: 0.0,
                 };
                 capacity
             ],
@@ -1051,18 +962,12 @@ impl EmitterScene {
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
             twinkle: DEFAULT_TWINKLE,
-            brightness: DEFAULT_BRIGHTNESS,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             palette: Palette::default_spectrum(),
-            hue: DEFAULT_HUE,
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
             star_valley: DEFAULT_STAR_VALLEY,
@@ -1132,17 +1037,11 @@ impl Scene for EmitterScene {
         self.size_spread = DEFAULT_SIZE_SPREAD;
         self.spin = DEFAULT_SPIN;
         self.twinkle = DEFAULT_TWINKLE;
-        self.brightness = DEFAULT_BRIGHTNESS;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
         self.star_valley = DEFAULT_STAR_VALLEY;
@@ -1151,6 +1050,11 @@ impl Scene for EmitterScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "spawn_rate" => self.spawn_rate = value,
             "gravity" => self.gravity = value,
@@ -1167,17 +1071,9 @@ impl Scene for EmitterScene {
             "size_spread" => self.size_spread = value,
             "spin" => self.spin = value,
             "twinkle" => self.twinkle = value,
-            "brightness" => self.brightness = value,
-            "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
             "star_valley" => self.star_valley = value,
@@ -1193,7 +1089,7 @@ impl Scene for EmitterScene {
         self.field.step(time, &cfg);
 
         let size = finite(self.size, DEFAULT_SIZE) * BASE_SIZE;
-        let brightness = finite(self.brightness, DEFAULT_BRIGHTNESS);
+        let brightness = finite(self.colour.brightness, DEFAULT_BRIGHTNESS);
         // The three appearance distributions, hoisted: read once, used for every
         // live object. Unlike `spread` and `lifetime_spread` these are resolved
         // at *draw* rather than at spawn, because they describe how an object
@@ -1227,27 +1123,27 @@ impl Scene for EmitterScene {
                 self.hue_center,
                 self.hue_spread,
                 unit(object.seed, channel::HUE),
-                self.hue,
+                self.colour.hue,
             );
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
             // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
                 self.palette.sample(
-                    palette::band_coord(coord, self.palette_steps),
-                    self.palette_mix,
+                    palette::band_coord(coord, self.colour.steps),
+                    self.colour.mix,
                 ),
-                self.saturation,
+                self.colour.saturation,
             );
             let bright = brightness
                 * envelope(u)
                 * spawn_ramp(u, spawn_fade)
                 * twinkle_factor(object.seed, time, twinkle);
-            *slot = Instance {
+            *slot = marks::QuadInstance {
                 center: pos,
                 size: size * size_factor(object.seed, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
-                angle: sprite_angle(object.seed, age, spin),
+                attr: sprite_angle(object.seed, age, spin),
             };
             count += 1;
         }
@@ -1265,11 +1161,10 @@ impl Scene for EmitterScene {
         // render target's aspect — the only correct source for a shape
         // (ADR-0037).
         self.aspect = aspect.max(0.1);
-        queue.write_buffer(
-            &self.uniforms,
-            0,
-            bytemuck::bytes_of(&Misc {
-                v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+        self.quads.write_uniform(
+            queue,
+            &marks::QuadUniform {
+                v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
                 // Quantized here, on the way into the uniform, so the shader's
                 // precondition stays visible on the CPU side: no fractional
                 // point count ever reaches an angular fold (ADR-0084).
@@ -1285,38 +1180,20 @@ impl Scene for EmitterScene {
                     marks::star_jitter(self.star_jitter),
                     0.0,
                 ],
-            }),
+            },
         );
-        if let Some(live) = self.instance_data.get(..self.draw_count)
-            && !live.is_empty()
-        {
-            queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(live));
+        if let Some(live) = self.instance_data.get(..self.draw_count) {
+            self.quads.write_instances(queue, live);
         }
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("emitter-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018).
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
-        if self.draw_count == 0 {
-            return;
-        }
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, self.instances.slice(..));
-        pass.draw(0..6, 0..self.draw_count as u32);
+        // Load over the engine backdrop (ADR-0018).
+        self.quads.draw(
+            encoder,
+            "emitter-pass",
+            view,
+            wgpu::LoadOp::Load,
+            self.draw_count as u32,
+        );
     }
 }
 

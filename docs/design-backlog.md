@@ -3275,8 +3275,10 @@ coordinate, so `palette_steps` quantizes the light going in rather than the stru
 - **Verified 2026-08-27** — the palette coordinate is the deposit's own angle, computed in the
   deposit pass:
   `present: let coord = dp\.c\.y \+ dp\.c\.z \* \(ang / 6\.2831853\); in: core/src/render/scenes/warp_mesh/mod.rs`
-- **Verified 2026-08-27** — and the banding constants ride the deposit uniform, not the present one:
-  `present: palette::band_steps\(self\.palette_steps\), in: core/src/render/scenes/warp_mesh/mod.rs`
+- **Verified 2026-08-31** — and the banding constants ride the deposit uniform, not the present one.
+  Plan 0125 moved the field into the shared colour block, so the spelling changed and the claim did
+  not: the call sits in the same `DepositUniform` write it always did.
+  `present: palette::band_steps\(self\.colour\.steps\), in: core/src/render/scenes/warp_mesh/mod.rs`
 - **Verified 2026-08-27** — `unprobeable: that the present pass performs no palette lookup is an
   absence inside one function of a file whose other function does perform one, so no file-scoped
   reduction separates them; read PRESENT_SRC's body.`

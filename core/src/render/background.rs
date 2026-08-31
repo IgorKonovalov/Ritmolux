@@ -470,12 +470,7 @@ impl Resources {
     fn build(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
         let shader =
             gpu::fullscreen_shader(device, "background-shader", gpu::FULLSCREEN_VS_NDC, SHADER);
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("background-params"),
-            size: std::mem::size_of::<Bg>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = gpu::uniform_buffer(device, "background-params", std::mem::size_of::<Bg>());
         // **The explicit `min_binding_size` is the fix for a measured WARP
         // mis-render, not tidiness (Plan 0053 Phase 3, ADR-0058). Do not drop it
         // back to `gpu::uniform`.**
@@ -861,22 +856,12 @@ impl Background {
         if self.bright <= 0.0 && self.band_amount <= 0.0 {
             // Passthrough: a plain black clear establishes the frame without a
             // second fullscreen pipeline (module docs: NFR §1 + WARP).
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("background-clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            gpu::color_pass(
+                encoder,
+                "background-clear",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+            );
             return;
         }
 
@@ -913,24 +898,14 @@ impl Background {
                 n: [self.band_hue, self.band_hue_span, 0.0, 0.0],
             }),
         );
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("background-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // The backdrop owns the clear: establish the frame here so no
-                    // scene needs to (ADR-0018).
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // The backdrop owns the clear: establish the frame here so no scene
+        // needs to (ADR-0018).
+        let mut pass = gpu::color_pass(
+            encoder,
+            "background-pass",
+            view,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(0, &res.bind_group, &[]);
         pass.set_bind_group(1, &res.lut_bind_group, &[]);

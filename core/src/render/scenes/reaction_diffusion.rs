@@ -35,6 +35,7 @@
 
 use crate::render::gpu;
 
+use super::common;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
@@ -90,12 +91,9 @@ const DEFAULT_GLOW: f32 = 1.0;
 // (now sampling the shared LUT instead of the private cosine).
 const DEFAULT_COLOR_SPAN: f32 = 0.85;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// View transform defaults (ADR-0018): identity — `zoom` = 1 leaves the sampled
 /// window unscaled, `pan` = 0 unshifted, so an unbound preset is byte-unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 
 /// Beat-stamped seed injection (Phase 3). A rising `inject` edge stamps a blob
 /// of V into the field at the next seeded position, so a beat spawns new growth.
@@ -474,11 +472,10 @@ struct Resources {
     init_bg: wgpu::BindGroup,
     present_bg_a: wgpu::BindGroup,
     present_bg_b: wgpu::BindGroup,
-    /// The shared gradient LUT textures (A/B) the present pass samples + crossfades
-    /// (ADR-0021); uploaded from the scene's baked palette on the first frame after
-    /// a (re)build and on a preset switch.
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
+    /// The shared gradient LUT pair (A/B) the present pass samples + crossfades
+    /// (ADR-0021). A fresh pair is dirty, so a (re)build uploads on its first
+    /// frame; a preset switch re-`set`s it through the scene's `set_palette`.
+    luts: palette::LutPair,
 }
 
 impl Resources {
@@ -505,24 +502,15 @@ impl Resources {
 
         let field = PingPongField::new(device, GRID, GRID);
 
-        let sim_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-sim-params"),
-            size: std::mem::size_of::<SimParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let init_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-init-params"),
-            size: std::mem::size_of::<InitParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let present_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("rd-present-params"),
-            size: std::mem::size_of::<PresentParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let sim_uniform =
+            gpu::uniform_buffer(device, "rd-sim-params", std::mem::size_of::<SimParams>());
+        let init_uniform =
+            gpu::uniform_buffer(device, "rd-init-params", std::mem::size_of::<InitParams>());
+        let present_uniform = gpu::uniform_buffer(
+            device,
+            "rd-present-params",
+            std::mem::size_of::<PresentParams>(),
+        );
         // --- init pipeline: one uniform, writes the seed field ---
         let init_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-init-layout"),
@@ -590,11 +578,7 @@ impl Resources {
         });
         // Shared gradient LUTs (ADR-0021): two 256×1 textures (A/B) + a repeat
         // sampler, in the present bind group alongside the field.
-        let lut_texture_a = palette::lut_texture(device, "rd-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "rd-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        let luts = palette::LutPair::new(device, "rd");
         let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("rd-present-layout"),
             entries: &[
@@ -612,9 +596,7 @@ impl Resources {
             field.view_a(),
             &sampler,
             &present_uniform,
-            &lut_view_a,
-            &lut_view_b,
-            &lut_sampler,
+            &luts,
         );
         let present_bg_b = present_bind_group(
             device,
@@ -622,9 +604,7 @@ impl Resources {
             field.view_b(),
             &sampler,
             &present_uniform,
-            &lut_view_a,
-            &lut_view_b,
-            &lut_sampler,
+            &luts,
         );
         let present_pipeline = gpu::fullscreen_pipeline(
             device,
@@ -652,30 +632,19 @@ impl Resources {
             init_bg,
             present_bg_a,
             present_bg_b,
-            lut_texture_a,
-            lut_texture_b,
+            luts,
         }
     }
 
     /// Encode the one-shot seed pass into the current read texture, filling the
     /// field with the deterministic initial pattern. Run once after a (re)build.
     fn encode_seed(&self, encoder: &mut wgpu::CommandEncoder) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("rd-seed-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: self.field.read_view(),
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(
+            encoder,
+            "rd-seed-pass",
+            self.field.read_view(),
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
         pass.set_pipeline(&self.init_pipeline);
         pass.set_bind_group(0, &self.init_bg, &[]);
         pass.draw(0..3, 0..1);
@@ -717,36 +686,29 @@ pub struct ReactionDiffusionScene {
     flow: f32,
     /// This frame's injection level (bound to a beat/onset expression).
     inject: f32,
-    /// Present-look params (Phase 4): palette hue, iso-contour density, hatch
-    /// stripe spacing, glow strength.
-    hue: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `brightness`.
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     contour: f32,
     hatch: f32,
     glow: f32,
     /// Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5).
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 2): `zoom` scales the
     /// present-pass sample window about its centre, `pan_*` offsets it.
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// How much of this field's coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`](super::Scene::set_occlude) — not a named param, so
     /// `reset_params` leaves it alone.
     occlude: f32,
-    /// The active baked palette pair; uploaded to the present LUT textures when
-    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    /// The active baked palette. Held here rather than only in the resources'
+    /// [`palette::LutPair`] because the resources build lazily: `set_palette` can
+    /// arrive with `res` still `None`, and this is what seeds the pair when it
+    /// finally exists.
     palette: Palette,
-    palette_dirty: bool,
 }
 
 impl ReactionDiffusionScene {
@@ -783,22 +745,16 @@ impl ReactionDiffusionScene {
             kill: DEFAULT_KILL,
             flow: DEFAULT_FLOW,
             inject: 0.0,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             contour: DEFAULT_CONTOUR,
             hatch: DEFAULT_HATCH,
             glow: DEFAULT_GLOW,
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
         }
     }
 }
@@ -825,17 +781,15 @@ fn sim_bind_group(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn present_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     input: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
     uniform: &wgpu::Buffer,
-    lut_a: &wgpu::TextureView,
-    lut_b: &wgpu::TextureView,
-    lut_sampler: &wgpu::Sampler,
+    luts: &palette::LutPair,
 ) -> wgpu::BindGroup {
+    let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("rd-present-bg"),
         layout,
@@ -852,18 +806,9 @@ fn present_bind_group(
                 binding: 2,
                 resource: uniform.as_entire_binding(),
             },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::TextureView(lut_a),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::TextureView(lut_b),
-            },
-            wgpu::BindGroupEntry {
-                binding: 5,
-                resource: wgpu::BindingResource::Sampler(lut_sampler),
-            },
+            lut_a,
+            lut_b,
+            lut_sampler,
         ],
     })
 }
@@ -916,7 +861,9 @@ impl Scene for ReactionDiffusionScene {
         // Uploaded to the present LUT textures in `render` (deferred — resources
         // build lazily on first render). Cheap array copy, off the hot path.
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.luts.set(palette);
+        }
     }
 
     fn reset_params(&mut self) {
@@ -924,22 +871,22 @@ impl Scene for ReactionDiffusionScene {
         self.kill = DEFAULT_KILL;
         self.flow = DEFAULT_FLOW;
         self.inject = 0.0;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.contour = DEFAULT_CONTOUR;
         self.hatch = DEFAULT_HATCH;
         self.glow = DEFAULT_GLOW;
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         // ADR-0002 layer 2 knobs. `feed`/`kill` pick the regime; `flow` scales
         // the diffusion; `inject` is a beat/onset level whose rising edge stamps
         // a seed (edge detected in `update`). `hue`/`contour`/`hatch`/`glow`
@@ -949,19 +896,12 @@ impl Scene for ReactionDiffusionScene {
             "kill" => self.kill = value,
             "flow" => self.flow = value,
             "inject" => self.inject = value,
-            "hue" => self.hue = value,
             "contour" => self.contour = value,
             "hatch" => self.hatch = value,
             "glow" => self.glow = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             _ => {}
         }
     }
@@ -986,11 +926,13 @@ impl Scene for ReactionDiffusionScene {
         view: &wgpu::TextureView,
         _aspect: f32,
     ) {
-        // Build GPU resources on first use (module docs). Fresh LUT textures are
-        // empty, so mark the palette dirty to upload it below.
+        // Build GPU resources on first use (module docs). A fresh pair's textures
+        // are empty and hold the default palette, so hand it the one the scene is
+        // actually carrying; the upload happens in the flush below.
         if self.res.is_none() {
-            self.res = Some(Resources::build(&self.device, self.surface_format));
-            self.palette_dirty = true;
+            let mut built = Resources::build(&self.device, self.surface_format);
+            built.luts.set(&self.palette);
+            self.res = Some(built);
         }
         let Self {
             res,
@@ -1001,22 +943,15 @@ impl Scene for ReactionDiffusionScene {
             feed,
             kill,
             flow,
-            hue,
             contour,
             hatch,
             glow,
             color_span,
             color_center,
-            saturation,
-            palette_mix,
-            palette_steps,
-            palette_contour,
+            colour,
             zoom,
-            pan_x,
-            pan_y,
+            pan,
             occlude,
-            palette,
-            palette_dirty,
             ..
         } = self;
         let Some(res) = res.as_mut() else {
@@ -1025,22 +960,18 @@ impl Scene for ReactionDiffusionScene {
 
         // Upload the active palette LUTs (A + B) on a preset switch or a fresh
         // build — off the hot path, once per change.
-        if *palette_dirty {
-            palette::write_lut(queue, &res.lut_texture_a, &palette.lut_a_bytes());
-            palette::write_lut(queue, &res.lut_texture_b, &palette.lut_b_bytes());
-            *palette_dirty = false;
-        }
+        res.luts.flush(queue);
 
         queue.write_buffer(
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentParams {
-                a: [*hue, *contour, *hatch, *glow],
-                b: [*color_span, *color_center, *saturation, *palette_mix],
-                c: [*zoom, *pan_x, *pan_y, *occlude],
+                a: [colour.hue, *contour, *hatch, *glow],
+                b: [*color_span, *color_center, colour.saturation, colour.mix],
+                c: [*zoom, pan.x, pan.y, *occlude],
                 d: [
-                    palette::band_steps(*palette_steps),
-                    palette::band_contour(*palette_contour),
+                    palette::band_steps(colour.steps),
+                    palette::band_contour(colour.contour),
                     0.0,
                     0.0,
                 ],
@@ -1078,23 +1009,13 @@ impl Scene for ReactionDiffusionScene {
                 &res.sim_bg_b
             };
             {
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("rd-sim-pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: res.field.write_view(),
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            // The fullscreen sim pass overwrites every texel.
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
+                // The fullscreen sim pass overwrites every texel.
+                let mut pass = gpu::color_pass(
+                    encoder,
+                    "rd-sim-pass",
+                    res.field.write_view(),
+                    wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                );
                 pass.set_pipeline(&res.sim_pipeline);
                 pass.set_bind_group(0, sim_bg, &[]);
                 pass.draw(0..3, 0..1);
@@ -1108,28 +1029,13 @@ impl Scene for ReactionDiffusionScene {
         } else {
             &res.present_bg_b
         };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("rd-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018). The present is
-                    // **not** opaque: it writes premultiplied alpha, with the
-                    // V-field's `structure` term as coverage, so the coral's
-                    // voids reveal the `bg_*` gradient underneath. Over the
-                    // default black backdrop a premultiplied Load is arithmetically
-                    // an opaque REPLACE, which is why the golden does not move.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        // Load over the engine backdrop (ADR-0018). The present is **not**
+        // opaque: it writes premultiplied alpha, with the V-field's `structure`
+        // term as coverage, so the coral's voids reveal the `bg_*` gradient
+        // underneath. Over the default black backdrop a premultiplied Load is
+        // arithmetically an opaque REPLACE, which is why the golden does not
+        // move.
+        let mut pass = gpu::color_pass(encoder, "rd-present-pass", view, wgpu::LoadOp::Load);
         pass.set_pipeline(&res.present_pipeline);
         pass.set_bind_group(0, present_bg, &[]);
         pass.draw(0..3, 0..1);

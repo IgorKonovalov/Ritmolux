@@ -18,10 +18,10 @@
     clippy::unreachable
 )]
 
+use super::common;
 use super::marks;
 use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
-use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
 const SEED: u64 = 0x4C4D_565F_5357_524D; // "LMV_SWRM"
@@ -158,15 +158,10 @@ const RESEED_KICK: f32 = 0.06;
 // `saturation = 1` leaves color untouched — so an unbound swarm is unchanged.
 const DEFAULT_HUE_SPREAD: f32 = 1.0;
 const DEFAULT_HUE_CENTER: f32 = 0.5;
-const DEFAULT_SATURATION: f32 = 1.0;
-/// `palette_mix` default — 0 = palette A only (the crossfade is a no-op unless a
-/// preset declares `[palette_b]` and binds `palette_mix`).
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // The mark silhouette (ADR-0084). `disc` is exactly the arithmetic the sprite
 // drew before the roster existed, so an unbound swarm is unchanged.
 const DEFAULT_SHAPE: f32 = marks::DEFAULT_SHAPE;
@@ -265,32 +260,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Instance {
-    center: [f32; 2],
-    size: f32,
-    color: [f32; 3],
-    /// The particle's depth parallax strength, resolved from its `z` on the CPU so
-    /// the shader needs no depth constants (Plan 0043 Phase 3).
-    parallax: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Misc {
-    v: [f32; 4],
-    /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
-    /// (ADR-0084). Padded to a second `vec4` because that is WGSL's uniform
-    /// layout rule, not because three slots are wanted.
-    m: [f32; 4],
-    /// `[star_valley, star_curve, star_jitter, 0]` — the star arm's three shape
-    /// params, conditioned on the way in (Plan 0091 Phase 5). A third `vec4`
-    /// rather than a wider `m` because WGSL's uniform layout rule packs in
-    /// 16-byte rows; the layout SHAPE is unchanged, so ADR-0058 is untouched.
-    s: [f32; 4],
-}
-
 struct Particle {
     /// Position on the torus in **normalized** domain coordinates, each axis in
     /// `[-1, 1)`; world position is this times the current half-extents (Plan 0043
@@ -337,12 +306,14 @@ struct Particle {
 
 /// ~10k-particle CPU flow-field swarm, driven by named preset parameters.
 pub struct SwarmScene {
-    pipeline: wgpu::RenderPipeline,
-    instances: wgpu::Buffer,
-    uniforms: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    /// The instance buffer, the view/silhouette uniform, the bind group over the
+    /// layout declared below, and the instanced-quad pipeline (ADR-0007).
+    quads: marks::InstancedQuads,
     particles: Vec<Particle>,
-    instance_data: Vec<Instance>,
+    /// This frame's marks, rebuilt in place every `update` — the fourth attribute
+    /// is this scene's **depth parallax**, resolved from the particle's `z` on the
+    /// CPU so the shader needs no depth constants (Plan 0043 Phase 3).
+    instance_data: Vec<marks::QuadInstance>,
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// The **render target's** aspect, recorded by `render` for the next `update`
@@ -376,13 +347,13 @@ pub struct SwarmScene {
     /// so it reads as the flow changing its mind, not as a teleport.
     field_phase: Phase,
     burst: f32,
-    hue: f32,
-    brightness: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     size: f32,
     field_freq: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// The active baked palette (ADR-0021), sampled per particle on the CPU. Set
     /// by `set_palette` on a preset switch; default `spectrum` reproduces the
     /// prior cosine.
@@ -390,14 +361,6 @@ pub struct SwarmScene {
     /// Per-particle hue band + shared desaturation (ADR-0021).
     hue_spread: f32,
     hue_center: f32,
-    saturation: f32,
-    /// A/B palette crossfade position (Plan 0020 Phase 4); 0 = palette A.
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
     /// are quantized on the way to the uniform rather than here, so a
     /// `[smoothing]`-eased binding still eases — it just steps at the midpoints
@@ -444,18 +407,6 @@ impl SwarmScene {
             // one `mark_distance`, two scenes (ADR-0084).
             source: wgpu::ShaderSource::Wgsl(format!("{}{SHADER}", marks::sdf_wgsl()).into()),
         });
-        let instances = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("swarm-instances"),
-            size: (particles * std::mem::size_of::<Instance>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let uniforms = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("swarm-misc"),
-            size: std::mem::size_of::<Misc>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("swarm-bind-layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -469,55 +420,14 @@ impl SwarmScene {
                 count: None,
             }],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("swarm-bind-group"),
-            layout: &bind_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniforms.as_entire_binding(),
-            }],
-        });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("swarm-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("swarm-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Instance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32,
-                        2 => Float32x3,
-                        3 => Float32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // Additive light, saturating coverage (ADR-0056) — shared
-                    // with the line renderer so the two cannot drift.
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        let quads = marks::InstancedQuads::new(
+            device,
+            "swarm",
+            particles,
+            &shader,
+            &bind_layout,
+            surface_format,
+        );
 
         let mut rng = SeededRng::new(SEED);
         // The individuation draws come off the particle's index through `unit`,
@@ -538,17 +448,14 @@ impl SwarmScene {
             .collect();
 
         Self {
-            pipeline,
-            instances,
-            uniforms,
-            bind_group,
+            quads,
             particles: particle_state,
             instance_data: vec![
-                Instance {
+                marks::QuadInstance {
                     center: [0.0, 0.0],
                     size: 0.0,
                     color: [0.0, 0.0, 0.0],
-                    parallax: 1.0,
+                    attr: 1.0,
                 };
                 particles
             ],
@@ -559,20 +466,14 @@ impl SwarmScene {
             spin: DEFAULT_SPIN,
             field_phase: Phase::default(),
             burst: DEFAULT_BURST,
-            hue: DEFAULT_HUE,
-            brightness: DEFAULT_BRIGHTNESS,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             size: DEFAULT_SIZE,
             field_freq: DEFAULT_FIELD_FREQ,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             palette: Palette::default_spectrum(),
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             shape: DEFAULT_SHAPE,
             points: DEFAULT_POINTS,
             star_valley: DEFAULT_STAR_VALLEY,
@@ -742,19 +643,13 @@ impl Scene for SwarmScene {
         self.force = DEFAULT_FORCE;
         self.spin = DEFAULT_SPIN;
         self.burst = DEFAULT_BURST;
-        self.hue = DEFAULT_HUE;
-        self.brightness = DEFAULT_BRIGHTNESS;
+        self.colour.reset();
+        self.pan.reset();
         self.size = DEFAULT_SIZE;
         self.field_freq = DEFAULT_FIELD_FREQ;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.shape = DEFAULT_SHAPE;
         self.points = DEFAULT_POINTS;
         self.star_valley = DEFAULT_STAR_VALLEY;
@@ -772,23 +667,20 @@ impl Scene for SwarmScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "force" => self.force = value,
             "spin" => self.spin = value,
             "burst" => self.burst = value,
-            "hue" => self.hue = value,
-            "brightness" => self.brightness = value,
             "size" => self.size = value,
             "field_freq" => self.field_freq = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "shape" => self.shape = value,
             "points" => self.points = value,
             "star_valley" => self.star_valley = value,
@@ -904,16 +796,16 @@ impl Scene for SwarmScene {
             // Colour through the shared LUT (ADR-0021): the per-particle hue is
             // mapped into the `hue_spread`/`hue_center` band, then desaturated by
             // the shared `saturation`. Defaults reproduce the prior full-wheel look.
-            let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.hue);
+            let coord = hue_coord(self.hue_center, self.hue_spread, p.hue, self.colour.hue);
             // Hard bands on the palette coordinate (ADR-0078), the canonical
             // `palette::band_coord` called rather than copied. `palette_steps <= 1`
             // returns it untouched, so an unbound preset is byte-unchanged.
             let base = palette::desaturate(
                 self.palette.sample(
-                    palette::band_coord(coord, self.palette_steps),
-                    self.palette_mix,
+                    palette::band_coord(coord, self.colour.steps),
+                    self.colour.mix,
                 ),
-                self.saturation,
+                self.colour.saturation,
             );
             // Depth, resolved into the three visual terms it drives (Plan 0043
             // Phase 3). Three `mul_add`-shaped lerps on a value that never changes
@@ -930,15 +822,15 @@ impl Scene for SwarmScene {
             // bit-exact, which is what keeps the shipped captures byte-identical
             // (Plan 0077 Phase 2).
             let bright = ((0.25 + speed * 0.7) * p.bright).min(1.6)
-                * self.brightness
+                * self.colour.brightness
                 * depth_fade
                 * twinkle_factor(p.twinkle_freq, p.twinkle_phase, time, twinkle);
 
-            *inst = Instance {
+            *inst = marks::QuadInstance {
                 center: [p.pos[0] * bound_x, p.pos[1] * bound_y],
                 size: p.size * self.size * depth_scale * size_factor(p.size_unit, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
-                parallax,
+                attr: parallax,
             };
         }
     }
@@ -954,16 +846,11 @@ impl Scene for SwarmScene {
         // argument is the render target's aspect — the only correct source for a
         // shape (ADR-0037); see the field's docs for why `set_target_size` is not.
         self.aspect = aspect.max(0.1);
-        queue.write_buffer(
-            &self.instances,
-            0,
-            bytemuck::cast_slice(&self.instance_data),
-        );
-        queue.write_buffer(
-            &self.uniforms,
-            0,
-            bytemuck::bytes_of(&Misc {
-                v: [self.aspect, self.zoom, self.pan_x, self.pan_y],
+        self.quads.write_instances(queue, &self.instance_data);
+        self.quads.write_uniform(
+            queue,
+            &marks::QuadUniform {
+                v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
                 // Quantized here, on the way into the uniform, so the shader's
                 // precondition stays visible on the CPU side: the roster's
                 // bounds and the integer point count live in `marks`, and no
@@ -980,32 +867,19 @@ impl Scene for SwarmScene {
                     marks::star_jitter(self.star_jitter),
                     0.0,
                 ],
-            }),
+            },
         );
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("swarm-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    // Load over the engine backdrop (ADR-0018): the additive
-                    // particles bloom over whatever the background pass painted,
-                    // so the sparse gaps between them reveal it.
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, self.instances.slice(..));
-        pass.draw(0..6, 0..self.particles.len() as u32);
+        // Load over the engine backdrop (ADR-0018): the additive particles
+        // bloom over whatever the background pass painted, so the sparse gaps
+        // between them reveal it.
+        self.quads.draw(
+            encoder,
+            "swarm-pass",
+            view,
+            wgpu::LoadOp::Load,
+            self.particles.len() as u32,
+        );
     }
 }
 
