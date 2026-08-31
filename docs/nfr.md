@@ -192,9 +192,10 @@ contradicts this file is a plan bug — surface it, don't guess.
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — the three Node doc gates, `fmt`,
-  `clippy --workspace`, and a narrowed `nextest --workspace` — and prints the GPU-heavy suites it
-  skipped.
+  `git config core.hooksPath .githooks`. Runs the fast subset — the five Node doc gates, `fmt`,
+  `clippy --workspace`, and a narrowed `nextest --workspace -P fast` — whose `fast` profile
+  (ADR-0156) is where the excluded GPU-heavy suites are listed, and which nextest names on every
+  run.
   **Measured 48.6 s warm (2026-08-08, dev box), against the ~28 s recorded when ADR-0033 set it up.**
   The number drifted with the suite it runs, not with the gate's design; it is recorded here rather
   than targeted, and the README's developer section carries the per-step breakdown. If it grows past

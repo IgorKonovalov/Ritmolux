@@ -641,7 +641,7 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
 
    The same asymmetry is why `clippy` above is already written `--workspace --all-targets`. Note the
    hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
-   its `nextest` step is filtered (`-E "$NEXTEST_FILTER"`) rather than complete.
+   its `nextest` step is narrowed (`-P fast`) rather than complete.
 3. **Then steps 1–4 above** — plan status, ADRs, both READMEs, and `cargo release <level>` — all
    **on the branch**. The version is chosen against what `main` actually reached, not against the
    branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the

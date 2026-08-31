@@ -1,8 +1,8 @@
 # ADR-0156 — The per-phase gate is scoped, and the whole suite is owed once per plan
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-08-31
-> **Related plan(s):** [0145](../plans/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)
+> **Related plan(s):** [0145](../plans/done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)
 
 ## Context
 
@@ -123,6 +123,39 @@ Commit on the narrow gate, run the full suite in the background, read it before 
 Rejected: a red result then lands *after* the commit it convicts, and this project never rewrites
 history, so the repair is a follow-up commit whose relationship to the defect is legible only from
 the log. Worth revisiting if once-per-plan proves too coarse.
+
+## Outcome (2026-08-31, at Plan 0145's close)
+
+**The structure of the argument reproduced; every magnitude in the Notes above did not.** Plan 0145
+Phase 1 and Phase 6 each took three full and three narrow runs on a verified-idle box, machine
+identification per ADR-0071, and the architect's single pair recorded above is superseded by them.
+
+| this ADR's Notes | measured over six runs per arm |
+|---|---|
+| full suite **869 s** | **430-463 s** per window, pooled **446.3 s** |
+| narrowed **163 s** | pooled **148.9 s** |
+| the reading spans **489-885 s** (1.8x) within an hour | **0.7 %** within a window, **7.5 %** between two |
+| `animation` is **758 s, 87 %** of the wall time | **331 s of 428 s, 77 %** - still the critical path |
+| the deferral is worth **706 s** | worth **~297 s** per phase |
+
+So the **critical-path mechanism this decision actually rests on holds** - the excluded set cannot
+compress below its longest single test, and `animation`, `reactivity`, `distinctness` and `sanity`
+remain the tail - while the *size* of the prize is roughly half what was written down. On a median
+six-phase plan the stated rule costs **24.9 min** where it used to cost **49.6 min**: a **49.9 %**
+reduction, not the ~59 min the plans index projected. The saving is against the *stated* old rule;
+the Context above records that `dev` already narrowed silently, so what past plans really paid is
+unknown and unknowable.
+
+**The 1.8x instability that was itself offered as a finding did not reproduce and is withdrawn.**
+Three readings within a window agree to 0.7 %; the two windows differ by 7.5 %, which is the figure
+to carry. The once-observed exit-100 flake did not recur in six narrow runs.
+
+**The counts moved with the tree, and the 27 did not.** `1212 / 1185 / 27` above became
+`1230 / 1203 / 27` after the 0144 and 0125 merges. The Mode 4 close re-derived the set
+independently: `-P fast` and the retired `-E` expression enumerate an **identical** 1203 tests
+(empty diff), their union with the nine binaries is **exactly** the unfiltered 1230, and the four
+reporting tests stay audible under the custom profile - so the profile is a faithful replacement
+for the two copies it retired, which is the one claim this decision could not afford to get wrong.
 
 ## Notes
 

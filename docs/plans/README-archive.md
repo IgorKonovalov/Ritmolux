@@ -13,6 +13,64 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)
+  — closed 2026-08-31. Six `dev` phases on `main` rather than a worktree, `8b1d7b0`..`a1b9559`:
+  the baseline (`8b1d7b0`), the `fast` nextest profile (`f5431dc`), the hook and CI citing it
+  (`975c31b`), `dev`'s per-phase tier (`b90e382`), the recorded full-suite fact (`05a6f5d`) and the
+  re-measurement (`a1b9559`). Mode 4: **no blockers, no majors, three minors.** Version: **none** —
+  docs/chore-only, no Rust, C++ or preset file changed, so no shipped artifact moved.
+
+  **What it decided.** ADR-0156, accepted with an `Outcome`: the per-phase gate narrows to
+  `-P fast`, the full `cargo nextest run --workspace` is owed **once per plan** at the last phase
+  and recorded in the close block, and two upward overrides stay with `dev`. The exclusion that
+  existed as two byte-copies (`.githooks/pre-push`, `ci.yml`) and was invisible to the `dev` lane
+  became **one** `[profile.fast]` `default-filter`; a repo-wide grep at the close finds exactly one
+  live definition.
+
+  **The close re-derived the plan's own load-bearing claims rather than reading them.** The full
+  suite exits 0 (`1230 tests run: 1230 passed (12 slow), 5 skipped`, 472.6 s), corroborating the
+  log's bullet. `-P fast` and the retired `-E` expression enumerate an **identical** 1203 tests
+  (empty diff, not equal counts); their union with the nine excluded binaries is **exactly** the
+  unfiltered 1230, and the 27 deferred tests are all `lmv-core`. The four reporting tests do stay
+  audible under the custom profile — `the_estimator_decomposes_into_its_terms` printed its
+  decomposition under `-P fast` — so Phase 2's stated fallback was never needed.
+
+  **The plan falsified its own architect-supplied baseline, which is the durable finding.** Six
+  runs per arm on a verified-idle box put the full suite at **446.3 s** pooled and the narrow arm
+  at **148.9 s**, against the **869 s / 163 s** single pair the plan and ADR-0156 were written on.
+  The **1.8x instability that had itself been offered as a finding did not reproduce and was
+  withdrawn**: three readings inside a window agree to **0.7 %**, and two windows differ by
+  **7.5 %**. `animation::every_preset_animates_over_time` is **77 %** of the wall time, not 87 %.
+  So the *critical-path mechanism* the decision rests on held — the excluded set cannot compress
+  below its longest single test — while the prize is **24.8 min on a median six-phase plan
+  (49.9 %)**, roughly half the ~59 min the plans index had projected. That projection was corrected
+  in place at the close, and the discrepancy is recorded as ADR-0156's `Outcome` rather than by
+  editing its body.
+
+  **The three minors, all repaired in the close commit.** The implementation log runs 90 lines
+  against its phases section's 77, which `dev` flagged and which the two full measurement records
+  its own done-whens demanded do justify. Three documents the plan falsified were not swept by it:
+  `.claude/skills/architect/SKILL.md` still cited the `$NEXTEST_FILTER` variable Phase 3 deleted,
+  and **both `README.md` and `docs/nfr.md` still promised the hook "prints the GPU-heavy suites it
+  skipped"** — a loop Phase 3 removed on the correct reasoning that a hand-written echo of the list
+  is the copy that goes stale. README's prose also still enumerated the nine, which is the third
+  copy this plan exists to prevent; it now points at the profile and lets nextest name them.
+  `docs/plans/README.md`'s sequencing note carried the pre-measurement projection.
+
+  **What outlived the plan.** The close ceremony now has a claim it must verify rather than trust:
+  Mode 4 lens 1 runs `cargo nextest run --workspace` itself and compares it against the close
+  block's `**Full suite:**` bullet, a missing or vague one being a **blocker**. The deferral's real
+  price — a `golden` or `sanity` regression surfacing at the last phase instead of the phase that
+  caused it, with bisection costing a full suite per candidate — rests on `dev`'s blast-radius
+  judgement and no gate enforces it. Four followups stand: the exclusion list is plausibly
+  **under-inclusive** (`warp_mesh` 377 s, `easing` 313, `tempo_probe` 281, `feedback` 266,
+  `transition` 236, `bloom` 201 CPU-seconds, none ever candidates because the list predates them),
+  and re-deriving it by measurement is now a one-file edit; concurrent lanes still serialize on one
+  GPU; CI still pays on every push what this plan saved locally; and a once-observed narrowed-run
+  exit-100 did not recur in six runs and remains undiagnosed. Plan 0146 — splitting the monoliths
+  per preset, at no coverage cost — is sequenced next and is the lever this plan's own
+  critical-path finding points at.
+
 - [0144 — The flags mean what they say](done/0144-the-flags-mean-what-they-say.md)
   — closed 2026-08-31. Six `dev` commits in the `lmv-plan-0144` worktree, one per phase: `1b29936`
   (`FlagSpec.requires` + the companion refusal), `3872605` (`--gpu` reaches the window), `cb6a037`

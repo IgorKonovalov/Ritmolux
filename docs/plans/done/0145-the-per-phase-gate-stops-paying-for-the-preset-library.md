@@ -1,11 +1,18 @@
 # 0145 — The per-phase gate stops paying for the preset library
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-31. Six `dev` phases on `main`, `8b1d7b0`..`a1b9559`.
+> Mode 4: **no blockers, no majors, three minors** (an oversized log, three docs the plan
+> falsified and did not sweep, a plans-index projection its own Phase 6 superseded — all
+> repaired in the close commit). Verified independently at the close: the full suite exits 0
+> (`1230 passed, 5 skipped`, 472.6 s), `-P fast` and the retired `-E` expression enumerate an
+> identical 1203 tests with an empty diff, their union is exactly the unfiltered 1230, and the
+> reporting-test override does inherit into the custom profile. **No version bump** —
+> docs/chore-only, no shipped artifact changed.
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
-> **Related ADRs:** [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
-> (proposed), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+> (proposed), [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 
 ## TL;DR
 
@@ -26,7 +33,7 @@ bottleneck — Plan 0129 already fixed that, and a warm rebuild after a one-file
 What is left is the suite run itself plus the test-binary link, paid five to nine times per plan.
 
 Four facts, none of them timings, establish the shape (see
-[ADR-0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) for the
+[ADR-0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) for the
 full argument):
 
 | fact | value | source |
