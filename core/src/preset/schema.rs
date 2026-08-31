@@ -555,6 +555,21 @@ pub struct Preset {
     /// (ADR-0020), and this is metadata *about* a binding rather than part of
     /// it. Harness-only — nothing per-frame reads it.
     pub occupancy_exempt: Vec<String>,
+    /// Whether this preset is one of its family's **representatives** — the
+    /// sample the `dev` lane's per-phase test tier renders (ADR-0157).
+    ///
+    /// Absent means `false`. Harness-only, like `occupancy_exempt`: nothing
+    /// per-frame reads it, and it changes nothing about how the preset looks or
+    /// what the close and CI render, which is the whole library either way. It
+    /// is **declared, not derived** — a first-N or hash-rotation rule would
+    /// either never sample a newly landed preset or make the same tree gate
+    /// differently on different commits.
+    ///
+    /// A floor is enforced in `core/tests/preset.rs`: every family carries at
+    /// least two. That catches a sample decayed to nothing; it cannot catch two
+    /// representatives that have stopped representing a family that grew around
+    /// them, which is a curation duty with no gate behind it.
+    pub representative: bool,
     /// The optional second scene layer (ADR-0090 / Plan 0076), from a `[layer]`
     /// table. `None` — the overwhelmingly common case — takes exactly the code
     /// path a preset took before layers existed: no new pass, no new target.
@@ -856,6 +871,7 @@ impl Preset {
             occupancy_exempt,
             layer,
             warnings,
+            representative: raw.representative,
         })
     }
 }
@@ -1345,6 +1361,11 @@ struct RawPreset {
     system: String,
     #[serde(default)]
     name: Option<String>,
+    /// The `representative` flag (ADR-0157). Absent means `false`; a non-boolean
+    /// value is a `toml` type error, which is the same load-time rejection every
+    /// other mistyped scalar in this struct gets.
+    #[serde(default)]
+    representative: bool,
     #[serde(default)]
     params: BTreeMap<String, String>,
     /// The optional `[curve]` structural-config table (ADR-0007), present on

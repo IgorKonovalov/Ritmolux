@@ -98,6 +98,13 @@ Rules:
 
 - **`system`** must be one of the seven known system names (below). An unknown
   system rejects the whole file.
+- **`representative`** is an optional boolean, absent meaning `false`. It marks
+  this preset as one of its family's samples for the `dev` lane's per-phase test
+  tier. It changes **nothing** about how the preset looks, and nothing about what
+  the plan close and CI render, which is the whole library either way — the only
+  thing it moves is how early a defect in this preset is noticed. A non-boolean
+  value rejects the file. See [`presets/README.md`](../presets/README.md) for
+  what the flag is for and who sets it.
 - **`name`** is free text shown in the standalone title bar. If omitted, the
   system name is used.
 - **`[params]`** binds parameters by name to expression strings. Every value is

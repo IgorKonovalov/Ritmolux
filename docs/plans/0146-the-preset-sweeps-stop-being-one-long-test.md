@@ -250,8 +250,8 @@ fn animation_attractor_leviathan() {
 |---|---|---|---|
 | 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
 | 2 — Split the remaining per-preset sweeps | dev | done | `e2f84cf` |
-| 3 — Split `distinctness` per family | dev | done | committed with this row |
-| 4 — The `representative` key and its floor | dev | not started | |
+| 3 — Split `distinctness` per family | dev | done | `1c52867` |
+| 4 — The `representative` key and its floor | dev | done | committed with this row |
 | 5 — Seed the representatives | dev | not started | |
 | 6 — Hang the sample on the per-phase tier | dev | not started | |
 | 7 — Measure, and state what it cost | dev | not started | |
@@ -360,6 +360,20 @@ printed matrices survive per family, verified by running `distinctness_star_patt
 assertion, not asked for by the phase, fails a curated family that ships fewer than two presets: that
 is the one way this advisory can go quiet without anyone noticing, and it is the staleness the list's
 own comment already records.
+
+**Phase 4 ships the key without its floor test, which moves to Phase 5.** The phase's done-when asks
+for both the key and a test asserting *"every family has at least two representatives"*, but no preset
+declares the key until Phase 5 seeds them — so that test is red at every commit between the two. The
+key, its parsing, its rejection of a non-boolean, the `build.rs` naming and both authoring docs land
+here; the floor test lands with the content that makes it pass. Nothing is dropped and the phase
+boundary is where it was; only that one assertion crosses it.
+
+**The sample is selected by a marker in the test NAME.** nextest predicates match binaries and test
+names and cannot read a `.toml`, so a representative's generated tests are named `<sweep>_rep_<stem>`
+and a static `.config/nextest.toml` filter can select them. The cost, stated in `presets/README.md`:
+flipping the flag renames that preset's tests. This is also what ADR-0073 rules out when it says
+*"sampling cannot be a nextest filter"* — that was written when the sweeps were roster loops, and
+splitting them is what makes a filter possible at all.
 
 **A counting trap worth recording, because it nearly entered these numbers.** `grep -c '^system'`
 over `presets/*.toml` returns **85** for 81 files: `fragment_interferencemono`, `fragment_nebula`,

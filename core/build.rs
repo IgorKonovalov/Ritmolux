@@ -79,9 +79,21 @@ fn main() {
     let roster = roster(&presets_dir, &files);
 
     // Per preset: the sweeps whose claim is about one preset on its own.
+    //
+    // A representative's test carries a `rep_` marker in its NAME, which is what
+    // lets a static `.config/nextest.toml` filter select the sample: nextest
+    // predicates match binaries and test names and cannot read a `.toml`. The
+    // cost is that flipping `representative` renames a test.
     let per_preset: Vec<(String, String)> = roster
         .iter()
-        .map(|(stem, name, _)| (stem.clone(), name.clone()))
+        .map(|(stem, name, _, representative)| {
+            let id = if *representative {
+                format!("rep_{stem}")
+            } else {
+                stem.clone()
+            };
+            (id, name.clone())
+        })
         .collect();
     emit_sweep(
         &out_dir,
@@ -118,7 +130,8 @@ fn main() {
     );
 }
 
-/// `(stem, display name, system)` for every shipped preset, in `files` order.
+/// `(stem, display name, system, representative)` for every shipped preset, in
+/// `files` order.
 ///
 /// The **stem** is the `.toml` filename without its extension: unique by
 /// construction, already ident-shaped, and the handle `-E test(...)` selects on.
@@ -126,8 +139,10 @@ fn main() {
 /// renderer's roster is keyed by and what a per-preset test hands its helper —
 /// the two differ for every shipped preset (`attractor_leviathan` /
 /// `Leviathan`), so neither can stand in for the other. The **system** is the
-/// family label, which a per-family test hands its helper instead.
-fn roster(presets_dir: &Path, files: &[String]) -> Vec<(String, String, String)> {
+/// family label, which a per-family test hands its helper instead. The
+/// **representative** flag marks the sample the per-phase tier renders
+/// (ADR-0157) and is absent from all but a curated few.
+fn roster(presets_dir: &Path, files: &[String]) -> Vec<(String, String, String, bool)> {
     files
         .iter()
         .map(|file| {
@@ -140,6 +155,7 @@ fn roster(presets_dir: &Path, files: &[String]) -> Vec<(String, String, String)>
                 ident(stem),
                 preamble_string(&src, "name", file),
                 preamble_string(&src, "system", file),
+                preamble_bool(&src, "representative"),
             )
         })
         .collect()
@@ -151,8 +167,8 @@ fn roster(presets_dir: &Path, files: &[String]) -> Vec<(String, String, String)>
 /// glob exists at all: a family with no shipped preset would generate a test
 /// that measures an empty set and passes, and a family added to the library
 /// gets its test without anyone editing a list.
-fn families(roster: &[(String, String, String)]) -> Vec<(String, String)> {
-    let mut labels: Vec<String> = roster.iter().map(|(_, _, sys)| sys.clone()).collect();
+fn families(roster: &[(String, String, String, bool)]) -> Vec<(String, String)> {
+    let mut labels: Vec<String> = roster.iter().map(|(_, _, sys, _)| sys.clone()).collect();
     labels.sort();
     labels.dedup();
     labels
@@ -201,6 +217,37 @@ fn preamble_string(src: &str, key: &str, file: &str) -> String {
         return value.to_string();
     }
     panic!("preset {file}: no top-level `{key} = \"...\"` before the first [section]");
+}
+
+/// A preset's top-level `key = true|false`, defaulting to `false` when absent.
+///
+/// The same preamble scan as [`preamble_string`] and the same trap — the `=` is
+/// required after the trim so `key_of_thing` cannot prefix-match. Unlike that
+/// function an absent key is not an error, because the overwhelming majority of
+/// presets do not carry this one. A present key with a non-boolean value fails
+/// the build here rather than being silently read as `false`, which would drop a
+/// preset out of the sample without saying so.
+fn preamble_bool(src: &str, key: &str) -> bool {
+    for line in src.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            break;
+        }
+        let Some(rest) = line
+            .strip_prefix(key)
+            .map(str::trim_start)
+            .and_then(|r| r.strip_prefix('='))
+            .map(str::trim)
+        else {
+            continue;
+        };
+        return match rest {
+            "true" => true,
+            "false" => false,
+            other => panic!("`{key}` must be `true` or `false`, got `{other}`"),
+        };
+    }
+    false
 }
 
 /// Lowercase the stem into something that is certainly a Rust identifier.
