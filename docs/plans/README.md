@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0145** (ADRs are a separate sequence — next free there is **0156**.)
+**Next free number: 0146** (ADRs are a separate sequence — next free there is **0157**.)
 
 ## Active roster
 
@@ -29,7 +29,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. |
-| [0125](0125-the-scenes-share-their-gpu-boilerplate.md) | The scenes share their GPU boilerplate | approved | dev | Second of three. Five helpers retire ~800-1000 pasted lines across 12 scenes, one per phase, **golden-identical unblessed on both adapters at every commit**. ADR-0058 constrains it. |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
@@ -42,6 +41,7 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
 | [0144](0144-the-flags-mean-what-they-say.md) | The flags mean what they say | draft | dev | Backlog 0167 + 0168 + 0169. ADR-0155 (proposed): four `--stream` flags get refused, `--gpu` and `--preset` reach the window. Phase 2 makes an on-device checklist line false — rewrite it there. |
+| [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) | The per-phase gate stops paying for the preset library | draft | dev | ADR-0156 (proposed): narrowed per phase, full suite once at the last phase. Touches both skills. **Land it before the queue above pays the old gate again.** |
 <!-- roster:end -->
 
 **Added 2026-08-19, from a MilkDrop backlog round after
@@ -171,7 +171,8 @@ claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; thre
   measurable for the first time, using the level statistic [0137] adds.
 - **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
   GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
-- **[0140] contends with [0125]** (all twelve scenes' boilerplate) and edits five of them. Series.
+- **[0140]'s contention with [0125] is discharged — 0125 closed 2026-08-31.** It still edits five
+  scenes, whose rate params now sit beside `scenes::common`'s colour and framing blocks.
 - **Declined, and the record is the reason.** Backlog 0038 is routed to `preset-author` as a content
   pass — *"no engine change and no ADR"* — and is §4 of `content-brief.md`. Backlog 0075's remaining
   half is ADR-0102, **proposed with no plan by the user's call**, holding until a look asks for the
@@ -241,9 +242,9 @@ functional candidates the round surfaced (backlog 0042's bar gate, 0126's per-tr
   [0128] is what is left of this pair. 0127's Phase 3 capture also left a number 0128 does not need
   but the next `warp_mesh` plan will: the reference draws a unit-scale mode-6 trace at 0.316 frame
   heights against our 0.3019, which is [backlog 0120](../design-backlog.md)'s whole remaining gap.
-- **Neither waits on [0124]/[0125]/[0126].** 0125 retires GPU boilerplate across the 12 scenes and
-  0126 splits large files; if those are in flight, expect merge contention in
-  `core/src/render/scenes/particles/` (0128) and none in `core/src/dsp/` (0127).
+- **Neither waits on [0124]/[0125]/[0126], and two of the three have closed.** 0125 retired the GPU
+  boilerplate across the 12 scenes on 2026-08-31, so [0128]'s `core/src/render/scenes/particles/`
+  contention is now only with 0126's file splits.
 
 **[0129](done/0129-the-build-stops-being-paid-three-times.md) closed 2026-08-29, and every plan on
 this roster is the beneficiary.** A lane that has never built now compiles **3 workspace crates in
@@ -332,7 +333,7 @@ would revert most quietly.
 
 **Added 2026-08-28, from a whole-codebase review (layering, god modules, hot-path safety, doc
 drift): [0124](done/0124-the-review-fixes-that-move-no-pixels.md) →
-[0125](0125-the-scenes-share-their-gpu-boilerplate.md) →
+[0125](done/0125-the-scenes-share-their-gpu-boilerplate.md) →
 [0126](0126-the-large-files-split-along-their-seams.md), in that order and not in parallel.** The
 review found no blocker — layering, the audio callbacks, the C ABI and determinism all came back
 clean — so these are a maintenance lane, not a feature one, and they **interleave with the roster
@@ -342,8 +343,11 @@ ordered so each inherits the previous one's instrument — 0124's harness and wi
 0125's helpers, then 0126's splits of the now-smaller files. Every phase in all three is
 golden-identical unblessed; a bless anywhere in this lane is a finding.
 
-**[0124] closed 2026-08-30, so 0125 is next in this lane and its instrument is live.** Two things
-0125 and 0126 inherit that are not what the plan promised. `core/tests/common/` holds the ADR-0016
+**[0124] closed 2026-08-30 and [0125] closed 2026-08-31, so 0126 is next in this lane and both
+instruments ahead of it are live.** 0125 landed with **nothing blessed** anywhere across its five
+phases, which is the property this lane's ordering exists to protect — 0126's splits are pure moves
+and inherit the same rule. Two things 0126 still inherits that are not what the plan promised.
+`core/tests/common/` holds the ADR-0016
 skip once, but **eleven** files still carry an inline copy inside a bespoke `capture_at`-shaped
 function (`arc_cost`, `attractor`, `backdrop_palette`, `backdrop_ramp`, `background_composite`,
 `beat`, `collage_cost`, `field_cost`, `mark_cost`, `palette_contour`, `reaction_diffusion`) — so a
@@ -961,6 +965,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0125 - The scenes share their GPU boilerplate](done/0125-the-scenes-share-their-gpu-boilerplate.md) - closed 2026-08-31. Review: **no blockers, no majors, four minors, four nits.** Version: **0.96.0** (minor). Nothing blessed. Repaired [backlog 0146](../design-backlog.md). [Write-up](README-archive.md).
 - [0124 - The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md) - closed 2026-08-30. Review: **no blockers, one major, five minors, two nits.** Version: **0.95.1** (patch). Filed [backlog 0168 + 0169](../design-backlog.md). [Write-up](README-archive.md).
 - [0135 - The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md) - closed 2026-08-30. Review: **no blockers, one major, five minors.** Version: **0.95.0**. Archived [backlog 0155 + 0156 + 0159](../design-backlog-archive.md). Phase 5 carried - see Standing. [Write-up](README-archive.md).
 - [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md) - closed 2026-08-30. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Revoked ADR-0141's store half. [Write-up](README-archive.md).
@@ -1156,7 +1161,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: done/0124-the-review-fixes-that-move-no-pixels.md
-[0125]: 0125-the-scenes-share-their-gpu-boilerplate.md
+[0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md

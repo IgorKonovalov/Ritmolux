@@ -65,6 +65,7 @@ use crate::render::feedback::PingPongField;
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
+use super::common;
 use super::{Phase, Scene, lines};
 
 /// The smallest grid a `[mesh]` table may name, in cells. Below two the mesh is
@@ -316,8 +317,6 @@ const DARKEN_CENTER_STRENGTH: f32 = 0.22;
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_COLOR_SPAN: f32 = 1.0;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
@@ -895,8 +894,10 @@ struct Resources {
     /// How many indices the current mesh draws, and the grid they were built for.
     index_count: u32,
     mesh: (u32, u32),
-    lut_texture_a: wgpu::Texture,
-    lut_texture_b: wgpu::Texture,
+    /// The shared gradient LUT pair (A/B) the deposit pass samples + crossfades
+    /// (ADR-0021). A fresh pair is dirty, so a (re)build uploads on its first
+    /// frame; a preset switch re-`set`s it through the scene's `set_palette`.
+    luts: palette::LutPair,
     /// The draw layer's own line renderer (Plan 0100 Phase 4).
     ///
     /// **Its own, not the roster's shared one**, for the reason
@@ -1076,17 +1077,15 @@ pub struct WarpMeshScene {
     echo_alpha: f32,
     echo_zoom: f32,
     echo_orient: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021). This scene has no `pan_*`.
+    colour: common::PaletteParams,
     color_span: f32,
     color_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    palette_steps: f32,
-    palette_contour: f32,
-    brightness: f32,
     occlude: f32,
+    /// The active baked palette. Held here rather than only in the resources'
+    /// [`palette::LutPair`] because the resources are rebuilt on a resize and
+    /// built lazily: this is what seeds a fresh pair.
     palette: Palette,
-    palette_dirty: bool,
     /// The converted MilkDrop preset's live EEL2 state, when the preset carries a
     /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a hand-authored
     /// preset — executes no VM at all, so the ten native systems and a native
@@ -1190,17 +1189,11 @@ impl WarpMeshScene {
             echo_alpha: DEFAULT_ECHO_ALPHA,
             echo_zoom: DEFAULT_ECHO_ZOOM,
             echo_orient: DEFAULT_ECHO_ORIENT,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
-            brightness: DEFAULT_BRIGHTNESS,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
             milk: None,
             shader_spec: None,
             quantize_steps: 0.0,
@@ -1262,24 +1255,21 @@ impl Resources {
 
         let field = PingPongField::new(device, size.0.max(1), size.1.max(1));
 
-        let warp_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-warp-uniform"),
-            size: std::mem::size_of::<WarpUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let deposit_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-deposit-uniform"),
-            size: std::mem::size_of::<DepositUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let present_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-present-uniform"),
-            size: std::mem::size_of::<PresentUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let warp_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-warp-uniform",
+            std::mem::size_of::<WarpUniform>(),
+        );
+        let deposit_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-deposit-uniform",
+            std::mem::size_of::<DepositUniform>(),
+        );
+        let present_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-present-uniform",
+            std::mem::size_of::<PresentUniform>(),
+        );
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("warp-mesh-sampler"),
@@ -1381,11 +1371,7 @@ impl Resources {
         });
 
         // --- deposit pass ---
-        let lut_texture_a = palette::lut_texture(device, "warp-mesh-lut-a");
-        let lut_texture_b = palette::lut_texture(device, "warp-mesh-lut-b");
-        let lut_view_a = lut_texture_a.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_view_b = lut_texture_b.create_view(&wgpu::TextureViewDescriptor::default());
-        let lut_sampler = palette::lut_sampler(device);
+        let luts = palette::LutPair::new(device, "warp-mesh");
         // The uniform sits **last** and declares a size, which is what keeps this
         // shape off `blend-bind-layout`'s `[Uniform+size, Texture, Texture,
         // Sampler]` and off `shape-field-bind-layout`'s (ADR-0058). Do not tidy
@@ -1414,24 +1400,18 @@ impl Resources {
         let deposit_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("warp-mesh-deposit-bg"),
             layout: &deposit_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_a),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&lut_view_b),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&lut_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: deposit_uniform.as_entire_binding(),
-                },
-            ],
+            entries: &{
+                let [lut_a, lut_b, lut_sampler] = luts.bind_entries(0, 1, 2);
+                [
+                    lut_a,
+                    lut_b,
+                    lut_sampler,
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: deposit_uniform.as_entire_binding(),
+                    },
+                ]
+            },
         });
         let deposit_pipeline = gpu::fullscreen_pipeline(
             device,
@@ -1509,12 +1489,11 @@ impl Resources {
             label: Some("warp-mesh-shape-shader"),
             source: wgpu::ShaderSource::Wgsl(SHAPE_SHADER.into()),
         });
-        let shape_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-shape-uniform"),
-            size: std::mem::size_of::<ShapeUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let shape_uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-shape-uniform",
+            std::mem::size_of::<ShapeUniform>(),
+        );
         // A vertex-visible sized uniform, which is a shape nothing else in
         // `core/src` holds (ADR-0058): `swarm-bind-layout` is the same kind and
         // visibility with **no** declared size, and that difference is exactly
@@ -1649,8 +1628,7 @@ impl Resources {
             indices,
             index_count: indices_data.len() as u32,
             mesh,
-            lut_texture_a,
-            lut_texture_b,
+            luts,
             lines,
             shape_pipeline,
             shape_over_pipeline,
@@ -1669,22 +1647,12 @@ impl Resources {
     /// very first frame.
     fn encode_clear(&self, encoder: &mut wgpu::CommandEncoder) {
         for view in [self.field.view_a(), self.field.view_b()] {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-field-clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            gpu::color_pass(
+                encoder,
+                "warp-mesh-field-clear",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
         }
     }
 }
@@ -1725,7 +1693,9 @@ impl Scene for WarpMeshScene {
 
     fn set_palette(&mut self, palette: &Palette) {
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.luts.set(palette);
+        }
     }
 
     fn configure(&mut self, cfg: &super::GeneratorConfig) -> Option<super::CapOverflow> {
@@ -1793,17 +1763,17 @@ impl Scene for WarpMeshScene {
         self.echo_alpha = DEFAULT_ECHO_ALPHA;
         self.echo_zoom = DEFAULT_ECHO_ZOOM;
         self.echo_orient = DEFAULT_ECHO_ORIENT;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
-        self.brightness = DEFAULT_BRIGHTNESS;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) {
+            return;
+        }
         // The nine per-vertex outputs, as whole-mesh scalars — the fallback a
         // `[per_vertex]` binding of the same name overrides.
         if let Some(index) = PER_VERTEX_PARAMS.iter().position(|n| *n == name) {
@@ -1834,14 +1804,8 @@ impl Scene for WarpMeshScene {
             "echo_alpha" => self.echo_alpha = value,
             "echo_zoom" => self.echo_zoom = value,
             "echo_orient" => self.echo_orient = value,
-            "hue" => self.hue = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
-            "brightness" => self.brightness = value,
             _ => {}
         }
     }
@@ -1948,7 +1912,7 @@ impl Scene for WarpMeshScene {
             }
         };
         if stale {
-            self.res = Some(Resources::build(
+            let mut built = Resources::build(
                 &self.device,
                 queue,
                 self.surface_format,
@@ -1957,8 +1921,11 @@ impl Scene for WarpMeshScene {
                 self.max_segments,
                 self.shader_spec.as_ref(),
                 shader_key,
-            ));
-            self.palette_dirty = true;
+            );
+            // A fresh pair's textures are empty and hold the default palette;
+            // hand it the one the scene is actually carrying.
+            built.luts.set(&self.palette);
+            self.res = Some(built);
         }
         let Some(res) = self.res.as_mut() else {
             return;
@@ -1978,11 +1945,7 @@ impl Scene for WarpMeshScene {
             );
             res.needs_clear = false;
         }
-        if self.palette_dirty {
-            palette::write_lut(queue, &res.lut_texture_a, &self.palette.lut_a_bytes());
-            palette::write_lut(queue, &res.lut_texture_b, &self.palette.lut_b_bytes());
-            self.palette_dirty = false;
-        }
+        res.luts.flush(queue);
 
         self.last_aspect = aspect;
         // A converted preset's per-vertex program, evaluated over the whole grid
@@ -2060,14 +2023,14 @@ impl Scene for WarpMeshScene {
                 ],
                 c: [
                     self.deposit_phase.get(),
-                    self.hue + self.color_center,
+                    self.colour.hue + self.color_center,
                     self.color_span,
-                    self.saturation,
+                    self.colour.saturation,
                 ],
                 d: [
-                    self.palette_mix,
-                    palette::band_steps(self.palette_steps),
-                    palette::band_contour(self.palette_contour),
+                    self.colour.mix,
+                    palette::band_steps(self.colour.steps),
+                    palette::band_contour(self.colour.contour),
                     0.0,
                 ],
             }),
@@ -2076,7 +2039,7 @@ impl Scene for WarpMeshScene {
             &res.present_uniform,
             0,
             bytemuck::bytes_of(&PresentUniform {
-                a: [self.brightness, self.occlude, self.gamma, 0.0],
+                a: [self.colour.brightness, self.occlude, self.gamma, 0.0],
                 b: [
                     f32::from(self.brighten >= 0.5),
                     f32::from(self.darken >= 0.5),
@@ -2121,7 +2084,7 @@ impl Scene for WarpMeshScene {
                     size,
                     aspect,
                     self.decay,
-                    self.brightness,
+                    self.colour.brightness,
                     self.occlude,
                     self.quantize_steps,
                 )),
@@ -2135,26 +2098,15 @@ impl Scene for WarpMeshScene {
             &res.warp_bg_b
         };
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-warp-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: res.field.write_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        // The mesh covers the whole target, but clearing first
-                        // makes the pass independent of what the buffer held two
-                        // frames ago — which is what keeps a capture a pure
-                        // function of its inputs.
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            // The mesh covers the whole target, but clearing first makes the
+            // pass independent of what the buffer held two frames ago — which
+            // is what keeps a capture a pure function of its inputs.
+            let mut pass = gpu::color_pass(
+                encoder,
+                "warp-mesh-warp-pass",
+                res.field.write_view(),
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
             // A converted warp shader replaces the built-in decay fragment; the
             // vertex stage — the mesh transform — is shared, so `uv` reaching
             // the custom fragment is exactly the warped source uv (Phase 6).
@@ -2186,22 +2138,12 @@ impl Scene for WarpMeshScene {
 
         // --- deposit: this frame's light, onto the warped past ---
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-deposit-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: res.field.write_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            let mut pass = gpu::color_pass(
+                encoder,
+                "warp-mesh-deposit-pass",
+                res.field.write_view(),
+                wgpu::LoadOp::Load,
+            );
             pass.set_pipeline(&res.deposit_pipeline);
             pass.set_bind_group(0, &res.deposit_bg, &[]);
             pass.draw(0..3, 0..1);
@@ -2235,22 +2177,12 @@ impl Scene for WarpMeshScene {
                         v: [aspect, 0.0, 0.0, 0.0],
                     }),
                 );
-                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("warp-mesh-shape-pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: res.field.write_view(),
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
+                let mut pass = gpu::color_pass(
+                    encoder,
+                    "warp-mesh-shape-pass",
+                    res.field.write_view(),
+                    wgpu::LoadOp::Load,
+                );
                 // Two draws over one buffer, split at the partition the draw
                 // layer built: additive instances first, then the over-blended
                 // ones on top of them. See `draw`'s module docs for why both
@@ -2315,22 +2247,7 @@ impl Scene for WarpMeshScene {
         } else {
             &res.present_bg_b
         };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("warp-mesh-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "warp-mesh-present-pass", view, wgpu::LoadOp::Load);
         // A converted comp shader replaces the built-in remap stack whole — it
         // *is* MilkDrop's composite, gamma and echo and all, in the preset's
         // own arithmetic.

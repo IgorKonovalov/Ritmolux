@@ -8,6 +8,7 @@
 
 use super::super::ViewTransform;
 use super::{DrawExtent, SegmentInstance, measure_extent};
+use crate::render::gpu;
 
 /// A segment with everything but its endpoints held constant — colour, width
 /// and the join flags are not part of this measurement (it is length, not
@@ -923,22 +924,12 @@ fn arc_capture(
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("arc-control"),
         });
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("arc-control-clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    gpu::color_pass(
+        &mut encoder,
+        "arc-control-clear",
+        &view,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
 
     let mut renderer = if arc_capacity > 0 {
         super::LineRenderer::new_with_arcs(
@@ -1452,22 +1443,12 @@ fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("overlap-capture"),
         });
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("overlap-clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    gpu::color_pass(
+        &mut encoder,
+        "overlap-clear",
+        &view,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
 
     // Two fat strokes crossing at the centre, wide enough that the overlap has a
     // real interior rather than only the coverage ramps of two edges. Red first,
@@ -1650,22 +1631,12 @@ fn profile_capture(
         });
     // The line pass loads rather than clears (the background pass owns the clear
     // in the shipped chain), so clear this target once here.
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("profile-clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    gpu::color_pass(
+        &mut encoder,
+        "profile-clear",
+        &view,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
 
     let mut renderer =
         super::LineRenderer::new(&ctx.device, FORMAT, segments.len().max(1), "profile");

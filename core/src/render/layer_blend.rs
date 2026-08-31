@@ -281,22 +281,7 @@ impl LayerBlendPass {
                 q: [0.0; 4],
             }),
         );
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("layer-blend-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: out,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: fold.load_op(),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "layer-blend-pass", out, fold.load_op());
         pass.set_pipeline(&pipeline.pipeline);
         pass.set_bind_group(0, &targets.bind_group, &[]);
         pass.draw(0..3, 0..1);
@@ -331,12 +316,11 @@ impl Pipeline {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("layer-blend-uniform"),
-            size: std::mem::size_of::<LayerBlendUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniform = gpu::uniform_buffer(
+            device,
+            "layer-blend-uniform",
+            std::mem::size_of::<LayerBlendUniform>(),
+        );
         let shader = gpu::fullscreen_shader(
             device,
             "layer-blend-shader",

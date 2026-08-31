@@ -79,6 +79,7 @@ use crate::render::gpu;
 
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
+use super::common;
 use super::{Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
@@ -221,12 +222,9 @@ const MAX_PERSPECTIVE: f32 = 0.8;
 // jitter — so an unbound attractor is unchanged (`saturation = 1`, `mix = 0`).
 const DEFAULT_HUE_SPREAD: f32 = 0.15;
 const DEFAULT_HUE_CENTER: f32 = 0.075;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// View transform defaults (ADR-0018): identity — `zoom` = 1 unscaled, `pan` = 0
 /// unshifted, so an unbound preset is byte-unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 /// Trail persistence: the fraction of the accumulation retained per 1/60 s frame.
 /// ~0.94 gives glowing trails that fade over ~1 s; `fade = 0` clears each frame
 /// (trail-free). Applied frame-rate-independently (raised to the `dt`-relative
@@ -715,14 +713,10 @@ pub struct AttractorScene {
     c: f32,
     d: f32,
     size: f32,
-    hue: f32,
-    /// Scene-local level (ADR-0080): a multiplier on the per-particle additive
-    /// deposit, which [`deposit_scale`] has already normalized by the particle
-    /// count. So it composes with `density` instead of fighting it, and — being a
-    /// property of the pixels this scene lays down — it blends across a dissolve
-    /// the way the picture does, which the engine-wide `exposure` a preset might
-    /// reach for instead does not.
-    brightness: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     fade: f32,
     /// How much of this cloud's coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
@@ -746,18 +740,9 @@ pub struct AttractorScene {
     /// seed jitter band + shared desaturation + A/B crossfade.
     hue_spread: f32,
     hue_center: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     /// Shared view transform (ADR-0018 / Plan 0025 Phase 4): `zoom` scales the
     /// projected cloud about the screen centre, `pan_*` offsets it.
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     /// Perspective strength (ADR-0076): the figure's depth half-extent as a
     /// fraction of the camera distance, clamped to [`MAX_PERSPECTIVE`] where the
     /// uniform is packed. `0` is the orthographic projection this scene shipped
@@ -822,10 +807,10 @@ pub struct AttractorScene {
     /// `perspective`, `depth_fade` and `depth_hue` reach two. That asymmetry is
     /// deliberate — an in-plane spin is a real look on De Jong today.
     spin: f32,
-    /// The active baked palette pair; uploaded to the draw LUT textures when
-    /// `palette_dirty` (a preset switch or a resource rebuild), off the hot path.
+    /// The active baked palette. Held here rather than only in the pipelines'
+    /// [`palette::LutPair`] because the resources build lazily: `set_palette` can
+    /// arrive with `res` still `None`, and this is what seeds the pair.
     palette: Palette,
-    palette_dirty: bool,
     /// This frame's `reseed` level (bound to a beat/onset expression); its rising
     /// edge disturbs the cloud in place (ADR-0066).
     reseed: f32,
@@ -889,21 +874,15 @@ impl AttractorScene {
             c,
             d,
             size: DEFAULT_SIZE,
-            hue: DEFAULT_HUE,
-            brightness: DEFAULT_BRIGHTNESS,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             fade: DEFAULT_FADE,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             feedback_transform: feedback::Transform::IDENTITY,
             feedback: FeedbackConfig::default(),
             hue_spread: DEFAULT_HUE_SPREAD,
             hue_center: DEFAULT_HUE_CENTER,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             perspective: DEFAULT_PERSPECTIVE,
             depth_fade: DEFAULT_DEPTH_FADE,
             depth_hue: DEFAULT_DEPTH_HUE,
@@ -914,7 +893,6 @@ impl AttractorScene {
             emergence: DEFAULT_EMERGENCE,
             spin: DEFAULT_SPIN,
             palette: Palette::default_spectrum(),
-            palette_dirty: true,
             reseed: 0.0,
             prev_reseed: 0.0,
         }
@@ -955,18 +933,20 @@ impl AttractorScene {
                 res
             }
             None => {
-                // First build: the LUT textures are fresh, so the palette needs its
-                // one upload, and the particle buffer has never been written — this
-                // is the arm the seed upload belongs to.
-                self.palette_dirty = true;
+                // First build: the LUT pair is fresh and holds the default palette,
+                // so hand it the one the scene is carrying, and the particle buffer
+                // has never been written — this is the arm the seed upload belongs
+                // to.
                 self.needs_upload = true;
-                Resources::build(
+                let mut built = Resources::build(
                     &self.device,
                     self.surface_format,
                     self.trail_w,
                     self.trail_h,
                     self.particle_count,
-                )
+                );
+                built.pipelines.luts.set(&self.palette);
+                built
             }
         };
         self.res = Some(res);
@@ -1353,7 +1333,9 @@ impl Scene for AttractorScene {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
         // lazily on first render). Cheap array copy, off the hot path.
         self.palette = palette.clone();
-        self.palette_dirty = true;
+        if let Some(res) = self.res.as_mut() {
+            res.pipelines.luts.set(palette);
+        }
     }
 
     fn reset_params(&mut self) {
@@ -1367,18 +1349,12 @@ impl Scene for AttractorScene {
         self.c = c;
         self.d = d;
         self.size = DEFAULT_SIZE;
-        self.hue = DEFAULT_HUE;
-        self.brightness = DEFAULT_BRIGHTNESS;
+        self.colour.reset();
+        self.pan.reset();
         self.fade = DEFAULT_FADE;
         self.hue_spread = DEFAULT_HUE_SPREAD;
         self.hue_center = DEFAULT_HUE_CENTER;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.perspective = DEFAULT_PERSPECTIVE;
         self.depth_fade = DEFAULT_DEPTH_FADE;
         self.depth_hue = DEFAULT_DEPTH_HUE;
@@ -1396,6 +1372,11 @@ impl Scene for AttractorScene {
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "a" => self.a = value,
             "b" => self.b = value,
@@ -1405,18 +1386,10 @@ impl Scene for AttractorScene {
             // this frame has been routed — see the field's doc comment.
             "tuple" => self.tuple = value,
             "size" => self.size = value,
-            "hue" => self.hue = value,
-            "brightness" => self.brightness = value,
             "fade" => self.fade = value,
             "hue_spread" => self.hue_spread = value,
             "hue_center" => self.hue_center = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "perspective" => self.perspective = value,
             "depth_fade" => self.depth_fade = value,
             "depth_hue" => self.depth_hue = value,
@@ -1646,20 +1619,15 @@ impl Scene for AttractorScene {
             c,
             d,
             size,
-            hue,
-            brightness,
+            colour,
             fade,
             occlude,
             feedback_transform,
             feedback,
             hue_spread,
             hue_center,
-            saturation,
-            palette_mix,
-            palette_steps,
             zoom,
-            pan_x,
-            pan_y,
+            pan,
             perspective,
             depth_fade,
             depth_hue,
@@ -1668,8 +1636,6 @@ impl Scene for AttractorScene {
             root_tint,
             root_hue,
             emergence,
-            palette,
-            palette_dirty,
             ..
         } = self;
         let Some(Resources { pipelines, grid }) = res.as_mut() else {
@@ -1682,8 +1648,6 @@ impl Scene for AttractorScene {
             pipelines,
             grid,
             seed_particles,
-            palette,
-            palette_dirty,
             needs_clear,
             needs_upload,
         );
@@ -1713,19 +1677,19 @@ impl Scene for AttractorScene {
                 // being re-framed back to a net zero.
                 ifs_frame: ifs_fit.as_ref().map(|fit| fit.sample(*morph)),
                 size: *size,
-                hue: *hue,
-                brightness: *brightness,
+                hue: colour.hue,
+                brightness: colour.brightness,
                 fade: *fade,
                 occlude: *occlude,
                 feedback_transform: *feedback_transform,
                 feedback: *feedback,
                 hue_spread: *hue_spread,
                 hue_center: *hue_center,
-                saturation: *saturation,
-                palette_mix: *palette_mix,
-                palette_steps: *palette_steps,
+                saturation: colour.saturation,
+                palette_mix: colour.mix,
+                palette_steps: colour.steps,
                 zoom: *zoom,
-                pan: [*pan_x, *pan_y],
+                pan: [pan.x, pan.y],
                 perspective: *perspective,
                 depth_fade: *depth_fade,
                 depth_hue: *depth_hue,

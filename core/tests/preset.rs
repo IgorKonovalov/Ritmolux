@@ -1348,6 +1348,26 @@ fn params_declared_in(text: &str) -> Vec<String> {
     names
 }
 
+/// The colour and framing names every scene **delegates** to
+/// `render::scenes::common` instead of matching itself.
+///
+/// Invisible to the source-text scan below for the same reason the `fb_*` seven
+/// are, and replaced by the same two-part coverage: `common`'s own
+/// `each_block_answers_exactly_its_roster` and
+/// `every_system_that_declares_a_shared_name_uses_the_shared_spelling`, plus the
+/// check right here that a file declaring one of these names actually carries the
+/// delegation. Kept as a literal list rather than reaching into the crate because
+/// this is an integration test and `scenes::common` is `pub(crate)`.
+const PALETTE_BLOCK: &[&str] = &[
+    "palette_mix",
+    "palette_steps",
+    "palette_contour",
+    "saturation",
+    "hue",
+    "brightness",
+];
+const PAN_BLOCK: &[&str] = &["pan_x", "pan_y"];
+
 /// Drift guard (ADR-0020's flagged risk): each declared `PARAMS` list must be
 /// exactly the set of names its `set_param` match handles. The two sit side by
 /// side in the source, so this compares them by scanning it — which covers the
@@ -1485,10 +1505,34 @@ fn declared_params_match_set_param() {
         // replaces it is `feedback.rs`'s
         // `both_sinks_declare_exactly_the_shared_fb_vocabulary`, which asserts the
         // same property programmatically and across both sinks at once.
+        // The eight shared colour/framing names are invisible to this scan for
+        // the same reason: every scene delegates them to `scenes::common`. What
+        // replaces the coverage is the pair of assertions below — a file that
+        // declares one of them must carry the delegation — plus that module's own
+        // roster tests.
+        if declared.iter().any(|name| PALETTE_BLOCK.contains(name)) {
+            assert!(
+                text.contains("self.colour.set(name, value)"),
+                "{}: declares one of `scenes::common`'s palette names but does                  not delegate to `self.colour.set(name, value)`, so the name is                  declared and answered by nothing",
+                file.display(),
+            );
+        }
+        if declared.iter().any(|name| PAN_BLOCK.contains(name)) {
+            assert!(
+                text.contains("self.pan.set(name, value)"),
+                "{}: declares `pan_x`/`pan_y` but does not delegate to                  `self.pan.set(name, value)`, so the name is declared and                  answered by nothing",
+                file.display(),
+            );
+        }
+
         let mut declared_sorted: Vec<&str> = declared
             .iter()
             .copied()
-            .filter(|name| !name.starts_with("fb_"))
+            .filter(|name| {
+                !name.starts_with("fb_")
+                    && !PALETTE_BLOCK.contains(name)
+                    && !PAN_BLOCK.contains(name)
+            })
             .collect();
         declared_sorted.sort_unstable();
         let mut handled_sorted: Vec<String> = handled.clone();

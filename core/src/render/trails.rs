@@ -255,12 +255,8 @@ impl Resources {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-        let feedback_uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("trails-feedback"),
-            size: std::mem::size_of::<Feedback>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let feedback_uniform =
+            gpu::uniform_buffer(device, "trails-feedback", std::mem::size_of::<Feedback>());
 
         // ADR-0048's transform, concatenated in rather than written here: this
         // is the same WGSL the attractor's trail blit compiles, so the two sinks
@@ -388,27 +384,17 @@ impl Resources {
     /// defined (black) trail rather than undefined texels.
     fn clear_accum(&self, encoder: &mut wgpu::CommandEncoder) {
         for view in [self.accum.view_a(), self.accum.view_b()] {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("trails-clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        // TRANSPARENT, not BLACK (ADR-0055). The accumulation is
-                        // premultiplied and the feedback pass takes `max(cur, prev
-                        // * fade)` on all four channels — a fresh field cleared
-                        // opaque would start every pixel at alpha 1 and hold the
-                        // backdrop out of the whole frame until it decayed away.
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            // TRANSPARENT, not BLACK (ADR-0055). The accumulation is
+            // premultiplied and the feedback pass takes `max(cur, prev * fade)`
+            // on all four channels — a fresh field cleared opaque would start
+            // every pixel at alpha 1 and hold the backdrop out of the whole
+            // frame until it decayed away.
+            gpu::color_pass(
+                encoder,
+                "trails-clear",
+                view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
         }
     }
 }
@@ -660,24 +646,14 @@ impl PostStage for Trails {
             (&res.trails_bg_b, res.accum.view_a())
         };
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("trails-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: write_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        // Fully covered by the draw below; transparent for
-                        // consistency with the accumulation's premultiplied model.
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            // Fully covered by the draw below; transparent for consistency with
+            // the accumulation's premultiplied model.
+            let mut pass = gpu::color_pass(
+                encoder,
+                "trails-pass",
+                write_view,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
             pass.set_pipeline(&res.trails_pipeline);
             pass.set_bind_group(0, trails_bg, &[]);
             pass.draw(0..3, 0..1);
@@ -690,22 +666,7 @@ impl PostStage for Trails {
         } else {
             &res.present_bg_b
         };
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("trails-present-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: out,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: fold.load_op(),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        let mut pass = gpu::color_pass(encoder, "trails-present-pass", out, fold.load_op());
         pass.set_pipeline(&res.present_pipeline);
         pass.set_bind_group(0, present_bg, &[]);
         pass.draw(0..3, 0..1);

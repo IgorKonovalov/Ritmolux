@@ -35,6 +35,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use super::super::common;
 use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
 use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
@@ -43,7 +44,7 @@ use super::{
     ViewTransform, curves, replicate_mirror,
 };
 use crate::dsp::AnalysisFrame;
-use crate::render::palette::{self, Palette};
+use crate::render::palette::Palette;
 
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = 6.0;
@@ -56,12 +57,11 @@ const DEFAULT_RADIAL_OFFSET: f32 = 0.0;
 const DEFAULT_SAMPLES: f32 = 361.0;
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
-/// Colour surface (ADR-0021 / ADR-0059), all three at the value that reproduces
-/// the single flat `hue` this scene drew before the palette reached it: no ramp
-/// along the path, palette A alone, unmodified saturation.
+/// Colour surface (ADR-0021 / ADR-0059), at the value that reproduces the single
+/// flat `hue` this scene drew before the palette reached it: no ramp along the path.
+/// The palette-A-alone and unmodified-saturation halves of that rest in
+/// `scenes::common`, which every system shares them with.
 const DEFAULT_HUE_SPREAD: f32 = 0.0;
-const DEFAULT_SATURATION: f32 = 1.0;
-const DEFAULT_PALETTE_MIX: f32 = 0.0;
 const DEFAULT_SPIN: f32 = 0.1;
 const DEFAULT_SCALE: f32 = 0.9;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
@@ -73,7 +73,6 @@ const DEFAULT_DRAW_PROGRESS: f32 = 1.0;
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_PAN: f32 = 0.0;
 // Geometry mirror (Phase 4): identity by default (one copy, no reflection).
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
@@ -135,18 +134,13 @@ pub struct ParametricCurveScene {
     radial_offset: f32,
     samples: f32,
     thickness: f32,
-    hue: f32,
+    /// The shared palette knobs (ADR-0021).
+    colour: common::PaletteParams,
+    /// The shared view transform (ADR-0018).
+    pan: common::PanParams,
     hue_spread: f32,
-    saturation: f32,
-    palette_mix: f32,
-    /// Hard palette bands and their contour (ADR-0078), raw as the preset
-    /// bound them -- `palette::band_steps` / `band_contour` condition them on
-    /// the way to the sample site.
-    palette_steps: f32,
-    palette_contour: f32,
     spin: f32,
     scale: f32,
-    brightness: f32,
     glow: f32,
     softness: f32,
     /// Whether this figure draws through the **opacity-preserving** seam
@@ -160,8 +154,6 @@ pub struct ParametricCurveScene {
     stroke_blend: f32,
     draw_progress: f32,
     zoom: f32,
-    pan_x: f32,
-    pan_y: f32,
     mirror_order: f32,
     mirror_reflect: f32,
 }
@@ -193,22 +185,16 @@ impl ParametricCurveScene {
             radial_offset: DEFAULT_RADIAL_OFFSET,
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
-            hue: DEFAULT_HUE,
+            colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
+            pan: common::PanParams::default(),
             hue_spread: DEFAULT_HUE_SPREAD,
-            saturation: DEFAULT_SATURATION,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            palette_contour: palette::DEFAULT_PALETTE_CONTOUR,
             spin: DEFAULT_SPIN,
             scale: DEFAULT_SCALE,
-            brightness: DEFAULT_BRIGHTNESS,
             glow: DEFAULT_GLOW,
             softness: super::DEFAULT_SOFTNESS,
             stroke_blend: super::ADDITIVE_BLEND,
             draw_progress: DEFAULT_DRAW_PROGRESS,
             zoom: DEFAULT_ZOOM,
-            pan_x: DEFAULT_PAN,
-            pan_y: DEFAULT_PAN,
             mirror_order: DEFAULT_MIRROR_ORDER,
             mirror_reflect: DEFAULT_MIRROR_REFLECT,
         }
@@ -352,27 +338,26 @@ impl Scene for ParametricCurveScene {
         self.radial_offset = DEFAULT_RADIAL_OFFSET;
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
-        self.hue = DEFAULT_HUE;
+        self.colour.reset();
+        self.pan.reset();
         self.hue_spread = DEFAULT_HUE_SPREAD;
-        self.saturation = DEFAULT_SATURATION;
-        self.palette_mix = DEFAULT_PALETTE_MIX;
-        self.palette_steps = palette::DEFAULT_PALETTE_STEPS;
-        self.palette_contour = palette::DEFAULT_PALETTE_CONTOUR;
         self.spin = DEFAULT_SPIN;
         self.scale = DEFAULT_SCALE;
-        self.brightness = DEFAULT_BRIGHTNESS;
         self.glow = DEFAULT_GLOW;
         self.softness = super::DEFAULT_SOFTNESS;
         self.stroke_blend = super::ADDITIVE_BLEND;
         self.draw_progress = DEFAULT_DRAW_PROGRESS;
         self.zoom = DEFAULT_ZOOM;
-        self.pan_x = DEFAULT_PAN;
-        self.pan_y = DEFAULT_PAN;
         self.mirror_order = DEFAULT_MIRROR_ORDER;
         self.mirror_reflect = DEFAULT_MIRROR_REFLECT;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
+        // The shared param blocks first, this scene's own names after
+        // (`scenes::common`).
+        if self.colour.set(name, value) || self.pan.set(name, value) {
+            return;
+        }
         match name {
             "n" => self.n = value,
             "d" => self.d = value,
@@ -380,22 +365,14 @@ impl Scene for ParametricCurveScene {
             "radial_offset" => self.radial_offset = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
-            "hue" => self.hue = value,
             "hue_spread" => self.hue_spread = value,
-            "saturation" => self.saturation = value,
-            "palette_mix" => self.palette_mix = value,
-            "palette_steps" => self.palette_steps = value,
-            "palette_contour" => self.palette_contour = value,
             "spin" => self.spin = value,
             "scale" => self.scale = value,
-            "brightness" => self.brightness = value,
             "glow" => self.glow = value,
             "softness" => self.softness = value,
             "stroke_blend" => self.stroke_blend = value,
             "draw_progress" => self.draw_progress = value,
             "zoom" => self.zoom = value,
-            "pan_x" => self.pan_x = value,
-            "pan_y" => self.pan_y = value,
             "mirror_order" => self.mirror_order = value,
             "mirror_reflect" => self.mirror_reflect = value,
             _ => {}
@@ -440,12 +417,12 @@ impl Scene for ParametricCurveScene {
         self.spin_phase.step(self.spin, self.dt);
         let rotation = self.spin_phase.get();
         let ramp = ColorRamp {
-            hue: self.hue,
+            hue: self.colour.hue,
             hue_spread: self.hue_spread,
-            palette_mix: self.palette_mix,
-            palette_steps: self.palette_steps,
-            saturation: self.saturation,
-            brightness: self.brightness,
+            palette_mix: self.colour.mix,
+            palette_steps: self.colour.steps,
+            saturation: self.colour.saturation,
+            brightness: self.colour.brightness,
         };
         // The sampler paints the whole web in the walk's starting colour; the
         // pass below walks it along the path. Keeping the sampler colour-agnostic
@@ -539,7 +516,7 @@ impl Scene for ParametricCurveScene {
         // separate per-segment falloff multiplier (Plan 0038 Phase 1).
         let xform = ViewTransform {
             zoom: self.zoom,
-            pan: [self.pan_x, self.pan_y],
+            pan: [self.pan.x, self.pan.y],
             _pad: 0.0,
         };
         let mut renderer = self.renderer.borrow_mut();
@@ -637,9 +614,9 @@ mod tests {
         ColorRamp {
             hue: DEFAULT_HUE,
             hue_spread,
-            palette_mix: DEFAULT_PALETTE_MIX,
-            palette_steps: palette::DEFAULT_PALETTE_STEPS,
-            saturation: DEFAULT_SATURATION,
+            palette_mix: common::DEFAULT_PALETTE_MIX,
+            palette_steps: crate::render::palette::DEFAULT_PALETTE_STEPS,
+            saturation: common::DEFAULT_SATURATION,
             brightness: DEFAULT_BRIGHTNESS,
         }
     }

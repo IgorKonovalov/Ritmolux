@@ -582,12 +582,11 @@ impl MilkShaderResources {
         noise_textures.extend(dummy_textures);
 
         // --- the surface layout, positionally `milk::shader::BINDINGS` ---
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("warp-mesh-milk-uniform"),
-            size: std::mem::size_of::<MilkUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniform = gpu::uniform_buffer(
+            device,
+            "warp-mesh-milk-uniform",
+            std::mem::size_of::<MilkUniform>(),
+        );
         // Fifteen entries — a shape nothing else in the crate approaches in
         // length, which is its ADR-0058 separation.
         let texture_3d = |binding: u32| wgpu::BindGroupLayoutEntry {
@@ -946,22 +945,12 @@ impl MilkShaderResources {
             return;
         };
         for pass in &chain.passes {
-            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-milk-blur-clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &pass.target,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            gpu::color_pass(
+                encoder,
+                "warp-mesh-milk-blur-clear",
+                &pass.target,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
         }
     }
 
@@ -983,22 +972,12 @@ impl MilkShaderResources {
                 }
                 (None, None) => continue,
             };
-            let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("warp-mesh-milk-blur-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &pass.target,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            let mut rp = gpu::color_pass(
+                encoder,
+                "warp-mesh-milk-blur-pass",
+                &pass.target,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
             rp.set_pipeline(&chain.pipeline);
             rp.set_bind_group(0, bind, &[]);
             rp.draw(0..3, 0..1);

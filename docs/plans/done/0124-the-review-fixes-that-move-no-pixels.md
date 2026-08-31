@@ -35,7 +35,7 @@ under `core/src/render/` changes a pixel, and the golden suite proves it.**
 
 The review ran four lenses over the tree (layering, god modules, hot-path safety, doc/test
 drift). Layering, real-time safety and the ABI came back clean; what it found was maintenance
-debt and a few plain defects. Plans [0125](../0125-the-scenes-share-their-gpu-boilerplate.md) and
+debt and a few plain defects. Plans [0125](0125-the-scenes-share-their-gpu-boilerplate.md) and
 [0126](../0126-the-large-files-split-along-their-seams.md) take the structural half. This plan takes
 what needs no design and no judgement, so that it can go first and so that the other two inherit a
 harness and a gate that already work.
@@ -221,7 +221,7 @@ pub fn decode(path: &Path) -> CaptureImage
 
 ## What this plan does NOT do
 
-- No GPU helper, no scene edit, no file split — [0125](../0125-the-scenes-share-their-gpu-boilerplate.md)
+- No GPU helper, no scene edit, no file split — [0125](0125-the-scenes-share-their-gpu-boilerplate.md)
   and [0126](../0126-the-large-files-split-along-their-seams.md).
 - Does not move `new_from_win32_hwnd` out of `core` or the `shot` thread-local diagnostic off
   the scene renderer — both are seam moves and belong to 0126.

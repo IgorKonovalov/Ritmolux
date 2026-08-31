@@ -198,7 +198,7 @@ flowchart TB
 - **The guard still cannot see this class after this plan.** ADR-0153 declines to widen `hygiene.rs`
   for good reasons, which means the next per-element rate has nothing catching it but review — the
   exact route these three arrived by. Phase 1 is the only durable mitigation, and it is a doc.
-- **Phase 2 contends with [Plan 0125](0125-the-scenes-share-their-gpu-boilerplate.md)** — that plan
+- **Phase 2 contends with [Plan 0125](done/0125-the-scenes-share-their-gpu-boilerplate.md)** — that plan
   touches all twelve scenes' boilerplate and this one edits five of them. Take them in series.
 - **The 49x and 35x figures are computed, not measured**, from a one-pole at `tau = 0.6` and
   `SPIN_SPEED = 0.07`. Per ADR-0071 do not assert them; they justify the work, they are not a

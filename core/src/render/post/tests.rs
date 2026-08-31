@@ -875,12 +875,7 @@ fn draw_disc(
     aspect: f32,
 ) {
     let format = ctx.surface_format();
-    let uniform = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("disc-uniform"),
-        size: 16,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
+    let uniform = gpu::uniform_buffer(&ctx.device, "disc-uniform", 16);
     ctx.queue
         .write_buffer(&uniform, 0, bytemuck::bytes_of(&[aspect, 0.0, 0.0, 0.0]));
     let layout = ctx
@@ -911,22 +906,12 @@ fn draw_disc(
         wgpu::BlendState::REPLACE,
         "disc",
     );
-    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("disc-pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: target,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    let mut pass = gpu::color_pass(
+        encoder,
+        "disc-pass",
+        target,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
     pass.set_pipeline(&pipeline);
     pass.set_bind_group(0, &bind_group, &[]);
     pass.draw(0..3, 0..1);

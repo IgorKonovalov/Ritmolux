@@ -363,6 +363,138 @@ pub fn write_lut(queue: &wgpu::Queue, texture: &wgpu::Texture, bytes: &[u8; LUT_
     );
 }
 
+// ---------------------------------------------------------------------------
+// The A/B LUT pair a shader-coloured scene owns
+// ---------------------------------------------------------------------------
+
+/// The two LUT textures, their views, the sampler, the baked palette awaiting
+/// upload and the dirty flag — the set every shader-coloured scene owns to
+/// render a `palette_mix` crossfade.
+///
+/// # The upload is deferred, and that is the invariant this type keeps
+///
+/// [`set`](LutPair::set) is called from `Scene::set_palette`, which has no
+/// `Queue`: a preset switch bakes a palette on the CPU and the GPU upload has to
+/// wait for the next frame. So `set` stores the palette and raises `dirty`, and
+/// [`flush`](LutPair::flush) — called at the top of `render`, where a `Queue`
+/// exists — uploads and clears it. Two `set`s between frames cost one upload;
+/// a frame with no `set` costs none.
+///
+/// A **freshly constructed pair is dirty**, because its textures are empty. A
+/// scene that builds its GPU resources lazily (or rebuilds them on a resize)
+/// therefore gets the upload for free, but must re-`set` the palette it is
+/// actually holding — [`new`](LutPair::new) can only seed the default.
+///
+/// # It owns resources, never a layout shape
+///
+/// [`bind_entries`](LutPair::bind_entries) takes all three binding numbers from
+/// the caller and the caller's own `create_bind_group_layout` still spells the
+/// entries. Nothing here can make two layouts share a shape, which is what
+/// ADR-0058 forbids without recorded evidence — and the six scenes bind this
+/// triple at genuinely different indices and in different orders.
+pub struct LutPair {
+    texture_a: wgpu::Texture,
+    texture_b: wgpu::Texture,
+    view_a: wgpu::TextureView,
+    view_b: wgpu::TextureView,
+    sampler: wgpu::Sampler,
+    palette: Palette,
+    dirty: bool,
+}
+
+impl LutPair {
+    /// Both textures, both views and the sampler, seeded with the default
+    /// palette and **dirty** — the textures hold no bytes until the first
+    /// [`flush`](LutPair::flush).
+    ///
+    /// `stem` names the pair: the textures are labelled `<stem>-lut-a` and
+    /// `<stem>-lut-b`.
+    pub fn new(device: &wgpu::Device, stem: &str) -> Self {
+        let texture_a = lut_texture(device, &format!("{stem}-lut-a"));
+        let texture_b = lut_texture(device, &format!("{stem}-lut-b"));
+        let view_a = texture_a.create_view(&wgpu::TextureViewDescriptor::default());
+        let view_b = texture_b.create_view(&wgpu::TextureViewDescriptor::default());
+        Self {
+            texture_a,
+            texture_b,
+            view_a,
+            view_b,
+            sampler: lut_sampler(device),
+            palette: Palette::default_spectrum(),
+            dirty: true,
+        }
+    }
+
+    /// Hold `palette` for upload on the next [`flush`](LutPair::flush). A
+    /// 6 KB array copy, off the hot path (preset switch or resource build).
+    pub fn set(&mut self, palette: &Palette) {
+        self.palette = palette.clone();
+        self.dirty = true;
+    }
+
+    /// Upload the held palette into both textures if anything has changed since
+    /// the last call, and report whether it did.
+    ///
+    /// Called once per frame from `render`. The return value is what the unit
+    /// test reads; the scenes ignore it.
+    pub fn flush(&mut self, queue: &wgpu::Queue) -> bool {
+        if !self.dirty {
+            return false;
+        }
+        write_lut(queue, &self.texture_a, &self.palette.lut_a_bytes());
+        write_lut(queue, &self.texture_b, &self.palette.lut_b_bytes());
+        self.dirty = false;
+        true
+    }
+
+    /// The palette A texture's view.
+    pub fn view_a(&self) -> &wgpu::TextureView {
+        &self.view_a
+    }
+
+    /// The palette B texture's view.
+    pub fn view_b(&self) -> &wgpu::TextureView {
+        &self.view_b
+    }
+
+    /// The shared LUT sampler.
+    pub fn sampler(&self) -> &wgpu::Sampler {
+        &self.sampler
+    }
+
+    /// The three bind-group entries, at the binding numbers the caller names.
+    ///
+    /// **The array is ordered by LUT role — A, B, sampler — not by binding
+    /// number**, because the callers disagree on both. `shape_field` and
+    /// `shape_collage` bind the sampler at 0 and the textures at 1 and 2;
+    /// `fragment_field` and `warp_mesh` bind A, B, sampler at 0, 1, 2; the
+    /// attractor at 1, 2, 3 and reaction-diffusion at 3, 4, 5. Each entry
+    /// carries its own `binding`, which is what wgpu matches against the layout,
+    /// so spreading this array into an `entries` list in role order is correct at
+    /// every one of them.
+    pub fn bind_entries(
+        &self,
+        binding_a: u32,
+        binding_b: u32,
+        binding_sampler: u32,
+    ) -> [wgpu::BindGroupEntry<'_>; 3] {
+        [
+            wgpu::BindGroupEntry {
+                binding: binding_a,
+                resource: wgpu::BindingResource::TextureView(&self.view_a),
+            },
+            wgpu::BindGroupEntry {
+                binding: binding_b,
+                resource: wgpu::BindingResource::TextureView(&self.view_b),
+            },
+            wgpu::BindGroupEntry {
+                binding: binding_sampler,
+                resource: wgpu::BindingResource::Sampler(&self.sampler),
+            },
+        ]
+    }
+}
+
 // --- Banding (ADR-0078) -----------------------------------------------------
 
 /// `palette_steps` default — 0, which is off: the smooth ramp every preset drew
@@ -509,6 +641,59 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::panic)]
 
     use super::*;
+    use crate::render::RenderError;
+    use crate::render::context::RenderContext;
+
+    /// **The deferred upload costs one `write_texture` pair per change and none
+    /// otherwise** — the contract every scene's `render` leans on when it calls
+    /// `flush` unconditionally on the hot path.
+    ///
+    /// A fresh pair is dirty because its textures hold no bytes yet, so the first
+    /// flush after construction uploads. After that only a `set` can make one
+    /// upload again, and two `set`s between frames still cost one — which is what
+    /// makes a preset dissolve, which re-`set`s both sides every frame it runs,
+    /// bounded rather than proportional to how often the palette is touched.
+    ///
+    /// Needs a GPU adapter to create the textures, so it skips on runners without
+    /// one (ADR-0016).
+    #[test]
+    fn the_lut_pair_uploads_once_per_set_and_never_otherwise() {
+        let ctx = match RenderContext::new_headless(16, 16, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+
+        let mut luts = LutPair::new(&ctx.device, "lut-pair-test");
+        assert!(
+            luts.flush(&ctx.queue),
+            "a fresh pair's textures are empty, so its first flush uploads"
+        );
+        assert!(
+            !luts.flush(&ctx.queue),
+            "nothing changed since, so the second flush uploads nothing"
+        );
+
+        luts.set(&Palette::bake(&PaletteConfig::Named(NamedPalette::Ember)));
+        assert!(luts.flush(&ctx.queue), "one set, one upload");
+        assert!(!luts.flush(&ctx.queue), "and only one");
+
+        // Two sets between frames: still one upload, of the LAST palette set.
+        luts.set(&Palette::bake(&PaletteConfig::Named(NamedPalette::Ice)));
+        luts.set(&Palette::bake(&PaletteConfig::Named(NamedPalette::Mono)));
+        assert!(luts.flush(&ctx.queue), "two sets still cost one upload");
+        assert!(!luts.flush(&ctx.queue));
+
+        // Setting the same palette again is still a set: the pair compares
+        // nothing, deliberately — a 6 KB array comparison per switch would buy
+        // an upload nobody measured as costly.
+        let same = Palette::bake(&PaletteConfig::Named(NamedPalette::Mono));
+        luts.set(&same);
+        assert!(luts.flush(&ctx.queue));
+    }
 
     /// The exact analytic cosine the fragment field / swarm used before this
     /// module — the no-regression reference.

@@ -100,25 +100,18 @@ pub(super) struct UniformInputs {
 /// build, the field clear after a (re)build, and the seeded particle scatter on
 /// first build or a `reseed` rising edge. Each clears its own flag, so none
 /// repeats per frame.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn flush_deferred_uploads(
     queue: &wgpu::Queue,
     encoder: &mut wgpu::CommandEncoder,
-    pipelines: &PipelineResources,
+    pipelines: &mut PipelineResources,
     grid: &FieldResources,
     seed_particles: &[Particle],
-    palette: &Palette,
-    palette_dirty: &mut bool,
     needs_clear: &mut bool,
     needs_upload: &mut bool,
 ) {
     // Upload the active palette LUTs (A + B) on a preset switch or a fresh
     // build — off the hot path, once per change.
-    if *palette_dirty {
-        palette::write_lut(queue, &pipelines.lut_texture_a, &palette.lut_a_bytes());
-        palette::write_lut(queue, &pipelines.lut_texture_b, &palette.lut_b_bytes());
-        *palette_dirty = false;
-    }
+    pipelines.luts.flush(queue);
 
     // Clear the trail field once after a (re)build so the first decay reads
     // black rather than garbage.
@@ -436,22 +429,12 @@ pub(super) fn encode_trail_pass(
     } else {
         &grid.decay_bg_b
     };
-    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("attractor-trail-pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: grid.field.write_view(),
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    let mut pass = gpu::color_pass(
+        encoder,
+        "attractor-trail-pass",
+        grid.field.write_view(),
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
     pass.set_pipeline(&pipelines.decay_pipeline);
     pass.set_bind_group(0, decay_bg, &[]);
     pass.draw(0..3, 0..1);
@@ -479,24 +462,9 @@ pub(super) fn encode_present(
     } else {
         &grid.present_bg_b
     };
-    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("attractor-present-pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                // Load over the engine backdrop (ADR-0018): the additive
-                // point cloud blooms over whatever the background pass painted.
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    // Load over the engine backdrop (ADR-0018): the additive point cloud blooms
+    // over whatever the background pass painted.
+    let mut pass = gpu::color_pass(encoder, "attractor-present-pass", view, wgpu::LoadOp::Load);
     pass.set_pipeline(&pipelines.present_pipeline);
     pass.set_bind_group(0, present_bg, &[]);
     pass.draw(0..3, 0..1);

@@ -1,6 +1,7 @@
 #![allow(clippy::indexing_slicing)]
 
 use super::*;
+use crate::render::gpu;
 
 /// Build one rosette exactly as `build` does.
 fn rosette(n: u32, contact_deg: f32) -> Vec<SegmentInstance> {
@@ -1538,22 +1539,12 @@ fn round_capture(segments: &[SegmentInstance], arcs: &[ArcInstance]) -> Option<V
         });
     // The line pass loads rather than clears; in the shipped chain the
     // background pass owns the clear, so this stands in for it.
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("round-clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
+    gpu::color_pass(
+        &mut encoder,
+        "round-clear",
+        &view,
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+    );
 
     let mut renderer = LineRenderer::new_with_arcs(
         &ctx.device,
