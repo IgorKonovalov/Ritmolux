@@ -139,79 +139,6 @@ A trailing `see NNNN` names another backlog entry rather than a document — loo
 already closed. Written once here so that a cross-reference costs a row four bytes instead of
 eighty.
 
-## 0168 - the broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list
-
-Filed 2026-08-30 at Plan 0124's close, as the review's one major.
-
-**The defect.** A Rust string literal broken across source lines without a trailing `\` keeps the
-newline and the continuation line's indentation; joined back onto one line afterwards, it keeps the
-run of spaces. The operator reads `(x/y/rad/ang), which` followed by twenty-two spaces and then
-`reads 0`. It compiles, it matches a `contains` assertion on either half, and it is wrong only where
-it is read.
-
-**What Plan 0124 Phase 2 did, and where it stops.** Six literals in `core/src/preset/schema.rs` were
-rejoined, and `core/tests/preset.rs::operator_messages_carry_no_run_of_spaces` guards them - by
-constructing six presets and checking the six resulting messages by hand. The guard is an
-enumeration of call sites, so it cannot see a seventh, and a seventh already exists. The plan's file
-list scoped Phase 2 to `schema.rs`, so this is not a `dev` miss; it is the instrument not
-generalizing.
-
-**What survives.** Roughly twenty string literals repo-wide carry a run of three or more spaces
-mid-sentence. Three reach a human at runtime:
-
-- `standalone/src/stream.rs:393` - a `--stream` CLI error: `"... --list-presets is not a flag, but
-  the                  embedded set is what the window browses"`.
-- `milkconv/src/convert.rs:430` - a converter report line.
-- `core/src/dsp/mod.rs:57` - a `const _: () = assert!` message, so this one reaches a compile
-  failure rather than a run.
-
-The rest are test-assertion messages (`star/tests.rs`, `particles/tests.rs`), which is the text a
-failing test prints. Deliberate column alignment in diagnostic tables (`milk_wash.rs`,
-`render/tests.rs`, `console/tests.rs`) is **not** this defect and any check has to exempt it - which
-is why a naive repo-wide grep is not the fix.
-
-**What a fix looks like.** The instrument already exists one directory over:
-`scripts/check-comment-hygiene.mjs` lexes Rust and C source and already knows where a string literal
-starts and ends - Plan 0124 Phase 3 made that walk repo-wide. The mirror check is a string-literal
-pass over the same spans, reporting a run of two or more spaces that is neither a format-width spec
-(`{:>12}`) nor part of a literal whose other lines align on the same column. That would convict the
-class rather than six instances of it, and it would run at pre-push and in CI like the rest.
-
-**Impact:** low severity, unbounded frequency. Nothing catches the next one, and Plan 0124's close
-is the moment the project is most likely to believe it did.
-
-- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer      than it in: core/src/dsp/mod.rs`
-- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the                  embedded set in: standalone/src/stream.rs`
-- **Verified 2026-08-30** - the guard is still an enumeration rather than a scan: `absent: fn operator_messages_carry_no_run_of_spaces[\s\S]{0,4000}read_to_string in: core/tests/preset.rs`
-
-## 0169 - `cargo doc` emits 64 intra-doc-link warnings and nothing in the project runs `cargo doc`
-
-Filed 2026-08-30 at Plan 0124's close, from `dev`'s own followup.
-
-**The claim.** `cargo doc --workspace --no-deps` emits 64 intra-doc-link warnings over 31 files.
-`dev` measured the count twice during Plan 0124 Phase 3 - before and after rewriting 72 comments -
-precisely because it was the only available substitute for a bit-reproducible build check, and it
-was **unchanged at 64 both times**, so this plan neither caused it nor moved it.
-
-**Why it matters, and why it is small.** A rustdoc intra-doc link is the *one* comment link form
-[ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
-deliberately keeps, on the stated grounds that `rustc` resolves it and so it cannot rot silently.
-That argument is exactly right about the mechanism and wrong about this repo: `rustc` does emit the
-diagnostic, and nothing here ever asks it to. `.githooks/pre-push` runs doc-links, fmt, clippy and a
-narrowed nextest; the CI `links` job runs the five Node gates. Neither runs `cargo doc`. So 64 links
-that ADR-0127 exempted on the grounds of being checked are, in this project, unchecked.
-
-**What a fix looks like.** One line - `cargo doc --workspace --no-deps` with
-`RUSTDOCFLAGS="-D warnings"` - in the CI job that already builds, after the 64 existing warnings are
-cleared. Adding the gate before clearing them would red every push, so the order is fixed. Roughly
-an hour of mechanical repair; the value is that ADR-0127's exemption becomes true.
-
-**Impact:** low. No user sees a rustdoc link. It is filed because the exemption is stated as a
-property and is not one.
-
-- **Verified 2026-08-30** - neither call site runs it: `absent: cargo doc in: .githooks/pre-push`
-- **Verified 2026-08-30** - and not in CI either: `absent: cargo doc in: .github/workflows/ci.yml`
-
 
 <!-- roster:begin cap=320 -->
 
@@ -4199,6 +4126,79 @@ is Alternative C again and loses for the same reason.
 
 - **Verified 2026-08-30** - the early return is still what makes the six unread: `present: if !args.iter\(\).any\(\|arg\| arg == "--stream"\) in: standalone/src/stream.rs`
 - **Verified 2026-08-30** - and `FlagSpec` still has no way to state the dependency: `absent: requires in: standalone/src/main.rs`
+
+## 0168 - the broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list
+
+Filed 2026-08-30 at Plan 0124's close, as the review's one major.
+
+**The defect.** A Rust string literal broken across source lines without a trailing `\` keeps the
+newline and the continuation line's indentation; joined back onto one line afterwards, it keeps the
+run of spaces. The operator reads `(x/y/rad/ang), which` followed by twenty-two spaces and then
+`reads 0`. It compiles, it matches a `contains` assertion on either half, and it is wrong only where
+it is read.
+
+**What Plan 0124 Phase 2 did, and where it stops.** Six literals in `core/src/preset/schema.rs` were
+rejoined, and `core/tests/preset.rs::operator_messages_carry_no_run_of_spaces` guards them - by
+constructing six presets and checking the six resulting messages by hand. The guard is an
+enumeration of call sites, so it cannot see a seventh, and a seventh already exists. The plan's file
+list scoped Phase 2 to `schema.rs`, so this is not a `dev` miss; it is the instrument not
+generalizing.
+
+**What survives.** Roughly twenty string literals repo-wide carry a run of three or more spaces
+mid-sentence. Three reach a human at runtime:
+
+- `standalone/src/stream.rs:393` - a `--stream` CLI error: `"... --list-presets is not a flag, but
+  the                  embedded set is what the window browses"`.
+- `milkconv/src/convert.rs:430` - a converter report line.
+- `core/src/dsp/mod.rs:57` - a `const _: () = assert!` message, so this one reaches a compile
+  failure rather than a run.
+
+The rest are test-assertion messages (`star/tests.rs`, `particles/tests.rs`), which is the text a
+failing test prints. Deliberate column alignment in diagnostic tables (`milk_wash.rs`,
+`render/tests.rs`, `console/tests.rs`) is **not** this defect and any check has to exempt it - which
+is why a naive repo-wide grep is not the fix.
+
+**What a fix looks like.** The instrument already exists one directory over:
+`scripts/check-comment-hygiene.mjs` lexes Rust and C source and already knows where a string literal
+starts and ends - Plan 0124 Phase 3 made that walk repo-wide. The mirror check is a string-literal
+pass over the same spans, reporting a run of two or more spaces that is neither a format-width spec
+(`{:>12}`) nor part of a literal whose other lines align on the same column. That would convict the
+class rather than six instances of it, and it would run at pre-push and in CI like the rest.
+
+**Impact:** low severity, unbounded frequency. Nothing catches the next one, and Plan 0124's close
+is the moment the project is most likely to believe it did.
+
+- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer      than it in: core/src/dsp/mod.rs`
+- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the                  embedded set in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - the guard is still an enumeration rather than a scan: `absent: fn operator_messages_carry_no_run_of_spaces[\s\S]{0,4000}read_to_string in: core/tests/preset.rs`
+
+## 0169 - `cargo doc` emits 64 intra-doc-link warnings and nothing in the project runs `cargo doc`
+
+Filed 2026-08-30 at Plan 0124's close, from `dev`'s own followup.
+
+**The claim.** `cargo doc --workspace --no-deps` emits 64 intra-doc-link warnings over 31 files.
+`dev` measured the count twice during Plan 0124 Phase 3 - before and after rewriting 72 comments -
+precisely because it was the only available substitute for a bit-reproducible build check, and it
+was **unchanged at 64 both times**, so this plan neither caused it nor moved it.
+
+**Why it matters, and why it is small.** A rustdoc intra-doc link is the *one* comment link form
+[ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+deliberately keeps, on the stated grounds that `rustc` resolves it and so it cannot rot silently.
+That argument is exactly right about the mechanism and wrong about this repo: `rustc` does emit the
+diagnostic, and nothing here ever asks it to. `.githooks/pre-push` runs doc-links, fmt, clippy and a
+narrowed nextest; the CI `links` job runs the five Node gates. Neither runs `cargo doc`. So 64 links
+that ADR-0127 exempted on the grounds of being checked are, in this project, unchecked.
+
+**What a fix looks like.** One line - `cargo doc --workspace --no-deps` with
+`RUSTDOCFLAGS="-D warnings"` - in the CI job that already builds, after the 64 existing warnings are
+cleared. Adding the gate before clearing them would red every push, so the order is fixed. Roughly
+an hour of mechanical repair; the value is that ADR-0127's exemption becomes true.
+
+**Impact:** low. No user sees a rustdoc link. It is filed because the exemption is stated as a
+property and is not one.
+
+- **Verified 2026-08-30** - neither call site runs it: `absent: cargo doc in: .githooks/pre-push`
+- **Verified 2026-08-30** - and not in CI either: `absent: cargo doc in: .github/workflows/ci.yml`
 
 ## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
 
