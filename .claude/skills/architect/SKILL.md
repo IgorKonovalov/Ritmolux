@@ -209,7 +209,15 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   It hands you the lane, the phase-to-commit mapping, `dev`'s notes and the close triggers, so none
   of that has to be re-derived. **It is claims, not evidence.** You still open the tests, read the
   diff and reach your own verdict — a close that grades the log instead of the tree has failed, in
-  exactly the way a green `cargo test` is not a passing test. **And silence in it is not
+  exactly the way a green `cargo test` is not a passing test.
+- **Verify the `### Close triggers` `**Full suite:**` bullet — do not trust it.** Since
+  [ADR-0156](../../../docs/adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+  the nine GPU suites run **once per plan** rather than at every phase, so that bullet is the only
+  record that the goldens and the preset sweeps ever ran against the finished tree. Run
+  `cargo nextest run --workspace` yourself — the full run, not `-P fast` — and compare. A green
+  full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
+  vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
+- **Silence in it is not
   certification:** done-when results are reported by exception, so a criterion with no note carries
   `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
   to test.
