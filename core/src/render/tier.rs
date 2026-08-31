@@ -124,10 +124,10 @@ pub struct TierConfig {
     ///
     /// The floor value is NFR §12 memory arithmetic, **redone for the linear-light
     /// composite** (Plan 0045 Phase 3 / ADR-0046). Every intermediate upstream of
-    /// the tonemap is now [`COMPOSITE_FORMAT`](super::COMPOSITE_FORMAT) — 8
+    /// the tonemap is now `COMPOSITE_FORMAT` — 8
     /// bytes/texel, not 4 — so a stage offscreen costs twice what the surface
     /// format would charge, while the trails accumulation
-    /// ([`PingPongField`](super::feedback::PingPongField), two textures) was
+    /// (`PingPongField`, two textures) was
     /// already float and did not move.
     ///
     /// Per chain, both stages live, at this cap (1920x1080, 8 bytes/texel =
@@ -172,7 +172,7 @@ pub struct TierConfig {
     pub post_cap: (u32, u32),
 
     /// How many levels deep the bloom pyramid goes
-    /// ([`Bloom`](super::bloom::Bloom), ADR-0046).
+    /// (`Bloom`, ADR-0046).
     ///
     /// This is a **capacity**, not a look: each level doubles the halo's reach and
     /// costs three passes at a quarter of the previous level's area, so the tail
@@ -180,7 +180,7 @@ pub struct TierConfig {
     /// reaching ~16 of the grid's texels at the default radius); rich runs six,
     /// which is where the widest levels start to matter on a 1440p-class grid.
     ///
-    /// [`level_sizes`](super::bloom) clamps this down on a small render target, so
+    /// `level_sizes` clamps this down on a small render target, so
     /// a value here is an upper bound rather than a promise.
     pub bloom_levels: u32,
 
@@ -450,7 +450,7 @@ pub const MISS_FRACTION: f32 = 0.75;
 /// **This number is only satisfiable because of a constant in another module.**
 /// The only series the renderer ever hands [`sustained_miss`] is
 /// [`FrameStats::samples`](crate::diag::FrameStats::samples), which yields at
-/// most [`crate::diag::RING`] items — so a `MIN_SAMPLES` above the ring's
+/// most `crate::diag::RING` items — so a `MIN_SAMPLES` above the ring's
 /// capacity makes the governor a permanent no-op. See the assertion below.
 pub const MIN_SAMPLES: usize = 180;
 

@@ -41,7 +41,7 @@ pub enum Outcome {
     ParseFailed,
     /// It parsed, but a program did not compile.
     CompileFailed,
-    /// It converted. Whether it *renders* is [`Report::blank`]'s business, since
+    /// It converted. Whether it *renders* is [`Row::blank`]'s business, since
     /// that needs a device.
     Converted,
 }

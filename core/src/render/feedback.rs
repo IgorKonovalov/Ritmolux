@@ -113,7 +113,7 @@ pub enum Deposit {
 /// **One vocabulary, two sinks.** This type and the `fb_*` params it accompanies
 /// are consumed by *both* accumulation buffers — the engine trails stage and the
 /// attractor scene's internal trail — and each transforms only its own. It lives
-/// here, beside [`PingPongField`], rather than in either of them, because that is
+/// here, beside `PingPongField`, rather than in either of them, because that is
 /// what makes "one vocabulary" structural instead of a convention.
 ///
 /// [`Default`] is the identity in both fields, so a preset with no `[feedback]`

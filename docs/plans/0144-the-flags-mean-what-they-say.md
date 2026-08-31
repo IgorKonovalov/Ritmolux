@@ -328,7 +328,7 @@ pub struct RendererOptions {
 | 3 — `--preset` holds a scene in the window | dev | done | cb6a037 |
 | 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 7399ab5 |
 | 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | 8e7bfe3 |
-| 6 — `cargo doc` becomes a gate | dev | **not run**, deferred on the user's call | (none) |
+| 6 — `cargo doc` becomes a gate | dev | done | committed with this row |
 
 ### Notes
 
@@ -382,11 +382,36 @@ these blocks actually match and is what was used; it now appears only in `core/t
 **P5 — `#[test]` under `core/tests/` is 237 before and 237 after.** Plan 0124's log recorded 236;
 the difference is `main` moving between that close and this branch, not this phase.
 
-**P6 — not run.** 71 real warnings, not the 64 Plan 0124's log recorded, and **51 of them are in
-`core/src/render/**`**, which the live `plan-0125` lane is restructuring — ten in files it has
-already committed changes to. The user was given the collision with those numbers and chose to defer
-the phase rather than take the merge cost for the plan's lowest-value item. Design-backlog 0169 stays
-live and its count is stale by 7.
+**P6 — deferred once, then run after `plan-0125` merged.** At the first attempt the count was **71**
+real warnings, not the 64 Plan 0124's log recorded, and 51 of them sat in `core/src/render/**`, which
+the live `plan-0125` lane was restructuring — ten in files it had already committed changes to. The
+user was given the collision and chose to defer. `plan-0125` has since closed and merged into this
+branch; the count on the merged tree is the same **71 over 31 files**, so nothing moved them.
+
+**P6 — the 71 fall into four classes, and only two of them were link *errors*.**
+
+| class | count | repair |
+|---|---|---|
+| `private_intra_doc_links` — a public item's docs link to a `pub(crate)`/private/`pub(super)` target | 52 | reduced to a code span; the link never rendered without `--document-private-items` |
+| `broken_intra_doc_links` — renamed, moved or removed | 8 | five resolved to the item's real path or owner, three reduced |
+| `broken_intra_doc_links` — the target is `#[cfg(test)]`, so rustdoc never compiles it | 2 | reduced (`console::route`, `emitter`'s parabola test) |
+| `redundant_explicit_links` — `[`X`](X)` | 7 | explicit target dropped, keeping the link |
+
+Nothing was feature-gated. The five that resolved: `film::total_hops` needed `super::`;
+`Report::blank` is `Row::blank`; `MAX_LOOP_ITERATIONS` (×3) is now `Budget::loops`. Two more named
+items that no longer exist under any name — `UNCONSUMED_OUTPUTS` is the private `OUTPUTS`,
+`curves::maurer_rose_arcs` is the private `maurer_rose_pieces` — so the prose now names what is
+there. `AttractorFamily::projection` is a field of `Basis`, not of `AttractorFamily`.
+
+**P6 — the bulk pass is scripted and one of its rewrites needed a hand repair.**
+`shape_collage.rs` carried `[`KNEE`](…)` followed immediately by a second code span, so stripping the
+link produced `` `KNEE`` = 0.6` `` — two adjacent spans, which markdown does not read. Joined into
+one. That is the only rewrite the script got wrong, and it was found by scanning the diff for
+adjacent backticks rather than by any gate.
+
+**P6 — the strip leaves some lines short of their paragraph's wrap width and they were not
+re-wrapped.** Markdown reflows, so no rendered page changes, and one changed line per warning is what
+keeps the diff reviewable.
 
 **A test this plan added was flaky and is now bound-free.**
 `a_stream_only_flag_without_stream_exits_without_starting` asserted a 1-second wall-clock bound and
@@ -417,18 +442,23 @@ features and it disappears. Reproduced on `main` at `da38c09`, untouched here.
 ### Close triggers
 
 - **`presets/` touched:** no. `git diff --name-only 77a2e23..HEAD -- presets/` is empty.
-- **Plan header `Closes:`** design-backlog 0167, 0168, 0169. **0167 and 0168 are discharged; 0169 is
-  not** — Phase 6 did not run.
+- **Plan header `Closes:`** design-backlog 0167, 0168, 0169. **All three are discharged** — 0169 by
+  Phase 6, which ran after `plan-0125` merged.
 - **What shipped:** a **feature** — `--gpu` and `--preset` now reach the windowed path, which is new
-  operator-facing capability, alongside the refusal of four flags that were silently ignored. Plus a
-  new gate class, a repaired literal set and a test-harness fold.
+  operator-facing capability, alongside the refusal of four flags that were silently ignored, plus a
+  fifth refusal (a valueless flag given a value) added at the review. And two new gate classes, a
+  repaired literal set, a test-harness fold and 71 cleared intra-doc links.
 - **Operator docs touched:** `README.md` (the flag list — the four refused, `--gpu` and `--preset`
   windowed, the display-name rule) and `docs/on-device-validation.md` (the `--gpu` reaches
   `--stream` only claim, now false, rewritten with the dGPU reading and what it unblocks).
   `scripts/fixtures/README.md` for the fixture roster.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, two entries, both red on
-  delivery rather than by decay. `0167` — `absent: requires in: standalone/src/main.rs` now matches,
-  because Phase 1 added the field the entry asked for. `0165` — `present: RenderContext::new\(target,
-  width, height\)\?` no longer matches, because Phase 2 gave that call the adapter argument that
-  entry says the window lacks. Left alone for `architect`. The other four Node gates exit 0.
-- **Outstanding `human` phases:** none. Phase 6 is `dev`-owned and deferred, not handed over.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, five probes across four
+  entries, every one red on delivery rather than by decay. `0167` — `absent: requires in:
+  standalone/src/main.rs` now matches (Phase 1 added the field). `0165` — `present:
+  RenderContext::new\(target, width, height\)\?` no longer matches (Phase 2 gave that call the
+  adapter argument). `0168` ×2 — `present: cannot be longer\s{2,}than it` and `present: is not a
+  flag, but the\s{2,}embedded set` no longer match, the first repaired at the review commit and the
+  second by Phase 4. `0169` — `absent: cargo doc in: .github/workflows/ci.yml` now matches, because
+  the phase added the gate the entry asked for. Left alone for `architect`, as instructed. The other
+  four Node gates exit 0.
+- **Outstanding `human` phases:** none.

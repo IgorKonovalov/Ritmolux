@@ -12,7 +12,7 @@
 //! Those are one program, joined in index order. MilkDrop's writer chops at a
 //! fixed width without regard for token boundaries, so a line may be cut
 //! **mid-identifier** — which decides how the join has to work; see
-//! [`join_code`], where the choice is measured rather than assumed.
+//! `join_code`, where the choice is measured rather than assumed.
 //!
 //! # What this module does not do
 //!

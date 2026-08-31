@@ -46,7 +46,7 @@
 //!   falloff runs across the stroke only — so a short segment is round *because*
 //!   [`JOINED_A`]`|`[`JOINED_B`] push the quad past both ends by the half-width
 //!   (ADR-0041), not because it is short. Without the flags it is a sub-pixel
-//!   dash; see [`dots`].
+//!   dash; see `dots`.
 //! - **`wave_mystery` means something different in every mode**, which is the
 //!   reference's own design rather than a simplification here.
 //! - **Mode 6 and 7's line does not drift.** Its angle is `wave_mystery` alone;
@@ -88,8 +88,8 @@ pub struct ShapeVertex {
 ///
 /// Additive geometry occupies `..n_additive` and over-blended geometry the rest,
 /// which is what lets one buffer and one render pass serve two pipelines — see
-/// the module docs. Producers are appended through [`push_segment`](Self::push_segment)
-/// and [`push_triangle`](Self::push_triangle) rather than to the vectors
+/// the module docs. Producers are appended through `push_segment`
+/// and `push_triangle` rather than to the vectors
 /// directly, so the invariant is maintained in one place.
 #[derive(Default)]
 pub struct DrawGeometry {
@@ -221,7 +221,7 @@ pub fn build(
 /// 30 Hz one does into a buffer that fades at the same rate — and the picture
 /// would differ with the refresh, which ADR-0019 exists to prevent. `rate` is how
 /// many nominal frames of wall clock this frame is, and both branches of
-/// [`scale`](Self::scale) convert through it.
+/// `scale` convert through it.
 #[derive(Clone, Copy)]
 pub struct Exposure {
     /// `dt * NOMINAL_FPS`: how many nominal frames of wall clock this frame is.

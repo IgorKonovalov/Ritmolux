@@ -4,7 +4,7 @@
 //! lag of the strongest mean-subtracted autocorrelation of the recent onset
 //! envelope (parabolically refined for sub-hop precision, and **held against
 //! challengers** so two near-tied peaks cannot trade it hop by hop — Plan 0095
-//! Phase 2, see [`TempoTracker::hold`]), and `bar` is a 0..1
+//! Phase 2, see `TempoTracker::hold`), and `bar` is a 0..1
 //! phase advanced each hop by the current BPM and snapped to 0 on every
 //! detected beat. Pure and allocation-free after construction — the envelope
 //! history is a fixed array and every pass is iterator-based, so the same

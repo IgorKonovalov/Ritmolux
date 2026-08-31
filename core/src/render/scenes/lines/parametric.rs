@@ -7,7 +7,7 @@
 //! ## The colour axis: **position along the traced path** (ADR-0059)
 //!
 //! This scene honours `[palette]` / `[palette_b]` / `palette_mix` / `hue_spread`
-//! / `saturation` through the shared [`ColorRamp`], and the axis its generator
+//! / `saturation` through the shared `ColorRamp`, and the axis its generator
 //! makes meaningful is **how far along the walk a chord sits**: `0` at the first
 //! sampled point, `1` at the last. On a Maurer rose that is the drawn-stroke
 //! reading — the web is one continuous walk, so the ramp travels along it the way

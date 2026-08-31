@@ -17,7 +17,7 @@ use super::biarc::{self, Piece};
 use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
 
 /// The largest share of a Maurer walk's vertices that may be **corners** before
-/// [`maurer_rose_pieces`] declines to fit it — *is this a curve at all?*
+/// `maurer_rose_pieces` declines to fit it — *is this a curve at all?*
 ///
 /// **The two families a Maurer walk holds are not near each other on this
 /// number, which is the whole reason a threshold can exist.** At the shipped

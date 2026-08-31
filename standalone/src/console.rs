@@ -106,7 +106,7 @@ impl Console {
 /// its source and lands in exactly one of the two vectors.
 ///
 /// Drains rather than allocating so the frame path reuses the same buffers every
-/// frame; [`route`] is the owned-value wrapper the tests read.
+/// frame; `route` is the owned-value wrapper the tests read.
 pub fn route_into(
     dst: &mut FrameText,
     chrome: &mut Vec<Line>,

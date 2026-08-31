@@ -4,7 +4,7 @@
 //! This is the `wgpu` half of `particles/` — buffers, layouts, pipelines and the
 //! bind groups that wire them together. The scene that drives them, its `Scene`
 //! impl and the `encode_*` passes stay in `mod.rs`; the ODE math it draws is in
-//! [`family`](super::family), which imports no `wgpu` at all.
+//! [`family`], which imports no `wgpu` at all.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard).

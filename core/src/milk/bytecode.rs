@@ -30,7 +30,7 @@
 //! interpreter loop stay free of bounds checks it would otherwise pay per op per
 //! vertex. **Nothing constructs an `EelProgram` except this decoder and the
 //! converter's codegen**, and the codegen runs its own output through
-//! [`EelProgram::validate`] before writing it.
+//! `EelProgram::validate` before writing it.
 
 // Load-time code, but this module is named in the hygiene guard's scan set
 // (Plan 0100 Phase 2): the VM beside it runs per vertex per frame, and the file
@@ -316,13 +316,14 @@ pub enum Op {
     JumpIfNotZero(u32),
     /// Pop a count, open a loop frame, and jump past [`Op::LoopEnd`] when the
     /// count rounds to less than one. The count is clamped to
-    /// [`MAX_LOOP_ITERATIONS`].
+    /// [`Budget::loops`](super::vm::Budget::loops).
     LoopBegin(u32),
     /// Close a loop iteration: discard the body's value, decrement, and jump back
     /// to the operand while iterations remain. Pushes `0` when the loop ends,
     /// because a loop is an expression.
     LoopEnd(u32),
-    /// Open a `while` frame with [`MAX_LOOP_ITERATIONS`] iterations, jumping past
+    /// Open a `while` frame with [`Budget::loops`](super::vm::Budget::loops)
+    /// iterations, jumping past
     /// its [`Op::WhileEnd`] never — the test is at the end, because EEL2's
     /// `while(body)` runs the body first.
     WhileBegin(u32),
@@ -448,7 +449,7 @@ impl EelProgram {
 
     /// Assemble from code and register names, validating both.
     ///
-    /// **The only constructor**, so the invariants [`validate`](Self::validate)
+    /// **The only constructor**, so the invariants `validate`
     /// establishes hold of every `EelProgram` that exists.
     pub fn new(code: Vec<Op>, names: Vec<String>) -> Result<Self, ProgramError> {
         let mut program = Self {

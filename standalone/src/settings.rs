@@ -10,7 +10,7 @@
 //! the dwell clamps and the row/action mapping assertable as values.
 //!
 //! Two *enums* do cross the seam — [`Tier`] and
-//! [`InputMode`](crate::config::InputMode) — because the rows carrying them are
+//! [`InputMode`] — because the rows carrying them are
 //! switches over a closed set, and a row that re-spelled the value could
 //! disagree with what `config.toml` holds. Only one of the two is a config type:
 //! `Tier` is `lmv_core::render::Tier`, a core type a config key happens to name.

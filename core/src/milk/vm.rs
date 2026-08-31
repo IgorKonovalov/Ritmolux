@@ -1,4 +1,4 @@
-//! The stack VM that executes an [`EelProgram`](super::bytecode::EelProgram).
+//! The stack VM that executes an [`EelProgram`].
 //!
 //! **The only half of the EEL2 machine that ships.** The compiler lives in
 //! `milkconv` and never enters `lmv.exe` or `foo_lmv.dll` (ADR-0113).
@@ -8,7 +8,7 @@
 //! **Total.** No operation panics and no input value can make one. Division by
 //! zero yields `0`, `log(0)` yields `0`, an out-of-range `megabuf` index reads
 //! `0` and writes nowhere, an unbalanced pop reads `0`, and every loop is bounded
-//! by [`MAX_LOOP_ITERATIONS`]. `unwrap`/`expect`/`panic`/`indexing` are denied on
+//! by [`Budget::loops`]. `unwrap`/`expect`/`panic`/`indexing` are denied on
 //! this path by the Plan 0002 pragma below, and `core/tests/hygiene.rs` scans
 //! this directory so the denial is enforced rather than intended.
 //!

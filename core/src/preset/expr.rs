@@ -630,7 +630,7 @@ fn value_noise(x: f32, salt: u32) -> f32 {
 /// function.
 ///
 /// The loader's guard against a `[latch]` name nothing could reach. Latch names
-/// resolve **last** in [`Parser::parse_primary`], so a latch called `bass` would
+/// resolve **last** in `Parser::parse_primary`, so a latch called `bass` would
 /// silently be the band and one called `sin` would fail as a call — either way
 /// the author debugs a preset that is doing exactly what it was told. Rejecting
 /// the collision at load is what makes that resolution order unobservable.
@@ -639,7 +639,7 @@ pub fn is_reserved_ident(name: &str) -> bool {
 }
 
 /// Whether `name` lexes as a single identifier — `[A-Za-z_][A-Za-z0-9_]*`, the
-/// rule [`tokenize`] applies.
+/// rule `tokenize` applies.
 ///
 /// A `[latch]` name failing this could never be written inside an expression, so
 /// the loader rejects it rather than admitting a latch no binding can read.

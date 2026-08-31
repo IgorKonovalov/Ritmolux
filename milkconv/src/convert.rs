@@ -19,7 +19,7 @@
 //! # What Phase 3 does not convert
 //!
 //! The waveform, the custom waves and shapes, the borders and the motion vectors
-//! ([`UNCONSUMED_OUTPUTS`]) are Phase 4, and the HLSL blocks are Phase 6. A
+//! (`OUTPUTS`) are Phase 4, and the HLSL blocks are Phase 6. A
 //! converted preset therefore has **no light source of its own**, because
 //! MilkDrop's is the waveform — so the converter emits a **stand-in deposit**,
 //! says so in the bundle's header, and Phase 4 replaces it. Without one there

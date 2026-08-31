@@ -17,7 +17,7 @@
 //! The padding rule is the trap: an OSC-string is **always** NUL-terminated and
 //! then padded up, so a 4-byte address takes 8 bytes on the wire, not 4. A
 //! string whose length is already a multiple of 4 gains a full 4 bytes of
-//! padding rather than none. [`pad_to_4`] is that rule, and every element goes
+//! padding rather than none. `pad_to_4` is that rule, and every element goes
 //! through it.
 //!
 //! ## The address space is versioned in the addresses

@@ -145,7 +145,7 @@ struct AppState {
     /// The window is the whole of the console's shell-side state: there is no
     /// second `Renderer`, no second scene clock and no second modal state
     /// machine. What the console *shows* is decided every frame by
-    /// [`console::route`], from the same lines the output would have drawn.
+    /// `console::route`, from the same lines the output would have drawn.
     console_window: Option<Arc<Window>>,
     /// Last cursor position seen on the console surface, in its device pixels.
     ///

@@ -11,7 +11,7 @@
 //! *place* rather than as a visible vertex.
 //!
 //! **A corner in the source outline stays a corner.** The fit breaks its chain
-//! wherever consecutive chords turn by more than [`CORNER_TURN`], because a
+//! wherever consecutive chords turn by more than `CORNER_TURN`, because a
 //! trefoil's three cusps and a diamond's four vertices are the figure, not
 //! sampling artefacts, and a run that is all corners comes back as the polyline
 //! it was given.
@@ -21,8 +21,8 @@
 //! runs of two and three chords that the fit happily replaces with arcs, which
 //! would redraw a figure whose chords *are* the figure. So the decision of
 //! whether a walk is a curve at all is the **caller's**, taken from
-//! [`corner_fraction`] before the fit is ever called; see
-//! [`curves::maurer_rose_arcs`](super::curves::maurer_rose_arcs).
+//! `corner_fraction` before the fit is ever called; see
+//! `curves::maurer_rose_pieces`.
 //!
 //! Pure: no clock, no randomness, no global state, so the same outline always
 //! yields the same chain (the determinism rule). Allocation-free into a
