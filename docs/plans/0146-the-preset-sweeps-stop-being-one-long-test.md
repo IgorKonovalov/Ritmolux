@@ -1,6 +1,6 @@
 # 0146 — The preset sweeps stop being one long test
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
 > **Related ADRs:** [0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
@@ -221,11 +221,11 @@ fn animation_attractor_leviathan() {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Spike: split the worst sweep | dev | not started | |
+| 1 — Spike: split the worst sweep | dev | done | committed with this row |
 | 2 — Split the remaining per-preset sweeps | dev | not started | |
 | 3 — Split `distinctness` per family | dev | not started | |
 | 4 — The `representative` key and its floor | dev | not started | |
@@ -233,7 +233,70 @@ fn animation_attractor_leviathan() {
 | 6 — Hang the sample on the per-phase tier | dev | not started | |
 | 7 — Measure, and state what it cost | dev | not started | |
 
+### Measurements
+
+**Machine** (ADR-0071): AMD Ryzen 9 5900HS, 16 logical CPUs, Windows 10 19045, rustc 1.97.1,
+cargo-nextest 0.9.140, on AC. **Tree:** `ee0792b`, Plan 0145's close. **Quiet precondition:**
+`cargo` / `cargo-nextest` / `rustc` and test-binary processes enumerated before and after every run;
+none present at any boundary, 16:21-16:55 CEST 2026-08-31. Test binaries were pre-built, so no
+compile sits inside any figure; elapsed is nextest's own `Summary` wall and concurrency is summed
+test-wall over it.
+
+**Before:**
+
+| arm | elapsed | summed test-wall | concurrency | tests |
+|---|---|---|---|---|
+| `-E 'binary(animation)'` | 133.7 s | 142.4 s | 1.07 | 3 |
+| `--workspace` | 464.2 s | 4,169.5 s | 8.98 | 1230 |
+| `--workspace -P fast` | 147.3 s | 2,002.8 s | 13.60 | 1203 |
+
+The five roster monoliths were the last five tests to finish, at positions 1225-1230 of 1230:
+`animation` 365.5 s, `reactivity` 336.4 s, `distinctness` 203.2 s, `sanity` loudness 172.8 s,
+`sanity` shape 128.8 s.
+
+**After:**
+
+| arm | elapsed | summed test-wall | concurrency | tests |
+|---|---|---|---|---|
+| `-E 'binary(animation)'` | 65.8 s | 1,011.6 s | 15.19 | 83 |
+| the same, `--test-threads=1` | 270.1 s | 270.1 s | 1.00 | 83 |
+| `--workspace` | 458.4 s | 4,747.1 s | 10.36 | 1310 |
+
+**Per-test device creation: 1.60 s.** Derived from the serial arm, which is the only one measuring
+work rather than contention: 270.1 s serial after against 142.4 s serial before is +127.7 s across
+the 80 renderer builds the split adds - 81 tests, one of whose devices the monolith already paid
+for. Per-preset render work is 133.7/81 = **1.65 s**, so one device costs about what one preset's
+three captures cost.
+
+`animation` left the critical path: its 81 tests summed 986.3 s contended with a 32.0 s maximum, and
+none of them appears in the suite's slowest eight or its last eight to finish. The last test is now
+`reactivity` at 279.6 s.
+
+`cargo nextest list -E 'binary(animation)'` enumerates 81 generated tests, diffing empty against the
+81 `presets/*.toml` stems. Copying a preset to `presets/zz_glob_probe.toml` took the list to 82 with
+no Rust edit and removing it returned it to 81.
+
 ### Notes
+
+**The Phase 1 stop condition trips on one of its two clauses. The plan is paused here.**
+
+- *"the binary's wall does not fall"* - it fell: 133.7 s to 65.8 s, 2.03x, with concurrency inside
+  the binary going 1.07 to 15.19.
+- *"the summed test-wall rises by more than it saves in elapsed"* - it does, on every reading.
+  Work added is **+127.7 s** (serial arm) against **67.9 s** of binary elapsed saved and **5.8 s**
+  of full-suite elapsed saved (464.2 s to 458.4 s).
+
+Both numbers are recorded above, per the phase's own instruction. Two observations that bear on
+reading them: ADR-0157 predicts this full-suite result at Phase 1 in as many words - *"splitting one
+merely promotes the next"* - and ADR-0157's Negative sizes the device-creation risk against *"the
+~9 s of per-preset work"*, where the measured per-preset work is 1.65 s.
+
+**The aggregate `driven_only` roster print is gone.** ADR-0136 asks that the set of presets still in
+silence be visible; with one test per preset there is no end of a sweep to collect it at, so each
+test prints its own branch label instead. Neither form is in `.config/nextest.toml`'s four-test
+audible override, so both are captured by nextest unless the test fails.
+
+**ADR-0136 cites `every_preset_animates_over_time`,** which no longer exists.
 
 ### Close triggers
 
