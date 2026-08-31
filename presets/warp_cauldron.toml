@@ -55,6 +55,7 @@
 # the library makes.
 system = "warp_mesh"
 name   = "Cauldron"
+representative = true
 
 [mesh]
 # Coarser than its siblings on purpose. The wobble is a smooth field with no

@@ -55,6 +55,7 @@
 
 system = "shape_collage"
 name   = "Suprematist"
+representative = true
 
 [palette]
 stops = [

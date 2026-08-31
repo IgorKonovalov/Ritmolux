@@ -19,6 +19,7 @@
 # the door is open rather than locked.
 system = "parametric_curve"
 name   = "Nightbloom"
+representative = true
 
 [curve]
 family = "maurer_rose"

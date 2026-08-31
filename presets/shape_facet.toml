@@ -98,6 +98,7 @@
 
 system = "shape_field"
 name   = "Facet"
+representative = true
 
 [palette]
 stops = [

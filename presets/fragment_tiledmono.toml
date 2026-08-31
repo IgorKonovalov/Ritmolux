@@ -113,6 +113,7 @@
 # frame edge. A constant is the only safe binding until that is fixed.
 system = "fragment_field"
 name = "Tiled Rosette Mono"
+representative = true
 
 [palette]
 # Twenty bands in five runs. Read as band counts: black 4, white 4, black 4,

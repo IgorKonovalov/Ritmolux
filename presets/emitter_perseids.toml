@@ -24,6 +24,7 @@
 # leans the radiant, treble sharpens the chroma, onset lifts the sky's glow.
 system = "emitter"
 name = "Perseids"
+representative = true
 
 [palette]
 stops = [

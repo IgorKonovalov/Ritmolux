@@ -9,6 +9,7 @@
 # continuous where `tuple` cuts, and the whole point is that it is gradual.
 system = "attractor"
 name = "Rho Walk"
+representative = true
 
 [particles]
 family = "lorenz"

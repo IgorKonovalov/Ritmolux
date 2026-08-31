@@ -2786,3 +2786,62 @@ fn the_representative_key_defaults_to_false_and_rejects_a_non_boolean() {
         );
     }
 }
+
+/// **Every family carries at least two representatives** (ADR-0157) — the floor
+/// that stops the per-phase sample decaying to nothing as content lands.
+///
+/// Two is the minimum that says anything: one representative makes a family's
+/// per-phase coverage a single preset, and zero makes the family invisible until
+/// the close. The failure names the family, because a count alone would send the
+/// reader back to the whole library to find which one moved.
+///
+/// **This catches absence and never staleness.** Two representatives that have
+/// stopped representing a family grown around them pass here exactly as they did
+/// the day they were chosen. That is a curation duty at the plan-close cadence
+/// with no gate behind it, and `presets/README.md` says so rather than leaving it
+/// to be inferred from this test's existence.
+#[test]
+fn every_family_carries_at_least_two_representatives() {
+    const FLOOR: usize = 2;
+
+    let presets = lmv_core::preset::default_presets();
+    let mut short = Vec::new();
+    let mut families = 0usize;
+    // `SystemKind::ALL` rather than the families the set happens to contain: it
+    // is the canonical roster, so a family cannot slip the floor by being missed.
+    for system in SystemKind::ALL {
+        let members: Vec<&Preset> = presets.iter().filter(|p| p.system == system).collect();
+        // A family shipping nothing has nothing to represent, and failing it here
+        // would gate the *library's* composition rather than the sample's.
+        if members.is_empty() {
+            continue;
+        }
+        families += 1;
+        let reps: Vec<&str> = members
+            .iter()
+            .filter(|p| p.representative)
+            .map(|p| p.name.as_str())
+            .collect();
+        println!(
+            "{system:?}: {}/{} representative(s) — {reps:?}",
+            reps.len(),
+            members.len()
+        );
+        if reps.len() < FLOOR {
+            short.push(format!(
+                "{system:?} ships {} preset(s) and declares {} representative(s) ({reps:?}),                  under the floor of {FLOOR} — add `representative = true` to the presets that                  stand for this family",
+                members.len(),
+                reps.len()
+            ));
+        }
+    }
+
+    assert!(
+        families > 0,
+        "no shipped preset was found, so this floor would hold vacuously"
+    );
+    assert!(
+        short.is_empty(),
+        "these families are under the representative floor: {short:#?}"
+    );
+}

@@ -6,6 +6,7 @@
 # cathedral of itself on the loud sections.
 system = "attractor"
 name = "Leviathan"
+representative = true
 
 [particles]
 family = "de_jong"

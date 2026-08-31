@@ -24,6 +24,7 @@
 # what is in it.
 system = "star_pattern"
 name   = "Star Mandala Bordered"
+representative = true
 
 [generator]
 tiling = "none"

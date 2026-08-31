@@ -251,8 +251,8 @@ fn animation_attractor_leviathan() {
 | 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
 | 2 — Split the remaining per-preset sweeps | dev | done | `e2f84cf` |
 | 3 — Split `distinctness` per family | dev | done | `1c52867` |
-| 4 — The `representative` key and its floor | dev | done | committed with this row |
-| 5 — Seed the representatives | dev | not started | |
+| 4 — The `representative` key and its floor | dev | done | `5107d8e` |
+| 5 — Seed the representatives | dev | done | committed with this row |
 | 6 — Hang the sample on the per-phase tier | dev | not started | |
 | 7 — Measure, and state what it cost | dev | not started | |
 
@@ -374,6 +374,46 @@ and a static `.config/nextest.toml` filter can select them. The cost, stated in 
 flipping the flag renames that preset's tests. This is also what ADR-0073 rules out when it says
 *"sampling cannot be a nextest filter"* — that was written when the sweeps were roster loops, and
 splitting them is what makes a filter possible at all.
+
+**Phase 5's seeding, and the matrix reading behind each pair.** The rule applied is the phase's own:
+the two furthest-apart presets in the family, by **`struct_diff`** — the shape metric, chosen because
+it is the one `distinctness` flags near-duplicates on, so "furthest apart" means the same thing here
+as it does there. Row alignment was checked rather than assumed: the printed matrix truncates names
+to eight characters and `Clifford`/`Clifford Gallery` collide there, so rows were indexed by the
+filename-sorted family order and the zero diagonal asserted before any pair was read.
+
+| family | n | representative A | representative B | shape |
+|---|---|---|---|---|
+| attractor | 19 | Leviathan | Rho Walk | 0.325 |
+| fragment_field | 13 | Tiled Rosette Mono | Whorl | 0.400 |
+| reaction_diffusion | 7 | Etching | Flux Mono | 0.340 |
+| shape_field | 6 | Contour Mono | Facet | 0.356 |
+| parametric_curve | 5 | Loom | Nightbloom | 0.271 |
+| lsystem | 5 | Coral | Rime | 0.232 |
+| spectrum | 5 | Ridge | Skyline | 0.229 |
+| emitter | 5 | Heartfall | Perseids | 0.262 |
+| swarm | 4 | Drift | Stipple | 0.203 |
+| star_pattern | 4 | Corona | Star Mandala Bordered | 0.247 |
+| warp_mesh | 4 | Cauldron | Millrace | 0.249 |
+| shape_collage | 4 | Collage Mono | Suprematist | 0.269 |
+
+**Three of those families have no shipped matrix, and the numbers above were measured for them.**
+`shape_field`, `warp_mesh` and `shape_collage` are absent from `distinctness`'s curated list, so the
+phase's rule had nothing to read. Rather than invent a preference, the three were added to `FAMILIES`
+in a **scratch** patch, the report run, and the patch reverted — `core/tests/distinctness.rs` is
+byte-identical to its Phase 3 state and the committed list is still nine. Their rows above are
+therefore real readings of the same statistic, taken the same way, from a report that does not ship
+them. Nothing about the curated list changed, which the plan puts out of scope.
+
+**No family's choice was ambiguous enough to defer.** The smallest winning margin over the
+second-best pair is in `swarm` (0.203, a 4-preset family), which is the case the phase says barely
+matters; every other family's maximum stands clear. The close-ceremony curation has the table above
+to overrule any of it from.
+
+**The floor test was proved to fail, not merely to pass.** Deleting `Rho Walk`'s flag reddens it with
+*"Attractor ships 19 preset(s) and declares 1 representative(s) ([\"Leviathan\"]), under the floor of
+2"*. It also prints every family's count on a pass, so the sample's shape is visible without a
+special run.
 
 **A counting trap worth recording, because it nearly entered these numbers.** `grep -c '^system'`
 over `presets/*.toml` returns **85** for 81 files: `fragment_interferencemono`, `fragment_nebula`,

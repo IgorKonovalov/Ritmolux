@@ -3,6 +3,7 @@
 # form is IN FRONT OF another instead of added to it.
 system = "shape_collage"
 name = "Collage Mono"
+representative = true
 
 [palette]
 # Eight plateaus at the generator's own coordinates (k/8 + 1/16); the last is

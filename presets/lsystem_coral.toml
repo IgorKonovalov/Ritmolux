@@ -27,6 +27,7 @@
 # the holdfast.
 system = "lsystem"
 name   = "Coral"
+representative = true
 
 [generator]
 axiom     = "X"
