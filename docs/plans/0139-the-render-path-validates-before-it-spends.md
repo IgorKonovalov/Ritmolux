@@ -1,6 +1,6 @@
 # 0139 — The render path validates before it spends
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
 > **Related ADRs:** none — both entries state *"No ADR needed"*.
@@ -147,3 +147,25 @@ flowchart TB
 - **It does not touch the diffusion filter at all**, and it does not carry backlog 0125. That
   entry's evidence gate is [Plan 0128](0128-the-rendered-file-stops-looking-upscaled.md) Phase 5,
   which owned it first.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0139` on `plan-0139-render-validates`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — Validate the preset name before spending anything | dev | done | committed with this row |
+| 2 — A size lever on the convenience path | dev | not started | |
+| 3 — The capture doc says what the levers are | dev | not started | |
+
+### Notes
+
+- Phase 1's assertions live in `standalone/src/shot/render/tests.rs`, which no phase's **Files
+  touched** names; it is `render.rs`'s own `mod tests` and was read as part of it.
+
+### Close triggers
+
+_(filled at the last phase.)_

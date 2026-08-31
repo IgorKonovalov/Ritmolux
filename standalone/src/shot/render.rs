@@ -654,6 +654,36 @@ impl ResidentSet {
 // The mode
 // ---------------------------------------------------------------------------
 
+/// Which preset this render will draw, or why it cannot.
+///
+/// The membership test is **exact equality on [`Preset::name`]**, the same
+/// comparison the renderer itself makes when it selects, so a name accepted here
+/// is a name the renderer will find. The roster's keys go into the failure text
+/// because the name is the preset's `name` field and not its filename, and those
+/// differ often enough that a bare rejection is a puzzle.
+///
+/// **This must run before the encoder is spawned and before a device is built.**
+/// `ffmpeg` exits 0 on a frame stream that never carried a frame, so a name
+/// rejected downstream of the spawn leaves a valid, playable, audio-only file at
+/// the destination — indistinguishable at a glance from a short render.
+fn resolve_preset(requested: Option<&str>, presets: &[Preset]) -> Result<String, String> {
+    match (requested, presets) {
+        (Some(name), _) => {
+            if presets.iter().any(|p| p.name == name) {
+                Ok(name.to_string())
+            } else {
+                let keys: Vec<&str> = presets.iter().map(|p| p.name.as_str()).collect();
+                Err(format!(
+                    "--render: unknown preset `{name}` ({})",
+                    keys.join(" | ")
+                ))
+            }
+        }
+        (None, [only]) => Ok(only.name.clone()),
+        (None, _) => Err("--render renders one preset: name it with --preset <name>".to_string()),
+    }
+}
+
 /// Render the clip, writing the stream to stdout or to a spawned encoder.
 ///
 /// **Everything human-readable goes to stderr**, because stdout is the frame
@@ -667,13 +697,7 @@ pub fn run(
     format: AudioFormat,
     label: &str,
 ) -> Result<(), String> {
-    let name = match (&req.preset, presets.as_slice()) {
-        (Some(name), _) => name.clone(),
-        (None, [only]) => only.name.clone(),
-        (None, _) => {
-            return Err("--render renders one preset: name it with --preset <name>".to_string());
-        }
-    };
+    let name = resolve_preset(req.preset.as_deref(), &presets)?;
     let frames = frame_count(pcm.len(), format, req.fps)?;
     eprintln!(
         "render: {name} over {label} — {frames} frames at {} fps, {}x{}, tier {} [{source}]",
