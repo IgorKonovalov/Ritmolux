@@ -159,7 +159,7 @@ flowchart TB
 |---|---|---|---|
 | 1 — Validate the preset name before spending anything | dev | done | `5cf50bc` |
 | 2 — A size lever on the convenience path | dev | done | `fa211e0` |
-| 3 — The capture doc says what the levers are | dev | done | committed with this row |
+| 3 — The capture doc says what the levers are | dev | done | `4d8e4c8` |
 
 ### Notes
 
@@ -176,4 +176,16 @@ flowchart TB
 
 ### Close triggers
 
-_(filled at the last phase.)_
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0111, 0112.
+- **What shipped:** a fix (Phase 1) and a feature (Phase 2's `--crf`), plus the doc sweep.
+- **Operator docs touched:** `docs/capturing.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, two broken, both this plan's
+  own `Closes:` entries - 0111 `absent: presets\.iter in: standalone/src/shot/render.rs` now matches
+  at `render.rs:704`, and 0112 `absent: --crf in: standalone/examples/shot.rs` now matches at
+  `shot.rs:52`. No third entry broke.
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), exit 0,
+  **1495 passed, 5 skipped, 0 failed**, 444.9 s. No suite was run under an upward override at an
+  earlier phase - no phase touched a scene, the composite, the preset engine or the embedded set,
+  so phases 1-3 each gated on `-P fast`.
+- **Outstanding `human` phases:** none - all three phases are `dev`.
