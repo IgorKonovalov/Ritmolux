@@ -117,6 +117,44 @@ artifact rather than a regression — which this project rejects for analysis an
 ### Alternative D — Run the sweeps in CI only
 Already rejected by ADR-0156 Alternative C: a plan would close having never run its own drift guards.
 
+## Measured correction (2026-08-31, at Plan 0146 Phase 1)
+
+**The decision stands. The argument it was made from does not, and is replaced here rather than
+left to be re-read as true.** Plan 0146 Phase 1 split `animation` and measured the result on an
+idle box, quiet verified before and after; the plan's `### Measurements` carries the full tables.
+
+**Falsified: the idle-machine premise.** *"Average concurrency 9.2 on 16 CPUs, so 43 % of the
+machine sits idle"* counts **processes**, not cores, and a sweep test is not single-threaded. The
+scaling curve over sixteen animation tests saturates at **3.51x** by eight threads for the expensive
+families and **6.18x** for the cheap ones — not the ~16x an idle machine would give. Device creation
+was ruled out as the cause: sixteen cheap presets reach 5.6 s, far under the 25.6 s a serialized
+device would impose. So there was no 43 % of idle machine to reclaim, and the **~500 s "perfect
+packing" floor this ADR quotes was never reachable.**
+
+**Survives, in corrected form: the critical-path mechanism.** What is true, and is what the decision
+actually rests on, is that **one test process cannot use more than about four of sixteen logical
+CPUs**. Measured directly by pinning affinity: the monolith runs **133.5 s on 4 cores and 133.7 s on
+16** — 0.17 % apart, so more machine buys it nothing — while the split runs **89.5 s on 4** and
+**65.8 s on 16**. A tail of four such monoliths cannot fill the box, and the last one standing
+leaves three quarters of it unusable. That is why splitting wins, and it holds on a small CI runner
+as well as on a large developer box: the split beats the monolith **1.49x at four cores** and
+**2.03x at sixteen**.
+
+**Mis-priced: the device-creation Negative.** This ADR sizes that risk against *"the ~9 s of
+per-preset work"*. The measured per-preset work is **1.65 s** and a device costs **1.60 s**, so the
+split roughly **doubles** the sweeps' work rather than adding a fraction to it. The Negative's
+direction was right and its magnitude was out by about 5x. The split still wins, because the packing
+it buys is worth more than the work it adds — but the margin is thinner than this ADR implies, and
+it is what makes sampling the half that matters for total cost.
+
+**Unchanged by any of this:** splitting redistributes and only sampling removes, `distinctness` must
+not be sampled, and the close and CI keep rendering the whole library. One consequence is worth
+stating plainly because this ADR does not: per
+[ADR-0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) the per-phase
+tier already excludes all nine GPU binaries, so hanging a sample on that tier **adds coverage the
+per-phase gate does not have today and costs time there** — it is not a saving, and Plan 0146 Phase 6
+should be read as buying coverage rather than speed.
+
 ## Notes
 
 The measurements above are Plan 0145's, taken 2026-08-31 on an idle box at `fd7f55b` (AMD Ryzen 9
