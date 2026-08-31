@@ -3,9 +3,10 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
 use super::{
-    ATTACK_FRAC, DEFAULT_SOURCE_Y, Field, Instance, Object, RETIRE_MARGIN, Spawn, bounds, build,
-    exit_time, size_factor, sprite_angle, twinkle_factor,
+    ATTACK_FRAC, DEFAULT_SOURCE_Y, Field, Object, RETIRE_MARGIN, Spawn, bounds, build, exit_time,
+    size_factor, sprite_angle, twinkle_factor,
 };
+use crate::render::scenes::marks::QuadInstance;
 
 /// A test aspect, and the retirement bound it gives.
 const ASPECT: f32 = 16.0 / 9.0;
@@ -1380,14 +1381,14 @@ fn the_pool_costs_what_the_nfr_says_it_does() {
         "docs/nfr.md section 12 charges the emitter pool at 40 bytes an object"
     );
     assert_eq!(
-        size_of::<Instance>(),
+        size_of::<QuadInstance>(),
         28,
         "docs/nfr.md section 12 charges the emitter's instance buffers at 28 bytes"
     );
     // The floor tier's total — both CPU copies, the free list, and the GPU
     // buffer — against the ~200 KB the table quotes.
     let floor = crate::render::TierConfig::FLOOR.emitter_objects;
-    let bytes = floor * (size_of::<Object>() + 4 + 2 * size_of::<Instance>());
+    let bytes = floor * (size_of::<Object>() + 4 + 2 * size_of::<QuadInstance>());
     assert!(
         (190_000..210_000).contains(&bytes),
         "the floor pool costs {bytes} bytes, not the ~200 KB docs/nfr.md quotes"

@@ -102,6 +102,8 @@
     clippy::unreachable
 )]
 
+use crate::render::gpu;
+
 /// The `shape` roster, in the order the numeric parameter selects them.
 ///
 /// `shape` is a **numeric selector**, like `kaleido_edge`: the preset expression
@@ -140,6 +142,195 @@ const MIN_POINTS: f32 = 3.0;
 const MAX_POINTS: f32 = 12.0;
 /// `points` default — a five-pointed star / a pentagon.
 pub(crate) const DEFAULT_POINTS: f32 = 5.0;
+
+// --- The instanced-quad draw both mark scenes share ----------------------------
+
+/// One camera-facing quad, expanded in the vertex shader from a centre, a size
+/// and a colour (ADR-0007).
+///
+/// The **fourth attribute is the scene's own**: the swarm resolves its
+/// particle's depth parallax into it, the emitter its sprite's orientation in
+/// radians. Both shaders read it at `@location(3)`; nothing shared interprets
+/// it, which is why it has no name of its own here.
+///
+/// **`attr` stays last.** `vertex_attr_array!` assigns shader locations by
+/// declaration order and offsets by field order, so a field inserted anywhere
+/// above it silently re-points every attribute after it — the failure looks like
+/// an adapter bug, not like a struct change.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct QuadInstance {
+    /// Centre, world units.
+    pub center: [f32; 2],
+    /// Half-extent, world units.
+    pub size: f32,
+    /// Premultiplied light (ADR-0056): the colour already scaled by brightness.
+    pub color: [f32; 3],
+    /// The scene's fourth attribute — see the type docs.
+    pub attr: f32,
+}
+
+/// The uniform both mark scenes bind at group 0, binding 0.
+///
+/// Three `vec4` rows because that is WGSL's uniform layout rule, not because
+/// twelve slots are wanted: `v` is the view (`aspect`, `zoom`, `pan_x`,
+/// `pan_y`), `m` is `[shape, points, 0, 0]` (ADR-0084) and `s` is
+/// `[star_valley, star_curve, star_jitter, 0]`. Both scenes quantize on the way
+/// in, so no fractional point count reaches an angular fold.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct QuadUniform {
+    /// `[aspect, zoom, pan_x, pan_y]`.
+    pub v: [f32; 4],
+    /// `[shape, points, 0, 0]`.
+    pub m: [f32; 4],
+    /// `[star_valley, star_curve, star_jitter, 0]`.
+    pub s: [f32; 4],
+}
+
+/// The instance buffer, the [`QuadUniform`], the instanced-quad pipeline and the
+/// draw — everything `swarm` and `emitter` need to put marks on screen once
+/// their simulations have decided where the marks are.
+///
+/// # It is handed a layout, never asked to build one
+///
+/// The two scenes' bind-group layouts are **deliberately different shapes**, and
+/// that difference is the third recorded instance of ADR-0058's hazard: written
+/// byte-identical, the emitter's pipeline made the *swarm* read the emitter's
+/// uniform on DX12 WARP. `emitter.rs` carries the measurement and says not to
+/// tidy it back. A constructor that built the layout from a visibility mask and a
+/// size argument would hide that difference behind two parameters, and would also
+/// take both layouts out of the enumeration
+/// `no_two_layouts_share_a_shape_without_recorded_evidence` builds by scanning
+/// `core/src` for `create_bind_group_layout` with literal entries — removing the
+/// pair the guard exists for. So each scene declares its own layout and passes
+/// it here.
+pub(crate) struct InstancedQuads {
+    pipeline: wgpu::RenderPipeline,
+    instances: wgpu::Buffer,
+    uniforms: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+}
+
+impl InstancedQuads {
+    /// The instance buffer sized for `capacity` marks, the uniform buffer, the
+    /// bind group over `bind_layout`, and the pipeline: one instance-stepped
+    /// vertex buffer, six vertices per quad, additive light with saturating
+    /// coverage (ADR-0056).
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        stem: &str,
+        capacity: usize,
+        shader: &wgpu::ShaderModule,
+        bind_layout: &wgpu::BindGroupLayout,
+        target_format: wgpu::TextureFormat,
+    ) -> Self {
+        let instances = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(&format!("{stem}-instances")),
+            size: (capacity * std::mem::size_of::<QuadInstance>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let uniforms = gpu::uniform_buffer(
+            device,
+            &format!("{stem}-misc"),
+            std::mem::size_of::<QuadUniform>(),
+        );
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("{stem}-bind-group")),
+            layout: bind_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniforms.as_entire_binding(),
+            }],
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(&format!("{stem}-pipeline-layout")),
+            bind_group_layouts: &[Some(bind_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(&format!("{stem}-pipeline")),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<QuadInstance>() as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &wgpu::vertex_attr_array![
+                        0 => Float32x2,
+                        1 => Float32,
+                        2 => Float32x3,
+                        3 => Float32,
+                    ],
+                })],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    // Additive light, saturating coverage (ADR-0056) — the same
+                    // state the line renderer draws through, so the three mark
+                    // seams cannot drift.
+                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            pipeline,
+            instances,
+            uniforms,
+            bind_group,
+        }
+    }
+
+    /// Write this frame's view and silhouette uniform.
+    pub(crate) fn write_uniform(&self, queue: &wgpu::Queue, uniform: &QuadUniform) {
+        queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(uniform));
+    }
+
+    /// Write this frame's marks. A zero-length `write_buffer` is not legal, so an
+    /// empty slice writes nothing.
+    pub(crate) fn write_instances(&self, queue: &wgpu::Queue, instances: &[QuadInstance]) {
+        if instances.is_empty() {
+            return;
+        }
+        queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(instances));
+    }
+
+    /// Encode the draw: six vertices, `count` instances.
+    ///
+    /// **The pass is begun even at `count == 0`**, which is what the emitter did
+    /// when its field was empty: the load/store pair is encoded either way, and
+    /// dropping it would change what the command buffer contains on an idle frame.
+    pub(crate) fn draw(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        label: &str,
+        view: &wgpu::TextureView,
+        load: wgpu::LoadOp<wgpu::Color>,
+        count: u32,
+    ) {
+        let mut pass = gpu::color_pass(encoder, label, view, load);
+        if count == 0 {
+            return;
+        }
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.instances.slice(..));
+        pass.draw(0..6, 0..count);
+    }
+}
 
 // --- The silhouette constants the WGSL is templated with -----------------------
 //

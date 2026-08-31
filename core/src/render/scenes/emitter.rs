@@ -64,7 +64,6 @@ use super::common;
 use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
-use crate::render::gpu;
 use crate::render::palette::{self, Palette};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
@@ -297,32 +296,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color * g, g);
 }
 "#;
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Instance {
-    center: [f32; 2],
-    size: f32,
-    color: [f32; 3],
-    /// The sprite's orientation in radians, resolved on the CPU from the
-    /// object's seeded base angle and `spin` times its age (Plan 0052 Phase 2),
-    /// so the shader needs no per-object state and no spin constants.
-    angle: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Misc {
-    v: [f32; 4],
-    /// `[shape, points, 0, 0]` — the mark silhouette, quantized on the way in
-    /// (ADR-0084), padded to a second `vec4` by WGSL's uniform layout rule.
-    m: [f32; 4],
-    /// `[star_valley, star_curve, star_jitter, 0]` — the star arm's three shape
-    /// params, conditioned on the way in (Plan 0091 Phase 5). A third `vec4`
-    /// rather than a wider `m` because WGSL's uniform layout rule packs in
-    /// 16-byte rows; the layout SHAPE is unchanged, so ADR-0058 is untouched.
-    s: [f32; 4],
-}
 
 /// One thrown object. Everything here is fixed at spawn — the path is decided
 /// once and never re-steered (ADR-0057: no drag, no flow field, no collision).
@@ -822,12 +795,15 @@ pub const PARAMS: &[&str] = &[
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).
 pub struct EmitterScene {
-    pipeline: wgpu::RenderPipeline,
-    instances: wgpu::Buffer,
-    uniforms: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    /// The instance buffer, the view/silhouette uniform, the bind group over the
+    /// layout declared below, and the instanced-quad pipeline (ADR-0007).
+    quads: marks::InstancedQuads,
     field: Field,
-    instance_data: Vec<Instance>,
+    /// This frame's marks, rebuilt in place every `update` — the fourth attribute
+    /// is this scene's **sprite orientation** in radians, resolved on the CPU
+    /// from the object's seeded base angle and `spin` times its age (Plan 0052
+    /// Phase 2), so the shader needs no per-object state.
+    instance_data: Vec<marks::QuadInstance>,
     /// How many of `instance_data`'s slots this frame's draw uses.
     draw_count: usize,
     /// Shared scene clock (seconds), set by the renderer each frame.
@@ -909,13 +885,6 @@ impl EmitterScene {
                 .into(),
             ),
         });
-        let instances = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("emitter-instances"),
-            size: (capacity * std::mem::size_of::<Instance>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let uniforms = gpu::uniform_buffer(device, "emitter-misc", std::mem::size_of::<Misc>());
         // **This layout is deliberately not the swarm's, and that is load-bearing
         // on the software adapter** (design-backlog 0039, the surface Plan 0053
         // is about).
@@ -948,74 +917,30 @@ impl EmitterScene {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: std::num::NonZeroU64::new(std::mem::size_of::<Misc>() as u64),
+                    min_binding_size: std::num::NonZeroU64::new(std::mem::size_of::<
+                        marks::QuadUniform,
+                    >() as u64),
                 },
                 count: None,
             }],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("emitter-bind-group"),
-            layout: &bind_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniforms.as_entire_binding(),
-            }],
-        });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("emitter-pipeline-layout"),
-            bind_group_layouts: &[Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("emitter-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Instance>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &wgpu::vertex_attr_array![
-                        0 => Float32x2,
-                        1 => Float32,
-                        2 => Float32x3,
-                        3 => Float32,
-                    ],
-                })],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    // Additive light, saturating coverage (ADR-0056) — shared
-                    // with the swarm and the line renderer so the three cannot
-                    // drift.
-                    blend: Some(gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
 
         Self {
-            pipeline,
-            instances,
-            uniforms,
-            bind_group,
+            quads: marks::InstancedQuads::new(
+                device,
+                "emitter",
+                capacity,
+                &shader,
+                &bind_layout,
+                surface_format,
+            ),
             field: Field::new(capacity),
             instance_data: vec![
-                Instance {
+                marks::QuadInstance {
                     center: [0.0, 0.0],
                     size: 0.0,
                     color: [0.0, 0.0, 0.0],
-                    angle: 0.0,
+                    attr: 0.0,
                 };
                 capacity
             ],
@@ -1214,11 +1139,11 @@ impl Scene for EmitterScene {
                 * envelope(u)
                 * spawn_ramp(u, spawn_fade)
                 * twinkle_factor(object.seed, time, twinkle);
-            *slot = Instance {
+            *slot = marks::QuadInstance {
                 center: pos,
                 size: size * size_factor(object.seed, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
-                angle: sprite_angle(object.seed, age, spin),
+                attr: sprite_angle(object.seed, age, spin),
             };
             count += 1;
         }
@@ -1236,10 +1161,9 @@ impl Scene for EmitterScene {
         // render target's aspect — the only correct source for a shape
         // (ADR-0037).
         self.aspect = aspect.max(0.1);
-        queue.write_buffer(
-            &self.uniforms,
-            0,
-            bytemuck::bytes_of(&Misc {
+        self.quads.write_uniform(
+            queue,
+            &marks::QuadUniform {
                 v: [self.aspect, self.zoom, self.pan.x, self.pan.y],
                 // Quantized here, on the way into the uniform, so the shader's
                 // precondition stays visible on the CPU side: no fractional
@@ -1256,23 +1180,20 @@ impl Scene for EmitterScene {
                     marks::star_jitter(self.star_jitter),
                     0.0,
                 ],
-            }),
+            },
         );
-        if let Some(live) = self.instance_data.get(..self.draw_count)
-            && !live.is_empty()
-        {
-            queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(live));
+        if let Some(live) = self.instance_data.get(..self.draw_count) {
+            self.quads.write_instances(queue, live);
         }
 
         // Load over the engine backdrop (ADR-0018).
-        let mut pass = gpu::color_pass(encoder, "emitter-pass", view, wgpu::LoadOp::Load);
-        if self.draw_count == 0 {
-            return;
-        }
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, self.instances.slice(..));
-        pass.draw(0..6, 0..self.draw_count as u32);
+        self.quads.draw(
+            encoder,
+            "emitter-pass",
+            view,
+            wgpu::LoadOp::Load,
+            self.draw_count as u32,
+        );
     }
 }
 

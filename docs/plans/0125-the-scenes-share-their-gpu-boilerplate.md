@@ -224,8 +224,8 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 | 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | 8d2d590 |
 | 2 — `palette::LutPair` | dev | done | 672cd85 |
 | 3 — `scenes::common::{PaletteParams, PanParams}` | dev | done | c7dab47 |
-| 4 — `gpu::FullscreenScene` | dev | committed with this row | |
-| 5 — `marks::InstancedQuads` | dev | not started | |
+| 4 — `gpu::FullscreenScene` | dev | done | 60f57a7 |
+| 5 — `marks::InstancedQuads` | dev | committed with this row | |
 
 ### Notes
 
@@ -342,6 +342,39 @@ The layout guard prints **35 layouts walked and 4 allowed pairs, all of them pre
 new allowlist row. The `docs/capturing.md` adapter check was run at 512x512 on the three SDF
 fixtures as well as at the golden's 128: hardware and WARP agree, and both are byte-identical to
 `main`.
+
+**Phase 5. The type is not "parameterised by label, visibility and `min_binding_size`" as the
+phase describes it — it takes a finished layout.** Label yes; the other two stay in each scene's
+own literal `create_bind_group_layout`, for the reason recorded above and one that is sharper
+here than in Phase 4: *this* pair is ADR-0058's third recorded instance. Building the layout from
+a visibility mask and a size would put the emitter's `VERTEX_FRAGMENT` + declared size behind two
+arguments, and would take both layouts out of the enumeration the guard scans. The guard still
+prints them as distinct shapes — `swarm-bind-layout [Uniform:VERTEX]`, `emitter-bind-layout
+[Uniform:VERTEX_FRAGMENT+size]` — 35 layouts walked, the same four pre-existing allowlist rows,
+none added. The 25-line comment in `emitter.rs` that records the measurement still sits directly
+above the layout it explains.
+
+**The two `Instance` structs were byte-identical but not semantically identical.** Same four
+fields in the same order, and the fourth is the swarm's *depth parallax* and the emitter's *sprite
+orientation in radians*. The shared `marks::QuadInstance` therefore names it `attr` and the type
+docs say whose it is at each scene; the field docs also pin it **last**, because
+`vertex_attr_array!` assigns offsets by declaration order. `Misc` was identical in both and is now
+`marks::QuadUniform`. Both scenes' WGSL still declares its own `struct Misc` — those are shader
+text, not Rust.
+
+**A fourth file changed, outside the phase's three:** `core/src/render/scenes/emitter/tests.rs`
+imported `Instance` by name and asserts `size_of::<Instance>() == 28` against `docs/nfr.md`
+section 12. It now imports `marks::QuadInstance`; the assertion and the number are unchanged.
+
+Two behavioural details preserved deliberately. `InstancedQuads::draw` **begins the pass even at
+`count == 0`** — the emitter did, and dropping it would change what an idle frame's command buffer
+contains. `write_instances` returns early on an empty slice, which the emitter had inline and the
+swarm did not need (its instance vector is never empty).
+
+**The first full run of this phase's suite is void: the machine entered modern standby part way
+through** (Kernel-Power 506/507, ~22:17 onward). Every test in the cohort that was live reports
+~7740 s, and two `transition` tests failed with `headless capture readback failed`. The clean
+re-run is the one recorded below.
 
 **A constraint Phases 4 and 5 inherit, found while reading the Phase-1 gate.**
 `no_two_layouts_share_a_shape_without_recorded_evidence` reads layouts by **scanning
