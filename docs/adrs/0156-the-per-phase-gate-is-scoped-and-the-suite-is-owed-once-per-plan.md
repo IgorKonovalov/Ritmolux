@@ -138,6 +138,14 @@ belong in a decision record. Plan 0145 Phase 1 takes the baseline on a quiet box
 The counts in this ADR are not timings and are unaffected: 1212 / 1185 / 27 tests come from
 `cargo nextest list`, and 54 / 81 presets from `git ls-tree` at two named commits.
 
+**A clean pair was obtained later the same day**, on an idle box with the precondition verified
+before and after: the full suite **869 s** (1217 tests) against **163 s** under the pre-push filter
+(1190 tests), with a 64 s compile/lint/link floor either way. Summing per-test durations, the nine
+excluded binaries hold **80 %** of all test time and four preset sweeps alone hold **73 %**. Those
+readings and their caveats live in Plan 0145's `### The measured baseline`, which is where a reader
+should go — including the finding that three readings of the same command spanned **489–885 s**
+within an hour, so the decision rests on the 80 % share and not on any single wall-time figure.
+
 **Concurrent lanes are a second, independent cost centre.** The GPU suites serialize on one adapter,
 so N lanes running them at once cost N times as long each. That is not addressed here and is filed
 as a followup on Plan 0145.
