@@ -4168,8 +4168,9 @@ class rather than six instances of it, and it would run at pre-push and in CI li
 **Impact:** low severity, unbounded frequency. Nothing catches the next one, and Plan 0124's close
 is the moment the project is most likely to believe it did.
 
-- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer      than it in: core/src/dsp/mod.rs`
-- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the                  embedded set in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer\s{2,}than it in: core/src/dsp/mod.rs`
+- **Re-written 2026-08-31**, at Plan 0144's review. Both probes above and below were written with the literal run of spaces they are about, which the gate collapses to one before matching (see 0171), so neither could ever fire. `\s{2,}` carries the same claim and survives, because it holds no space character. Note that the repair is not checkable from here either: `firstMatch` excludes the backlog from every probe by design, since the file quotes each pattern verbatim.
+- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the\s{2,}embedded set in: standalone/src/stream.rs`
 - **Verified 2026-08-30** - the guard is still an enumeration rather than a scan: `absent: fn operator_messages_carry_no_run_of_spaces[\s\S]{0,4000}read_to_string in: core/tests/preset.rs`
 
 ## 0169 - `cargo doc` emits 64 intra-doc-link warnings and nothing in the project runs `cargo doc`
@@ -4235,3 +4236,93 @@ way and is green today only because neither vendored tree happens to carry a rel
 - **Verified 2026-08-30** - nothing consults git's ignore rules: `absent: check-ignore in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-30** - the by-name patch this entry says is not the fix is present: `present: const VENDORED_TREES = new Set in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-30** - and both ignore rules that make the trees invisible to CI still stand: `present: plugin-foobar/sdk/ in: .gitignore`
+
+
+## 0171 - a backlog probe about a run of spaces is collapsed to one space before it is matched, so it can never fire
+
+> **Filed 2026-08-31** at Plan 0144's review, by moving 0168 into the probed section and watching
+> the gate hand its own probe back with the spaces gone.
+
+`scripts/check-backlog-claims.mjs:225` extracts each probe from its bullet with
+
+```js
+.map((m) => m[1].replace(/\s+/g, " ").trim())
+```
+
+which is right for the reason it was written - a markdown bullet may wrap across source lines, and
+the pattern has to survive that - and wrong for one class of claim. **A probe whose regex contains a
+run of two or more spaces is silently rewritten into a different regex**, one that matches
+single-spaced text the tree does not contain. It does not error, it does not warn; it reports `no
+match` and reads exactly like decay.
+
+**The instance, which is the reason this is filed rather than noticed.** Entry 0168 is *about* the
+broken-literal defect - a string carrying a run of spaces mid-sentence - and both of its probes
+quoted the run verbatim:
+
+```
+present: cannot be longer      than it in: core/src/dsp/mod.rs
+present: is not a flag, but the                  embedded set in: standalone/src/stream.rs
+```
+
+Neither has ever been capable of matching. That went unseen for a second reason - 0168 sat above
+`## Open entries`, where nothing probes at all - so the two defects hid each other, and the entry
+looked green by being unread. Both probes now use `\s{2,}`, which carries the same claim and holds
+no space character to collapse.
+
+**Impact.** Low frequency, and bounded: after 0168's repair no live probe contains a space run.
+It is filed because the failure is silent in the direction that matters - an author writes the
+claim they mean, the gate accepts the bullet, and the probe is dead on arrival. ADR-0108's whole
+argument is that a claim about the repo carries something re-runnable; a probe that cannot fire is
+the one shape that satisfies the letter of that and none of it.
+
+**What a fix looks like.** Two options, and the cheap one is probably right. **Refuse it:** after
+collapsing, if the extracted span differs from the source span, print the entry and the probe and
+exit non-zero - the author is told to use `\s{2,}` and nothing is silently rewritten. Roughly five
+lines, and it converts an unfalsifiable probe into a build error the moment it is written. **Or
+preserve it:** join wrapped bullet lines with a single space but leave interior runs alone, which
+is more faithful and more code, and needs care where a bullet wraps mid-pattern. The gate's own
+grammar note already says *"Regex source, so a literal dot needs escaping"*; whichever way this
+lands, it should say the same about a space.
+
+- **Verified 2026-08-31** - the collapse is still unconditional and still happens before the verb is read: `present: replace\(/\\s\+/g, " "\) in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-31** - and nothing tells the author it happened: there is no diagnostic on the rewrite, which is the whole of why the probe reads as decay rather than as a mistake: `absent: collapse in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-31** - the grammar note tells an author to escape a dot and says nothing about a space: `present: a literal dot needs escaping in: scripts/check-backlog-claims.mjs`
+
+## 0172 - the seeded preset directory is never pruned, so an operator's roster drifts from the shipped set and can hold two presets under one name
+
+> **Filed 2026-08-31** at Plan 0144's review. Surfaced because Phase 3 gave the window a
+> `--preset <name>` that matches the display name exactly, which makes the drift operator-visible
+> for the first time.
+
+`preset::seed_dir` writes an embedded preset into the per-user directory only when the file is not
+already there, and **removes nothing**. That is the correct rule for the problem it solves - it must
+never overwrite an operator's edits - but it has no counterpart. A preset that is renamed, retired
+or re-slugged upstream is written once and then stays in that directory for the life of the install,
+while the new file arrives beside it on the next launch.
+
+**What that adds up to on a machine that has tracked this project for a while.** The shipped set is
+81 presets with no duplicate display name. The development box's own
+`%APPDATA%\light-music-visualizer\presets` holds **118**, and two of them are named `Coral`.
+`Renderer::select_preset_by_name` takes the first exact match, so the second is unreachable by name
+from the window, from `--stream`, and from anything else that selects by name - while both still
+appear in the browse overlay and both still take a turn in the rotation.
+
+**Why it is worth recording rather than shrugging at.** Nothing is broken and no gate can see this:
+the repo is clean by construction, and the drift lives entirely in a directory that exists in no
+checkout. Every preset-set judgement this project makes - the curation sweep at a plan close,
+`shot --presets presets --report`, the distinctness gate - reads `presets/`, which is the set an
+operator with a fresh install has and nobody who has been here a while does. The reachability loss
+is the sharp end; the general form is that the thing being demonstrated and the thing shipped are
+different sets, and no instrument reports the difference.
+
+**What a fix looks like.** Not a prune - deleting from a directory the operator is invited to edit
+is the wrong default and would eat their work. The honest options are to **report** rather than
+repair: seeding already prints `seeded {n} curated preset(s)`, and the same pass knows which files
+in the directory are not in the embedded set and whether any display name is claimed twice. One
+extra line at startup naming both counts would make the drift visible to the person who can decide
+about it. A `--list-presets` flag - the one `stream.rs`'s own error message says is not a flag -
+would serve the same end deliberately rather than as a side effect.
+
+- **Verified 2026-08-31** - seeding is write-if-absent and has no removal arm: `present: if !path.exists\(\) in: core/src/preset/mod.rs`
+- **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/mod.rs`
+- **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
