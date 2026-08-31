@@ -49,6 +49,9 @@
 //!   --ffmpeg <path>          spawn this encoder and wire the pipe, so one
 //!                            command produces a file. Needs --out <file>.
 //!                            No encoder ships and there is no fallback
+//!   --crf <0-51>             the encoder's rate-quality setting (default 18,
+//!                            archival). Higher is smaller; +6 is about half the
+//!                            size. Needs --ffmpeg
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -158,6 +161,10 @@ struct Args {
     /// so the common case is one command (Plan 0101 Phase 2). Nothing is bundled
     /// and there is no fallback — see [`render::EncoderRequest`].
     ffmpeg: Option<PathBuf>,
+    /// `--crf <n>`: the encoder's rate-quality setting, `None` for
+    /// [`render::DEFAULT_CRF`]. An `Option` rather than an eager default so
+    /// "passed without an encoder to pass it to" is an exact question.
+    crf: Option<u8>,
 }
 
 impl Default for Args {
@@ -188,6 +195,7 @@ impl Default for Args {
             render: None,
             fps: render::DEFAULT_FPS,
             ffmpeg: None,
+            crf: None,
         }
     }
 }
@@ -252,6 +260,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--fps" => args.fps = parse_fps(&next_value(&mut it, "--fps")?)?,
             "--ffmpeg" => args.ffmpeg = Some(PathBuf::from(next_value(&mut it, "--ffmpeg")?)),
+            "--crf" => args.crf = Some(render::parse_crf(&next_value(&mut it, "--crf")?)?),
             "--at" => args.at = Some(parse_hops(&next_value(&mut it, "--at")?)?),
             "--frame-at" => {
                 let value = next_value(&mut it, "--frame-at")?;
@@ -336,6 +345,15 @@ fn parse_args() -> Result<Args, String> {
             }
             _ => {}
         }
+        // The raw-stream path encodes nothing, so there is no command line for
+        // `--crf` to appear in and it would be accepted and silently ignored.
+        if args.crf.is_some() && args.ffmpeg.is_none() {
+            return Err(
+                "--crf configures the encoder --ffmpeg spawns; without one the frame \
+                 stream goes to stdout unencoded and your own encoder sets the rate"
+                    .to_string(),
+            );
+        }
     } else {
         // Every other capture path steps at the fixed capture cadence and writes
         // its own file, so either flag outside `--render` would be accepted and
@@ -345,6 +363,9 @@ fn parse_args() -> Result<Args, String> {
         }
         if args.ffmpeg.is_some() {
             return Err("--ffmpeg only applies to --render <clip.wav>".to_string());
+        }
+        if args.crf.is_some() {
+            return Err("--crf only applies to --render <clip.wav>".to_string());
         }
     }
     Ok(args)
@@ -406,7 +427,10 @@ fn print_usage() {
          --fps <n|num/den>          render frame rate (default 60; 30000/1001\n\
                                     for NTSC - a decimal is rejected)\n\
          --ffmpeg <path>            spawn this encoder and wire the pipe, so\n\
-                                    one command makes a file. Needs --out"
+                                    one command makes a file. Needs --out\n\
+         --crf <0-51>               encoder rate-quality (default 18, archival).\n\
+                                    Higher is smaller; +6 about halves it.\n\
+                                    Needs --ffmpeg"
     );
 }
 
@@ -525,6 +549,7 @@ fn offline_render(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), 
             ffmpeg,
             clip: path.clone(),
             out,
+            crf: args.crf.unwrap_or(render::DEFAULT_CRF),
         });
     render::run(
         presets,

@@ -462,6 +462,7 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     let args = ffmpeg_args(
         std::path::Path::new("track.wav"),
         std::path::Path::new("out.mp4"),
+        DEFAULT_CRF,
     );
     let line = args.join(" ");
 
@@ -503,6 +504,61 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     // Overwrite without prompting: an encoder waiting on a y/n at the far end of
     // a pipe is a render that hangs with no explanation.
     assert!(args.iter().any(|a| a == "-y"), "{line}");
+
+    // The default is archival and stays archival: `--crf` adds a lever beside it
+    // and does not move it.
+    assert!(line.contains("-crf 18"), "{line}");
+}
+
+/// `--crf` moves exactly one argument. Everything the previous test pins
+/// *describes the stream* — geometry, colour, mapping — and a size lever that
+/// dropped one of those would be a worse defect than the archival default it was
+/// added to work around.
+#[test]
+fn a_moved_crf_changes_the_rate_and_nothing_that_describes_the_stream() {
+    let clip = std::path::Path::new("track.wav");
+    let out = std::path::Path::new("out.mp4");
+
+    let default = ffmpeg_args(clip, out, DEFAULT_CRF);
+    let moved = ffmpeg_args(clip, out, 23);
+
+    assert!(moved.join(" ").contains("-crf 23"));
+    assert_eq!(
+        default.len(),
+        moved.len(),
+        "a rate change adds and removes no argument"
+    );
+
+    // The one differing position is the value after `-crf`, and every colour tag
+    // and mapping argument is byte-identical across the two.
+    let differing: Vec<usize> = (0..default.len())
+        .filter(|&i| default[i] != moved[i])
+        .collect();
+    assert_eq!(
+        differing,
+        vec![
+            default
+                .iter()
+                .position(|a| a == "-crf")
+                .expect("a -crf flag")
+                + 1
+        ]
+    );
+}
+
+/// The range is x264's own. Outside it the encoder rejects the whole command
+/// line, and the failure arrives as the encoder's diagnostics through a pipe
+/// rather than as a named flag error.
+#[test]
+fn crf_parses_its_range_and_refuses_what_the_encoder_would() {
+    assert_eq!(parse_crf("23"), Ok(23));
+    assert_eq!(parse_crf(" 0 "), Ok(0));
+    assert_eq!(parse_crf("51"), Ok(51));
+
+    for bad in ["52", "-1", "18.5", "", "high"] {
+        let err = parse_crf(bad).expect_err("{bad} is not a crf");
+        assert!(err.contains("--crf"), "the error names the flag: {err}");
+    }
 }
 
 // ---------------------------------------------------------------------------

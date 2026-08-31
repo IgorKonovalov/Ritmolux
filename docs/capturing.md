@@ -296,6 +296,29 @@ ffmpeg -hide_banner -nostats -y -f yuv4mpegpipe -i pipe:0 -i track.wav \
   -c:a aac -b:a 192k -shortest track.mp4
 ```
 
+**`-crf` is the one argument you may move, and `--crf <0-51>` moves it.**
+Everything else in that command line *describes the stream* — geometry, mapping,
+colour — and a lever on any of those would be a way to mistype what is already on
+the wire. The default of 18 is archival and deliberately not shareable: on a 30 s
+slice of `attractor_leviathan` at 1080p60 rich it is **119 Mbit/s**, against
+**60** at `-crf 23` and **27** at `-crf 28`, where a typical 1080p60 upload
+recommendation is about 12. Lower is bigger and better; the scale is roughly
+logarithmic, so `+6` is about half the size. The default does not move, because a
+capture is evidence first — re-encoding down from an archival master is lossy but
+possible, and the reverse is not.
+
+```bash
+# The same render at a shareable size.
+cargo run -p standalone --example shot --   --preset "Supernova" --render track.wav --fps 30 --size 1920x1080   --ffmpeg ffmpeg --out track.mp4 --crf 23
+```
+
+`--crf` needs `--ffmpeg`, and says so rather than being ignored: without an
+encoder there is no command line for it to appear in. **The other size-control
+route is the raw-stream path** — omit `--ffmpeg`, redirect stdout, and run your
+own encoder with whatever rate control, codec, or two-pass recipe you want. That
+path is the one that has always been there and `--crf` does not replace it; what
+it buys is that the common case stays one command line.
+
 No `-s` or input `-pix_fmt`: the geometry is on the wire, which is the point of a
 self-describing stream. The `-map` pair is explicit so a clip carrying album art
 cannot displace the rendered picture. The four colour tags are the half most

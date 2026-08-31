@@ -138,6 +138,33 @@ impl Fps {
     }
 }
 
+/// The encoder's rate-quality setting: **archival, not shareable.** On the
+/// measured slice this is about nine times a typical 1080p60 upload
+/// recommendation, and that is the deliberate choice — a capture is evidence
+/// first, and re-encoding down from it is lossy but possible while the reverse is
+/// not. `--crf` moves it per run; the anchors are in Plan 0139 Phase 2.
+pub const DEFAULT_CRF: u8 = 18;
+
+/// The widest range x264 accepts. Outside it the encoder rejects the whole
+/// command line, so catching it here is the difference between a named flag
+/// error and a spawn that dies with the encoder's own diagnostics.
+const CRF_RANGE: std::ops::RangeInclusive<u8> = 0..=51;
+
+/// Parse `--crf` as an x264 rate-quality value.
+///
+/// Lower is bigger and better; the scale is roughly logarithmic, so `+6` is
+/// about half the size.
+pub fn parse_crf(spec: &str) -> Result<u8, String> {
+    let crf: u8 = spec
+        .trim()
+        .parse()
+        .map_err(|_| format!("--crf expects a whole number 0-51, got `{spec}`"))?;
+    if !CRF_RANGE.contains(&crf) {
+        return Err(format!("--crf `{spec}` is outside x264's range 0-51"));
+    }
+    Ok(crf)
+}
+
 /// Parse `--fps` as a whole number of frames a second, or as an exact
 /// `num/den` rational.
 ///
@@ -339,6 +366,11 @@ pub struct EncoderRequest {
     pub clip: std::path::PathBuf,
     /// Where the encoded file lands.
     pub out: std::path::PathBuf,
+    /// `--crf`: the encoder's rate-quality setting, defaulting to
+    /// [`DEFAULT_CRF`]. The only argument of the generated command line a caller
+    /// may move — everything else in it describes the stream, and a lever on any
+    /// of those would be a way to mistype what is already on the wire.
+    pub crf: u8,
 }
 
 /// Drive `name` over `pcm` at `fps`, handing every rendered frame to `sink`.
@@ -416,7 +448,9 @@ pub fn render_frames(
 ///   ignore the latter outright.
 /// - `-shortest` — the trailing partial frame makes the video a fraction longer
 ///   than the audio, and they should end together.
-pub fn ffmpeg_args(clip: &std::path::Path, out: &std::path::Path) -> Vec<String> {
+/// - `-crf` — the one argument a caller may move, because it is the only one that
+///   trades size against the picture rather than describing the stream.
+pub fn ffmpeg_args(clip: &std::path::Path, out: &std::path::Path, crf: u8) -> Vec<String> {
     [
         "-hide_banner",
         "-nostats",
@@ -431,16 +465,14 @@ pub fn ffmpeg_args(clip: &std::path::Path, out: &std::path::Path) -> Vec<String>
     .chain(["-i".to_string(), clip.display().to_string()])
     .chain(
         [
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium",
+        ]
+        .iter()
+        .map(|s| (*s).to_string()),
+    )
+    .chain(["-crf".to_string(), crf.to_string()])
+    .chain(
+        [
             "-pix_fmt",
             "yuv420p",
             "-color_range",
@@ -489,7 +521,7 @@ impl Encoder {
     /// "the path is wrong" are the two ways this goes wrong and both are the
     /// user's to fix — there is deliberately no fallback to try instead.
     fn spawn(req: &EncoderRequest) -> Result<Self, String> {
-        let args = ffmpeg_args(&req.clip, &req.out);
+        let args = ffmpeg_args(&req.clip, &req.out, req.crf);
         eprintln!(
             "render: encoding with `{} {}`",
             req.ffmpeg.display(),
