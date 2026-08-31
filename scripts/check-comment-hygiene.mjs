@@ -384,8 +384,9 @@ const ESCAPE = /hygiene-allow:\s*(\S.*)?$/;
 // produced by rustfmt against the enclosing block and measured 14-23 here, while
 // hand-typed alignment measured 4-11. Twelve sits in that gap.
 //
-// The cost is stated rather than hidden: this is silent on a narrow instance,
-// and one existed at 6 (`core/src/dsp/mod.rs`, repaired when this landed). The
+// The cost is stated rather than hidden: this is silent on a narrow instance.
+// The narrowest this tree has held measured 6, in `core/src/dsp/mod.rs`, and it
+// took a hand repair - no run of this gate convicted it and none would. The
 // alternative was a threshold of four and roughly thirty `hygiene-allow` markers
 // through the report-formatting code, which buys the narrow cases by making the
 // escape ordinary - and an escape that is ordinary is how a gate stops meaning

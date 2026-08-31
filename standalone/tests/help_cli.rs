@@ -150,11 +150,13 @@ fn a_stream_only_flag_without_stream_exits_without_starting() {
     }
 }
 
-/// **`--gpu` and `--preset` are NOT refused**, because they reach the window.
-/// A regression that put either back behind `--stream` would show up here as a
-/// process that exits 2 naming a flag the operator did not type.
+/// **`--preset` is NOT refused for a missing `--stream`**, because it reaches
+/// the window. This covers `--preset` alone: `--gpu` gets past its own scanner
+/// only by opening a wgpu device, so its freedom from `--stream` is pinned
+/// against the roster by `the_two_windowed_flags_carry_no_dependency` in
+/// `main.rs` rather than by a process here.
 #[test]
-fn the_two_windowed_flags_are_not_refused_for_a_missing_stream() {
+fn the_windowed_preset_flag_is_not_refused_for_a_missing_stream() {
     let (code, _, stderr, _) = run_both(&["--preset", "a-name-no-preset-has"]);
     assert_eq!(
         code,
