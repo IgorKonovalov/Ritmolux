@@ -27,6 +27,7 @@
 # there is deliberately no fit mode; this world is composed for 16:9.
 system = "spectrum"
 name   = "Skyline"
+representative = true
 
 [generator]
 seed = 7

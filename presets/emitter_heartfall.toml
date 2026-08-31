@@ -79,6 +79,7 @@
 # - the same trap `attractor_ink.toml` records.
 system = "emitter"
 name = "Heartfall"
+representative = true
 
 [palette]
 # The remap discards hue, so this gradient does NOT set the colour on screen - it

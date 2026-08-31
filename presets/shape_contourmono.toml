@@ -80,6 +80,7 @@
 # met).
 system = "shape_field"
 name = "Contour Mono"
+representative = true
 
 [palette]
 # Twenty bands in five runs: black 5 / white 5 / black 4 / white 4 / RED 2, the

@@ -4,6 +4,7 @@
 # wander). Two files rather than one binding - see that file's header for why.
 system = "reaction_diffusion"
 name = "Flux Mono"
+representative = true
 
 [palette]
 # 20 bands: black 8 / RED 2 / white 9 / RED 1. Gray-Scott's level distribution is

@@ -28,6 +28,7 @@
 # over range.
 system = "parametric_curve"
 name   = "Loom"
+representative = true
 
 [curve]
 family = "maurer_rose"

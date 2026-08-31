@@ -16,6 +16,7 @@
 # Drives: bass folds the source, mid is spiral speed, onset blooms the crossings.
 system = "fragment_field"
 name = "Whorl"
+representative = true
 
 [palette]
 stops = [

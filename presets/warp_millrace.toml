@@ -42,6 +42,7 @@
 # unsmoothed.
 system = "warp_mesh"
 name   = "Millrace"
+representative = true
 
 [mesh]
 x = 48

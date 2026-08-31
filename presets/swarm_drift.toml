@@ -27,6 +27,7 @@
 #   Storm   size 1.20   trails 0.50   spin 0.155   field_freq ~3.0   torn churn
 system = "swarm"
 name = "Drift"
+representative = true
 
 [palette]
 name = "aurora"

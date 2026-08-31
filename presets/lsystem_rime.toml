@@ -28,6 +28,7 @@
 # long cycle, so the crystal is never twice the same temperature.
 system = "lsystem"
 name   = "Rime"
+representative = true
 
 [generator]
 axiom     = "F--F--F"

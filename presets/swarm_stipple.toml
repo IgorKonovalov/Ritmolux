@@ -50,6 +50,7 @@
 # about 0.75, which is where the hatching closes up.
 system = "swarm"
 name   = "Stipple"
+representative = true
 
 [palette]
 # In ink mode the palette shapes LUMINANCE only - the two poles below are the

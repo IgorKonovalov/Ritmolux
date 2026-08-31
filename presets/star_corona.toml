@@ -34,6 +34,7 @@
 # the rings rather than three fences moving together.
 system = "star_pattern"
 name   = "Corona"
+representative = true
 
 [generator]
 tiling = "none"          # no interlace at all - the boundaries are the whole figure
