@@ -140,11 +140,23 @@ The counts in this ADR are not timings and are unaffected: 1212 / 1185 / 27 test
 
 **A clean pair was obtained later the same day**, on an idle box with the precondition verified
 before and after: the full suite **869 s** (1217 tests) against **163 s** under the pre-push filter
-(1190 tests), with a 64 s compile/lint/link floor either way. Summing per-test durations, the nine
-excluded binaries hold **80 %** of all test time and four preset sweeps alone hold **73 %**. Those
-readings and their caveats live in Plan 0145's `### The measured baseline`, which is where a reader
-should go — including the finding that three readings of the same command spanned **489–885 s**
-within an hour, so the decision rests on the 80 % share and not on any single wall-time figure.
+(1190 tests), with a 64 s compile/lint/link floor either way.
+
+**The mechanism is a critical path, not a share of the work.** The nine excluded binaries hold only
+**49 %** of the suite's 7,965 CPU-seconds — near parity with the narrow set. What separates them is
+that four `#[test]` functions each loop the whole preset roster *serially*, and nextest parallelizes
+across tests and never inside one: `animation::every_preset_animates_over_time` alone runs **758 s,
+87 % of the entire suite's wall time**. The narrow set's 4,036 CPU-seconds compress to 163 s across
+1,190 tests; the excluded set cannot compress below its longest single test.
+
+That distinction matters for what comes next. It means the deferral this ADR decides is worth its
+706 s for a structural reason, and it means **Alternative A's sampling is not the only way to attack
+the sweeps** — splitting a monolith into one test per preset would recover most of the same wall time
+at *no* coverage cost. Plan 0145 carries the table and the followup.
+
+Those readings and their caveats live in Plan 0145's `### The measured baseline`, including the
+finding that three readings of the same command spanned **489–885 s** within an hour — so the
+decision rests on the critical-path structure, not on any single wall-time figure.
 
 **Concurrent lanes are a second, independent cost centre.** The GPU suites serialize on one adapter,
 so N lanes running them at once cost N times as long each. That is not addressed here and is filed

@@ -58,12 +58,26 @@ Windows 10 19045, rustc 1.97.1, cargo-nextest 0.9.140, on AC.
 | `cargo nextest run --workspace` — 1217 tests, 24 slow | **869 s** |
 | the same under the pre-push filter — 1190 tests, 3 slow | **163 s** |
 
-**27 tests carry 706 s.** Summing per-test durations from the full run's log, the nine excluded
-binaries hold **21,022 of 26,265 CPU-seconds — 80 %** of all test time, and four preset sweeps alone
-(`animation` 5,501, `reactivity` 4,639, `distinctness` 4,626, `sanity` 4,302) hold **73 %**. Wall
-time tracks that: 26,265 CPU-s at ~30x parallelism gives the 869 s observed, and the narrow set's
-5,244 CPU-s gives 163 s at the same ~32x — so the model holds and the cut is real, not a scheduling
-artifact.
+**27 tests carry 706 s, and one test carries 758 s of it.** The suite is not slow because it has
+many tests — it is slow because four `#[test]` functions each loop the *whole* preset roster
+serially, and nextest parallelizes across tests, never inside one:
+
+| the serial monoliths | wall |
+|---|---|
+| `animation::every_preset_animates_over_time` | **758 s — 87 % of the whole suite's 869 s** |
+| `reactivity::every_preset_reacts_to_at_least_one_band` | 667 s |
+| `distinctness::report_family_distinctness` | 665 s |
+| `sanity::a_louder_frame_is_reported_against_a_quieter_one` | 473 s |
+| `sanity::every_preset_draws_a_real_shape` | 432 s |
+
+CPU-seconds tell the same story from the other side. The suite spends **7,965 CPU-seconds** in total,
+split **3,929 (49 %) in the nine excluded binaries** against 4,036 in the narrow set — near parity.
+Yet the narrow set compresses to **163 s** wall (~25x) because its 4,036 s is spread over 1,190
+tests, while the excluded set cannot compress below **its longest single test**. The exclusion buys
+706 s of wall not because those tests are half the work but because they are *unparallelizable* work.
+
+**This bounds what any preset-sampling change can achieve, and points at a cheaper lever** — see
+Followups: splitting a monolith into one test per preset costs no coverage at all.
 
 **The full-suite figure is not stable, and that is itself a finding.** Three readings of the same
 command on the same tree within one hour: **885 s**, **489 s**, **873 s**. The first was contended by
