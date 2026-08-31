@@ -80,16 +80,19 @@ jobs:
       # guard and every GPU behavioural suite with it, and nothing else says so.
       # Treat deleting this comment as deleting a gate.
       #
-      # The same list `.githooks/pre-push` skips locally, by the same measured
-      # reason. Verified by a union check rather than asserted: `nextest list`
-      # for this job plus `nextest list -p lmv-core` / `-p lmv-core-cabi` for
-      # `coverage` covers all 589 tests the unfiltered run listed, and all 18
-      # tests this removes are `lmv-core` binaries.
+      # WHICH nine, and the measured reason for those nine, lives in
+      # `.githooks/pre-push`'s header; the list itself is the `fast` profile's
+      # default-filter in `.config/nextest.toml` (ADR-0156). This job, that hook
+      # and the `dev` lane's per-phase gate all cite `-P fast`, so the exclusion
+      # has one definition and no consumer can drift from another. Verified by a
+      # union check rather than asserted: the `-P fast` set plus the tests in the
+      # nine excluded binaries equals the unfiltered `--workspace` set exactly,
+      # and every test this removes is an `lmv-core` binary.
       #
       # Applied on BOTH matrix arms, not branched per-OS: macOS already skips
       # every GPU suite (ADR-0016), so the filter removes nothing there, and a
       # per-OS branch is a second thing to keep true.
-      - run: cargo nextest run --workspace -E 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
+      - run: cargo nextest run --workspace -P fast
       - run: cargo test --workspace --doc
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo fmt --all --check

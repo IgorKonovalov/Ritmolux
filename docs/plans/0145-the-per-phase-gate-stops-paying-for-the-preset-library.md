@@ -284,8 +284,8 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Take the baseline on a quiet box | dev | done | `8b1d7b0` |
-| 2 — Define the filter once, as a nextest profile | dev | done | committed with this row |
-| 3 — Point the hook and CI at the profile | dev | not started | |
+| 2 — Define the filter once, as a nextest profile | dev | done | `f5431dc` |
+| 3 — Point the hook and CI at the profile | dev | done | committed with this row |
 | 4 — Give the per-phase loop its tier | dev | not started | |
 | 5 — Make the full-suite run a recorded fact | dev | not started | |
 | 6 — Re-measure, and do the per-plan arithmetic | dev | not started | |
