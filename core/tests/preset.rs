@@ -1513,14 +1513,18 @@ fn declared_params_match_set_param() {
         if declared.iter().any(|name| PALETTE_BLOCK.contains(name)) {
             assert!(
                 text.contains("self.colour.set(name, value)"),
-                "{}: declares one of `scenes::common`'s palette names but does                  not delegate to `self.colour.set(name, value)`, so the name is                  declared and answered by nothing",
+                "{}: declares one of `scenes::common`'s palette names but does \
+                 not delegate to `self.colour.set(name, value)`, so the name is \
+                 declared and answered by nothing",
                 file.display(),
             );
         }
         if declared.iter().any(|name| PAN_BLOCK.contains(name)) {
             assert!(
                 text.contains("self.pan.set(name, value)"),
-                "{}: declares `pan_x`/`pan_y` but does not delegate to                  `self.pan.set(name, value)`, so the name is declared and                  answered by nothing",
+                "{}: declares `pan_x`/`pan_y` but does not delegate to \
+                 `self.pan.set(name, value)`, so the name is declared and \
+                 answered by nothing",
                 file.display(),
             );
         }

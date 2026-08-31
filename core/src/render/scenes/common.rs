@@ -264,7 +264,8 @@ mod tests {
         }
         assert!(
             seen > 40,
-            "only {seen} shared-name declarations found across twelve systems —              the scan has stopped seeing them, so this guard would pass vacuously"
+            "only {seen} shared-name declarations found across twelve systems — \
+             the scan has stopped seeing them, so this guard would pass vacuously"
         );
     }
 
