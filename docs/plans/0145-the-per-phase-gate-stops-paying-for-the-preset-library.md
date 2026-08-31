@@ -287,56 +287,82 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
 | 2 — Define the filter once, as a nextest profile | dev | done | `f5431dc` |
 | 3 — Point the hook and CI at the profile | dev | done | `975c31b` |
 | 4 — Give the per-phase loop its tier | dev | done | `b90e382` |
-| 5 — Make the full-suite run a recorded fact | dev | done | committed with this row |
-| 6 — Re-measure, and do the per-plan arithmetic | dev | not started | |
+| 5 — Make the full-suite run a recorded fact | dev | done | `05a6f5d` |
+| 6 — Re-measure, and do the per-plan arithmetic | dev | done | committed with this row |
 
 ### Measurements
 
 **Machine** (ADR-0071): AMD Ryzen 9 5900HS, 16 logical CPUs, Windows 10 19045, rustc 1.97.1,
-cargo-nextest 0.9.140, on AC. **Tree:** `d66e91d`, *not* the architect's `fd7f55b` — Plans 0144 and
-0125 merged in between (105 files, +4244/-2468), so 0144's shared harness is in every reading here.
-**Quiet precondition:** `cargo`/`cargo-nextest`/`rustc`/`rust-lld`/`link` enumerated immediately
-before and after each run; none present at any of the twenty boundaries. 14:14-14:44 CEST
-2026-08-31, one uninterrupted sequence. Counts on this tree: **1230** unfiltered, **1203** narrowed,
-**27** in the nine excluded binaries.
+cargo-nextest 0.9.140, on AC. **Trees:** Phase 1 at `d66e91d`, Phase 6 at `05a6f5d` — *not* the
+architect's `fd7f55b`, which predates the 0144 and 0125 merges (105 files, +4244/-2468), so 0144's
+shared harness is in every reading here and in none of the plan's. **Quiet precondition:**
+`cargo`/`cargo-nextest`/`rustc`/`rust-lld`/`link` enumerated before and after all twenty runs; none
+present at any of the forty boundaries. 14:14-14:44 and 15:07-15:39 CEST 2026-08-31, each window one
+uninterrupted sequence. **1230** tests unfiltered, **1203** narrowed, **27** in the nine excluded
+binaries; every run exited 0.
 
-Floor, after appending one comment line to `core/src/lib.rs` (reverted afterwards):
+Each window appended one comment line to `core/src/lib.rs` (reverted after), took the floor, then
+ran three full and three narrow runs interleaved so thermal drift reaches both arms alike. **Floor**
+(build + fmt + clippy + link of 59 binaries): Phase 1 `4.0 + 2.0 + 14.2 + 32.4` = **52.6 s**;
+Phase 6 `7.1 + 2.0 + 8.1 + 30.4` = **47.6 s**.
 
-| step | wall | exit |
+| suite run | 1 | 2 | 3 | mean |
+|---|---|---|---|---|
+| Phase 1 — `--workspace` | 429.6 | 431.9 | 428.8 | **430.1 s** |
+| Phase 1 — `-E` (the hook's expression) | 147.8 | 148.7 | 148.6 | **148.4 s** |
+| Phase 6 — `--workspace` | 473.1 | 444.4 | 470.1 | **462.5 s** |
+| Phase 6 — `-P fast` | 150.8 | 149.8 | 147.8 | **149.5 s** |
+
+**Against the plan's stated findings.** The full suite is **430-463 s**, not 869 s; it repeats to
+**0.7 % within** a window while the two window means differ by **7.5 %**, so ~7 % is the figure to
+carry and the plan's 489-885 s (1.8x) spread reproduces neither way. The exit-100 flake did not
+recur in six narrow runs. The critical path does reproduce:
+`animation::every_preset_animates_over_time` is 331 s of a 428 s run (77 %), then `reactivity` 309,
+`distinctness` 220, `sanity` 193, `reaction_diffusion` 163. `-P fast` lands within 0.7 % of the
+`-E` arm it replaced — the profile swap behaving as the empty list-diff predicted.
+
+**Per-plan arithmetic**, pooled over all six runs of each arm (full **446.3 s**, narrow **148.9 s**,
+floor **50.1 s**), for a 6-phase plan, the last phase's full run subsuming its narrow one:
+
+| shape | arithmetic | total |
 |---|---|---|
-| `cargo build` | 4.0 s | 0 |
-| `cargo fmt --all --check` | 2.0 s | 0 |
-| `cargo clippy --workspace --all-targets -- -D warnings` | 14.2 s | 0 |
-| `cargo nextest run --workspace --no-run` (link 59 binaries) | 32.4 s | 0 |
-| **floor** | **52.6 s** | |
+| old — six full gates | 6 x (50.1 + 446.3) | **2978 s — 49.6 min** |
+| new — five narrow + one full | 5 x (50.1 + 148.9) + (50.1 + 446.3) | **1491 s — 24.9 min** |
+| **difference** | | **1487 s — 24.8 min, 49.9 %** |
 
-Suite runs, interleaved full/narrow so thermal drift reaches both arms alike; all six exited 0:
-
-| run | 1 | 2 | 3 | mean | spread |
-|---|---|---|---|---|---|
-| `cargo nextest run --workspace` (59 binaries) | 429.6 | 431.9 | 428.8 | **430.1 s** | 3.1 s (0.7 %) |
-| the same under the pre-push filter (50 binaries) | 147.8 | 148.7 | 148.6 | **148.4 s** | 0.9 s (0.6 %) |
-
-Against the plan's stated findings, from this machine:
-
-- **The full suite is 430 s, not 869 s** — half the architect's reading.
-- **It repeats to 0.7 %, not "no better than ~1.8x".** The 489-885 s spread does not reproduce; the
-  plan's unexplained 489 s is the reading nearest this one.
-- **The narrowed-run exit-100 flake did not recur** — three runs, all exit 0.
-- **The critical-path mechanism does reproduce.** `animation::every_preset_animates_over_time` is
-  331 s of the 428 s run (77 %), then `reactivity` 309 s, `distinctness` 220 s, `sanity` 193 s,
-  `reaction_diffusion` 163 s.
+If the last phase pays its narrow gate *and* the full run separately, the new shape is 1640 s and
+the saving 22.3 min (44.9 %). The saving is against the **stated** rule; the plan's own Context
+records that `dev` already narrowed silently, so what past plans actually paid is unknown.
 
 ### Notes
 
+- **Scope deviation, Phase 5 (`05a6f5d`):** `.claude/skills/dev/references/close-ceremony-prompt.md`
+  also gained the `**Full suite:**` bullet, though it is in no phase's "Files touched" — without it
+  that field guide enumerates six bullets while the template holds seven. Raised first; user's call.
+- **Deviation, Phase 3 (`975c31b`):** beyond deleting the expression, the hook's `SKIPPED_SUITES`
+  variable and the loop echoing it are gone too. It was a second copy of the same list and would
+  have drifted against the profile; nextest names the skipped binaries itself.
+- **The tier was applied to this plan from Phase 2 on, before Phase 4 landed it.** Phases 2-5 were
+  gated with `-P fast`; the full suite ran six times, across Phases 1 and 6. Phase 6 and this close
+  block share one commit rather than two — both touch only this log.
+- Phase 1's readings **contradict the plan's own baseline**; they sit under `### Measurements`
+  because that phase's done-when asked for them there, which is also why this log breaches the
+  size rule (90 lines against 78) — two full measurement records plus the arithmetic.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **What shipped:** docs-chore-only — no Rust, C++ or preset file changed; the nine touched files
+  are `.config/nextest.toml`, `.githooks/pre-push`, `.github/workflows/ci.yml`, five skill markdown
+  files and this plan.
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry falsified
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`) — **exit 0**, `1230 tests run:
+  1230 passed (11-12 slow), 5 skipped`, three times at `05a6f5d` (Phase 5's tip, so it covers every
+  non-log change in the plan) and three times at `d66e91d`. No upward override was needed at any
+  phase: no scene, composite, preset-engine or embedded-set file was touched.
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
