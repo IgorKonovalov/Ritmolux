@@ -113,6 +113,7 @@ Flags:
 | `--render <clip.wav>` | [offline video](#--render-a-music-video-from-a-track) — walk the clip at `--fps` and stream every frame to stdout for an encoder to read. Deterministic and decoupled from real time |
 | `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
 | `--ffmpeg <path>` | spawn this encoder and wire the pipe, so one command produces a file. Needs `--out <file>`. No encoder ships and there is no fallback |
+| `--crf <0-51>` | the encoder's rate-quality setting (default 18, archival). Higher is smaller; `+6` is about half the size. Needs `--ffmpeg` — [the one argument you may move](#the-one-canonical-ffmpeg-invocation) |
 
 Bad arguments and unknown presets exit non-zero with a message.
 
@@ -232,6 +233,18 @@ cargo run -p standalone --example shot -- \
   --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 \
   --ffmpeg ffmpeg --out track.mp4
 ```
+
+**A `--preset` that names nothing costs nothing.** The name is checked against
+the roster before the encoder is spawned and before a GPU device is built, so a
+typo exits 1, lists the roster's keys, and **writes no file at all**. That check
+sits where it does because `ffmpeg` exits 0 on a frame stream that never carried
+a frame: rejecting the name any later left a valid, playable, audio-only MP4 at
+the destination, a few hundred bytes that a glance cannot tell from a short
+render. If you have such a file on disk from an older build, that is what it is.
+
+**The roster is keyed on a preset's `name` field, not on its filename** —
+`presets/attractor_leviathan.toml` is `--preset "Leviathan"`. That is the
+confusion the key list in the error exists to settle.
 
 **No encoder ships, and that is a decision rather than an omission.** A 1080p
 RGBA frame is 8.29 MB and four minutes at 60 fps is 119 GB, so the frames can
