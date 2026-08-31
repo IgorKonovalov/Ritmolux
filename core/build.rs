@@ -7,8 +7,14 @@
 //! `include_str!(<absolute path>)` tuples, so rustc embeds the bytes exactly as
 //! a hand-written array would. Zero dependency: a `read_dir` + extension filter
 //! is all it takes.
+//!
+//! The same glob also emits **one `#[test]` per preset** for the roster sweeps
+//! (ADR-0157). nextest parallelizes across tests and never inside one, so a
+//! sweep written as a loop over the whole library is a single serial process
+//! however many cores are idle. The generated tests make the loop's assertions
+//! one process at a time instead.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     // Resolve `presets/` from the crate manifest dir (core/..), never the CWD,
@@ -69,4 +75,115 @@ fn main() {
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is set by cargo"));
     std::fs::write(out_dir.join("embedded_presets.rs"), out)
         .expect("write generated embedded_presets.rs");
+
+    let roster = roster(&presets_dir, &files);
+    emit_sweep(
+        &out_dir,
+        "animation_tests.rs",
+        "animation",
+        "animates_over_time",
+        &roster,
+    );
+}
+
+/// `(stem, display name)` for every shipped preset, in `files` order.
+///
+/// The **stem** is the `.toml` filename without its extension: unique by
+/// construction, already ident-shaped, and the handle `-E test(...)` selects on.
+/// The **display name** is the preset's own `name` key, which is what the
+/// renderer's roster is keyed by and what the generated test hands its helper —
+/// the two differ for every shipped preset (`attractor_leviathan` /
+/// `Leviathan`), so neither can stand in for the other.
+fn roster(presets_dir: &Path, files: &[String]) -> Vec<(String, String)> {
+    files
+        .iter()
+        .map(|file| {
+            let src = std::fs::read_to_string(presets_dir.join(file))
+                .unwrap_or_else(|e| panic!("read preset {file}: {e}"));
+            let stem = file
+                .strip_suffix(".toml")
+                .expect("the extension filter admitted only `*.toml`");
+            (ident(stem), preamble_string(&src, "name", file))
+        })
+        .collect()
+}
+
+/// A preset's top-level `key = "value"` from its TOML preamble.
+///
+/// A line scan, not a TOML parse: adding a `[build-dependencies]` parser to read
+/// two scalars would be a dependency this build script has never needed. The
+/// preamble is every line before the first `[section]` header, which is where
+/// TOML puts the root table's keys, and every shipped preset declares `name`
+/// and `system` there as a plain double-quoted value.
+///
+/// The trap this guards is a prefix match: `strip_prefix("name")` also accepts
+/// `name_of_thing = ...`, so the `=` is required *after* the trim. A preset that
+/// breaks either assumption fails the build here with its filename, rather than
+/// silently losing its generated test — an absent test passes.
+fn preamble_string(src: &str, key: &str, file: &str) -> String {
+    for line in src.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            break;
+        }
+        let Some(rest) = line
+            .strip_prefix(key)
+            .map(str::trim_start)
+            .and_then(|r| r.strip_prefix('='))
+            .map(str::trim)
+        else {
+            continue;
+        };
+        let value = rest
+            .strip_prefix('"')
+            .and_then(|r| r.split_once('"'))
+            .map(|(v, _)| v)
+            .unwrap_or_else(|| {
+                panic!("preset {file}: `{key}` is not a plain double-quoted string: {rest}")
+            });
+        assert!(
+            !value.contains('\\'),
+            "preset {file}: `{key}` contains a backslash escape, which this scan does not decode"
+        );
+        return value.to_string();
+    }
+    panic!("preset {file}: no top-level `{key} = \"...\"` before the first [section]");
+}
+
+/// Lowercase the stem into something that is certainly a Rust identifier.
+///
+/// The shipped filenames are already `[a-z0-9_]`, so this is a guard rather than
+/// a transform: a preset landing as `Fire-Storm.toml` becomes `fire_storm`
+/// instead of a syntax error inside a generated file nobody edits.
+fn ident(stem: &str) -> String {
+    stem.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// Write one `#[test]` per preset into `OUT_DIR/<file>`, each calling `helper`
+/// with the preset's display name (ADR-0157).
+///
+/// The sweep's own test file `include!`s the result and supplies `helper`, so
+/// the assertions stay in the sweep next to the constants they gate on and only
+/// the *fan-out* is generated. Naming is `<prefix>_<stem>`, which is what makes
+/// a failure name the preset and `-E test(...)` select one.
+fn emit_sweep(out_dir: &Path, file: &str, prefix: &str, helper: &str, roster: &[(String, String)]) {
+    let mut out = format!(
+        "// @generated by core/build.rs from presets/*.toml (ADR-0157). Do not edit.\n\
+         // One test per shipped preset; `{helper}` lives in the sweep that includes this.\n"
+    );
+    for (stem, name) in roster {
+        out.push_str(&format!(
+            "#[test]\nfn {prefix}_{stem}() {{\n    {helper}({name:?});\n}}\n"
+        ));
+    }
+    std::fs::write(out_dir.join(file), out)
+        .unwrap_or_else(|e| panic!("write generated {file}: {e}"));
 }
