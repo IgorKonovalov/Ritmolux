@@ -1,6 +1,6 @@
 # 0146 — The preset sweeps stop being one long test
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
 > **Related ADRs:** [0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)

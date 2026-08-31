@@ -1,6 +1,6 @@
 # 0145 — The per-phase gate stops paying for the preset library
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
 > **Related ADRs:** [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
@@ -70,11 +70,18 @@ serially, and nextest parallelizes across tests, never inside one:
 | `sanity::a_louder_frame_is_reported_against_a_quieter_one` | 473 s |
 | `sanity::every_preset_draws_a_real_shape` | 432 s |
 
-CPU-seconds tell the same story from the other side. The suite spends **7,965 CPU-seconds** in total,
-split **3,929 (49 %) in the nine excluded binaries** against 4,036 in the narrow set — near parity.
-Yet the narrow set compresses to **163 s** wall (~25x) because its 4,036 s is spread over 1,190
-tests, while the excluded set cannot compress below **its longest single test**. The exclusion buys
-706 s of wall not because those tests are half the work but because they are *unparallelizable* work.
+Concurrency tells the same story from the other side. Summed test-wall over elapsed, on 16 logical
+CPUs:
+
+| run | summed test-wall | elapsed | average concurrency |
+|---|---|---|---|
+| full | 7,965 s | 869 s | **9.2** — 43 % of the machine idle |
+| narrow | 2,229 s | 163 s | **13.7** — near-saturated |
+
+Within the full run the nine excluded binaries hold **3,929 of the 7,965 s — 49 %**, near parity with
+everything else. So the exclusion does not buy its 706 s by removing half the work: it buys it by
+removing the *unparallelizable* half. The full run's whole deficit is its tail, where only the five
+monoliths remain and twelve threads have nothing to do.
 
 **This bounds what any preset-sampling change can achieve, and points at a cheaper lever** — see
 Followups: splitting a monolith into one test per preset costs no coverage at all.
