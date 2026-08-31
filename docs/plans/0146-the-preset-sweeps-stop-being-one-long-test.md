@@ -197,6 +197,13 @@ fn animation_attractor_leviathan() {
 - **A `build.rs` defect becomes a test-suite defect** across five suites rather than one table.
 - **Open:** whether two per family is the right floor for `attractor` at 19. Deliberately not decided
   here — Phase 7's coverage count is the evidence to revisit it from.
+- **`distinctness` is quadratic, cannot be sampled, and is the wall this plan does not remove.** Its
+  665 s covers **349 pairs at 1.91 s each**; `attractor` at 19 presets is **171 of them — 326 s, 49 %
+  of the test**. Adding one attractor preset adds 19 pairs (**36 s**), which is *more than the other
+  four sweeps add combined* (29 s). After Phase 3 splits it, `distinctness_attractor` is already the
+  longest single test at ~328 s, and it overtakes the ~539 s packing floor at about **24 presets in
+  one family** — five away. Nothing in this plan changes that, and sampling by construction cannot.
+  See Followups.
 
 ## What this plan does NOT do
 
@@ -240,6 +247,14 @@ fn animation_attractor_leviathan() {
 
 ## Followups (after this lands)
 
+- **The next wall is `distinctness`, and it is quadratic.** Everything else in this plan makes a new
+  preset roughly free — **+0 s per phase** unless it is a representative, and ~2–4 s on the close/CI
+  wall against **~29 s of suite wall today**. `distinctness` is the exception: it grows as
+  `n(n-1)/2` per family, it is the one sweep that cannot be sampled without retiring its own claim,
+  and at ~24 presets in a single family it becomes the critical path again. `attractor` is at 19.
+  **This is the thing to design next if the library keeps growing** — plausibly by comparing each
+  preset against a family reference or its k nearest rather than against all pairs, which is an
+  O(n) or O(n·k) claim and an ADR-worthy change to what the check asserts. Not attempted here.
 - **Two per family may be wrong for the lopsided families.** Phase 7's count is the evidence.
 - **The exclusion list Plan 0145 moves into the profile may be under-inclusive** — six binaries
   outside the nine each cost over 200 s. Once these five split, re-deriving that list by measurement
