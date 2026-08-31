@@ -98,13 +98,14 @@ exclusion means a bare `cargo nextest run` silently skips the ABI conformance su
 `--workspace` from the narrowed row loses the C ABI exactly as it always did. `.githooks/pre-push`
 and `ci.yml` both pass `--workspace` for this reason; match them.
 
-**The test step is tiered (ADR-0156), and the tier is about *when*, not about coverage.** Every
+**The test step is tiered (ADR-0156 and ADR-0157), and the tier is mostly about *when*.** Every
 phase owes `cargo build`, `cargo clippy --workspace --all-targets -- -D warnings`,
 `cargo fmt --all --check` and the **narrowed** `cargo nextest run --workspace -P fast`, all green
 before you commit it. The **full** `cargo nextest run --workspace` is owed **once per plan**, at
-the last phase, before the close handoff. Nothing is skipped, only deferred: the nine GPU suites
-`-P fast` holds back sweep the shipped preset library or every scene through a real adapter, so
-their price is set by the `preset-author` lane's output rather than by the change under test.
+the last phase, before the close handoff. What `-P fast` holds back is deferred rather than
+skipped: those suites sweep the shipped preset library or every scene through a real adapter, so
+their price is set by the `preset-author` lane's output rather than by the change under test. Since
+ADR-0157 the exclusion is not total — three of the nine run a preset sample, described next.
 
 **Which scope renders which presets (ADR-0157).** `-P fast` renders the **representatives** — the
 two presets per family that declare `representative = true`, so **24 of 81** through `animation`,
@@ -112,7 +113,9 @@ two presets per family that declare `representative = true`, so **24 of 81** thr
 adds `sanity`'s per-family shape gate and `distinctness`, neither of which is ever sampled. So a
 defect in one of the other 57 presets waits for the close rather than failing the phase that caused
 it — that is the deliberate trade, and it is why the once-per-plan full run is not optional. The
-close and CI paths are unchanged, so ADR-0081's curation gate still sees the whole library.
+close path is unchanged, and so is CI's `coverage` job — which renders the whole library on
+Windows and is what ADR-0081's curation gate actually rests on. CI's `check` job cites `-P fast`,
+so it gains the sample too, at a cost nobody has measured on a CI runner.
 
 **Two overrides are yours, and both go upward:**
 

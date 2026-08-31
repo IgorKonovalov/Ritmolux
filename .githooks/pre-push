@@ -26,7 +26,14 @@ set -u
 # animation 73 s, sanity 46 s, distinctness 41 s, reaction_diffusion 54 s,
 # attractor 49 s, golden 25 s. They iterate every shipped preset or scene
 # through a real GPU, which is what makes them slow and what makes them CI's
-# job. Excluding them takes the gate from ~98 s to ~27 s warm.
+# job. Excluding them took the gate from ~98 s to ~27 s warm.
+#
+# SINCE ADR-0157 THE EXCLUSION IS NO LONGER TOTAL, and the ~27 s above is the
+# figure before that. Three of the nine - animation, reactivity and sanity - now
+# run a 24-preset sample unioned back in by the `fast` profile, measured at
+# +58.5 s on the development machine (Plan 0146 Phase 7; a smaller runner packs
+# it worse). That is bought coverage, not lost speed: before it, the per-phase
+# tier rendered none of the preset library at all.
 #
 # WHICH nine they are is no longer written here. Since ADR-0156 the list is the
 # `fast` profile's default-filter in .config/nextest.toml, and this hook, CI's
@@ -138,11 +145,12 @@ run_step "cargo fmt --all --check" cargo fmt --all --check
 # clippy` / `cargo nextest run` silently stops covering the C ABI entirely.
 run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 
-# nextest names the skipped binaries itself, on the profile's authority
-# ("9 binaries skipped ... via profile.fast.default-filter"), so this step does
-# not enumerate them a second time — a hand-written echo of the list is the
-# copy that goes stale when the profile changes.
-echo "pre-push: skipping the GPU-heavy suites via profile.fast (CI runs them)"
+# nextest names what it skipped itself, on the profile's authority, so this step
+# does not enumerate it a second time - a hand-written echo of the list is the
+# copy that goes stale when the profile changes, which is exactly what happened
+# to the "9 binaries skipped" this comment used to quote. Since ADR-0157 the
+# skip is partly per TEST rather than per binary, so read nextest's own line.
+echo "pre-push: deferring most of the GPU-heavy suites via profile.fast, minus the preset sample (CI runs the rest)"
 run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
 
 echo ""
