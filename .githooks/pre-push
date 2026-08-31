@@ -28,15 +28,18 @@ set -u
 # through a real GPU, which is what makes them slow and what makes them CI's
 # job. Excluding them takes the gate from ~98 s to ~27 s warm.
 #
+# WHICH nine they are is no longer written here. Since ADR-0156 the list is the
+# `fast` profile's default-filter in .config/nextest.toml, and this hook, CI's
+# `check` job and the `dev` lane's per-phase gate all cite `-P fast`. The
+# measured reasoning above stays in this file and is deliberately not copied
+# into the toml; only the list moved. Adding or removing a suite is now a
+# one-file edit that none of the three consumers can fall out of step on.
+#
 # CI still runs all of it on every push, but since ADR-0073 it runs these nine
 # in ONE job rather than two: `check (windows-latest)` now carries the same
 # exclusion this hook does, and `coverage` is the only place they execute on
 # Windows. So skipping them locally still costs nothing — but that promise is
 # now underwritten by a single CI job rather than by a redundancy between two.
-SKIPPED_SUITES="golden attractor reaction_diffusion background_composite ink reactivity animation sanity distinctness"
-
-NEXTEST_FILTER='not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
-
 fail() {
     echo ""
     echo "pre-push: FAILED at: $1"
@@ -135,11 +138,12 @@ run_step "cargo fmt --all --check" cargo fmt --all --check
 # clippy` / `cargo nextest run` silently stops covering the C ABI entirely.
 run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 
-echo "pre-push: skipping GPU-heavy suites (CI runs them):"
-for suite in $SKIPPED_SUITES; do
-    echo "pre-push:   - $suite"
-done
-run_step "cargo nextest run (narrowed)" cargo nextest run --workspace -E "$NEXTEST_FILTER"
+# nextest names the skipped binaries itself, on the profile's authority
+# ("9 binaries skipped ... via profile.fast.default-filter"), so this step does
+# not enumerate them a second time — a hand-written echo of the list is the
+# copy that goes stale when the profile changes.
+echo "pre-push: skipping the GPU-heavy suites via profile.fast (CI runs them)"
+run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast
 
 echo ""
 echo "pre-push: OK"
