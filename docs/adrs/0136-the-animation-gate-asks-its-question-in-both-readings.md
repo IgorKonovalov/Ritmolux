@@ -156,3 +156,24 @@ names, which is no longer the minimum of either population. The floor itself is 
 under 0.0201 with 2.01x slack, which is the 2.05x it claims to within the rounding. What needs
 repair is the *statement* — a derivation under a disjunctive gate has to name its population.
 Filed as design-backlog 0152.
+
+## Outcome (2026-08-31, at Plan 0146's close)
+
+**The disjunction and both floors stand. The *roster* this ADR traded the weakening for no longer
+exists in aggregate form, and this section is where that is recorded rather than discovered.**
+
+Plan 0146 split `animation`'s roster sweep into one `#[test]` per preset (ADR-0157). The branch
+label survives — every preset's own test prints whether `silent` or `driven` carried its pass — but
+there is no longer an end of a sweep at which to collect the "still in silence" set, so the single
+printed roster this ADR's Positive section calls *"a visible, countable roster"* is gone. On a red
+run you now see the failing preset's label and not the set.
+
+**The property is still printed; only the aggregation moved, and it moved to a tool that already
+had it.** `shot --presets presets --report`'s `anim` column reads the same statistic over the whole
+library in one command, and `docs/capturing.md` now names it as where that list is obtained.
+Alternative A of this ADR — *"a silent disjunction, with nothing printed"* — remains rejected and is
+not what shipped.
+
+This ADR also cites `every_preset_animates_over_time` by name; that function no longer exists. The
+gate it describes is now the generated `animation_<preset>` family, and the body above is left
+unedited per the append-only rule.

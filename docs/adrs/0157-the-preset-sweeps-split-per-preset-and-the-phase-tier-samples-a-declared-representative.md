@@ -1,8 +1,8 @@
 # ADR-0157 — The preset sweeps split per preset, and the per-phase tier samples a declared representative
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-31 (Plan 0146), extends 0156, Outcome
 > **Date:** 2026-08-31
-> **Related plan(s):** [0146](../plans/0146-the-preset-sweeps-stop-being-one-long-test.md)
+> **Related plan(s):** [0146](../plans/done/0146-the-preset-sweeps-stop-being-one-long-test.md)
 
 ## Context
 
@@ -162,3 +162,45 @@ The measurements above are Plan 0145's, taken 2026-08-31 on an idle box at `fd7f
 `### The measured baseline` carries the caveats, including a full-suite spread of 489–885 s across
 three readings within an hour — which is why this ADR argues from the **concurrency figure and the
 critical-path structure**, both stable, rather than from any single wall time.
+
+## Outcome (2026-08-31, at Plan 0146's close)
+
+**Accepted as built. The structural claim landed in full, the timing claim did not, and one number
+in the Decision above shipped differently.**
+
+**`distinctness` split into NINE tests, not the twelve this ADR's Decision names.** That report
+covers a **curated** list of families in `core/tests/distinctness.rs`, not all twelve — `shape_field`,
+`warp_mesh` and `shape_collage` have never been in it. Twelve tests would have *added* 27 pairs
+across those three families, which the plan's own done-when (*"no pair dropped, no pair added"*)
+forbids. Nine shipped and the 322 pairs are preserved exactly. Widening the curated list is real
+work with a real cost and is filed as a followup, not done silently here.
+
+**The elapsed win is 6.2 %, not the 1.6x this ADR projects.** Full suite 464.2 s -> 435.6 s on the
+development box, because the sweeps' summed work rose **58 %**: device creation costs 1.60 s against
+1.65 s of per-preset render, paid 243 times. The packing bought nearly all of that back and 28.6 s
+more. **Splitting a serial sweep on a saturated box trades work for schedulability at close to par.**
+What it unambiguously bought is the tail (no preset sweep is anywhere near the last tests to finish;
+the critical path went from `animation` at 365.5 s to `tempo_probe` at 69.5 s), per-preset failure
+attribution, and the ability to sample at all.
+
+**Sampling costs the per-phase tier time rather than saving it, exactly as the Measured correction
+above predicts.** A phase renders 24 of 81 presets for **+58.5 s**; it rendered 0 before. On a median
+six-phase plan the tier is 20.6 min against 14.7 min.
+
+**Three consumers moved, not one.** `.githooks/pre-push` and CI's `check` job both cite `-P fast`
+and both gained the 72-test sample. **That cost was measured on one sixteen-core development box and
+on no CI runner**, which is the machine ADR-0073 exists to defend; `ci.yml` carries the note at both
+affected steps, and `coverage`'s ~264 test processes are unmeasured for the same reason.
+
+**What this ADR asked for and got, unqualified:** generation from the existing `build.rs` glob (a new
+`.toml` gets its tests by existing, verified by adding and removing a probe file); no assertion
+changed anywhere — `Renderer::capture_preset` is a pure function of `(name, frame, frames)`, so
+per-process isolation cannot move a reading, and no baseline was re-blessed; the floor test proved to
+*fail* and not merely to pass; and the close and CI's `coverage` job still render the whole library,
+so ADR-0081's curation gate keeps its full strength.
+
+**Retired by this ADR, and recorded where it lived:** ADR-0073 Alternative C's mechanical ground
+that *"sampling cannot be a `nextest` filter"*. That ADR carries its own dated Outcome.
+
+**Degraded by this ADR, and recorded where it lived:** ADR-0136's single printed roster of the
+presets that are still images in silence. Same shape, same treatment.
