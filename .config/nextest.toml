@@ -49,5 +49,26 @@ success-output = "immediate"
 # `-P fast` and under the default profile emits the same decomposition. It
 # arrives on stderr, which is where nextest writes captured test output — a
 # stdout-only check reads as silence under both profiles and proves nothing.
+# --- job 3: the representative sample ---
+#
+# The nine binaries stay excluded, and then the **representatives** are unioned
+# back in: `presets/*.toml` may declare `representative = true`, and `build.rs`
+# names that preset's generated tests `<sweep>_rep_<stem>` (ADR-0157). A nextest
+# predicate matches binaries and test names and cannot read a `.toml`, so the
+# marker in the name is the only thing a static profile can select on — and the
+# per-preset split is what makes any filter possible here at all, which is what
+# `.githooks/pre-push`'s ancestor claim that "sampling cannot be a nextest
+# filter" was true of when the sweeps were roster loops.
+#
+# So a phase renders two presets per family and the close renders all 81. This
+# ADDS coverage to the per-phase tier rather than saving time there: ADR-0156
+# had excluded these binaries outright, so the tier rendered none of the library.
+#
+# Anchored to the three sweep prefixes rather than a bare `_rep_`, so an
+# unrelated test whose name happens to contain the marker cannot join the tier.
+# `sanity_shape_*` and `distinctness_*` are per FAMILY, carry no marker, and stay
+# excluded: `distinctness` must never be sampled (two presets leave one pair,
+# which retires the check), and the shape sweep's floor-slack gate is a claim
+# about a family's whole distribution.
 [profile.fast]
-default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
+default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness)) + test(/^(animation|reactivity|sanity_loudness)_rep_/)'
