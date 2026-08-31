@@ -40,8 +40,8 @@ place. The plan file carries the real link.
 | [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
-| [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) | The per-phase gate stops paying for the preset library | draft | dev | ADR-0156 (proposed): narrowed per phase, full suite once at the last phase. Touches both skills. **Land it before the queue above pays the old gate again.** |
-| [0146](0146-the-preset-sweeps-stop-being-one-long-test.md) | The preset sweeps stop being one long test | draft | dev | ADR-0157 (proposed): 5 roster monoliths split per preset, a declared `representative` samples the per-phase tier only. **Sequenced after 0145.** Phase 1 is a spike that may end the plan. |
+| [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) | The per-phase gate stops paying for the preset library | approved | dev | ADR-0156 (proposed): narrowed per phase, full suite once at the last phase. Touches both skills. **Land it before the queue above pays the old gate again.** |
+| [0146](0146-the-preset-sweeps-stop-being-one-long-test.md) | The preset sweeps stop being one long test | approved | dev | ADR-0157 (proposed): 5 roster monoliths split per preset, a declared `representative` samples the per-phase tier only. **Sequenced after 0145.** Phase 1 is a spike that may end the plan. |
 <!-- roster:end -->
 
 **Added 2026-08-19, from a MilkDrop backlog round after
@@ -157,6 +157,19 @@ user's call.** Both were `draft` carrying proposed ADRs, and neither could serve
 evening — 0133 Phase 1 needs an evening with the rig patched and 0115 Phase 1 needs the Spout SDK
 staged. **The set runs on the external Python bridge** (`WORK/lmv-lighting-probes/`, outside version
 control), unmodified. Approving the plans starts the work; it changes nothing about the show.
+
+**Added 2026-08-31: [0145] and [0146] are approved, and [0145] goes first — ahead of the roster, not
+into it.** It is tooling, and every plan queued above pays the old gate until it lands: the per-phase
+gate measured **933 s** against **227 s** after, which is **~59 min on a median six-phase plan**.
+Phases 2-5 are **parallel-safe with the one live lane** (0144 touches none of `.config/`,
+`.githooks/`, `.github/`, `.claude/skills/`), and its two measurement phases need an idle box but
+gate nothing — the "before" arm stays measurable forever.
+
+**[0146] is sequenced after it and is not a time plan.** It adds ~3 min per plan on top; what it buys
+is the CI run on every push (869 s -> ~539 s, modelled) and a **zero marginal cost per new preset**
+in the implementation loop, which is what stops the preset library taxing engine work as it grows.
+**Its Phase 1 is a spike with a real stop condition** and may end the plan — nothing downstream
+should be scheduled as if its later phases are certain.
 
 **Added 2026-08-29, second promotion round: [0138], [0139], [0140], [0141] and [0142], all `draft`.**
 The sweep was re-run with a corrected filter — the first pass's regex was greedy and over-counted
@@ -1176,3 +1189,5 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0140]: 0140-every-rate-integrates-for-real.md
 [0141]: 0141-the-plugin-seams-stop-drifting.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0145]: 0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
+[0146]: 0146-the-preset-sweeps-stop-being-one-long-test.md
