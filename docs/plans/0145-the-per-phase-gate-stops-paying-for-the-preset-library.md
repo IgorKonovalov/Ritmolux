@@ -42,9 +42,74 @@ being followed: Plan 0135's `test(core): one shared harness for the integration 
 minutes after the commit before it, which no full suite run fits inside. `dev` narrows silently
 today, inconsistently, and no phase records what it ran.
 
-**The measurement this plan was supposed to open with was taken and discarded.** Three lanes (0092,
-0125, 0144) were live on 2026-08-31 and two other sessions were running suites concurrently with it,
-so every figure was an upper bound of unknown looseness. Phase 1 retakes it on a quiet box.
+### The measured baseline
+
+Taken 2026-08-31 at `fd7f55b` on an idle box — no other `cargo`/`cargo-nextest`/`rustc` process at
+the start of the pair, verified before and after each run. Machine per ADR-0071: AMD Ryzen 9 5900HS,
+Windows 10 19045, rustc 1.97.1, cargo-nextest 0.9.140, on AC.
+
+| step, after touching `core/src/lib.rs` | wall |
+|---|---|
+| `cargo build` | 16 s |
+| `cargo fmt --all --check` | 2 s |
+| `cargo clippy --workspace --all-targets -- -D warnings` | 8 s |
+| `cargo nextest run --workspace --no-run` (link 46 binaries) | 38 s |
+| **compile / lint / link floor** | **64 s** |
+| `cargo nextest run --workspace` — 1217 tests, 24 slow | **869 s** |
+| the same under the pre-push filter — 1190 tests, 3 slow | **163 s** |
+
+**27 tests carry 706 s, and one test carries 758 s of it.** The suite is not slow because it has
+many tests — it is slow because four `#[test]` functions each loop the *whole* preset roster
+serially, and nextest parallelizes across tests, never inside one:
+
+| the serial monoliths | wall |
+|---|---|
+| `animation::every_preset_animates_over_time` | **758 s — 87 % of the whole suite's 869 s** |
+| `reactivity::every_preset_reacts_to_at_least_one_band` | 667 s |
+| `distinctness::report_family_distinctness` | 665 s |
+| `sanity::a_louder_frame_is_reported_against_a_quieter_one` | 473 s |
+| `sanity::every_preset_draws_a_real_shape` | 432 s |
+
+CPU-seconds tell the same story from the other side. The suite spends **7,965 CPU-seconds** in total,
+split **3,929 (49 %) in the nine excluded binaries** against 4,036 in the narrow set — near parity.
+Yet the narrow set compresses to **163 s** wall (~25x) because its 4,036 s is spread over 1,190
+tests, while the excluded set cannot compress below **its longest single test**. The exclusion buys
+706 s of wall not because those tests are half the work but because they are *unparallelizable* work.
+
+**This bounds what any preset-sampling change can achieve, and points at a cheaper lever** — see
+Followups: splitting a monolith into one test per preset costs no coverage at all.
+
+**The full-suite figure is not stable, and that is itself a finding.** Three readings of the same
+command on the same tree within one hour: **885 s**, **489 s**, **873 s**. The first was contended by
+another lane; the 489 s is unexplained. Phase 1 owes the spread, not just a number.
+
+**One flake was observed.** The narrowed run exited 100 on one contended pass and 0 on the two
+others, same tree. Not diagnosed here; Phase 1 should name it if it recurs.
+
+**An earlier attempt at this measurement was discarded outright.** Three lanes (0092, 0125, 0144)
+were live and two other sessions were running suites against it, so every figure was an upper bound
+of unknown looseness. It is recorded in ADR-0156's Notes rather than used.
+
+### Running this alongside other lanes
+
+**Phases 2–5 are parallel-safe and can start immediately.** This plan touches `.config/`,
+`.githooks/`, `.github/` and `.claude/skills/` and nothing else; checked 2026-08-31, the only live
+lane (0144) touches **none** of those four paths, so the file-level conflict set is empty. Neither
+needs a GPU, so neither contends for the one adapter.
+
+**Phases 1 and 6 are the exception, and they are not blocking.** They need an idle box — three
+attempts on 2026-08-31 were contaminated by other sessions' suites. The scheduling relief is that
+**Phase 1 does not gate Phases 2–5**: the "before" arm is `cargo nextest run --workspace`, which this
+plan never removes, so both arms stay measurable forever. Run the whole measurement as one
+back-to-back pair in an announced quiet window whenever one is available — before Phases 2–5, after
+them, or in the middle. The `## Implementation log` records when it was taken.
+
+Two ordering notes rather than blockers. Phase 3 edits `.githooks/pre-push`, and each worktree uses
+its own copy, so a live lane keeps the old hook until it merges `main` — the exposure starts at that
+merge, which is what Phase 3's list-diff done-when is for. And Plan 0144 modifies 13 files under
+`core/tests/` (the shared harness) while **adding and deleting no test binary**, so it moves per-test
+cost without moving the binary count; if the measurement is taken before that merges, say so, because
+the link figure belongs to the tree it was taken on.
 
 ## Decision
 
@@ -79,16 +144,20 @@ flowchart LR
 
 ## Implementation phases
 
-### Phase 1 — Take the baseline on a quiet box
+### Phase 1 — Confirm the baseline, and pin its spread
 - **Owner skill:** dev
-- **What:** The readings this plan will be judged against, taken with nothing else building.
+- **What:** Re-take the readings above and establish how repeatable they are. The architect's pair
+  (869 s / 163 s) is one sample; the three full-suite readings spanned 489–885 s, so the number this
+  plan is judged against needs a spread, not a point.
 - **Files touched:** none (this plan's `## Implementation log` only).
 - **Done when:** the log records, from this machine, the wall time of each of `cargo build`,
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` and
   `cargo nextest run --workspace --no-run` after a one-file edit to `core/src/lib.rs`, plus
   `cargo nextest run --workspace` and the same run under the current pre-push filter — **and** the
   machine identification ADR-0071 requires. **No threshold is asserted and none is owed**: the phase
-  produces readings, not a bar. Quiet is a stated precondition, not an assumption: enumerate
+  produces readings, not a bar. **At least three full-suite runs**, so the spread above is either
+  reproduced or contradicted; if it is contradicted, say so — the architect's sample is one reading
+  and this phase outranks it. Quiet is a stated precondition, not an assumption: enumerate
   `cargo`/`cargo-nextest`/`rustc` processes immediately before and after the run and record that
   none but this one was present. If that cannot be achieved, record the readings **and** what else
   was running, and mark them contended — a contended reading is reportable, a laundered one is not.
@@ -175,9 +244,13 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
   push is rejected after the commits are already made. Known trap on this machine.
 - **A custom nextest profile may not inherit `[[profile.default.overrides]]`.** Phase 2's done-when
   tests this rather than assuming it, and states the fallback.
-- **Phase 1 and Phase 6 need the other lanes idle.** Three worktrees are live (0092, 0125, 0144) and
-  the GPU suites serialize on one adapter, so a concurrent lane inflates any reading. Both phases
-  verify and record the condition instead of asserting it held.
+- **Phase 1 and Phase 6 need the other lanes idle**, and the GPU suites serialize on one adapter, so
+  a concurrent lane inflates any reading. Both phases verify and record the condition instead of
+  asserting it held. They do **not** gate the rest of the plan — see "Running this alongside other
+  lanes" above.
+- **Plan 0144's merge can move the baseline.** It modifies 13 files under `core/tests/`, including
+  the shared harness, adding and deleting no binary. A measurement taken across that merge is a
+  measurement of two trees; name which tree each reading belongs to.
 - **Open:** whether once-per-plan is the right cadence for a plan of 9+ phases, or whether the full
   run should also fire at a midpoint. Deliberately not decided here — Phase 6's arithmetic is the
   evidence to decide it from, and ADR-0156 Alternative D is the fallback if it proves too coarse.
@@ -231,3 +304,13 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
   full one does not.
 - **CI pays the cost this plan reduces locally, on every push** — Plan 0129 left the same followup
   and it is still open.
+- **The exclusion list may be under-inclusive.** Six binaries outside the nine cost more than 200
+  CPU-seconds each in the measured run — `warp_mesh` 377, `easing` 313, `tempo_probe` 281, `feedback`
+  266, `transition` 236, `bloom` 201 — and were never candidates because the list predates them. Not
+  touched here (the list moves as-is into the profile, so this plan changes *where* it is defined and
+  not *what* it holds), but re-deriving it by measurement is now a one-file edit.
+- **The full suite's wall time is not repeatable to better than ~1.8x** on this box (489–885 s across
+  three readings within an hour). Worth understanding on its own: it makes every before/after claim
+  about test cost, including this plan's, weaker than it looks.
+- **A narrowed run exited 100 once and 0 twice on the same tree.** Undiagnosed. If it is a real flake
+  it will outlive this plan and belongs in the backlog with a probe.
