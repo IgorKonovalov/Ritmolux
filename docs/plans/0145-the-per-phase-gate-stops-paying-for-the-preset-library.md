@@ -1,6 +1,6 @@
 # 0145 — The per-phase gate stops paying for the preset library
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
 > **Related ADRs:** [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
@@ -279,16 +279,53 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Take the baseline on a quiet box | dev | not started | |
+| 1 — Take the baseline on a quiet box | dev | done | committed with this row |
 | 2 — Define the filter once, as a nextest profile | dev | not started | |
 | 3 — Point the hook and CI at the profile | dev | not started | |
 | 4 — Give the per-phase loop its tier | dev | not started | |
 | 5 — Make the full-suite run a recorded fact | dev | not started | |
 | 6 — Re-measure, and do the per-plan arithmetic | dev | not started | |
+
+### Measurements
+
+**Machine** (ADR-0071): AMD Ryzen 9 5900HS, 16 logical CPUs, Windows 10 19045, rustc 1.97.1,
+cargo-nextest 0.9.140, on AC. **Tree:** `d66e91d`, *not* the architect's `fd7f55b` — Plans 0144 and
+0125 merged in between (105 files, +4244/-2468), so 0144's shared harness is in every reading here.
+**Quiet precondition:** `cargo`/`cargo-nextest`/`rustc`/`rust-lld`/`link` enumerated immediately
+before and after each run; none present at any of the twenty boundaries. 14:14-14:44 CEST
+2026-08-31, one uninterrupted sequence. Counts on this tree: **1230** unfiltered, **1203** narrowed,
+**27** in the nine excluded binaries.
+
+Floor, after appending one comment line to `core/src/lib.rs` (reverted afterwards):
+
+| step | wall | exit |
+|---|---|---|
+| `cargo build` | 4.0 s | 0 |
+| `cargo fmt --all --check` | 2.0 s | 0 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | 14.2 s | 0 |
+| `cargo nextest run --workspace --no-run` (link 59 binaries) | 32.4 s | 0 |
+| **floor** | **52.6 s** | |
+
+Suite runs, interleaved full/narrow so thermal drift reaches both arms alike; all six exited 0:
+
+| run | 1 | 2 | 3 | mean | spread |
+|---|---|---|---|---|---|
+| `cargo nextest run --workspace` (59 binaries) | 429.6 | 431.9 | 428.8 | **430.1 s** | 3.1 s (0.7 %) |
+| the same under the pre-push filter (50 binaries) | 147.8 | 148.7 | 148.6 | **148.4 s** | 0.9 s (0.6 %) |
+
+Against the plan's stated findings, from this machine:
+
+- **The full suite is 430 s, not 869 s** — half the architect's reading.
+- **It repeats to 0.7 %, not "no better than ~1.8x".** The 489-885 s spread does not reproduce; the
+  plan's unexplained 489 s is the reading nearest this one.
+- **The narrowed-run exit-100 flake did not recur** — three runs, all exit 0.
+- **The critical-path mechanism does reproduce.** `animation::every_preset_animates_over_time` is
+  331 s of the 428 s run (77 %), then `reactivity` 309 s, `distinctness` 220 s, `sanity` 193 s,
+  `reaction_diffusion` 163 s.
 
 ### Notes
 
