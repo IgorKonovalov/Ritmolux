@@ -328,7 +328,8 @@ pub struct RendererOptions {
 | 3 — `--preset` holds a scene in the window | dev | done | cb6a037 |
 | 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 7399ab5 |
 | 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | 8e7bfe3 |
-| 6 — `cargo doc` becomes a gate | dev | done | committed with this row |
+| 6 — `cargo doc` becomes a gate | dev | done | 2c5dc2a |
+| (review fixes, not a phase) | dev | done | a2f7627, 0a687f0 |
 
 ### Notes
 
