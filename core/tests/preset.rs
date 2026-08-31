@@ -2797,9 +2797,15 @@ fn the_representative_key_defaults_to_false_and_rejects_a_non_boolean() {
 ///
 /// **This catches absence and never staleness.** Two representatives that have
 /// stopped representing a family grown around them pass here exactly as they did
-/// the day they were chosen. That is a curation duty at the plan-close cadence
-/// with no gate behind it, and `presets/README.md` says so rather than leaving it
-/// to be inferred from this test's existence.
+/// the day they were chosen. That is a curation duty at the close cadence with
+/// no gate behind it, and `presets/README.md` says so rather than leaving it to
+/// be inferred from this test's existence.
+///
+/// **The floor is the family's own size when that is smaller than two.** A
+/// family shipping exactly one preset cannot satisfy a floor of two, and under
+/// ADR-0081 the content lane lands presets gated on this suite — so a fixed
+/// floor would redden the first world on a new scene for a reason that has
+/// nothing to do with the preset.
 #[test]
 fn every_family_carries_at_least_two_representatives() {
     const FLOOR: usize = 2;
@@ -2827,9 +2833,12 @@ fn every_family_carries_at_least_two_representatives() {
             reps.len(),
             members.len()
         );
-        if reps.len() < FLOOR {
+        let floor = FLOOR.min(members.len());
+        if reps.len() < floor {
             short.push(format!(
-                "{system:?} ships {} preset(s) and declares {} representative(s) ({reps:?}),                  under the floor of {FLOOR} — add `representative = true` to the presets that                  stand for this family",
+                "{system:?} ships {} preset(s) and declares {} representative(s) ({reps:?}), \
+                 under the floor of {floor} — add `representative = true` to the presets \
+                 that stand for this family",
                 members.len(),
                 reps.len()
             ));
