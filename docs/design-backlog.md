@@ -313,6 +313,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0155 | The input-recovery settle window is counted in frames, so its guarantee differs on every display | [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phase 4, as `INPUT_RECOVERY_SETTLE_SECS`. **Closed 2026-08-30** |
 | 0156 | After a give-up, a loss inside the settle window rewrites no surface, so the verdict reads `live` while nothing delivers | [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phase 3, as `RecoveryPolicy::on_restart`. **Closed 2026-08-30** |
 | 0159 | An unrecognized flag is silently ignored and there is no `--help` | [ADR-0148](adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) + [Plan 0135](plans/done/0135-the-show-night-surfaces-stop-lying.md) Phases 1-2; see 0167. **Closed 2026-08-30** |
+| 0167 | Six flags do nothing without `--stream`, and the roster built to end silently-ignored flags does not say so | [ADR-0155](adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) + [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phases 1-3; see 0159. **Closed 2026-08-31** |
+| 0168 | The broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 4, as a repo-wide scan in `check-comment-hygiene.mjs`; the unrejoined form is still unseen, see 0173. **Closed 2026-08-31** |
+| 0169 | `cargo doc` emits intra-doc-link warnings and nothing in the project runs `cargo doc` | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 6: 71 cleared, then `RUSTDOCFLAGS=-D warnings` added to CI. **Closed 2026-08-31** |
 <!-- roster:end -->
 
 ## Open entries
@@ -4036,9 +4039,24 @@ on an adapter that does not drive the display it is on, which is the same dual-G
 0131 Phase 6 is still owed - so it wants measuring before it is promised. The startup note that names
 the running adapter has already landed and is what makes any of this attributable.
 
-- **Verified 2026-08-30** - the windowed constructor still hands `RenderContext` no adapter choice: `present: RenderContext::new\(target, width, height\)\? in: core/src/render/mod.rs`
+> **Updated 2026-08-31, at Plan 0144's close. Half discharged: the lever landed, the measurement did
+> not.** [ADR-0155](adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) gave
+> `--gpu` to the windowed path exactly as the fix above describes, and it was observed working —
+> `lmv --gpu 1` put this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)`
+> with the startup line reading `(pinned by --gpu)`. The dual-GPU question this entry said *"wants
+> measuring before it is promised"* is answered for the surface-creation half: a named adapter that
+> cannot present is refused by name rather than silently swapped.
+>
+> **What is left is this entry's actual title.** No windowed frame-time figure has been re-taken on
+> the discrete adapter, so every published one is still an iGPU figure — and that is now true *by
+> choice* rather than by impossibility, because Plan 0144 deliberately left the unflagged request at
+> `AdapterChoice::Default` so no existing number would move underneath a CLI change. The remaining
+> work is a measurement pass producing a **new row** beside the iGPU numbers, not a correction to
+> them. The first probe below is rewritten because Phase 2 falsified its reduction, not its claim.
+
+- **Re-written 2026-08-31** - the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
-- **Verified 2026-08-30** - the resolver that would fix it exists and is reached from `--stream` only: `present: gpu::renderer_choice in: standalone/src/stream.rs`
+- **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/main.rs`
 - **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/main.rs`
 
@@ -4080,128 +4098,6 @@ table region.
 - **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`
-
-## 0167 - six flags do nothing without `--stream`, and the roster that was built to end silently-ignored flags does not say so
-
-> **Filed 2026-08-30** at Plan 0135's Mode 4 review. The plan closed the general case; this is the
-> specific case it left standing, inside the structure it built.
-
-[ADR-0148](adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) makes `lmv` refuse *"an
-argument no scanner claimed"*, and Plan 0135 shipped it: a misspelt `--osc` is now a startup error
-naming `--osc`. **Six flags are claimed conditionally and fall outside that guarantee.** `--size`,
-`--fps`, `--gpu`, `--sender`, `--preset` and `--frames` exist only in `FLAGS` and in
-`standalone/src/stream.rs`'s `parse`, whose first statement is
-
-```rust
-if !args.iter().any(|arg| arg == "--stream") {
-    return Ok(None);
-}
-```
-
-so without `--stream` every one of them is walked past by the roster gate as recognized, never read
-by anything, and never mentioned again. `lmv --preset attractor_clifford` starts the app, rotates
-presets normally, and says nothing. `lmv --gpu 1` renders on whatever adapter it would have picked
-anyway.
-
-**This is design-backlog 0159's own failure class**, one level down: *"a running visualizer doing
-less than it was asked, with no diagnostic."* `--gpu` is the sharpest of the six — an operator who
-believes they pinned an adapter and did not has the identical debugging experience 0159 describes,
-and [backlog 0165](design-backlog.md) says every windowed frame-time figure this project has quoted
-is an integrated-GPU figure, which is exactly the confusion a silently-ignored `--gpu` sustains.
-
-**What is already mitigating it, and why that is not enough.** All six help lines name `--stream`
-(`<n> --stream frame rate (default 60)`), so `--help` does disclose the coupling to anyone who
-reads it. That is disclosure, not refusal, and ADR-0148's Alternative C is the recorded argument
-against exactly that trade: *"a warning on a show floor is a line in a scrollback nobody is
-reading."* The roster also makes this **cheaper to fix than it was to file** — the structure that
-would carry the constraint now exists and did not before.
-
-**Impact:** low frequency, and it is not a regression — the behavior predates Plan 0135 unchanged.
-It is filed because the roster's existence makes the gap *look* closed, which is the property that
-gets a class of bug forgotten.
-
-**What a fix looks like:** one more field on `FlagSpec` — `requires: Option<&'static str>` — and
-one more arm in `unrecognized_flag`, refusing a flag whose `requires` is not also present with the
-same "did you mean" shape. Roughly ten lines, gated by the same roster test that already exists. The
-alternative shape, which costs nothing and buys less, is to let the six be accepted and warn; that
-is Alternative C again and loses for the same reason.
-
-- **Verified 2026-08-30** - the early return is still what makes the six unread: `present: if !args.iter\(\).any\(\|arg\| arg == "--stream"\) in: standalone/src/stream.rs`
-- **Verified 2026-08-30** - and `FlagSpec` still has no way to state the dependency: `absent: requires in: standalone/src/main.rs`
-
-## 0168 - the broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list
-
-Filed 2026-08-30 at Plan 0124's close, as the review's one major.
-
-**The defect.** A Rust string literal broken across source lines without a trailing `\` keeps the
-newline and the continuation line's indentation; joined back onto one line afterwards, it keeps the
-run of spaces. The operator reads `(x/y/rad/ang), which` followed by twenty-two spaces and then
-`reads 0`. It compiles, it matches a `contains` assertion on either half, and it is wrong only where
-it is read.
-
-**What Plan 0124 Phase 2 did, and where it stops.** Six literals in `core/src/preset/schema.rs` were
-rejoined, and `core/tests/preset.rs::operator_messages_carry_no_run_of_spaces` guards them - by
-constructing six presets and checking the six resulting messages by hand. The guard is an
-enumeration of call sites, so it cannot see a seventh, and a seventh already exists. The plan's file
-list scoped Phase 2 to `schema.rs`, so this is not a `dev` miss; it is the instrument not
-generalizing.
-
-**What survives.** Roughly twenty string literals repo-wide carry a run of three or more spaces
-mid-sentence. Three reach a human at runtime:
-
-- `standalone/src/stream.rs:393` - a `--stream` CLI error: `"... --list-presets is not a flag, but
-  the                  embedded set is what the window browses"`.
-- `milkconv/src/convert.rs:430` - a converter report line.
-- `core/src/dsp/mod.rs:57` - a `const _: () = assert!` message, so this one reaches a compile
-  failure rather than a run.
-
-The rest are test-assertion messages (`star/tests.rs`, `particles/tests.rs`), which is the text a
-failing test prints. Deliberate column alignment in diagnostic tables (`milk_wash.rs`,
-`render/tests.rs`, `console/tests.rs`) is **not** this defect and any check has to exempt it - which
-is why a naive repo-wide grep is not the fix.
-
-**What a fix looks like.** The instrument already exists one directory over:
-`scripts/check-comment-hygiene.mjs` lexes Rust and C source and already knows where a string literal
-starts and ends - Plan 0124 Phase 3 made that walk repo-wide. The mirror check is a string-literal
-pass over the same spans, reporting a run of two or more spaces that is neither a format-width spec
-(`{:>12}`) nor part of a literal whose other lines align on the same column. That would convict the
-class rather than six instances of it, and it would run at pre-push and in CI like the rest.
-
-**Impact:** low severity, unbounded frequency. Nothing catches the next one, and Plan 0124's close
-is the moment the project is most likely to believe it did.
-
-- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer\s{2,}than it in: core/src/dsp/mod.rs`
-- **Re-written 2026-08-31**, at Plan 0144's review. Both probes above and below were written with the literal run of spaces they are about, which the gate collapses to one before matching (see 0171), so neither could ever fire. `\s{2,}` carries the same claim and survives, because it holds no space character. Note that the repair is not checkable from here either: `firstMatch` excludes the backlog from every probe by design, since the file quotes each pattern verbatim.
-- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the\s{2,}embedded set in: standalone/src/stream.rs`
-- **Verified 2026-08-30** - the guard is still an enumeration rather than a scan: `absent: fn operator_messages_carry_no_run_of_spaces[\s\S]{0,4000}read_to_string in: core/tests/preset.rs`
-
-## 0169 - `cargo doc` emits 64 intra-doc-link warnings and nothing in the project runs `cargo doc`
-
-Filed 2026-08-30 at Plan 0124's close, from `dev`'s own followup.
-
-**The claim.** `cargo doc --workspace --no-deps` emits 64 intra-doc-link warnings over 31 files.
-`dev` measured the count twice during Plan 0124 Phase 3 - before and after rewriting 72 comments -
-precisely because it was the only available substitute for a bit-reproducible build check, and it
-was **unchanged at 64 both times**, so this plan neither caused it nor moved it.
-
-**Why it matters, and why it is small.** A rustdoc intra-doc link is the *one* comment link form
-[ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
-deliberately keeps, on the stated grounds that `rustc` resolves it and so it cannot rot silently.
-That argument is exactly right about the mechanism and wrong about this repo: `rustc` does emit the
-diagnostic, and nothing here ever asks it to. `.githooks/pre-push` runs doc-links, fmt, clippy and a
-narrowed nextest; the CI `links` job runs the five Node gates. Neither runs `cargo doc`. So 64 links
-that ADR-0127 exempted on the grounds of being checked are, in this project, unchecked.
-
-**What a fix looks like.** One line - `cargo doc --workspace --no-deps` with
-`RUSTDOCFLAGS="-D warnings"` - in the CI job that already builds, after the 64 existing warnings are
-cleared. Adding the gate before clearing them would red every push, so the order is fixed. Roughly
-an hour of mechanical repair; the value is that ADR-0127's exemption becomes true.
-
-**Impact:** low. No user sees a rustdoc link. It is filed because the exemption is stated as a
-property and is not one.
-
-- **Verified 2026-08-30** - neither call site runs it: `absent: cargo doc in: .githooks/pre-push`
-- **Verified 2026-08-30** - and not in CI either: `absent: cargo doc in: .github/workflows/ci.yml`
 
 ## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
 
@@ -4328,3 +4224,45 @@ would serve the same end deliberately rather than as a side effect.
 - **Verified 2026-08-31** - seeding is write-if-absent and has no removal arm: `present: if !path.exists\(\) in: core/src/preset/mod.rs`
 - **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/mod.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
+
+## 0173 - the literal gate is blind to the defect in its unrejoined form, and the fixture README states that silence as a general truth
+
+> **Filed 2026-08-31** at Plan 0144's review, by seeding a two-line literal under
+> `scripts/fixtures/` and watching the gate stay silent.
+
+Plan 0144 Phase 4 gave `scripts/check-comment-hygiene.mjs` a string-literal pass, which is what
+closed 0168. `brokenLiteral` decodes each literal the way rustc does and then **returns `null` for
+any literal whose decoded text still contains a newline**, on the stated grounds that such a literal
+is a formatted block whose column spacing is layout the author typed - *"prose does not carry a
+newline in the middle of itself"*.
+
+**A lost `\` continuation is prose carrying a newline in the middle of itself.** That is the whole
+mechanism: the newline survives, the next line's indent survives, and the reader gets a run of
+spaces mid-sentence. So the gate catches the defect only *after* someone joins the lines, and is
+silent on it in the form an author actually types. The finding message it prints - `(a line break
+with no trailing \)` - names the shape it structurally cannot see.
+
+**Why this is low and not a re-opening of 0168.** Every instance this tree has held arrived already
+single-line: `core/src/dsp/mod.rs:57`, `standalone/src/stream.rs:393` and `milkconv/src/convert.rs:430`
+were all one source line with the run baked in, which is why the 12-space rule convicted 15 sites and
+`cargo fmt` never disturbed them. The authoring path that produces this defect here emits the joined
+form. The gap is real and the gate's own documentation overstates itself; the frequency is not known
+to be nonzero.
+
+**What a fix looks like.** One more arm, not a rewrite: alongside the single-line run, report a
+**newline immediately followed by 12 or more spaces and then a non-space** - which is precisely a
+continuation indent and is not what a column table looks like, since a table's rows start at a
+column and carry interior runs rather than a leading one. Seed both spellings. Failing that, the
+honest minimum is to correct `scripts/fixtures/README.md`'s silence row and the `LITERAL_RUN`
+comment so neither claims a generality the check does not have.
+
+**Also here, because it is one line of the same file.** The finding message's `\` is written `\)`
+inside a JS template literal, so it is consumed as an escape and the operator reads `(a line break
+with no trailing )`. It needs `\`.
+
+**Impact:** low. Nothing is mis-reported; a class is under-reported, and the documentation says
+otherwise, which is the property that gets the next reader to stop looking.
+
+- **Verified 2026-08-31** - the newline exclusion is still unconditional and still ahead of the run check, so the unrejoined form still returns before it is judged: `present: text\.includes.{0,40}return null in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-31** - the fixture roster still states the silence as a general property: `present: prose does not carry one mid-sentence in: scripts/fixtures/README.md`
+- **Verified 2026-08-31** - the swallowed backslash is still in the message the operator reads: `present: with no trailing \\\) in: scripts/check-comment-hygiene.mjs`

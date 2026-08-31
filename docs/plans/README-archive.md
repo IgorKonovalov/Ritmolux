@@ -13,6 +13,67 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0144 — The flags mean what they say](done/0144-the-flags-mean-what-they-say.md)
+  — closed 2026-08-31. Six `dev` commits in the `lmv-plan-0144` worktree, one per phase: `1b29936`
+  (`FlagSpec.requires` + the companion refusal), `3872605` (`--gpu` reaches the window), `cb6a037`
+  (`--preset` holds a scene), `7399ab5` (the hygiene gate scans string literals), `8e7bfe3` (the
+  last eleven skip blocks fold into `core/tests/common/`) and `2c5dc2a` (`cargo doc` becomes a CI
+  gate, 71 intra-doc links cleared), plus `a2f7627` and `0a687f0` for review fixes and `55e16b6`
+  / `b7fff62` / `75df3b8` for the log. 65 files, `+1532 / -451`.
+
+  **What it was for.** [ADR-0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md)
+  promised that `lmv` refuses an argument no scanner claimed, and design-backlog 0167 found the case
+  it left standing: `stream.rs`'s `parse` returns `Ok(None)` before reading anything unless
+  `--stream` is present, so six flags were walked past as recognized and then read by nothing.
+  `lmv --gpu 1` started normally and rendered on whatever adapter it would have picked anyway.
+
+  **The investigation changed the answer.** Two of the six were not missing features but existing
+  ones the window could not reach, and one of them was load-bearing:
+  `RenderContext::from_surface` asked for its adapter with a default power preference, which on a
+  hybrid laptop is the power-saving GPU — design-backlog 0165's finding that *every windowed
+  frame-time figure this project has quoted is an iGPU figure*. So the plan refused four and wired
+  two, and [ADR-0155](../adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md)
+  answered the question [ADR-0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
+  had explicitly left open.
+
+  **What the close verified rather than took on trust.** `RUSTDOCFLAGS="-D warnings" cargo doc
+  --workspace --no-deps` emits **zero** warnings after `cargo clean --doc`; `cargo nextest run
+  --workspace` is **1230 passed, 5 skipped**; `clippy --workspace --all-targets` and `fmt` are
+  clean. The C ABI did not move — the diff over `core-cabi/`, `plugin-foobar/` and `docs/specs/` is
+  empty, `RendererOptions::default()` still carries `AdapterChoice::Default`, and a `core` test pins
+  that because it *is* the shim's window request. All eleven folded skip blocks were checked
+  individually against `main` for adapter preference and tier. The two unflagged arms are held apart
+  by `the_window_and_the_stream_disagree_when_unflagged`, which is the one test standing between
+  this plan and a silent re-basing of every windowed measurement.
+
+  **A third refusal was found at review and is recorded in ADR-0155's Neutral section.** A rostered
+  valueless flag spelled `--stream=1` passed both gates — `flag_name` reduces it to a rostered name,
+  and it counts as a `--stream` occurrence for the companion check — while every scanner comparing
+  the whole argument matched nothing. `lmv --stream=1 --fps 30` therefore started **windowed** with
+  `--fps` read by nothing. It is refused ahead of the companion check, because that check sees only
+  the consequence and would name the wrong token.
+
+  **What the plan did not buy, and it is worth knowing.** Phase 4's literal gate rejects any literal
+  whose decoded text holds a newline, so it is structurally blind to the defect in its *unrejoined*
+  form — the very shape a lost `\` continuation produces. Confirmed at review by seeding a two-line
+  literal with an 18-space indent: silent. It catches the form this tree actually produces (all
+  three instances design-backlog 0168 named were already single-line), which is why 0168 archived
+  rather than staying live, and the residual is design-backlog 0173. The threshold itself is the
+  user's call, not the plan's: `dev` presented three options and the chosen 12-space rule yields
+  zero false positives and zero `hygiene-allow` escapes, against roughly thirty escapes at the
+  plan's proposed four.
+
+  **Half-discharged, deliberately.** design-backlog 0165 keeps the second half — the windowed
+  frame-time figures have not been re-taken on the discrete adapter. `dev` observed `--gpu 1`
+  putting this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` with the
+  startup line reading `(pinned by --gpu)`, so the lever works; the measurement pass is a new row on
+  the on-device checklist and not a correction to the existing numbers, because unflagged behaviour
+  is unchanged by design.
+
+  Review: **no blockers, no majors, five minors, three nits.** Version: **0.97.0** (minor — a
+  feature plan). Archived [backlog 0167 + 0168 + 0169](../design-backlog-archive.md); filed
+  [backlog 0173](../design-backlog.md); `dev` filed 0171 and 0172 during the lane.
+
 - [0125 — The scenes share their GPU boilerplate](done/0125-the-scenes-share-their-gpu-boilerplate.md)
   — closed 2026-08-31. Five `dev` commits in the `lmv-plan-0125` worktree, one per phase: `8d2d590`
   (`gpu::color_pass` + `gpu::uniform_buffer`), `672cd85` (`palette::LutPair`), `c7dab47`

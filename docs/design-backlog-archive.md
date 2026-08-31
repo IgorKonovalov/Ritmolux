@@ -6976,3 +6976,125 @@ either shape and is the part an operator actually reaches for.
 - `unprobeable:` that no unclaimed argument is rejected is a negative about the whole of `main`'s argument handling, not a match countable in one file; the two commands above are the reduction, and they are re-runnable against any build.
 
 ---
+
+## 0167 - six flags do nothing without `--stream`, and the roster that was built to end silently-ignored flags does not say so
+
+> **Filed 2026-08-30** at Plan 0135's Mode 4 review. The plan closed the general case; this is the
+> specific case it left standing, inside the structure it built.
+
+[ADR-0148](adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) makes `lmv` refuse *"an
+argument no scanner claimed"*, and Plan 0135 shipped it: a misspelt `--osc` is now a startup error
+naming `--osc`. **Six flags are claimed conditionally and fall outside that guarantee.** `--size`,
+`--fps`, `--gpu`, `--sender`, `--preset` and `--frames` exist only in `FLAGS` and in
+`standalone/src/stream.rs`'s `parse`, whose first statement is
+
+```rust
+if !args.iter().any(|arg| arg == "--stream") {
+    return Ok(None);
+}
+```
+
+so without `--stream` every one of them is walked past by the roster gate as recognized, never read
+by anything, and never mentioned again. `lmv --preset attractor_clifford` starts the app, rotates
+presets normally, and says nothing. `lmv --gpu 1` renders on whatever adapter it would have picked
+anyway.
+
+**This is design-backlog 0159's own failure class**, one level down: *"a running visualizer doing
+less than it was asked, with no diagnostic."* `--gpu` is the sharpest of the six — an operator who
+believes they pinned an adapter and did not has the identical debugging experience 0159 describes,
+and [backlog 0165](design-backlog.md) says every windowed frame-time figure this project has quoted
+is an integrated-GPU figure, which is exactly the confusion a silently-ignored `--gpu` sustains.
+
+**What is already mitigating it, and why that is not enough.** All six help lines name `--stream`
+(`<n> --stream frame rate (default 60)`), so `--help` does disclose the coupling to anyone who
+reads it. That is disclosure, not refusal, and ADR-0148's Alternative C is the recorded argument
+against exactly that trade: *"a warning on a show floor is a line in a scrollback nobody is
+reading."* The roster also makes this **cheaper to fix than it was to file** — the structure that
+would carry the constraint now exists and did not before.
+
+**Impact:** low frequency, and it is not a regression — the behavior predates Plan 0135 unchanged.
+It is filed because the roster's existence makes the gap *look* closed, which is the property that
+gets a class of bug forgotten.
+
+**What a fix looks like:** one more field on `FlagSpec` — `requires: Option<&'static str>` — and
+one more arm in `unrecognized_flag`, refusing a flag whose `requires` is not also present with the
+same "did you mean" shape. Roughly ten lines, gated by the same roster test that already exists. The
+alternative shape, which costs nothing and buys less, is to let the six be accepted and warn; that
+is Alternative C again and loses for the same reason.
+
+- **Verified 2026-08-30** - the early return is still what makes the six unread: `present: if !args.iter\(\).any\(\|arg\| arg == "--stream"\) in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - and `FlagSpec` still has no way to state the dependency: `absent: requires in: standalone/src/main.rs`
+
+## 0168 - the broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list
+
+Filed 2026-08-30 at Plan 0124's close, as the review's one major.
+
+**The defect.** A Rust string literal broken across source lines without a trailing `\` keeps the
+newline and the continuation line's indentation; joined back onto one line afterwards, it keeps the
+run of spaces. The operator reads `(x/y/rad/ang), which` followed by twenty-two spaces and then
+`reads 0`. It compiles, it matches a `contains` assertion on either half, and it is wrong only where
+it is read.
+
+**What Plan 0124 Phase 2 did, and where it stops.** Six literals in `core/src/preset/schema.rs` were
+rejoined, and `core/tests/preset.rs::operator_messages_carry_no_run_of_spaces` guards them - by
+constructing six presets and checking the six resulting messages by hand. The guard is an
+enumeration of call sites, so it cannot see a seventh, and a seventh already exists. The plan's file
+list scoped Phase 2 to `schema.rs`, so this is not a `dev` miss; it is the instrument not
+generalizing.
+
+**What survives.** Roughly twenty string literals repo-wide carry a run of three or more spaces
+mid-sentence. Three reach a human at runtime:
+
+- `standalone/src/stream.rs:393` - a `--stream` CLI error: `"... --list-presets is not a flag, but
+  the                  embedded set is what the window browses"`.
+- `milkconv/src/convert.rs:430` - a converter report line.
+- `core/src/dsp/mod.rs:57` - a `const _: () = assert!` message, so this one reaches a compile
+  failure rather than a run.
+
+The rest are test-assertion messages (`star/tests.rs`, `particles/tests.rs`), which is the text a
+failing test prints. Deliberate column alignment in diagnostic tables (`milk_wash.rs`,
+`render/tests.rs`, `console/tests.rs`) is **not** this defect and any check has to exempt it - which
+is why a naive repo-wide grep is not the fix.
+
+**What a fix looks like.** The instrument already exists one directory over:
+`scripts/check-comment-hygiene.mjs` lexes Rust and C source and already knows where a string literal
+starts and ends - Plan 0124 Phase 3 made that walk repo-wide. The mirror check is a string-literal
+pass over the same spans, reporting a run of two or more spaces that is neither a format-width spec
+(`{:>12}`) nor part of a literal whose other lines align on the same column. That would convict the
+class rather than six instances of it, and it would run at pre-push and in CI like the rest.
+
+**Impact:** low severity, unbounded frequency. Nothing catches the next one, and Plan 0124's close
+is the moment the project is most likely to believe it did.
+
+- **Verified 2026-08-30** - the seventh is still there: `present: cannot be longer\s{2,}than it in: core/src/dsp/mod.rs`
+- **Re-written 2026-08-31**, at Plan 0144's review. Both probes above and below were written with the literal run of spaces they are about, which the gate collapses to one before matching (see 0171), so neither could ever fire. `\s{2,}` carries the same claim and survives, because it holds no space character. Note that the repair is not checkable from here either: `firstMatch` excludes the backlog from every probe by design, since the file quotes each pattern verbatim.
+- **Verified 2026-08-30** - and the operator-facing one on the CLI error path: `present: is not a flag, but the\s{2,}embedded set in: standalone/src/stream.rs`
+- **Verified 2026-08-30** - the guard is still an enumeration rather than a scan: `absent: fn operator_messages_carry_no_run_of_spaces[\s\S]{0,4000}read_to_string in: core/tests/preset.rs`
+
+## 0169 - `cargo doc` emits 64 intra-doc-link warnings and nothing in the project runs `cargo doc`
+
+Filed 2026-08-30 at Plan 0124's close, from `dev`'s own followup.
+
+**The claim.** `cargo doc --workspace --no-deps` emits 64 intra-doc-link warnings over 31 files.
+`dev` measured the count twice during Plan 0124 Phase 3 - before and after rewriting 72 comments -
+precisely because it was the only available substitute for a bit-reproducible build check, and it
+was **unchanged at 64 both times**, so this plan neither caused it nor moved it.
+
+**Why it matters, and why it is small.** A rustdoc intra-doc link is the *one* comment link form
+[ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+deliberately keeps, on the stated grounds that `rustc` resolves it and so it cannot rot silently.
+That argument is exactly right about the mechanism and wrong about this repo: `rustc` does emit the
+diagnostic, and nothing here ever asks it to. `.githooks/pre-push` runs doc-links, fmt, clippy and a
+narrowed nextest; the CI `links` job runs the five Node gates. Neither runs `cargo doc`. So 64 links
+that ADR-0127 exempted on the grounds of being checked are, in this project, unchecked.
+
+**What a fix looks like.** One line - `cargo doc --workspace --no-deps` with
+`RUSTDOCFLAGS="-D warnings"` - in the CI job that already builds, after the 64 existing warnings are
+cleared. Adding the gate before clearing them would red every push, so the order is fixed. Roughly
+an hour of mechanical repair; the value is that ADR-0127's exemption becomes true.
+
+**Impact:** low. No user sees a rustdoc link. It is filed because the exemption is stated as a
+property and is not one.
+
+- **Verified 2026-08-30** - neither call site runs it: `absent: cargo doc in: .githooks/pre-push`
+- **Verified 2026-08-30** - and not in CI either: `absent: cargo doc in: .github/workflows/ci.yml`

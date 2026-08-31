@@ -1,8 +1,8 @@
 # ADR-0155 — The window takes the adapter and the preset the operator names
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-31
 > **Date:** 2026-08-30
-> **Related plan(s):** [0144](../plans/0144-the-flags-mean-what-they-say.md)
+> **Related plan(s):** [0144](../plans/done/0144-the-flags-mean-what-they-say.md)
 > **Refines:** [ADR-0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md),
 > [ADR-0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md)
 
@@ -107,6 +107,17 @@ passes exactly that. `LMV_ABI_VERSION` does not move ([ADR-0003](0003-c-abi-v1-s
   to their own config entries.
 - The four refused flags could later acquire windowed meanings; `requires` is per-flag data and
   clearing it is a one-line change, as this decision itself demonstrates for the other two.
+- **A third refusal falls out of the same walk, and it is the one this decision did not foresee.**
+  A rostered flag that takes **no** value, spelled with an `=value` suffix, is a silence neither the
+  ADR-0148 gate nor the `requires` arm above can see: `flag_name` reduces `--stream=1` to a rostered
+  name, so it is not unrecognized, and it counts as a `--stream` occurrence, so it satisfies the
+  companion check — while every scanner claiming a valueless flag compares the whole argument
+  (`arg == "--stream"`) and matches nothing. `lmv --stream=1 --fps 30` therefore passed both gates,
+  started **windowed**, and read `--fps` with nothing. The refusal is the same shape as the other
+  two and is ordered **ahead of** the companion check, because that check sees only the consequence
+  and would name `--fps` when the wrong token is `--stream`. Recorded here rather than as its own
+  decision: it is the identical failure class one spelling down, and the mechanism the roster needed
+  to see it — one shared walk yielding a token kind per flag — is the one this ADR already required.
 
 ## Alternatives considered
 
