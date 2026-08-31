@@ -249,7 +249,7 @@ fn animation_attractor_leviathan() {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
-| 2 — Split the remaining per-preset sweeps | dev | not started | |
+| 2 — Split the remaining per-preset sweeps | dev | done | committed with this row |
 | 3 — Split `distinctness` per family | dev | not started | |
 | 4 — The `representative` key and its floor | dev | not started | |
 | 5 — Seed the representatives | dev | not started | |
@@ -299,6 +299,19 @@ none of them appears in the suite's slowest eight or its last eight to finish. T
 81 `presets/*.toml` stems. Copying a preset to `presets/zz_glob_probe.toml` took the list to 82 with
 no Rust edit and removing it returned it to 81.
 
+**Phase 2, same machine and preconditions.** `reactivity` and `sanity`'s loudness test generate 81
+tests each; `sanity`'s shape test generates 12, one per family the shipped set contains, diffing
+empty against the 12 distinct `system` values in `presets/*.toml`.
+
+| full `--workspace` | elapsed | summed test-wall | concurrency | tests |
+|---|---|---|---|---|
+| before, Phase 0 | 464.2 s | 4,169.5 s | 8.98 | 1230 |
+| after Phase 1 | 458.4 s | 4,747.1 s | 10.36 | 1310 |
+| after Phase 2 | **441.6 s** | 6,704.8 s | **15.18** | 1481 |
+
+The critical path is now `distinctness` at 290.4 s, which is Phase 3's subject. `reaction_diffusion`
+(196.3 s) and `attractor` (146.9 s) are the two behind it and are outside this plan.
+
 ### Notes
 
 **The Phase 1 stop condition trips on one of its two clauses. The plan is paused here.**
@@ -320,6 +333,23 @@ test prints its own branch label instead. Neither form is in `.config/nextest.to
 audible override, so both are captured by nextest unless the test fails.
 
 **ADR-0136 cites `every_preset_animates_over_time`,** which no longer exists.
+
+**Phase 2's done-when is met except in its letter, on one test.** It asks that the four split sweeps
+*"no longer appear among the last tests to finish"*. Three of the four do not appear anywhere near
+the tail; `sanity_shape_attractor` does, at **67.4 s** and position **1472 of 1481**. It is not among
+the suite's slowest six and it is not the critical path, but it is in the last ten, so the criterion
+is reported as partially met rather than passed. The cause is structural and was chosen at the plan
+revision: `attractor` holds 19 of the 81 presets and the per-family split makes that family the
+largest indivisible unit in the sweep. It is the same lopsidedness the plan's open question raises
+about a two-per-family sample.
+
+**Three reports changed shape, none disappeared.** `sanity`'s loudness ratio prints one row per
+preset instead of one sorted table, so the ranking is reconstructed by sorting a run's lines. The
+shape sweep's flattest-preset ranking and its under-boundary-floor count are now scoped to the family
+whose test printed them rather than to the whole library. The coverage distribution and its
+floor-slack gate are unchanged, because they were already per family: verified by running
+`sanity_shape_spectrum` alone, which prints `spectrum floor 0.28 lowest 0.0996 (Ridge) - factor 0.36
+(max 2.2)` and evaluates the gate on it.
 
 ### Close triggers
 
