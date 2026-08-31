@@ -85,9 +85,19 @@ jobs:
       # default-filter in `.config/nextest.toml` (ADR-0156). This job, that hook
       # and the `dev` lane's per-phase gate all cite `-P fast`, so the exclusion
       # has one definition and no consumer can drift from another. Verified by a
-      # union check rather than asserted: the `-P fast` set plus the tests in the
-      # nine excluded binaries equals the unfiltered `--workspace` set exactly,
-      # and every test this removes is an `lmv-core` binary.
+      # union check rather than asserted: `-P fast` is a strict SUBSET of the
+      # unfiltered `--workspace` set, and every test it defers is in an
+      # `lmv-core` binary.
+      #
+      # SINCE ADR-0157 THE EXCLUSION IS NOT TOTAL, and this job pays for that.
+      # The profile unions a 24-preset sample back into `animation`, `reactivity`
+      # and `sanity`'s loudness gate - 72 tests this job did not run before, on a
+      # runner with no GPU and few cores. It buys per-push coverage of the preset
+      # library that ADR-0156 had removed entirely; it costs wall time here, and
+      # HOW MUCH IS UNMEASURED ON THIS RUNNER (Plan 0146 measured only the
+      # development machine, at +58.5 s on sixteen cores). If this job's wall
+      # becomes the critical path ADR-0073 is fighting, that union is the first
+      # thing to re-derive by measurement.
       #
       # Applied on BOTH matrix arms, not branched per-OS: macOS already skips
       # every GPU suite (ADR-0016), so the filter removes nothing there, and a
@@ -208,6 +218,13 @@ jobs:
   # Line coverage gates; region coverage is emitted in the report for
   # information only (ADR-0033 Alternative C). Separate job, so it stays off the
   # critical path even though instrumented binaries make the WARP suites slower.
+  #
+  # This job renders the WHOLE preset library and is the only place that still
+  # happens on Windows, which is what ADR-0081's curation gate rests on. Since
+  # ADR-0157 it reaches that library through ~264 test processes rather than five
+  # roster loops, each paying its own device creation and its own profraw, and
+  # that cost is UNMEASURED here (Plan 0146 measured the development machine
+  # only). It is the second figure to re-derive if this job's wall moves.
   coverage:
     runs-on: windows-latest
     steps:
