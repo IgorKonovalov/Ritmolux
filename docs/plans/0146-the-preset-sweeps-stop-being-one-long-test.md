@@ -249,8 +249,8 @@ fn animation_attractor_leviathan() {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
-| 2 — Split the remaining per-preset sweeps | dev | done | committed with this row |
-| 3 — Split `distinctness` per family | dev | not started | |
+| 2 — Split the remaining per-preset sweeps | dev | done | `e2f84cf` |
+| 3 — Split `distinctness` per family | dev | done | committed with this row |
 | 4 — The `representative` key and its floor | dev | not started | |
 | 5 — Seed the representatives | dev | not started | |
 | 6 — Hang the sample on the per-phase tier | dev | not started | |
@@ -342,6 +342,30 @@ is reported as partially met rather than passed. The cause is structural and was
 revision: `attractor` holds 19 of the 81 presets and the per-family split makes that family the
 largest indivisible unit in the sweep. It is the same lopsidedness the plan's open question raises
 about a two-per-family sample.
+
+**Phase 3 splits `distinctness` into NINE tests, not the twelve its `What` line names.** The phase
+contradicts itself: `Twelve tests, one per family` against a `Done when` of *"no pair dropped, no pair
+added"*, and the plan's own followups record that this report covers **9 of the 12 families** by a
+curated list and that changing that list is out of scope. The done-when and the scope note agree with
+each other, so the curated nine is what shipped; twelve would have **added** 27 pairs across
+`shape_field`, `warp_mesh` and `shape_collage`. The phase's `Files touched` names only
+`core/tests/distinctness.rs` and not `core/build.rs`, which is consistent with hand-written tests over
+the existing curated array rather than a generated fan-out, and that is how it is written.
+
+**The pair count is preserved exactly: 322.** Per family — `attractor` 171, `fragment_field` 78,
+`reaction_diffusion` 21, `parametric_curve`/`lsystem`/`spectrum`/`emitter` 10 each,
+`swarm`/`star_pattern` 6 each. Each test asserts its own family's count against `n(n-1)/2` and all
+nine pass, which is the no-pair-dropped claim made mechanically rather than by inspection. The two
+printed matrices survive per family, verified by running `distinctness_star_pattern` alone. A second
+assertion, not asked for by the phase, fails a curated family that ships fewer than two presets: that
+is the one way this advisory can go quiet without anyone noticing, and it is the staleness the list's
+own comment already records.
+
+**A counting trap worth recording, because it nearly entered these numbers.** `grep -c '^system'`
+over `presets/*.toml` returns **85** for 81 files: `fragment_interferencemono`, `fragment_nebula`,
+`fragment_sumi` and `fragment_vitrail` each carry a second `system = "..."` inside a later table.
+`core/build.rs` reads only the preamble — it stops at the first `[section]` — so the generated tests
+were always right; the naive grep used to check them was not.
 
 **Three reports changed shape, none disappeared.** `sanity`'s loudness ratio prints one row per
 preset instead of one sorted table, so the ranking is reconstructed by sorting a run's lines. The
