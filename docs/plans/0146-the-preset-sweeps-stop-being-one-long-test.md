@@ -254,7 +254,7 @@ fn animation_attractor_leviathan() {
 | 4 — The `representative` key and its floor | dev | done | `5107d8e` |
 | 5 — Seed the representatives | dev | done | `4e596c0` |
 | 6 — Hang the sample on the per-phase tier | dev | done | `d3effa9` |
-| 7 — Measure, and state what it cost | dev | done | committed with this row |
+| 7 — Measure, and state what it cost | dev | done | `a9df6bb` |
 
 ### Measurements
 
