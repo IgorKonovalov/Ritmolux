@@ -1,4 +1,8 @@
-# nextest configuration. Currently one job: keep the reporting tests audible.
+# nextest configuration. Two jobs: keep the reporting tests audible, and define
+# the narrowed test set as a profile (ADR-0156) so one file says what the
+# pre-push hook, CI's `check` job and the `dev` lane's per-phase gate all run.
+#
+# --- job 1: the reporting tests ---
 #
 # nextest hides a passing test's output, which is right for 456 of them and wrong
 # for the few that exist partly to *report*. Per ADR-0071 a numeric assertion
@@ -22,3 +26,28 @@
 [[profile.default.overrides]]
 filter = 'test(dual_live_keeps_the_outgoing_side_animating) + test(raw_levels_are_bit_identical_to_the_pre_normalization_build) + test(the_estimator_decomposes_into_its_terms) + test(the_degradation_ladder_says_which_axis_is_steep)'
 success-output = "immediate"
+
+# --- job 2: the narrowed set ---
+#
+# Everything except the nine GPU-heavy suites, which iterate the shipped preset
+# library or every scene through a real adapter. This is the ONE definition of
+# that set: `.githooks/pre-push`, `.github/workflows/ci.yml` and the `dev` lane
+# all cite `-P fast` rather than restating the expression, so adding or removing
+# a suite is a one-file edit that all three inherit.
+#
+# WHICH nine, and why those, is argued from measurement in `.githooks/pre-push`'s
+# own header. That reasoning stays there and is deliberately not copied here — a
+# second prose copy is the thing this profile exists to prevent.
+#
+# One line on purpose: a backslash is NOT a line continuation inside a TOML
+# literal string, so this either stays on one line or becomes a multi-line
+# literal ('''...''').
+#
+# A custom profile inherits `profile.default`'s overrides, so the four reporting
+# tests above stay audible under `-P fast` and their block is NOT restated here.
+# Checked rather than assumed, on cargo-nextest 0.9.140: the same test run under
+# `-P fast` and under the default profile emits the same decomposition. It
+# arrives on stderr, which is where nextest writes captured test output — a
+# stdout-only check reads as silence under both profiles and proves nothing.
+[profile.fast]
+default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness))'
