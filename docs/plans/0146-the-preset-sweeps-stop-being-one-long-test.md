@@ -253,8 +253,8 @@ fn animation_attractor_leviathan() {
 | 3 — Split `distinctness` per family | dev | done | `1c52867` |
 | 4 — The `representative` key and its floor | dev | done | `5107d8e` |
 | 5 — Seed the representatives | dev | done | `4e596c0` |
-| 6 — Hang the sample on the per-phase tier | dev | done | committed with this row |
-| 7 — Measure, and state what it cost | dev | not started | |
+| 6 — Hang the sample on the per-phase tier | dev | done | `d3effa9` |
+| 7 — Measure, and state what it cost | dev | done | committed with this row |
 
 ### Measurements
 
@@ -303,14 +303,9 @@ no Rust edit and removing it returned it to 81.
 tests each; `sanity`'s shape test generates 12, one per family the shipped set contains, diffing
 empty against the 12 distinct `system` values in `presets/*.toml`.
 
-| full `--workspace` | elapsed | summed test-wall | concurrency | tests |
-|---|---|---|---|---|
-| before, Phase 0 | 464.2 s | 4,169.5 s | 8.98 | 1230 |
-| after Phase 1 | 458.4 s | 4,747.1 s | 10.36 | 1310 |
-| after Phase 2 | **441.6 s** | 6,704.8 s | **15.18** | 1481 |
-
-The critical path is now `distinctness` at 290.4 s, which is Phase 3's subject. `reaction_diffusion`
-(196.3 s) and `attractor` (146.9 s) are the two behind it and are outside this plan.
+Full suite **464.2 s -> 458.4 s (Phase 1) -> 441.6 s**, concurrency **8.98 -> 10.36 -> 15.18**; the
+final figures are in `### What it cost` below. The critical path became `distinctness` at 290.4 s,
+which is Phase 3's subject.
 
 ### Notes
 
@@ -361,19 +356,14 @@ assertion, not asked for by the phase, fails a curated family that ships fewer t
 is the one way this advisory can go quiet without anyone noticing, and it is the staleness the list's
 own comment already records.
 
-**Phase 4 ships the key without its floor test, which moves to Phase 5.** The phase's done-when asks
-for both the key and a test asserting *"every family has at least two representatives"*, but no preset
-declares the key until Phase 5 seeds them — so that test is red at every commit between the two. The
-key, its parsing, its rejection of a non-boolean, the `build.rs` naming and both authoring docs land
-here; the floor test lands with the content that makes it pass. Nothing is dropped and the phase
-boundary is where it was; only that one assertion crosses it.
+**Phase 4 ships the key without its floor test, which moves to Phase 5.** No preset declares the key
+until Phase 5 seeds them, so that test is red at every commit between the two. Only that one
+assertion crosses the boundary; nothing is dropped.
 
-**The sample is selected by a marker in the test NAME.** nextest predicates match binaries and test
-names and cannot read a `.toml`, so a representative's generated tests are named `<sweep>_rep_<stem>`
-and a static `.config/nextest.toml` filter can select them. The cost, stated in `presets/README.md`:
-flipping the flag renames that preset's tests. This is also what ADR-0073 rules out when it says
-*"sampling cannot be a nextest filter"* — that was written when the sweeps were roster loops, and
-splitting them is what makes a filter possible at all.
+**The sample is selected by a marker in the test NAME** — `<sweep>_rep_<stem>` — because a nextest
+predicate matches names and cannot read a `.toml`. The cost, stated in `presets/README.md`: flipping
+the flag renames that preset's tests. ADR-0073's *"sampling cannot be a nextest filter"* was true of
+roster loops; splitting them is what makes a filter possible.
 
 **Phase 5's seeding, and the matrix reading behind each pair.** The rule applied is the phase's own:
 the two furthest-apart presets in the family, by **`struct_diff`** — the shape metric, chosen because
@@ -423,16 +413,10 @@ and `reaction_diffusion`. The 72 admitted are 24 presets across each of `animati
 and `sanity_loudness`. Every one of the 81 shipped stems still appears in the full list, checked per
 stem rather than by count.
 
-**The per-phase gate got slower, and that is what this phase buys.** `-P fast` goes **~150 s to
-198.8 s** (1203 tests to 1277). ADR-0156 had excluded all nine binaries outright, so the tier
-rendered **no** preset at all; it now renders 24. The plan's framing of Phase 6 as hanging a sample
-on the tier is right, but the effect is added coverage at added cost, not a saving — recorded here
-because the plan's TL;DR reads the other way.
-
-**It also changes the pre-push hook and CI's `check` job, which the plan does not mention.** Both
-cite `-P fast` by design (ADR-0156), so both gain the same 72 tests and the same ~47 s. CI's
-`coverage` job runs everything and is untouched, so ADR-0081's curation gate is unaffected — but
-three consumers moved here, not one.
+**This phase also moves the pre-push hook and CI's `check` job, which the plan does not mention.**
+Both cite `-P fast` by design (ADR-0156), so both gain the same 72 tests and the same added time.
+CI's `coverage` job runs everything and is untouched, so ADR-0081's curation gate is unaffected —
+but three consumers moved here, not one.
 
 **A counting trap worth recording, because it nearly entered these numbers.** `grep -c '^system'`
 over `presets/*.toml` returns **85** for 81 files: `fragment_interferencemono`, `fragment_nebula`,
@@ -448,15 +432,64 @@ floor-slack gate are unchanged, because they were already per family: verified b
 `sanity_shape_spectrum` alone, which prints `spectrum floor 0.28 lowest 0.0996 (Ridge) - factor 0.36
 (max 2.2)` and evaluates the gate on it.
 
+### What it cost (Phase 7)
+
+Same machine and preconditions as Phase 1, at `d3effa9`, quiet verified before and after each run.
+The `-P fast` arm was taken twice because the first reading found one foreign process at the
+boundary; the tainted 212.6 s is discarded and the clean 205.8 s stands.
+
+| | before (`ee0792b`) | after (`d3effa9`) | |
+|---|---|---|---|
+| **full `--workspace`** elapsed | 464.2 s | **435.6 s** | **-28.6 s, -6.2 %** |
+| summed test-wall | 4,169.5 s | 6,594.7 s | +58 % |
+| average concurrency | 8.98 | **15.14** | |
+| tests | 1230 | 1491 | |
+| **per-phase `-P fast`** elapsed | 147.3 s | **205.8 s** | **+58.5 s, +39.7 %** |
+| summed test-wall | 2,002.8 s | 2,822.6 s | |
+| average concurrency | 13.60 | 13.71 | |
+| tests | 1203 | 1277 | |
+
+**The structural claim landed in full and the timing claim did not.** No preset sweep appears
+anywhere near the tail: the last five tests to finish are `tempo_probe` twice, two `standalone`
+memory tests and `shot_cli`, and the suite's critical path is now `tempo_probe` at 69.5 s where it
+was `animation` at 365.5 s. Concurrency went 8.98 to 15.14 on 16 logical CPUs. But the **elapsed win
+is 6.2 %**, not the 1.6x ADR-0157 projected, because the sweeps' total work rose 58 % — device
+creation at 1.60 s against 1.65 s of per-preset render, paid 243 times over three per-preset sweeps.
+The packing bought back nearly all of that and 28.6 s more. **Splitting a serial sweep on a saturated
+box trades work for schedulability at close to par**; what it unambiguously bought is the tail, the
+failure attribution, and the ability to sample at all.
+
+**The per-phase coverage gap, as a count.** A phase now renders **24 of the 81** presets — two per
+family, through `animation`, `reactivity` and `sanity`'s loudness gate — and **57 wait for the
+close**. It rendered **0 of 81** before, because ADR-0156 excluded all nine binaries outright, so
+this is a coverage gain of 24 presets bought for 58.5 s per phase and not a saving of anything. The
+close additionally runs `sanity`'s 12 per-family shape tests and `distinctness`'s 9, neither ever
+sampled. On a median six-phase plan the tier now costs **20.6 min** against **14.7 min** before.
+
+**The open question the plan left for this phase has its evidence.** Two per family means
+`attractor` shows 2 of 19 per phase and `fragment_field` 2 of 13, while four families show 2 of 4.
+The gap is widest exactly where the library is thickest, which is the shape the plan predicted; the
+count above is what a revisit would argue from.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
-- **Full suite:**
+- **`presets/` touched:** yes — 24 `.toml` gain `representative = true` (Phase 5, `4e596c0`), two per
+  family across all 12. No parameter, expression or palette changed in any of them; the flag is
+  harness metadata. `presets/README.md` gained the section documenting it.
+- **Plan header `Closes:`** none.
+- **What shipped:** a new preset schema key (`representative`, with its parsing, its rejection of a
+  non-boolean and a floor test), a restructuring of five test sweeps from roster loops into generated
+  per-preset and per-family tests, a `.config/nextest.toml` profile change that also moves the
+  pre-push hook and CI's `check` job, and documentation in three operator files.
+- **Operator docs touched:** `presets/README.md` (the `representative` flag, the floor, and that
+  staleness is ungated), `docs/presets.md` (the key in the file anatomy), and
+  `.claude/skills/dev/references/project-context.md` (which scope renders which presets).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 146 stated reductions hold
+  across all 63 live entries, 8 unprobeable, 3 advisory rows (0146, 0161, 0172) whose probed paths
+  have moved. No entry was convicted.
+- **Outstanding `human` phases:** none — all seven phases are `dev`.
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), at `d3effa9` on a verified-quiet
+  box: **exit 0, 1491 passed, 0 failed, 5 skipped, 435.562 s**.
 
 ## Followups (after this lands)
 
