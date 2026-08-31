@@ -95,11 +95,23 @@ const FAMILIES: [(SystemKind, &str); 9] = [
 /// reason the other sweeps split for: nextest parallelizes across tests and
 /// never inside one.
 ///
-/// **The pair count is asserted, not trusted.** A per-family fan-out can drop or
-/// double a comparison silently, and a report that prints nothing wrong while
-/// measuring fewer pairs than the family contains is precisely the failure no
-/// reader would catch.
+/// **The pair count is asserted against the library, not against the loop.** A
+/// per-family fan-out can drop or double a comparison silently, and a report
+/// that prints nothing wrong while measuring fewer pairs than the family
+/// contains is precisely the failure no reader would catch — so the count below
+/// is re-derived from [`default_presets`] rather than from the loop that
+/// produced it.
+///
+/// Each `#[test]` passes its family as a literal rather than by index into
+/// [`FAMILIES`], so reordering that array cannot leave a test running one family
+/// under another's name; membership in the curated list is then checked here.
 fn report_distinctness_within(system: SystemKind, label: &str) {
+    assert!(
+        FAMILIES.contains(&(system, label)),
+        "{label} is not in this report's curated list, so either the list lost an entry that \
+         still has a test or a test's (SystemKind, label) pair has drifted apart"
+    );
+
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
@@ -154,56 +166,88 @@ fn report_distinctness_within(system: SystemKind, label: &str) {
         "{label} is in this report's curated list but ships {n} preset(s), so it has no pair to \
          compare and the report says nothing about it"
     );
+    // The pair count is checked against the LIBRARY's own membership, not
+    // against the loop that just ran. `compared` is incremented once per
+    // iteration of that loop, so comparing it against `n(n-1)/2` for
+    // `n = caps.len()` is an arithmetic identity and cannot fail whatever the
+    // fan-out did. Re-counting the family from `default_presets()` puts the two
+    // sides of the comparison in different places, which is the only shape in
+    // which this says anything: a family whose captures went missing between the
+    // filter and the matrix fails, and so does a test handed a `SystemKind` that
+    // does not match the label it reports under.
+    let shipped = default_presets()
+        .into_iter()
+        .filter(|p| p.system == system)
+        .count();
     assert_eq!(
         compared,
-        n * (n - 1) / 2,
-        "{label}: compared {compared} pairs across {n} presets, not the {} every pair of a \
-         family makes — the split has dropped or doubled a comparison",
-        n * (n - 1) / 2
+        shipped * (shipped - 1) / 2,
+        "{label}: compared {compared} pairs, but the shipped set holds {shipped} preset(s) in \
+         this family and every pair of them is {}. The fan-out has dropped or doubled a \
+         comparison, or this test is running a family other than the one it is named for",
+        shipped * (shipped - 1) / 2
     );
 }
 
 #[test]
 fn distinctness_fragment_field() {
-    report_distinctness_within(FAMILIES[0].0, FAMILIES[0].1);
+    report_distinctness_within(SystemKind::FragmentField, "fragment_field");
 }
 
 #[test]
 fn distinctness_swarm() {
-    report_distinctness_within(FAMILIES[1].0, FAMILIES[1].1);
+    report_distinctness_within(SystemKind::Swarm, "swarm");
 }
 
 #[test]
 fn distinctness_parametric_curve() {
-    report_distinctness_within(FAMILIES[2].0, FAMILIES[2].1);
+    report_distinctness_within(SystemKind::ParametricCurve, "parametric_curve");
 }
 
 #[test]
 fn distinctness_lsystem() {
-    report_distinctness_within(FAMILIES[3].0, FAMILIES[3].1);
+    report_distinctness_within(SystemKind::LSystem, "lsystem");
 }
 
 #[test]
 fn distinctness_star_pattern() {
-    report_distinctness_within(FAMILIES[4].0, FAMILIES[4].1);
+    report_distinctness_within(SystemKind::StarPattern, "star_pattern");
 }
 
 #[test]
 fn distinctness_spectrum() {
-    report_distinctness_within(FAMILIES[5].0, FAMILIES[5].1);
+    report_distinctness_within(SystemKind::Spectrum, "spectrum");
 }
 
 #[test]
 fn distinctness_attractor() {
-    report_distinctness_within(FAMILIES[6].0, FAMILIES[6].1);
+    report_distinctness_within(SystemKind::Attractor, "attractor");
 }
 
 #[test]
 fn distinctness_reaction_diffusion() {
-    report_distinctness_within(FAMILIES[7].0, FAMILIES[7].1);
+    report_distinctness_within(SystemKind::ReactionDiffusion, "reaction_diffusion");
 }
 
 #[test]
 fn distinctness_emitter() {
-    report_distinctness_within(FAMILIES[8].0, FAMILIES[8].1);
+    report_distinctness_within(SystemKind::Emitter, "emitter");
+}
+
+/// **Growing [`FAMILIES`] must force a decision about a test to run it.**
+///
+/// The fan-out here is hand-written, one `#[test]` per curated family, so a
+/// tenth entry in that array would otherwise be measured by nothing and report
+/// nothing — the same silent-absence failure the array's own doc comment
+/// describes for a new `SystemKind`. This pins the count so the array and the
+/// roster of tests below it cannot drift apart unnoticed. Adding a family means
+/// adding its `#[test]` and moving this number, in one commit.
+#[test]
+fn every_curated_family_has_its_own_test() {
+    assert_eq!(
+        FAMILIES.len(),
+        9,
+        "the curated family list changed size; add or remove the matching #[test] below it, \
+         then move this number"
+    );
 }

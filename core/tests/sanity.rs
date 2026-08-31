@@ -43,7 +43,7 @@
 //!
 //! **A second excitation** (Plan 0058 Phase 3), because one fully-driven frame
 //! cannot see a figure that is fine at rehearsal level and gone at the top of
-//! its range. [`a_louder_frame_is_reported_against_a_quieter_one`] captures at
+//! its range. [`louder_frame_is_reported_against_a_quieter_one`] captures at
 //! [`MODERATE`] as well as [`LOUD`] and reports the ratio — a **report, not a
 //! gate**, since no threshold on that axis convicts any known defective
 //! configuration while the nearest content to one is the attractor family's
@@ -147,7 +147,7 @@ const MIN_QUADRANTS: u8 = 2;
 ///
 /// **Measured from the shipped library's own values** under the ADR-0067 capture
 /// (backdrop suppressed, compared against [`BLACK`]).
-/// `every_preset_draws_a_real_shape` prints the whole distribution on every run;
+/// The shape sweep prints the whole distribution on every run, one test per family;
 /// its top:
 ///
 /// ```text
@@ -329,8 +329,8 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// reaction_diffusion  0.09           0.1603 Mitosis (unmoved)         lit-on-dark
 /// ```
 ///
-/// **The table is a snapshot; the distribution `every_preset_draws_a_real_shape`
-/// prints on every run is authoritative.** Upward drift in a family minimum is
+/// **The table is a snapshot; the distribution the shape sweep prints on every
+/// run is authoritative.** Upward drift in a family minimum is
 /// the safe direction and [`MAX_FLOOR_SLACK`] is what eventually calls it.
 ///
 /// # Two traps for whoever re-measures
@@ -543,7 +543,7 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// derive from: nothing in them is over the flatness ceiling, so the second term
 /// has never been asked about them. **22 of the 42 shipped presets read below
 /// their family's floor today and pass only because term one clears them** —
-/// `every_preset_draws_a_real_shape` prints that count on every run. Converting
+/// the shape sweep prints that count per family on every run. Converting
 /// one to a two-ink print raises its flatness toward `1.0` and leaves its
 /// boundary alone, so **each such conversion needs its own arm with its own
 /// derivation** before it can ship. For `attractor` that is a real fork: the
@@ -1014,8 +1014,8 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
 ///
 /// **It is a witness, not a fixture.** If it is ever retuned above its floor or
 /// retired, the property below is still true of the library and the fix is to
-/// name another preset from the list `every_preset_draws_a_real_shape` prints on
-/// every run — not to relax the assertion.
+/// name another preset from the under-their-floor list the shape sweep prints
+/// for that family on every run — not to relax the assertion.
 const STRUCTURELESS_BUT_TONED: &str = "Sumi";
 
 /// **Neither term of the flatness conjunction is redundant**, asserted term by
@@ -1061,8 +1061,8 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
         .unwrap_or_else(|| {
             panic!(
                 "{STRUCTURELESS_BUT_TONED} is no longer in the shipped set — pick another \
-                 preset from the under-their-floor list every_preset_draws_a_real_shape \
-                 prints, and say in the commit which one and what it reads"
+                 preset from the under-their-floor list the shape sweep prints for that family \
+                 and say in the commit which one and what it reads"
             )
         });
     let (witness_name, witness_system) = (witness.name.clone(), witness.system);
@@ -1787,6 +1787,10 @@ fn louder_frame_is_reported_against_a_quieter_one(name: &str) {
         "excitation ratio — coverage at {LOUD} over coverage at {MODERATE} (a report, not a \
          gate; this helper's doc comment says why):"
     );
+    // The legend is reprinted per preset rather than once per sweep, because
+    // with a test per preset there is no sweep header to hang it under and a
+    // row of three bare numbers is not a reading anyone can use.
+    println!("     ratio  cov@{MODERATE}  cov@{LOUD}  preset");
     println!(
         "  {:>8.4}   {mid_cov:.4}   {loud_cov:.4}  {name}",
         ratio_of(loud_cov, mid_cov)
@@ -2068,7 +2072,7 @@ struct GroundRow {
     failures: Vec<String>,
 }
 
-/// `every_preset_draws_a_real_shape`'s verdict, restated over a supplied
+/// [`draws_a_real_shape`]'s verdict, restated over a supplied
 /// reference rather than [`BLACK`] — the structural rescue included, since a
 /// candidate that moves `coverage` moves what the rescue is asked about.
 ///
