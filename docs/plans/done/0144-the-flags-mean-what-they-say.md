@@ -1,14 +1,33 @@
 # 0144 — The flags mean what they say
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-31
 > **Created:** 2026-08-30
 > **Owner skill(s):** dev
 > **Closes:** design-backlog 0167, design-backlog 0168, design-backlog 0169
-> **Related ADRs:** [ADR-0155](../adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md)
-> (proposed with this plan — the decision it implements), [ADR-0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md)
-> (the roster this extends), [ADR-0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
-> (the `--gpu` question this answers), [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+> **Related ADRs:** [ADR-0155](../../adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md)
+> (accepted with this close — the decision it implements), [ADR-0148](../../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md)
+> (the roster this extends), [ADR-0146](../../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)
+> (the `--gpu` question this answers), [ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
 > (the gate Phase 4 extends)
+>
+> **Close summary.** All six phases landed (`1b29936`, `3872605`, `cb6a037`, `7399ab5`, `8e7bfe3`,
+> `2c5dc2a`) plus two review-fix commits (`a2f7627`, `0a687f0`). Mode 4 verdict: **no blockers, no
+> majors, five minors, three nits.** Verified independently of the log: `fmt` clean; `clippy
+> --workspace --all-targets -D warnings` clean; `RUSTDOCFLAGS="-D warnings" cargo doc --workspace
+> --no-deps` **zero warnings after `cargo clean --doc`**; `cargo nextest run --workspace` **1230
+> passed, 5 skipped**; four of the five Node gates exit 0 and `check-backlog-claims` exits 1 on
+> exactly the five red-on-delivery probes, repaired at this close. The C ABI is untouched — the diff
+> over `core-cabi/`, `plugin-foobar/` and `docs/specs/` is empty, and `RendererOptions::default()`
+> still carries `AdapterChoice::Default`, pinned by a `core` test. Checked by hand against `main`:
+> all eleven folded skip blocks preserve their adapter preference and tier, no new numeric assertion
+> freezes a measurement, and no `aspect` is derived from a grid.
+>
+> **The one gap worth carrying forward.** Phase 4's gate is structurally blind to the defect in its
+> *unrejoined* form — `brokenLiteral` rejects any literal whose decoded text holds a newline, which
+> is exactly the shape a lost `\` continuation produces before anyone reflows it. Confirmed by
+> seeding a two-line literal with an 18-space indent: not reported. It catches the form this tree
+> actually produces (all three instances design-backlog 0168 named were already single-line), so
+> 0168 is discharged in substance; the residual is filed as design-backlog 0173.
 
 ## TL;DR
 
@@ -23,7 +42,7 @@ one exempted link form is actually checked.
 
 ## Context & problem
 
-Plan 0135 shipped [ADR-0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md): `lmv`
+Plan 0135 shipped [ADR-0148](../../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md): `lmv`
 refuses an argument no scanner claimed, so a misspelt `--osc` is a startup error naming `--osc`.
 Design-backlog 0167, filed at that plan's own Mode 4 review, found the case it left standing.
 `standalone/src/stream.rs`'s `parse` opens with
@@ -51,9 +70,9 @@ missing features — they are features the engine already has, unreachable from 
 - `Renderer::select_preset_by_name` is already what `--stream` calls to hold a scene, and
   `[rotate] auto` already defaults off for the window (ADR-0027).
 
-[ADR-0146](../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)'s Neutral
+[ADR-0146](../../adrs/0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md)'s Neutral
 section left this open in as many words — *"widening the flag to the windowed app is a separate
-question this does not answer"* — and [ADR-0155](../adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md),
+question this does not answer"* — and [ADR-0155](../../adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md),
 proposed with this plan, answers it.
 
 **Three further items come from Plan 0124's close and are the same kind of work.** They are here
@@ -287,7 +306,7 @@ pub struct RendererOptions {
   line in the log — it would mean something moved them between the close and the phase.
 - **Open (architect, not this plan):** design-backlog 0161 says three committed scripts resolve
   cargo output under `<repo>/target`, *"which the artifact-store docs assert nothing does"*.
-  [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked that
+  [ADR-0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked that
   redirect, so `<repo>/target` may now be correct again and the entry's premise may be dead. It is a
   live entry with an `unprobeable:` verification, so nothing will convict it. Re-read it at this
   plan's close.

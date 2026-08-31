@@ -176,7 +176,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
 | [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
 | [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | proposed 2026-08-30 (Plan 0143) |
-| [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | proposed 2026-08-30 (Plan 0144), refines 0146 + 0148 |
+| [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | proposed 2026-08-31 (Plan 0145), extends 0033 |
 | [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | proposed 2026-08-31 (Plan 0146), extends 0156 |
 <!-- roster:end -->
