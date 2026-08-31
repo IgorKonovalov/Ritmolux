@@ -8,7 +8,7 @@
 > [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
 > [0022](../adrs/0022-build-time-preset-embedding.md)
 >
-> **Sequenced after [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)**, whose
+> **Sequenced after [0145](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)**, whose
 > `fast` nextest profile is where Phase 6 hangs the sample.
 
 ## TL;DR

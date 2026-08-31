@@ -40,7 +40,6 @@ place. The plan file carries the real link.
 | [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
-| [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) | The per-phase gate stops paying for the preset library | approved | dev | ADR-0156 (proposed): narrowed per phase, full suite once at the last phase. Touches both skills. **Land it before the queue above pays the old gate again.** |
 | [0146](0146-the-preset-sweeps-stop-being-one-long-test.md) | The preset sweeps stop being one long test | approved | dev | ADR-0157 (proposed): 5 roster monoliths split per preset, a declared `representative` samples the per-phase tier only. **Sequenced after 0145.** Phase 1 is a spike that may end the plan. |
 <!-- roster:end -->
 
@@ -158,12 +157,14 @@ evening — 0133 Phase 1 needs an evening with the rig patched and 0115 Phase 1 
 staged. **The set runs on the external Python bridge** (`WORK/lmv-lighting-probes/`, outside version
 control), unmodified. Approving the plans starts the work; it changes nothing about the show.
 
-**Added 2026-08-31: [0145] and [0146] are approved, and [0145] goes first — ahead of the roster, not
-into it.** It is tooling, and every plan queued above pays the old gate until it lands: the per-phase
-gate measured **933 s** against **227 s** after, which is **~59 min on a median six-phase plan**.
-Phases 2-5 are **parallel-safe with the one live lane** (0144 touches none of `.config/`,
-`.githooks/`, `.github/`, `.claude/skills/`), and its two measurement phases need an idle box but
-gate nothing — the "before" arm stays measurable forever.
+**Added 2026-08-31, updated at [0145]'s close the same day: [0145] landed and [0146] is next.**
+[0145] was tooling, and every plan queued above was paying the old gate until it landed. **What it
+actually bought, measured over six runs per arm on a verified-idle box: 24.8 min on a median
+six-phase plan (49.6 -> 24.9 min, 49.9 %)** — half the ~59 min projected here from the architect's
+single pair, because the full suite is 446 s and not the 869 s that pair recorded. The critical-path
+mechanism reproduced exactly; only the magnitudes moved. See
+[ADR-0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)'s
+`Outcome`.
 
 **[0146] is sequenced after it and is not a time plan.** It adds ~3 min per plan on top; what it buys
 is the CI run on every push (869 s -> ~539 s, modelled) and a **zero marginal cost per new preset**
@@ -978,6 +979,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) — closed 2026-08-31. Review: **no blockers, no majors, three minors.** Version: **none** (docs/chore-only). [Write-up](README-archive.md).
 - [0144 - The flags mean what they say](done/0144-the-flags-mean-what-they-say.md) - closed 2026-08-31. Review: **no blockers, no majors, five minors, three nits.** Version: **0.97.0**. Archived [backlog 0167 + 0168 + 0169](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0125 - The scenes share their GPU boilerplate](done/0125-the-scenes-share-their-gpu-boilerplate.md) - closed 2026-08-31. Review: **no blockers, no majors, four minors, four nits.** Version: **0.96.0** (minor). Nothing blessed. Repaired [backlog 0146](../design-backlog.md). [Write-up](README-archive.md).
 - [0124 - The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md) - closed 2026-08-30. Review: **no blockers, one major, five minors, two nits.** Version: **0.95.1** (patch). Filed [backlog 0168 + 0169](../design-backlog.md). [Write-up](README-archive.md).
@@ -1189,5 +1191,5 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0140]: 0140-every-rate-integrates-for-real.md
 [0141]: 0141-the-plugin-seams-stop-drifting.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
-[0145]: 0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
+[0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
 [0146]: 0146-the-preset-sweeps-stop-being-one-long-test.md

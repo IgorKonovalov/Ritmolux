@@ -538,7 +538,7 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Comment hygiene | `node scripts/check-comment-hygiene.mjs` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Tests | `cargo nextest run --workspace` (narrowed — see below) |
+| Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
 
 The Node steps come first because they are the cheapest (tens of milliseconds
 between them): every relative markdown link in the repo must resolve, every row
@@ -558,9 +558,12 @@ skip and are not bypassable.
 **Measured warm wall time: ~48.6 s** (2026-08-08; dominated by the tests — `fmt`
 and `clippy` are under two seconds between them). The hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real
-adapter — `golden`, `attractor`, `reaction_diffusion`, `background_composite`,
-`ink`, `reactivity`, `animation`, `sanity`, `distinctness`. It **prints which
-suites it skipped** on every run, so the narrowing is never silent, and **CI runs
+adapter. **Which nine is not written here** — since
+[ADR-0156](docs/adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+the list is the `fast` profile's `default-filter` in `.config/nextest.toml`, and the hook, CI's
+`check` job and the `dev` lane's per-phase gate all cite `-P fast` rather than restating it.
+Nextest **names the skipped binaries itself** on every run, on the profile's
+authority, so the narrowing is never silent, and **CI runs
 all of them regardless** — though since [ADR-0073](docs/adrs/0073-the-windows-ci-critical-path.md)
 it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
 the promise is now underwritten by one job instead of a redundancy between two.
