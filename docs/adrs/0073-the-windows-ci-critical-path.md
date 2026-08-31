@@ -288,3 +288,33 @@ to bound is bounded by the fixture instead.
 Windows, so disabling it, skipping it, or letting `cargo-llvm-cov` fail to install takes the golden
 guard and every GPU behavioural suite with it — while the workflow still goes green. Treat deleting
 those comments as deleting a gate.
+
+## Outcome (2026-08-31, at Plan 0146's close)
+
+**The decision stands. One of Alternative C's two rejection grounds is falsified, and the other is
+the reason the falsification did not reopen the decision.**
+
+Alternative C — *"Sample the preset sweep on branch pushes, sweep fully on `main` or nightly"* — was
+rejected on a mechanical ground and a ground in kind. The **mechanical** one was:
+
+> the expensive suites are **single tests** — `reactivity` at 409.6 s is one `#[test]`,
+> `every_preset_reacts_to_at_least_one_band` — so sampling cannot be a `nextest` filter; it must be
+> an environment variable read inside the assertion, which makes it an edit to what the test
+> *claims*.
+
+That was true of roster loops and stopped being true when Plan 0146 split them. Sampling **is** a
+`nextest` filter now: `.config/nextest.toml`'s `fast` profile selects on a `_rep_` marker
+`core/build.rs` puts in the generated test names, and no assertion is edited or conditioned.
+
+The **in-kind** ground — *"this project's recurring failure is a defect shipping behind a green
+suite because nothing could render the configuration the defect occurs in"* — is untouched, and
+ADR-0157 is built to respect it rather than to argue with it: the sample is hung on the **per-phase**
+tier only. CI's `coverage` job still renders the whole library on Windows on every push, which is
+what ADR-0081 rests on, and the plan close still owes the full suite. Note the direction of travel
+against this ADR's own worry: ADR-0156 had removed the nine suites from the per-phase tier outright,
+so the sample **adds** 24 presets where a phase previously rendered none.
+
+One consequence this ADR would want flagged: `check (windows-latest)` cites `-P fast` and therefore
+now runs 72 sweep tests it did not run before. Plan 0146 measured that union at +58.5 s on a
+sixteen-core development box and **never measured it on a CI runner**, which is the machine this ADR
+exists to defend. `ci.yml` carries the note at the step.
