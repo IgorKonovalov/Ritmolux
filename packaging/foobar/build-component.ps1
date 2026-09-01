@@ -200,7 +200,50 @@ there by hand (see plugin-foobar/README.md). The SDK is third-party and
 separately licensed, so it is gitignored and never committed.
 "@
 }
-Check "SDK $LmvSdkVersion staged at plugin-foobar\sdk"
+
+# The staged tree states its own version, so compare rather than assert over it.
+# The pin and what is on disk are the same fact only on the fetch route, where
+# fetch-sdk.ps1 checked a SHA-256; the pre-staged route is first-class
+# (ADR-0115) and unpacks by hand whatever the developer has. Without this, a
+# hand-staged older SDK produces a component whose READ-ME-FIRST.txt asserts a
+# build against the pin - a claim nothing downstream can check, because the SDK
+# version is not in the DLL.
+#
+# The marker is a line inside sdk-readme.html's <h1>, and the tag spans lines,
+# so this matches the text and not the element. Captured to end-of-line rather
+# than as a date: the version format is foobar2000's to change, and a pattern
+# that stops matching would fail this open.
+$sdkReadme = Join-Path $sdkDir "sdk-readme.html"
+if (-not (Test-Path $sdkReadme)) {
+    Die @"
+staged SDK has no sdk-readme.html at $sdkReadme.
+That file carries the SDK's own version marker, which is what this recipe
+compares against packaging\foobar\sdk-pin.ps1. Re-stage the SDK from the
+official archive rather than a partial copy of one.
+"@
+}
+$sdkMatch = [regex]::Match(
+    (Get-Content -Raw $sdkReadme), "foobar2000 SDK,\s*version\s*([^\r\n<]+)")
+if (-not $sdkMatch.Success) {
+    Die @"
+no version marker in $sdkReadme.
+Expected a line reading `"foobar2000 SDK, version <version>`". Re-stage the SDK
+from the official archive.
+"@
+}
+$stagedSdkVersion = $sdkMatch.Groups[1].Value.Trim()
+if ($stagedSdkVersion -ne $LmvSdkVersion) {
+    Die @"
+the staged SDK is not the pinned one.
+  staged (plugin-foobar\sdk\sdk-readme.html): $stagedSdkVersion
+  pinned (packaging\foobar\sdk-pin.ps1):      $LmvSdkVersion
+READ-ME-FIRST.txt states the pin, so this build would ship a version claim that
+never touched it. Run packaging\foobar\fetch-sdk.ps1 -Force to stage the pinned
+release, or bump the pin if the move is deliberate - sdk-pin.ps1 says what a
+bump requires.
+"@
+}
+Check "SDK $stagedSdkVersion staged at plugin-foobar\sdk (matches the pin)"
 
 # --- Build --------------------------------------------------------------------
 

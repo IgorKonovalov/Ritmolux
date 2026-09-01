@@ -190,8 +190,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — The preset menu selects by name | dev | done | `a7354b8` |
 | 2 — The size table becomes a dated series | dev | done | `e6f71f1` |
-| 3 — Attribute the 400 KB | dev | done | committed with this row |
-| 4 — The recipe reads the SDK's own version | dev | not started | — |
+| 3 — Attribute the 400 KB | dev | done | `c6a6449` |
+| 4 — The recipe reads the SDK's own version | dev | done | committed with this row |
 
 ### Notes
 
@@ -208,6 +208,16 @@ flowchart TB
 - Phase 3 bisected the window the plan names (Plan 0097's close to Plan 0107's close) and did not
   extend to the +510,464 B that landed after 2026-08-18, which is outside the phase's scope. That
   second window is unattributed and is a candidate backlog entry.
+- Phase 4's risk line asks how the check was exercised, CI being unable to reach it. Three local
+  runs of `build-component.ps1 -SkipBuild` against a hand-edited `plugin-foobar/sdk/sdk-readme.html`:
+  the pinned version passes and prints `ok: SDK 2025-03-07 staged at plugin-foobar\sdk (matches the
+  pin)`; a marker reading `2011-03-11` fails naming both versions and their two files; a file with
+  the marker deleted fails separately, naming what it expected. The staged tree was restored and the
+  passing run re-run afterwards.
+- Phase 4's marker is not shaped the way the plan and backlog 0105 quote it. They give
+  `<h1>foobar2000 SDK, version 2025-03-07</h1>`; the file breaks that tag across three lines, so a
+  one-line tag match finds nothing. The check matches the marker text and captures to end-of-line
+  rather than as a date, so a version format only foobar2000 controls cannot fail it open silently.
 - The `rust-lld` override (ADR-0147, adopted 2026-08-29) was carried as a suspected confound on the
   cdylib column in the Phase 2 commit, and Phase 3's bisect falsified it: the rebuilt Plan 0097
   baseline is 1,536 B (0.02 %) from the number recorded at that plan's close. The spec's wording was
