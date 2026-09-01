@@ -473,15 +473,13 @@ fn segment_length(s: &lmv_core::render::scenes::lines::SegmentInstance) -> f32 {
 /// before the repair, mode 5's dotted geometry held a segment **13.6x longer
 /// than `DOT_LENGTH`** and every other mode's held none.
 ///
-/// The `joined` arm pins the second half of the same phase's finding, and it is
-/// not cosmetic: the line renderer's falloff runs *across* the stroke only, so a
-/// mark is round because both caps are pushed out by the half-width (ADR-0041),
-/// not because the segment is short. Unflagged, it is a hard-edged sub-pixel
+/// The cap arm pins the second half of the same phase's finding, and it is not
+/// cosmetic: the line renderer's falloff runs *across* the stroke only, so a
+/// mark is round because both caps are pushed out by the half-width (ADR-0158),
+/// not because the segment is short. Unextended, it is a hard-edged sub-pixel
 /// dash — see `draw::dots` and the render test below.
 #[test]
 fn wave_usedots_puts_separated_marks_where_a_line_puts_a_stroke() {
-    use lmv_core::render::scenes::lines::{JOINED_A, JOINED_B};
-
     for mode in WAVE_MODES {
         let line = waveform_geometry(mode, 0.0);
         let dotted = waveform_geometry(mode, 1.0);
@@ -527,9 +525,9 @@ fn wave_usedots_puts_separated_marks_where_a_line_puts_a_stroke() {
             dotted
                 .segments
                 .iter()
-                .all(|s| s.joined == JOINED_A | JOINED_B),
-            "wave_mode {mode}: a dotted mark must flag BOTH ends joined so the \
-             quad extends past each cap by the half-width (ADR-0041). Without \
+                .all(|s| s.ext_a == s.width && s.ext_b == s.width),
+            "wave_mode {mode}: a dotted mark must extend BOTH ends by its own \
+             half-width so the quad reaches past each cap (ADR-0158). Without \
              that the falloff is clipped to a dash and the beads vanish at any \
              resolution where the mark is under a pixel long"
         );

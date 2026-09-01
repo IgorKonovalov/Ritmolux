@@ -21,18 +21,10 @@
 
 use crate::render::gpu;
 
-/// [`SegmentInstance::joined`] bit: the `a` end continues a neighbouring
-/// segment, so the quad extends **backward** along its own direction by the
-/// half-width (ADR-0041).
-pub const JOINED_A: u32 = 1 << 0;
-/// [`SegmentInstance::joined`] bit: the `b` end continues a neighbouring
-/// segment, so the quad extends **forward** by the half-width (ADR-0041).
-pub const JOINED_B: u32 = 1 << 1;
-
 /// One line segment: endpoints `a`/`b` in world space (x is divided by aspect
 /// in the shader, matching the swarm's convention), an RGB colour, a
 /// half-width in NDC-y units (uniform on screen after the aspect divide), and
-/// the per-endpoint connectivity the join needs.
+/// the per-endpoint extension length the join needs.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SegmentInstance {
@@ -44,18 +36,23 @@ pub struct SegmentInstance {
     pub color: [f32; 3],
     /// Half-width in NDC-y units.
     pub width: f32,
-    /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
+    /// How far the quad extends **backward** past `a`, along the segment's own
+    /// direction, in the same NDC-y units as [`width`](Self::width). `0.0` is a
+    /// free end (ADR-0158).
     ///
-    /// Connectivity is the **producer's** to declare: only it knows whether an
-    /// end is shared with a neighbour. `0` (neither end joined) renders exactly
-    /// the pre-Plan-0039 geometry, which is what keeps the isolated producers —
-    /// `spectrum`'s `Bars` and `RadialRing` — byte-identical.
+    /// The length is the **producer's** to compute: only it knows whether an end
+    /// is shared with a neighbour and at what interior angle, which is the same
+    /// argument that put connectivity on the producer side. `0.0` renders exactly
+    /// the geometry an unflagged end rendered, because `dir * 0.0` is exactly
+    /// zero — that is what keeps the isolated producers, `spectrum`'s `Bars` and
+    /// `RadialRing`, byte-identical.
     ///
-    /// A bitfield rather than two `f32`s: 4 bytes instead of 8 against
-    /// ADR-0007's fixed-capacity instance buffer, still `Pod` (36 + 4 = 40 with
-    /// no padding at align 4), and it leaves 30 bits for whatever the next
-    /// per-endpoint property turns out to be.
-    pub joined: u32,
+    /// **A world-space length, not a factor.** It is resolved against `width` at
+    /// the moment the producer fills the instance. Every producer in this crate
+    /// rebuilds its instance buffer per frame, so the two cannot drift; a
+    /// producer that ever caches instances across frames while animating
+    /// `thickness` would have to recompute this alongside it.
+    pub ext_a: f32,
     /// **How much of its own footprint this stroke occupies**, on top of the
     /// across-the-stroke falloff — the fragment's alpha is `falloff * alpha`.
     ///
@@ -71,13 +68,23 @@ pub struct SegmentInstance {
     /// producer's real coverage: a MilkDrop waveform at `wave_a = 0.1` must
     /// replace a tenth of what is under it, not all of it (Plan 0100 Phase 4).
     ///
-    /// **Declared last, and that is load-bearing.** `vertex_attr_array!` derives
-    /// each attribute's byte offset from the order of the *shader locations*, so a
-    /// field inserted before `joined` puts location 4 (`Uint32`) over this float
-    /// and location 5 over the flags. The result compiles, renders, and quietly
-    /// reinterprets every stroke's join bits as alpha's mantissa — which is what
-    /// it did, moving five composite golden baselines.
+    /// **Its position in this struct is load-bearing.** `vertex_attr_array!`
+    /// derives each attribute's byte offset from the order of the *shader
+    /// locations*, so a field inserted ahead of this one shifts location 5 onto
+    /// the bytes location 4 is reading and every attribute after it by one slot.
+    /// The result compiles, renders, and quietly reinterprets one field as
+    /// another's mantissa — which is what it did, moving five composite golden
+    /// baselines. **A new field goes last**, which is where
+    /// [`ext_b`](Self::ext_b) is.
     pub alpha: f32,
+    /// How far the quad extends **forward** past `b`. The `b`-end counterpart of
+    /// [`ext_a`](Self::ext_a), in the same units and with the same `0.0`-is-free
+    /// convention.
+    ///
+    /// **Declared last**, for the reason [`alpha`](Self::alpha) records: it was
+    /// appended when the endpoint stopped carrying a flag and started carrying a
+    /// length, and appending is the only placement that re-points nothing.
+    pub ext_b: f32,
 }
 
 /// One **circular arc**: a centre and radius in world space, a signed angular
@@ -91,9 +98,9 @@ pub struct SegmentInstance {
 /// with no vertices at any resolution, where the segment path needs one
 /// instance and one additive joint per sample.
 ///
-/// **No `joined` field: an arc has no interior joints**, which is the whole
-/// point of the primitive. Where two arcs in a chain meet they overlap by
-/// ADR-0041's half-width as any two strokes do, and the additive composite
+/// **No extension fields: an arc has no interior joints**, which is the whole
+/// point of the primitive. Where two arcs in a chain meet they overlap by a
+/// half-width as any two strokes do, and the additive composite
 /// sums that overlap exactly as it does for segments — the bead is reduced by
 /// there being fewer joints, not by a joint doing anything different.
 ///
@@ -158,8 +165,7 @@ struct Uniforms {
 /// - `0` is a solid stroke whose coverage falls to zero across **one pixel**,
 ///   whatever the stroke width, the resolution or the aspect.
 ///
-/// Shared rather than written twice for the reason [`shader_source`] emits the
-/// join bits from the Rust constants: two copies of a profile is a divergence
+/// Shared rather than written twice: two copies of a profile is a divergence
 /// that compiles, and here it would mean a mandala whose circles and interlace
 /// stop matching.
 ///
@@ -175,9 +181,7 @@ fn stroke_coverage(u: f32, du: f32, softness: f32) -> f32 {
 }
 "#;
 
-/// The WGSL body, minus the join-bit constants and the shared profile —
-/// [`shader_source`] prepends those, the join bits generated from [`JOINED_A`] /
-/// [`JOINED_B`] themselves.
+/// The WGSL body, minus the shared profile — [`shader_source`] prepends that.
 const SHADER_BODY: &str = r#"
 struct Uniforms {
     v: vec4<f32>,
@@ -200,8 +204,9 @@ fn vs_main(
     @location(1) b: vec2<f32>,
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
-    @location(4) joined: u32,
+    @location(4) ext_a: f32,
     @location(5) alpha: f32,
+    @location(6) ext_b: f32,
 ) -> VsOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -232,15 +237,14 @@ fn vs_main(
     }
     let nrm = vec2<f32>(-dir.y, dir.x);
 
-    // Join (ADR-0041): a flagged end continues into a neighbouring segment, so
-    // push the quad past that endpoint by the half-width along its **own**
-    // direction. Adjacent quads then overlap by half a stroke on both sides of
-    // the shared vertex and the additive falloff fills the wedge the two
-    // divergent perpendiculars would otherwise leave. Each end is independent,
-    // and an unflagged end keeps its exact previous geometry — `dir * 0.0` is
-    // exactly zero, so a producer that flags nothing is byte-identical.
-    let ext_a = select(0.0, width, (joined & JOINED_A) != 0u);
-    let ext_b = select(0.0, width, (joined & JOINED_B) != 0u);
+    // Join (ADR-0158): an end that continues into a neighbouring segment is
+    // pushed past that endpoint along its **own** direction by the length the
+    // producer computed for it. Adjacent quads then overlap across the shared
+    // vertex and the additive falloff fills the wedge the two divergent
+    // perpendiculars would otherwise leave. The producer is the only party that
+    // can compute it, because a segment cannot see its neighbour's direction.
+    // Each end is independent, and a free end is exactly `0.0` — `dir * 0.0` is
+    // exactly zero, so a producer that extends nothing is byte-identical.
     let a_j = a_s - dir * ext_a;
     let b_j = b_s + dir * ext_b;
 
@@ -282,33 +286,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// The full WGSL, with the join bits **generated from the Rust constants**
-/// rather than restated as literals (Plan 0040 Phase 2).
+/// The full WGSL: the shared profile prepended to the body.
 ///
-/// A shader testing `(joined & 1u)` and `(joined & 2u)` against [`JOINED_A`] /
-/// [`JOINED_B`] defined here has nothing tying the two together — a swap or a
-/// renumbering would compile, pass, and render wrongly. Emitting the WGSL
-/// `const`s from the Rust ones makes that divergence **unrepresentable** rather
-/// than merely detected: there is one definition, and the shader reads it by
-/// name. Prepending a generated prelude rather than `format!`-ing the whole body
-/// is deliberate — the body is full of braces, and every one would need
-/// escaping.
+/// **The prelude carries no constants.** An endpoint's extension is an `f32`
+/// length the shader multiplies by a direction (ADR-0158), and a float has no
+/// bit assignment that could disagree with a Rust-side numbering — so there is
+/// nothing here to generate and keep in step.
+///
+/// Prepending rather than `format!`-ing the whole body is deliberate: the body
+/// is full of braces and every one would need escaping.
 ///
 /// Runs once per [`LineRenderer::new`] (pipeline build, not the hot path).
 fn shader_source() -> String {
-    format!(
-        "const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = \
-         {JOINED_B}u;\n{PROFILE_WGSL}\n{SHADER_BODY}"
-    )
+    format!("{PROFILE_WGSL}\n{SHADER_BODY}")
 }
 
 /// The arc pipeline's full WGSL: [`PROFILE_WGSL`] prepended to [`ARC_SHADER`].
 ///
 /// The two fragments are separate modules, so **the profile is shared by
 /// construction rather than by convention** - the same reason [`shader_source`]
-/// emits the join bits from the Rust constants instead of restating them. Two
-/// hand-kept copies of the expression would compile, render, and give a mandala
-/// whose circles and interlace stop matching.
+/// prepends it instead of the body restating it. Two hand-kept copies of the
+/// expression would compile, render, and give a mandala whose circles and
+/// interlace stop matching.
 ///
 /// Runs once per [`LineRenderer::new_with_arcs`] (pipeline build, not the hot
 /// path).
@@ -923,8 +922,9 @@ impl LineRenderer {
                             1 => Float32x2,
                             2 => Float32x3,
                             3 => Float32,
-                            4 => Uint32,
+                            4 => Float32,
                             5 => Float32,
+                            6 => Float32,
                         ],
                     })],
                 },

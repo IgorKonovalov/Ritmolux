@@ -29,7 +29,8 @@
 
 use std::f32::consts::TAU;
 
-use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
+use super::PLACEHOLDER_WIDTH;
+use super::renderer::SegmentInstance;
 
 /// Map a `tiling` name to its star order `n`. Accepts a few named/numeric
 /// regular tilings (the v1 set); returns `None` for anything else so the loader
@@ -103,20 +104,23 @@ pub fn star_rosette(n: u32, contact_angle: f32, out: &mut Vec<SegmentInstance>) 
             // `half_width / tan(contact_angle)` — wider than the one at the tips
             // for any star pointier than 45 degrees, against `star.rs`'s
             // `CONTACT_MIN_DEG = 8`. Plan 0039 flagged only the tips.
-            out.push(seg(m0, tip, JOINED_A | JOINED_B));
-            out.push(seg(m1, tip, JOINED_A | JOINED_B));
+            out.push(seg(m0, tip, PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH));
+            out.push(seg(m1, tip, PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH));
         }
     }
 }
 
-fn seg(a: [f32; 2], b: [f32; 2], joined: u32) -> SegmentInstance {
+/// One rosette segment. `ext_a`/`ext_b` are in units of [`PLACEHOLDER_WIDTH`],
+/// which is what the rosette is cached at; the star scene restyles it per frame.
+fn seg(a: [f32; 2], b: [f32; 2], ext_a: f32, ext_b: f32) -> SegmentInstance {
     SegmentInstance {
         a,
         b,
         color: [1.0, 1.0, 1.0],
-        width: 0.01,
+        width: PLACEHOLDER_WIDTH,
         alpha: 1.0,
-        joined,
+        ext_a,
+        ext_b,
     }
 }
 
@@ -159,7 +163,7 @@ mod tests {
     /// segments from `contact(k)` and `contact(k + 1)`, and petal `k + 1` emits
     /// one from `contact(k + 1)` again. All `2n` vertices are joints.
     #[test]
-    fn the_star_is_a_closed_chain_joined_at_every_vertex() {
+    fn the_star_is_a_closed_chain_extended_at_every_vertex() {
         let n = 5usize;
         let mut out = Vec::new();
         star_rosette(n as u32, 30f32.to_radians(), &mut out);
@@ -167,8 +171,8 @@ mod tests {
 
         for (i, seg) in out.iter().enumerate() {
             assert_eq!(
-                seg.joined,
-                JOINED_A | JOINED_B,
+                (seg.ext_a, seg.ext_b),
+                (PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH),
                 "segment {i} lies in a closed chain, so both its ends are joints"
             );
         }
@@ -201,8 +205,8 @@ mod tests {
                 k + 1
             );
             assert!(
-                out[i].joined & JOINED_A != 0 && out[j].joined & JOINED_A != 0,
-                "both segments at contact point {} must declare that end joined, \
+                out[i].ext_a > 0.0 && out[j].ext_a > 0.0,
+                "both segments at contact point {} must extend that end, \
                  or the sharper half of the rosette keeps the notch",
                 k + 1
             );

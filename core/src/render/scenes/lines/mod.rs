@@ -34,7 +34,7 @@ pub mod turtle;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
-pub use renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+pub use renderer::{ArcInstance, LineRenderer, SegmentInstance};
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
 
@@ -252,6 +252,19 @@ pub fn palette(t: f32) -> [f32; 3] {
 /// segment figure and an arc figure to drift apart under the same `rotation`
 /// binding — and the failure would render as a mandala whose circles lag its
 /// interlace, which is close to unreadable in a capture.
+/// The half-width the two **cached** producers — the L-system walk and the star
+/// pattern's outlines — fill their instances with at build time.
+///
+/// Both figures are built once at `configure` and restyled every frame by
+/// [`transform_cached`], which overwrites this with the frame's real half-width.
+/// No preset ever sees the value and it is not a default.
+///
+/// **It is load-bearing exactly once**: a joined end's extension is stored in
+/// these units, so [`LineInstance::styled`] can carry it to this frame's width by
+/// the ratio between the two. A producer that wrote a different placeholder into
+/// `width` than into the extensions would rescale them wrongly.
+pub(crate) const PLACEHOLDER_WIDTH: f32 = 0.01;
+
 pub(crate) trait LineInstance: Copy {
     /// Rotate about the origin and scale uniformly. `sin`/`cos` are the
     /// rotation's, passed pre-computed because the caller applies it to a whole
@@ -264,6 +277,13 @@ pub(crate) trait LineInstance: Copy {
 
     /// Take this frame's colour and half-width. Alpha goes to `1.0`: every
     /// generator line scene draws through ADR-0056's additive seam.
+    ///
+    /// **Anything measured in half-widths is re-resolved here, not passed
+    /// through.** A cached figure is walked once at a placeholder width and
+    /// restyled every frame, so a field holding a *length* — as
+    /// [`SegmentInstance::ext_a`] does under ADR-0158 — goes stale the moment
+    /// `thickness` moves unless this carries it along. A field holding a
+    /// width-independent property passes through untouched.
     fn styled(self, color: [f32; 3], width: f32) -> Self;
 }
 
@@ -279,7 +299,10 @@ impl LineInstance for SegmentInstance {
             a: rot(self.a),
             b: rot(self.b),
             // Connectivity is a property of the cached structure, not of this
-            // frame's rotation/scale, so it passes straight through.
+            // frame's rotation/scale, so it passes straight through — and so do
+            // the extensions, which are measured against `width`. `scale` moves
+            // endpoints and leaves stroke width alone, so an extension scaled
+            // here would stop matching the stroke it belongs to.
             ..self
         }
     }
@@ -293,10 +316,22 @@ impl LineInstance for SegmentInstance {
     }
 
     fn styled(self, color: [f32; 3], width: f32) -> Self {
+        // The extensions are world-space lengths resolved against the width the
+        // producer held when it filled the instance (ADR-0158), and a cached
+        // figure was walked at a placeholder one. Carry them across by the width
+        // ratio: a free end is `0.0` and stays exactly `0.0`, and an end
+        // extended by its own half-width stays extended by this frame's.
+        let k = if self.width > 0.0 {
+            width / self.width
+        } else {
+            0.0
+        };
         Self {
             color,
             width,
             alpha: 1.0,
+            ext_a: self.ext_a * k,
+            ext_b: self.ext_b * k,
             ..self
         }
     }

@@ -11,7 +11,7 @@ use super::{DrawExtent, SegmentInstance, measure_extent};
 use crate::render::gpu;
 
 /// A segment with everything but its endpoints held constant — colour, width
-/// and the join flags are not part of this measurement (it is length, not
+/// and the end extensions are not part of this measurement (it is length, not
 /// area).
 fn seg(a: [f32; 2], b: [f32; 2]) -> SegmentInstance {
     SegmentInstance {
@@ -20,8 +20,52 @@ fn seg(a: [f32; 2], b: [f32; 2]) -> SegmentInstance {
         color: [1.0, 1.0, 1.0],
         width: 0.01,
         alpha: 1.0,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
     }
+}
+
+/// The instance layout the vertex-attribute array is written against.
+///
+/// `wgpu::vertex_attr_array!` derives each attribute's byte offset by walking
+/// the *shader locations* in order and summing their formats' sizes. Nothing
+/// ties that walk to this struct's field order: put a field in the wrong place
+/// and every attribute after it silently reads the neighbouring field's bytes.
+/// It compiles, it renders, and it moved five composite golden baselines the one
+/// time it happened.
+///
+/// So the layout is pinned as numbers. `alpha` is the load-bearing one — it sits
+/// between the two extensions at location 5, and it is what a field inserted
+/// ahead of `ext_b` would displace.
+#[test]
+fn the_instance_layout_matches_the_vertex_attribute_array() {
+    use std::mem::{offset_of, size_of};
+
+    assert_eq!(
+        size_of::<SegmentInstance>(),
+        44,
+        "2 + 2 + 3 + 1 + 1 + 1 + 1 floats, no padding at align 4"
+    );
+    // Location 0..=6, in the order `vertex_attr_array!` walks them.
+    assert_eq!(offset_of!(SegmentInstance, a), 0);
+    assert_eq!(offset_of!(SegmentInstance, b), 8);
+    assert_eq!(offset_of!(SegmentInstance, color), 16);
+    assert_eq!(offset_of!(SegmentInstance, width), 28);
+    assert_eq!(
+        offset_of!(SegmentInstance, ext_a),
+        32,
+        "ext_a replaced the join bitfield in place at location 4"
+    );
+    assert_eq!(
+        offset_of!(SegmentInstance, alpha),
+        36,
+        "alpha keeps location 5 and its byte offset"
+    );
+    assert_eq!(
+        offset_of!(SegmentInstance, ext_b),
+        40,
+        "ext_b is last, which is the only placement that re-points nothing"
+    );
 }
 
 /// Slack for the *clipped* cases only. The two endpoints of the property —
@@ -982,7 +1026,8 @@ fn sampled_circle(centre: [f32; 2], radius: f32, width: f32) -> Vec<SegmentInsta
             b: point(k + 1),
             color: [1.0, 1.0, 1.0],
             width,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
             alpha: 1.0,
         })
         .collect()
@@ -1194,7 +1239,8 @@ fn the_arc_stroke_falls_off_quadratically_like_a_segment() {
         b: [1.0, RADIUS],
         color: [1.0, 1.0, 1.0],
         width: WIDTH,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
         alpha: 1.0,
     }];
 
@@ -1459,7 +1505,8 @@ fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
             b: [4.0, 0.0],
             color: [1.0, 0.0, 0.0],
             width: 0.30,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
             alpha: 1.0,
         },
         SegmentInstance {
@@ -1467,7 +1514,8 @@ fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
             b: [0.0, 4.0],
             color: [1.0, 1.0, 1.0],
             width: 0.30,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
             alpha: 1.0,
         },
     ];
@@ -1674,7 +1722,8 @@ fn flat_stroke(half_width: f32) -> [SegmentInstance; 1] {
         b: [4.0, 0.0],
         color: [1.0, 1.0, 1.0],
         width: half_width,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
         alpha: 1.0,
     }]
 }
@@ -1689,7 +1738,8 @@ fn slanted_stroke(half_width: f32) -> [SegmentInstance; 1] {
         b: [1.55, 0.69],
         color: [1.0, 1.0, 1.0],
         width: half_width,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
         alpha: 1.0,
     }]
 }

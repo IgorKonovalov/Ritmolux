@@ -14,7 +14,7 @@
 )]
 
 use super::biarc::{self, Piece};
-use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
+use super::renderer::SegmentInstance;
 
 /// The largest share of a Maurer walk's vertices that may be **corners** before
 /// `maurer_rose_pieces` declines to fit it — *is this a curve at all?*
@@ -107,25 +107,21 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
     let mut prev = point(0);
     for k in 1..=drawn {
         let cur = point(k);
-        // Chained (ADR-0041): consecutive chords share a sampled point, so every
+        // Chained (ADR-0158): consecutive chords share a sampled point, so every
         // interior vertex is a joint. The two ends of the walk stay free — and
         // that includes the head of a partially revealed curve, so
-        // `draw_progress` never pushes the stroke half a width past the point it
-        // actually reached.
-        let mut joined = 0;
-        if k > 1 {
-            joined |= JOINED_A;
-        }
-        if k < drawn {
-            joined |= JOINED_B;
-        }
+        // `draw_progress` never pushes the stroke past the point it actually
+        // reached.
+        let ext_a = if k > 1 { p.width } else { 0.0 };
+        let ext_b = if k < drawn { p.width } else { 0.0 };
         out.push(SegmentInstance {
             a: prev,
             b: cur,
             color: p.color,
             width: p.width,
             alpha: 1.0,
-            joined,
+            ext_a,
+            ext_b,
         });
         prev = cur;
     }

@@ -14,8 +14,12 @@ fn white(n: usize) -> Vec<[f32; 3]> {
     vec![[1.0, 1.0, 1.0]; n]
 }
 
+/// The per-element half-width [`even_widths`] hands every element, and so the
+/// extension a joined end carries in these tests.
+const W: f32 = 0.01;
+
 fn even_widths(n: usize) -> Vec<f32> {
-    vec![0.01; n]
+    vec![W; n]
 }
 
 /// Build one figure from raw per-element lengths at an explicit placement.
@@ -552,38 +556,38 @@ fn each_layout_draws_the_same_levels_as_its_own_figure() {
 /// centre-mirror Plan 0038 shipped — and a spoke whose `a` end extended would
 /// grow inward through `radius` and fill the inner circle.
 #[test]
-fn only_the_polyline_declares_its_endpoints_joined() {
+fn only_the_polyline_extends_its_endpoints() {
     let levels = [0.1f32, 0.4, 0.9, 0.3, 0.6];
 
     // Chained: every interior vertex is a joint; the figure's two outer ends
     // stay free, or the stroke would run half a width past each edge.
     let chain = figure(SpectrumLayout::Polyline, &levels);
     assert_eq!(
-        chain.iter().map(|s| s.joined).collect::<Vec<_>>(),
-        vec![JOINED_B, JOINED_A | JOINED_B, JOINED_A | JOINED_B, JOINED_A,],
-        "the interior endpoints of the chain are joined and only those"
+        chain.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+        vec![(0.0, W), (W, W), (W, W), (W, 0.0)],
+        "the interior endpoints of the chain are extended and only those"
     );
-    // ...and every flag matches a genuinely shared point, which is the
+    // ...and every extension matches a genuinely shared point, which is the
     // invariant nothing else in the pipeline validates.
     for i in 1..chain.len() {
         assert_eq!(chain[i - 1].b, chain[i].a, "segment {i} shares a point");
-        assert_ne!(
-            chain[i - 1].joined & JOINED_B,
-            0,
-            "seen from the segment before"
-        );
-        assert_ne!(chain[i].joined & JOINED_A, 0, "and from the one after");
+        assert_ne!(chain[i - 1].ext_b, 0.0, "seen from the segment before");
+        assert_ne!(chain[i].ext_a, 0.0, "and from the one after");
     }
     // Two elements make one segment, which is all end and no joint.
     let lone = figure(SpectrumLayout::Polyline, &[0.3, 0.7]);
     assert_eq!(lone.len(), 1);
-    assert_eq!(lone[0].joined, 0, "a lone segment has two free ends");
+    assert_eq!(
+        (lone[0].ext_a, lone[0].ext_b),
+        (0.0, 0.0),
+        "a lone segment has two free ends"
+    );
 
     // Isolated: one segment per element, both ends free, and the endpoints
     // stay exactly where they always were.
     let bars = figure(SpectrumLayout::Bars, &levels);
     for (i, seg) in bars.iter().enumerate() {
-        assert_eq!(seg.joined, 0, "bar {i} is isolated");
+        assert_eq!((seg.ext_a, seg.ext_b), (0.0, 0.0), "bar {i} is isolated");
         assert_eq!(
             seg.a[1], DEFAULT_BASELINE,
             "bar {i} still stands on the baseline"
@@ -603,7 +607,7 @@ fn only_the_polyline_declares_its_endpoints_joined() {
         },
     );
     for (i, seg) in ring.iter().enumerate() {
-        assert_eq!(seg.joined, 0, "spoke {i} is isolated");
+        assert_eq!((seg.ext_a, seg.ext_b), (0.0, 0.0), "spoke {i} is isolated");
         let inner = (seg.a[0] * seg.a[0] + seg.a[1] * seg.a[1]).sqrt();
         assert!(
             (inner - 0.4).abs() < 1e-5,
@@ -700,7 +704,8 @@ fn a_degenerate_element_count_is_inert() {
             color: [1.0, 1.0, 1.0],
             width: 1.0,
             alpha: 1.0,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
         }];
         build(layout, &none, &[], &[], Placement::default(), &mut out);
         assert!(out.is_empty(), "{layout:?}: no elements, no segments");
