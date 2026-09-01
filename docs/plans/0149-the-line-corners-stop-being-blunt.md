@@ -158,30 +158,117 @@ flowchart LR
     survives, now pinned by `ext == 0.0` rather than by a single bit.
 
 ### Phase 2 — The corner reaches its point
+
+> **Amended 2026-09-01, after Phase 1 landed.** Phase 1's implementation established three things
+> this block was written without: the real producer roster, that `warp_mesh` is a producer using the
+> extension as a **cap**, and that the cached scenes restyle per frame. A fourth is new and is a
+> **stop gate** — see the aspect question below. [ADR-0158] carries the scope decision.
+
 - **Owner skill:** dev
-- **What:** each producer computes `min(width / sin(theta / 2), MITER_LIMIT * width)` for a joined
-  end. Closes backlog 0134.
-- **Files touched:** `parametric.rs`, `lsystem.rs`, `hankin.rs`, `spectrum.rs`,
-  `renderer.rs` (the `MITER_LIMIT` constant and its doc), the line goldens.
-- **Done when:**
-  - `MITER_LIMIT = 4.0` is a named constant whose doc states **what it is derived from** — it serves
-    every corner down to `2 * asin(1/4) = 28.96 degrees` exactly, it is SVG's `stroke-miterlimit`
-    default, and it was adopted rather than measured. Per ADR-0071 that is a stated property, not a
-    frozen measurement.
-  - **The measured defect is gone on its own fixture.** A `diamond` at `thickness = 9` in a 1000x1000
-    frame no longer reads 26 px of flat and then zero through the 61.9-degree vertex; the profile
-    tapers. The diamond's factor is **1.945**, well inside the limit, so this corner is served
-    *exactly* and the limit is not engaged — assert the computed extension against
-    `width * 1.945` within a tolerance derived from `f32` angle precision, on the CPU, where `theta`
-    is available directly rather than through a rendered frame.
-  - **Each of the four producers has its own test** that a joined end's extension corresponds to the
-    angle it actually forms, and that a free end is `0.0`. ADR-0158's stated negative is that a
-    producer computing the angle wrongly now renders a *wrong-length* stroke rather than merely
-    keeping the notch — a test per producer is the answer to that, not a comment.
-  - `spectrum`'s `Bars` and `RadialRing` baselines are **still unmoved**, which is ADR-0041's
-    original property and the one thing Phase 2 must not cost.
-  - The line goldens are re-blessed. **`LMV_BLESS` rewrites every baseline, not the failing scene's**
-    — restore the unrelated ones before committing, and compare adapters before trusting a bless.
+- **What:** each producer **in the four line families** computes
+  `min(width / sin(theta / 2), MITER_LIMIT * width)` for a joined end. Closes backlog 0134.
+- **Files touched:** `core/src/render/scenes/lines/` — `renderer.rs` (the `MITER_LIMIT` constant and
+  its doc), `curves.rs`, `parametric.rs`, `turtle.rs`, `hankin.rs`, `spectrum.rs`, `star.rs` — their
+  test modules, and the line goldens.
+
+  **Not `lsystem.rs`**, which sets no extension: the L-system's producer is `turtle.rs`. **Not
+  `warp_mesh/draw.rs`**, per the scope rule below.
+
+#### The scope rule: `warp_mesh` keeps the flat half-width
+
+`warp_mesh/draw.rs` is a seventh `SegmentInstance` producer and it is **out of scope**, at both call
+sites — `polyline` and `dots`. [ADR-0158]'s Scope paragraph carries the three reasons; the one that
+decides it is that `warp_mesh` pins `MILKDROP_SOFTNESS = 1.0` rather than `DEFAULT_SOFTNESS = 0.25`,
+so the "there is no blur left" premise that supersedes ADR-0041 is absent on that surface and
+ADR-0041 still holds there on its own terms.
+
+`draw::dots` additionally has **no interior angle at all**: it emits a zero-length segment whose two
+extensions are a **cap**, the thing that makes a bead a bead rather than a sub-pixel dash. A miter
+expression evaluated there has no `theta` to take a sine of.
+
+**Done when:** `core/src/render/scenes/warp_mesh/**` is untouched by this phase's diff, and the
+composite and MilkDrop goldens are **unmoved and unblessed**. That is the phase's second oracle and
+it is as load-bearing as the first: a moved composite baseline means the scope rule was not held.
+
+#### The cached producers need no special case, and here is why
+
+`turtle`, `hankin` and `star` build their figures at `configure` against `PLACEHOLDER_WIDTH` and are
+restyled every frame by `LineInstance::styled`, which carries the extensions across by the width
+ratio. A miter computed at build time survives that unchanged, and the reason is worth stating
+because it is not obvious:
+
+- **The whole expression is homogeneous of degree 1 in `width`.** Both `width / sin(theta / 2)` and
+  the clamp `MITER_LIMIT * width` scale linearly, so `ext(c * w) == c * ext(w)` — the clamp commutes
+  with the rescale and cannot be engaged on one side and not the other. Computing the miter in
+  placeholder units and multiplying by `frame_width / PLACEHOLDER_WIDTH` is exactly computing it at
+  `frame_width`.
+- **`theta` is invariant under every transform between the producer and the shader** — uniform
+  scale, rotation, reflection and the mirror replication are all similarities, and a similarity
+  preserves angles. `normalize_fit` is a uniform scale too.
+
+So the cached producers compute `theta` from their build-time geometry like everyone else. **The one
+thing that must not happen is a producer writing a miter into `ext_*` while leaving `width` at some
+other value** — the ratio rescale is only correct while the two are in the same units.
+
+#### Stop gate — which space is `theta` measured in?
+
+**This gate can halt the phase, and it is not rhetorical.** The shader applies the extension along
+`dir` computed **after** the aspect divide; the producer computes `theta` in **world** coordinates.
+A flat `width` never had to care — a constant is orientation-independent. A miter does.
+
+Swept numerically at 16:9 for the diamond's 61.9-degree vertex, a world-space miter factor lands
+between **0.705x and 1.609x** of the aspect-corrected one depending on the corner's orientation. At
+aspect 1.0 the ratio is **identically 1.000x** — and the fixture this plan specifies for its own
+measurement is **1000x1000**. The plan's instrument is blind to the question by construction, which
+is the failure mode this project has shipped twice under ADR-0037.
+
+**Do this before writing any miter arithmetic**, because the answer changes what the producer can
+compute:
+
+1. Render one `diamond` at `thickness = 9` at **1280x800** as well as 1000x1000 — a size this repo
+   already uses precisely because 16:9 and its own 2048x1152 display agree where others do not.
+2. With the **Phase 1 tree** (flat `width`, no miter), measure the stroke's half-thickness at a
+   near-horizontal and a near-vertical segment of the same figure. If they differ by more than
+   golden's own `0.02` drift floor, world space and the extension's space are **not** similar.
+3. **Then one of two things is true, and the commit message says which:**
+   - **They are similar.** The producer's world-space `theta` is the right angle, the arithmetic in
+     this phase is correct as written, and the phase proceeds. Record the two measurements.
+   - **They are not similar.** The producer **cannot** compute the length from world coordinates
+     alone, and every option that fixes it — passing the neighbour direction, passing the bisector,
+     handing the producer the aspect — changes what the instance carries and therefore changes
+     [ADR-0158]. **Stop and route to `architect`.** Do not proceed on an approximation, and do not
+     bless a golden taken at 1:1 to cover it.
+
+  **A note on step 2, so it is not mis-run:** it measures the *existing* Phase 1 geometry, not the
+  miter. It is asking whether the space the extension lives in is the space the angle would be
+  measured in — a property of the renderer that predates this plan and that this plan is the first
+  to depend on.
+
+#### Done when
+
+- `MITER_LIMIT = 4.0` is a named constant whose doc states **what it is derived from** — it serves
+  every corner down to `2 * asin(1/4) = 28.96 degrees` exactly, it is SVG's `stroke-miterlimit`
+  default, and it was adopted rather than measured. Per ADR-0071 that is a stated property, not a
+  frozen measurement.
+- **The measured defect is gone on its own fixture.** A `diamond` at `thickness = 9` in a 1000x1000
+  frame no longer reads 26 px of flat and then zero through the 61.9-degree vertex; the profile
+  tapers. The diamond's factor is **1.945**, well inside the limit, so this corner is served
+  *exactly* and the limit is not engaged — assert the computed extension against `width * 1.945`
+  within a tolerance derived from `f32` angle precision, on the CPU, where `theta` is available
+  directly rather than through a rendered frame.
+- **Each of the five in-scope producers has its own test** that a joined end's extension corresponds
+  to the angle it actually forms, and that a free end is `0.0`. ADR-0158's stated negative is that a
+  producer computing the angle wrongly now renders a *wrong-length* stroke rather than merely
+  keeping the notch — a test per producer is the answer to that, not a comment. `curves.rs` and
+  `parametric.rs` are two producers and get two tests; `turtle.rs`, `hankin.rs` and `star.rs` are
+  the cached three.
+- `spectrum`'s `Bars` and `RadialRing` baselines are **still unmoved**, which is ADR-0041's original
+  property and the one thing Phase 2 must not cost.
+- **`warp_mesh` is untouched and the composite and MilkDrop goldens are unmoved** — the scope rule's
+  own oracle, above.
+- The stop gate above has been run and its outcome recorded in the commit message.
+- The line goldens are re-blessed. **`LMV_BLESS` rewrites every baseline, not the failing scene's**
+  — restore the unrelated ones before committing, and compare adapters before trusting a bless.
 
 ### Phase 3 — A `scallop` refuses a depth it cannot draw
 - **Owner skill:** dev
@@ -262,6 +349,14 @@ pub struct SegmentInstance {
 
 ## Risks & open questions
 
+- **`theta` may not be measured in the space the extension is applied in, and this plan's own
+  fixture cannot tell.** The shader extends along `dir` computed after the aspect divide; the
+  producer computes the angle in world coordinates. A flat `width` was orientation-independent
+  and never had to care. Swept at 16:9, a world-space miter factor lands between **0.705x and
+  1.609x** of the aspect-corrected one for the diamond's 61.9-degree vertex; at aspect 1.0 it is
+  identically 1.000x, and the specified fixture is 1000x1000. **Phase 2 opens with a stop gate**
+  that measures this at 1280x800 before any miter arithmetic is written. Found while amending
+  the plan after Phase 1, not by the plan as first written.
 - **The golden re-bless is the largest cost here and it is bookkeeping.** `LMV_BLESS` is not scoped
   to the failing scene, so unrelated baselines must be restored before committing, and a bless taken
   on the wrong adapter can freeze garbage — this repo has blessed a WARP bind-layout aliasing bug
@@ -294,6 +389,10 @@ pub struct SegmentInstance {
   a stated reason not to be taken, and Phase 5 corrects the prose instead.
 - **It does not re-size `segments` or `single_buf`.** Phase 4 takes the five buffers Plan 0087 added;
   the ~4.8 MB that predates it is untouched and stays a separate question.
+- **It does not change `warp_mesh`.** That surface is a `SegmentInstance` producer and is
+  deliberately out of scope at both its call sites, per [ADR-0158]'s Scope paragraph: it draws
+  at `MILKDROP_SOFTNESS = 1.0`, where ADR-0041's premise still holds, and its `dots` use the
+  extension as a cap on a zero-length segment rather than as a join.
 - **It does not draw an inward scallop.** Phase 3 refuses one.
 
 ## Implementation log
@@ -306,7 +405,7 @@ pub struct SegmentInstance {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
-| 2 — The corner reaches its point | dev | **halted before start** — see Notes | |
+| 2 — The corner reaches its point | dev | not started (block amended 2026-09-01) | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | not started | |
 | 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
 | 5 — Four contracts that say more than they hold | dev | not started | |
@@ -382,3 +481,5 @@ all clean.
 - Whether any roster figure reaches below the 28.96-degree miter limit; if none does, the clamp arm
   needs a synthetic fixture.
 - The ~4.8 MB `segments` / `single_buf` allocation that predates Plan 0087, still unexamined.
+
+[ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
