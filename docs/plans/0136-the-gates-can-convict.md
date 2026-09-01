@@ -1,6 +1,6 @@
 # 0136 — The gates can convict
 
-> **Status:** in-progress (phases 1-9 landed; Phase 10 is `human`)
+> **Status:** in-progress (all ten phases landed; awaiting the close review)
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (proposed)
@@ -378,7 +378,7 @@ flowchart TB
 | 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
 | 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
 | 9 — The image sweep runs again | dev | done | `a87983a`, `7b9a1ae` |
-| 10 — What the pictures are of | human | not started | |
+| 10 — What the pictures are of | human | done | committed with this row |
 
 ### Notes
 
@@ -461,6 +461,14 @@ flowchart TB
   `.claude/`: the string `self-test` appears in none of them. Not acted on - it is outside every
   phase's file list.
 
+- **Phase 10's decision, and the thing that made it a real choice.** A fifth
+  `warp_mesh` world - `presets/warp_smoke.toml`, a rising plume - was authored and
+  shipped **on `main`** during this phase, so the slot was judged against five
+  candidates rather than four. It was NOT taken: the smoke plume is a better picture
+  of *smoke* than `warp_wellhead` is, but wellhead is the better picture of the
+  *family*, which is what a gallery slot is for. The preset is independent of this
+  plan and is not on this branch; `presets/` is still untouched here.
+
 ### Close triggers
 
 - **`presets/` touched:** no. `git diff --name-only main..HEAD -- presets/` is empty.
@@ -480,7 +488,10 @@ flowchart TB
 - **Full suite:** `cargo nextest run --workspace` — **exit 0**, 1500 passed, 5 skipped, 15 slow,
   477.8 s. Run 2026-09-01 on the development machine after the last phase's commit.
   `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` both clean.
-- **Outstanding `human` phases:** Phase 10, and only Phase 10.
+- **Outstanding `human` phases:** none. Phase 10 was taken 2026-09-01: the twelve
+  gallery images were opened and looked at, and `warp_mesh`'s slot was confirmed on
+  `warp_wellhead` rather than swapped. Its provenance line in the manifest now records
+  that verdict instead of the UNJUDGED marker `dev` left.
 
 ## Followups (after this lands)
 
