@@ -13,6 +13,69 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0139 — The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md)
+  — closed 2026-09-01. Three `dev` phases in the `lmv-plan-0139` lane on
+  `plan-0139-render-validates`, `5cf50bc`..`4d8e4c8`. Mode 4: **no blockers, one major, four minors,
+  three nits.** Version: **0.99.0** (minor) — Phase 1 is a fix but `--crf` is a new flag.
+
+  **What landed.** `render::run()` gained `resolve_preset`, which tests `--preset` against the
+  roster before `Encoder::spawn` and before a GPU device is built, and names the roster's keys when
+  it rejects. That is backlog 0111: the reproduction was `--preset attractor_leviathan`, the
+  *filename* of a preset whose `name` is `Leviathan`, which exited 1 and left a **262-byte playable
+  audio-only MP4** at `--out` because `ffmpeg` had already been spawned, muxed the WAV and exited 0.
+  Phase 2 added `--crf <0-51>` as the one movable argument of the generated command line — backlog
+  0112 — keeping `18` as the archival default and joining the guarded-flag roster the ADR-0148 way,
+  so `--crf` without `--ffmpeg` and `--crf` outside `--render` are both named errors rather than
+  silently-ignored flags.
+
+  **Verified rather than accepted.** On the lane with `main` merged in: `cargo nextest run
+  --workspace` **1496 passed, 5 skipped, 0 failed** (the log claimed 1495; `main` added one since),
+  `fmt` and `clippy --workspace --all-targets` clean, and all five Node gates green. The "inherited
+  red" `dev` recorded on `core/tests/preset.rs` was fixed on `main` and the merge carried the fix
+  in. `check-backlog-claims` broke on exactly 0111 and 0112 and no third entry — both are probes
+  written to go red on delivery.
+
+  **The one thing the review checked that nothing else could.** `resolve_preset`'s doc comment
+  claims it makes *"the same comparison the renderer itself makes when it selects, so a name
+  accepted here is a name the renderer will find."* `Renderer::select_preset_by_name_now` is
+  `preset_names().position(|n| n == name)` — exact equality — and `run()` moves the very same
+  `Vec<Preset>` into the renderer after the check, so the two rosters cannot diverge. The claim
+  holds by construction, not by coincidence.
+
+  **The major is a missing guard, not a defect, and it is filed.** Phase 1's done-when has four
+  clauses; only the first ("exits 1 naming the roster's keys") is asserted. `resolve_preset` is
+  tested as a pure function and returns the same answer whether its call site sits before or after
+  `Encoder::spawn`, so the ordering that *is* the defect is held up by line order alone — and the
+  plan's own risks section warns against the refactor that would move it. `standalone/tests/shot_cli.rs`
+  already holds every helper the test needs and already asserts the mirror property for a missing
+  encoder. Filed as **design-backlog 0175**, together with Phase 2's two uncovered cross-flag
+  rejections.
+
+  **Two more filings, and one repair the close made.** **0174** — `dev` observed `ffprobe` reading
+  the produced file as `bt709/unknown/unknown` while `-color_trc` and `-color_primaries` are both on
+  the command line, which contradicts `docs/capturing.md`'s claim that the four colour tags are the
+  half most likely to ship wrong; correctly reported and not acted on, so the close owed it an
+  entry. **0176** — `shot`'s usage text and its parser can drift with nothing checking, while
+  Plan 0144 built exactly that guard for the `lmv` binary; `shot` is the CLI the `preset-author`
+  lane drives. And `README.md`'s "Rendering a music video" section was swept at the close: Phase 3's
+  **Files touched** named only `docs/capturing.md`, so a reader following the README's own command
+  got a multi-gigabyte file with no hint the lever existed.
+
+  **Also repaired here, found while writing a ledger row.** A stray blank line inside
+  `docs/design-backlog.md`'s closed-entry ledger had split it into two tables, leaving the 0114,
+  0115, 0116 and 0121 rows after a blank with no header — rendering as literal pipe-separated text
+  rather than a table. Pre-existing and unrelated to this plan; the blank is gone and the rows are
+  back in the table.
+
+  **Nits recorded and not all fixed.** The new `--crf` example in `docs/capturing.md` had lost its
+  `\` line continuations to a Windows tooling hazard and was rewrapped at the close.
+  `parse_crf`'s loop uses `expect_err("{bad} is not a crf")`, where `expect_err` takes a `&str` and
+  prints `{bad}` literally, so a regression among the five inputs cannot say which — left for the
+  next touch of that file, being test-message-only. And *"`+6` is about half the size"* is stated in
+  four places beside anchors showing `+5` halving it twice (119→60, 60→27); the rule of thumb is
+  generically true and conservative, and correcting only the two `docs/` copies would have put them
+  out of step with the CLI's own help, so all four were left as they are.
+
 - [0146 — The preset sweeps stop being one long test](done/0146-the-preset-sweeps-stop-being-one-long-test.md)
   — closed 2026-08-31. Seven `dev` phases on `main` rather than a worktree, `c2fa99f`..`af4d2b1`,
   with an architect commit (`d009f50`) between Phases 1 and 2. Mode 4: **one blocker, four majors,

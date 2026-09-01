@@ -322,7 +322,9 @@ possible, and the reverse is not.
 
 ```bash
 # The same render at a shareable size.
-cargo run -p standalone --example shot --   --preset "Supernova" --render track.wav --fps 30 --size 1920x1080   --ffmpeg ffmpeg --out track.mp4 --crf 23
+cargo run -p standalone --example shot -- \
+  --preset "Supernova" --render track.wav --fps 30 --size 1920x1080 \
+  --ffmpeg ffmpeg --out track.mp4 --crf 23
 ```
 
 `--crf` needs `--ffmpeg`, and says so rather than being ignored: without an

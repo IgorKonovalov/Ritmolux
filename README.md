@@ -467,9 +467,20 @@ point it at and lets it own the container
 ([ADR-0114](docs/adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md)).
 Without `--ffmpeg` the raw frame stream goes to stdout for any encoder to read.
 
+**The default is archival, not shareable, and `--crf <0-51>` is the lever.**
+At `-crf 18` a four-minute track at 1080p60 is several gigabytes; `--crf 23`
+cuts that to roughly half and `--crf 28` to a quarter, with the colour tags
+untouched. The default does not move, because a capture is evidence first and
+re-encoding down from a master is possible while the reverse is not.
+
+A `--preset` that names nothing costs nothing: the name is checked before the
+encoder is spawned and before a GPU device is built, so a typo exits 1, lists
+the roster's keys, and writes no file. The roster is keyed on a preset's
+`name` field, not its filename.
+
 See **[`docs/capturing.md`](docs/capturing.md#--render-a-music-video-from-a-track)**
-for the frame-rate rules, the exact `ffmpeg` command line it generates, and what
-it reports about a long render.
+for the frame-rate rules, the exact `ffmpeg` command line it generates, the size
+lever's measured anchors, and what it reports about a long render.
 
 ### Through a diffusion model
 

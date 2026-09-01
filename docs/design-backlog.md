@@ -281,7 +281,8 @@ The residual defects are live entries 0113-0116, not reopenings of these.
 |---|-------|---------|
 | 0106 | Converted MilkDrop presets wash out or invert: the float feedback field never truncates | [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) + [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md). **Closed 2026-08-17** |
 | 0107 | The MilkDrop draw layer misplaces figures, and two warp-path defects mirror or unfold the frame | [Plan 0108](plans/done/0108-the-milkdrop-import-gets-its-tone-back.md) Phases 3-5. Two fixed, two re-attributed (both attributions here were wrong), one seam still open. **Closed 2026-08-17** |
-
+| 0111 | `shot --render` spawns the encoder and builds a GPU device before it validates `--preset` | [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md) Phase 1. **Closed 2026-09-01** |
+| 0112 | The one canonical `ffmpeg` invocation is archival-grade and has no size lever | [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md) Phase 2, as `--crf`; the default stays 18. **Closed 2026-09-01** |
 | 0114 | A negative scale is clamped away, so MilkDrop’s standard mirror idiom collapses | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 1. Both halves were engine-side. **Closed 2026-08-19** |
 | 0115 | There is no video-echo stage, and one preset in seven is unrecognisable without it | [ADR-0119](adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) + [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phases 3 and 7. **Closed 2026-08-19** |
 | 0116 | The mode 6/7 waveform rotates a full turn every two minutes, and the reference’s does not | [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md) Phase 2. **Closed 2026-08-19** |
@@ -1837,64 +1838,7 @@ app** — nothing shipped is broken and the live tiers are validated where they 
 whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
 [Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
 
----
-
-## 0111 — `shot --render` spawns the encoder and builds a GPU device before it validates `--preset`
-
-- **Raised:** 2026-08-17, hit twice while running
-  [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase 5.
-- **Verified 2026-08-17** — `run()` never scans the roster for membership; its only roster read is
-  the one-entry `[only]` arm: `absent: presets\.iter in: standalone/src/shot/render.rs`.
-
-**Reproduced.** `--preset attractor_leviathan` — the *filename*, where the roster key is the
-preset's `name` field, `"Leviathan"` — exits 1 with `no preset named 'attractor_leviathan' in the
-roster` and leaves a **262-byte MP4 at `--out`**, because `ffmpeg` had already been spawned,
-consumed the muxed WAV, written a valid audio-only container and exited 0. At the 20 s trial size
-the leftover was 26 KB. The name is only checked deep inside `Renderer::capture_stream`'s
-`reset_for_capture`, after `Encoder::spawn` *and* after a GPU device is built.
-
-**Why it matters beyond tidiness.** ADR-0114's rule for this path is that a missing encoder is a
-named error and *never* a silent fallback, because a quietly-substituted encoder makes an exported
-file untrustworthy. This is that hazard one step over: nothing was substituted, but the artifact
-left at the destination is a real, playable MP4 that a glance cannot tell from a short render. Two
-wasted costs ride along — a child process and a GPU device — on an error knowable from the
-arguments alone.
-
-**The fix is small**: check `name` against `presets` in `render::run()` before `Encoder::spawn`.
-The roster is already in hand there — the `(None, [only])` arm reads it two lines up — and the
-error can name the roster's keys, which would also have caught the filename-vs-`name` confusion
-that produced this. **No ADR needed. Priority: low-medium**, a good first-phase item on any
-follow-up that touches `--render`.
-
----
-
-## 0112 — the one canonical `ffmpeg` invocation is archival-grade and has no size lever
-
-- **Raised:** 2026-08-17, from [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase
-  5's real render.
-- **Verified 2026-08-17** — the quality setting is a literal in the generated command and no flag
-  reaches it: `present: -crf in: standalone/src/shot/render.rs`,
-  `absent: --crf in: standalone/examples/shot.rs`.
-
-**Measured.** `attractor_leviathan` at 1920x1080/60, `--tier rich`, a 4:41 track: **3.73 GB,
-106 Mbit/s**. On a 30 s slice, the shipped `-crf 18` is 119 Mbit/s, `-crf 23` is 60, `-crf 28` is
-27. The engine's grainiest families are pathological for x264 — an attractor is a per-pixel
-stochastic spray, so every frame is full-frame noise that changes completely — and entry 0110 is
-why that grain is there at 1080p at all. For scale, ~12 Mbit/s is a typical 1080p60 upload
-recommendation, so the shipped default is about **9x** it.
-
-**Nothing is missing from the capability** — omit `--ffmpeg`, redirect stdout and run your own
-encoder, which `capturing.md` documents. What is missing is a lever on the *convenience* path,
-whose whole stated justification is that there is exactly one command line to fix rather than a
-wiki of incantations; today adjusting it means editing `ffmpeg_args`.
-
-**Shapes:** a `--crf <n>` passthrough (smallest, and the tests already pin the load-bearing
-arguments so the colour tags cannot be lost); or one line in `docs/capturing.md` naming the
-raw-stream path as the size-control route, which costs nothing and may be the whole answer.
-**No ADR needed. Priority: low** — and it may be **discharged by 0110** rather than on its own,
-since most of those bits are encoding shot noise that should not have been in the picture.
-
----
+--
 
 ## 0113 — the converted feedback field equilibrates far brighter than the reference's, and nothing knows why
 
@@ -4266,3 +4210,105 @@ otherwise, which is the property that gets the next reader to stop looking.
 - **Verified 2026-08-31** - the newline exclusion is still unconditional and still ahead of the run check, so the unrejoined form still returns before it is judged: `present: text\.includes.{0,40}return null in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-31** - the fixture roster still states the silence as a general property: `present: prose does not carry one mid-sentence in: scripts/fixtures/README.md`
 - **Verified 2026-08-31** - the swallowed backslash is still in the message the operator reads: `present: with no trailing \\\) in: scripts/check-comment-hygiene.mjs`
+
+---
+
+## 0174 — two of the four colour tags the render path pins do not survive into the container, and the doc calls all four the half most likely to ship wrong
+
+- **Raised:** 2026-09-01, by `dev` during [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)
+  Phase 2, reported and deliberately not acted on.
+- **Verified 2026-09-01** — the tags are still emitted unconditionally:
+  `present: color_primaries in: standalone/src/shot/render.rs`
+- **Verified 2026-09-01** — and nothing reads back what the produced file actually carries:
+  `absent: color_primaries in: standalone/tests/shot_cli.rs`
+
+**Observed.** `ffprobe` reads a file produced by the generated command line as
+**`bt709/unknown/unknown`**. `-color_trc bt709` and `-color_primaries bt709` are both on that
+command line. It was identical on both arms of Phase 2's `--crf` comparison, so it is a property of
+the shipped invocation and not of the new flag.
+
+**Why it matters.** `docs/capturing.md` states that *“the four colour tags are the half most likely
+to ship wrong — an untagged file is one the player expands from studio swing and shows washed
+out”*, and the same paragraph argues `-color_trc bt709` over `iec61966-2-1` on the ground that
+*“every player assumes the former”*. If two of the four do not reach the container, that reasoning
+is being applied to arguments that have no effect, and the doc is asserting a guarantee the artifact
+does not carry. Nothing here is known to be *wrong* on screen — the range tag is the one that
+produces the washed-out failure and it does survive — but the claim is stated as a property and is
+not verified as one.
+
+**What a fix looks like, in order.** (a) Establish what is actually true: `ffprobe -show_streams` on
+a produced file, against what the same `ffmpeg` writes when the tags are passed as output-side
+`-bsf:v h264_metadata` or via `-color_primaries` placed after `-c:v`. Argument *position* is the
+first suspect — colour options ahead of the output codec can bind to the input. (b) If they are
+being dropped, move them and assert the readback in `standalone/tests/shot_cli.rs`, which already
+gates on `ffmpeg_on_path()`. (c) If they cannot survive H.264-in-MP4 the way this command writes
+them, correct the paragraph rather than the command.
+
+**Impact:** low-medium. No reported visual defect; a documented guarantee that is not checked, on
+the path [Plan 0103](plans/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
+
+---
+
+## 0175 — the render path's spend-nothing ordering is a structural property with no end-to-end guard
+
+- **Raised:** 2026-09-01, by `architect` at [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)'s
+  close review.
+- **Verified 2026-09-01** — no test in the CLI suite drives `--render` with a name the roster does
+  not hold: `absent: unknown preset in: standalone/tests/shot_cli.rs`
+
+**The claim nothing checks.** Plan 0139 Phase 1's done-when is that a misspelt `--preset` *“exits 1
+naming the roster's keys, spawns no child process, builds no GPU device, and leaves **nothing** at
+`<path>`”*. The first clause is asserted; the last three are not. `resolve_preset` is tested as a
+pure function, and it returns the same answer whether its call site sits before or after
+`Encoder::spawn` — so the ordering that is the entire defect (a valid, playable, 262-byte audio-only
+MP4 left at the destination) is held up by nothing but the current line order in `render::run()`.
+Plan 0139's own risks section warns against *“merging it into a larger refactor of
+`render::run()`”*; that refactor reintroduces the artifact with a green suite.
+
+**What a fix looks like.** About ten lines in `standalone/tests/shot_cli.rs`'s existing `--render`
+section, using helpers already in that file — `render_clip()`, `run()`, `scratch()`,
+`assert_failed_naming()`. Drive `--preset attractor_leviathan` (the reproduction: a filename against
+a roster keyed on `name`) with `--ffmpeg no_such_encoder_binary --out <scratch>/nothing.mp4`, then
+assert stderr names `Leviathan`, does **not** name `--ffmpeg`, and that the output path does not
+exist. It needs no real encoder: if the ordering regresses, the spawn failure arrives first and the
+assertion on the roster keys fails. `a_missing_encoder_names_the_flag_rather_than_falling_back`
+asserts the mirror property of the same ordering and is the template.
+
+**Also here, because it is the same file and the same shape.** Plan 0139 Phase 2 added two
+cross-flag rejections — `--crf` without `--ffmpeg`, and `--crf` outside `--render` — and neither is
+covered. They live in `parse_args`, which reads `std::env::args` and is reachable only through the
+binary. Their `--ffmpeg` siblings are asserted three lines apart in that same test.
+
+**Impact:** medium. The shipped behaviour is correct; what is missing is the guard on the one
+property the plan exists to hold. **No ADR needed.**
+
+---
+
+## 0176 — `shot`'s usage text and its parser can drift with nothing checking, and the other CLI in this repo has exactly that guard
+
+- **Raised:** 2026-09-01, by `architect` at [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)'s
+  close review, from noticing `--crf` reached `print_usage()` by hand.
+- **Verified 2026-09-01** — nothing in the CLI suite reaches the usage text:
+  `absent: print_usage in: standalone/tests/shot_cli.rs`
+- **Verified 2026-09-01** — while the `lmv` binary holds precisely this property:
+  `present: fn the_help_text_prints_every_rostered_flag in: standalone/src/main.rs`
+
+**The asymmetry.** [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) built a flag roster
+for the `lmv` binary and two tests over it — `every_scanner_flag_literal_is_rostered` and
+`the_help_text_prints_every_rostered_flag` — so that binary's help cannot fall behind its scanner.
+`shot` has the same failure mode, no roster and no test. Its flags are matched in one `match` arm
+each and re-typed by hand into `print_usage()` and again into `docs/capturing.md`'s flag table.
+Plan 0139 added `--crf` to all three correctly; nothing would have reported it if it had not.
+
+**Why it matters here specifically.** `shot` is the CLI the `preset-author` lane drives, and that
+lane has no other way to discover a flag — `CLAUDE.md` routes it to `docs/capturing.md`, and the
+guide's flag table is transcribed from the usage text nobody checks. A flag that exists and is
+undocumented is invisible to the only consumer that needs it.
+
+**What a fix looks like.** The cheap half is one test asserting `--help`'s output contains every
+literal the parser's `match` arms accept, extracted the way `every_scanner_flag_literal_is_rostered`
+extracts them. The expensive half — a shared roster type both binaries build from — is not obviously
+worth it for two CLIs and is not proposed.
+
+**Impact:** low. No known drift today; the property Plan 0144 decided was worth holding for one
+binary is unheld for the other. **No ADR needed.**
