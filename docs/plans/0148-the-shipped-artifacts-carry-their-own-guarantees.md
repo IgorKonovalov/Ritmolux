@@ -1,6 +1,6 @@
 # 0148 — The shipped artifacts carry their own guarantees
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
