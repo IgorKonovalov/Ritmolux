@@ -92,8 +92,9 @@ import { relative, resolve, sep } from "node:path";
 /// Nine were judged at the Plan 0088 close (Phase 7) and carry the verdict where
 /// one pick displaced another; four of those nine were chosen when the family
 /// held exactly one preset, so they were never a comparison and are marked
-/// UNJUDGED. The three newest families were picked by `dev` and are unjudged
-/// too. A swap is one line here plus a re-run.
+/// UNJUDGED. The three newest families were picked by `dev`; `warp_mesh` was
+/// judged and kept at Plan 0136 Phase 10, and the other two were seen at that
+/// same look and left standing. A swap is one line here plus a re-run.
 ///
 /// Two slots came out of the Plan 0088 pass with a picture that is accepted
 /// rather than good, and the fix is content work rather than a hop:
@@ -254,10 +255,12 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // warp_mesh — picked by `dev` at Plan 0136 Phase 9 and NOT yet judged.
-    // Backlog 0133 and that plan both record that this family ships no preset,
-    // which had stopped being true: four warp worlds ship, and all four were shot
-    // at this hop and compared.
+    // warp_mesh — JUDGED at Plan 0136 Phase 10 and kept. Backlog 0133 and that
+    // plan both record that this family ships no preset, which had stopped being
+    // true: four warp worlds ship, and all four were shot at this hop and
+    // compared. A fifth, `warp_smoke`, was authored during that same phase and
+    // was NOT taken for this slot - the plume is a stronger picture of smoke than
+    // wellhead is of the family.
     //
     // The whole family is SOFT — a warp field has no edges of its own, it only
     // moves what is already there — so the question is which world still has a
@@ -267,7 +270,7 @@ const IMAGES = [
     // with no hard edge anywhere in it; millrace is one crescent on black, and
     // sirocco is a horizontal drape that reads as an abstract gradient.
     //
-    // Phase 10 is where a human confirms or swaps this. One line here, plus a
+    // Confirmed at that phase's own look. A later swap is one line here plus a
     // re-run.
     out: "docs/images/gallery/warp_mesh.png",
     presetFile: "presets/warp_wellhead.toml",
