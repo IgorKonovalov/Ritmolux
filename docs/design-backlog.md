@@ -324,6 +324,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0132 | The metrics module has no level statistic, and every statistic it has reads gamma-encoded code values | [ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md) + [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phases 1-3. **Closed 2026-09-01** |
 | 0151 | The driven floor's sharpest non-vacuity probe is printed and never asserted | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 5; both halves now asserted, mutation-checked. **Closed 2026-09-01** |
 | 0152 | A disjunctive gate made *the shipped library's minimum* ambiguous in both floors' derivations | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 6; re-measured over 81 presets, no constant moved. **Closed 2026-09-01** |
+| 0135 | `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty | [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4, reserved lazily rather than at load — 5,999,992 B not committed, and `nfr.md` 12 corrected. **Closed 2026-09-01** |
+| 0144 | The repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally | [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5. All four repairs landed; the prose was qualified, the divisor kept. **Closed 2026-09-01** |
 <!-- roster:end -->
 
 ## Open entries
@@ -2659,80 +2661,6 @@ concentrated rather than diffuse.
 
 ---
 
-## 0135 — `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty
-
-[Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 5 gave
-`ParametricCurveScene` five new buffers, all `Vec::with_capacity(max_segments)` at construction:
-`arcs` and `single_arcs` (36 B each), `points` (8 B), `pieces` (~24 B) and `walk` (4 B). At Rich's
-`max_segments = 60_000` that is about 6.5 MB of Rust heap, on top of the ~4.8 MB `segments` and
-`single_buf` already cost — so it more than doubles the scene's allocation. **Four of the five stay
-permanently empty for every preset in the library**, because every shipped `d` is a chord web and
-`maurer_rose_pieces` declines the fit before it ever fills them.
-
-- **Raised:** 2026-08-27, at Plan 0087's Mode 4 review. `dev` disclosed the GPU side (+720 KB at
-  Floor, +2.1 MB at Rich, and a layered line preset builds a second one) and routed the tighter bound
-  to `architect`; the CPU side was not in that accounting and is the larger number.
-- **The same plan already found the answer, one file over.** `star.rs` sizes its arc buffers at load
-  from the roster the preset actually declared and reserves nothing when there are no arcs
-  (`ring_arcs.len()`, capped by the mirror order). `parametric_curve` can do the same once
-  `corner_fraction` has answered — it is the identical shape of decision, taken one frame later.
-- **A second, smaller defect in the same buffers:** `points` is one short. Its capacity is
-  `max_segments`, and `maurer_rose_pieces` pushes `drawn + 1` where `drawn <= samples <=
-  max_segments`, so a preset binding `samples` at the cap reallocates once inside a path whose own
-  doc says *"Allocation-free into preallocated buffers, because this runs every frame"*. One-shot,
-  not per-frame, but it falsifies the sentence.
-- **Verified 2026-08-27** — the eager preallocation is still there:
-  `present: arcs: Vec::with_capacity\(max_segments\) in: core/src/render/scenes/lines/parametric.rs`
-- Worth re-reading [`docs/nfr.md`](nfr.md) section 12 against both numbers while this is open: it
-  claims *"our own Rust state stays <~1 MB"*, and the pre-0087 4.8 MB already exceeded that. The NFR
-  line may be the thing that is wrong rather than the code.
-
-### Priority
-
-**Low.** It is a fixed cost on a floor the driver dominates (~327 MB), and nothing measures it today.
-It becomes worth doing the moment a second parametric layer ships, or alongside any other
-`max_segments` re-sizing.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4**, which takes both halves - buffers sized at load from what
-  the preset declared, and the `points` off-by-one - and **re-reads `nfr.md` section 12 against the real
-  numbers**, since this entry's last bullet says the NFR line may be the thing that is wrong.
-
----
-
-## 0136 — a negative ring `scale` makes a `scallop` lobe bulge outward instead of dimpling inward
-
-`star.rs`'s `scallop_lobe` takes the ring `scale` as the lobe's **depth**. Past
-`depth ~ -R * (cos(s) + sin(s) - 1)` the arc's two ends move to the far side of its centre, and the
-counter-clockwise sweep then runs the long way round: the lobe bulges *outward* to roughly twice the
-ring radius instead of dimpling inward. The picture is wrong rather than degenerate — no panic, no
-cap violation, and nothing warns.
-
-- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md)'s Mode 4
-  review, by reading the construction rather than from a rendered frame.
-- **Its own comment names the wrong lever.** The code says the guard covers only the exactly-flat
-  case *"(`ring_scale` clamps at zero)"* — but `ring_scale` is the **bindable multiplier**, which is
-  clamped, while the **structural per-ring `scale`** is validated for finiteness alone
-  (`schema.rs`), and the two sibling arc branches carry explicit `.abs()` handling precisely because
-  a negative one is reachable and means a reflection. A second over-claim sits four lines below:
-  *"the sweep between them is under half a turn for any depth"* is false past the same threshold.
-- **The shipped preset cannot reach it.** `star_mandala_bordered` binds
-  `ring_scale = "1.00 + sin(time * 0.61) * 0.115 + clamp(mid * 0.20, 0, 0.17)"`, which is positive
-  everywhere, and its ring `scale` is `0.055`.
-- **What a fix is:** either an inward lobe drawn correctly (take the short way when the centre passes
-  the chord), or a load-time refusal saying `scallop` depth must be positive. The first is a few
-  lines; the second is honest and cheaper. It is a decision about whether an inward scallop is a look
-  anyone wants.
-- **Verified 2026-08-27** — the sweep is still taken unconditionally counter-clockwise:
-  `present: sweep: \(end - start\)\.rem_euclid\(TAU\) in: core/src/render/scenes/lines/star.rs`
-
-### Priority
-
-**Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
-author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 3**, which takes the **load-time refusal**, not the inward lobe.
-  That is a stated guess and the plan says so: no shipped preset is in range, the refusal is the honest
-  and cheaper of the two, and it is what makes an inward-scallop ask come back rather than ship a silent
-  bulge. Both over-claiming comments are corrected with it.
-
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
 [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) fixed *which* edges
@@ -2895,63 +2823,6 @@ rule. Three defensible answers, and one should be chosen before any editing:
 
 Option 3 also makes the gate question moot; options 1 and 2 leave a class that wants a fragment
 check in `check-doc-links.mjs` to stay repaired.
-
----
-
-## 0144 — the repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally
-
-[Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1 replaced the curved/jittered
-`star` arm's normalization reference and the interior contract came back with it — but only for a
-figure whose spikes are all the same length. Under `star_jitter` the divisor is the **unjittered**
-figure's while the measured distance is the fragment's own spike's, so the coordinate at the
-figure's centre is `0.076`-`0.085` rather than `0`, and a `max(0.0, ·)` guard sits in the shader for
-the case that asymmetry runs the other way. That is a large improvement on the `-0.23`..`-0.94` it
-replaced and it is not what the prose says.
-
-- **Raised:** 2026-08-27, at [Plan 0098](plans/done/0098-the-figure-nests-properly.md)'s close
-  review. **Owner if taken:** `dev`. Small, mechanical, and worth folding into whatever next opens
-  `marks.rs` rather than given a plan.
-- **Verified 2026-08-27** — the module header states the exactness for the whole branch:
-  `present: at the centre for every curved configuration in: core/src/render/scenes/marks.rs`
-- **Verified 2026-08-27** — and the guard that makes the `>= 0` sweep unfalsifiable on this arm is
-  right there: `present: return max\(0\.0, 1\.0 \+ sd / inradius\); in: core/src/render/scenes/marks.rs`
-- **Verified 2026-08-27** — the only assertion that pins the *reference* rather than the clamp is
-  gated to the unjittered case:
-  `present: if star\[2\] == 0\.0 && in: core/src/render/scenes/marks/tests.rs`
-
-### The finding, and the three other things it carries
-
-The review that raised this found five minors and two nits; four of them are one-line repairs and
-are collected here so none of them lives only in a review transcript.
-
-1. **The exactness claim**, above. The repair is either to qualify the header and the module
-   contract at `marks.rs`'s `mark_distance` doc block, or to make the jittered arm's divisor the
-   fragment's own spike's — which would make it exact and would also make the divisor depend on
-   which spike a fragment folded onto, the very thing Phase 1 walked the unjittered edge to avoid.
-   **Qualifying the prose is almost certainly right**; the entry says so rather than leaving it open,
-   because the alternative has a stated reason not to be taken.
-2. **`core/src/preset/schema.rs` hardcodes the `coord_mode` bounds** as `m.clamp(0.0, 1.0)` instead
-   of reading `shape_field`'s `COORD_MODES`. The predicate stays correct if a third mode is added,
-   so this is duplication rather than a latent bug.
-3. **The CPU mirror of `mark_boundary_radius` is not literally identical to the WGSL** it says it
-   mirrors "by inspection": the shader normalizes `abs(p.x) + 1e-20`, the mirror divides by
-   `max(len, 1e-20)`. They differ only at `p == (0,0)` and the resulting coordinate is `0` either
-   way, so nothing renders differently — but the comment promises identity and the next reader will
-   believe it.
-4. **A failure message names a pentagon on a test that renders a triangle**
-   (`the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets`). A message that names
-   the wrong figure sends the reader to the wrong place.
-
-### Priority
-
-**Low.** Nothing renders wrong and no gate is weakened in a way that hides a defect — the exactness
-claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
-reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
-has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5**, against this entry's own instruction to fold it into
-  whatever next opens `marks.rs`. Nothing else on the roster opens that file, and the plan is the nearest
-  work on figure-geometry contracts. All four repairs travel, and item 1 **qualifies the prose** rather
-  than changing the divisor, which is what this entry argues for.
 
 ---
 
