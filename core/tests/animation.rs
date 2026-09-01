@@ -78,17 +78,30 @@ const FRAME_B: u32 = 48;
 /// a coincidence of the derivation, not a constant carried over. The derivation,
 /// per ADR-0071:
 ///
-/// - The shipped library's minimum under the new statistic is **0.0205**
-///   (`Banded Mandala`), measured 2026-08-12, DX12 software adapter, backdrop
-///   suppressed. The floor sits at **half the shipped minimum** — the sanity
-///   suite's per-system-floor convention, applied to this gate's one floor.
-///   Slack 2.05x; the sweep prints the distribution, so a new library minimum
-///   is re-derived from the printed numbers, not nudged until green.
+/// - **The population is the presets that pass on THIS branch**, and naming it
+///   is load-bearing. A preset carried by the driven branch is still by design
+///   (ADR-0136) and reads near zero here on purpose, so folding it in would
+///   derive this floor from the frames the branch exists to let through.
+///   Re-measured 2026-09-01, DX12 software adapter, backdrops suppressed, 81
+///   shipped presets: **74 pass on this branch and their minimum is 0.0155**
+///   (`Nocturne`), so the floor sits 1.55x under it. The seven the driven
+///   branch carries run from `Heart Mono`'s **0.0000** up.
+/// - **The floor is `0.01` because half of `0.0205` (`Banded Mandala`, measured
+///   2026-08-12 on the same adapter) rounds there**, on the per-system-floor
+///   ceremony `sanity.rs` uses. Half of the branch minimum above is `0.0078`,
+///   so the number in force is the *stricter* of the two derivations. It stays
+///   put: above what the ceremony gives on today's population, and still under
+///   every preset the branch admits.
+/// - **Do not re-derive by reading the top of the printed sweep.** The sweep
+///   prints one line per preset with no branch filter, and its lowest rows are
+///   the driven-branch worlds — the minimum off it is `0.0000` and half of
+///   that admits everything, including the flicker the noise ceiling below
+///   exists to exclude. Filter to the branch, then take the minimum.
 /// - The noise ceiling sits **below** it: with the mask floored at
 ///   [`MIN_FOOTPRINT_FRAC`], the worst-case stray event ADR-0091 names (one
 ///   pixel swinging full-scale on all three channels in an otherwise empty
 ///   frame) reads `1/139 = 0.0072` — under this floor with 1.4x margin, so a
-///   flicker cannot clear a gate that real content clears by 2x.
+///   flicker cannot clear a gate that the branch's own minimum clears by 1.55x.
 /// - The non-vacuity pair brackets it: the rejected fifth-density Squall draft
 ///   reads **0.1049** (10.5x the floor, against 0.0057 under the whole-frame
 ///   statistic that priced it out), and the static control reads **0.0000** —
@@ -102,14 +115,23 @@ const ANIM_FLOOR: f32 = 0.01;
 /// **Derived from the sweep this file prints, on the convention
 /// [`ANIM_FLOOR`]'s own derivation uses**, per ADR-0071:
 ///
-/// - The shipped library's minimum on this statistic is **0.0345**
-///   (`Valentine`), measured 2026-08-27, DX12 software adapter, backdrops
-///   suppressed, 53 presets; the median is 0.19 and the maximum 0.71. The floor
-///   sits at **half the shipped minimum**, rounded down — the same
-///   per-system-floor convention the silent floor applies to this gate's one
-///   floor. Slack 2.03x, which is the 2.05x [`ANIM_FLOOR`] carries. A new
-///   library minimum is re-derived off the printed numbers, not nudged until
-///   green.
+/// - **The population is the presets that pass on THIS branch**, which is a
+///   narrower set than the library and reads exactly like the library.
+///   [`Motion::branch`] tests the silent reading first and returns, so a preset
+///   that moves on its own clock is never measured against this floor at all:
+///   its driven reading is a number the gate does not consult, and deriving
+///   from it would fix a floor off frames it does not gate. Re-measured
+///   2026-09-01, DX12 software adapter, backdrops suppressed, 81 shipped
+///   presets: **seven pass on this branch and their minimum is 0.0577**
+///   (`Stipple`), so the floor sits 3.4x under it. Across all 81 the median
+///   driven reading is 0.19 and the maximum 0.68.
+/// - **The floor is `0.017` because half of `0.0345` (`Valentine`, measured
+///   2026-08-27 over 53 presets) rounds down there** — but `Valentine` passes
+///   on the *silent* branch, so that derivation read the whole library rather
+///   than this branch's population. The library's lowest driven reading today
+///   is `Thomas on Red`'s **0.0320**, and it too is a silent-branch preset. The
+///   number stands: it is well under this branch's real minimum, and moving it
+///   is not what naming the population is for.
 /// - The noise ceiling sits **below** it, and it is literally the same ceiling.
 ///   This statistic is `footprint_diff` over a mask floored at
 ///   [`MIN_FOOTPRINT_FRAC`], so ADR-0091's worst-case stray event — one pixel
