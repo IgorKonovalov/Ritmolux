@@ -2620,8 +2620,17 @@ the quadratic falloff blurred it;
   `thickness = 9`: the profile through the acute vertex is 26 px of flat 185 and then zero, with no
   taper at all, and the corner patch reads 1.38x the stroke's own value. Both halves are the same
   constant.
-- **Verified 2026-08-27** — the extension is still one unmitred `width`:
-  `present: let ext_a = select\(0\.0, width, in: core/src/render/scenes/lines/renderer.rs`
+- **Verified 2026-09-01** — the extension is still one unmitred `width`, and this entry stays
+  live. Reduced on 2026-08-27 to the presence of the vertex shader's `select(0.0, width, ...)`
+  expression;
+  [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 1 then replaced the join
+  bitfield with a per-endpoint `f32` length, deleting that expression. **What it verified is
+  still true**: every producer passes a flat `width` at a joined end, the geometry is
+  byte-identical, and the corner is exactly as blunt as it was measured. The mechanism moved and
+  the defect did not, so the reduction is re-pointed rather than the entry closed. What
+  discharges this is Phase 2, and the constant it introduces is what the reduction now watches
+  for:
+  `absent: MITER_LIMIT in: core/src/render/scenes/lines/renderer.rs`
 
 **This revises ADR-0041**, whose disc-join alternative closes with *"worth revisiting only if the
 blunt corners above turn out to matter"*. They matter. It reaches all four line families and moves

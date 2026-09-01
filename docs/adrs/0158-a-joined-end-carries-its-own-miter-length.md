@@ -82,6 +82,30 @@ Three properties carry the decision:
   the current constant produces. The diamond's 61.9-degree vertex needs a factor of **1.945** and
   is therefore served exactly, with the limit not engaged.
 
+**Scope: the four line families, and not `warp_mesh`.** `SegmentInstance` has a seventh producer
+this decision does not reach — `warp_mesh::draw`, the MilkDrop compatibility surface — and it keeps
+the flat half-width at both of its call sites. Three independent reasons, any one sufficient:
+
+- **The premise that supersedes ADR-0041 does not hold there.** This ADR's whole argument is that
+  Plan 0114 took `DEFAULT_SOFTNESS` to `0.25` and left no blur for a blunt corner to hide in.
+  `warp_mesh` does not draw at that value: it pins `MILKDROP_SOFTNESS = 1.0`, the pure quadratic
+  falloff, which is precisely the regime ADR-0041 was reasoning about when it priced a mitred corner
+  and a rounded one as indistinguishable. On that surface **ADR-0041 still stands on its own terms**,
+  and it is not being superseded so much as left alone.
+- **`draw::dots` has no angle to compute one from.** It emits a **zero-length** segment and uses the
+  extension as a **cap**: the half-width at each end is what turns a degenerate quad into a round
+  bead, and without it the mark is a sub-pixel dash that vanishes below 1080p (Plan 0108 Phase 4,
+  design-backlog 0107). `theta` is undefined there, so `width / sin(theta / 2)` is not merely
+  unwanted but meaningless.
+- **It is a measuring instrument with a live measurement pending.** `warp_mesh` is judged against
+  `foo_vis_milk2`, and Plan 0142 is about to write ADR-0113's third Outcome from readings taken on
+  it. Moving its stroke geometry now perturbs the instrument between the question and the answer.
+
+The rule that follows is one line: **the miter is a property of the four line families**
+(`curves`, `parametric`, `turtle`/`lsystem`, `hankin`/`star`, `spectrum`), which draw at
+`DEFAULT_SOFTNESS`. A producer drawing at some other softness passes `width` and keeps ADR-0041's
+geometry.
+
 `MITER_LIMIT = 4.0` is SVG's `stroke-miterlimit` default. It is adopted because it is a published,
 widely-implemented choice for the same geometric problem, not because it was measured here — and
 the plan states it as a named constant with that provenance rather than as a tuned number.
@@ -118,6 +142,17 @@ the plan states it as a named constant with that provenance rather than as a tun
 - **A closed chain's two ends still have no neighbour.** The rosette is closed and every vertex is
   a joint, but a polyline's first and last points are genuinely free and stay bevelled, which is
   correct and is what the existing first/last-point assertion pins.
+- **The miter introduces a dependence on *which space* the angle is measured in, and the flat
+  extension had none.** `width` is a constant: it is the same number at every orientation, so
+  ADR-0041's geometry never had to ask whether the producer's space and the shader's agree. A miter
+  is `width / sin(theta / 2)`, and the shader applies it along `dir` computed **after** the aspect
+  divide, while the producer computes `theta` in **world** coordinates. If those two spaces are not
+  similar, the length is wrong by a factor that varies with the corner's orientation — swept
+  numerically at 16:9 for the diamond's 61.9-degree vertex, the world-space factor lands between
+  **0.705x and 1.609x** of the aspect-corrected one. **It is identically 1.000x at aspect 1.0**,
+  which is the square fixture this ADR's own measurement was taken on and the one the plan specifies.
+  Whether the two spaces are in fact similar is not established here; the plan carries it as a stop
+  gate with a measurement at a non-square target, because no fixture at 1:1 can answer it.
 - **The extension is in world units, so it does not track a per-frame `width` change on its own.**
   Producers recompute per frame anyway — they rebuild the instance buffer — but a future producer
   that caches instances across frames while animating `thickness` would desynchronize the two. The
@@ -144,6 +179,13 @@ hot-path allocation. +4 bytes per existing instance beats +100 % instance count.
 **A true miter computed in the shader, from neighbour endpoints on the instance.** ADR-0041's
 original rejection, and still rejected: 8 floats to 12 is a 50 % instance growth against this
 decision's 10 %, and it duplicates in WGSL an angle the producer already has in Rust.
+
+**Apply the miter to every `SegmentInstance` producer, `warp_mesh` included.** The consistent-looking
+choice, and the one a reader of the Decision would assume. Lost on all three counts in the Scope
+paragraph above, and decisively on the first: `warp_mesh` draws at `MILKDROP_SOFTNESS = 1.0`, so the
+premise this ADR uses to supersede ADR-0041 is simply absent there. Applying it anyway would move
+composite and MilkDrop goldens to fix a defect that surface does not have, and would give
+`draw::dots` a `sin(theta / 2)` with no `theta` in it.
 
 **Widen the constant — extend by `2 * width` instead of `width`.** Cheapest imaginable, one
 character. Lost on being the same error with a different constant: it is exact at

@@ -39,7 +39,7 @@ place. The plan file carries the real link.
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved | dev | Backlog 0175 + 0176 + 0174 + 0177 + 0178. ADR-0159 (proposed): a 12,582,912 B component cap the recipe reads. Phases 1-2 are pure test additions. No GPU, no `human`. |
-| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | approved | dev | Backlog 0134 + 0135 + 0136 + 0144. ADR-0158 (proposed): a joined end carries its own miter length. **Phase 1 must move no golden; Phase 2 re-blesses every line scene.** |
+| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | in-progress | dev | Backlog 0134 + 0135 + 0136 + 0144. ADR-0158 (proposed). Phase 1 landed golden-clean. **Phase 2 opens with a stop gate**: a world-space miter is 0.705-1.609x wrong at 16:9 and the 1:1 fixture cannot see it. |
 <!-- roster:end -->
 
 **Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
