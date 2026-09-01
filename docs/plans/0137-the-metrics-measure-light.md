@@ -231,10 +231,10 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
 |---|---|---|---|
 | 1 — One sRGB decode | dev | done | `efde516` |
 | 2 — A level statistic | dev | done | `69da480` |
-| 3 — A column for it | dev | not started | — |
+| 3 — A column for it | dev | done | committed with this row |
 | 4 — `boundary_density` says what it is bound to | dev | done | `98977ff` |
 | 5 — The driven floor's second probe is actually pinned | dev | done | `2e1552a` |
-| 6 — Both floors name their population | dev | done | committed with this row |
+| 6 — Both floors name their population | dev | done | `4512095` |
 
 ### Notes
 
