@@ -38,7 +38,7 @@ use std::rc::Rc;
 use super::super::common;
 use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
-use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance};
 use super::{
     CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
     ViewTransform, curves, replicate_mirror,
@@ -238,24 +238,20 @@ impl ParametricCurveScene {
                     width,
                 }),
                 Piece::Line { a, b } => {
-                    // A chain is a chain (ADR-0041): every piece but the walk's
+                    // A chain is a chain (ADR-0158): every piece but the walk's
                     // two ends continues a neighbour, across a corner as much
-                    // as along a curve — the join is what covers the wedge
+                    // as along a curve — the extension is what covers the wedge
                     // between two strokes, and a corner is where there is one.
-                    let mut joined = 0;
-                    if k > 0 {
-                        joined |= JOINED_A;
-                    }
-                    if k < last {
-                        joined |= JOINED_B;
-                    }
+                    let ext_a = if k > 0 { width } else { 0.0 };
+                    let ext_b = if k < last { width } else { 0.0 };
                     self.single_buf.push(SegmentInstance {
                         a,
                         b,
                         color,
                         width,
                         alpha: 1.0,
-                        joined,
+                        ext_a,
+                        ext_b,
                     });
                 }
             }

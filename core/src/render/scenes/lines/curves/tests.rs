@@ -108,7 +108,11 @@ fn zero_phase_and_offset_reduce_to_the_plain_sine_rose() {
 /// joints keeps the notch and nothing else in the pipeline notices, so only
 /// a per-producer test catches it.
 #[test]
-fn the_rose_flags_every_interior_vertex_of_its_chain() {
+fn the_rose_extends_every_interior_vertex_of_its_chain() {
+    /// The extension a joined end carries here. Phase 1 plumbing: the producer
+    /// passes its own half-width, which reproduces the flag's geometry exactly.
+    const W: f32 = 0.01;
+
     let mut arc = Vec::with_capacity(8);
     maurer_rose(
         RoseParams {
@@ -119,11 +123,11 @@ fn the_rose_flags_every_interior_vertex_of_its_chain() {
     );
     assert_eq!(arc.len(), 3, "three chords through four sampled points");
     assert_eq!(
-        arc.iter().map(|s| s.joined).collect::<Vec<_>>(),
-        vec![JOINED_B, JOINED_A | JOINED_B, JOINED_A],
+        arc.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+        vec![(0.0, W), (W, W), (W, 0.0)],
         "the two interior vertices are joints; the walk's own ends are free"
     );
-    // Each flag stands for a genuinely shared point.
+    // Each extension stands for a genuinely shared point.
     for k in 1..arc.len() {
         assert_eq!(arc[k - 1].b, arc[k].a, "chord {k} continues the previous");
     }
@@ -142,7 +146,8 @@ fn the_rose_flags_every_interior_vertex_of_its_chain() {
     );
     assert_eq!(half.len(), 4, "half of eight chords");
     assert_eq!(
-        half[3].joined, JOINED_A,
+        (half[3].ext_a, half[3].ext_b),
+        (W, 0.0),
         "the drawing head is a free end, so draw_progress cannot push the \
          stroke past the point it reached"
     );
@@ -157,7 +162,7 @@ fn the_rose_flags_every_interior_vertex_of_its_chain() {
         &mut single,
     );
     assert_eq!(single.len(), 1);
-    assert_eq!(single[0].joined, 0);
+    assert_eq!((single[0].ext_a, single[0].ext_b), (0.0, 0.0));
 }
 
 /// A nonzero `radial_offset` shifts every sampled radius by that constant.

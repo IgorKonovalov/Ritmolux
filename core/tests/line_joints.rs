@@ -19,10 +19,9 @@
 //! # Three duties, one capture, in this order
 //!
 //! Plan 0040 Phase 2 added the middle one: the figure's two **outer** ends are
-//! free, so the stroke must not reach past them. That is the only place a swap
-//! of `JOINED_A` and `JOINED_B` is visible — an interior joint carries both bits
-//! and renders identically either way — and it is why the pair is now generated
-//! into the shader from the Rust constants rather than restated as `1u`/`2u`.
+//! free, so the stroke must not reach past them. That is the only place a
+//! crossed or over-applied end extension is visible — an interior joint is
+//! extended from both sides and renders identically either way.
 //!
 //! Plan 0040 Phase 1 added a **committed baseline** beside the relative claim,
 //! because the reported defect — the polyline's notch — was pinned by no pixels
@@ -248,24 +247,21 @@ fn assert_no_notch(img: &CaptureImage) -> f32 {
     dimmest_interior
 }
 
-/// Plan 0040 Phase 2: **a swap of [`JOINED_A`] and [`JOINED_B`] must fail a
-/// test**, which before this nothing did.
+/// **The stroke must not extend past the figure's own first and last points.**
 ///
-/// `line_joints.rs` probed only *interior* joints, where a chained segment
-/// carries both bits and the two are indistinguishable — swap them and every
-/// interior vertex renders identically. The bits are only separable where a
-/// segment carries **one** of them, and the fixture already has exactly that
-/// shape: six elements, five segments, `joined[0] = JOINED_B` (its `a` free) and
-/// `joined[4] = JOINED_A` (its `b` free). No new fixture needed.
+/// Stated rather than thresholded. Those two ends are free — the producer
+/// passes `0.0` for each — so a probe just beyond them along the stroke
+/// direction falls in background. Give either one an extension and it grows,
+/// putting that probe on the stroke's **centre line**, where the shader's
+/// falloff is 1 and it reads brighter than any of the off-centre interior
+/// samples [`assert_no_notch`] measured. Hence the ordinal comparison: dimmer
+/// than the dimmest stroke sample separates "background" from "stroke" without
+/// inventing a constant.
 ///
-/// The property, stated rather than thresholded: **the stroke must not extend
-/// past the figure's own first and last points.** Those two ends are free, so a
-/// probe just beyond them along the stroke direction falls in background. Swap
-/// the bits and each grows by a half-width, putting that probe on the stroke's
-/// **centre line** — where the shader's falloff is 1, so it reads brighter than
-/// any of the off-centre interior samples [`assert_no_notch`] measured. Hence
-/// the ordinal comparison: dimmer than the dimmest stroke sample separates
-/// "background" from "stroke" without inventing a constant.
+/// The fixture is six elements and five segments, and the two outer endpoints
+/// are the only ones a producer leaves free — so this is where an extension
+/// applied to the wrong end, or applied unconditionally, is visible at all. An
+/// interior joint is extended from both sides and renders the same either way.
 ///
 /// The probe sits **half** an extension out, not a full one: at a full
 /// half-width it would land exactly on the flat end-cut a swapped quad would
@@ -320,9 +316,10 @@ fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
             "the {label} end of the figure is free, but the stroke reaches past it: \
              {beyond:.4} sits on the lit side of {unlit_side_of:.4} (background \
              {background:.4}, stroke {dimmest_interior:.4}). The most likely cause \
-             is JOINED_A and JOINED_B being swapped between the Rust constants and \
-             the shader — the outer ends are the only endpoints carrying a single \
-             bit, so they are the only place a swap is fully visible."
+             is a producer writing a nonzero ext_a/ext_b at an end with no \
+             neighbour, or the two being crossed between the producer and the \
+             vertex shader's locations 4 and 6 - the outer ends are the only \
+             endpoints where either is visible."
         );
     }
 }

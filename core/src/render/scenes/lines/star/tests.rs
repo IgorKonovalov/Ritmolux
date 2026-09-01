@@ -274,7 +274,8 @@ fn a_figure_with_radial_spread_still_ramps_across_it() {
         color: [0.0; 3],
         width: 0.01,
         alpha: 1.0,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
     };
     // Three concentric chords at radii 0.2, 0.5 and 0.9.
     let segs = vec![
@@ -435,7 +436,8 @@ fn an_absent_roster_builds_no_ornament_at_all() {
             color: [0.0; 3],
             width: 1.0,
             alpha: 1.0,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
         };
         3
     ];
@@ -1459,11 +1461,15 @@ fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
             &mut out,
             &mut Vec::new(),
         );
-        let flags: Vec<u32> = out.iter().map(|s| s.joined).collect();
+        // In units of `PLACEHOLDER_WIDTH`: the outlines are cached geometry, so
+        // a joined end carries the placeholder half-width and the scene's
+        // per-frame restyle rescales it.
+        let ends: Vec<(f32, f32)> = out.iter().map(|s| (s.ext_a, s.ext_b)).collect();
+        let j = PLACEHOLDER_WIDTH;
         if m.is_closed() {
             assert!(
-                flags.iter().all(|&f| f == JOINED_A | JOINED_B),
-                "{}: a closed outline joins at every vertex, got {flags:?}",
+                ends.iter().all(|&e| e == (j, j)),
+                "{}: a closed outline joins at every vertex, got {ends:?}",
                 m.name()
             );
             // ...and it really does close: the last segment's `b` end is the
@@ -1476,11 +1482,11 @@ fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
                 m.name()
             );
         } else {
-            assert_eq!(flags.first().copied(), Some(JOINED_B), "{}", m.name());
-            assert_eq!(flags.last().copied(), Some(JOINED_A), "{}", m.name());
-            for (i, &f) in flags.iter().enumerate() {
-                if i > 0 && i + 1 < flags.len() {
-                    assert_eq!(f, JOINED_A | JOINED_B, "{} interior {i}", m.name());
+            assert_eq!(ends.first().copied(), Some((0.0, j)), "{}", m.name());
+            assert_eq!(ends.last().copied(), Some((j, 0.0)), "{}", m.name());
+            for (i, &e) in ends.iter().enumerate() {
+                if i > 0 && i + 1 < ends.len() {
+                    assert_eq!(e, (j, j), "{} interior {i}", m.name());
                 }
             }
         }
@@ -1776,7 +1782,8 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
                 b: [b[0] * MOTIF_SCALE, b[1] * MOTIF_SCALE],
                 color: [1.0, 1.0, 1.0],
                 width: 0.012,
-                joined: JOINED_A | JOINED_B,
+                ext_a: PLACEHOLDER_WIDTH,
+                ext_b: PLACEHOLDER_WIDTH,
                 alpha: 1.0,
             })
         })

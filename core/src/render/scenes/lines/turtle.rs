@@ -24,7 +24,8 @@
 
 use std::f32::consts::FRAC_PI_2;
 
-use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
+use super::PLACEHOLDER_WIDTH;
+use super::renderer::SegmentInstance;
 
 /// Walk `s` into `out` (cleared first) as base geometry — positions only; the
 /// scene fills colour/width per frame. `angle` is in radians. Segments beyond
@@ -77,13 +78,17 @@ pub fn walk_with_depths(
                 let nx = x + dx * step;
                 let ny = y + dy * step;
                 if out.len() < max_segments {
-                    // One joint, flagged from both sides. A turn does not break
+                    // One joint, extended from both sides. A turn does not break
                     // the run — `+`/`-` only change heading — which is why the
                     // state is a run rather than a look at the previous char.
-                    let mut joined = 0;
+                    //
+                    // The extension is in units of the placeholder `width`
+                    // below; `LineInstance::styled` rescales it to whatever
+                    // half-width the frame is drawn at.
+                    let mut ext_a = 0.0;
                     if let Some(prev) = run.and_then(|i| out.get_mut(i)) {
-                        prev.joined |= JOINED_B;
-                        joined |= JOINED_A;
+                        prev.ext_b = PLACEHOLDER_WIDTH;
+                        ext_a = PLACEHOLDER_WIDTH;
                     }
                     run = Some(out.len());
                     // Generation depth = how many branch pushes are still open.
@@ -92,9 +97,10 @@ pub fn walk_with_depths(
                         a: [x, y],
                         b: [nx, ny],
                         color: [1.0, 1.0, 1.0],
-                        width: 0.01,
+                        width: PLACEHOLDER_WIDTH,
                         alpha: 1.0,
-                        joined,
+                        ext_a,
+                        ext_b: 0.0,
                     });
                 } else {
                     dropped += 1;
@@ -184,38 +190,45 @@ mod tests {
         assert_eq!(out.len(), 3, "trunk + branch + trunk");
     }
 
-    /// Plan 0039 Phase 3 done-when 2 and 4 (ADR-0041). The turtle is the tricky
+    /// Plan 0039 Phase 3 done-when 2 and 4 (ADR-0158). The turtle is the tricky
     /// producer: it is a chain, but the chain **breaks** every time the pen stops
     /// continuing from where it was — at a branch push or pop, and at a
-    /// move-without-draw. Asserted on the flag pattern rather than on pixels.
+    /// move-without-draw. Asserted on the extension pattern rather than on
+    /// pixels; `W` is [`PLACEHOLDER_WIDTH`], the units a cached walk stores its
+    /// extensions in.
     #[test]
     fn the_turtle_joins_within_a_run_and_breaks_at_a_branch() {
+        const W: f32 = PLACEHOLDER_WIDTH;
         let mut out = Vec::with_capacity(16);
         // Trunk of two, a one-segment branch, then a trunk of two more.
         walk("FF[+F]FF", FRAC_PI_2, 100, &mut out);
         assert_eq!(out.len(), 5, "two trunk, one branch, two trunk");
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A, 0, JOINED_B, JOINED_A],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, W), (W, 0.0), (0.0, 0.0), (0.0, W), (W, 0.0)],
             "joined inside each run, free on both sides of the branch"
         );
         // The branch segment starts at the same point the first run ended, and
-        // that is exactly the case the flag must *not* claim: it is a new stroke,
-        // not a continuation, so extending it backward would run along the
-        // branch's own direction into space it never covered.
+        // that is exactly the case the extension must *not* claim: it is a new
+        // stroke, not a continuation, so extending it backward would run along
+        // the branch's own direction into space it never covered.
         assert_eq!(
             out[1].b, out[2].a,
             "the branch does start at the trunk's end"
         );
-        assert_eq!(out[2].joined, 0, "and is still free at both ends");
+        assert_eq!(
+            (out[2].ext_a, out[2].ext_b),
+            (0.0, 0.0),
+            "and is still free at both ends"
+        );
 
         // A turn is not a break — that is the whole reason the walk tracks a run
         // rather than looking at the previous character.
         out.clear();
         walk("F+F", FRAC_PI_2, 100, &mut out);
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, W), (W, 0.0)],
             "a turn keeps the pen on the paper"
         );
 
@@ -224,8 +237,8 @@ mod tests {
         out.clear();
         walk("FfF", 0.0, 100, &mut out);
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![0, 0],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, 0.0), (0.0, 0.0)],
             "`f` breaks the run"
         );
         assert_ne!(out[0].b, out[1].a, "and the two really are disjoint");
@@ -235,8 +248,8 @@ mod tests {
         let dropped = walk("FFFF", 0.0, 2, &mut out);
         assert_eq!((out.len(), dropped), (2, 2));
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, W), (W, 0.0)],
             "the kept prefix keeps its own joint and claims none past the cap"
         );
     }

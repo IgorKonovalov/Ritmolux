@@ -1,6 +1,6 @@
 # 0149 — The line corners stop being blunt
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (proposed — a
@@ -301,17 +301,69 @@ pub struct SegmentInstance {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0149-the-line-corners-stop-being-blunt`, worktree `WORK/lmv-plan-0149`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The instance carries a length, and nothing moves | dev | not started | |
-| 2 — The corner reaches its point | dev | not started | |
+| 1 — The instance carries a length, and nothing moves | dev | done | committed with this row |
+| 2 — The corner reaches its point | dev | **halted before start** — see Notes | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | not started | |
 | 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
 | 5 — Four contracts that say more than they hold | dev | not started | |
 
 ### Notes
+
+**Phase 1 — the file list in the phase block does not match the tree.** The
+producers that set the join flag are `curves.rs`, `parametric.rs`, `turtle.rs`,
+`hankin.rs`, `spectrum.rs`, `star.rs` and `warp_mesh/draw.rs`. The phase names
+`lsystem.rs`, which sets none — its producer is `turtle.rs` — and omits the other
+three. `star.rs` appears in the plan only for Phase 3. Two further files carry
+assertions on the flag and were not listed: `core/tests/line_joints.rs` and
+`milkconv/tests/draw_layer.rs`. Phase 1 was implemented against the corrected
+list, on the user's answer at the pre-implementation gate.
+
+**`warp_mesh/draw.rs` is a producer no phase mentions, and it does not use the
+flag as a join.** `draw::dots` emits a **zero-length** segment with both ends
+flagged, and the extension is what turns the degenerate quad into a round bead
+(its own doc block and the module header both say so; `milkconv`'s
+`wave_usedots_puts_separated_marks_where_a_line_puts_a_stroke` asserts it).
+Phase 1 passes `width` there and the geometry is unchanged. **Phase 2's rule has
+no meaning at that site** — a zero-length segment has no interior angle, so
+`sin(theta / 2)` is undefined — and applying it would move composite goldens.
+Work stopped before Phase 2 for an architect amendment; this is the user's call
+at the gate, not a judgement made here.
+
+**A risk the plan lists as hypothetical is already live.** The Risks section says
+*"a future producer that caches instances while animating `thickness` would
+desynchronize them"*. `lsystem` and `star` are that producer today: both build
+their figure once at `configure` and restyle it every frame through
+`LineInstance::styled`, which stamps the frame's real half-width onto instances
+walked at a `0.01` placeholder. A join **flag** was width-independent and passed
+through untouched; a **length** is not. Left alone, both scenes' joints would be
+extended by the placeholder while the stroke was drawn at the bound `thickness`.
+
+- `styled` now carries `ext_a`/`ext_b` across by the width ratio; `rotate_scale`
+  still passes them through, and its comment says why (`scale` moves endpoints
+  and leaves width alone).
+- The placeholder is named once as `lines::PLACEHOLDER_WIDTH` and read by
+  `turtle.rs`, `star.rs` and `hankin.rs`, because the rescale is only correct
+  while a producer's `width` and its extensions are in the same units.
+- `the_cached_transform_carries_the_join_flags_through` is now
+  `the_cached_transform_rescales_the_end_extensions_to_this_frames_width` and
+  asserts the ratio at `4 * W`. Its sibling `the_mirror_carries_the_end_extensions_through`
+  still asserts verbatim carry-through, and its doc block says why the two differ.
+
+**`core/tests/line_joints.rs`.** The outer-ends-are-free assertion survives and is
+re-pinned on the producer passing `0.0`. Its swap-detection framing — the doc
+block, the module header paragraph, and the failure message naming the two
+constants — is gone, per the phase's done-when.
+
+**Phase 1's oracle.** `cargo nextest run --workspace` (default profile, not
+`-P fast`), 1500 tests run, 1500 passed, 5 skipped, exit 0 — every golden suite
+included, `LMV_BLESS` unset, and `git status` shows no baseline file modified.
+`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
+`node scripts/check-comment-hygiene.mjs` and `node scripts/check-doc-links.mjs`
+all clean.
 
 ### Close triggers
 

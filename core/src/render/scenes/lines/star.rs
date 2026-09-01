@@ -134,10 +134,10 @@ use std::sync::OnceLock;
 use super::super::Scene;
 use super::super::common;
 use super::biarc::{self, Piece};
-use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance};
 use super::{
-    CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, hankin,
-    replicate_mirror, transform_cached, turtle,
+    CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, PLACEHOLDER_WIDTH,
+    ViewTransform, hankin, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
@@ -1467,26 +1467,30 @@ pub(crate) fn build_rings(
                             width: 0.01,
                         }),
                         Piece::Line { a, b } => {
-                            // A chain is a chain (ADR-0041): every piece
+                            // A chain is a chain (ADR-0158): every piece
                             // continues its neighbour, and a closed one
                             // continues it at both ends. That is true across a
-                            // corner too — the join is what covers the wedge
-                            // between two strokes, and a corner is exactly
+                            // corner too — the extension is what covers the
+                            // wedge between two strokes, and a corner is exactly
                             // where there is one.
-                            let mut joined = 0;
-                            if closed || k > 0 {
-                                joined |= JOINED_A;
-                            }
-                            if closed || k < last {
-                                joined |= JOINED_B;
-                            }
+                            let ext_a = if closed || k > 0 {
+                                PLACEHOLDER_WIDTH
+                            } else {
+                                0.0
+                            };
+                            let ext_b = if closed || k < last {
+                                PLACEHOLDER_WIDTH
+                            } else {
+                                0.0
+                            };
                             out.push(SegmentInstance {
                                 a: place(a),
                                 b: place(b),
                                 color: [1.0, 1.0, 1.0],
-                                width: 0.01,
+                                width: PLACEHOLDER_WIDTH,
                                 alpha: 1.0,
-                                joined,
+                                ext_a,
+                                ext_b,
                             });
                         }
                     }
@@ -1517,26 +1521,26 @@ pub(crate) fn build_rings(
                     continue;
                 };
                 // A closed outline is a closed chain, so every vertex is a joint
-                // (ADR-0041); an open one is free at its two ends only.
-                let joined = if ring.motif.is_closed() {
-                    JOINED_A | JOINED_B
+                // (ADR-0158); an open one is free at its two ends only.
+                let closed = ring.motif.is_closed();
+                let ext_a = if closed || e > 0 {
+                    PLACEHOLDER_WIDTH
                 } else {
-                    let mut j = 0;
-                    if e > 0 {
-                        j |= JOINED_A;
-                    }
-                    if e + 1 < edges {
-                        j |= JOINED_B;
-                    }
-                    j
+                    0.0
+                };
+                let ext_b = if closed || e + 1 < edges {
+                    PLACEHOLDER_WIDTH
+                } else {
+                    0.0
                 };
                 out.push(SegmentInstance {
                     a: place(a),
                     b: place(b),
                     color: [1.0, 1.0, 1.0],
-                    width: 0.01,
+                    width: PLACEHOLDER_WIDTH,
                     alpha: 1.0,
-                    joined,
+                    ext_a,
+                    ext_b,
                 });
             }
         }
