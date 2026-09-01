@@ -305,7 +305,7 @@ pub struct SegmentInstance {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The instance carries a length, and nothing moves | dev | done | committed with this row |
+| 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
 | 2 — The corner reaches its point | dev | **halted before start** — see Notes | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | not started | |
 | 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
