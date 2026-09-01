@@ -378,7 +378,7 @@ flowchart TB
 | 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
 | 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
 | 9 — The image sweep runs again | dev | done | `a87983a`, `7b9a1ae` |
-| 10 — What the pictures are of | human | done | committed with this row |
+| 10 — What the pictures are of | human | done | `93e40bb` |
 
 ### Notes
 
