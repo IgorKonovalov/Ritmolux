@@ -20,7 +20,7 @@ Three separate things are wrong with using that as a gate, and they compound.
 
 **It names no unit.** `foo_lmv.dll` measured **9,789,952 B** on 2026-09-01. That is **97.9 %** of
 the decimal reading and **93.4 %** of the binary one. Which of those two numbers is true decides
-whether the component has 210,048 B of headroom or 696,064 B — a factor of 3.3 — and nothing in the
+whether the component has 210,048 B of headroom or 695,808 B — a factor of 3.3 — and nothing in the
 repository says.
 
 **Its subject is the standalone exe.** The plugin is covered by *"in the same ballpark"*, which is
@@ -65,7 +65,7 @@ when it exceeds 90 % of that figure. It never fails a release over it.**
 The figure is derived, not chosen: **today's 9,789,952 B plus one more step the size of the `text`
 step (+2,104,320 B) is 11,894,272 B**, and 12 MiB is the next round binary boundary above it. So the
 cap admits exactly one more feature of the largest class this project has actually shipped, and the
-second one has to be argued for. Headroom on delivery is **2,792,960 B (28.5 %)**; the warning
+second one has to be argued for. Headroom on delivery is **2,792,960 B**, which is **22.2 % of the cap** — the component sits at 77.8 % of it, and that is the figure `docs/specs/0001-c-abi.md` records; the warning
 threshold sits at 11,324,620 B, which is **1,534,668 B above today**.
 
 Three properties this decision insists on:
@@ -99,9 +99,13 @@ Three properties this decision insists on:
   ballpark" could absorb any outcome; `12,582,912 B` cannot, and the first feature that would cross
   it forces a decision that today's wording lets everyone avoid. That is the intended effect and it
   is still a cost.
-- **The exe's cap is left as `~10 MB` in substance** — this ADR fixes its unit, not its value, and
-  does not measure the exe. The two artifacts now have caps derived by different methods, one
-  argued and one inherited.
+- **The exe's cap is left as `~10 MB` in substance** — this ADR does not measure the exe, so its
+  figure stays inherited while the component's is argued. Writing it as **10,000,000 B** is
+  nonetheless a *choice*, not only a unit: the two readings of `~10 MB` differ by 4.9 %, and this
+  takes the tighter one, which is what `docs/specs/0001-c-abi.md` already said to plan against. Note
+  that the same reading is **rejected** for the component two sections below, on a ground that does
+  not transfer — there it left 210,048 B of headroom and would have warned permanently, and here
+  nothing reads the number at all. The two artifacts now have caps derived by different methods.
 - **A warning that never fires teaches nothing.** Until the component crosses 11,324,620 B the new
   branch is unexercised, so the plan seeds it against a forced threshold rather than shipping an
   untested arm.
@@ -116,7 +120,7 @@ new judgement. Rejected because it leaves **210,048 B** of headroom — the next
 it, the warning fires immediately and permanently, and a warning that is always on is noise that
 gets filtered. It would also assert that a figure written with a tilde is exact.
 
-**Adopt 10,485,760 B, the binary reading.** Same objection, one step weaker: 696,064 B is a little
+**Adopt 10,485,760 B, the binary reading.** Same objection, one step weaker: 695,808 B is a little
 over one `+510,464 B` release step. It buys one plan of quiet and then behaves like the decimal
 reading.
 
