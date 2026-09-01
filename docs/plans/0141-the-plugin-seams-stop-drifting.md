@@ -188,8 +188,8 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preset menu selects by name | dev | done | committed with this row |
-| 2 — The size table becomes a dated series | dev | not started | — |
+| 1 — The preset menu selects by name | dev | done | `a7354b8` |
+| 2 — The size table becomes a dated series | dev | done | committed with this row |
 | 3 — Attribute the 400 KB | dev | not started | — |
 | 4 — The recipe reads the SDK's own version | dev | not started | — |
 
@@ -200,3 +200,11 @@ flowchart TB
   build and by call-site sweep: `lmv_select_preset` has exactly two call sites, one of them inside
   `select_preset_named` against a snapshot that helper read itself, and the menu path now routes
   through the helper. The live click is carried, not run.
+- Phase 2's re-measure found the growth is larger than the plan's table records, and still moving:
+  `foo_lmv.dll` is 9,789,952 B on 2026-09-01 against 9,279,488 B on 2026-08-18, so +510,464 B has
+  landed since backlog 0118 was filed, on top of the +400,384 B it names. Headroom on the decimal
+  reading of NFR §4's cap is 210,048 B — 97.9 % of cap. The plan says Phase 2 does not move the
+  cap and it did not.
+- The `lmv_core_c.dll` column is not comparable across 2026-08-29: this machine acquired the
+  `rust-lld` override (ADR-0147) between the two measurements, and it links the cdylib. The shipped
+  `foo_lmv.dll` column is unaffected. Recorded in the spec beneath the table.
