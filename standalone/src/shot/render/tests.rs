@@ -389,6 +389,66 @@ fn a_written_frame_is_a_marker_and_three_planes() {
 }
 
 // ---------------------------------------------------------------------------
+// Which preset, decided before anything is spent
+// ---------------------------------------------------------------------------
+
+/// A roster of empty presets under the given names — enough for a membership
+/// test, which reads nothing but `name`.
+fn roster(names: &[&str]) -> Vec<Preset> {
+    names
+        .iter()
+        .map(|n| {
+            Preset::from_toml_str(&format!("system = \"attractor\"\nname = \"{n}\"\n"))
+                .expect("a minimal preset parses")
+        })
+        .collect()
+}
+
+/// The rejection is the whole point of the check: it happens **before** the
+/// encoder is spawned and before a device is built, and it hands back the keys
+/// the roster is actually keyed on. `attractor_leviathan` is the reproduction —
+/// the *filename* of a preset whose `name` is `Leviathan`.
+#[test]
+fn an_unknown_preset_is_rejected_and_the_error_names_the_rosters_keys() {
+    let presets = roster(&["Leviathan", "Drift Field"]);
+
+    let err = resolve_preset(Some("attractor_leviathan"), &presets)
+        .expect_err("a filename is not a roster key");
+    assert!(
+        err.contains("attractor_leviathan"),
+        "the rejected name is quoted back: {err}"
+    );
+    assert!(
+        err.contains("Leviathan") && err.contains("Drift Field"),
+        "every roster key is offered: {err}"
+    );
+
+    // Exact equality, the same comparison the renderer makes when it selects: a
+    // near-miss is a miss, or the check would pass a name the renderer rejects.
+    assert!(resolve_preset(Some("leviathan"), &presets).is_err());
+    assert!(resolve_preset(Some("Leviathan "), &presets).is_err());
+    assert_eq!(
+        resolve_preset(Some("Leviathan"), &presets),
+        Ok("Leviathan".to_string())
+    );
+}
+
+/// The two `--preset`-less arms, unchanged by the membership test: a one-entry
+/// roster names itself, and a longer one has to be told which.
+#[test]
+fn an_unnamed_preset_resolves_only_against_a_one_entry_roster() {
+    assert_eq!(
+        resolve_preset(None, &roster(&["Leviathan"])),
+        Ok("Leviathan".to_string())
+    );
+
+    let err = resolve_preset(None, &roster(&["Leviathan", "Drift Field"]))
+        .expect_err("two presets, no name");
+    assert!(err.contains("--preset"), "the error names the flag: {err}");
+    assert!(resolve_preset(None, &roster(&[])).is_err());
+}
+
+// ---------------------------------------------------------------------------
 // The one canonical encoder invocation
 // ---------------------------------------------------------------------------
 
@@ -402,6 +462,7 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     let args = ffmpeg_args(
         std::path::Path::new("track.wav"),
         std::path::Path::new("out.mp4"),
+        DEFAULT_CRF,
     );
     let line = args.join(" ");
 
@@ -443,6 +504,61 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     // Overwrite without prompting: an encoder waiting on a y/n at the far end of
     // a pipe is a render that hangs with no explanation.
     assert!(args.iter().any(|a| a == "-y"), "{line}");
+
+    // The default is archival and stays archival: `--crf` adds a lever beside it
+    // and does not move it.
+    assert!(line.contains("-crf 18"), "{line}");
+}
+
+/// `--crf` moves exactly one argument. Everything the previous test pins
+/// *describes the stream* — geometry, colour, mapping — and a size lever that
+/// dropped one of those would be a worse defect than the archival default it was
+/// added to work around.
+#[test]
+fn a_moved_crf_changes_the_rate_and_nothing_that_describes_the_stream() {
+    let clip = std::path::Path::new("track.wav");
+    let out = std::path::Path::new("out.mp4");
+
+    let default = ffmpeg_args(clip, out, DEFAULT_CRF);
+    let moved = ffmpeg_args(clip, out, 23);
+
+    assert!(moved.join(" ").contains("-crf 23"));
+    assert_eq!(
+        default.len(),
+        moved.len(),
+        "a rate change adds and removes no argument"
+    );
+
+    // The one differing position is the value after `-crf`, and every colour tag
+    // and mapping argument is byte-identical across the two.
+    let differing: Vec<usize> = (0..default.len())
+        .filter(|&i| default[i] != moved[i])
+        .collect();
+    assert_eq!(
+        differing,
+        vec![
+            default
+                .iter()
+                .position(|a| a == "-crf")
+                .expect("a -crf flag")
+                + 1
+        ]
+    );
+}
+
+/// The range is x264's own. Outside it the encoder rejects the whole command
+/// line, and the failure arrives as the encoder's diagnostics through a pipe
+/// rather than as a named flag error.
+#[test]
+fn crf_parses_its_range_and_refuses_what_the_encoder_would() {
+    assert_eq!(parse_crf("23"), Ok(23));
+    assert_eq!(parse_crf(" 0 "), Ok(0));
+    assert_eq!(parse_crf("51"), Ok(51));
+
+    for bad in ["52", "-1", "18.5", "", "high"] {
+        let err = parse_crf(bad).expect_err("{bad} is not a crf");
+        assert!(err.contains("--crf"), "the error names the flag: {err}");
+    }
 }
 
 // ---------------------------------------------------------------------------
