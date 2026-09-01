@@ -1141,7 +1141,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         );
         let _ = writeln!(
             out,
-            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7}",
+            "  {:<name_w$} {:>6} {:>6} {:>6} {:>6}",
             "preset",
             "bass",
             "mid",
@@ -1152,7 +1152,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         for p in &fam.presets {
             let _ = writeln!(
                 out,
-                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3}",
+                "  {:<name_w$} {:>6.3} {:>6.3} {:>6.3} {:>6.3}",
                 fit_name(&p.name),
                 p.reactivity_footprint[0],
                 p.reactivity_footprint[1],
@@ -1163,9 +1163,12 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         }
 
         // The second reading, as its own block rather than four more columns:
-        // the table above is already nine wide and a wide terminal is not
-        // guaranteed (ADR-0042). Keeping it un-widened also means every number
-        // a previous run printed is still in the same place.
+        // the table above is already ten wide and a wide terminal is not
+        // guaranteed (ADR-0042).
+        //
+        // Both blocks carry the main table's cell width, because both are read
+        // by comparing a column against the one directly above it — the prose
+        // over each says so — and a column that does not line up cannot be.
         let [bass_lo, mid_lo, treb_lo, onset_lo] = LOW_LEVELS;
         let _ = writeln!(
             out,
@@ -1174,7 +1177,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         );
         let _ = writeln!(
             out,
-            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5}",
+            "  {:<name_w$} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>5}",
             "preset",
             "bass",
             "mid",
@@ -1189,7 +1192,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             let (dead, ceilings, saturated) = gate_counts(p);
             let _ = writeln!(
                 out,
-                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7} {:>5}",
+                "  {:<name_w$} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6} {:>6} {:>5}",
                 fit_name(&p.name),
                 p.reactivity_low[0],
                 p.reactivity_low[1],
