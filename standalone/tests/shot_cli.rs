@@ -1566,6 +1566,98 @@ fn a_missing_encoder_names_the_flag_rather_than_falling_back() {
         "--ffmpeg only applies",
         "--ffmpeg without --render",
     );
+
+    // `--crf` is `--ffmpeg`'s companion and has the same two ways to be
+    // meaningless: without an encoder there is no command line for it to appear
+    // in, and outside the render mode there is no encoder at all. Both were
+    // rejected in the parser and asserted nowhere.
+    assert_failed_naming(
+        &run(&[
+            "--preset-file",
+            SHIPPED_PRESET_FILE,
+            "--render",
+            &clip.to_string_lossy(),
+            "--crf",
+            "20",
+        ]),
+        "--crf",
+        "--crf without --ffmpeg",
+    );
+    assert_failed_naming(
+        &run(&["--preset-file", SHIPPED_PRESET_FILE, "--crf", "20"]),
+        "--crf only applies",
+        "--crf without --render",
+    );
+}
+
+/// **The spend-nothing ordering, held by something other than the line order in
+/// `render::run()`.**
+///
+/// Plan 0139 exists to stop a rejected preset name from leaving a valid,
+/// playable, audio-only MP4 at the destination: `ffmpeg` exits 0 on a frame
+/// stream that never carried a frame. Its repair was to resolve the name before
+/// the encoder is spawned and before a device is built — and `resolve_preset`
+/// returns the same answer from either side of that call, so the only thing
+/// holding the ordering was the order of two lines. A refactor of `run()`
+/// reintroduces the artifact **with a green suite**.
+///
+/// The reproduction is a *filename* against a roster keyed on `name`, which is
+/// the confusion that produced the original report: `attractor_leviathan.toml`
+/// carries `name = "Leviathan"`, so the file's stem is not a key.
+///
+/// `--ffmpeg no_such_encoder_binary` is what makes this need no encoder: if the
+/// ordering ever regresses, the spawn fails first and the assertions below name
+/// the flag instead of the roster. **That is why stderr must not contain
+/// `--ffmpeg`** — it is the difference between "validated first" and "tried to
+/// spawn and failed", and it is the assertion that keeps the test's mechanism
+/// legible if a missing encoder ever stops being fatal.
+#[test]
+fn a_render_that_cannot_name_its_preset_spends_nothing() {
+    let clip = render_clip("unspent.wav", 48_000, 0.5);
+    let out_path = scratch("render-unspent").join("must-not-be-written.mp4");
+    let _ = std::fs::remove_file(&out_path);
+
+    let out = run(&[
+        "--render",
+        &clip.to_string_lossy(),
+        "--preset",
+        "attractor_leviathan",
+        "--ffmpeg",
+        "no_such_encoder_binary",
+        "--out",
+        &out_path.to_string_lossy(),
+    ]);
+    assert_failed_naming(
+        &out,
+        "unknown preset `attractor_leviathan`",
+        "a filename where a preset name belongs",
+    );
+
+    let err = stderr(&out);
+    // The roster's keys are printed, because the name is the preset's `name`
+    // field and not its filename. Two shipped keys stand in for the list.
+    assert!(
+        err.contains("Leviathan") && err.contains(SHIPPED_PRESET_NAME),
+        "the rejection must name the roster's keys:\n{err}"
+    );
+    // Nothing was spawned...
+    assert!(
+        !err.contains("--ffmpeg"),
+        "the encoder was reached before the name was resolved:\n{err}"
+    );
+    // ...no device was built...
+    assert!(
+        !err.contains("adapter"),
+        "a rejected preset name should not have reached the renderer:\n{err}"
+    );
+    // ...and the destination is untouched. This is the clause that fails when
+    // the ordering regresses: the file the original defect left behind was a
+    // valid 262-byte MP4, indistinguishable at a glance from a short render.
+    assert!(
+        !out_path.exists(),
+        "a rejected render left a file at {}",
+        out_path.display()
+    );
 }
 
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
