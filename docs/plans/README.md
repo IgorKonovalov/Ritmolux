@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0150** (ADRs are a separate sequence — next free there is **0158**.)
+**Next free number: 0150** (ADRs are a separate sequence — next free there is **0161**.)
 
 ## Active roster
 
@@ -39,7 +39,7 @@ place. The plan file carries the real link.
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved | dev | Backlog 0175 + 0176 + 0174 + 0177 + 0178. ADR-0159 (proposed): a 12,582,912 B component cap the recipe reads. Phases 1-2 are pure test additions. No GPU, no `human`. |
-| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | in-progress, **Phase 2 BLOCKED** | dev | 0135/0136/0144 discharged; **0134 is not**. Stop gate found stroke thickness tracks the aspect (1.78x at 1080p), so a producer cannot miter in world space. Needs an ADR-0158 call. |
+| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | in-progress, **Phase 2a next** | dev, human | 0135/0136/0144 closed; **0134 open**. Gained Phase 2a on ADR-0160: the stroke moves to world space. 7 phases. |
 <!-- roster:end -->
 
 **Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
@@ -48,8 +48,10 @@ shape, because most of what it decided was sequencing rather than design:
 
 - **[0149] must run before [0126].** They contend on two files: 0149's Phase 3 edits `star.rs` and
   its Phase 5 edits `schema.rs`, and 0126 **splits both**. A pure move of code that is about to
-  change is the move done twice, and 0126's phases are gated on golden while 0149's Phase 2
-  deliberately re-blesses every line scene. They must not run in parallel in any order.
+  change is the move done twice, and 0126's phases are gated on golden while 0149's Phases 2a and 2
+  each deliberately re-bless the non-square line baselines. They must not run in parallel in any
+  order, and the contention got worse when 0149 gained Phase 2a on 2026-09-01: `renderer.rs` and
+  both its WGSL modules are now in scope too.
 - **[0147]'s Phase 1 wants to land before [0133] is built.** Backlog 0163 is one sentence of prose,
   and 0133 brings in-house the exact consumer that was misled by its absence — a lighting look
   multiplying a band term into a physical output. The rest of 0147 does not gate 0133.

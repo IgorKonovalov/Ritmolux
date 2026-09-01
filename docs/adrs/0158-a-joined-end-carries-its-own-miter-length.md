@@ -10,6 +10,10 @@
 > this grows), [ADR-0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (the golden re-bless this
 > forces)
 > **Backlog entry closed:** [0134](../design-backlog.md)
+> **Depends on:** [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) — the
+> measurement-space question this ADR raised as unresolved was answered, in the negative, by
+> Plan 0149 Phase 2's stop gate. ADR-0160 makes the two spaces similar and this Decision correct
+> as written; see the amended Negative bullet below. **Nothing in the Decision changes.**
 
 ## Context
 
@@ -75,7 +79,11 @@ Three properties carry the decision:
   around.
 - **`0.0` is exactly "free end", so the flag is not lost, it is subsumed.** A producer that passes
   nothing is byte-identical to today, which is the property ADR-0041 chose its shape for and which
-  keeps `spectrum`'s `Bars` and `RadialRing` baselines still.
+  keeps `spectrum`'s `Bars` and `RadialRing` baselines still. **Scoped to the miter**: it says this
+  decision moves no isolated producer's picture, and nothing more.
+  [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) does move them on any
+  non-square target — a bar is vertical by construction and takes the full aspect factor — for an
+  unrelated reason, and this bullet is not a promise about that.
 - **The miter limit is the near-180-degree rule ADR-0041 had to hand-wave.** `4.0` serves every
   corner down to `2 * asin(1 / 4) = 28.96 degrees` exactly; below that the extension clamps and the
   corner bevels as it does today, which is the standard behaviour and a strictly smaller bevel than
@@ -153,6 +161,22 @@ the plan states it as a named constant with that provenance rather than as a tun
   which is the square fixture this ADR's own measurement was taken on and the one the plan specifies.
   Whether the two spaces are in fact similar is not established here; the plan carries it as a stop
   gate with a measurement at a non-square target, because no fixture at 1:1 can answer it.
+
+  **Answered 2026-09-01: they are not similar.** Plan 0149 Phase 2's stop gate ran on the Phase 1
+  tree and measured a stroke's on-screen thickness against its orientation at four targets — the
+  vertical/horizontal ratio is `1.0000` at 1000x1000, `1.5789` at 1280x800, `1.7843` at 1920x1080
+  and `0.6333` at 800x1280. **The ratio tracks the aspect**, because the half-width is offset along
+  a normal computed after the aspect divide, in a space where x is compressed relative to y. So a
+  producer cannot compute this ADR's miter length from world coordinates alone, and the phase
+  stopped as instructed.
+
+  **The repair is not in this ADR.** Every option that keeps the clip-space metric changes what
+  `SegmentInstance` carries — the neighbour direction, the bisector, or the aspect handed to
+  producers that build at `configure` — and each was rejected on cost.
+  [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) removes the disagreement
+  instead: the stroke moves into world space, `dir` becomes world-space, and the producer's
+  world-space `theta` is then exactly the angle the shader extends along. **This Decision is correct
+  as written and grows the instance by nothing.**
 - **The extension is in world units, so it does not track a per-frame `width` change on its own.**
   Producers recompute per frame anyway — they rebuild the instance buffer — but a future producer
   that caches instances across frames while animating `thickness` would desynchronize the two. The
