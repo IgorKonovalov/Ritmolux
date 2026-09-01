@@ -551,3 +551,126 @@ fn a_frame_of_one_tone_is_all_ground_and_nothing_is_lit() {
     assert_eq!(quadrant_spread(&bare, modal_ground(&bare), 8), 0);
     assert_eq!(coverage(&bare, BLACK, 8), 1.0);
 }
+
+// -----------------------------------------------------------------------
+// The level statistic (ADR-0150)
+// -----------------------------------------------------------------------
+
+/// A figure over a background, both flat, given in **linear** light: the lit
+/// quarter at `figure`, the rest at `ground`. Encoding each here is what makes
+/// the trim below a trim of the *source*, the way a `brightness` change is.
+fn figure_over_ground(figure: f32, ground: f32) -> CaptureImage {
+    let (f, g) = (encode(figure), encode(ground));
+    image(96, 96, |x, y| {
+        if x < 48 && y < 48 {
+            [f, f, f, 255]
+        } else {
+            [g, g, g, 255]
+        }
+    })
+}
+
+/// Mean over [`luma`] across every pixel — the reachable substitute ADR-0150
+/// rejects, kept here as the thing the property is stated against.
+fn encoded_frame_mean(img: &CaptureImage) -> f32 {
+    let n = img.rgba.len() / 4;
+    if n == 0 {
+        return 0.0;
+    }
+    img.rgba.chunks_exact(4).map(luma).sum::<f32>() / n as f32
+}
+
+/// The same mean restricted to the lit set, which isolates the *space* half of
+/// the defect from the *set* half.
+fn encoded_lit_mean(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
+    let lit: Vec<f32> = img
+        .rgba
+        .chunks_exact(4)
+        .filter(|px| is_lit(px, bg, eps))
+        .map(luma)
+        .collect();
+    if lit.is_empty() {
+        return 0.0;
+    }
+    lit.iter().sum::<f32>() / lit.len() as f32
+}
+
+/// ADR-0150's motivating measurement, as a property rather than as the pair of
+/// numbers it was taken as: **the linear reading responds substantially more
+/// than an encoded mean does to the same source trim**, and it responds by
+/// about the size of the trim itself.
+///
+/// The 30 % trim here is applied in linear light before encoding, which is what
+/// a `brightness` change does to a scene. Both encoded readings are stated
+/// because the defect has two independent halves — the space (a concave
+/// transfer curve halves the apparent move) and the set (a background the trim
+/// does not touch dilutes it further) — and ADR-0150 fixes both.
+#[test]
+fn the_level_statistic_reads_a_trim_that_an_encoded_mean_under_reports() {
+    const GROUND: f32 = 0.02;
+    const FULL: f32 = 0.5;
+    const TRIM: f32 = 0.70;
+    let eps = 8u8;
+    let bg: [u8; 4] = [encode(GROUND), encode(GROUND), encode(GROUND), 255];
+
+    let full = figure_over_ground(FULL, GROUND);
+    let trimmed = figure_over_ground(FULL * TRIM, GROUND);
+
+    let drop = |before: f32, after: f32| 1.0 - after / before;
+    let linear = drop(
+        mean_lit_level(&full, bg, eps),
+        mean_lit_level(&trimmed, bg, eps),
+    );
+    let coded_lit = drop(
+        encoded_lit_mean(&full, bg, eps),
+        encoded_lit_mean(&trimmed, bg, eps),
+    );
+    let coded_frame = drop(encoded_frame_mean(&full), encoded_frame_mean(&trimmed));
+    println!(
+        "30 % source trim reads: linear-over-lit {linear:.3}, \
+         encoded-over-lit {coded_lit:.3}, encoded-over-frame {coded_frame:.3}"
+    );
+
+    // It measures the trim: a 30 % cut in linear light reads as ~30 %, within
+    // what 8-bit quantization of the two levels can move it.
+    assert!(
+        (linear - (1.0 - TRIM)).abs() < 0.02,
+        "linear reading {linear:.3} should recover the {:.2} trim",
+        1.0 - TRIM
+    );
+    // The space half: the same trim on the same pixels reads far smaller once
+    // the concave transfer curve is left in.
+    assert!(
+        linear > 1.5 * coded_lit,
+        "linear {linear:.3} must respond substantially more than \
+         encoded-over-lit {coded_lit:.3}"
+    );
+    // The set half, on top of it: the untouched background dilutes further.
+    assert!(
+        coded_lit > coded_frame,
+        "encoded-over-lit {coded_lit:.3} should still beat \
+         encoded-over-frame {coded_frame:.3}"
+    );
+}
+
+/// The two conventions the statistic inherits: the background is excluded by
+/// construction, so darkening it alone moves nothing, and a frame with no lit
+/// pixels reads `0.0` rather than dividing by zero.
+#[test]
+fn the_level_statistic_ignores_the_ground_and_is_zero_with_nothing_lit() {
+    let eps = 8u8;
+    let bright_ground: [u8; 4] = [encode(0.02); 4];
+    let dark_ground: [u8; 4] = [encode(0.002); 4];
+
+    let over_bright = figure_over_ground(0.5, 0.02);
+    let over_dark = figure_over_ground(0.5, 0.002);
+    let a = mean_lit_level(&over_bright, bright_ground, eps);
+    let b = mean_lit_level(&over_dark, dark_ground, eps);
+    assert!(
+        (a - b).abs() < 1e-6,
+        "the same figure over two grounds must read the same level: {a} vs {b}"
+    );
+
+    let empty = solid(16, 16, BLACK);
+    assert_eq!(mean_lit_level(&empty, BLACK, eps), 0.0);
+}
