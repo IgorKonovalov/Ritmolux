@@ -1660,6 +1660,98 @@ fn a_render_that_cannot_name_its_preset_spends_nothing() {
     );
 }
 
+/// Every flag name `parse_args` compares an argument against, read out of the
+/// example's own source.
+///
+/// A flag literal is the **whole** string — `"--preset"` — which is what
+/// separates a match arm from prose that mentions a flag. Every error message in
+/// this CLI opens with the flag it is about (`"--frames expects a positive
+/// integer"`), and the usage text is one long literal whose lines start with a
+/// flag name; neither is a name the parser accepts, and requiring the closing
+/// quote immediately after the name excludes both.
+fn parser_flag_literals(source: &str) -> Vec<String> {
+    let bytes = source.as_bytes();
+    let mut found = Vec::new();
+    let mut i = 0;
+    while let Some(offset) = source[i..].find("\"--") {
+        // Past the opening quote; the name itself starts at the dashes.
+        let start = i + offset + 1;
+        let mut end = start;
+        while end < bytes.len()
+            && (bytes[end] == b'-'
+                || bytes[end].is_ascii_lowercase()
+                || bytes[end].is_ascii_digit())
+        {
+            end += 1;
+        }
+        // A bare `"--"` names nothing, and a name is only a name when the string
+        // ends right after it.
+        if end > start + 2 && end < bytes.len() && bytes[end] == b'"' {
+            let name = source[start..end].to_owned();
+            if !found.contains(&name) {
+                found.push(name);
+            }
+        }
+        i = start + 2;
+    }
+    found
+}
+
+/// **The drift gate `lmv` has and `shot` did not.** ADR-0148 gave the app's
+/// roster a test so a flag cannot be added to a scanner and left out of
+/// `--help`. `shot` has the same failure mode: its flags are matched in one arm
+/// each and re-typed by hand into `print_usage()` and again into
+/// `docs/capturing.md`'s table.
+///
+/// That matters on this CLI specifically — it is the one the `preset-author`
+/// lane drives, and `CLAUDE.md` routes that lane to `docs/capturing.md`, whose
+/// table is transcribed from the usage text. A flag that exists and is
+/// undocumented is invisible to the only consumer that needs it.
+///
+/// One-directional by construction, exactly as ADR-0148's is: it cannot assert
+/// that every line of the usage text is still reachable, so a retired flag can
+/// linger there. The shared roster type both binaries would construct from is
+/// deliberately not built — two CLIs do not pay for it, and this buys the
+/// property that was actually missing.
+#[test]
+fn the_usage_text_names_every_flag_the_parser_accepts() {
+    let source = include_str!("../examples/shot.rs");
+    let flags = parser_flag_literals(source);
+    // A lexer that silently stopped matching would make this pass by finding
+    // nothing, which is the one way a drift gate fails quietly.
+    assert!(
+        flags.len() >= 20,
+        "the scan found only {} flag literals in examples/shot.rs; it has stopped \
+         reading the source: {flags:?}",
+        flags.len()
+    );
+
+    let out = run(&["--help"]);
+    assert!(
+        out.status.success(),
+        "--help must exit 0, got {}\nstderr: {}",
+        out.status,
+        stderr(&out)
+    );
+    // The usage goes to stderr, because stdout is the frame stream on the render
+    // path and a mode that printed help to stdout would be inconsistent with it.
+    let usage = stderr(&out);
+    for flag in &flags {
+        assert!(
+            usage.contains(flag.as_str()),
+            "`{flag}` is a match arm in examples/shot.rs and --help does not \
+             mention it, so the binary accepts a flag its own usage text hides\n\
+             usage:\n{usage}"
+        );
+    }
+    // `-h` is a single-dash synonym the extraction above cannot see, so it is
+    // named here rather than silently uncovered.
+    assert!(
+        usage.contains("-h"),
+        "--help does not name its own synonym:\n{usage}"
+    );
+}
+
 /// `--report --json` emits parseable JSON with the documented top-level shape. The
 /// report is hand-rolled (no serde), so nothing but a consumer proves it is
 /// well-formed — and the `preset-author` lane is that consumer.

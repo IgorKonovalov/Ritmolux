@@ -114,6 +114,7 @@ Flags:
 | `--fps <n\|num/den>` | the render mode's frame rate (default 60). A decimal is rejected: write `30000/1001`, not `29.97` |
 | `--ffmpeg <path>` | spawn this encoder and wire the pipe, so one command produces a file. Needs `--out <file>`. No encoder ships and there is no fallback |
 | `--crf <0-51>` | the encoder's rate-quality setting (default 18, archival). Higher is smaller; `+6` is about half the size. Needs `--ffmpeg` — [the one argument you may move](#the-one-canonical-ffmpeg-invocation) |
+| `--help`, `-h` | print the usage text and exit 0 |
 
 Bad arguments and unknown presets exit non-zero with a message.
 
