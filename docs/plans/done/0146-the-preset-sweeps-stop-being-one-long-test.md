@@ -1,14 +1,14 @@
 # 0146 — The preset sweeps stop being one long test
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-08-31
 > **Created:** 2026-08-31
 > **Owner skill(s):** dev
-> **Related ADRs:** [0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
-> (proposed), [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
-> [0081](../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
-> [0022](../adrs/0022-build-time-preset-embedding.md)
+> **Related ADRs:** [0157](../../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
+> (accepted, Outcome), [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
+> [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md),
+> [0022](../../adrs/0022-build-time-preset-embedding.md)
 >
-> **Sequenced after [0145](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)**, whose
+> **Sequenced after [0145](0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)**, whose
 > `fast` nextest profile is where Phase 6 hangs the sample.
 
 ## TL;DR
@@ -52,7 +52,7 @@ so two per family is 24 of 81, drawing most of its saving from two families.
 
 ## Decision
 
-Adopt [ADR-0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md):
+Adopt [ADR-0157](../../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md):
 the four per-preset sweeps generate one test per preset from `build.rs`'s existing glob;
 `distinctness` splits per family, never per preset, because its claim is pairwise within one; and a
 declared `representative` key selects what the **per-phase tier** renders while the close and CI keep
@@ -508,5 +508,24 @@ count above is what a revisit would argue from.
 - **The exclusion list Plan 0145 moves into the profile may be under-inclusive** — six binaries
   outside the nine each cost over 200 s. Once these five split, re-deriving that list by measurement
   is a one-file edit.
-- **CI pays this reduction too**, on every push, across three jobs. Plan 0129 and Plan 0145 both left
-  the same followup open.
+- **CI pays this too, and for `check` it is a COST, not a reduction** — that job cites `-P fast` and
+  gains the 72-test sample. Plan 0129 and Plan 0145 both left the same followup open; this plan makes
+  it sharper, because the figure is now unmeasured in the direction that hurts.
+
+Added by the Mode 4 review (2026-08-31):
+
+- **The CI cost of this plan is unmeasured on a CI runner**, which is the machine ADR-0073 exists to
+  defend. Two jobs moved: `check (windows-latest)` gained 72 sweep tests, and `coverage` reaches the
+  same library through ~264 test processes rather than five roster loops, each paying its own device
+  creation and its own profraw. Both are noted at the step in `ci.yml`. A single instrumented reading
+  of each would settle whether the exclusion list wants re-deriving.
+- **`representative` is parsed twice and cross-checked in one direction only.** `core/build.rs`
+  line-scans the preamble; `core/src/preset/schema.rs` parses with serde. A `name` or `system` the
+  two disagree on fails loudly (three sweeps panic naming the preset). A `representative` serde reads
+  and the scan misses passes the floor test while silently dropping that preset out of the per-phase
+  tier. Emitting the representative count from `build.rs` and asserting it against `default_presets()`
+  closes it in one test.
+- **Widening `distinctness`'s curated list to all twelve families adds 27 pairs** — `shape_field`
+  15, `warp_mesh` 6, `shape_collage` 6 — and is out of scope here for exactly that reason. Phase 5
+  measured those three families' matrices in a scratch patch and reverted it, so the readings exist
+  in the log above and the shipped list is unchanged.
