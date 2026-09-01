@@ -231,19 +231,69 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
 |---|---|---|---|
 | 1 — One sRGB decode | dev | done | `efde516` |
 | 2 — A level statistic | dev | done | `69da480` |
-| 3 — A column for it | dev | done | committed with this row |
+| 3 — A column for it | dev | done | `5bf9dd6`, `32754b5` |
 | 4 — `boundary_density` says what it is bound to | dev | done | `98977ff` |
 | 5 — The driven floor's second probe is actually pinned | dev | done | `2e1552a` |
 | 6 — Both floors name their population | dev | done | `4512095` |
 
 ### Notes
 
+- **Phase 3's done-when could not be met as stated.** A tenth 7-wide column put the widest row
+  (a line family, so `geom` is present) at **107 columns** against the standing 100-column cap
+  `no_report_table_line_wraps_at_a_hundred_columns` holds; the row was already at 99. Resolved by
+  narrowing the eight 5-character numeric cells from 7 to 6 — `rate` keeps 7 because its cell can
+  carry a `+` — which lands the widest row at 99 with no test relaxed (`5bf9dd6`). The user chose
+  that over raising the cap. ADR-0150 named the width a Negative but no measurement was taken.
+- **`32754b5` is a follow-on to Phase 3 and not in the plan.** The narrowing left the footprint and
+  realistic-levels blocks at width 7, so their `bass`/`mid`/`treb`/`onset` columns stopped sitting
+  under the main table's. Both blocks' own prose tells the reader to compare against the columns
+  above, so both were narrowed to match.
+- **Phases 3 and 5 touched `docs/design-backlog.md`, which neither phase's `Files touched` lists.**
+  Phase 3's notes require it (*"update the probe, do not work around it"*); backlog **0151**'s probe
+  broke by the identical mechanism — it asserted `absent: rosette\.driven`, which Phase 5 makes
+  present — and was rewritten the same way. Both entries' probes now pin the state the plan put
+  the tree in, and two probes were added for `mean_lit_level` and the now-public `srgb_decode_lut`.
+- **Phase 6's re-measurement disagrees with the plan's stated figures, in both directions.**
+  Re-measured 2026-09-01, DX12 software adapter (`common::headless` prefers WARP), backdrops
+  suppressed, **81 shipped presets**:
+  - silent branch: **74 presets, minimum `Nocturne` 0.0155**, so `ANIM_FLOOR = 0.01` carries
+    **1.55x** slack. The plan expected `0.0201` / 2.01x and the comment claimed 2.05x
+    (`Banded Mandala` 0.0205, now third).
+  - driven branch: **7 presets, minimum `Stipple` 0.0577**, `DRIVEN_FLOOR = 0.017` carries 3.4x.
+    `Valentine` (0.0345), which that floor's derivation named as the library minimum, **passes on
+    the silent branch** and was therefore never in this floor's population.
+  - the re-derivation hazard is larger than the plan's example: the top of the sorted sweep is
+    **`Heart Mono` 0.0000**, not 0.0025. No constant moved.
+- **Phase 2's test lives in `core/src/render/metrics/tests.rs`**, the module's own test file; the
+  phase's `Files touched` names only `core/src/render/metrics.rs`.
+- **Phase 3 also puts `level` in `--json`**, which the plan does not name.
+- **Phase 5's mutation, as the done-when asks:** anchoring the driven differential at `FRAME_A`
+  instead of `FRAME_B` — `footprint_diff(&early, &driven, ..)` — admits 24 frames of the scene's
+  own clock. `rosette_spin_only` then reads driven **0.4167** and the test fails; before this phase
+  it passed under that mutation, because `star_frozen` still reads 0.0000. Reverted.
+- **Phases 4, 5 and 6 were committed before Phase 3**, which was blocked on the width decision
+  above. The plan's Risks section anticipates the split at that seam.
+- **Not acted on:** `boundary_density`'s resolution dependence is documented, not fixed — the plan
+  says so explicitly, and the question only becomes live if the statistic reaches `--report`.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog **0132, 0130, 0151, 0152**.
+- **What shipped:** feature — a new metric (`mean_lit_level`) and a `--report`/`--json` level
+  column. Phases 4 and 6 are doc-only and Phase 5 is test-only; no rendering changed and no golden
+  moved.
+- **Operator docs touched:** `docs/capturing.md` — the sample table re-rendered at the new cell
+  widths, a `level` row in the column table, and a new
+  *"What the `level` column measures"* section (space, lit set, the code-space seam, the background
+  blind spot).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 0** —
+  *151 stated reductions still hold across all 64 live entries (8 unprobeable)*. Entries **0132**
+  and **0151** went red mid-plan by construction and their probes were rewritten (see Notes).
+- **Full suite:** `cargo nextest run --workspace`, **exit 0**, **1499 passed, 5 skipped** (70 slow).
+  ADR-0156's once-per-plan run, against the finished tree. Run under an upward override at earlier
+  phases: `--test transition` and `render::ink` (Phase 1), `render::metrics` (Phase 2),
+  `--test animation` and `--test sanity` (Phases 4-6), `-p standalone --lib shot::report`
+  (Phase 3). The `Summary` wall time is not a usable figure — a second lane
+  (`plan-0141-plugin-seams`) shares this box.
+- **Outstanding `human` phases:** none — every phase is `dev`.
