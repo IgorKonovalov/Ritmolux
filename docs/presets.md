@@ -96,7 +96,7 @@ flash = "clamp(onset * 3, 0, 1)"
 
 Rules:
 
-- **`system`** must be one of the seven known system names (below). An unknown
+- **`system`** must be one of the known system names (below). An unknown
   system rejects the whole file.
 - **`representative`** is an optional boolean, absent meaning `false`. It marks
   this preset as one of its family's samples for the `dev` lane's per-phase test

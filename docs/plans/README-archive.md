@@ -13,6 +13,89 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0146 — The preset sweeps stop being one long test](done/0146-the-preset-sweeps-stop-being-one-long-test.md)
+  — closed 2026-08-31. Seven `dev` phases on `main` rather than a worktree, `c2fa99f`..`af4d2b1`,
+  with an architect commit (`d009f50`) between Phases 1 and 2. Mode 4: **one blocker, four majors,
+  eight minors, three nits**, all repaired at the close. Version: **0.98.0** (minor) — a new preset
+  schema key is a new authoring surface.
+
+  **What landed.** Five roster monoliths became generated tests: `animation`, `reactivity` and
+  `sanity`'s loudness gate at one `#[test]` per preset from `core/build.rs`'s existing glob, and
+  `sanity`'s shape gate and `distinctness` at one per family, because a floor-slack gate and a
+  pairwise matrix are claims about a family and do not decompose. A preset may now declare
+  `representative = true`; `build.rs` marks its tests `<sweep>_rep_<stem>`, and `.config/nextest.toml`'s
+  `fast` profile selects on that marker, so a phase renders 24 of 81 presets and the close and CI's
+  `coverage` job render all 81.
+
+  **Phase 1's stop condition tripped and the architect replaced the condition, not the result.** As
+  written it convicted the design at the one phase ADR-0157 says cannot pay for itself — splitting
+  one sweep promotes the next — and it compared added work against saved elapsed, which no
+  redistribution can pass. What decided it instead was an affinity measurement: the monolith runs
+  133.5 s on four cores and 133.7 s on sixteen, so more machine buys it nothing, while the split runs
+  89.5 s and 65.8 s. The property holds on a small CI runner as well as a large box.
+
+  **The structural claim landed in full and the timing claim did not.** No preset sweep is anywhere
+  near the tail; the critical path went from `animation` at 365.5 s to `tempo_probe` at 69.5 s and
+  concurrency from 8.98 to 15.14 on sixteen logical CPUs. But elapsed fell only **464.2 s → 435.6 s
+  (6.2 %)**, not the projected 1.6x, because the sweeps' summed work rose **58 %**: device creation
+  costs 1.60 s against 1.65 s of per-preset render, paid 243 times. **Splitting a serial sweep on a
+  saturated box trades work for schedulability at close to par.** What it bought is the tail,
+  per-preset failure attribution, and the ability to sample at all.
+
+  **The sample costs the per-phase tier time rather than saving it** — +58.5 s for 24 presets where
+  ADR-0156 had left it rendering none, so 20.6 min against 14.7 min on a median six-phase plan. The
+  plan's own README projection (*"~3 min per plan; the CI run 869 s → ~539 s"*) was falsified in both
+  halves and is corrected in place.
+
+  **Three properties the review verified rather than accepted.** `Renderer::capture_preset` is
+  documented and used as a pure function of `(name, frame, frames)`, so per-process isolation cannot
+  move a reading — which is why "no assertion changed" holds in its strongest form and no baseline
+  was re-blessed. The Phase 6 list diff re-derived exactly: full 1491, `-P fast` 1277, a strict
+  subset, 214 deferred split animation 59 / reactivity 59 / sanity 74 / distinctness 9 / 13 elsewhere,
+  72 `_rep_` admitted, and all 81 stems present. Phase 3's arithmetic re-derived exactly: 322 pairs
+  across nine families, and the 27 twelve families would have added.
+
+  **What the review found and the close repaired.** The blocker was `check-comment-hygiene.mjs` red
+  on `main` — a Phase 4 failure message carrying an 18-space run mid-sentence, which also meant the
+  log quoted text the code does not print. The four majors were all the same shape: the plan changed
+  a thing and left the prose describing it standing. Seven references to the retired sweep functions
+  inside `core/tests/sanity.rs`, including a **broken rustdoc intra-doc link** (ADR-0127 exempts those
+  on the ground that rustc checks them, and rustc does not check them in an integration-test target)
+  and a panic message directing an author to a list no test prints. Three consumers of `-P fast`
+  — the hook, `ci.yml` and `nextest.toml`'s own job-2 comment, which contradicted its job-3 comment
+  three lines below — all describing a nine-binary exclusion that is no longer total. And
+  `docs/capturing.md`, the harness's operator doc, unswept entirely.
+
+  **The fourth major is the one worth carrying forward: the CI cost was measured on one sixteen-core
+  development box and on no CI runner.** `check (windows-latest)` cites `-P fast` and gained 72 sweep
+  tests; `coverage` — the job ADR-0073 names as the >20-minute Windows critical path — now reaches
+  the library through ~264 test processes rather than five roster loops, each paying its own device
+  creation and profraw. Both are noted at the step in `ci.yml` and left as followups rather than
+  guessed at.
+
+  **Two accepted ADRs were falsified or degraded and now say so.** ADR-0073 Alternative C's
+  mechanical ground — *"sampling cannot be a `nextest` filter; it must be an environment variable"*
+  — was true of roster loops and is retired by splitting them; its in-kind ground is untouched and is
+  why the sample is hung on the per-phase tier only. ADR-0136's *"visible, countable roster"* of the
+  presets still in silence has no aggregate form left; the per-preset branch label survives and
+  `shot --presets presets --report`'s `anim` column is now named as where the list is read. Both
+  carry dated `Outcome` sections. ADR-0157 shipped `distinctness` as **nine** tests, not the twelve
+  its Decision names, because the curated list covers nine families and twelve would have *added* 27
+  pairs against the plan's own done-when; its Outcome records that too.
+
+  **Curation (ADR-0081).** `presets/` was touched by 24 files adding one boolean each — no parameter,
+  expression or palette moved, so there was nothing to judge for convergence, and the plan fixed no
+  engine defect, so the stale-workaround grep had no trigger (run anyway; it convicts nothing new).
+  One observation for the record: "furthest apart by `struct_diff`" selects a family's two *least
+  typical* members by construction, so the tier samples `fragment_tiledmono` (the two-ink print held
+  out of the set for two plans) and `attractor_walkrho` (a Plan 0079 walk demo). Right for breadth,
+  wrong for typicality, and Phase 7's coverage count is what a revisit argues from.
+
+  **Two minors left standing deliberately.** The implementation log is 2.2x the `## Implementation
+  phases` section it reports against — noted, not rewritten, because the log is `dev`'s section. And
+  `representative` is parsed twice, by serde and by a `build.rs` line scan, cross-checked in one
+  direction only; the closing fix is a test and is filed as a followup on the plan.
+
 - [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)
   — closed 2026-08-31. Six `dev` phases on `main` rather than a worktree, `8b1d7b0`..`a1b9559`:
   the baseline (`8b1d7b0`), the `fast` nextest profile (`f5431dc`), the hook and CI citing it
