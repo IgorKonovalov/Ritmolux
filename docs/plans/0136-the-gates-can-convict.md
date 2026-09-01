@@ -370,8 +370,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
-| 2 — A seeded tree the row gate rejects | dev | done | committed with this row |
-| 3 — The row gate reads a row's shape | dev | not started | |
+| 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
+| 3 — The row gate reads a row's shape | dev | done | committed with this row |
 | 4 — Backlog references stop using fragments | dev | not started | |
 | 5 — A probe path is checked against the repository | dev | not started | |
 | 6 — The figure gate stops convicting untracked files | dev | not started | |
@@ -385,6 +385,15 @@ flowchart TB
 - **Phase 1's `--self-test` is wired into the call sites in Phase 2, not Phase 1.** Phase 1's file
   list is the script and the fixtures README; `.githooks/pre-push` and the CI `links` job are named
   in Phase 2's. Both invocations land together there.
+- **Phase 3 takes the region's kind from the MAJORITY of its rows, not from its first measured
+  row.** Backlog 0166's "What a fix looks like" and this plan's Phase 3 both name first-row
+  inference. Measured against the instance the entry itself records - a closed-plan bullet seeded
+  immediately under `roster:begin` and above the table header in `docs/plans/README.md`, which is
+  where the real one landed - first-row inference reports **14 breaks, none of them the stray row**,
+  because the stray row is the one it adopts as the region's form. The majority rule reports one:
+  `docs/plans/README.md:27  a bullet row in a table region (expected a table row; 14 of the 15 rows
+  in this region have that form)`. A region split evenly has no majority, so it is reported once at
+  its own opening line rather than at a guessed row; `index-rows-red/` seeds that case too.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified

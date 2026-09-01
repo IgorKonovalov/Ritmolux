@@ -54,6 +54,19 @@
 // documented way this gate is defeated (ADR-0116, Negative 3), and the reason
 // the per-file region count is printed on success as well as on failure: a
 // deleted marker shows up as a region that vanished rather than as silence.
+//
+// TWO THINGS ARE MEASURED PER ROW, AND THEY ARE DIFFERENT ASSERTIONS. Bytes is
+// the cap. SHAPE is the check that a row's form matches its region's: each
+// region takes its kind from its first measured row and a row of the other kind
+// is reported, naming the form that was expected. docs/plans/README.md holds one
+// region of each kind — the active roster is a table, `## Recently closed` is a
+// bullet list — and a closed-plan bullet dropped into the table region is a
+// BULLET inside a region and under cap, so a length check alone reports it as
+// `0 over cap` and exits 0. That is not hypothetical: it happened at a close, in
+// the one file every session opens first, and both this gate and the link gate
+// waved it through (backlog 0166). A 200-byte bullet in a table region is under
+// cap and still wrong, so the shape check sits BESIDE the length one rather than
+// replacing it.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
@@ -124,16 +137,63 @@ function markdownFiles(root, dir = root, found = []) {
  * position, because the ledger holds seven separate table blocks under their own
  * subheadings — "the first table line in the region" would let six headers
  * through as rows and inflate every count this prints.
+ *
+ * A region's KIND is inferred rather than declared on the marker or hardcoded
+ * per file. Inferred, because a region that holds both forms deliberately is a
+ * real possibility elsewhere and the marker syntax should not have to grow a
+ * second attribute to describe one that does not; per-region, because the two
+ * regions in docs/plans/README.md are different kinds and a per-file
+ * expectation could not tell them apart.
+ *
+ * THE KIND IS THE MAJORITY FORM, NOT THE FIRST ROW'S, and the difference is the
+ * whole diagnostic value of the check. The observed instance put a closed-plan
+ * bullet immediately under `roster:begin` and ABOVE the table header, because
+ * the insertion anchored on a string rather than on a section - so the stray row
+ * is the one a first-row rule adopts as the region's form, and the thirteen real
+ * table rows below it become the finding. Measured on that seeded tree: 14
+ * reported, and not one of them the mistake. Majority reports the one row.
+ *
+ * A region split evenly between the two forms is reported ONCE, at the region,
+ * naming both counts. There is no majority to appeal to there and guessing which
+ * half is wrong would be the same misdiagnosis in a quieter form.
  */
 function scan(root, file) {
   const lines = readFileSync(join(root, file), "utf8").split(/\r?\n/);
   const regions = [];
   const rows = [];
   const errors = [];
+  const shapes = [];
 
   let cap = null;
   let openedAt = 0;
   let inFence = false;
+  let inRegion = []; // this region's rows so far; the form is judged when it closes
+
+  /** Judge one closed region's rows against the form most of them have. */
+  const judge = (begin, end) => {
+    const table = inRegion.filter((r) => r.kind === "table");
+    const bullet = inRegion.filter((r) => r.kind === "bullet");
+    if (table.length === 0 || bullet.length === 0) return;
+
+    if (table.length === bullet.length) {
+      shapes.push(
+        `${file}:${begin}  the region opened here holds ${table.length} table row(s) and ` +
+          `${bullet.length} bullet row(s), and a region is one form ` +
+          `(no majority to report against; it closes at line ${end})`,
+      );
+      return;
+    }
+
+    const majority = table.length > bullet.length ? "table" : "bullet";
+    const odd = majority === "table" ? bullet : table;
+    for (const r of odd) {
+      shapes.push(
+        `${file}:${r.line}  a ${r.kind} row in a ${majority} region ` +
+          `(expected a ${majority} row; ${Math.max(table.length, bullet.length)} of the ` +
+          `${inRegion.length} rows in this region have that form)`,
+      );
+    }
+  };
 
   lines.forEach((line, i) => {
     const lineNo = i + 1;
@@ -153,6 +213,7 @@ function scan(root, file) {
       }
       cap = begin[1] ? Number(begin[1]) : DEFAULT_CAP;
       openedAt = lineNo;
+      inRegion = [];
       return;
     }
 
@@ -161,8 +222,10 @@ function scan(root, file) {
         errors.push(`${file}:${lineNo} roster:end with no open region`);
         return;
       }
+      judge(openedAt, lineNo);
       regions.push({ begin: openedAt, end: lineNo, cap });
       cap = null;
+      inRegion = [];
       return;
     }
 
@@ -172,14 +235,21 @@ function scan(root, file) {
     // The line above a delimiter is the table's header, not a row.
     if (TABLE_ROW.test(line) && DELIMITER.test(lines[i + 1] ?? "")) return;
 
-    rows.push({ line: lineNo, bytes: Buffer.byteLength(line, "utf8"), cap });
+    const row = {
+      line: lineNo,
+      bytes: Buffer.byteLength(line, "utf8"),
+      cap,
+      kind: TABLE_ROW.test(line) ? "table" : "bullet",
+    };
+    inRegion.push(row);
+    rows.push(row);
   });
 
   if (cap !== null) {
     errors.push(`${file}:${openedAt} roster:begin never closed`);
   }
 
-  return { regions, rows, errors };
+  return { regions, rows, errors, shapes };
 }
 
 /**
@@ -192,6 +262,7 @@ function scan(root, file) {
 function measure(root) {
   const violations = [];
   const errors = [];
+  const misshaped = [];
   const summary = [];
   const perFile = new Map();
   let regionTotal = 0;
@@ -199,24 +270,38 @@ function measure(root) {
 
   for (const file of markdownFiles(root).sort()) {
     const show = file.split(sep).join("/");
-    const { regions, rows, errors: fileErrors } = scan(root, file);
+    const { regions, rows, errors: fileErrors, shapes } = scan(root, file);
     errors.push(...fileErrors.map((e) => e.split(sep).join("/")));
+    misshaped.push(...shapes.map((e) => e.split(sep).join("/")));
     if (regions.length === 0 && fileErrors.length === 0) continue;
 
     const over = rows.filter((r) => r.bytes > r.cap);
     regionTotal += regions.length;
     rowTotal += rows.length;
-    perFile.set(show, { regions: regions.length, rows: rows.length, over: over.length });
+    perFile.set(show, {
+      regions: regions.length,
+      rows: rows.length,
+      over: over.length,
+      misshaped: shapes.length,
+    });
     summary.push(
       `  ${show}: ${regions.length} region${regions.length === 1 ? "" : "s"}, ` +
-        `${rows.length} rows, ${over.length} over cap`,
+        `${rows.length} rows, ${over.length} over cap, ${shapes.length} misshaped`,
     );
     for (const r of over) {
       violations.push(`${show}:${r.line}  ${r.bytes} bytes (cap ${r.cap})`);
     }
   }
 
-  return { violations, errors, summary, perFile, regions: regionTotal, rows: rowTotal };
+  return {
+    violations,
+    errors,
+    misshaped,
+    summary,
+    perFile,
+    regions: regionTotal,
+    rows: rowTotal,
+  };
 }
 
 // --- self-test ---------------------------------------------------------------
@@ -245,6 +330,13 @@ const ROSTER_ROW_FLOOR = 20;
 const REPO_ROW_FLOOR = 100;
 const REPORT_SHAPE = /^[\w./-]+\.md:\d+ {2}\d+ bytes \(cap \d+\)$/;
 
+// The shape report has to name the form it EXPECTED, not only the one it found —
+// a message reading "wrong kind of row" sends its reader to the cap. Both halves
+// are pinned here, and the red fixture's third region is the silence beside it:
+// the byte-identical bullet in a bullet region must not be reported at all.
+const SHAPE_REPORT = /^[\w./-]+\.md:\d+ {2}a (table|bullet) row in a (table|bullet) region \(expected a (table|bullet) row/;
+const TIE_REPORT = /^[\w./-]+\.md:\d+ {2}the region opened here holds \d+ table row\(s\) and \d+ bullet row\(s\)/;
+
 function selfTest() {
   const results = [];
   const record = (label, ok, detail) => results.push({ label, ok, detail });
@@ -256,21 +348,35 @@ function selfTest() {
     `${fixture.regions} regions, ${fixture.rows} rows`,
   );
   record(
-    "fixture: nothing over cap and no malformed marker",
-    fixture.violations.length === 0 && fixture.errors.length === 0,
-    `${fixture.violations.length} over cap, ${fixture.errors.length} malformed`,
+    "fixture: nothing over cap, misshaped, or malformed",
+    fixture.violations.length === 0 &&
+      fixture.errors.length === 0 &&
+      fixture.misshaped.length === 0,
+    `${fixture.violations.length} over cap, ${fixture.misshaped.length} misshaped, ` +
+      `${fixture.errors.length} malformed`,
   );
 
   const red = measure(RED_FIXTURE);
   record(
-    "red fixture: exactly 1 region, 2 rows, 1 over cap",
-    red.regions === 1 && red.rows === 2 && red.violations.length === 1,
-    `${red.regions} regions, ${red.rows} rows, ${red.violations.length} over cap`,
+    "red fixture: exactly 4 regions, 8 rows, 1 over cap, 2 misshaped",
+    red.regions === 4 && red.rows === 8 && red.violations.length === 1 && red.misshaped.length === 2,
+    `${red.regions} regions, ${red.rows} rows, ${red.violations.length} over cap, ` +
+      `${red.misshaped.length} misshaped`,
   );
   record(
-    "red fixture: the report names the row as `file:line  N bytes (cap C)`",
+    "red fixture: the over-cap report reads `file:line  N bytes (cap C)`",
     REPORT_SHAPE.test(red.violations[0] ?? ""),
     red.violations[0] ?? "nothing reported",
+  );
+  record(
+    "red fixture: the shape report names the form it expected",
+    SHAPE_REPORT.test(red.misshaped[0] ?? ""),
+    red.misshaped[0] ?? "nothing reported",
+  );
+  record(
+    "red fixture: a region with no majority is reported once, at the region",
+    TIE_REPORT.test(red.misshaped[1] ?? ""),
+    red.misshaped[1] ?? "nothing reported",
   );
 
   const repo = measure(REPO_ROOT);
@@ -312,7 +418,7 @@ function selfTest() {
 
 if (SELF_TEST) selfTest();
 
-const { violations, errors, summary } = measure(REPO);
+const { violations, errors, misshaped, summary } = measure(REPO);
 
 console.log("index rows: regions found");
 for (const s of summary) console.log(s);
@@ -322,9 +428,36 @@ if (errors.length > 0) {
   for (const e of errors) console.error(`  ${e}`);
 }
 
-if (violations.length === 0 && errors.length === 0) {
-  console.log("index rows: OK (every row inside a marked region is within its cap)");
+if (violations.length === 0 && errors.length === 0 && misshaped.length === 0) {
+  console.log(
+    "index rows: OK (every row inside a marked region is within its cap and matches its region)",
+  );
   process.exit(0);
+}
+
+if (misshaped.length > 0) {
+  console.error(`\nindex rows: ${misshaped.length} row(s) of the wrong shape for their region`);
+  for (const m of misshaped) console.error(`  ${m}`);
+  console.error(
+    "\nA region's rows are all one form, and the form is read off the rows\n" +
+      "themselves — the majority — rather than declared on the marker. This is a\n" +
+      "SHAPE break, not a length one: the row above is under its cap and still\n" +
+      "belongs in a different list.\n" +
+      "\n" +
+      "docs/plans/README.md is where this bites, because its two regions are\n" +
+      "different kinds — the active roster is a table, `## Recently closed` is a\n" +
+      "bullet list — and a close ceremony rewrites both. A closed-plan bullet that\n" +
+      "lands in the table region reads as an active plan, resolves as a link, and\n" +
+      "sits under cap, so nothing else in the toolchain reports it.\n" +
+      "\n" +
+      "  table region      | [NNNN](NNNN-slug.md) | <title> | <status> |\n" +
+      "  bullet region     - [NNNN - Title](done/NNNN-slug.md) - closed <date>. Review: <verdict>\n" +
+      "\n" +
+      "Move the row into the region whose form it has. A region split evenly\n" +
+      "between the two forms is reported at its own opening line instead, with\n" +
+      "both counts: there is no majority to appeal to, and guessing which half is\n" +
+      "wrong would send its reader to the wrong rows.",
+  );
 }
 
 if (violations.length > 0) {

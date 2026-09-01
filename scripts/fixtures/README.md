@@ -164,19 +164,41 @@ than as a file that quietly stopped being checked.
 node scripts/check-index-rows.mjs scripts/fixtures/index-rows-red
 ```
 
-Expect **exit 1 and exactly one break**, on the model Plans 0084 and 0094 established for the two
-sibling gates. A bare "exits non-zero" is also what a crash looks like, so the count is the
-assertion and the `--self-test` below additionally pins the *shape* of the printed line.
+Expect **exit 1 and exactly three breaks** — one over cap, two of the wrong shape — on the model
+Plans 0084 and 0094 established for the two sibling gates. A bare "exits non-zero" is also what a
+crash looks like, so the counts are the assertion and the `--self-test` below additionally pins the
+*shape* of each printed line.
+
+**Length and shape are two different assertions** and this tree seeds both, because a row can
+satisfy either while failing the other:
 
 | File | Case | Expected |
 |------|------|----------|
 | `roster.md` | a 437-byte row inside a `roster:begin cap=320` region | reported as `roster.md:25  437 bytes (cap 320)` |
 | `roster.md` | a correctly-sized row in the same region | measured, not reported — so the report picks one of two rather than convicting everything inside a marker |
+| `roster.md` | a closed-plan **bullet** in a **table** region, well under cap | reported by line, naming the form expected and how many rows carry it |
+| `roster.md` | the byte-identical bullet in a **bullet** region | **not** reported — the check is the row's form against its region's, and nothing else |
+| `roster.md` | a region holding one row of each form | reported **once, at the region's own opening line**, naming both counts |
 
-**This is the only thing anywhere that runs the reporting path.** Nothing tracked in this
-repository is over cap and neither is the green fixture, so `file:line  N bytes (cap C)` — two
-spaces before the count, which is what makes the line clickable — had never been executed by any
-run of this gate.
+**This is the only thing anywhere that runs either reporting path.** Nothing tracked in this
+repository is over cap or misshaped, and neither is the green fixture, so `file:line  N bytes
+(cap C)` — two spaces before the count, which is what makes the line clickable — had never been
+executed by any run of this gate.
+
+### The bullet sits above the table header, and that is the whole test
+
+A region's form is the **majority** of its rows, not its first row's, and this fixture is where the
+difference is pinned. The instance backlog 0166 was filed for put the stray bullet immediately
+under `roster:begin` and *above* the table header, because the insertion anchored on a string
+rather than on a section. Under a first-row rule that stray row **defines** the region and every
+real row below it becomes the finding: seeded into `docs/plans/README.md`, a first-row rule reports
+**14 breaks and not one of them the mistake**, where the majority rule reports the one row —
+`docs/plans/README.md:27  a bullet row in a table region (expected a table row; 14 of the 15 rows
+in this region have that form)`.
+
+A region split evenly has no majority to appeal to, and guessing which half is wrong would be the
+same misdiagnosis in a quieter form — so it is reported at the region rather than at a row. The
+fourth region seeds that.
 
 **Note the root.** Unlike the green fixture this checker is pointed at the subdirectory rather than
 at `scripts/fixtures`, and the tree names itself on the checker's `SEEDED_TREES` list for a second
@@ -195,21 +217,21 @@ reduction, and the per-file counts it collapses were the documented mitigation �
 compared to nothing.
 
 ```
-node scripts/check-index-rows.mjs --self-test    # expects exit 0, 8 of 8
+node scripts/check-index-rows.mjs --self-test    # expects exit 0, 10 of 10
 ```
 
-The eight split into three halves — the green fixture, the red one, and the repository — and they
-die to different mutations:
+The ten split three ways — the green fixture, the red one, and the repository — and they die to
+different mutations:
 
 | Half | Asserts | Why that shape |
 |------|---------|----------------|
-| green fixture | **exactly** 3 regions and 4 rows, nothing over cap, no malformed marker | this tree changes only when someone changes it on purpose, so an exact number is affordable — and **4 rather than 6** is what holds a table's header and its `\|---\|` delimiter to being structure rather than rows |
-| red fixture | **exactly** 1 region, 2 rows, 1 over cap, and the break matching `file:line  N bytes (cap C)` | the count separates a conviction from a crash; the shape is the only assertion the reporting path has, since no other run reaches it |
+| green fixture | **exactly** 3 regions and 4 rows, nothing over cap, misshaped or malformed | this tree changes only when someone changes it on purpose, so an exact number is affordable — and **4 rather than 6** is what holds a table's header and its `\|---\|` delimiter to being structure rather than rows |
+| red fixture | **exactly** 4 regions, 8 rows, 1 over cap and 2 misshaped, with each break matching its own printed form | the counts separate a conviction from a crash; the forms are the only assertion the two reporting paths have, since no other run reaches either |
 | repository | a **floor** of 20 rows in each of `docs/adrs/README.md`, `docs/plans/README.md` and `docs/design-backlog.md`, and 100 across the tree | those three gain a row at every close, so an exact count would be red on the next one and would be raised without being read; a floor still goes to zero the moment the detectors stop matching, which is the only thing it is for |
 
-Under the matches-nothing mutation the self-test reports **1 of 8** and exits 1, while the plain
+Under the matches-nothing mutation the self-test reports **1 of 10** and exits 1, while the plain
 run still exits 0 — which is the whole reason the self-test is where the assertion lives rather
-than in the exit code of the ordinary run. Rewriting the report string alone reports **7 of 8**.
+than in the exit code of the ordinary run. Rewriting either report string alone costs one row.
 
 Both invocations — the plain repo run and `--self-test` — are in `.githooks/pre-push` and in the
 CI `links` job. A self-test nothing runs is the mechanism this fixture exists to have repaired.
