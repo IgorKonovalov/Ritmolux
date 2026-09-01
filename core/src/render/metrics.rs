@@ -336,7 +336,8 @@ pub fn peak_to_mean(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// retune asks when it wants to hold level constant across a change, and it is
 /// the one question that cannot be asked on the stored bytes: sRGB's transfer
 /// curve is concave, so an encoded mean under-reports a trim by roughly half.
-/// [`linear_diff`] carries the same reasoning for a two-frame comparison.
+/// `linear_diff` carries the same reasoning for a two-frame comparison. It is
+/// private, so this names it rather than linking it.
 ///
 /// **The lit predicate is [`coverage`]'s, so this is linear light over a
 /// CODE-SPACE-selected set.** ADR-0150 records why that seam is accepted rather
@@ -353,7 +354,7 @@ pub fn peak_to_mean(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// background* is invisible here.
 ///
 /// Luminance weights are Rec.709 (`0.2126/0.7152/0.0722`), not the Rec.601 that
-/// [`luma`] applies to code values — those are the luminance coefficients of
+/// `luma` applies to code values — those are the luminance coefficients of
 /// sRGB's own primaries, and they are what every other linear-light reading in
 /// this workspace uses.
 pub fn mean_lit_level(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
@@ -749,7 +750,8 @@ fn linear_diff(a: &CaptureImage, b: &CaptureImage) -> f32 {
 /// probe is a whole sequence of them.
 ///
 /// Index it by the stored byte: `lut[b]` is the linear light of code value `b`.
-/// [`linear_diff`]'s doc comment carries why a level comparison decodes first.
+/// `linear_diff`'s doc comment carries why a level comparison decodes first
+/// (private, hence named rather than linked).
 pub fn srgb_decode_lut() -> &'static [f32; 256] {
     static LUT: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
     LUT.get_or_init(|| {

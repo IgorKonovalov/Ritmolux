@@ -1,0 +1,170 @@
+# Smoke - a plume that rises off a source at the bottom edge, wanders, opens out
+# and thins before it reaches the top. Authored fresh-slate (ADR-0089).
+#
+# THE MECHANISM, AND WHY THIS SYSTEM. Smoke is not a figure - it is the history
+# of a source, deformed. That is what `warp_mesh` is: light laid into a feedback
+# field, and then a PER-VERTEX transform moving the field. One shared affine
+# (`trails`, ADR-0048) cannot express it, because smoke's whole character is that
+# the transform DIFFERS with height - laminar at the source, turbulent above it,
+# spreading as it climbs.
+#
+# FOUR HEIGHT GRADIENTS DO THE WORK, and each reads `y`, which is 0 at the TOP.
+# `(1 - y)` is therefore "how far up this vertex is", 0 at the source and 1 at
+# the ceiling:
+#
+#   dy    rise, accelerating upward     - buoyancy
+#   warp  turbulence, growing upward    - the laminar-to-turbulent transition
+#   dx    lateral wander, widening      - the serpentine every real plume has
+#   sx    horizontal stretch, widening  - entrainment; the column opens out
+#
+# Take any one out and it stops being smoke: without the `warp` gradient it is a
+# straight jet, without `dx` a rising bar, without `sx` a rope that never
+# disperses.
+#
+# THE ARMS ARE NOT DECORATION - THEY ARE WHAT MAKES THE TURBULENCE VISIBLE, and
+# this is the one thing to know before tuning this file. `warp` DISPLACES the
+# field; it does not create structure in it. Drafted with a soft round blob for a
+# source (`deposit_radius = 0`, no arms) and a `warp` climbing to 4.5, the frame
+# came back as a perfectly smooth grey finger with no turbulence visible at ALL -
+# and raising `warp` further only made the finger wave about. `warp_cauldron`
+# records the same trap in one line: a wobble applied to a featureless gradient
+# moves it and changes nothing you can see. Twelve twisted arms give the field
+# filaments, and only then does the warp have anything to shred. The arms are
+# invisible as arms - what you see is the wisps they become.
+#
+# THE SOURCE SITS AT THE BOTTOM EDGE so the whole frame is the plume, rather than
+# a streak leaving the middle - the same argument `warp_sirocco` makes for
+# putting its source upwind. `deposit_y = 0.9` is below the deposit's own width,
+# so the ring is cropped and reads as a fire-line rather than as a hoop.
+#
+# COLOUR IS WHAT KEEPS IT SMOKE AND NOT FIRE. The deposit is coloured BY ANGLE
+# through the palette, so a wide `color_span` rainbows the source and the plume
+# carries that rainbow up. `color_span` is 0.12 and `saturation` 0.22: the stops
+# carry a cool ash ramp and the picture is essentially a value study, which is
+# what smoke is. A warm high-saturation variant was tried and reads as a lit
+# column with a hard vertical seam down it - that seam is the angle colouring
+# showing through, not lighting, and it is why this stays desaturated.
+#
+# HORIZON VERDICT, ten simulated minutes at 96x96, bass 0.6 / mid 0.45. This world
+# accumulates - a feedback field is the whole mechanism - so it is exactly the
+# case ADR-0099's spot-check exists for.
+#
+#   coverage    0.0386 ->  0.7684   delta  +0.7298   monotone 0.35
+#   peak/mean  41.4136 ->  2.6592   delta -38.7543   monotone 0.45
+#   footprint   0.4504 ->  0.0695   delta  -0.3809   monotone 0.53
+#
+# READ THE ROWS, NOT THE DELTA. The 0 s row is the field before it has filled - a
+# `warp_mesh` world starts empty by construction - and the 30 s row is already at
+# the steady value. The remaining nineteen rows hold coverage between 0.760 and
+# 0.773, peak/mean between 2.43 and 2.67, and footprint between 0.064 and 0.085,
+# wandering with no march in either direction. The whole delta is warm-up. A
+# static control run at the same horizon reads delta 0.0000 and monotone 0.00 on
+# all three, which is what earns that reading.
+#
+# WHAT IT WARMS UP INTO IS WORTH KNOWING BEFORE JUDGING A SHORT CAPTURE. For the
+# first second or two this is a single narrow finger; the broad layered column is
+# what it becomes and what runs on stage. A two-second still shows only the first.
+#
+# WHAT DRIVES WHAT. Bass feeds the source, so each swell is a fresh puff of
+# material. Mid twists the source's arms and stirs the turbulence. Treble tightens
+# the wobble's spatial scale into finer curl and widens the serpentine. Onset
+# gives the column a brief updraft.
+#
+# MID REACHES THE SOURCE BECAUSE NOTHING ELSE IT TOUCHES IS MEASURABLE. Drafted
+# with mid on `warp` and `warp_speed` alone, `--report` read its column at 0.000
+# whole-frame and 0.001 over the footprint - not a dead gain (the arithmetic was
+# right) but a change the metric cannot see: altering the turbulence RESHUFFLES
+# wisps without moving coverage or luminance, and `warp_speed` integrates a phase,
+# so a speed change has barely diverged inside a 48-frame probe. Binding
+# `deposit_twist` as well took it to 0.010 / 0.050. The lesson generalizes to this
+# whole family: a lever on the FIELD is slow and statistically invisible, a lever
+# on the SOURCE shows immediately.
+#
+# BASS DRIVES THREE LEVERS RATHER THAN ONE, FOR THE SAME REASON MID REACHES THE
+# SOURCE. With the swell on `deposit` alone the reactivity gate FAILED at 0.0140
+# against its 0.02 floor - the deposit is upstream of a slow accumulator, so a
+# change in it reaches the picture over a second or two, and the probe is shorter
+# than that. Widening the fire-line (`deposit_radius`) and lifting the light
+# (`brightness`) both land in the same frame they are asked for. Together they
+# read 0.029 whole-frame and 0.115 over the lit footprint. The look is unchanged
+# by it: a plume that carries more material is brighter and wider at the base,
+# which is what the extra terms say.
+#
+# The `[per_vertex]` audio terms are kept SMALL deliberately: `[smoothing]` cannot
+# ease a per-vertex binding, so anything large there arrives unsmoothed as a jolt.
+# The smoothed audio lives on the scalars.
+system = "warp_mesh"
+name   = "Smoke"
+
+[mesh]
+x = 40
+y = 30
+
+[palette]
+stops = [
+  { at = 0.0, color = "#07080b" },   # the dark the plume is read against
+  { at = 0.35, color = "#33383f" },  # charcoal
+  { at = 0.7, color = "#8d9199" },   # cool ash
+  { at = 1.0, color = "#e6e3dd" },   # the lit edge of a wisp
+]
+
+[per_vertex]
+# Rise. Negative dy is upward, in frame-heights per second, accelerating with
+# height: buoyancy.
+dy = "-(0.09 + (1 - y) * (0.30 + clamp(onset * 0.33, 0, 0.20)))"
+
+# The serpentine. A travelling wave in height, so the column snakes rather than
+# leaning; the `(1 - y)` factor pins it at the source and lets it wander once it
+# is clear of it.
+dx = "sin(y * 6.5 - time * 0.7) * (1 - y) * (0.10 + clamp(treb * 0.15, 0, 0.09))"
+
+# Turbulence: nearly still at the source, full above it.
+warp = "0.25 + (1 - y) * (4.5 + mid * 1.2)"
+
+# Entrainment: the column opens out as it climbs.
+sx = "1.0 + (1 - y) * (0.22 + clamp(mid * 0.14, 0, 0.12))"
+
+[params]
+# The field. Longer than the family's default, because the plume has to survive
+# the whole climb - a shorter tail starves the top and the column ends in mid-air.
+decay = "0.78"
+
+# The source. Baseline plus a bass swell on all three of the levers that reach it
+# - how much light, how wide the fire-line, and how brightly it burns. Each gain
+# is its cap over 0.85, so a typical passage sits near half the cap and a peak at
+# it: 4.0/0.85 = 4.71, 0.04/0.85 = 0.047, 0.12/0.85 = 0.141.
+deposit        = "3.2 + clamp(bass * 4.71, 0, 4.0)"
+deposit_x      = "0.5"
+deposit_y      = "0.9"
+deposit_radius = "0.14 + clamp(bass * 0.047, 0, 0.04)"
+deposit_width  = "0.05"
+deposit_arms   = "12"
+deposit_twist  = "3.2 + clamp(mid * 0.94, 0, 0.8)"
+deposit_spin   = "0.35"
+
+# The wobble's shape. Larger is coarser, so treble tightens it into finer curl:
+# `0.15 / 0.60 = 0.25`. `warp_speed` integrates a phase (ADR-0132), so binding it
+# to audio bends the drift instead of teleporting it.
+warp_scale = "0.45 - clamp(treb * 0.25, 0, 0.15)"
+warp_speed = "0.55 + clamp(mid * 0.35, 0, 0.3)"
+
+# Colour: a value study, not a rainbow.
+color_span   = "0.12"
+color_center = "0.5"
+saturation   = "0.22"
+hue          = "0.58"
+
+# Luminance swings by about a seventh and no more - the peak is spent on the
+# source and on the turbulence, not on brightness (the additive ceiling). The
+# swing that IS here is the difference between passing the reactivity gate and
+# failing it; see the header.
+brightness = "0.86 + clamp(bass * 0.141, 0, 0.12)"
+gamma      = "1.05"
+
+[smoothing]
+deposit        = 0.18
+deposit_radius = 0.20
+deposit_twist  = 0.22
+brightness     = 0.16
+warp_scale     = 0.25
+warp_speed     = 0.30
