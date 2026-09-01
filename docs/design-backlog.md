@@ -4109,3 +4109,57 @@ now than after another twenty plans.
 - **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5**, carrying both method constraints this entry names: the
   `rustc` version recorded at every point against the ~13,312 B noise floor, and the cdylib read as a
   proxy while the number shipped is `foo_lmv.dll`'s.
+
+## 0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push
+
+**Raised by:** `architect`, at [Plan 0137](plans/done/0137-the-metrics-measure-light.md)'s close
+review (2026-09-01), from a red `main` the close ceremony's own gate list could not have caught.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-09-01** — CI runs the doc gate:
+  `present: RUSTDOCFLAGS in: .github/workflows/ci.yml`
+- **Verified 2026-09-01** — and the hook that mirrors every other CI gate does not:
+  `absent: cargo doc in: .githooks/pre-push`
+
+### The finding
+
+`.github/workflows/ci.yml:118` runs `cargo doc --workspace --no-deps` with
+`RUSTDOCFLAGS: -D warnings`, added by Plan 0144 Phase 6. `.githooks/pre-push` runs the five Node
+gates, `fmt`, `clippy --workspace --all-targets -D warnings` and a narrowed `nextest` — and no
+`cargo doc`. The exclusion is **deliberate and documented** in `ci.yml`'s own comment: the hook's
+budget is ~28 s and a full `cargo doc` does not fit. That reasoning is sound and this entry does not
+dispute it.
+
+What the entry is about is the **consequence nobody priced**: `cargo doc` is now the only CI gate
+with no local counterpart at any cadence — not the hook, not the `dev` per-phase gate, and not the
+architect close ceremony, whose written gate list is `fmt` + `clippy --workspace --all-targets` +
+`cargo nextest run --workspace` + the five Node scripts. So a rustdoc error is **structurally
+unreachable** until a push has already happened.
+
+Plan 0137 is the demonstration. It made `srgb_decode_lut` public (Phase 1) and added a public
+`mean_lit_level` (Phase 2). Both doc comments carried `[`linear_diff`]` and `[`luma`]` intra-doc
+links, and both targets are private — which is fine for a private item and an **error** for a
+public one under `-D warnings` (`rustdoc::private_intra_doc_links`). The links had been correct for
+as long as `srgb_decode_lut` was private; *making it public is what turned them red*, and that is
+the general shape: **the trigger is a visibility change, not a doc edit.** `dev` did not see it,
+the hook could not see it, and the close review ran every gate the ceremony names and still shipped
+a red `main` and a `chore: Release` tag on top of it.
+
+Three errors, all in `core/src/render/metrics.rs`, on both `macos-latest` and `windows-latest`.
+Repaired the same day by naming the two private helpers instead of linking them.
+
+### The shape of a repair, not a decision
+
+Two candidate cadences, and the choice between them is the design question:
+
+- **At the close.** One line in the architect ceremony's gate list, beside the `nextest --workspace`
+  it already owes once per plan. Costs ~10 s on a warm tree, catches it before the tag rather than
+  after. Cheapest, and it is the cadence at which visibility actually changes.
+- **In the hook, scoped.** `cargo doc -p lmv-core --no-deps` rather than `--workspace`, which is
+  where every public surface in this project lives. Needs measuring against ADR-0033's budget
+  before anyone claims it fits — the figure above is a warm-tree guess and nothing here measured it.
+
+A third option worth naming only to reject: adding `#[allow(rustdoc::private_intra_doc_links)]` at
+the module level. It would have made this specific failure impossible and would also have made the
+next real broken link invisible.
+
