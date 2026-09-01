@@ -2801,12 +2801,16 @@ by how much* — had no instrument and the lane had to write one in a scratch di
   `present: fn luma\(px: &\[u8\]\) -> f32 in: core/src/render/metrics.rs`
 - **Verified 2026-08-26** — it *does* linearize, for exactly one question, behind a private table:
   `present: fn srgb_decode_lut\(\) -> &'static \[f32; 256\] in: core/src/render/metrics.rs`
-- **Re-verified 2026-08-27** — the report's column set still carries no level column. Plan 0121
-  Phase 1 added `drive` and `rate`, neither of which is one, and broke the old probe by widening the
-  header string it pinned column by column. The replacement pins the numeric-column *shape* instead,
-  so a level column arriving is still a re-read trigger without the probe having to name every
-  column that exists:
-  `present: \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>7\} \{:>5\} \{:>5\} in: standalone/src/shot/report.rs`
+- **Re-verified 2026-09-01** — the level column now exists, and the probe pins the column set it
+  arrived in rather than the one it was missing from. The numeric cells narrowed from 7 to 6 to buy
+  its width back inside the table's 100-column budget; `rate` keeps 7 because its cell can carry a
+  `+`. A tenth numeric column, or a re-widening, moves this string and is a re-read trigger:
+  `present: \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>7\} \{:>6\} \{:>6\} \{:>5\} \{:>5\} in: standalone/src/shot/report.rs`
+- **Verified 2026-09-01** — the level statistic itself is reachable and is the one this entry asked
+  for, in linear light over the lit set:
+  `present: pub fn mean_lit_level in: core/src/render/metrics.rs`
+- **Verified 2026-09-01** — the decode table is no longer private, which is what let the other
+  statistics reach it: `present: pub fn srgb_decode_lut in: core/src/render/metrics.rs`
 
 ### The finding
 
@@ -3434,7 +3438,8 @@ wants asserting too (`>= ANIM_FLOOR`), so the probe cannot quietly stop moving a
 zero vacuous. Then the comment's "both" is true.
 
 - **Verified 2026-08-28** — the probe is in the roster: `present: rosette_spin_only in: core/tests/animation.rs`
-- **Verified 2026-08-28** — and nothing asserts on it: `absent: rosette\.driven in: core/tests/animation.rs`
+- **Verified 2026-09-01** — the driven half is now asserted on it: `present: rosette\.driven < DRIVEN_FLOOR in: core/tests/animation.rs`
+- **Verified 2026-09-01** — and so is the silent half, which is what keeps the driven zero from going vacuous: `present: rosette\.silent >= ANIM_FLOOR in: core/tests/animation.rs`
 
 ## 0152 — a disjunctive gate made "the shipped library's minimum" ambiguous, and `ANIM_FLOOR`'s recorded derivation still reads as though there were one population
 

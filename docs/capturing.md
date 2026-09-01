@@ -600,9 +600,9 @@ cross-machine byte equality does not hold and nothing here asserts it.
 ### What the report's columns mean
 
 ```
-  preset            bass     mid    treb   onset   drive    anim    rate   cover  rise  fall
-  Drift Mono       0.320   0.489   0.204   0.174   0.455   0.316 0.0411+   0.450    9+   24+
-  Static Control   0.000   0.000   0.000   0.000   0.000   0.122 0.0057+   0.997   43+   42+
+  preset           bass    mid   treb  onset  drive   anim    rate  cover  level  rise  fall
+  Shatter         0.099  0.064  0.013  0.106  0.103  0.092 0.0357+  0.997 0.0316   11+    4+
+  Stipple         0.050  0.013  0.001  0.011  0.057  0.010 0.0132+  0.222 0.5313    7+   26+
 ```
 
 | column | question it answers |
@@ -612,7 +612,34 @@ cross-machine byte equality does not hold and nothing here asserts it.
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
 | `rate` | how far the frame moves **frame to frame** — the only column that walks consecutive frames, and the only one measured at 96x96 ([the two motion readings](#the-two-motion-readings)) |
 | `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
+| `level` | how much **light** the picture carries: mean linear light over the pixels `cover` counts as lit ([what the level column measures](#what-the-level-column-measures)) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
+
+#### What the `level` column measures
+
+**Linear light, over the lit set** ([ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md)).
+Two halves, and both matter:
+
+- **Linear**, because the stored pixels are sRGB-encoded and that curve is
+  concave: a mean over the bytes under-reports a brightness change by roughly
+  half. Trimming a preset's `brightness` by 30 % moves an encoded mean about
+  15 % and this column about 30 %.
+- **Over the lit set**, the same pixels `cover` counts, so an authored
+  background does not dilute the reading. The two columns read one picture from
+  two directions: `cover` is how much of the frame is lit, `level` is how bright
+  that lit part is. In the sample above `Shatter` fills the frame at a low level
+  and `Stipple` lights a fifth of it, brightly.
+
+**It is a comparison number and never a threshold.** There is no level a preset
+ought to hit, and one row's cell says nothing on its own. What it is for is a
+before/after on the same preset — *did this change make it brighter, and by how
+much* — or an ordering across a family. The lit predicate is a threshold on the
+stored bytes, so the statistic is linear light over a set chosen in code space;
+ADR-0150 records why that seam is accepted rather than solved.
+
+**The blind spot, by construction:** a preset that goes wrong by changing its
+*background* is invisible here. That is the price of not being a background
+detector, and `cover` is the column that sees it.
 
 The name column is fourteen characters wide, and a longer name is **elided in
 the middle**, not at the tail: `Tiled Rosette Mono` prints as `Tiled R~e Mono`.

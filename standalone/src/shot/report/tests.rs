@@ -39,6 +39,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         drive: 0.625,
         rate: 0.0123,
         coverage: 0.5,
+        level: 0.1234,
         geometry: None,
         transient: Transient {
             response: StepResponse {
@@ -622,6 +623,40 @@ fn the_motion_columns_print_in_the_table_and_carry_their_size_in_the_json() {
         json.matches('{').count(),
         json.matches('}').count(),
         "braces balance with the new keys: {json}"
+    );
+}
+
+/// The level column reaches both outputs, one cell per preset (ADR-0150).
+///
+/// Its four decimals are not decoration: the statistic is a comparison number
+/// and the comparisons it is read for are small. Three places would round a
+/// 5 % move between two neighbouring rows to nothing, which is the resolution
+/// the encoded mean it replaces already had.
+#[test]
+fn the_level_column_prints_per_preset_and_reaches_the_json() {
+    let fam = || FamilyReport {
+        system: SystemKind::Swarm,
+        presets: vec![
+            preset_report("drifter", vec![]),
+            preset_report("eddy", vec![]),
+        ],
+        pixel: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+        shape: vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam()], Tier::Floor);
+    assert!(out.contains("level"), "the level header prints:\n{out}");
+    assert_eq!(
+        out.matches("0.1234").count(),
+        2,
+        "one level cell per preset, at four decimals:\n{out}"
+    );
+
+    let json = render_json("src", &[fam()], Tier::Floor);
+    assert_eq!(
+        json.matches("\"level\":0.1234").count(),
+        2,
+        "the level reaches the json once per preset: {json}"
     );
 }
 

@@ -20,8 +20,8 @@ use lmv_core::preset::{
     GateFlag, GateKind, Observations, Preset, SATURATED_OCCUPANCY, SystemKind, Variables,
 };
 use lmv_core::render::metrics::{
-    StepResponse, coverage, footprint_diff, frame_diff, quadrant_spread, segment_settled,
-    step_response, struct_diff,
+    StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, quadrant_spread,
+    segment_settled, step_response, struct_diff,
 };
 use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
 use lmv_core::render::{CaptureImage, Renderer, Tier};
@@ -151,6 +151,18 @@ struct PresetReport {
     /// steady motion, so the cell is marked rather than published bare.
     rate: f32,
     coverage: f32,
+    /// Mean linear light over the lit set of the same fully-driven capture
+    /// `coverage` reads (ADR-0150) — how much light the picture carries, not
+    /// how much of the frame it occupies.
+    ///
+    /// **A comparison number, not a threshold.** One preset's cell says nothing
+    /// on its own: there is no baseline level a preset ought to hit, and the
+    /// authored background it excludes means two presets are comparable in
+    /// their figures rather than in their overall impression. What it is for is
+    /// a before/after on the same preset, or an ordering across a family, which
+    /// is the reading a retune holding level constant across a change needs.
+    /// An encoded mean cannot serve: it under-reports a trim by roughly half.
+    level: f32,
     /// The in-frame geometry fraction of the fully-driven capture's last frame
     /// (Plan 0075 Phase 2, design-backlog 0070): the share of drawn segment
     /// length inside the render target, measured at `LineRenderer::draw`
@@ -303,6 +315,9 @@ fn build_family_report(
         let drive = frame_diff(&late, &fixed);
         let bg = corner(&fixed);
         let cov = coverage(&fixed, bg, COVERAGE_EPS);
+        // Same capture, same background, same lit predicate as `cov` — the two
+        // are the occupancy and the level of one picture.
+        let level = mean_lit_level(&fixed, bg, COVERAGE_EPS);
         // Belt-and-braces "not a dot" note folded into coverage via spread:
         // a single-quadrant frame is suspicious even at decent coverage.
         let _spread = quadrant_spread(&fixed, bg, COVERAGE_EPS);
@@ -316,6 +331,7 @@ fn build_family_report(
             drive,
             rate: rates.get(index).copied().unwrap_or(0.0),
             coverage: cov,
+            level,
             geometry,
             transient: transients.get(index).copied().unwrap_or(Transient {
                 response: StepResponse {
@@ -1022,9 +1038,17 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         // The `geom` column exists only where the measurement does: a family
         // whose scenes build no segment list has no line seam to measure at,
         // and a fabricated cell would read as a finding (backlog 0070).
+        //
+        // Numeric cells are 6 wide, which is one space of gutter around a
+        // `0.500`. `rate` is the exception at 7: its cell can carry a `+`
+        // suffix on an unsettled reading, so it is the one column whose
+        // content reaches 7 characters. The budget is what forces this — the
+        // widest row (a line family, so `geom` is present too) has to stay
+        // inside 100 columns or it wraps and stops lining up with its header,
+        // which `no_report_table_line_wraps_at_a_hundred_columns` holds.
         let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
         let mut header = format!(
-            "  {:<name_w$} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5}",
+            "  {:<name_w$} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>7} {:>6} {:>6} {:>5} {:>5}",
             "preset",
             "bass",
             "mid",
@@ -1034,6 +1058,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             "anim",
             "rate",
             "cover",
+            "level",
             "rise",
             "fall",
             name_w = NAME_WIDTH
@@ -1044,7 +1069,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
         let _ = writeln!(out, "{header}");
         for p in &fam.presets {
             let mut row = format!(
-                "  {:<name_w$} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7.3} {:>7} {:>7.3} {:>5} {:>5}",
+                "  {:<name_w$} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>7} {:>6.3} {:>6.4} {:>5} {:>5}",
                 fit_name(&p.name),
                 p.reactivity[0],
                 p.reactivity[1],
@@ -1056,6 +1081,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 // where the averaged frames were still travelling.
                 rate_cell(p.rate, p.transient.rise_settled),
                 p.coverage,
+                p.level,
                 transient_cell(p.transient.response.rise_frames, p.transient.rise_settled),
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
                 name_w = NAME_WIDTH,
@@ -1294,6 +1320,7 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 PROBE_SIZE
             ));
             out.push_str(&format!("\"coverage\":{},", num(p.coverage)));
+            out.push_str(&format!("\"level\":{},", num(p.level)));
             // Only where the measurement exists — the JSON mirrors the text
             // table's omission rather than inventing a null convention.
             if let Some(fraction) = p.geometry {
