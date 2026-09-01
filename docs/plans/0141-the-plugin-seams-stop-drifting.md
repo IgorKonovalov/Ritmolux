@@ -191,7 +191,7 @@ flowchart TB
 | 1 — The preset menu selects by name | dev | done | `a7354b8` |
 | 2 — The size table becomes a dated series | dev | done | `e6f71f1` |
 | 3 — Attribute the 400 KB | dev | done | `c6a6449` |
-| 4 — The recipe reads the SDK's own version | dev | done | committed with this row |
+| 4 — The recipe reads the SDK's own version | dev | done | `c4165f6` |
 
 ### Notes
 
@@ -222,3 +222,32 @@ flowchart TB
   cdylib column in the Phase 2 commit, and Phase 3's bisect falsified it: the rebuilt Plan 0097
   baseline is 1,536 B (0.02 %) from the number recorded at that plan's close. The spec's wording was
   corrected in the Phase 3 commit rather than left as filed.
+- Nothing was added to `docs/on-device-validation.md` for Phase 1's uncaptured live click. That file
+  is not in any phase's `Files touched`, and where the item belongs is a placement call.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0117, 0118, 0105.
+- **What shipped:** fix-only, plus docs. One behavioral change in shipped code (the menu dispatch,
+  `plugin-foobar/foo_lmv.cpp`), one in release tooling that ships nothing itself
+  (`packaging/foobar/build-component.ps1`), and two documentation phases in
+  `docs/specs/0001-c-abi.md`. No new capability, no Rust touched anywhere in the plan.
+- **Operator docs touched:** none. The four commits touch `plugin-foobar/foo_lmv.cpp`,
+  `docs/specs/0001-c-abi.md`, `packaging/foobar/build-component.ps1` and this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, one broken** —
+  `0105 absent: sdk-readme in: packaging/foobar/build-component.ps1`, matched at
+  `build-component.ps1:212`. The probe is falsified **by the fix it was filed to demand**: Phase 4
+  is what put `sdk-readme` in that file. Two neighbours did not break and both are worth reading
+  before deciding: **0117**'s probe asserts `ensure_handle(...)` is still reachable from the modal
+  loop, which is still true and always will be — the defect was the dispatch, not the reload — and
+  **0118**'s probe asserts `8,879,104 B` is still in the spec, which the dated series deliberately
+  keeps as its second row, so that probe can no longer distinguish a stale spec from a current one.
+- **Full suite:** `cargo nextest run --workspace` on the lane at `c4165f6`, **exit 0** —
+  `Summary [520.668s] 1492 tests run: 1492 passed (19 slow), 5 skipped`, across 59 binaries. This is
+  ADR-0156's once-per-plan run and the nine deferred GPU suites are inside it; no suite was run
+  under an upward override at an earlier phase, because no phase touched Rust. `cargo fmt --all
+  --check` exits 0. Clippy was not run: the plan changes no Rust, and the four commits touch one
+  `.cpp`, one `.ps1` and two `.md`.
+- **Outstanding `human` phases:** none; the plan has no `human` phase. One verification is carried
+  rather than run: Phase 1's live menu click, per the first note above.
