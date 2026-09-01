@@ -1,6 +1,6 @@
 # 0137 — The metrics measure light
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
 > **Related ADRs:** [0150](../adrs/0150-the-level-question-is-asked-in-linear-light.md) (proposed),
@@ -219,3 +219,31 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
   resolution-free is a design question that only becomes live if the statistic reaches `--report`,
   and it is explicitly not answered here.
 - **It moves no floor.** Phases 4 and 6 repair statements about numbers; the numbers stay.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0137` on `plan-0137-metrics-light`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — One sRGB decode | dev | done | committed with this row |
+| 2 — A level statistic | dev | not started | — |
+| 3 — A column for it | dev | not started | — |
+| 4 — `boundary_density` says what it is bound to | dev | not started | — |
+| 5 — The driven floor's second probe is actually pinned | dev | not started | — |
+| 6 — Both floors name their population | dev | not started | — |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**

@@ -13,7 +13,7 @@
 
 use lmv_core::dsp::AnalysisFrame;
 use lmv_core::preset::Preset;
-use lmv_core::render::metrics::frame_diff;
+use lmv_core::render::metrics::{frame_diff, srgb_decode_lut};
 use lmv_core::render::{CaptureImage, Renderer};
 
 mod common;
@@ -154,7 +154,7 @@ fn mean_linear_luma_of_mix(a: &CaptureImage, b: &CaptureImage, t: f32) -> f32 {
     sum / (a.rgba.len() / 4) as f32
 }
 
-/// sRGB EOTF: one 8-bit channel to linear light.
+/// sRGB EOTF: one 8-bit channel to linear light, off the engine's own table.
 ///
 /// The blend mixes in **linear** light (the surface is an sRGB format, so the
 /// sampler decodes and the target re-encodes), and the sRGB curve is steep near
@@ -163,12 +163,7 @@ fn mean_linear_luma_of_mix(a: &CaptureImage, b: &CaptureImage, t: f32) -> f32 {
 /// which would make every "is this kind spatially ordered?" probe below meaningless.
 /// Decoding first is what makes the regions comparable.
 fn to_linear(byte: u8) -> f32 {
-    let c = byte as f32 / 255.0;
-    if c <= 0.04045 {
-        c / 12.92
-    } else {
-        ((c + 0.055) / 1.055).powf(2.4)
-    }
+    srgb_decode_lut()[byte as usize]
 }
 
 /// How far the masked pixels have travelled from `a` toward `b`, in `[0, 1]`:

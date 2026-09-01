@@ -31,6 +31,7 @@
 use super::{DEFAULT_GAMMA, Ink, MAX_GAMMA, MIN_GAMMA, applied_gamma, key};
 use crate::render::capture;
 use crate::render::context::{RenderContext, RenderError};
+use crate::render::metrics::srgb_decode_lut;
 
 /// The exponents every property is measured across: two below the identity, the
 /// identity itself, two above. Ordered, because the monotonicity assertions walk
@@ -180,15 +181,6 @@ fn context() -> Option<RenderContext> {
     }
 }
 
-/// sRGB -> linear, the transfer function the 8-bit input texture applies on read.
-fn decode_srgb(x: f32) -> f32 {
-    if x <= 0.040_45 {
-        x / 12.92
-    } else {
-        ((x + 0.055) / 1.055).powf(2.4)
-    }
-}
-
 /// Linear -> sRGB, the transfer function the 8-bit target applies on write.
 fn encode_srgb(x: f32) -> f32 {
     if x <= 0.003_130_8 {
@@ -202,7 +194,7 @@ fn encode_srgb(x: f32) -> f32 {
 /// with the default poles: white paper, black ink, so `mix(paper, ink, key)`
 /// reduces to `1 - key`.
 fn expected_byte(level: u8, gamma: f32) -> f32 {
-    let l = decode_srgb(level as f32 / 255.0);
+    let l = srgb_decode_lut()[level as usize];
     // The shader's Rec. 709 dot, on a grey pixel.
     let d = 0.2126 * l + 0.7152 * l + 0.0722 * l;
     encode_srgb((1.0 - key(d.clamp(0.0, 1.0), gamma)).clamp(0.0, 1.0)) * 255.0
