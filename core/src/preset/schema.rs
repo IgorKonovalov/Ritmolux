@@ -765,8 +765,12 @@ impl Preset {
             };
             let shape = resting("shape").map(crate::render::scenes::marks::mark_shape);
             let mode = resting("coord_mode");
+            // The ceiling is `shape_field`'s own roster, not a literal `1.0`: a
+            // third coordinate would leave a hardcoded bound quietly testing the
+            // wrong thing, and this quantizes the way the scene does.
+            let max_mode = (crate::render::scenes::shape_field::COORD_MODES.len() - 1) as f32;
             if shape == Some(crate::render::scenes::marks::RING_SHAPE)
-                && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, 1.0).round() >= 1.0)
+                && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, max_mode).round() >= 1.0)
             {
                 warnings.push(
                     "parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in \

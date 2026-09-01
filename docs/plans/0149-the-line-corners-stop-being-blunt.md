@@ -408,7 +408,7 @@ pub struct SegmentInstance {
 | 2 — The corner reaches its point | dev | **BLOCKED** — stop gate ran and failed; see Notes | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | committed with this row |
 | 4 — `parametric_curve` reserves what a preset declared | dev | done | committed with this row |
-| 5 — Four contracts that say more than they hold | dev | not started | |
+| 5 — Four contracts that say more than they hold | dev | done | committed with this row |
 
 ### Notes
 
