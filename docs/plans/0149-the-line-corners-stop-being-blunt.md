@@ -405,6 +405,12 @@ wrong by a factor that varies with every corner's orientation.
   — restore the unrelated ones before committing, and compare adapters before trusting a bless.
   **Two phases in a row re-bless the same non-square set**, so bless from a known-good Phase 2a
   tree rather than carrying one bless across both.
+- **Phase 6's comparison sheet exists**, rendered as this phase's last step on the finished tree:
+  the line roster at **1920x1080 and 1280x800**, before Phase 2a and after Phase 2. Both non-square,
+  because a square render shows nothing. It lands under `target/` uncommitted, like the other
+  judging sheets `scripts/` renders, and the log records where. **The "before" arm is a rebuild from
+  the pre-2a commit, not a stashed render** — restoring a file with `Copy-Item` leaves cargo stale
+  and re-renders the code you reverted.
 
 ### Phase 3 — A `scallop` refuses a depth it cannot draw
 - **Owner skill:** dev
@@ -478,9 +484,8 @@ wrong by a factor that varies with every corner's orientation.
   question: does `WIDTH_SCALE` move, and to what. **The answer may be "it does not move"**, and that
   is a decision, recorded in the implementation log, not a skipped phase.
 
-  The sheet is `dev`'s to produce as the last step of Phase 2, on the finished tree. **The
-  comparison arm is a rebuild, not a stashed render**: restoring a file with `Copy-Item` after a
-  render leaves cargo stale and re-renders the code you reverted.
+  The sheet is `dev`'s to produce, and it is Phase 2's last done-when — so this phase consumes an
+  artifact that already exists rather than commissioning one.
 
 ### Phase 7 — Apply the calibration verdict
 - **Owner skill:** dev
