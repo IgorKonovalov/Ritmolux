@@ -278,20 +278,70 @@ $ComponentWarnBytes = 11324620
 | 1 — `--render` is held to spending nothing | dev | done | d527820 |
 | 2 — `shot`'s help cannot fall behind its parser | dev | done | 277e372 |
 | 3 — What the container actually carries | dev | done | 393a332 |
-| 4 — The recipe reads its own output's length | dev | committed with this row | |
-| 5 — The second bisect | dev | not started | |
+| 4 — The recipe reads its own output's length | dev | done | 690fb29 |
+| 5 — The second bisect | dev | **not run — held** | |
 
 ### Notes
 
+**Phase 3 reached neither of the two outcomes its done-when names, and took a third.** The
+done-when asks for the finding to be stated explicitly, so:
+
+- **Argument position is not the cause.** The colour options ahead of `-pix_fmt` read back
+  identically, and so does dropping `-color_range pc` — the range tag comes off the Y4M header,
+  which declares `XCOLORRANGE=FULL`, so that argument was already redundant.
+- **The tags are not unwritable in H.264-in-MP4 either.** `-colorspace` *is* honoured by the
+  libx264 path (asking for `bt2020nc` lands `bt2020nc`; omitting the flag leaves the matrix
+  `unknown`), while `-color_primaries` and `-color_trc` are dropped by it (asking for `bt2020` and
+  `smpte2084` leaves both `unknown`). The loss is in the encoder wrapper, not in the container and
+  not in what `ffprobe` reports.
+- So the repair is the first outcome's *shape* by a mechanism the plan did not name:
+  `-x264-params colorprim=bt709:transfer=bt709` sets the two directly and all four tags read back.
+  The existing flags stay beside it. Measured on ffmpeg 8.1 (gyan.dev full build); a build that
+  honours the flags gets the same values from both sources.
+
+**Phase 2's file list named `standalone/src/shot/`; `parse_args` and `print_usage` live in
+`standalone/examples/shot.rs`.** The plan hedges ("wherever they live") and the test reads that
+file through `include_str!`. No shared roster type was built, per backlog 0176.
+
+**Phase 2's test convicted on its first run**, which is why `docs/capturing.md` is in that commit:
+`--help` and `-h` are accepted by the parser and were absent from the usage text, from the
+example's module header, and from the doc's flag table. All three now carry them.
+
+**Phase 4 put its agreement test in `core/tests/hygiene.rs`** (a new guard (d)) rather than in a
+new packaging test target — that file is already the workspace-wide convention guard, is std-only,
+and runs in the everyday loop. `-WarnBytes` was added to the recipe so the warning arm stays
+reachable; the arm was exercised against a staged 9,564,672 B DLL and the run continued past it.
+The percentage is formatted invariant-culture after this box printed `76,0`.
+
+**A trap worth knowing before repeating any mutation check here:** `cargo nextest run --test
+shot_cli` does **not** rebuild the `shot` example the suite spawns as a subprocess, so a mutation
+appears to have no effect. `cargo build -p standalone --example shot` first.
+
+**Phase 5 was not run, and the reason is its own method constraint.** It requires that no other
+lane be building while the series is taken; `lmv-plan-0136` and `lmv-plan-0149` were both live
+throughout this session. Nothing about it is blocked otherwise — backlog 0178 is untouched and its
+probe still holds.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0175, 0176, 0174, 0177, 0178
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0175, 0176, 0174, 0177, 0178. **0178 is not closed** —
+  it is Phase 5's entry and Phase 5 did not run. The other four are discharged.
+- **What shipped:** a fix (two colour tags now reach the container — metadata only, no encoded
+  sample moves), a feature (the component recipe prints its output's length and warns above a
+  threshold), three new tests and one extended, and doc corrections.
+- **Operator docs touched:** `docs/capturing.md` (the flag table gains `--help`; the colour
+  paragraph now states what the artifact carries and cites the test that checks it), `docs/nfr.md`
+  §4 (two capped figures with units; the component gains its own cap), `docs/specs/0001-c-abi.md`
+  (the size series reads the new cap; headroom restated as 2,792,960 B and 77.8 % of cap).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, four broken** — 0174,
+  0175, 0176 and 0177. Each is an `absent:` probe asserting its defect is still present, and each
+  now matches the test or the constant that fixes it, so all four are ready to archive. 0178 is
+  unaffected. No probe was edited.
+- **Full suite:** `cargo nextest run --workspace`, **exit 0**, `1503 tests run: 1503 passed
+  (52 slow), 5 skipped` in 812.385 s. Run in the lane on the hardware adapter. The wall time is not
+  a comparable figure — another lane built during part of the session.
+- **Outstanding `human` phases:** none; the plan has no `human` phase. Phase 5 is `dev` and held.
 
 ## Followups (after this lands)
 
