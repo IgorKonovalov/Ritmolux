@@ -216,9 +216,9 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// idiom is; this asks the orthogonal question, and a picture is called a blot
 /// only when both say so.
 ///
-/// A solid mass carries only its rim on the boundary and reads near zero however
-/// large it is; a hatched, stroked or tiled figure is almost all rim and reads
-/// near one however small. **The denominator is the lit area, not the frame's**,
+/// A solid mass carries only its rim on the boundary and reads low; a hatched,
+/// stroked or tiled figure is almost all rim and reads near one however small.
+/// **The denominator is the lit area, not the frame's**,
 /// which is what keeps the statistic asking one question: normalizing by frame
 /// area would make a frame score higher merely for having more lit material,
 /// and *how much is lit* is [`coverage`], another term of the same gate.
@@ -227,6 +227,14 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// as boundary. The alternative — edges as lit — would let a fullscreen fill
 /// read as having no perimeter at all, which is the one answer this statistic
 /// must not give.
+///
+/// **It is bound to the capture's resolution and is comparable only at a fixed
+/// one.** Perimeter over area goes as ~`1/L` in the capture's linear size, so
+/// the same scene at 192×192 reads roughly half what it reads at 96×96, and a
+/// solid disc of radius `r` px reads about `2/r` — which is why a 4×4 solid
+/// block reads `1.0000` and a large one does not. Every floor derived from this
+/// statistic is measured at the sanity suite's 96×96 capture, and neither the
+/// numbers nor the ordering carry to another size.
 ///
 /// It reads pixel-scale perimeter, so a **ragged** mass defeats it: a particle
 /// blot noisier than the fixture the threshold was measured on has more
