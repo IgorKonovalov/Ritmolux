@@ -49,10 +49,24 @@
 //   2. The whitelisted orientation line is whitelisted BY LINE. A reflow that
 //      pushes its figure onto the next line reddens this gate. That is intended:
 //      the figure is supposed to stay on the marked line.
+//
+// AN UNTRACKED HIT IS AN ADVISORY AND NEVER AN EXIT CODE. The walk stays a walk
+// of the WORKING TREE, because narrowing it to `git ls-files` would give up the
+// gate's whole reason for existing — the copy that broke this was the one
+// outside the list anyone was checking (ADR-0122), and a gitignored copy of a
+// cost figure still misleads whoever reads it. But nothing wrong can reach
+// `main` through a gitignored file either: the `links` job checks out the
+// tracked tree, so only the local hook can fire on one. It did, once, on a
+// provenance file under `renders/` that had never been and could never be
+// committed, and the author's fix was to edit a file the repository will never
+// see. So the hit is reported and the exit code is left to the tracked half, in
+// the shape check-backlog-claims.mjs's advisory already uses — one idiom for
+// "reported, never part of the exit code" rather than two.
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
@@ -63,6 +77,31 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // check-doc-links.mjs and check-index-rows.mjs do it. The name form also
 // swallowed core/tests/fixtures/ when it was tried there.
 const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
+
+/**
+ * The tracked files under the scan root, as a Set of root-relative `/` paths,
+ * or null when git cannot answer — no git, or not a repository.
+ *
+ * ONE INVOCATION for the whole tree, and the reading is the same one
+ * check-backlog-claims.mjs takes: `git ls-files` output is relative to the cwd,
+ * which is the scan root, which is what these paths are relative to too. Null is
+ * the ADR-0016 shape — the check that cannot run says so rather than reporting
+ * something it did not measure, and here that means every hit stays a violation
+ * rather than every hit becoming advisory.
+ */
+function trackedFiles(root) {
+  try {
+    const out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return new Set(out.split("\0").filter(Boolean));
+  } catch {
+    return null;
+  }
+}
 
 /** The one page the figures are allowed to live on, relative to the scan root. */
 const CANONICAL = "docs/diffusion-filter.md";
@@ -198,7 +237,19 @@ function scannedLines(file) {
 
 const errors = [];
 const violations = [];
+const advisory = [];
 let canonicalKeys = new Set();
+
+// Asked once, up front. Null means git could not answer, and then every hit
+// stays a violation — a check that cannot measure trackedness must not quietly
+// downgrade everything it finds.
+const tracked = trackedFiles(REPO);
+
+/** A hit in a tracked file sets the exit code; one in an untracked file reports. */
+const report = (file, message) => {
+  if (tracked === null || tracked.has(file)) violations.push(message);
+  else advisory.push(message);
+};
 
 if (!existsSync(join(REPO, CANONICAL))) {
   errors.push(`${CANONICAL} does not exist — the canonical page is the whole mechanism`);
@@ -251,16 +302,18 @@ for (const file of files) {
     if (figures.length === 0) continue;
 
     if (ORIENTATION.test(text)) {
-      orientationLines += 1;
+      // Counted only for tracked files: the "exactly one orientation line" rule
+      // is about what the repository ships, and a local scratch file carrying
+      // the marker must not push the committed tree over the limit.
+      if (tracked === null || tracked.has(file)) orientationLines += 1;
       if (file !== ORIENTATION_FILE) {
-        violations.push(
-          `${file}:${line}  the orientation whitelist is only for ${ORIENTATION_FILE}`,
-        );
+        report(file, `${file}:${line}  the orientation whitelist is only for ${ORIENTATION_FILE}`);
         continue;
       }
       for (const f of figures) {
         if (!canonicalKeys.has(f.key)) {
-          violations.push(
+          report(
+            file,
             `${file}:${line}  orientation figure "${f.raw}" is in no figures region of ${CANONICAL}`,
           );
         }
@@ -269,7 +322,7 @@ for (const file of files) {
     }
 
     for (const f of figures) {
-      violations.push(`${file}:${line}  ${f.raw}`);
+      report(file, `${file}:${line}  ${f.raw}`);
     }
   }
 }
@@ -291,6 +344,33 @@ console.log(
 if (errors.length > 0) {
   console.error(`\nfilter figures: ${errors.length} structural problem(s)`);
   for (const e of errors) console.error(`  ${e}`);
+}
+
+// The advisory prints on a pass and on a failure alike, and never touches the
+// exit code. A gitignored copy of a cost figure still misleads whoever reads it,
+// which is why it is reported at all; it cannot reach `main`, which is why it is
+// not a break. The one shape this must not take is silence — dropping untracked
+// files from the walk would give up the reach that caught the copy nobody had
+// enumerated.
+if (advisory.length > 0) {
+  console.log("");
+  console.log("advisory — reported, and never part of the exit code:");
+  console.log(`  ${advisory.length} figure(s) in files this repository does not track:`);
+  for (const a of advisory) console.log(`    ${a}`);
+  console.log(
+    "  A gitignored file cannot reach `main`, so this is a note about your working\n" +
+      "  tree rather than about the repository. It is reported rather than dropped\n" +
+      "  because a stray copy still misleads whoever reads it.",
+  );
+}
+
+if (tracked === null) {
+  console.log("");
+  console.log(
+    "note: trackedness not measured — git could not answer here, so every hit\n" +
+      "      below counts toward the exit code (ADR-0016: say so rather than\n" +
+      "      report something that was not measured).",
+  );
 }
 
 if (violations.length === 0 && errors.length === 0) {

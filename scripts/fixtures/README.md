@@ -313,3 +313,25 @@ The third of those is ADR-0122's own accepted scope limit, and the second and fo
 checker's documented holes. All four are pinned here as **behavior** rather than left as accidents,
 so that a future attempt to widen the scan fails this fixture loudly instead of quietly convicting
 prose it was never meant to reach.
+
+### The fifth case cannot be seeded here, and that is why it is written down
+
+**A hit in an untracked file is an advisory and never an exit code**, and every file in this tree
+is tracked — a fixture for the untracked case would have to be a file the repository does not hold,
+which is a contradiction. So it is recorded instead of seeded, verified by hand and reproducible in
+two commands:
+
+| Seeded | Expected | Verified |
+|--------|----------|----------|
+| a **gitignored** file naming the filter and carrying a cost figure — `renders/scratch-note.md` with `54 minutes` | named in the advisory block, **exit 0** | yes, on this tree |
+| the same figure appended to a **tracked** file in scope — `docs/capturing.md` | reported as a violation, **exit 1** | yes, on this tree |
+
+The walk deliberately stays a walk of the working tree. Narrowing it to `git ls-files` buys the
+ergonomics and gives up the gate's whole reason for existing: the copy that broke this was the one
+outside the list anyone was checking ([ADR-0122](../../docs/adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)).
+Nothing wrong can reach `main` through a gitignored file — the CI `links` job checks out the
+tracked tree — so the reach is kept and the exit code is left to the tracked half.
+
+If git cannot answer at all, the gate says so and every hit counts toward the exit code. That is
+ADR-0016's shape and it is the safe direction: a check that cannot measure trackedness must not
+quietly downgrade everything it finds.
