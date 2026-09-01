@@ -350,6 +350,14 @@ include!(concat!(env!("OUT_DIR"), "/animation_tests.rs"));
 /// weakens a gate exactly as far as one branch and no further, so a control that
 /// had to fail only one of them would stop pinning the other.
 ///
+/// **`rosette_spin_only` is the third probe, and it is what makes the control's
+/// driven zero mean anything.** A figure frozen in both readings satisfies a
+/// driven statistic that measures nothing at all exactly as well as it satisfies
+/// a working one. This probe turns steadily on its own clock and binds no band,
+/// so it is the one frame in this file that separates *responds to the music*
+/// from *moves*: its silent reading must stay above the floor (or its driven
+/// zero is vacuous) and its driven reading must stay at zero.
+///
 /// Runs at [`SIZE`] only — the ladder below already measured that resolution
 /// does not move either statistic.
 #[test]
@@ -371,6 +379,7 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
 
     let mut sparse = None;
     let mut frozen = None;
+    let mut rosette = None;
     for ((label, note, _), name) in probes.iter().zip(names.iter()) {
         let m = motions(&mut renderer, name);
         println!(
@@ -380,11 +389,12 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
         match *label {
             "squall_sparse" => sparse = Some(m),
             "star_frozen" => frozen = Some(m),
+            "rosette_spin_only" => rosette = Some(m),
             _ => {}
         }
     }
-    let (Some(sparse), Some(frozen)) = (sparse, frozen) else {
-        panic!("the probe roster no longer carries the two pinned probes");
+    let (Some(sparse), Some(frozen), Some(rosette)) = (sparse, frozen, rosette) else {
+        panic!("the probe roster no longer carries the three pinned probes");
     };
     assert!(
         sparse.silent >= ANIM_FLOOR,
@@ -404,6 +414,27 @@ fn the_footprint_statistic_separates_the_rejected_draft_from_the_static_control(
          figure with no audio binding is moving under full drive, so the driven \
          floor is measuring something other than the music (ADR-0136)",
         frozen.driven,
+    );
+    // The static control's driven zero above is consistent with a driven
+    // statistic that measures nothing at all: a figure frozen in both
+    // readings satisfies it exactly as well. This probe is what separates
+    // the two. It turns steadily on its own clock and binds no band, so it
+    // moves in silence and must still read zero on the differential.
+    assert!(
+        rosette.silent >= ANIM_FLOOR,
+        "THE SYMMETRIC CASE stopped moving in silence ({:.4} < {ANIM_FLOOR}) \
+         - its driven zero below is then vacuous, and this file no longer \
+         holds the driven reading to responding to the music rather than \
+         to motion",
+        rosette.silent,
+    );
+    assert!(
+        rosette.driven < DRIVEN_FLOOR,
+        "THE SYMMETRIC CASE passes the DRIVEN branch ({:.4} >= {DRIVEN_FLOOR}) \
+         - it binds no band, so autonomous motion has leaked into the \
+         driven differential and the branch is scoring rotation as \
+         reactivity (ADR-0136)",
+        rosette.driven,
     );
 }
 
