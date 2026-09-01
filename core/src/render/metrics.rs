@@ -684,10 +684,14 @@ fn linear_diff(a: &CaptureImage, b: &CaptureImage) -> f32 {
     (sum / count as f64) as f32
 }
 
-/// The 256-entry sRGB→linear decode table, built once. A table rather than a
-/// `powf` per channel because [`frames_to_settle`] runs a full-frame difference
-/// per captured frame, and the probe is a whole sequence of them.
-fn srgb_decode_lut() -> &'static [f32; 256] {
+/// The 256-entry sRGB→linear decode table, built once — the workspace's one
+/// sRGB decode. A table rather than a `powf` per channel because
+/// [`frames_to_settle`] runs a full-frame difference per captured frame, and the
+/// probe is a whole sequence of them.
+///
+/// Index it by the stored byte: `lut[b]` is the linear light of code value `b`.
+/// [`linear_diff`]'s doc comment carries why a level comparison decodes first.
+pub fn srgb_decode_lut() -> &'static [f32; 256] {
     static LUT: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
     LUT.get_or_init(|| {
         let mut table = [0.0f32; 256];
