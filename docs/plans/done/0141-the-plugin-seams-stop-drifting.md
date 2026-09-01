@@ -1,6 +1,15 @@
 # 0141 — The plugin's seams stop drifting
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-01. Four phases, one commit each: `a7354b8` (menu selects by
+> name), `e6f71f1` (the size table becomes a dated series), `c6a6449` (the growth attributed to
+> Plan 0100), `c4165f6` (the recipe reads the staged SDK's version). Mode 4 review: **no blockers,
+> two majors, three minors** — all five repaired in the close commit. Verified independently of the
+> log: `lmv_select_preset` now has exactly one call site repo-wide; the bisect's byte deltas are
+> corroborated by the diffstats of their own windows (34 lines / 9,386 lines / 823 lines of
+> `core/src`); Phase 4's three failure modes re-exercised against a hand-edited `sdk-readme.html`.
+> Full suite on the merged tree: `cargo nextest run --workspace` **1496 passed, 5 skipped, exit 0**,
+> with `fmt`, `clippy --workspace --all-targets` and all five Node gates clean. Filed
+> [backlog 0177 + 0178](../../design-backlog.md).
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
 > **Related ADRs:** none — three mechanical repairs, no rejected alternative worth recording.
@@ -91,7 +100,7 @@ flowchart TB
   - The existing post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A
     handle that was **replaced** rather than dropped passes it — note that in the comment, since it is
     the second half of why the old reasoning failed.
-  - **This contends with [Plan 0103](0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
+  - **This contends with [Plan 0103](../0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
     this same handler. Backlog 0117 calls itself a natural pickup for whoever takes that phase; if
     0103 is live, coordinate rather than racing.
 - **Done when:** a menu click selects the preset whose name was displayed, and no code path resolves a
