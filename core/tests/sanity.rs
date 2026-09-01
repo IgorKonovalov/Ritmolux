@@ -510,6 +510,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// `0.3602` (`Tiled Rosette Mono`, measured 2026-08-26 at `8389f2a`), rounded to
 /// two places — `1.18x` above the defect and `1.16x` below the composition.
 ///
+/// **Both arms are measured at this suite's [`SIZE`] (96×96) capture, and both
+/// are bound to it.** `boundary_density` is perimeter over lit area, so it goes
+/// as ~`1/L` in the capture's linear size: the same frames at 192×192 read
+/// roughly half these numbers, and a floor carried across sizes convicts
+/// everything. The capture size is the one part of the configuration these
+/// numbers depend on, and no test at the size this project develops at can tell
+/// a resolution-bound constant from a resolution-free one.
+///
 /// It is **not** *half the sparsest legitimate content*, the ceremony every
 /// `coverage_floor` arm above follows, and the reason is structural: a
 /// conjunction's second term is only ever asked about frames that already failed
@@ -521,7 +529,7 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// number, and it does not exist yet.**
 ///
 /// **`0.13` is the ordinary ceremony** — half the sparsest legitimate member of
-/// the family (`Suprematist`, `0.2565`). It leaves `Suprematist` at `1.97x` and
+/// the family (`Suprematist`, `0.2565`, at the same 96×96 capture). It leaves `Suprematist` at `1.97x` and
 /// `On White` at `2.36x` above their own floor, so both survive a mono
 /// conversion with room.
 ///
