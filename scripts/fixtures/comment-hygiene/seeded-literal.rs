@@ -19,6 +19,19 @@ pub fn wide(count: usize) -> String {
     format!("only {count} of the particles moved in a frame, so a stalled cloud                      would satisfy the endpoint check trivially")
 }
 
+/// The UNREJOINED form, which is the shape an author actually types. The `\` is
+/// missing, so the newline survives, the continuation indent survives, and the
+/// reader gets a run of spaces mid-sentence. The gate was blind to precisely
+/// this: a literal whose decoded text still held a newline returned early as a
+/// formatted block, so the defect was caught only after someone joined the lines
+/// — while the message printed named the shape it structurally could not see.
+pub fn unrejoined() -> String {
+    String::from(
+        "the analysis window is the tail of the stream and this sentence lost its
+                 continuation, so a run of spaces lands in the middle of it",
+    )
+}
+
 /// **Not a finding, and the reason is the whole rule.** A correct `\`
 /// continuation removes the newline and the next line's indent, so what the
 /// reader gets is one clean sentence. Convicting this shape would convict most

@@ -15,10 +15,10 @@
 // `root` scans some other directory — used to run this against the committed
 // fixture tree (Plan 0084 Phase 1 built the argument, Plan 0093 Phase 1 finally
 // committed the tree): `node scripts/check-doc-links.mjs scripts/fixtures`
-// expects exit 1 and exactly three breaks, one per class below. CI and the
-// pre-push hook pass nothing and get the repo.
+// expects exit 1 and exactly five breaks, across the four classes below. CI and
+// the pre-push hook pass nothing and get the repo.
 //
-// Three break classes, and the first is the only one this script had until
+// Four break classes, and the first is the only one this script had until
 // Plan 0084. Markdown has two link forms and checking one of them was a green
 // light over 85 broken links of the other:
 //
@@ -26,6 +26,7 @@
 //   2. definition   [label]: target         — target must exist
 //   3. use          [label] / [text][label] — the file must define `label`,
 //                                             or it renders as literal brackets
+//   4. backlog      ](design-backlog.md#…)  — the fragment form is prohibited
 //
 // Class 3 is what a close ceremony breaks when it moves link-dense prose between
 // files: the *uses* travel with the paragraph and the *definitions* stay behind
@@ -61,6 +62,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
@@ -81,14 +83,62 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // tree has to name itself on this list.
 const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
 
-/** Every `.md` file in the repo, as paths relative to the repo root. */
-function markdownFiles(dir = REPO, found = []) {
+/** Whether an absolute path sits inside a seeded tree that is not the scan root. */
+function inSeededTree(abs) {
+  for (const tree of SEEDED_TREES) {
+    if (REPO === tree || REPO.startsWith(tree + sep)) continue; // the root is that tree
+    if (abs === tree || abs.startsWith(tree + sep)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every `.md` file the REPOSITORY holds under the root, as relative paths.
+ *
+ * ENUMERATED FROM GIT for the same reason check-comment-hygiene.mjs is: a
+ * filesystem walk cannot tell code we own from code sitting in the working tree
+ * that git ignores, so a gitignored vendored README is absent from CI's fresh
+ * clone and present in every working tree — CI green by construction, the local
+ * push blocked, with a diagnostic pointing at files nobody here wrote. This gate
+ * was green only because neither vendored tree happened to carry a
+ * relative-linked `.md`, which is luck rather than a property: seeding one
+ * `.venv/pkg/README.md` with two relative links reports both and exits 1.
+ *
+ * The consequence is the same one: a markdown file git has never seen is not
+ * checked, and at push time — the only time this runs — that window is a file
+ * created and not yet added.
+ *
+ * Falls back to the filesystem walk when git cannot answer, and says so, rather
+ * than reporting a set it did not measure (ADR-0016).
+ */
+function markdownFiles() {
+  try {
+    const out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: REPO,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const found = [];
+    for (const path of out.split("\0")) {
+      if (!path || !path.endsWith(".md")) continue;
+      if (inSeededTree(resolve(REPO, path))) continue;
+      found.push(path);
+    }
+    return { files: found, source: "git" };
+  } catch {
+    return { files: walk(), source: "filesystem" };
+  }
+}
+
+/** The pre-git enumeration, kept as the fallback for a tree git cannot answer for. */
+function walk(dir = REPO, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      markdownFiles(full, found);
+      walk(full, found);
     } else if (entry.name.endsWith(".md")) {
       found.push(relative(REPO, full));
     }
@@ -132,7 +182,7 @@ const isRelativeTarget = (t) => !/^(https?:|mailto:|#)/.test(t);
  * to hold brackets. A label nothing anywhere defines was never a link.
  */
 function collect() {
-  const files = markdownFiles();
+  const { files, source: enumeration } = markdownFiles();
   const parsed = new Map(); // file -> { definitions: Map, uses: [], inline: [] }
   const known = new Set(); // every label defined anywhere in the tree
 
@@ -198,10 +248,10 @@ function collect() {
     parsed.set(file, { definitions, uses, inline, fragments });
   }
 
-  return { parsed, known };
+  return { parsed, known, enumeration };
 }
 
-const { parsed, known } = collect();
+const { parsed, known, enumeration } = collect();
 const broken = [];
 
 for (const [file, { definitions, uses, inline, fragments }] of parsed) {
@@ -246,8 +296,17 @@ for (const [file, { definitions, uses, inline, fragments }] of parsed) {
   }
 }
 
+if (enumeration !== "git") {
+  console.log(
+    "note: git could not list this tree, so the file set came from a filesystem\n" +
+      "      walk. That set includes anything gitignored sitting in the working\n" +
+      "      tree — a vendored README, a virtualenv — whose links are not ours to\n" +
+      "      judge and which no checkout contains.",
+  );
+}
+
 if (broken.length === 0) {
-  console.log("doc links: OK (every relative markdown link resolves)");
+  console.log(`doc links: OK (every relative markdown link in ${parsed.size} tracked files resolves)`);
   process.exit(0);
 }
 
