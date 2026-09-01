@@ -374,8 +374,8 @@ flowchart TB
 | 3 — The row gate reads a row's shape | dev | done | `8986147` |
 | 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
 | 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
-| 6 — The figure gate stops convicting untracked files | dev | done | committed with this row |
-| 7 — The gates judge the code this project wrote | dev | not started | |
+| 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
+| 7 — The gates judge the code this project wrote | dev | done | committed with this row |
 | 8 — Two entries whose premise the store revocation falsified | dev | not started | |
 | 9 — The image sweep runs again | dev | not started | |
 | 10 — What the pictures are of | human | not started | |
@@ -410,6 +410,18 @@ flowchart TB
   binary, so `git diff` printed nothing for it and `grep` skipped it. Replaced with a space in this
   phase's commit, since the file is Phase 5's own and the defect makes the gate undiffable. Not
   found by a gate - found by `grep` refusing to search it.
+- **The plan's *"must still report its 10 findings"* was 12 before this phase and is 13 after.**
+  Plan 0144 added `seeded-literal.rs` with two, and 0173's unrejoined seed adds the third. The
+  fixture README carried 12 and was the accurate number; the plan and backlog 0170 both quote 10.
+- **`check-doc-links.mjs` got the enumeration rather than a note**, which is the half of Phase 7's
+  done-when that permitted either. Not on principle: seeding `.venv/pkg/README.md` with two
+  relative links made it report both and exit 1, so the sibling shares the defect outright and was
+  green only because neither vendored tree happened to carry a relative-linked `.md`.
+- **0173's first probe still holds while its claim no longer does.**
+  `present: text\.includes.{0,40}return null` asserts the newline exclusion is *"still
+  unconditional and still ahead of the run check"*. The early return is still in the source, so the
+  probe matches; the new continuation-indent arm now runs **before** it, so the claim is false.
+  Green here means the reduction still matches the tree, which is what the gate's own header says.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified

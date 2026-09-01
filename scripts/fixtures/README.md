@@ -120,11 +120,27 @@ rows carry real relative links, and a row shaped like a real row has to point so
 node scripts/check-comment-hygiene.mjs scripts/fixtures
 ```
 
-Expect **exit 1 and exactly twelve findings, across five files**. Note the root: like the two above,
-this checker is pointed at `scripts/fixtures` rather than at its own subdirectory, so the run also
-asserts that `backlog-claims/core/src/tier.rs` — the tree's other `.rs` file — is hygiene-clean.
-Keep it that way; a seeded finding outside `comment-hygiene/` would make the counts below wrong for
-the wrong reason.
+Expect **exit 1 and exactly thirteen findings, across five files**. Note the root: like the two
+above, this checker is pointed at `scripts/fixtures` rather than at its own subdirectory, so the run
+also asserts that `backlog-claims/core/src/tier.rs` — the tree's other `.rs` file — is
+hygiene-clean. Keep it that way; a seeded finding outside `comment-hygiene/` would make the counts
+below wrong for the wrong reason.
+
+**The file set comes from `git ls-files`, not from a filesystem walk**, which is what makes "code
+we own" and "code this gate judges" the same set by construction. A walk cannot tell them apart: a
+gitignored tree is absent from CI's fresh clone and present in every working tree, so the CI job is
+green by construction and the local push is not. This gate went from green to **490 findings**
+between two pushes twenty minutes apart with no commit touching it — 419 in `.venv/`'s torch, numpy
+and markupsafe headers, 71 in the unpacked foobar2000 SDK, none of it written here. Patching those
+two by name fixed those two; the next `pip install` would have re-broken it. These fixtures are
+tracked, so `ls-files` reaches them and the counts below are unaffected.
+
+`check-doc-links.mjs` was given the same enumeration in the same phase, and not on principle:
+seeding one `.venv/pkg/README.md` with two relative links made it report both and exit 1. It was
+green because neither vendored tree happened to carry a relative-linked `.md`, which is luck rather
+than a property. `check-filter-figures.mjs` reaches the same end by a different route — it keeps the
+whole working tree in scope on purpose and moves an untracked hit into an advisory. The remaining
+two walk sets that are already correct.
 
 **One rejected form per file, and the counts are the instrument.** A file that stopped biting shows
 up as a number that moved rather than as a silence nobody noticed, which is the whole reason the
@@ -136,14 +152,24 @@ totals are written down here instead of being re-derived.
 | `seeded-elapsed.rs` | 5 | one line per elapsed-time preposition in front of a numbered citation — `before` / `since` / `until` / `after` / `pre-` |
 | `seeded-residue.rs` | 1 | the residue phrase, in a sentence explaining why something is absent |
 | `seeded.cpp` | 2 | the same two classes as `seeded.rs`, in the dialect the foobar shim is written in |
-| `seeded-literal.rs` | 2 | class 3, a string literal carrying a run of 12+ spaces mid-sentence — one already rejoined onto a single line, one at the width a continuation indent produces |
+| `seeded-literal.rs` | 3 | class 3, a string literal carrying a run of 12+ spaces mid-sentence — one already rejoined onto a single line, one at the width a continuation indent produces, and one **still unrejoined**, in the form an author actually types |
 
 `seeded-elapsed.rs` seeds five rather than one because the pattern is an alternation and a
 dropped branch is exactly the regression a single seeded line cannot see.
 
-`seeded-literal.rs` seeds two convictions and **three silences**, which is the unusual ratio in
+`seeded-literal.rs` seeds three convictions and **three silences**, which is the unusual ratio in
 this tree and is the point of it: a lost `\` continuation and a hand-aligned column are the same
 construct, so that file is where the width rule's cost is pinned rather than argued.
+
+The three convictions are the defect in both of its forms plus the width. **Unrejoined** is the
+form an author types — the `\` is missing, so the newline survives and the next line's indent
+survives — and it was invisible until this fixture: `brokenLiteral` returned early for any literal
+whose decoded text still held a newline, on the grounds that such a literal is a formatted block.
+A lost continuation is prose carrying a newline in the middle of itself, so the gate caught the
+defect only *after* someone joined the lines, while printing a message naming the shape it could
+not see. **Rejoined** is what this tree has actually held: `core/src/dsp/mod.rs:57`,
+`standalone/src/stream.rs:393` and `milkconv/src/convert.rs:430` all arrived single-line with the
+run baked in.
 
 The silences are the load-bearing half, because a gate that cries wolf gets escaped rather than
 obeyed ([ADR-0127](../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md),
@@ -161,7 +187,7 @@ Negative 3):
 | a C block comment, which does not nest | `seeded.cpp` | not reported, and the rest of the file still is — Rust's nesting rules applied here would swallow the file and report nothing at all |
 | a C char literal | `seeded.cpp` — `'"'` and `'''` | not reported — C has no lifetimes, so every `'` opens one, which Rust's rule gets wrong in the other direction |
 | a correct `\` continuation | `seeded-literal.rs` — a literal wrapped across two lines with the escape present | not reported — the escape removes the newline **and** the next line's indent, so the reader gets one sentence; convicting this shape would convict most wrapped literals in the tree |
-| a formatted block | `seeded-literal.rs` — a column table carrying a `\n` | not reported — a literal holding a line break is layout the author typed, and prose does not carry one mid-sentence |
+| a formatted block | `seeded-literal.rs` — a column table carrying a `\n` | not reported — a table's rows start **at** a column and carry their runs between fields, so no line break in it is followed by a 12-space leading run. The rule is that shape, not "a literal holding a line break", which was the earlier wording and was **false**: a lost continuation is prose carrying a newline in the middle of itself, and it is now reported |
 | hand-typed column alignment | `seeded-literal.rs` — `note     : …` | not reported — nine spaces is under the width a continuation indent produces; this is the deliberate half of the ambiguity the width rule accepts missing |
 
 The last three are why this checker is a lexer and not a `grep`, and why it takes the dialect as an
