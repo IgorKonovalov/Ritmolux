@@ -433,11 +433,14 @@ flowchart TB
   the close ceremony's act. Raised with the user, who chose that reading.
 - **Phase 9: `warp_mesh` ships four presets, so no placeholder was left.** Backlog 0133 and the plan
   both state the family ships none; `warp_cauldron`, `warp_millrace`, `warp_sirocco` and
-  `warp_wellhead` all carry `system = "warp_mesh"`. `dev` picked cauldron, marked UNJUDGED in the
-  manifest, and Phase 10 is where that is confirmed or swapped. **Observation for that phase:** at
-  gallery size the cauldron frame reads as a soft symmetric blob with no hard edge anywhere in it,
-  where the other two new pictures carry structure. Three alternates are rendered for comparison at
-  `scratchpad/warp-candidates/`.
+  `warp_wellhead` all carry `system = "warp_mesh"`. All four were shot at hop 300 and compared;
+  the slot took **wellhead**, marked UNJUDGED in the manifest, and Phase 10 is where that is
+  confirmed or swapped. **Observation for that phase:** the family is soft throughout - a warp field
+  has no edges of its own - so the four differ in whether a subject survives at gallery size.
+  Wellhead keeps one (a dark star aperture against teal, its feeding ring reading as depth);
+  cauldron held the slot first and is a symmetric bloom with no hard edge anywhere in it; millrace
+  is a single crescent on black; sirocco reads as an abstract horizontal gradient. The three
+  alternates are rendered at `scratchpad/warp-candidates/` for a side-by-side.
 - **Phase 9: four manifest provenance comments said "the only X preset" and none was true.**
   lsystem ships 5, star_pattern 4, spectrum 5, emitter 5 - every family now ships several, so the
   manifest's *"Four families have exactly one preset and choose themselves"* was false before this

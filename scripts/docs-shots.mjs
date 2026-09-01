@@ -256,13 +256,21 @@ const IMAGES = [
   {
     // warp_mesh — picked by `dev` at Plan 0136 Phase 9 and NOT yet judged.
     // Backlog 0133 and that plan both record that this family ships no preset,
-    // which had stopped being true: four warp worlds ship. Cauldron is the pick
-    // because it is the one whose motion is legible in a STILL — bilaterally
-    // symmetric and folded down its own middle — where millrace and sirocco are
-    // shears whose whole subject is movement. Phase 10 is where a human confirms
-    // or swaps it, which is one line here plus a re-run.
+    // which had stopped being true: four warp worlds ship, and all four were shot
+    // at this hop and compared.
+    //
+    // The whole family is SOFT — a warp field has no edges of its own, it only
+    // moves what is already there — so the question is which world still has a
+    // readable subject at gallery size. Wellhead does: a dark star-shaped
+    // aperture against teal, with the ring feeding it legible as depth. Cauldron
+    // held this slot first and lost it on that ground, being a symmetric bloom
+    // with no hard edge anywhere in it; millrace is one crescent on black, and
+    // sirocco is a horizontal drape that reads as an abstract gradient.
+    //
+    // Phase 10 is where a human confirms or swaps this. One line here, plus a
+    // re-run.
     out: "docs/images/gallery/warp_mesh.png",
-    presetFile: "presets/warp_cauldron.toml",
+    presetFile: "presets/warp_wellhead.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
