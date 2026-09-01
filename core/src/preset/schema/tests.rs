@@ -193,6 +193,49 @@ fn a_declared_roster_parses_in_order_with_its_defaults() {
     assert_eq!(rings[1].phase, 0.0, "phase defaults");
 }
 
+/// A `scallop` reads its ring `scale` as the lobe's **depth**, and a negative
+/// one does not make a shallower dimple — past
+/// `depth = -R * (cos(s) + sin(s) - 1)` the lobe inverts and bulges outward to
+/// roughly twice the ring radius. It is a well-formed arc inside the cap, so
+/// nothing downstream can notice: no panic, no overflow, no warning.
+///
+/// **Refused at load rather than drawn.** Whether an inward scallop is a look
+/// anyone wants is a content question, and the refusal is what makes it come
+/// back as one instead of shipping a silent bulge (design-backlog 0136).
+///
+/// The bound is on the **structural** per-ring `scale`, which is otherwise
+/// validated for finiteness alone. It is a different quantity from the bindable
+/// `ring_scale` multiplier, which is clamped, and the clamp on that one does not
+/// reach this one — that conflation is the trap this test pins.
+#[test]
+fn a_scallop_refuses_a_depth_it_cannot_draw() {
+    let err = star(
+        "tiling = \"6\"\nrings = [{ motif = \"scallop\", count = 8, radius = 0.5, scale = -0.2 }]\n",
+    )
+    .expect_err("a negative scallop depth inverts the lobe rather than shallowing it");
+    let msg = err.to_string();
+    assert!(msg.contains("ring 0"), "the error names the ring: {msg}");
+    assert!(
+        msg.contains("scallop") && msg.contains("depth"),
+        "the error names the motif and what the number means: {msg}"
+    );
+
+    // Zero is the flat case `scallop_lobe` explicitly guards, and it loads.
+    assert!(
+        star("tiling = \"6\"\nrings = [{ motif = \"scallop\", count = 8, radius = 0.5, scale = 0.0 }]\n")
+            .is_ok(),
+        "a flat scallop is degenerate, not invalid"
+    );
+
+    // The bound is the scallop's alone: every other motif reads `scale` as a
+    // size multiplier, where a negative value is a reflection and reachable.
+    assert!(
+        star("tiling = \"6\"\nrings = [{ motif = \"petal\", count = 8, radius = 0.5, scale = -0.2 }]\n")
+            .is_ok(),
+        "the refusal must not spread to motifs whose scale is a multiplier"
+    );
+}
+
 /// **Validated once, at the boundary** (the project's rule): an unknown
 /// motif and a non-positive count are load errors rather than something
 /// the placement arithmetic has to survive.

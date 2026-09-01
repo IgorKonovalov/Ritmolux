@@ -2323,6 +2323,22 @@ impl RawGenerator {
                     "ring {i}: radius, scale and phase must all be finite"
                 )));
             }
+            // A `scallop` reads its ring's `scale` as the lobe's **depth**, and a
+            // negative one is not a shallower dimple: past
+            // `depth = -R * (cos(s) + sin(s) - 1)` the arc's two ends cross to
+            // the far side of its centre, the counter-clockwise sweep runs the
+            // long way round, and the lobe bulges outward to roughly twice the
+            // ring radius. Nothing downstream warns — it is a well-formed arc,
+            // inside the cap, drawn wrong. Refused here rather than drawn,
+            // because whether an inward scallop is a look anyone wants is a
+            // question for the content lane and not a default (ADR-0158's plan,
+            // design-backlog 0136).
+            if motif.is_scallop() && scale < 0.0 {
+                return Err(PresetError::Config(format!(
+                    "ring {i}: a scallop's scale is its lobe depth and must be \
+                     >= 0, got {scale}"
+                )));
+            }
             rings.push(RingSpec {
                 motif,
                 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
