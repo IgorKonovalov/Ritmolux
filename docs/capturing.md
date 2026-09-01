@@ -622,8 +622,15 @@ Two halves, and both matter:
 
 - **Linear**, because the stored pixels are sRGB-encoded and that curve is
   concave: a mean over the bytes under-reports a brightness change by roughly
-  half. Trimming a preset's `brightness` by 30 % moves an encoded mean about
-  15 % and this column about 30 %.
+  half. That factor of two is the property, and it is what the statistic is for.
+  **The move you see is not the trim you made**, and expecting it to be will
+  make a working column look broken. Trimming `star_rosewindow`'s `brightness`
+  by 30 % moves this column from `0.0532` to `0.0408` — **23 %**, measured
+  2026-09-01 on the DX12 software adapter. Two things eat the rest, and both are
+  the pipeline rather than the statistic: the tonemap is the identity only below
+  its knee and compressive above it, so bright content moves less than its
+  source; and the lit set itself shrinks as dimmed pixels fall under `cover`'s
+  threshold, which lifts the mean of what stays.
 - **Over the lit set**, the same pixels `cover` counts, so an authored
   background does not dilute the reading. The two columns read one picture from
   two directions: `cover` is how much of the frame is lit, `level` is how bright
@@ -1268,7 +1275,7 @@ figures; whether it needs a re-gain pass is
 
 The `--report --json` schema is a nested object of numbers keyed by
 family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint`,
-`animation`, `drive`, `rate`, `coverage`, `transient` (`rise_frames` /
+`animation`, `drive`, `rate`, `coverage`, `level`, `transient` (`rise_frames` /
 `fall_frames` as integers plus their `ratio`), `reachability`, the pairwise
 `pixel`/`shape` distinctness matrices, and `near_duplicates`.
 
