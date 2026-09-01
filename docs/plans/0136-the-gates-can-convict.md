@@ -1,6 +1,6 @@
 # 0136 — The gates can convict
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (proposed)
@@ -365,11 +365,11 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0136-the-gates-can-convict` in `WORK/lmv-plan-0136`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The row gate asserts its own counts | dev | not started | |
+| 1 — The row gate asserts its own counts | dev | done | committed with this row |
 | 2 — A seeded tree the row gate rejects | dev | not started | |
 | 3 — The row gate reads a row's shape | dev | not started | |
 | 4 — Backlog references stop using fragments | dev | not started | |
@@ -381,6 +381,15 @@ flowchart TB
 | 10 — What the pictures are of | human | not started | |
 
 ### Notes
+
+- **Phase 1's `--self-test` is wired into the call sites in Phase 2, not Phase 1.** Phase 1's file
+  list is the script and the fixtures README; `.githooks/pre-push` and the CI `links` job are named
+  in Phase 2's. Both invocations land together there.
+- **`check-backlog-claims.mjs --self-test` is wired into no call site at all.** Phase 1's note holds
+  it up as the model to follow and as the thing that must be wired *"or it is a mechanism nobody
+  runs, which is the defect being repaired"*. Grepped 2026-09-01 across `.githooks/`, `.github/` and
+  `.claude/`: the string `self-test` appears in none of them. Not acted on - it is outside every
+  phase's file list.
 
 ### Close triggers
 

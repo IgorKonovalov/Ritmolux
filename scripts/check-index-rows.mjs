@@ -16,6 +16,7 @@
 // See ADR-0116 for the decision and the arithmetic behind the cap.
 //
 // Usage:  node scripts/check-index-rows.mjs [root]
+//         node scripts/check-index-rows.mjs --self-test
 // Exit 0 = every measured row is within its region's cap. Exit 1 = the over-cap
 // ones are listed as `file:line  N bytes (cap C)`, which is clickable in most
 // terminals. The optional `root` scans some other directory — used to run this
@@ -23,6 +24,19 @@
 // `node scripts/check-index-rows.mjs scripts/fixtures` expects exit 0, because
 // that tree's marked rows are all under cap and its one fat row sits OUTSIDE the
 // markers. CI and the pre-push hook pass nothing and get the repo.
+//
+// WHY A `--self-test` EXISTS, AND WHY EXIT 0 IS NOT ENOUGH ON ITS OWN. A byte cap
+// convicts nothing on a tree with no fat row in it, so both this gate's roots —
+// the fixture and the repository — legitimately exit 0, and a detector that has
+// stopped matching anything exits 0 the same way. Replace TABLE_ROW and BULLET
+// with regexes that match nothing and the fixture reports `3 regions, 0 rows,
+// 0 over cap`, the repository reports the same shape, and all three call sites
+// go green. The per-file counts this prints were the mitigation and they are
+// PRINTED, not asserted. So `--self-test` asserts them: the fixture's exact
+// counts, and a floor on the repository's, which is the number a dead detector
+// collapses. Backlog 0104 is the demonstration; ADR-0033's argument is that a
+// rule nothing re-runs is a rule nobody follows, and its corollary is that a
+// check which re-runs and cannot fail is the same rule wearing a green tick.
 //
 // A region is delimited by HTML comments, so the markers are invisible in a
 // rendered page and survive a table being reflowed:
@@ -46,7 +60,11 @@ import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const REPO = resolve(process.argv[2] ?? REPO_ROOT);
+
+const argv = process.argv.slice(2);
+const SELF_TEST = argv.includes("--self-test");
+const ROOT_ARG = argv.find((a) => !a.startsWith("--"));
+const REPO = resolve(ROOT_ARG ?? REPO_ROOT);
 
 // Build output, vendored deps, and VCS internals hold markdown we do not own.
 const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
@@ -69,16 +87,23 @@ const DELIMITER = /^ {0,3}\|[\s:|-]*-[\s:|-]*$/;
 const TABLE_ROW = /^ {0,3}\|/;
 const BULLET = /^ {0,3}[-*+]\s/;
 
-/** Every `.md` file under the scan root, as paths relative to it. */
-function markdownFiles(dir = REPO, found = []) {
+/**
+ * Every `.md` file under the scan root, as paths relative to it.
+ *
+ * The root is a parameter rather than the module-level `REPO` because
+ * `--self-test` measures TWO trees in one process — the fixture and the
+ * repository — and a walk closed over one global can only ever answer for the
+ * tree the command line named.
+ */
+function markdownFiles(root, dir = root, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      markdownFiles(full, found);
+      markdownFiles(root, full, found);
     } else if (entry.name.endsWith(".md")) {
-      found.push(relative(REPO, full));
+      found.push(relative(root, full));
     }
   }
   return found;
@@ -92,8 +117,8 @@ function markdownFiles(dir = REPO, found = []) {
  * subheadings — "the first table line in the region" would let six headers
  * through as rows and inflate every count this prints.
  */
-function scan(file) {
-  const lines = readFileSync(join(REPO, file), "utf8").split(/\r?\n/);
+function scan(root, file) {
+  const lines = readFileSync(join(root, file), "utf8").split(/\r?\n/);
   const regions = [];
   const rows = [];
   const errors = [];
@@ -149,26 +174,118 @@ function scan(file) {
   return { regions, rows, errors };
 }
 
-const files = markdownFiles();
-const violations = [];
-const errors = [];
-const summary = [];
+/**
+ * Measure every marked region in one tree.
+ *
+ * `regions` and `rows` are returned as totals rather than only printed, which is
+ * the whole mechanism behind `--self-test`: a count nobody compares to an
+ * expected number is a count that cannot convict.
+ */
+function measure(root) {
+  const violations = [];
+  const errors = [];
+  const summary = [];
+  const perFile = new Map();
+  let regionTotal = 0;
+  let rowTotal = 0;
 
-for (const file of files.sort()) {
-  const show = file.split(sep).join("/");
-  const { regions, rows, errors: fileErrors } = scan(file);
-  errors.push(...fileErrors.map((e) => e.split(sep).join("/")));
-  if (regions.length === 0 && fileErrors.length === 0) continue;
+  for (const file of markdownFiles(root).sort()) {
+    const show = file.split(sep).join("/");
+    const { regions, rows, errors: fileErrors } = scan(root, file);
+    errors.push(...fileErrors.map((e) => e.split(sep).join("/")));
+    if (regions.length === 0 && fileErrors.length === 0) continue;
 
-  const over = rows.filter((r) => r.bytes > r.cap);
-  summary.push(
-    `  ${show}: ${regions.length} region${regions.length === 1 ? "" : "s"}, ` +
-      `${rows.length} rows, ${over.length} over cap`,
-  );
-  for (const r of over) {
-    violations.push(`${show}:${r.line}  ${r.bytes} bytes (cap ${r.cap})`);
+    const over = rows.filter((r) => r.bytes > r.cap);
+    regionTotal += regions.length;
+    rowTotal += rows.length;
+    perFile.set(show, { regions: regions.length, rows: rows.length, over: over.length });
+    summary.push(
+      `  ${show}: ${regions.length} region${regions.length === 1 ? "" : "s"}, ` +
+        `${rows.length} rows, ${over.length} over cap`,
+    );
+    for (const r of over) {
+      violations.push(`${show}:${r.line}  ${r.bytes} bytes (cap ${r.cap})`);
+    }
   }
+
+  return { violations, errors, summary, perFile, regions: regionTotal, rows: rowTotal };
 }
+
+// --- self-test ---------------------------------------------------------------
+//
+// Two halves, and they fail to different mutations.
+//
+// The FIXTURE half pins exact numbers, because the fixture tree is committed and
+// only changes when someone changes it deliberately. `> 0` would survive a
+// detector that matches one row in ten, and 4 rather than 6 is what asserts the
+// header and delimiter lines are still structure rather than rows.
+//
+// The REPOSITORY half is the one backlog 0104's demonstration collapses, and it
+// is a FLOOR rather than an equality: these three rosters gain a row at every
+// close, so an exact count would be red on the next one and would be raised
+// without being read. Measured 2026-09-01: 159 / 123 / 120 rows across 4
+// regions. The floors below sit far under those and still go to zero the moment
+// TABLE_ROW and BULLET stop matching, which is the only thing they are for.
+const ROSTERS = ["docs/adrs/README.md", "docs/plans/README.md", "docs/design-backlog.md"];
+const ROSTER_ROW_FLOOR = 20;
+const REPO_ROW_FLOOR = 100;
+
+function selfTest() {
+  const results = [];
+  const record = (label, ok, detail) => results.push({ label, ok, detail });
+
+  const fixture = measure(resolve(REPO_ROOT, "scripts", "fixtures"));
+  record(
+    "fixture: exactly 3 regions and 4 rows",
+    fixture.regions === 3 && fixture.rows === 4,
+    `${fixture.regions} regions, ${fixture.rows} rows`,
+  );
+  record(
+    "fixture: nothing over cap and no malformed marker",
+    fixture.violations.length === 0 && fixture.errors.length === 0,
+    `${fixture.violations.length} over cap, ${fixture.errors.length} malformed`,
+  );
+
+  const repo = measure(REPO_ROOT);
+  for (const roster of ROSTERS) {
+    const seen = repo.perFile.get(roster);
+    record(
+      `non-vacuity: ${roster}`,
+      seen !== undefined && seen.regions >= 1 && seen.rows >= ROSTER_ROW_FLOOR,
+      seen
+        ? `${seen.regions} regions, ${seen.rows} rows (floor ${ROSTER_ROW_FLOOR})`
+        : "measured no region at all",
+    );
+  }
+  record(
+    `non-vacuity: the repository measures at least ${REPO_ROW_FLOOR} rows`,
+    repo.rows >= REPO_ROW_FLOOR,
+    `${repo.rows} rows across ${repo.regions} regions`,
+  );
+
+  const width = Math.max(...results.map((r) => r.label.length));
+  for (const r of results) {
+    const pad = " ".repeat(width - r.label.length + 1);
+    console.log(`${r.label}${pad} ${r.ok ? "OK" : "FAILED"} (${r.detail})`);
+  }
+  const passed = results.filter((r) => r.ok).length;
+  console.log(`self-test: ${passed}/${results.length}`);
+  if (passed !== results.length) {
+    console.error(
+      "\nA failing self-test means this gate has stopped measuring, not that a row\n" +
+        "is too long. Check TABLE_ROW, BULLET, DELIMITER and the region markers\n" +
+        "before touching the numbers above — a detector that matches nothing\n" +
+        "reports `0 rows, 0 over cap` and exits 0 at every call site (backlog 0104).",
+    );
+  }
+  process.exit(passed === results.length ? 0 : 1);
+}
+
+// --- main --------------------------------------------------------------------
+
+if (SELF_TEST) selfTest();
+
+const { violations, errors, summary } = measure(REPO);
 
 console.log("index rows: regions found");
 for (const s of summary) console.log(s);
