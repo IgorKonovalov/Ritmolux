@@ -189,8 +189,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The preset menu selects by name | dev | done | `a7354b8` |
-| 2 — The size table becomes a dated series | dev | done | committed with this row |
-| 3 — Attribute the 400 KB | dev | not started | — |
+| 2 — The size table becomes a dated series | dev | done | `e6f71f1` |
+| 3 — Attribute the 400 KB | dev | done | committed with this row |
 | 4 — The recipe reads the SDK's own version | dev | not started | — |
 
 ### Notes
@@ -205,6 +205,10 @@ flowchart TB
   landed since backlog 0118 was filed, on top of the +400,384 B it names. Headroom on the decimal
   reading of NFR §4's cap is 210,048 B — 97.9 % of cap. The plan says Phase 2 does not move the
   cap and it did not.
-- The `lmv_core_c.dll` column is not comparable across 2026-08-29: this machine acquired the
-  `rust-lld` override (ADR-0147) between the two measurements, and it links the cdylib. The shipped
-  `foo_lmv.dll` column is unaffected. Recorded in the spec beneath the table.
+- Phase 3 bisected the window the plan names (Plan 0097's close to Plan 0107's close) and did not
+  extend to the +510,464 B that landed after 2026-08-18, which is outside the phase's scope. That
+  second window is unattributed and is a candidate backlog entry.
+- The `rust-lld` override (ADR-0147, adopted 2026-08-29) was carried as a suspected confound on the
+  cdylib column in the Phase 2 commit, and Phase 3's bisect falsified it: the rebuilt Plan 0097
+  baseline is 1,536 B (0.02 %) from the number recorded at that plan's close. The spec's wording was
+  corrected in the Phase 3 commit rather than left as filed.
