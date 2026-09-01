@@ -828,9 +828,14 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (menu == nullptr) return 0;
 
             // The roster is read ONCE, here, and the ids the items carry are
-            // positions in this snapshot. That is safe because the menu is
-            // modal: nothing on this thread can reload presets between the
-            // build and the click, and no other thread may touch the handle.
+            // positions in this snapshot. The snapshot can go stale while the
+            // menu is up: TrackPopupMenu runs its OWN message loop and keeps
+            // dispatching WM_TIMER - which is what keeps the visualisation
+            // animating - and that handler reaches ensure_handle, which on a
+            // stream-format change destroys the handle, builds a new one and
+            // reloads the roster. So these ids address menu items and nothing
+            // else; the click below re-resolves the chosen NAME against a fresh
+            // roster, because indices are snapshot-scoped (ADR-0117).
             PresetSnapshot snap;
             size_t listed = 0;
             if (read_preset_snapshot(g_session.handle, snap)) {
@@ -876,7 +881,12 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                 TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y,
                                0, wnd, nullptr);
             DestroyMenu(menu);
-            // The menu is modal, so ownership can have changed while it was up.
+            // The menu pumped messages while it was up, so ownership can have
+            // changed. This guard catches a dropped handle and a window this
+            // session does not own - but NOT a handle that was REPLACED, which
+            // keeps this owner and a non-null pointer and so passes here
+            // carrying a roster that need not match `snap`. Re-resolving by
+            // name below is what covers that second case.
             if (g_session.owner != wnd || g_session.handle == nullptr) return 0;
             const UINT ucmd = static_cast<UINT>(cmd);
             if (cmd == kMenuNextScene) {
@@ -892,9 +902,9 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                 open_preset_folder();
             } else if (listed != 0 && ucmd >= kMenuPresetBase &&
                        ucmd < kMenuPresetBase + listed) {
-                if (lmv_select_preset(
+                if (select_preset_named(
                         g_session.handle,
-                        static_cast<int32_t>(ucmd - kMenuPresetBase)) == LMV_OK) {
+                        snap.names[static_cast<size_t>(ucmd - kMenuPresetBase)])) {
                     remember_current_preset(g_session.handle);
                 }
             }

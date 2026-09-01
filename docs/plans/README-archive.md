@@ -67,6 +67,70 @@ were superseded orderings of the active roster.
   private `--report` table had been stale since Plan 0121 — six columns against the real eleven —
   which is exactly the rot the load-bearing-docs rule exists to stop; it now points at
   `docs/capturing.md` instead of carrying a copy.
+- [0141 — The plugin's seams stop drifting](done/0141-the-plugin-seams-stop-drifting.md)
+  — closed 2026-09-01. Four `dev` phases in the `lmv-plan-0141` lane on `plan-0141-plugin-seams`,
+  `a7354b8`..`c4165f6`. Mode 4: **no blockers, two majors, three minors, two nits** — all five
+  repaired in the close commit. Version: **0.99.1** (patch) — one behavioral fix in shipped code,
+  one in release tooling, two documentation phases, no new capability and no Rust touched.
+
+  **What landed.** The foobar shim's preset menu dispatches a click through `select_preset_named`
+  instead of the raw index its submenu item carried (backlog 0117). The index was justified by a
+  comment claiming the menu is modal and *"nothing on this thread can reload presets between the
+  build and the click"*; `TrackPopupMenu` runs its own message loop and keeps dispatching
+  `WM_TIMER`, which is what keeps the visualisation animating and which reaches `ensure_handle`,
+  which on a stream-format change destroys the handle, rebuilds it and reloads the roster. Both
+  comments were corrected, including the second half of why the old argument failed — the
+  post-dismiss guard catches a *dropped* handle but not a *replaced* one. Phases 2 and 3 turned the
+  C ABI spec's size table into a dated series and bisected the growth behind it. Phase 4 made
+  `build-component.ps1` read the staged SDK's own version out of `sdk-readme.html` and die when it
+  disagrees with the pin, instead of substituting the pin into the shipped `READ-ME-FIRST.txt` over
+  it — the pin and the staged tree are the same fact only on the fetch route, and ADR-0115 made the
+  pre-staged route first-class (backlog 0105).
+
+  **The measurement phase is the one worth reading.** `foo_lmv.dll` has grown **+910,848 B since
+  Plan 0097** and no plan attributed a byte of it as it landed. The bisect — four points, `core-cabi`
+  only — put **98.4 %** of the filed window on Plan 0100's MilkDrop conversion work (375,808 B of
+  381,952 B), confirming rather than assuming the suspicion the backlog entry named. The review
+  corroborated each step independently against the diffstat of its own window: 34 lines of
+  `core/src` for the 0 B step, 9,386 for the +375,808 B step, 823 for the +6,144 B step. Phase 2's
+  re-measure also found the growth is *still moving* — another **+510,464 B** after 2026-08-18,
+  larger than the delta that was worth filing an entry over, and outside the window Phase 3 was
+  scoped to. That is now backlog 0178.
+
+  **What the review repaired.** Two majors, both the plan's own thesis reappearing in its fix. The
+  new re-measure trigger — *"at every release"*, a real improvement on *"when a dependency is
+  added"*, which was conditioned on an event that never happened — was stated **only in the C ABI
+  spec**, which nobody opens to cut a tag, while `build-component.ps1` builds the DLL and never
+  reads its length; `docs/releasing.md` now carries it and the mechanical version is backlog 0177.
+  And `docs/on-device-validation.md`'s menu checklist stood marked *"Ran 2026-08-24 — all four
+  pass"* over a `foo_lmv.dll` predating Phase 1, with its item (a) being precisely the live click
+  `dev` carried rather than ran; that item's own text warns *date the installed artifact before
+  trusting a carried-forward check*. (a) is re-opened with the interesting case named — click a
+  preset while a reload lands under the open menu.
+
+  Three minors: the spec's two tables gave **two different numbers for the same labelled point**
+  (9,218,048 B in the series, 9,204,736 B rebuilt at `22bb460` — 13,312 B apart under the same build
+  command), and the doc generalized *"the two linkers are interchangeable at this precision"* from
+  the **other** point, which happened to agree within 1,536 B. The spec now states both gaps, says
+  the cause is not established, sets ~13 KB as the column's working noise floor — which puts the
+  `+6,144 B` row under it — and asks a future bisect to record its `rustc` version. Also:
+  `plugin-foobar/README.md` still sent a hand-stager to `foobar2000.org/SDK`, which serves *latest*
+  and now fails Phase 4's check; and *"97.9 % of cap"* was three significant figures against NFR §4's
+  *"~10 MB for the standalone release exe; plugin DLL in the same ballpark"*.
+
+  **Verified rather than accepted.** Phase 4's three failure modes were re-exercised in the review
+  against a hand-edited `sdk-readme.html` — pinned passes and prints the staged version, a
+  `2011-03-11` marker dies naming both versions and both files, a removed marker dies separately —
+  and the staged tree restored. `lmv_select_preset` now has **exactly one call site** repo-wide, in
+  `select_preset_named` immediately after that helper's own fresh read (the log said two, which was
+  the pre-fix count). On the lane with `main` merged in: `cargo nextest run --workspace` **1496
+  passed, 5 skipped, exit 0**, `fmt` and `clippy --workspace --all-targets` clean, all five Node
+  gates green. `check-backlog-claims` broke on exactly 0105 and no other — a probe falsified by the
+  fix it was filed to demand.
+
+  **One verification is still owed and is not pretendable.** CI builds no C++ and cannot load
+  foobar2000, so Phase 1's behavioral change is exercised by nothing anywhere until a human runs the
+  re-opened on-device item against a rebuilt component.
 
 - [0139 — The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md)
   — closed 2026-09-01. Three `dev` phases in the `lmv-plan-0139` lane on

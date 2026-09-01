@@ -1,6 +1,15 @@
 # 0141 — The plugin's seams stop drifting
 
-> **Status:** approved
+> **Status:** done — closed 2026-09-01. Four phases, one commit each: `a7354b8` (menu selects by
+> name), `e6f71f1` (the size table becomes a dated series), `c6a6449` (the growth attributed to
+> Plan 0100), `c4165f6` (the recipe reads the staged SDK's version). Mode 4 review: **no blockers,
+> two majors, three minors** — all five repaired in the close commit. Verified independently of the
+> log: `lmv_select_preset` now has exactly one call site repo-wide; the bisect's byte deltas are
+> corroborated by the diffstats of their own windows (34 lines / 9,386 lines / 823 lines of
+> `core/src`); Phase 4's three failure modes re-exercised against a hand-edited `sdk-readme.html`.
+> Full suite on the merged tree: `cargo nextest run --workspace` **1496 passed, 5 skipped, exit 0**,
+> with `fmt`, `clippy --workspace --all-targets` and all five Node gates clean. Filed
+> [backlog 0177 + 0178](../../design-backlog.md).
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
 > **Related ADRs:** none — three mechanical repairs, no rejected alternative worth recording.
@@ -91,7 +100,7 @@ flowchart TB
   - The existing post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A
     handle that was **replaced** rather than dropped passes it — note that in the comment, since it is
     the second half of why the old reasoning failed.
-  - **This contends with [Plan 0103](0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
+  - **This contends with [Plan 0103](../0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
     this same handler. Backlog 0117 calls itself a natural pickup for whoever takes that phase; if
     0103 is live, coordinate rather than racing.
 - **Done when:** a menu click selects the preset whose name was displayed, and no code path resolves a
@@ -178,3 +187,76 @@ flowchart TB
 - **It does not move the NFR soft cap.** Phase 2 corrects what is claimed about the headroom; whether
   ~10 MB is still the right cap is a different question and nothing here argues it.
 - **It does not repair whatever Phase 3 finds.** An attributable and unwanted 400 KB is a new entry.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0141` on `plan-0141-plugin-seams`, branched from `main` at `f2b37d5`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The preset menu selects by name | dev | done | `a7354b8` |
+| 2 — The size table becomes a dated series | dev | done | `e6f71f1` |
+| 3 — Attribute the 400 KB | dev | done | `c6a6449` |
+| 4 — The recipe reads the SDK's own version | dev | done | `c4165f6` |
+
+### Notes
+
+- Phase 1's done-when reads as a live check ("a menu click selects the preset whose name was
+  displayed"), which needs foobar2000 running with the component installed. Verified instead by
+  build and by call-site sweep: `lmv_select_preset` has exactly two call sites, one of them inside
+  `select_preset_named` against a snapshot that helper read itself, and the menu path now routes
+  through the helper. The live click is carried, not run.
+- Phase 2's re-measure found the growth is larger than the plan's table records, and still moving:
+  `foo_lmv.dll` is 9,789,952 B on 2026-09-01 against 9,279,488 B on 2026-08-18, so +510,464 B has
+  landed since backlog 0118 was filed, on top of the +400,384 B it names. Headroom on the decimal
+  reading of NFR §4's cap is 210,048 B — 97.9 % of cap. The plan says Phase 2 does not move the
+  cap and it did not.
+- Phase 3 bisected the window the plan names (Plan 0097's close to Plan 0107's close) and did not
+  extend to the +510,464 B that landed after 2026-08-18, which is outside the phase's scope. That
+  second window is unattributed and is a candidate backlog entry.
+- Phase 4's risk line asks how the check was exercised, CI being unable to reach it. Three local
+  runs of `build-component.ps1 -SkipBuild` against a hand-edited `plugin-foobar/sdk/sdk-readme.html`:
+  the pinned version passes and prints `ok: SDK 2025-03-07 staged at plugin-foobar\sdk (matches the
+  pin)`; a marker reading `2011-03-11` fails naming both versions and their two files; a file with
+  the marker deleted fails separately, naming what it expected. The staged tree was restored and the
+  passing run re-run afterwards.
+- Phase 4's marker is not shaped the way the plan and backlog 0105 quote it. They give
+  `<h1>foobar2000 SDK, version 2025-03-07</h1>`; the file breaks that tag across three lines, so a
+  one-line tag match finds nothing. The check matches the marker text and captures to end-of-line
+  rather than as a date, so a version format only foobar2000 controls cannot fail it open silently.
+- The `rust-lld` override (ADR-0147, adopted 2026-08-29) was carried as a suspected confound on the
+  cdylib column in the Phase 2 commit, and Phase 3's bisect falsified it: the rebuilt Plan 0097
+  baseline is 1,536 B (0.02 %) from the number recorded at that plan's close. The spec's wording was
+  corrected in the Phase 3 commit rather than left as filed.
+- Nothing was added to `docs/on-device-validation.md` for Phase 1's uncaptured live click. That file
+  is not in any phase's `Files touched`, and where the item belongs is a placement call.
+
+### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0117, 0118, 0105.
+- **What shipped:** fix-only, plus docs. One behavioral change in shipped code (the menu dispatch,
+  `plugin-foobar/foo_lmv.cpp`), one in release tooling that ships nothing itself
+  (`packaging/foobar/build-component.ps1`), and two documentation phases in
+  `docs/specs/0001-c-abi.md`. No new capability, no Rust touched anywhere in the plan.
+- **Operator docs touched:** none. The four commits touch `plugin-foobar/foo_lmv.cpp`,
+  `docs/specs/0001-c-abi.md`, `packaging/foobar/build-component.ps1` and this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, one broken** —
+  `0105 absent: sdk-readme in: packaging/foobar/build-component.ps1`, matched at
+  `build-component.ps1:212`. The probe is falsified **by the fix it was filed to demand**: Phase 4
+  is what put `sdk-readme` in that file. Two neighbours did not break and both are worth reading
+  before deciding: **0117**'s probe asserts `ensure_handle(...)` is still reachable from the modal
+  loop, which is still true and always will be — the defect was the dispatch, not the reload — and
+  **0118**'s probe asserts `8,879,104 B` is still in the spec, which the dated series deliberately
+  keeps as its second row, so that probe can no longer distinguish a stale spec from a current one.
+- **Full suite:** `cargo nextest run --workspace` on the lane at `c4165f6`, **exit 0** —
+  `Summary [520.668s] 1492 tests run: 1492 passed (19 slow), 5 skipped`, across 59 binaries. This is
+  ADR-0156's once-per-plan run and the nine deferred GPU suites are inside it; no suite was run
+  under an upward override at an earlier phase, because no phase touched Rust. `cargo fmt --all
+  --check` exits 0. Clippy was not run: the plan changes no Rust, and the four commits touch one
+  `.cpp`, one `.ps1` and two `.md`.
+- **Outstanding `human` phases:** none; the plan has no `human` phase. One verification is carried
+  rather than run: Phase 1's live menu click, per the first note above.
