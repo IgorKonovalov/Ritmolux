@@ -1,6 +1,6 @@
 # 0149 — The line corners stop being blunt
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (proposed — a

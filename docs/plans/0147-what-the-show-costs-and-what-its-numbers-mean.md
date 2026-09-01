@@ -1,6 +1,6 @@
 # 0147 — What the show costs, and what its numbers mean
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none for Phases 1-3 and 6 — mechanism fixes and prose under decisions that
