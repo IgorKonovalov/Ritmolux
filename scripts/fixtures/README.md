@@ -4,7 +4,8 @@ Five checkers in `scripts/` take an optional `root` argument so they can be run 
 other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written. `index-rows/` is the
-exception and inverts it — see its section below.
+exception and inverts it — and `index-rows-red/` is the half that restores the usual direction.
+See both sections below.
 
 `check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs` and
 `check-comment-hygiene.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,

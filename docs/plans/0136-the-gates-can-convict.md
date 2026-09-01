@@ -376,8 +376,8 @@ flowchart TB
 | 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
 | 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
 | 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
-| 8 — Two entries whose premise the store revocation falsified | dev | done | committed with this row |
-| 9 — The image sweep runs again | dev | not started | |
+| 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
+| 9 — The image sweep runs again | dev | done | committed with this row |
 | 10 — What the pictures are of | human | not started | |
 
 ### Notes
@@ -431,6 +431,27 @@ flowchart TB
   Both entries' probes are re-pointed at the repaired code and hold. Seven probes remain red across
   the five entries this plan CLOSES - they were written to go red on delivery, and archiving them is
   the close ceremony's act. Raised with the user, who chose that reading.
+- **Phase 9: `warp_mesh` ships four presets, so no placeholder was left.** Backlog 0133 and the plan
+  both state the family ships none; `warp_cauldron`, `warp_millrace`, `warp_sirocco` and
+  `warp_wellhead` all carry `system = "warp_mesh"`. `dev` picked cauldron, marked UNJUDGED in the
+  manifest, and Phase 10 is where that is confirmed or swapped. **Observation for that phase:** at
+  gallery size the cauldron frame reads as a soft symmetric blob with no hard edge anywhere in it,
+  where the other two new pictures carry structure. Three alternates are rendered for comparison at
+  `scratchpad/warp-candidates/`.
+- **Phase 9: four manifest provenance comments said "the only X preset" and none was true.**
+  lsystem ships 5, star_pattern 4, spectrum 5, emitter 5 - every family now ships several, so the
+  manifest's *"Four families have exactly one preset and choose themselves"* was false before this
+  phase and is falsified further by the three additions. Marked UNJUDGED with their counts rather
+  than re-picked, which is a content call.
+- **Phase 9: `docs/preset-guide.md` still carries three `— no picture yet` headings**, one per
+  new system, and each body says *"the gallery predates them, so there is no image here"*. That is
+  now false. The file is in no phase's `Files touched` list - not Phase 9's and not Phase 10's - so
+  it was left alone. It is the one place a reader meets these pictures.
+- **Phase 9: six committed images moved and four did not.** `lsystem`, `parametric_curve`,
+  `spectrum`, `star_pattern` are the four backlog 0133 predicted - Plan 0114 moved the line stroke's
+  default `softness` - plus `swarm` and `preset-minimal`. `hero`, `fragment_field`,
+  `reaction_diffusion`, `attractor`, `emitter` and the five walkthrough steps re-rendered
+  byte-identically on this machine.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified
