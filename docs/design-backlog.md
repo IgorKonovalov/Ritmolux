@@ -3387,9 +3387,18 @@ has to be re-stated, since it is the part that is wrong independently of the pat
 > independently of any redirect and is exactly what a returning redirect would break. What changes
 > is the impact - from a live stray directory to a latent one. Read ADR-0141 above as history.
 
-- **Verified 2026-08-29** - the scratch path still starts at the repo root: `present: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
-- **Verified 2026-08-29** - and still joins its way to a dir inside it: `present: \.join\("shot-cli-tests"\) in: standalone/tests/shot_cli.rs`
-- **Verified 2026-08-29** - the sibling that is correct is still correct, so the file is genuinely split: `present: current_exe in: standalone/tests/shot_cli.rs`
+> **Updated 2026-09-01, by `dev` at [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 8.** The
+> **reduced claim above is delivered**: `scratch()` now roots at `env!("CARGO_TARGET_TMPDIR")`, which
+> cargo sets to a per-test-binary directory inside the target directory it is actually writing to,
+> and the doc comment is re-stated to describe that rather than to promise it. **The entry is not
+> closed and is not archived** - what remains live is the half this plan does not touch: whether the
+> *rule* it is an instance of (never derive a cargo output path from a source location) holds
+> anywhere else, which entry 0161 is the roster for. Its probes below are re-pointed at the repaired
+> code, so they assert the repair rather than the defect.
+
+- **Verified 2026-09-01** - the scratch path roots at the directory cargo writes to, not at the source location: `present: env!\("CARGO_TARGET_TMPDIR"\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-09-01** - and no longer builds that path off the repo root: `absent: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-08-29** - the sibling that was always correct still is: `present: current_exe in: standalone/tests/shot_cli.rs`
 
 ## 0161 - three committed scripts still resolve cargo output under `<repo>/target`, which the artifact-store docs assert nothing does
 
@@ -3437,7 +3446,27 @@ looking.
 > `plugin-foobar/build.ps1:32` still cites ADR-0141 as the live reason for asking `cargo metadata`;
 > its behaviour is correct and only the citation is stale. Read ADR-0141 above as history.
 
-- **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
+> **Updated 2026-09-01, by `dev` at [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 8.**
+> **`bundle.sh` is repaired** and is off this roster: it reads `target_directory` from
+> `cargo metadata --format-version 1 --no-deps`, the question `plugin-foobar/build.ps1` already
+> asks, parsed with `sed` rather than `jq` because jq is not on a stock macOS and that script has to
+> run on a bare Mac. That was the one entry on the roster on a **release** path.
+>
+> **The two `renders/` scripts get no note in `renders/README.md`, and the proposed fix was wrong
+> for the reason this plan exists.** `renders/` is gitignored in full (`.gitignore:54`), so that
+> README is untracked: a line in it is absent from every checkout, reaches no reader, and cannot be
+> committed. It is the same shape Phase 5 taught the claim gate to reject one screen up - a claim
+> verified only on the machine that wrote it. **This entry is the record instead**, which is what
+> the `unprobeable:` bullet below has always said. Nothing about the two scripts changes: they are
+> archived one-offs from a closed plan, they resolve correctly under the current layout, and if the
+> redirect returns they are historical artifacts that were already broken.
+>
+> **What stays live** is the smallest and truest part: the documentation asserts *"never hardcode
+> `<repo>/target` in a script or a test"*, and that rule now has no committed violator this entry
+> knows of. The next sweep is the check, not a fix.
+
+- **Verified 2026-09-01** - the macOS bundler asks cargo where it writes instead of assuming: `present: read_target_dir in: packaging/macos/bundle.sh`
+- **Verified 2026-09-01** - and no longer builds a cargo output path off the repo root: `absent: repo_root\}/target/ in: packaging/macos/bundle.sh`
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
 

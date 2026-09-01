@@ -375,8 +375,8 @@ flowchart TB
 | 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
 | 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
 | 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
-| 7 — The gates judge the code this project wrote | dev | done | committed with this row |
-| 8 — Two entries whose premise the store revocation falsified | dev | not started | |
+| 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
+| 8 — Two entries whose premise the store revocation falsified | dev | done | committed with this row |
 | 9 — The image sweep runs again | dev | not started | |
 | 10 — What the pictures are of | human | not started | |
 
@@ -422,6 +422,15 @@ flowchart TB
   unconditional and still ahead of the run check"*. The early return is still in the source, so the
   probe matches; the new continuation-indent arm now runs **before** it, so the claim is false.
   Green here means the reduction still matches the tree, which is what the gate's own header says.
+- **Phase 8's `renders/README.md` resolution was not taken, and the reason is this plan's own
+  subject.** `renders/` is gitignored in full (`.gitignore:54`), so that README is untracked: a line
+  in it is absent from every checkout, reaches no reader, and cannot be committed - the same shape
+  Phase 5 taught the claim gate to reject one entry earlier. Recorded in backlog 0161 itself
+  instead, which is tracked and is where the roster lives. Raised with the user, who chose that.
+- **Phase 8's *"the claim gate exits 0"* is met for 0160 and 0161 and not for the gate overall.**
+  Both entries' probes are re-pointed at the repaired code and hold. Seven probes remain red across
+  the five entries this plan CLOSES - they were written to go red on delivery, and archiving them is
+  the close ceremony's act. Raised with the user, who chose that reading.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified
