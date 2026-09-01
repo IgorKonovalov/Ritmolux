@@ -91,6 +91,23 @@ box this project is developed on:
 .\packaging\foobar\build-component.ps1    # same script, same checks, as CI runs
 ```
 
+### While you are here: read the component's size
+
+`foo_lmv.dll` carries a **~10 MB soft cap** ([`docs/nfr.md`](nfr.md) §4) and it has been growing
+without anyone watching — +910,848 B between Plan 0097 and Plan 0141, none of it attributed as it
+landed. The release is the one moment the number exists for free, so take it:
+
+```powershell
+(Get-Item .\plugin-foobar\build\foo_lmv.dll).Length
+```
+
+If it has moved more than **~100 KB** since the last row, add a dated row to the size series in
+[`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) — that table is the only record of the trend, and
+a trend is what the cap is actually about. Nothing enforces this yet
+([design-backlog 0177](design-backlog.md)); it is here because the trigger it replaces — "re-measure
+when a dependency is added" — was conditioned on an event that never happened, and the growth
+arrived anyway.
+
 ## What this does NOT touch
 
 - **The C ABI version** (`LMV_ABI_VERSION`, `core-cabi/src/lib.rs`) is a **separate axis**

@@ -7155,3 +7155,144 @@ arguments so the colour tags cannot be lost); or one line in `docs/capturing.md`
 raw-stream path as the size-control route, which costs nothing and may be the whole answer.
 **No ADR needed. Priority: low** — and it may be **discharged by 0110** rather than on its own,
 since most of those bits are encoding shot noise that should not have been in the picture.
+
+---
+
+## 0105 — the component's READ-ME-FIRST states the SDK it was built against, and on the pre-staged route nothing checks that claim
+
+Found at [Plan 0102](plans/done/0102-the-component-ships.md)'s close (2026-08-16), reviewing the
+recipe that plan built.
+
+`packaging/foobar/build-component.ps1` substitutes `@SDK_VERSION@` into the shipped
+`READ-ME-FIRST.txt` from `packaging/foobar/sdk-pin.ps1`'s `$LmvSdkVersion` — the **pin**, which is
+what the recipe intends to have been built against. What it verifies about the SDK actually on disk
+is one existence test, `plugin-foobar/sdk/foobar2000/SDK/foobar2000.h`. The two are the same fact
+only on the fetch route, where `fetch-sdk.ps1` downloaded the pinned archive and checked its
+SHA-256.
+
+[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) makes
+the **pre-staged** route first-class — "how the SDK reaches the build host is a parameter of the
+recipe rather than a property of it" — and `plugin-foobar/README.md` documents unpacking it by hand.
+On that route a developer with an older SDK unpacked at `plugin-foobar/sdk/` produces a component
+whose reader-facing document asserts a build against 2025-03-07, with every one of the recipe's
+seven fatal checks green. Nothing downstream can tell, because the SDK version is not in the DLL.
+
+The fix is cheap and the recipe is one grep short of it: the SDK archive ships `sdk-readme.html`
+carrying `<h1>foobar2000 SDK, version 2025-03-07</h1>`, so the staged tree states its own version
+and `build-component.ps1` can fail when it disagrees with the pin instead of asserting over it. That
+also closes the smaller half — the script's own `ok: SDK <version> staged` line prints the pin, not
+what is staged.
+
+- **Verified 2026-08-16** — the recipe never reads the SDK's own version marker:
+  `absent: sdk-readme in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — but it does stamp a version claim into what ships:
+  `present: @SDK_VERSION@ in: packaging/foobar/build-component.ps1`
+- **Verified 2026-08-16** — the only thing asserted about the staged tree is that a header exists:
+  `present: foobar2000.h in: packaging/foobar/build-component.ps1`
+
+### Priority
+
+**Low.** CI takes the fetch route, so nothing published today can carry the wrong claim, and the
+window is a developer who hand-staged a different SDK and then shipped that build. It is filed
+because the recipe's whole argument is that a local run is held to CI's bar
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
+ADR-0115) — and this is the one assertion where the local route is held to a looser one.
+
+---
+
+## 0117 — the plugin's preset menu dispatches a snapshot index across a modal wait, and the "nothing can reload" argument is not sound
+
+**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
+close review (2026-08-18). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-18** — the render timer's handler is still the path that can re-create the
+  handle, and it is dispatched by the modal menu loop:
+  `present: ensure_handle\(static_cast<uint32_t>\(chunk_rate\) in: plugin-foobar/foo_lmv.cpp`
+
+### The finding
+
+`wnd_proc`'s `WM_CONTEXTMENU` case reads the roster once, builds the Preset submenu with
+`kMenuPresetBase + index` command ids, and after `TrackPopupMenu` returns dispatches the click by
+that **raw index**. The comment above it justifies this:
+
+> *"That is safe because the menu is modal: nothing on this thread can reload presets between the
+> build and the click."*
+
+That is not true. `TrackPopupMenu` runs its own message loop and dispatches `WM_TIMER` to the owner
+window, so `kRenderTimer` keeps firing while the menu is up — which is what keeps the visualizer
+animating behind an open menu, and is presumably wanted. That handler calls `VizSession::pump()`,
+which calls `ensure_handle()`, which on a mid-playback stream-format change **destroys the handle,
+creates a new one, re-runs `load_presets_into` and `restore_remembered_preset`**. The roster can
+therefore be reloaded, and the handle replaced, between the build and the click.
+
+The post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A handle that
+was *replaced* rather than dropped passes it.
+
+**Impact is small, which is why this is filed rather than fixed.** The reload reads the same
+directory, so the order is almost always identical and the index still resolves to the preset the
+user clicked. It goes wrong only if a file appeared or vanished inside the modal window.
+
+### What a fix would be
+
+Dispatch by name instead of index — the shim already has the helper, and every *other* selection
+path in the file uses it precisely because indices are snapshot-scoped (ADR-0117):
+
+```cpp
+} else if (listed != 0 && ucmd >= kMenuPresetBase && ucmd < kMenuPresetBase + listed) {
+    if (select_preset_named(g_session.handle, snap.names[ucmd - kMenuPresetBase]))
+        remember_current_preset(g_session.handle);
+}
+```
+
+Then correct the comment: the safety comes from re-resolving, not from modality.
+
+### Priority
+
+**Low.** A few lines, no design question, and it removes a false claim from a file whose comments
+are load-bearing. Natural pickup for whoever takes
+[Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
+
+---
+
+## 0118 — `foo_lmv.dll` has grown ~400 KB since the C ABI spec measured it, and the spec still advertises the old headroom
+
+**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
+close review (2026-08-18). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-18** — the spec still records the Plan 0097 measurement and the headroom it
+  implied: `present: 8,879,104 B in: docs/specs/0001-c-abi.md`
+
+### The finding
+
+`docs/specs/0001-c-abi.md`'s size table is from Plan 0097, when the `text` feature landed, and it
+concludes *"the headroom is now ~1.07 MB and is the tightest this component has had, so the next
+dependency added to this crate should re-measure rather than assume."* Measured on the dev box at
+Plan 0107's close, release x64:
+
+| Artifact | Spec records (Plan 0097) | Measured 2026-08-18 | Delta |
+|---|---|---|---|
+| `foo_lmv.dll` — the shipped component | 8,879,104 B | 9,279,488 B | +400,384 B |
+| `lmv_core_c.dll` — built, not shipped | 8,824,320 B | 9,218,048 B | +393,728 B |
+
+Against NFR §4's ~10 MB soft cap the real headroom is **~0.72 MB**, not ~1.07 MB.
+
+**Plan 0107 is not the cause and the review confirmed that**: it links nothing new — two small Rust
+functions and ~200 lines of C++. Plan 0100's MilkDrop conversion work landed between the two
+measurements and is the obvious suspect, but nothing has attributed the growth, which is the point
+of filing it.
+
+### What a fix would be
+
+Two separable halves. **Correct the spec** — the table becomes a dated series rather than a
+before/after pair, so the next reader sees a trend instead of a frozen pair, and the "~1.07 MB"
+sentence goes. **Attribute the delta** — bisect the component size across Plans 0100-0106, since a
+soft cap nobody can attribute movement in is a cap that gets discovered breached.
+
+Worth noting what makes this self-correcting badly: the spec instructs a re-measure *"when a
+dependency is added to this crate"*, and this growth arrived without one.
+
+### Priority
+
+**Medium-low.** Nothing is over cap and nothing is broken. But 0.72 MB is the tightest this
+component has been, the doc that would warn you is wrong by a third of the remaining room, and the
+trigger it names would not have fired.

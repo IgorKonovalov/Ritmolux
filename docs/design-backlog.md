@@ -317,6 +317,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0167 | Six flags do nothing without `--stream`, and the roster built to end silently-ignored flags does not say so | [ADR-0155](adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) + [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phases 1-3; see 0159. **Closed 2026-08-31** |
 | 0168 | The broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 4, as a repo-wide scan in `check-comment-hygiene.mjs`; the unrejoined form is still unseen, see 0173. **Closed 2026-08-31** |
 | 0169 | `cargo doc` emits intra-doc-link warnings and nothing in the project runs `cargo doc` | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 6: 71 cleared, then `RUSTDOCFLAGS=-D warnings` added to CI. **Closed 2026-08-31** |
+| 0117 | The preset menu dispatches a snapshot index across a modal wait, and "nothing can reload" is not sound | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 1, via `select_preset_named`. **Closed 2026-09-01** |
+| 0118 | `foo_lmv.dll` grew ~400 KB and the spec still advertised the old headroom | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phases 2-3: a dated series, 98.4 % of it Plan 0100; the later window is open, see 0178. **Closed 2026-09-01** |
+| 0105 | READ-ME-FIRST states an SDK version that nothing checks on the pre-staged route | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 4: the recipe reads the staged tree's own marker and dies on disagreement. **Closed 2026-09-01** |
 <!-- roster:end -->
 
 ## Open entries
@@ -1639,46 +1642,6 @@ whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-an
 is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
 same rule wearing a green tick.
 
-## 0105 — the component's READ-ME-FIRST states the SDK it was built against, and on the pre-staged route nothing checks that claim
-
-Found at [Plan 0102](plans/done/0102-the-component-ships.md)'s close (2026-08-16), reviewing the
-recipe that plan built.
-
-`packaging/foobar/build-component.ps1` substitutes `@SDK_VERSION@` into the shipped
-`READ-ME-FIRST.txt` from `packaging/foobar/sdk-pin.ps1`'s `$LmvSdkVersion` — the **pin**, which is
-what the recipe intends to have been built against. What it verifies about the SDK actually on disk
-is one existence test, `plugin-foobar/sdk/foobar2000/SDK/foobar2000.h`. The two are the same fact
-only on the fetch route, where `fetch-sdk.ps1` downloaded the pinned archive and checked its
-SHA-256.
-
-[ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md) makes
-the **pre-staged** route first-class — "how the SDK reaches the build host is a parameter of the
-recipe rather than a property of it" — and `plugin-foobar/README.md` documents unpacking it by hand.
-On that route a developer with an older SDK unpacked at `plugin-foobar/sdk/` produces a component
-whose reader-facing document asserts a build against 2025-03-07, with every one of the recipe's
-seven fatal checks green. Nothing downstream can tell, because the SDK version is not in the DLL.
-
-The fix is cheap and the recipe is one grep short of it: the SDK archive ships `sdk-readme.html`
-carrying `<h1>foobar2000 SDK, version 2025-03-07</h1>`, so the staged tree states its own version
-and `build-component.ps1` can fail when it disagrees with the pin instead of asserting over it. That
-also closes the smaller half — the script's own `ok: SDK <version> staged` line prints the pin, not
-what is staged.
-
-- **Verified 2026-08-16** — the recipe never reads the SDK's own version marker:
-  `absent: sdk-readme in: packaging/foobar/build-component.ps1`
-- **Verified 2026-08-16** — but it does stamp a version claim into what ships:
-  `present: @SDK_VERSION@ in: packaging/foobar/build-component.ps1`
-- **Verified 2026-08-16** — the only thing asserted about the staged tree is that a header exists:
-  `present: foobar2000.h in: packaging/foobar/build-component.ps1`
-
-### Priority
-
-**Low.** CI takes the fetch route, so nothing published today can carry the wrong claim, and the
-window is a developer who hand-staged a different SDK and then shipped that build. It is filed
-because the recipe's whole argument is that a local run is held to CI's bar
-([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)'s model, applied by
-ADR-0115) — and this is the one assertion where the local route is held to a looser one.
-
 ---
 
 ## 0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank
@@ -2010,105 +1973,6 @@ threshold here would be adapter-dependent; the probe asserts none.
 
 - **Verified 2026-08-19** — the field is still read back by the probe this update is built on:
   `present: fn feedback_field in: core/src/render/scenes/warp_mesh/mod.rs`
-
----
-
-## 0117 — the plugin's preset menu dispatches a snapshot index across a modal wait, and the "nothing can reload" argument is not sound
-
-**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
-close review (2026-08-18). **Owner if taken:** `dev`.
-
-- **Verified 2026-08-18** — the render timer's handler is still the path that can re-create the
-  handle, and it is dispatched by the modal menu loop:
-  `present: ensure_handle\(static_cast<uint32_t>\(chunk_rate\) in: plugin-foobar/foo_lmv.cpp`
-
-### The finding
-
-`wnd_proc`'s `WM_CONTEXTMENU` case reads the roster once, builds the Preset submenu with
-`kMenuPresetBase + index` command ids, and after `TrackPopupMenu` returns dispatches the click by
-that **raw index**. The comment above it justifies this:
-
-> *"That is safe because the menu is modal: nothing on this thread can reload presets between the
-> build and the click."*
-
-That is not true. `TrackPopupMenu` runs its own message loop and dispatches `WM_TIMER` to the owner
-window, so `kRenderTimer` keeps firing while the menu is up — which is what keeps the visualizer
-animating behind an open menu, and is presumably wanted. That handler calls `VizSession::pump()`,
-which calls `ensure_handle()`, which on a mid-playback stream-format change **destroys the handle,
-creates a new one, re-runs `load_presets_into` and `restore_remembered_preset`**. The roster can
-therefore be reloaded, and the handle replaced, between the build and the click.
-
-The post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A handle that
-was *replaced* rather than dropped passes it.
-
-**Impact is small, which is why this is filed rather than fixed.** The reload reads the same
-directory, so the order is almost always identical and the index still resolves to the preset the
-user clicked. It goes wrong only if a file appeared or vanished inside the modal window.
-
-### What a fix would be
-
-Dispatch by name instead of index — the shim already has the helper, and every *other* selection
-path in the file uses it precisely because indices are snapshot-scoped (ADR-0117):
-
-```cpp
-} else if (listed != 0 && ucmd >= kMenuPresetBase && ucmd < kMenuPresetBase + listed) {
-    if (select_preset_named(g_session.handle, snap.names[ucmd - kMenuPresetBase]))
-        remember_current_preset(g_session.handle);
-}
-```
-
-Then correct the comment: the safety comes from re-resolving, not from modality.
-
-### Priority
-
-**Low.** A few lines, no design question, and it removes a false claim from a file whose comments
-are load-bearing. Natural pickup for whoever takes
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
-
----
-
-## 0118 — `foo_lmv.dll` has grown ~400 KB since the C ABI spec measured it, and the spec still advertises the old headroom
-
-**Raised by:** `architect`, from [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)'s
-close review (2026-08-18). **Owner if taken:** `dev`.
-
-- **Verified 2026-08-18** — the spec still records the Plan 0097 measurement and the headroom it
-  implied: `present: 8,879,104 B in: docs/specs/0001-c-abi.md`
-
-### The finding
-
-`docs/specs/0001-c-abi.md`'s size table is from Plan 0097, when the `text` feature landed, and it
-concludes *"the headroom is now ~1.07 MB and is the tightest this component has had, so the next
-dependency added to this crate should re-measure rather than assume."* Measured on the dev box at
-Plan 0107's close, release x64:
-
-| Artifact | Spec records (Plan 0097) | Measured 2026-08-18 | Delta |
-|---|---|---|---|
-| `foo_lmv.dll` — the shipped component | 8,879,104 B | 9,279,488 B | +400,384 B |
-| `lmv_core_c.dll` — built, not shipped | 8,824,320 B | 9,218,048 B | +393,728 B |
-
-Against NFR §4's ~10 MB soft cap the real headroom is **~0.72 MB**, not ~1.07 MB.
-
-**Plan 0107 is not the cause and the review confirmed that**: it links nothing new — two small Rust
-functions and ~200 lines of C++. Plan 0100's MilkDrop conversion work landed between the two
-measurements and is the obvious suspect, but nothing has attributed the growth, which is the point
-of filing it.
-
-### What a fix would be
-
-Two separable halves. **Correct the spec** — the table becomes a dated series rather than a
-before/after pair, so the next reader sees a trend instead of a frozen pair, and the "~1.07 MB"
-sentence goes. **Attribute the delta** — bisect the component size across Plans 0100-0106, since a
-soft cap nobody can attribute movement in is a cap that gets discovered breached.
-
-Worth noting what makes this self-correcting badly: the spec instructs a re-measure *"when a
-dependency is added to this crate"*, and this growth arrived without one.
-
-### Priority
-
-**Medium-low.** Nothing is over cap and nothing is broken. But 0.72 MB is the tightest this
-component has been, the doc that would warn you is wrong by a third of the remaining room, and the
-trigger it names would not have fired.
 
 ---
 
@@ -4312,3 +4176,96 @@ worth it for two CLIs and is not proposed.
 
 **Impact:** low. No known drift today; the property Plan 0144 decided was worth holding for one
 binary is unheld for the other. **No ADR needed.**
+
+---
+
+## 0177 — the component's size cap has a trigger and no carrier: the recipe builds the DLL and never reads its own output's length
+
+**Raised by:** `architect`, from [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md)'s
+close review (2026-09-01). **Owner if taken:** `dev`.
+
+- **Verified 2026-09-01** — the recipe that produces the shipped DLL knows nothing about the cap it
+  is measured against: `absent: soft cap in: packaging/foobar/build-component.ps1`
+
+### The finding
+
+Plan 0141 Phase 2 replaced a re-measure trigger that could not fire (*"when a dependency is added to
+this crate"* — the growth arrived as code behind the ABI, with no new crate) with one that always
+fires: **at every release**. That is a real improvement, and it is still a duty a person performs
+from memory.
+
+`packaging/foobar/build-component.ps1` produces `foo_lmv.dll`, then runs seven fatal checks over it
+— it is an x64 PE, it exports `foobar2000_get_interface`, it carries the workspace version, the
+archive holds exactly one file. It parses the PE headers by hand to do this. **It never reads the
+file's length**, which is the cheapest fact about the artifact and the only one NFR §4 constrains.
+
+So the series in [`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) is only as current as the last
+person who remembered to look, and the history says that is not often: the component grew
+**+910,848 B across Plan 0097 to Plan 0141** and every byte of it was noticed retroactively, twice,
+by a reviewer rather than by the build.
+
+### What a fix would be
+
+One `Check` line in the recipe printing the DLL's size, and a **warning** — not a `Die` — when it is
+within some margin of NFR §4's cap. The cap is soft and the recipe must not start failing releases
+over a number the NFR writes with a tilde; the point is that the figure appears in the release log
+where a human already reads output, rather than in a spec nobody opens to cut a tag.
+
+The open question, and the reason this is filed rather than done: **the recipe has no cap constant
+today, and giving it one imports NFR §4's ambiguity** — "~10 MB" names no unit, its subject is the
+standalone exe, and the plugin is covered only by *"in the same ballpark"*. Deciding what the
+plugin's own cap is, and whether it is 10,000,000 or 10,485,760, is an NFR question that should be
+settled before a script starts asserting on it.
+
+### Priority
+
+**Low.** Nothing is over cap and the trigger now at least fires on an event that happens. This is
+the difference between a duty and a guard.
+
+---
+
+## 0178 — the +510,464 B the component gained after 2026-08-18 is unattributed, and it is the larger half of the growth
+
+**Raised by:** `architect`, from [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md)'s
+close review (2026-09-01), on `dev`'s own note that the window was outside Phase 3's scope.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-09-01** — the spec records the movement and says it is unattributed:
+  `present: is not attributed at all in: docs/specs/0001-c-abi.md`
+
+### The finding
+
+Plan 0141 Phase 3 bisected the window [backlog 0118](design-backlog-archive.md) named — Plan 0097's
+close to Plan 0107's close — and attributed **98.4 %** of it to Plan 0100's MilkDrop conversion work.
+That is a clean result and it closed the entry it was filed against.
+
+It is also the **smaller** half. Phase 2's re-measure found `foo_lmv.dll` had reached 9,789,952 B on
+2026-09-01, which is **+510,464 B beyond** the 2026-08-18 figure the bisect ended at — larger than
+the +400,384 B that was worth filing a backlog entry over. Phase 3's scope was the window the plan
+named, correctly, so this one has never been looked at.
+
+**What makes it worth a second bisect rather than a shrug** is that the first one paid off: the
+suspicion in the entry was confirmed rather than assumed, and the answer turned out to be one plan
+rather than "the sum of many small things". Roughly twenty plans closed between 2026-08-18 and
+2026-09-01.
+
+### What a fix would be
+
+The same method, and it is written down now: build only `core-cabi` at each `chore: Release` commit
+in the window and read `lmv_core_c.dll`. Two things Plan 0141's bisect learned that this one should
+carry:
+
+- **Record the `rustc` version at every point.** Rebuilding `22bb460` in 2026-09 gave a number
+  **13,312 B** from the one measured at that commit in 2026-08, under the same build command, and
+  nothing recorded at either date can now explain the gap. That is the working noise floor for this
+  column, and it makes any single step under ~13 KB uninterpretable.
+- **Read the cdylib, ship the number for `foo_lmv.dll`.** The shim links the staticlib, so the
+  cdylib is a proxy — fine for locating a step, not the artifact the cap is about.
+
+If the growth is attributable and unwanted, *that* is a third entry; this one asks only what moved.
+
+### Priority
+
+**Low-medium.** Nothing is over cap, and the component is at 97.9 % of the decimal reading of a soft
+cap written with a tilde — which is a reason to know what is in it, not a reason to panic. Cheaper
+now than after another twenty plans.
