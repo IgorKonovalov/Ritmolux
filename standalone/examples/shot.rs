@@ -52,6 +52,7 @@
 //!   --crf <0-51>             the encoder's rate-quality setting (default 18,
 //!                            archival). Higher is smaller; +6 is about half the
 //!                            size. Needs --ffmpeg
+//!   --help, -h               print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
 //! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
@@ -430,7 +431,8 @@ fn print_usage() {
                                     one command makes a file. Needs --out\n\
          --crf <0-51>               encoder rate-quality (default 18, archival).\n\
                                     Higher is smaller; +6 about halves it.\n\
-                                    Needs --ffmpeg"
+                                    Needs --ffmpeg\n\
+         --help, -h                 print this usage and exit"
     );
 }
 
