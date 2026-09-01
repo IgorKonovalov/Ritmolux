@@ -137,10 +137,10 @@ escape cannot silently become a silencer.
 node scripts/check-index-rows.mjs scripts/fixtures
 ```
 
-Expect **exit 0** — the one fixture here that passes rather than fails. A byte cap is trivially
-red on any tree with a fat row in it, so the interesting assertion is the reverse: that the
-checker measures the rows it should and stays silent about everything else. Green here means all
-four hold at once:
+Expect **exit 0** — this is the fixture that passes rather than fails, and it is only half the
+instrument. A byte cap is trivially red on any tree with a fat row in it, so the interesting
+assertion here is the reverse: that the checker measures the rows it should and stays silent about
+everything else. Green here means all four hold at once:
 
 | Case | Seeded as | Expected |
 |------|-----------|----------|
@@ -157,6 +157,30 @@ of changing what the markers mean without anyone noticing.
 The per-file region count the checker prints on success is the mitigation for that hole, and it
 is what the second case exercises — a deleted marker shows up as a region that vanished rather
 than as a file that quietly stopped being checked.
+
+### The counts are asserted, not printed
+
+**Exit 0 above is not on its own an assertion.** This tree holds no over-cap row inside a marker
+and neither does the repository, so a detector that has stopped matching anything exits 0 from
+both: replace `TABLE_ROW` and `BULLET` with regexes that match nothing and the fixture reports
+`3 regions, 0 rows, 0 over cap`, which reads exactly like a clean tree. That is backlog 0104's own
+reduction, and the per-file counts it collapses were the documented mitigation — *printed*, and
+compared to nothing.
+
+```
+node scripts/check-index-rows.mjs --self-test    # expects exit 0, 6 of 6
+```
+
+The six split into a fixture half and a repository half, and they die to different mutations:
+
+| Half | Asserts | Why that shape |
+|------|---------|----------------|
+| fixture | **exactly** 3 regions and 4 rows, nothing over cap, no malformed marker | this tree changes only when someone changes it on purpose, so an exact number is affordable — and **4 rather than 6** is what holds a table's header and its `\|---\|` delimiter to being structure rather than rows |
+| repository | a **floor** of 20 rows in each of `docs/adrs/README.md`, `docs/plans/README.md` and `docs/design-backlog.md`, and 100 across the tree | those three gain a row at every close, so an exact count would be red on the next one and would be raised without being read; a floor still goes to zero the moment the detectors stop matching, which is the only thing it is for |
+
+Under the mutation above the self-test reports **1 of 6** and exits 1, while the plain run still
+exits 0 — which is the whole reason the self-test is where the assertion lives rather than in the
+exit code of the ordinary run.
 
 ## `filter-figures/` — for `check-filter-figures.mjs`
 
