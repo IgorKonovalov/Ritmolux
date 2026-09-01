@@ -69,11 +69,19 @@ const REPO = resolve(ROOT_ARG ?? REPO_ROOT);
 // Build output, vendored deps, and VCS internals hold markdown we do not own.
 const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 
-// The fixture tree carries this checker's own bite check and is skipped on a
-// repo walk, exactly as check-doc-links.mjs skips it; it is scanned when it IS
-// the root, which is the only way its rows are reachable. Skipped BY PATH, not
-// by directory name — the name form also swallowed core/tests/fixtures/ there.
-const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
+// The fixture trees carry this checker's own bite checks and are skipped on a
+// repo walk, exactly as check-doc-links.mjs skips them; each is scanned when it
+// IS the root, which is the only way its rows are reachable. Skipped BY PATH,
+// not by directory name — the name form also swallowed core/tests/fixtures/ there.
+//
+// The RED tree is on this list for a second reason, and it is the one that bites:
+// it sits INSIDE the green tree, whose root is `scripts/fixtures`, so without the
+// skip the green run would walk it and inherit its over-cap row — turning the
+// green fixture's exact counts into 2 regions and 6 rows and its exit code into 1.
+// The two roots have to stay separable, because one asserts silence and the other
+// asserts a conviction.
+const RED_FIXTURE = resolve(REPO_ROOT, "scripts", "fixtures", "index-rows-red");
+const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures"), RED_FIXTURE]);
 
 const DEFAULT_CAP = 320;
 
@@ -226,9 +234,16 @@ function measure(root) {
 // without being read. Measured 2026-09-01: 159 / 123 / 120 rows across 4
 // regions. The floors below sit far under those and still go to zero the moment
 // TABLE_ROW and BULLET stop matching, which is the only thing they are for.
+// The RED half is the third, and it is the only one that runs the reporting path
+// at all: `file:line  N bytes (cap C)`, two spaces before the count, which is
+// what makes the line clickable in a terminal. Nothing in the repository and
+// nothing in the green fixture has ever reached that formatting, so it is
+// asserted by SHAPE rather than by an exit code — "exits non-zero" is also what
+// a crash and a thrown ENOENT look like.
 const ROSTERS = ["docs/adrs/README.md", "docs/plans/README.md", "docs/design-backlog.md"];
 const ROSTER_ROW_FLOOR = 20;
 const REPO_ROW_FLOOR = 100;
+const REPORT_SHAPE = /^[\w./-]+\.md:\d+ {2}\d+ bytes \(cap \d+\)$/;
 
 function selfTest() {
   const results = [];
@@ -244,6 +259,18 @@ function selfTest() {
     "fixture: nothing over cap and no malformed marker",
     fixture.violations.length === 0 && fixture.errors.length === 0,
     `${fixture.violations.length} over cap, ${fixture.errors.length} malformed`,
+  );
+
+  const red = measure(RED_FIXTURE);
+  record(
+    "red fixture: exactly 1 region, 2 rows, 1 over cap",
+    red.regions === 1 && red.rows === 2 && red.violations.length === 1,
+    `${red.regions} regions, ${red.rows} rows, ${red.violations.length} over cap`,
+  );
+  record(
+    "red fixture: the report names the row as `file:line  N bytes (cap C)`",
+    REPORT_SHAPE.test(red.violations[0] ?? ""),
+    red.violations[0] ?? "nothing reported",
   );
 
   const repo = measure(REPO_ROOT);

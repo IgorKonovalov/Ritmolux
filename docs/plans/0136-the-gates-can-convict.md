@@ -369,8 +369,8 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The row gate asserts its own counts | dev | done | committed with this row |
-| 2 — A seeded tree the row gate rejects | dev | not started | |
+| 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
+| 2 — A seeded tree the row gate rejects | dev | done | committed with this row |
 | 3 — The row gate reads a row's shape | dev | not started | |
 | 4 — Backlog references stop using fragments | dev | not started | |
 | 5 — A probe path is checked against the repository | dev | not started | |
@@ -385,6 +385,11 @@ flowchart TB
 - **Phase 1's `--self-test` is wired into the call sites in Phase 2, not Phase 1.** Phase 1's file
   list is the script and the fixtures README; `.githooks/pre-push` and the CI `links` job are named
   in Phase 2's. Both invocations land together there.
+- **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
+  `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
+  an `architect` act at the close, and the claim gate's own failure text says repairing a falsified
+  entry is not a `dev` call - so it is left red and recorded here rather than edited. The
+  `Backlog probes` close trigger carries the full roster.
 - **`check-backlog-claims.mjs --self-test` is wired into no call site at all.** Phase 1's note holds
   it up as the model to follow and as the thing that must be wired *"or it is a mechanism nobody
   runs, which is the defect being repaired"*. Grepped 2026-09-01 across `.githooks/`, `.github/` and

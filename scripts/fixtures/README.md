@@ -158,6 +158,33 @@ The per-file region count the checker prints on success is the mitigation for th
 is what the second case exercises — a deleted marker shows up as a region that vanished rather
 than as a file that quietly stopped being checked.
 
+### `index-rows-red/` — the same checker's other half
+
+```
+node scripts/check-index-rows.mjs scripts/fixtures/index-rows-red
+```
+
+Expect **exit 1 and exactly one break**, on the model Plans 0084 and 0094 established for the two
+sibling gates. A bare "exits non-zero" is also what a crash looks like, so the count is the
+assertion and the `--self-test` below additionally pins the *shape* of the printed line.
+
+| File | Case | Expected |
+|------|------|----------|
+| `roster.md` | a 437-byte row inside a `roster:begin cap=320` region | reported as `roster.md:25  437 bytes (cap 320)` |
+| `roster.md` | a correctly-sized row in the same region | measured, not reported — so the report picks one of two rather than convicting everything inside a marker |
+
+**This is the only thing anywhere that runs the reporting path.** Nothing tracked in this
+repository is over cap and neither is the green fixture, so `file:line  N bytes (cap C)` — two
+spaces before the count, which is what makes the line clickable — had never been executed by any
+run of this gate.
+
+**Note the root.** Unlike the green fixture this checker is pointed at the subdirectory rather than
+at `scripts/fixtures`, and the tree names itself on the checker's `SEEDED_TREES` list for a second
+reason beyond the usual one: it sits *inside* the green fixture's root, so without the skip the
+green run would walk it and inherit its over-cap row, turning that run's exact counts into 2
+regions and 6 rows and its exit code into 1. The two roots assert opposite things and have to stay
+separable.
+
 ### The counts are asserted, not printed
 
 **Exit 0 above is not on its own an assertion.** This tree holds no over-cap row inside a marker
@@ -168,19 +195,24 @@ reduction, and the per-file counts it collapses were the documented mitigation �
 compared to nothing.
 
 ```
-node scripts/check-index-rows.mjs --self-test    # expects exit 0, 6 of 6
+node scripts/check-index-rows.mjs --self-test    # expects exit 0, 8 of 8
 ```
 
-The six split into a fixture half and a repository half, and they die to different mutations:
+The eight split into three halves — the green fixture, the red one, and the repository — and they
+die to different mutations:
 
 | Half | Asserts | Why that shape |
 |------|---------|----------------|
-| fixture | **exactly** 3 regions and 4 rows, nothing over cap, no malformed marker | this tree changes only when someone changes it on purpose, so an exact number is affordable — and **4 rather than 6** is what holds a table's header and its `\|---\|` delimiter to being structure rather than rows |
+| green fixture | **exactly** 3 regions and 4 rows, nothing over cap, no malformed marker | this tree changes only when someone changes it on purpose, so an exact number is affordable — and **4 rather than 6** is what holds a table's header and its `\|---\|` delimiter to being structure rather than rows |
+| red fixture | **exactly** 1 region, 2 rows, 1 over cap, and the break matching `file:line  N bytes (cap C)` | the count separates a conviction from a crash; the shape is the only assertion the reporting path has, since no other run reaches it |
 | repository | a **floor** of 20 rows in each of `docs/adrs/README.md`, `docs/plans/README.md` and `docs/design-backlog.md`, and 100 across the tree | those three gain a row at every close, so an exact count would be red on the next one and would be raised without being read; a floor still goes to zero the moment the detectors stop matching, which is the only thing it is for |
 
-Under the mutation above the self-test reports **1 of 6** and exits 1, while the plain run still
-exits 0 — which is the whole reason the self-test is where the assertion lives rather than in the
-exit code of the ordinary run.
+Under the matches-nothing mutation the self-test reports **1 of 8** and exits 1, while the plain
+run still exits 0 — which is the whole reason the self-test is where the assertion lives rather
+than in the exit code of the ordinary run. Rewriting the report string alone reports **7 of 8**.
+
+Both invocations — the plain repo run and `--self-test` — are in `.githooks/pre-push` and in the
+CI `links` job. A self-test nothing runs is the mechanism this fixture exists to have repaired.
 
 ## `filter-figures/` — for `check-filter-figures.mjs`
 
