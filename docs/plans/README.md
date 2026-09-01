@@ -35,7 +35,6 @@ place. The plan file carries the real link.
 | [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
 | [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
-| [0139](0139-the-render-path-validates-before-it-spends.md) | The render path validates before it spends | approved | dev | Backlog 0111 + 0112. A typo in `--preset` spawns ffmpeg and a GPU device first, leaving a playable 262-byte MP4. Three `dev` phases, no human gate. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
@@ -984,6 +983,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0139 - The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md) - closed 2026-09-01. Review: **no blockers, one major, four minors, three nits.** Version: **0.99.0**. Archived [0111 + 0112](../design-backlog-archive.md), filed 0174-0176. [Write-up](README-archive.md).
 - [0146 — The preset sweeps stop being one long test](done/0146-the-preset-sweeps-stop-being-one-long-test.md) — closed 2026-08-31. Review: **one blocker, four majors, eight minors, three nits**, all repaired at the close. Version: **0.98.0** (minor). [Write-up](README-archive.md).
 - [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) — closed 2026-08-31. Review: **no blockers, no majors, three minors.** Version: **none** (docs/chore-only). [Write-up](README-archive.md).
 - [0144 - The flags mean what they say](done/0144-the-flags-mean-what-they-say.md) - closed 2026-08-31. Review: **no blockers, no majors, five minors, three nits.** Version: **0.97.0**. Archived [backlog 0167 + 0168 + 0169](../design-backlog-archive.md). [Write-up](README-archive.md).
@@ -1193,7 +1193,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0136]: 0136-the-gates-can-convict.md
 [0137]: 0137-the-metrics-measure-light.md
 [0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
-[0139]: 0139-the-render-path-validates-before-it-spends.md
+[0139]: done/0139-the-render-path-validates-before-it-spends.md
 [0140]: 0140-every-rate-integrates-for-real.md
 [0141]: 0141-the-plugin-seams-stop-drifting.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
