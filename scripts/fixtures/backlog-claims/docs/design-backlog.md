@@ -62,6 +62,15 @@ reports everything it sees.
   `absent: SEEDED_ABSENT_SYMBOL in: core/src`
 - **Verified 2026-08-15** — the rule is documented, and here:
   `present: SEEDED_PRESENT_RULE in: presets/README.md`
+- **Verified 2026-09-01** — a run of spaces inside the pattern survives into the match. This probe
+  is the one that has to FIRE: collapsing every whitespace run rewrote it into a different regex,
+  matching single-spaced text the fixture does not contain, and reported `no match` with no error
+  and no warning:
+  `present: SEEDED_SPACE_RUN     is separated in: presets/README.md`
+- **Verified 2026-09-01** — and the wrap is still absorbed, which is what the collapse was there
+  for. This span breaks across two source lines mid-pattern and must still resolve to one
+  space: `present: SEEDED_PRESENT_RULE applies to
+  every preset in: presets/README.md`
 
 ## 0007 — a live entry with no verification bullet at all
 
