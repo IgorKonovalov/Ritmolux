@@ -1,6 +1,9 @@
 # 0148 — The shipped artifacts carry their own guarantees
 
-> **Status:** in-progress
+> **Status:** in-progress — **parked after Phase 4.** Phases 1-4 are landed, reviewed and
+> green; Phase 5 cannot run while another lane is building (its own method constraint) and
+> Phase 6 carries the close review's repairs. Resume when `lmv-plan-0136` and
+> `lmv-plan-0149` are gone.
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
@@ -221,6 +224,47 @@ flowchart TB
 
   **If the growth turns out to be attributable and unwanted, that is a third backlog entry**, not
   more of this phase. This phase asks only what moved.
+
+### Phase 6 — The repairs the close review found
+- **Owner skill:** dev
+- **What:** the review of Phases 1-4 (2026-09-01, this session) found one major and three minors in
+  the code and the records. They are listed here rather than in the log because they are contract,
+  not report. The ADR-0159 items the same review found are already repaired — that document is
+  `architect`-owned and still `proposed`.
+- **Files touched:** `docs/specs/0001-c-abi.md`, `docs/releasing.md`,
+  `packaging/foobar/build-component.ps1`, `standalone/src/shot/render.rs`, `docs/capturing.md`,
+  `standalone/tests/shot_cli.rs`.
+- **Done when:**
+  - **`docs/specs/0001-c-abi.md` stops contradicting itself.** Its size-series paragraph (edited by
+    Phase 4) says the recipe prints the length on every build; ~80 lines below, the re-measure
+    paragraph still says *"Nothing **mechanically** reads the size yet: the recipe never looks at
+    its own output's `Length`"* and *"this remains a duty a person performs"*. The second passage is
+    rewritten to describe the guard Phase 4 built. Its `design-backlog 0177` citation points at
+    `design-backlog-archive.md` once that entry is archived at the close.
+  - **`docs/releasing.md`'s *"While you are here: read the component's size"* section is rewritten.**
+    All three of its claims are now false: the `~10 MB soft cap` it attributes to NFR §4 (which now
+    states 12,582,912 B for the component), the hand `(Get-Item ...).Length` two code blocks below
+    the recipe that prints exactly that, and *"Nothing enforces this yet"*. The section keeps its
+    purpose — telling a releaser what to do with the number — and states that the figure now arrives
+    in the build output and that the recipe warns above 11,324,620 B. This file was missing from
+    Phase 4's file list and from the log's `Operator docs touched` bullet.
+  - **`packaging/foobar/build-component.ps1`'s header stops saying every check is fatal.** Line 16
+    reads *"Every check below is fatal"*; the size step below it is a `Step`/`Check` in the same
+    vocabulary as the seven fatal ones and deliberately never `Die`s. One clause naming the
+    exception is enough.
+  - **`a_render_that_cannot_name_its_preset_spends_nothing` pins its own roster.** It passes no
+    `--presets`/`--preset-file`, so `err.contains("Leviathan") && err.contains("Supernova")` is an
+    assertion about the machine's per-user preset directory, which outranks the embedded set and is
+    seeded write-if-absent — a preset renamed in `presets/` leaves a stale copy there and the test
+    keeps passing off it. Adding `--presets presets` pins it to the repository. The ordering
+    property under test is unchanged, and the test must still convict when `Encoder::spawn` is moved
+    above `resolve_preset` (verified at the review by doing exactly that).
+  - **The dropped-tag finding names the build it was measured on.** `standalone/src/shot/render.rs`
+    and `docs/capturing.md` both attribute the loss to *"the libx264 path"* without qualification;
+    the measurement is ffmpeg 8.1 (gyan.dev full build), recorded only in this plan's log, and the
+    readback test runs only where `ffmpeg` and a GPU are both present. Per ADR-0071's prose
+    corollary, one clause naming the build goes in both places. The finding reproduced independently
+    at the review on that build; nothing claims it was seen on a second one.
 
 ## Data shapes
 
