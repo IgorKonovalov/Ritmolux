@@ -2643,6 +2643,10 @@ now documents the wrong constant, which is the ADR-0071 failure one level down.
 **Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
 (`diamond`, `chevron`) are exactly the two Plan 0087 did *not* convert to arcs — so the defect is now
 concentrated rather than diffuse.
+- **PROMOTED 2026-09-01 -> [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phases 1-2.** The ADR takes the first of the three
+  designs this entry lists - a per-endpoint miter length on the instance - and supersedes ADR-0041's
+  geometry half on the ground this entry names: Plan 0114 removed the blur that decision rested on.
+  The plan's Phase 5 also takes the `tests.rs` doc-block nit recorded at the end of this entry.
 
 ---
 
@@ -2679,6 +2683,9 @@ permanently empty for every preset in the library**, because every shipped `d` i
 **Low.** It is a fixed cost on a floor the driver dominates (~327 MB), and nothing measures it today.
 It becomes worth doing the moment a second parametric layer ships, or alongside any other
 `max_segments` re-sizing.
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4**, which takes both halves - buffers sized at load from what
+  the preset declared, and the `points` off-by-one - and **re-reads `nfr.md` section 12 against the real
+  numbers**, since this entry's last bullet says the NFR line may be the thing that is wrong.
 
 ---
 
@@ -2712,6 +2719,10 @@ cap violation, and nothing warns.
 
 **Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
 author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 3**, which takes the **load-time refusal**, not the inward lobe.
+  That is a stated guess and the plan says so: no shipped preset is in range, the refusal is the honest
+  and cheaper of the two, and it is what makes an inward-scallop ask come back rather than ship a silent
+  bulge. Both over-claiming comments are corrected with it.
 
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
@@ -2928,6 +2939,10 @@ are collected here so none of them lives only in a review transcript.
 claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
 reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
 has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5**, against this entry's own instruction to fold it into
+  whatever next opens `marks.rs`. Nothing else on the roster opens that file, and the plan is the nearest
+  work on figure-geometry contracts. All four repairs travel, and item 1 **qualifies the prose** rather
+  than changing the divisor, which is what this entry argues for.
 
 ---
 
@@ -3242,6 +3257,10 @@ questions (**(d)** does `REGDB_E_CLASSNOTREG` appear during a *real* loss, **(e)
 a real unplug consumes, **(f)** does the verdict name the right cause) alongside Plan 0130's
 original three, and a Standing bullet in [the plans index](plans/README.md). Run against v0.95.0 or
 later, or the policy under test is not the repaired one.
+- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 2**, which takes **only the third shape** - the verdict
+  stops reading the same about an activation and about a device. **The mechanism halves stay filed and
+  this entry stays live**, because choosing between retry-in-place and a long-lived enumerator wants the
+  unplug evidence, and the box still has no removable interface.
 
 ## 0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand
 
@@ -3539,6 +3558,8 @@ control) - and that is an ADR if it is ever wanted, not a patch.
 - **Verified 2026-08-30** - the absolute twin the consumer needed is already published: `present: "/lmv/v1/raw/bass" in: standalone/src/osc.rs`
 - **Verified 2026-08-30** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /lmv/v1/raw/bass in: README.md`
 - `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `README.md`, `docs/` and the OSC table, not a match countable in one file
+- **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
+  phase lands first in that plan because [Plan 0133](plans/0133-the-engine-drives-the-lights.md) is approved and meets this on its first evening.
 
 ## 0164 - the operator console halves the output's frame rate, and two comments say it cannot
 
@@ -3595,6 +3616,9 @@ above are corrected to the property that survives.
 - **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/main.rs`
 - **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
 - **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
+- **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phases 3-5.** Both levers become reachable, a hands-off window measures
+  four arms, and whichever verdict arrives sets the defaults. **The two false comments are corrected
+  either way** - the plan is explicit that a fix is conditional and the claim repair is not.
 
 ## 0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure
 
@@ -3654,6 +3678,10 @@ the running adapter has already landed and is what makes any of this attributabl
 - **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/main.rs`
 - **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/main.rs`
+- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6**, which takes the measurement half: a new windowed
+  frame-time row naming the discrete adapter, beside the iGPU figures rather than replacing them. The
+  phase also records whether the console's dual-GPU degrade path became reachable; **if it stays
+  unexercised this entry keeps that half and stays live.**
 
 ## 0166 - the index-row gate measures a row's bytes and never its shape, so a closed-plan bullet dropped into the active-plans table passes
 
@@ -3693,6 +3721,9 @@ table region.
 - **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 3** (added at that plan's 2026-09-01 amendment). A shape check
+  lands **beside** the length check, not instead of it: a 200-byte bullet in a table region is under cap
+  and still wrong.
 
 ## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
 
@@ -3729,6 +3760,10 @@ way and is green today only because neither vendored tree happens to carry a rel
 - **Verified 2026-08-30** - nothing consults git's ignore rules: `absent: check-ignore in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-30** - the by-name patch this entry says is not the fix is present: `present: const VENDORED_TREES = new Set in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-30** - and both ignore rules that make the trees invisible to CI still stand: `present: plugin-foobar/sdk/ in: .gitignore`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), taking the
+  `git ls-files` enumeration this entry names as the fix, and **removing the by-name patches** Plan 0134's
+  close added. The sibling question this entry raises about `check-doc-links.mjs` is in that phase's
+  done-when, and silence on it is not an answer.
 
 
 ## 0171 - a backlog probe about a run of spaces is collapsed to one space before it is matched, so it can never fire
@@ -3780,6 +3815,9 @@ lands, it should say the same about a space.
 - **Verified 2026-08-31** - the collapse is still unconditional and still happens before the verb is read: `present: replace\(/\\s\+/g, " "\) in: scripts/check-backlog-claims.mjs`
 - **Verified 2026-08-31** - and nothing tells the author it happened: there is no diagnostic on the rewrite, which is the whole of why the probe reads as decay rather than as a mistake: `absent: collapse in: scripts/check-backlog-claims.mjs`
 - **Verified 2026-08-31** - the grammar note tells an author to escape a dot and says nothing about a space: `present: a literal dot needs escaping in: scripts/check-backlog-claims.mjs`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 5** (added at that plan's 2026-09-01 amendment), as a done-when
+  on the phase that already opens `check-backlog-claims.mjs`. The wrap must still be absorbed; what stops
+  is a run of spaces inside a pattern being collapsed - proved by a fixture probe that **fires**.
 
 ## 0172 - the seeded preset directory is never pruned, so an operator's roster drifts from the shipped set and can hold two presets under one name
 
@@ -3861,6 +3899,9 @@ otherwise, which is the property that gets the next reader to stop looking.
 - **Verified 2026-08-31** - the newline exclusion is still unconditional and still ahead of the run check, so the unrejoined form still returns before it is judged: `present: text\.includes.{0,40}return null in: scripts/check-comment-hygiene.mjs`
 - **Verified 2026-08-31** - the fixture roster still states the silence as a general property: `present: prose does not carry one mid-sentence in: scripts/fixtures/README.md`
 - **Verified 2026-08-31** - the swallowed backslash is still in the message the operator reads: `present: with no trailing \\\) in: scripts/check-comment-hygiene.mjs`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), which takes
+  the unrejoined form **and** the fixture README sentence that states the gate's blindness as a general
+  truth.
 
 ---
 
@@ -3897,6 +3938,8 @@ them, correct the paragraph rather than the command.
 
 **Impact:** low-medium. No reported visual defect; a documented guarantee that is not checked, on
 the path [Plan 0103](plans/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 3**, whose done-when is written around *establishing what is
+  true* and admits both repairs this entry names - move the arguments, or correct the paragraph.
 
 ---
 
@@ -3932,6 +3975,7 @@ binary. Their `--ffmpeg` siblings are asserted three lines apart in that same te
 
 **Impact:** medium. The shipped behaviour is correct; what is missing is the guard on the one
 property the plan exists to hold. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 1**, using this entry's own reproduction and helper list.
 
 ---
 
@@ -3963,6 +4007,8 @@ worth it for two CLIs and is not proposed.
 
 **Impact:** low. No known drift today; the property Plan 0144 decided was worth holding for one
 binary is unheld for the other. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 2**, taking the cheap half only - one test that `--help` prints
+  every literal the parser accepts. **The shared roster type this entry declines is declined there too.**
 
 ---
 
@@ -4008,6 +4054,10 @@ settled before a script starts asserting on it.
 
 **Low.** Nothing is over cap and the trigger now at least fires on an event that happens. This is
 the difference between a duty and a guard.
+- **PROMOTED 2026-09-01 -> [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) + [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 4.** The open question this entry filed
+  rather than answered - what the plugin's own cap is - is settled by the ADR at **12,582,912 B (12 MiB)**,
+  derived as today's size plus one more step the size of the `text` step. The recipe prints the length
+  always and warns above 90 %; it never fails a release.
 
 ---
 
@@ -4056,3 +4106,6 @@ If the growth is attributable and unwanted, *that* is a third entry; this one as
 **Low-medium.** Nothing is over cap, and the component is at 97.9 % of the decimal reading of a soft
 cap written with a tilde — which is a reason to know what is in it, not a reason to panic. Cheaper
 now than after another twenty plans.
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5**, carrying both method constraints this entry names: the
+  `rustc` version recorded at every point against the ~13,312 B noise floor, and the cdylib read as a
+  proxy while the number shipped is `foo_lmv.dll`'s.

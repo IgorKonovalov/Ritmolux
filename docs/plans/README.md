@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0147** (ADRs are a separate sequence — next free there is **0158**.)
+**Next free number: 0150** (ADRs are a separate sequence — next free there is **0158**.)
 
 ## Active roster
 
@@ -32,12 +32,58 @@ place. The plan file carries the real link.
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
+| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133 + **0166 + 0170 + 0171 + 0173** (amended 2026-09-01, now 10 phases). ADR-0149 (proposed). 0170 blocks every local push. **Phases 1-8 need no GPU.** |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
+| [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | draft | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off measurement window.** Phase 1 wants to land before 0133. |
+| [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | draft | dev | Backlog 0175 + 0176 + 0174 + 0177 + 0178. ADR-0159 (proposed): a 12,582,912 B component cap the recipe reads. Phases 1-2 are pure test additions. No GPU, no `human`. |
+| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | draft | dev | Backlog 0134 + 0135 + 0136 + 0144. ADR-0158 (proposed): a joined end carries its own miter length. **Phase 1 must move no golden; Phase 2 re-blesses every line scene.** |
 <!-- roster:end -->
+
+**Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
+— three new plans and one amendment, taking 21 of the ~30 live entries no plan claimed. The round's
+shape, because most of what it decided was sequencing rather than design:
+
+- **[0149] must run before [0126].** They contend on two files: 0149's Phase 3 edits `star.rs` and
+  its Phase 5 edits `schema.rs`, and 0126 **splits both**. A pure move of code that is about to
+  change is the move done twice, and 0126's phases are gated on golden while 0149's Phase 2
+  deliberately re-blesses every line scene. They must not run in parallel in any order.
+- **[0147]'s Phase 1 wants to land before [0133] is built.** Backlog 0163 is one sentence of prose,
+  and 0133 brings in-house the exact consumer that was misled by its absence — a lighting look
+  multiplying a band term into a physical output. The rest of 0147 does not gate 0133.
+- **[0148] is the free one:** no `human` phase, no GPU, no preset, no golden. Two of its five phases
+  are pure test additions over behaviour that is already correct.
+- **The gate entries folded into [0136] rather than becoming a fourth plan**, which was the user's
+  call at the interview: a second lane over `scripts/check-*.mjs` would contend with 0136 on the
+  same six files for no benefit. That amendment took it from 8 phases to 10 and **falsified its own
+  closing claim** — it said it did not touch `check-comment-hygiene.mjs`, *"the one gate in
+  `scripts/` with no live complaint against it"*, and backlog 0170 and 0173 were filed against that
+  gate the day after. Repaired in the same edit. **0170 blocks `git push` for everyone whose working
+  tree holds `.venv/` or an unpacked SDK**, which makes it the most urgent thing in that plan.
+- **Two entries were promoted only in part, deliberately.** Backlog 0154 gives up its *verdict* fix
+  and keeps its mechanism question, because choosing between retry-in-place and a long-lived
+  enumerator wants unplug evidence the box cannot produce. Backlog 0165 gives up its measurement
+  half; whether the console's dual-GPU degrade path is reachable stays open, and 0147 Phase 6 is
+  written so that "it stayed unexercised" is a recordable finding rather than a failure.
+- **What stayed filed, and why.** The engine/content entries no plan here takes — 0140 (the band
+  contour), 0146 (`warp_mesh` colours at deposit), 0100, 0101, 0095, 0092, 0069 — are look-affecting
+  and larger, and several price themselves as a redesign of the composite. Backlog 0021 and 0032
+  remain parked with named triggers. **0157 and 0158 are not unclaimed** despite reading that way
+  from the roster: [0133]'s Phase 2 closes both.
+- **One design premise was reopened and one was left alone.** [ADR-0158] supersedes the *geometry*
+  half of ADR-0041 because that ADR rejected a true miter on the ground that *"a mitred corner and a
+  rounded one differ by less than the blur that is already there"* — and Plan 0114 took
+  `DEFAULT_SOFTNESS` to `0.25`. Its per-endpoint *granularity* stands and is what makes the fix
+  cheap. [ADR-0159] settles what backlog 0177 filed rather than answered — the plugin's own cap —
+  and does **not** touch the standalone exe's, which keeps its inherited value and gains only a unit.
+
+[0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
+[0148]: 0148-the-shipped-artifacts-carry-their-own-guarantees.md
+[0149]: 0149-the-line-corners-stop-being-blunt.md
+[ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
+[ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
 
 **Added 2026-08-19, from a MilkDrop backlog round after
 [0109](done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s close:
