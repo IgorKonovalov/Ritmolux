@@ -319,6 +319,57 @@ pub fn peak_to_mean(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
     peak / mean
 }
 
+/// Mean **linear light** over the lit set — the level statistic (ADR-0150), in
+/// `0.0..=1.0`. `0.0` for a frame with no lit pixels, the convention
+/// [`tonal_flatness`] and [`boundary_density`] use.
+///
+/// Every other statistic in this module answers a *shape* question. This one
+/// answers *how much light does the picture carry*, which is the question a
+/// retune asks when it wants to hold level constant across a change, and it is
+/// the one question that cannot be asked on the stored bytes: sRGB's transfer
+/// curve is concave, so an encoded mean under-reports a trim by roughly half.
+/// [`linear_diff`] carries the same reasoning for a two-frame comparison.
+///
+/// **The lit predicate is [`coverage`]'s, so this is linear light over a
+/// CODE-SPACE-selected set.** ADR-0150 records why that seam is accepted rather
+/// than solved: a lit predicate in linear light would change `coverage` itself
+/// and move blessed baselines across the whole suite, for no gain to the
+/// question being asked here. A reader who does not know that will eventually
+/// "fix" the wrong half.
+///
+/// **Restricted to the lit set, not the frame**, which is the substantive half.
+/// A preset's background is a deliberate authored constant; folding it into the
+/// level makes the reading mostly a measurement of that constant, and a frame
+/// mean read a 30 % source trim as 3 % on the fixture that motivated this.
+/// The corollary is a blind spot: a preset that goes wrong *by changing its
+/// background* is invisible here.
+///
+/// Luminance weights are Rec.709 (`0.2126/0.7152/0.0722`), not the Rec.601 that
+/// [`luma`] applies to code values — those are the luminance coefficients of
+/// sRGB's own primaries, and they are what every other linear-light reading in
+/// this workspace uses.
+pub fn mean_lit_level(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
+    let lut = srgb_decode_lut();
+    let decode = |px: &[u8], c: usize| -> f32 {
+        lut.get(px.get(c).copied().unwrap_or(0) as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    let mut sum = 0.0f64;
+    let mut lit: u64 = 0;
+    for px in img.rgba.chunks_exact(4) {
+        if !is_lit(px, bg, eps) {
+            continue;
+        }
+        lit += 1;
+        sum += f64::from(0.2126 * decode(px, 0) + 0.7152 * decode(px, 1) + 0.0722 * decode(px, 2));
+    }
+    if lit == 0 {
+        return 0.0;
+    }
+    (sum / lit as f64) as f32
+}
+
 /// Rec.601 luma of a pixel's first three channels — the same weights
 /// [`downscale_gray`] and [`tonal_flatness`] use, so "luminance" means one thing
 /// across this module. Tolerates a short slice (missing channels read zero).

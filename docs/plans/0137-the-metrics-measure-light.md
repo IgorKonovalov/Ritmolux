@@ -229,8 +229,8 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One sRGB decode | dev | done | committed with this row |
-| 2 — A level statistic | dev | not started | — |
+| 1 — One sRGB decode | dev | done | `efde516` |
+| 2 — A level statistic | dev | done | committed with this row |
 | 3 — A column for it | dev | not started | — |
 | 4 — `boundary_density` says what it is bound to | dev | not started | — |
 | 5 — The driven floor's second probe is actually pinned | dev | not started | — |
