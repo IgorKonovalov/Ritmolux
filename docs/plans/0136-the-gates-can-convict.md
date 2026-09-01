@@ -4,8 +4,16 @@
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (proposed)
-> **Closes:** design-backlog 0104, 0143, 0162, 0127, 0133. **0160 and 0161 are corrected in place,
-> not closed** — see Phase 6.
+> **Closes:** design-backlog 0104, 0143, 0162, 0127, 0133, **0166, 0170, 0171, 0173**.
+> **0160 and 0161 are corrected in place, not closed** — see Phase 8.
+>
+> **Amended 2026-09-01**, from the backlog round that wrote Plans 0147-0149. Four gate entries filed
+> after this plan was approved land here rather than in a sibling plan, because a second lane over
+> `scripts/check-*.mjs` would contend with this one on the same six files for no benefit. They are
+> **Phase 3** (0166), a done-when on **Phase 5** (0171), and **Phase 7** (0170 + 0173). The plan's
+> own closing claim that it *"does not touch `check-comment-hygiene.mjs`, the one gate in `scripts/`
+> with no live complaint against it"* was falsified by 0170 and 0173 a day after it was written, and
+> is repaired below.
 
 ## TL;DR
 
@@ -50,15 +58,18 @@ fails only for the human who tries to run it at a close, eleven days after the c
 **Repair the instruments before trusting more findings from them**, and take the entries in
 increasing order of how much judgement they need. Phases 1-2 give `check-index-rows.mjs` both shapes
 backlog 0104 names — they are explicitly not exclusive, the `--self-test` covers the demonstrated
-mutation and the red fixture covers the reporting path that nothing currently runs. Phase 3
-implements [ADR-0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md). Phase 4
-teaches the claim gate to ask git whether a probe path is tracked. Phase 5 takes the figure gate's
-untracked-file complaint as an advisory rather than an exit code. Phase 6 corrects two entries whose
-premise ADR-0147 falsified this morning. Phase 7 revives the image sweep, and Phase 8 is the human
+mutation and the red fixture covers the reporting path that nothing currently runs. Phase 3 gives the
+same gate the *shape* check it has never had. Phase 4
+implements [ADR-0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md). Phase 5
+teaches the claim gate to ask git whether a probe path is tracked, and to stop destroying a probe's
+own spacing on the way in. Phase 6 takes the figure gate's
+untracked-file complaint as an advisory rather than an exit code, and Phase 7 makes two gates judge
+the code this project actually wrote. Phase 8 corrects two entries whose
+premise ADR-0147 falsified this morning. Phase 9 revives the image sweep, and Phase 10 is the human
 look at what it re-shoots.
 
 We rejected doing the doc-image work first even though it is the most visibly stale thing here,
-because Phase 7's manifest decision wants `warp_mesh` to have something to be a picture *of*, and
+because Phase 9's manifest decision wants `warp_mesh` to have something to be a picture *of*, and
 that is a content question the plan should reach with its cheap mechanical work already banked.
 
 ## Architecture diagram
@@ -78,9 +89,9 @@ flowchart TB
     IR -->|--self-test asserts its own counts<br/>Phase 1| IR
     RED --> IR
     GREEN --> IR
-    BC -->|"git ls-files: is the probe path tracked?<br/>Phase 4"| GIT["git"]
-    FF -->|untracked hit becomes advisory<br/>not exit code — Phase 5| ADV["advisory block"]
-    DL -->|"rejects design-backlog#fragment<br/>Phase 3, ADR-0149"| DL
+    BC -->|"git ls-files: is the probe path tracked?<br/>Phase 5"| GIT["git"]
+    FF -->|untracked hit becomes advisory<br/>not exit code — Phase 6| ADV["advisory block"]
+    DL -->|"rejects design-backlog#fragment<br/>Phase 4, ADR-0149"| DL
     subgraph sweep["the image sweep (no GPU in the check half)"]
         DS["docs-shots.mjs"] -->|cross-check manifest vs SystemKind| SK["core/src/preset/schema.rs"]
         DS -->|renders| IMG["docs/images/gallery/"]
@@ -126,7 +137,24 @@ flowchart TB
 - **Done when:** the red fixture exits 1 naming exactly one over-cap row, and a change that breaks the
   reporting format fails it rather than printing garbage and passing.
 
-### Phase 3 — Backlog references stop using fragments
+### Phase 3 — The row gate reads a row's shape, not just its length
+- **Owner skill:** dev
+- **What:** Close backlog 0166. `check-index-rows.mjs` measures a row's bytes and never asks what
+  kind of row it is, so a closed-plan bullet dropped into the active-plans table passes.
+- **Files touched:** `scripts/check-index-rows.mjs`, `scripts/fixtures/**`.
+- **Notes for the implementer:**
+  - The entry was filed *"by the reviewer making the mistake and having the gate wave it through"* —
+    it is a real close-ceremony error, not a hypothetical. Steps 2, 3 and 3c of that ceremony each
+    rewrite a roster, which is exactly when the wrong shape gets pasted into the right region.
+  - **A shape check is a different assertion from a length check** and belongs beside it, not
+    instead of it. A 200-byte bullet in a table region is under cap and still wrong.
+  - The marked regions already declare what they hold; the check is that a row's form matches its
+    region's, and the message says which form was expected.
+- **Done when:** a closed-plan bullet placed inside the active-plans `roster:begin` region fails the
+  gate by name; a correctly-shaped row of the same length passes; and the red fixture from Phase 2
+  gains this case so the reporting path is exercised for it too.
+
+### Phase 4 — Backlog references stop using fragments
 - **Owner skill:** dev
 - **What:** Close backlog 0143. Implement
   [ADR-0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md): rewrite all 24
@@ -146,7 +174,7 @@ flowchart TB
     `check-doc-links.mjs`.
   - The gate still exits 0 on the repaired tree.
 
-### Phase 4 — A probe path is checked against the repository, not the disk
+### Phase 5 — A probe path is checked against the repository, not the disk
 - **Owner skill:** dev
 - **What:** Close backlog 0162. `check-backlog-claims.mjs` asks git whether a probe path is tracked,
   and reports *"probe path is not tracked"* rather than passing locally and failing only on CI.
@@ -164,9 +192,17 @@ flowchart TB
 - **Done when:**
   - A probe naming a path under `renders/` (gitignored in full) is reported as untracked by a local
     run, where today it passes.
+  - **Closes backlog 0171 in the same file and the same function.** `check-backlog-claims.mjs:225`
+    extracts each probe with `.map((m) => m[1].replace(/\s+/g, " ").trim())`, which is right for the
+    reason it was written — a markdown bullet may wrap across source lines and the pattern has to
+    survive that — and silently rewrites any probe whose regex contains **two or more consecutive
+    spaces** into a different regex. Such a probe can never fire. The wrap must still be absorbed;
+    what must stop is a run of spaces inside the pattern being collapsed. A probe asserting on a run
+    of spaces is added to the fixtures and **fires**, which is the check that this was fixed rather
+    than described.
   - The gate still exits 0 on the current tree, and its `--self-test` still holds.
 
-### Phase 5 — The figure gate stops convicting untracked files
+### Phase 6 — The figure gate stops convicting untracked files
 - **Owner skill:** dev
 - **What:** Close backlog 0127. `check-filter-figures.mjs` keeps walking the working tree, but an
   untracked hit becomes an **advisory that does not set the exit code**.
@@ -181,7 +217,47 @@ flowchart TB
 - **Done when:** a gitignored file carrying a cost figure is named in the advisory and does not fail
   the pre-push hook; a **tracked** one still fails it.
 
-### Phase 6 — Two entries whose premise the store revocation falsified
+### Phase 7 — The gates judge the code this project wrote
+- **Owner skill:** dev
+- **What:** Close backlog 0170 and 0173. `check-comment-hygiene.mjs` enumerates with `readdirSync`
+  from the repo root and **never asks git what is tracked**, so a gitignored vendored tree is
+  invisible to CI and scanned in full everywhere else; and its broken-literal detector cannot see the
+  defect in the form that actually produces it.
+- **Files touched:** `scripts/check-comment-hygiene.mjs`, `scripts/fixtures/**`,
+  `scripts/fixtures/README.md`.
+- **Notes for the implementer:**
+  - **0170 is the one that blocks pushes.** The gate went from green to **490 findings** between two
+    pushes twenty minutes apart with no commit touching it: `.venv/` (419 findings — torch, numpy and
+    markupsafe C headers) and `plugin-foobar/sdk/` (71). Both are gitignored, so **CI's fresh clone
+    is green by construction** and every working tree is not. The natural escape is `--no-verify`,
+    which is what makes it worth fixing: *a gate that fires on vendor code teaches its users to skip
+    the gate that fires on theirs.*
+  - Plan 0134's close patched the two instances **by name** (`SKIP_DIRS` gained `.venv`, a new
+    `VENDORED_TREES` holds the SDK path). That fixes these two and not the class — the next
+    `pip install` or unpacked SDK re-breaks it. **Enumerate from `git ls-files`**, which makes "code
+    we own" and "code the gate judges" the same set by construction and costs one call.
+  - **The one thing to preserve:** `node scripts/check-comment-hygiene.mjs scripts/fixtures` must
+    still report its 10 findings. Those fixtures are tracked, so `ls-files` reaches them.
+  - **Check whether the sibling gates share the shape.** `check-doc-links.mjs` walks markdown the
+    same way and is green today only because neither vendored tree happens to carry a
+    relative-linked `.md` — that is luck, not a property.
+  - **0173 is the narrower half.** `brokenLiteral` rejects any literal whose decoded text holds a
+    newline, which is exactly the shape a lost `\` continuation produces **before** anyone reflows
+    it — confirmed at Plan 0144's close by seeding a two-line literal with an 18-space indent and
+    watching it go unreported. It catches the form this tree actually produces, so backlog 0168 was
+    discharged in substance; what is left is the unrejoined form, plus a fixture README that states
+    that silence as a general truth.
+- **Done when:**
+  - A gitignored directory carrying comment-hygiene violations is **not** scanned, verified by
+    seeding one; the fixture bite still reports exactly its 10 findings; and the by-name
+    `VENDORED_TREES` / `.venv` patches are **removed**, not left beside the general fix.
+  - A two-line string literal produced by a lost `\` continuation, with an indented second line, is
+    reported — and `scripts/fixtures/README.md` no longer states the gate's blindness to it as a
+    general truth.
+  - `check-doc-links.mjs` is either given the same enumeration or carries a one-line note saying why
+    it does not need it. Silence on it is not an answer.
+
+### Phase 8 — Two entries whose premise the store revocation falsified
 - **Owner skill:** dev
 - **What:** Correct backlog 0160 and 0161 in place. Neither is closed.
 - **Files touched:** `docs/design-backlog.md`, `standalone/tests/shot_cli.rs`,
@@ -211,7 +287,7 @@ flowchart TB
     already does.
   - The claim gate exits 0.
 
-### Phase 7 — The image sweep runs again
+### Phase 9 — The image sweep runs again
 - **Owner skill:** dev
 - **What:** Close backlog 0133. Add the three missing gallery manifest entries so `docs-shots.mjs`
   stops throwing, and move its manifest-vs-`SystemKind` cross-check somewhere that runs without
@@ -229,7 +305,7 @@ flowchart TB
     to gate — keep them separate.
   - `shape_field` and `shape_collage` have obvious shipped worlds (`shape_pulse`,
     `collage_suprematist`). `warp_mesh` ships none, so it needs a fixture bundle or a converted
-    `.milk` named in the manifest's provenance line like every other entry — that is the Phase 8
+    `.milk` named in the manifest's provenance line like every other entry — that is the Phase 10
     question, so leave a placeholder rather than guessing.
   - **This phase renders.** It needs a free GPU and must not run while a show is live.
 - **Done when:**
@@ -237,7 +313,7 @@ flowchart TB
     have nothing to do with the three missing systems.
   - Adding a thirteenth `SystemKind` with no gallery entry fails a check that runs without a GPU.
 
-### Phase 8 — What the pictures are of
+### Phase 10 — What the pictures are of
 - **Owner skill:** human
 - **What:** Decide what `warp_mesh` should be a picture *of*, and look at the re-shot gallery.
 - **Files touched:** `scripts/docs-shots.mjs` (the provenance line), `docs/images/gallery/**`.
@@ -253,19 +329,22 @@ flowchart TB
 
 ## Risks & open questions
 
-- **Phase 3 edits ~20 append-only documents.** ADR-0149 argues a link form is not content, and that
+- **Phase 4 edits ~20 append-only documents.** ADR-0149 argues a link form is not content, and that
   argument is the load-bearing part of this plan's most reversible-looking phase. If it is rejected
-  at review, Phase 3 reverts cleanly and ADR-0149 is superseded; nothing else in the plan depends on
+  at review, Phase 4 reverts cleanly and ADR-0149 is superseded; nothing else in the plan depends on
   it.
-- **Phase 6 is the one phase that edits the backlog rather than the code**, and its judgement — that
+- **Phase 8 is the one phase that edits the backlog rather than the code**, and its judgement — that
   0160's premise is falsified — could be wrong if a redirect returns. It is written as a dated
   correction rather than an archive precisely so it survives that.
-- **Phase 7 needs a GPU and this plan may be taken while shows are running.** Phases 1-6 need
+- **Phase 9 needs a GPU and this plan may be taken while shows are running.** Phases 1-8 need
   none — they are Node, markdown and one shell script — so the plan is safely splittable at that
   seam if the machine is busy.
-- **The gates repaired here are the ones that verified this plan's own siblings.** Anything Phase 1
-  or Phase 4 turns up may retroactively weaken a finding from an earlier close. That is the point,
-  and it should be reported rather than quietly absorbed.
+- **The gates repaired here are the ones that verified this plan's own siblings.** Anything Phase 1,
+  Phase 3, Phase 5 or Phase 7 turns up may retroactively weaken a finding from an earlier close.
+  That is the point, and it should be reported rather than quietly absorbed.
+- **Phase 7 changes what every local push scans**, so it is the one phase here whose regression is
+  invisible on CI by construction — CI's clone never held the vendored trees. Its done-when is
+  written around seeding a gitignored violation for that reason.
 
 ## What this plan does NOT do
 
@@ -273,6 +352,47 @@ flowchart TB
   why the general checker got less likely as a result.
 - **It does not gate image freshness.** ADR-0100's refusal to put non-reproducible renders in CI
   stands; only the text cross-check moves.
-- **It does not close backlog 0160 or 0161.** Phase 6 corrects and reduces them.
-- **It does not touch `check-comment-hygiene.mjs`**, the one gate in `scripts/` with no live
-  complaint against it.
+- **It does not close backlog 0160 or 0161.** Phase 8 corrects and reduces them.
+- **It does not build a shared enumeration layer for the five gates.** Phase 7 gives
+  `check-comment-hygiene.mjs` the `git ls-files` source and asks the same question of
+  `check-doc-links.mjs`; the other three walk sets that are already correct, and a shared helper for
+  two callers is not obviously worth its own indirection.
+- **It does not re-derive the shipped preset roster or re-shoot anything outside the gallery.**
+  Phase 9's sweep is the twelve gallery images, not `docs/images/` at large.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** _(to be filled by `dev`)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The row gate asserts its own counts | dev | not started | |
+| 2 — A seeded tree the row gate rejects | dev | not started | |
+| 3 — The row gate reads a row's shape | dev | not started | |
+| 4 — Backlog references stop using fragments | dev | not started | |
+| 5 — A probe path is checked against the repository | dev | not started | |
+| 6 — The figure gate stops convicting untracked files | dev | not started | |
+| 7 — The gates judge the code this project wrote | dev | not started | |
+| 8 — Two entries whose premise the store revocation falsified | dev | not started | |
+| 9 — The image sweep runs again | dev | not started | |
+| 10 — What the pictures are of | human | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** design-backlog 0104, 0143, 0162, 0127, 0133, 0166, 0170, 0171, 0173
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- Whether the remaining three Node gates need the `git ls-files` enumeration Phase 7 gives one of
+  them.

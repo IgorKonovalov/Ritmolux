@@ -1,0 +1,332 @@
+# 0149 — The line corners stop being blunt
+
+> **Status:** draft
+> **Created:** 2026-09-01
+> **Owner skill(s):** dev
+> **Related ADRs:** [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (proposed — a
+> joined end carries its own miter length), [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> (whose geometry half 0158 supersedes and whose granularity it keeps),
+> [0007](../adrs/0007-line-geometry-generators.md) (the fixed-capacity instance buffer),
+> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Closes:** design-backlog 0134, 0135, 0136, 0144.
+
+## TL;DR
+
+A joined corner in this engine is extended by a flat half-width, which is the correct extension for
+exactly one interior angle — 180 degrees. Every sharper corner truncates to a bevel: a `diamond`'s
+61.9-degree vertex needs 26.3 px of a 13.5 px half-width and gets 13.5, so the point reads as a flat
+cut and the inner side sums to 1.38x the stroke. It arrived as a user complaint on the running app,
+and it is now *concentrated* rather than diffuse, because Plan 0087 converted the curved motifs to
+arcs and left the straight figures behind. This plan makes the producer compute the miter it already
+has the angle for, and takes the three other entries that live in the same two files while they are
+open. The first visible behavior is the plumbing landing **golden-identical** — the instance carries
+a length instead of a flag, and nothing moves until Phase 2 puts the real number in it.
+
+## Context & problem
+
+[ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) gave
+`SegmentInstance` a per-endpoint `joined` bitfield and had the vertex shader do
+
+```wgsl
+let ext_a = select(0.0, width, (joined & JOINED_A) != 0u);
+```
+
+A corner of interior angle `theta` needs `width / sin(theta / 2)`. The shipped constant is that
+expression's `theta -> 180` limit, so the shortfall grows without bound as the corner sharpens.
+Measured 2026-08-27, a single `diamond` filling a 1000x1000 frame at `thickness = 9`: **26 px of
+flat 185 and then zero, with no taper at all**, and the corner patch reads **1.38x the stroke's own
+value**. Both halves are the same missing factor, `1 / sin(30.95 deg) = 1.945`.
+
+**ADR-0041 saw this and accepted it, on a premise Plan 0114 removed.** Its rejection of a true miter
+reads *"a mitred corner and a rounded one differ by less than the blur that is already there"*, and
+its disc-join alternative closes with *"worth revisiting only if the blunt corners above turn out to
+matter"*. [Plan 0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
+`0.25`; there is no blur left. And they turned out to matter — at
+[Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) Phase 7, in the running app: *"how straight
+lines are connected, its clearly visible and doesn't look solid"*.
+
+Three smaller entries sit in the same two files, and each is cheaper to take now than to schedule
+later.
+
+**`parametric_curve` commits ~6.5 MB at Rich for buffers nothing fills.** Plan 0087 Phase 5 gave
+`ParametricCurveScene` five `Vec::with_capacity(max_segments)` buffers — `arcs` and `single_arcs`
+(36 B each), `points` (8 B), `pieces` (~24 B), `walk` (4 B). At Rich's `max_segments = 60_000` that
+is 108 B x 60,000 = **6,480,000 B of Rust heap**, on top of the ~4.8 MB `segments` and `single_buf`
+already cost — it more than doubles the scene's allocation. **Four of the five stay permanently
+empty for every preset in the library**, because every shipped `d` is a chord web and
+`maurer_rose_pieces` declines the fit before it ever fills them. The same plan already found the
+answer one file over: `star.rs` sizes its arc buffers at load from the roster the preset actually
+declared and reserves nothing when there are none. A second, smaller defect rides along — `points`
+is **one short**: its capacity is `max_segments` and `maurer_rose_pieces` pushes `drawn + 1`, so a
+preset binding `samples` at the cap reallocates once inside a path whose own doc says *"Allocation-
+free into preallocated buffers, because this runs every frame"*.
+
+**A negative ring `scale` inverts a `scallop` lobe.** `star.rs`'s `scallop_lobe` takes the ring
+`scale` as the lobe's **depth**. Past `depth ~ -R * (cos(s) + sin(s) - 1)` the arc's two ends move to
+the far side of its centre and the counter-clockwise sweep runs the long way round: the lobe bulges
+*outward* to roughly twice the ring radius instead of dimpling inward. No panic, no cap violation,
+nothing warns. Its own comment names the wrong lever — it says the guard covers only the exactly-flat
+case *"(`ring_scale` clamps at zero)"*, but `ring_scale` is the **bindable multiplier**, which is
+clamped, while the **structural per-ring `scale`** is validated for finiteness alone in `schema.rs`,
+and the two sibling arc branches carry explicit `.abs()` handling precisely because a negative one is
+reachable. A second over-claim sits four lines below: *"the sweep between them is under half a turn
+for any depth"* is false past the same threshold. **No shipped preset can reach it** —
+`star_mandala_bordered` binds a `ring_scale` positive everywhere and its ring `scale` is `0.055`.
+
+**And a contract in `marks.rs` is stated unconditionally that holds only for equal spikes.** Plan
+0098 Phase 1 restored the `star` arm's interior contract, but under `star_jitter` the divisor is the
+**unjittered** figure's while the measured distance is the fragment's own spike's, so the coordinate
+at the centre is `0.076`-`0.085` rather than `0`, with a `max(0.0, ·)` guard in the shader for when
+the asymmetry runs the other way. That is a large improvement on the `-0.23`..`-0.94` it replaced and
+it is **not what the module header says**. Three one-line repairs travel with it, collected at Plan
+0098's review so none of them lives only in a transcript.
+
+## Decision
+
+**The producer computes the miter length and the instance carries it as an `f32`**, per
+[ADR-0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) — a segment cannot see its
+neighbour's direction, which is exactly why ADR-0041 put connectivity on the producer side, and the
+angle is one step further along the same argument. `SegmentInstance.joined: u32` becomes `ext_a: f32`
+in place at location 4, `ext_b: f32` is appended **last** at location 6, and `0.0` is exactly "free
+end" so a producer that passes nothing stays byte-identical.
+
+**The plumbing and the geometry land as separate commits.** Phase 1 changes what the instance carries
+while every producer still passes `width` for a joined end, so it is provably golden-neutral — if a
+baseline moves in Phase 1, the vertex-attribute wiring is wrong and nothing else is being debugged at
+the same time. Phase 2 puts the real miter in and the line goldens re-bless. That split exists
+because this exact struct carries a comment recording that a field added anywhere but the end
+*"compiles, renders, and quietly reinterprets every stroke's join bits as alpha's mantissa — which is
+what it did, moving five composite golden baselines"*.
+
+For backlog 0136 we take the **load-time refusal** over drawing an inward lobe correctly. **This is a
+stated guess, not a settled question:** the entry frames it as *"a decision about whether an inward
+scallop is a look anyone wants"*, no shipped preset is in range, and the refusal is the honest and
+cheaper of the two. If an inward scallop is wanted, that is a `preset-author` ask that comes back as
+its own entry — and the refusal is what makes it come back, rather than shipping a silent bulge.
+
+We rejected **drawing a round join in the fragment** and **ADR-0041's disc-per-vertex** for the
+reasons ADR-0158 records. We rejected **doing 0135's re-sizing before 0134**, because the miter does
+not change the buffer count and doing the cheap allocation work first would put the golden-moving
+phase last, where a failed bless strands it.
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph prod["producers — know the neighbour, so know theta"]
+        rose["parametric.rs<br/>maurer_rose"]
+        lsys["lsystem.rs<br/>turtle walk"]
+        hank["hankin.rs<br/>closed rosette"]
+        spec["spectrum.rs<br/>polyline / bars / ring"]
+    end
+    subgraph rend["lines/renderer.rs — a dumb primitive"]
+        inst["SegmentInstance<br/>loc 4: ext_a f32<br/>loc 6: ext_b f32 (last)"]
+        vs["vertex: a - dir * ext_a<br/>              b + dir * ext_b"]
+    end
+    subgraph star["lines/star.rs"]
+        scal["scallop_lobe<br/>depth = ring scale"]
+    end
+
+    rose -->|"min(w / sin(theta/2), 4w)"| inst
+    lsys --> inst
+    hank --> inst
+    spec -->|"0.0 — free ends<br/>byte-identical"| inst
+    inst --> vs
+    scal -->|"negative depth<br/>refused at load — Phase 3"| star
+```
+
+## Implementation phases
+
+### Phase 1 — The instance carries a length, and nothing moves
+- **Owner skill:** dev
+- **What:** replace the join bitfield with two per-endpoint extension lengths, with every producer
+  passing `width` where it previously set a flag. Pure plumbing, and the phase's whole value is that
+  it isolates the vertex-attribute wiring from the geometry change.
+- **Files touched:** `core/src/render/scenes/lines/renderer.rs` (the struct, the attribute array, the
+  WGSL), `parametric.rs`, `lsystem.rs`, `hankin.rs`, `spectrum.rs`.
+- **Done when:**
+  - `SegmentInstance` is **44 bytes**: `ext_a: f32` replaces `joined: u32` **in place at shader
+    location 4** (the offset is unchanged), `ext_b: f32` is appended **last** at location 6, and
+    `alpha` keeps location 5 and its byte offset. A test asserts `size_of::<SegmentInstance>()` and
+    the offset of `alpha`, so a field inserted in the wrong place fails rather than renders.
+  - **Every golden in the suite is unmoved, unblessed.** This is the acceptance oracle for the phase
+    and there is no exception: passing `width` at a joined end reproduces ADR-0041's geometry
+    exactly. A moved baseline here means the wiring is wrong.
+  - The generated `const JOINED_A` / `JOINED_B` WGSL and the swap-detection assertion that guarded
+    them are **deleted**, not left orphaned — a float extension has no bits to renumber. The
+    first/last-point assertion (that the stroke does not reach past the figure's own endpoints)
+    survives, now pinned by `ext == 0.0` rather than by a single bit.
+
+### Phase 2 — The corner reaches its point
+- **Owner skill:** dev
+- **What:** each producer computes `min(width / sin(theta / 2), MITER_LIMIT * width)` for a joined
+  end. Closes backlog 0134.
+- **Files touched:** `parametric.rs`, `lsystem.rs`, `hankin.rs`, `spectrum.rs`,
+  `renderer.rs` (the `MITER_LIMIT` constant and its doc), the line goldens.
+- **Done when:**
+  - `MITER_LIMIT = 4.0` is a named constant whose doc states **what it is derived from** — it serves
+    every corner down to `2 * asin(1/4) = 28.96 degrees` exactly, it is SVG's `stroke-miterlimit`
+    default, and it was adopted rather than measured. Per ADR-0071 that is a stated property, not a
+    frozen measurement.
+  - **The measured defect is gone on its own fixture.** A `diamond` at `thickness = 9` in a 1000x1000
+    frame no longer reads 26 px of flat and then zero through the 61.9-degree vertex; the profile
+    tapers. The diamond's factor is **1.945**, well inside the limit, so this corner is served
+    *exactly* and the limit is not engaged — assert the computed extension against
+    `width * 1.945` within a tolerance derived from `f32` angle precision, on the CPU, where `theta`
+    is available directly rather than through a rendered frame.
+  - **Each of the four producers has its own test** that a joined end's extension corresponds to the
+    angle it actually forms, and that a free end is `0.0`. ADR-0158's stated negative is that a
+    producer computing the angle wrongly now renders a *wrong-length* stroke rather than merely
+    keeping the notch — a test per producer is the answer to that, not a comment.
+  - `spectrum`'s `Bars` and `RadialRing` baselines are **still unmoved**, which is ADR-0041's
+    original property and the one thing Phase 2 must not cost.
+  - The line goldens are re-blessed. **`LMV_BLESS` rewrites every baseline, not the failing scene's**
+    — restore the unrelated ones before committing, and compare adapters before trusting a bless.
+
+### Phase 3 — A `scallop` refuses a depth it cannot draw
+- **Owner skill:** dev
+- **What:** close backlog 0136. A negative structural ring `scale` on a `scallop` is refused at load
+  with a message naming the ring, rather than silently bulging outward.
+- **Files touched:** `core/src/preset/schema.rs`, `core/src/render/scenes/lines/star.rs`.
+- **Done when:** a preset declaring a `scallop` ring with negative `scale` fails to load with a
+  message naming the ring and the constraint; **both over-claiming comments are corrected** — the one
+  citing `ring_scale` (the bindable multiplier, which is clamped) where the structural `scale` is
+  meant, and the *"the sweep between them is under half a turn for any depth"* line four below it,
+  which is false past the same threshold. Every shipped preset still loads: `star_mandala_bordered`'s
+  ring `scale` is `0.055` and its bound `ring_scale` is positive everywhere.
+
+### Phase 4 — `parametric_curve` reserves what a preset declared
+- **Owner skill:** dev
+- **What:** close backlog 0135. Size the five arc/piece buffers at load from what the preset actually
+  declares, the way `star.rs` already does, and fix the `points` off-by-one.
+- **Files touched:** `core/src/render/scenes/lines/parametric.rs`, `docs/nfr.md` (§12).
+- **Done when:**
+  - A shipped preset — every one of which is a chord web that `maurer_rose_pieces` declines — reserves
+    **nothing** for the four buffers it never fills, against today's 108 B x `max_segments` for all
+    five. At Rich's 60,000 that is 6,480,000 B not committed.
+  - `points` is capacious enough for `drawn + 1` at `samples == max_segments`, so the path that
+    documents itself as *"allocation-free into preallocated buffers"* is not falsified by its own
+    cap.
+  - **No golden moves and no preset changes what it draws** — this is an allocation change only.
+  - **`docs/nfr.md` §12 is re-read against the real numbers and corrected if it is the thing that is
+    wrong.** It claims *"our own Rust state stays <~1 MB"*, and the pre-Plan-0087 4.8 MB already
+    exceeded that. Either the line gets a figure it can defend or it says what it actually bounds;
+    it does not stay as it is.
+
+### Phase 5 — Four contracts that say more than they hold
+- **Owner skill:** dev
+- **What:** close backlog 0144's four collected repairs, plus the doc-block nit backlog 0134 carries.
+  Prose and one-line fixes; nothing renders differently.
+- **Files touched:** `core/src/render/scenes/marks.rs`, `core/src/render/scenes/marks/tests.rs`,
+  `core/src/preset/schema.rs`, `core/src/render/scenes/lines/renderer/tests.rs`.
+- **Done when:**
+  - **The exactness claim is qualified.** `marks.rs`'s header and `mark_distance`'s doc block say the
+    interior contract is exact for **equal spikes**, and state what `star_jitter` actually yields
+    (`0.076`-`0.085` at the centre) and why the `max(0.0, ·)` guard is there. **The prose is
+    corrected, not the divisor** — making the jittered arm's divisor the fragment's own spike's would
+    make it depend on which spike a fragment folded onto, which is the very thing Plan 0098 Phase 1
+    walked the unjittered edge to avoid, and backlog 0144 says so.
+  - `schema.rs` reads `shape_field`'s `COORD_MODES` instead of hardcoding `m.clamp(0.0, 1.0)`.
+  - The CPU mirror of `mark_boundary_radius` either **is** literally identical to the WGSL or its
+    comment stops promising identity and names the one divergence (`abs(p.x) + 1e-20` against
+    `max(len, 1e-20)`, which differ only at `p == (0,0)` where the coordinate is `0` either way).
+  - `the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets`'s failure message names
+    the figure it actually renders — a triangle, not a pentagon.
+  - In `lines/renderer/tests.rs`, the doc block deriving the arc comparison's tolerances gets a blank
+    line before `SOFT_PROFILE`'s, so `ARC_MEAN_TOL` and `ARC_OUTLIER_TOL` are documented by their own
+    derivation rather than attaching to the wrong constant. The values are right — `0.02` and `48`
+    match `golden.rs` exactly — and this is the ADR-0071 failure one level down.
+
+## Data shapes
+
+```rust
+// illustrative — not the final interface
+#[repr(C)]
+pub struct SegmentInstance {
+    pub a: [f32; 2],       // loc 0, offset 0
+    pub b: [f32; 2],       // loc 1, offset 8
+    pub color: [f32; 3],   // loc 2, offset 16
+    pub width: f32,        // loc 3, offset 28
+    /// Miter extension at `a`, in world units. `0.0` == free end, which is
+    /// byte-identical to a producer that flagged nothing under ADR-0041.
+    /// Replaces `joined: u32` IN PLACE — same location, same offset.
+    pub ext_a: f32,        // loc 4, offset 32
+    pub alpha: f32,        // loc 5, offset 36 — unchanged, see its own doc
+    /// Miter extension at `b`. **Declared last**, for the reason `alpha`'s
+    /// doc block records: `vertex_attr_array!` derives offsets from location
+    /// order, so a field inserted earlier silently re-points every attribute
+    /// after it.
+    pub ext_b: f32,        // loc 6, offset 40 — total 44
+}
+```
+
+## Risks & open questions
+
+- **The golden re-bless is the largest cost here and it is bookkeeping.** `LMV_BLESS` is not scoped
+  to the failing scene, so unrelated baselines must be restored before committing, and a bless taken
+  on the wrong adapter can freeze garbage — this repo has blessed a WARP bind-layout aliasing bug
+  before. Compare adapters before trusting Phase 2's output.
+- **Phase 1 could move a golden.** That is the phase failing, not a finding to bless around: passing
+  `width` at a joined end is arithmetically identical to today, so a moved pixel means the attribute
+  wiring is wrong.
+- **A closed chain's ends are genuinely free and stay bevelled.** The rosette is closed and every
+  vertex is a joint, but a polyline's first and last points have no neighbour. That is correct, and
+  it is what the surviving first/last-point assertion pins.
+- **The miter limit at very sharp corners is untested by any shipped figure.** `diamond` at 61.9
+  degrees needs 1.945 and never engages the limit. Whether any roster member goes below 28.96 degrees
+  is not established; if none does, the clamp arm ships unexercised and wants a synthetic fixture
+  rather than a comment.
+- **Backlog 0136's refusal is a stated guess.** If an inward scallop is wanted, the refusal is what
+  surfaces the ask.
+- **The extension is in world units and does not track a per-frame `width` change on its own.** Every
+  producer rebuilds its instance buffer per frame so this is inert today; a future producer that
+  caches instances while animating `thickness` would desynchronize them. Record it on the field.
+
+## What this plan does NOT do
+
+- **It does not add a round or disc join.** ADR-0158 rejects both, and re-rejects the disc for the
+  same instance-count reason ADR-0041 gave.
+- **It does not touch the arc primitive.** An arc has no interior joints, which is the whole point of
+  it, and `ArcInstance` gains no field.
+- **It does not change the `Scene` trait or any preset-facing parameter.** A preset's `thickness`
+  means what it meant; corners simply reach their points.
+- **It does not make the jittered `star` interior exact.** Backlog 0144 argues the divisor change has
+  a stated reason not to be taken, and Phase 5 corrects the prose instead.
+- **It does not re-size `segments` or `single_buf`.** Phase 4 takes the five buffers Plan 0087 added;
+  the ~4.8 MB that predates it is untouched and stays a separate question.
+- **It does not draw an inward scallop.** Phase 3 refuses one.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** _(to be filled by `dev`)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The instance carries a length, and nothing moves | dev | not started | |
+| 2 — The corner reaches its point | dev | not started | |
+| 3 — A `scallop` refuses a depth it cannot draw | dev | not started | |
+| 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
+| 5 — Four contracts that say more than they hold | dev | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- A look pass on `diamond` and `chevron` at shipped thickness, in the `preset-author` lane — the
+  complaint that raised backlog 0134 was visual and its discharge should be judged the same way.
+- Whether any roster figure reaches below the 28.96-degree miter limit; if none does, the clamp arm
+  needs a synthetic fixture.
+- The ~4.8 MB `segments` / `single_buf` allocation that predates Plan 0087, still unexamined.
