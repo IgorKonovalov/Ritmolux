@@ -118,8 +118,21 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 ## 4. Size and dependencies
 
-- **Soft cap ~10 MB** for the standalone release exe; plugin DLL in the same ballpark.
-  wgpu is the accepted fixed cost; little else is.
+- **Soft cap 10,000,000 B** for the standalone release exe. The unit is in the number because
+  "~10 MB" reads two ways 4.9 % apart and nothing here said which; the *value* is the inherited
+  one, and it has never been measured against what the exe actually contains.
+- **Soft cap 12,582,912 B (12 MiB)** for the foobar2000 component, `foo_lmv.dll` — its own figure
+  rather than "the same ballpark", because the two artifacts do not carry the same things. The
+  component carries the whole core, the embedded preset library and the SDK shim, and carries
+  neither `winit`, the window, nor the WASAPI capture stack. Derived in
+  [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) as
+  9,789,952 B plus one more step the size of the `text` step, rounded up to the next binary
+  boundary — so it admits one more feature of the largest class this project has shipped, and a
+  second one has to be argued for. `packaging/foobar/build-component.ps1` prints the length on
+  every build and **warns** above 11,324,620 B (90 % of the cap). It never fails a release over a
+  size: these caps are soft, while the seven fatal checks beside the measurement are properties of
+  a correct artifact.
+- wgpu is the accepted fixed cost; little else is.
 - Release profile: LTO on, symbols stripped, exact-version pins for direct deps.
 - Gate: any new crate pulling > ~20 transitive deps needs a stated justification (comment in
   `Cargo.toml` or, if cross-cutting, an ADR).

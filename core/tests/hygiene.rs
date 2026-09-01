@@ -7,6 +7,9 @@
 //!     (`=x.y.z`), per CLAUDE.md ("pin direct dependencies to exact versions").
 //! (c) No scene multiplies the shared clock by a settable field — every bindable
 //!     rate integrates a phase instead (ADR-0132, ADR-0135).
+//! (d) The component size cap in `packaging/foobar/build-component.ps1` is the
+//!     one `docs/nfr.md` §4 states (ADR-0159). Two copies of a number is the
+//!     shape this repository keeps finding rot in.
 
 use std::path::{Path, PathBuf};
 
@@ -514,4 +517,62 @@ fn collapse_whitespace(text: &str) -> String {
         }
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// (d) The component's size cap is written down once
+// ---------------------------------------------------------------------------
+
+/// ADR-0159's stated negative: the recipe now carries a constant that can drift
+/// from the NFR it cites. This is what answers that, rather than a comment.
+///
+/// Both figures are asserted in **bytes with separators**, the form NFR §4 and
+/// the size series in `docs/specs/0001-c-abi.md` both write, so a reader
+/// comparing the two documents is comparing the same string. The warning
+/// threshold is derived rather than transcribed: it is 90 % of the cap, and the
+/// arithmetic is checked here so the two cannot drift apart independently.
+#[test]
+fn the_component_size_cap_agrees_between_the_recipe_and_the_nfr() {
+    /// NFR §4's cap for `foo_lmv.dll`, as a number.
+    const CAP: u64 = 12_582_912;
+    /// 90 % of it, which is where the recipe warns.
+    const WARN: u64 = 11_324_620;
+
+    // Derived, not transcribed: a cap edited without its threshold is the
+    // drift this test exists to catch, and it would otherwise pass.
+    assert_eq!(
+        WARN,
+        CAP * 9 / 10,
+        "the warning threshold must be 90 % of the cap"
+    );
+
+    let root = workspace_root();
+    let recipe_path = root.join("packaging/foobar/build-component.ps1");
+    let recipe = std::fs::read_to_string(&recipe_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", recipe_path.display()));
+    for (name, value) in [("$ComponentCapBytes", CAP), ("$ComponentWarnBytes", WARN)] {
+        let assignment = format!("{name} = {value}");
+        assert!(
+            recipe.contains(&assignment),
+            "packaging/foobar/build-component.ps1 does not set `{assignment}`; \
+             the recipe and docs/nfr.md §4 have drifted apart"
+        );
+    }
+
+    let nfr_path = root.join("docs/nfr.md");
+    let nfr = std::fs::read_to_string(&nfr_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", nfr_path.display()));
+    // The unit is part of the claim: "~10 MB" is what could be read two ways,
+    // and a figure written without `B` would reintroduce exactly that.
+    for figure in ["12,582,912 B", "11,324,620 B"] {
+        assert!(
+            nfr.contains(figure),
+            "docs/nfr.md does not state `{figure}`, which \
+             packaging/foobar/build-component.ps1 reads it as saying"
+        );
+    }
+    assert!(
+        !nfr.contains("Soft cap ~10 MB"),
+        "docs/nfr.md §4 still carries the unitless `~10 MB` cap ADR-0159 replaced"
+    );
 }

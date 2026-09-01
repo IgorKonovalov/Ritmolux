@@ -15,19 +15,37 @@
 # The verification lives HERE rather than in the workflow, so a local run is
 # held to the same bar as CI. Every check below is fatal.
 #
-#   Usage:  packaging\foobar\build-component.ps1 [-SkipBuild]
+#   Usage:  packaging\foobar\build-component.ps1 [-SkipBuild] [-WarnBytes <n>]
 #
 #   -SkipBuild   Reuse plugin-foobar/build/foo_lmv.dll already on disk. For
 #                iterating on the package layout without paying for a
 #                lto = "fat" rebuild of the core; never used by CI.
+#   -WarnBytes   Lower the size warning's threshold. Its default sits about
+#                1.5 MB above what the component measures today, so this is how
+#                that branch is exercised without waiting for the artifact to
+#                grow into it.
 #
 # Written for Windows PowerShell 5.1 as well as pwsh 7: a developer box runs the
 # former and the GitHub runner the latter, so nothing here uses ternaries,
 # null-coalescing, or -AsHashtable.
 
-param([switch]$SkipBuild)
+# `param` has to be the first statement, so the two size constants it would
+# read for a default are below it and -WarnBytes 0 means "use the default".
+param([switch]$SkipBuild, [long]$WarnBytes = 0)
 
 $ErrorActionPreference = "Stop"
+
+# NFR section 4: the component's soft cap, and 90% of it. A size is a
+# MEASUREMENT (ADR-0071): printed on every build, warned on above the
+# threshold, and NEVER fatal - the seven checks below are properties of a
+# correct artifact, and a release must not fail on a byte count.
+#
+# core/tests/hygiene.rs asserts both figures against NFR section 4, because two
+# copies of a number is the shape this repository keeps finding rot in. Change
+# one and that test names the other.
+$ComponentCapBytes = 12582912
+$ComponentWarnBytes = 11324620
+if ($WarnBytes -le 0) { $WarnBytes = $ComponentWarnBytes }
 
 $script:here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo = Split-Path -Parent (Split-Path -Parent $script:here)
@@ -259,6 +277,39 @@ if (-not $SkipBuild) {
 }
 
 if (-not (Test-Path $dll)) { Die "missing $dll (drop -SkipBuild?)" }
+
+# --- Measure: the component's length, against NFR section 4's cap (ADR-0159) --
+#
+# The cheapest fact about the artifact, and the only one NFR section 4
+# constrains, went unread here for the whole life of this script: +3,015,168 B
+# arrived across Plan 0097 to Plan 0141 and every byte of it was noticed
+# retroactively, by a reviewer at a close, never by the build. Printed in bytes
+# because that is the unit docs/specs/0001-c-abi.md's series records, so
+# extending that series is a copy out of a build log rather than a measurement.
+Step "measure $DllName against NFR section 4"
+$dllBytes = (Get-Item $dll).Length
+# Invariant culture, not the operator's: this box renders `-f '{0:0.0}'` as
+# `76,0` and the figure is meant to be copied straight into a document that
+# writes decimal points.
+$capPercent = [string]::Format(
+    [System.Globalization.CultureInfo]::InvariantCulture,
+    "{0:0.0}", (100.0 * $dllBytes / $ComponentCapBytes))
+Write-Host "    $DllName is $dllBytes B ($capPercent % of the $ComponentCapBytes B cap)"
+if ($dllBytes -gt $WarnBytes) {
+    # A warning, never a Die. The cap is soft, and a release blocked on a byte
+    # count is one where someone edits the constant under time pressure at a
+    # tag - which is worse than no gate, because it also destroys the record.
+    #
+    # The cap is named, the threshold is not described as a fraction of it: with
+    # -WarnBytes the two are unrelated, and a message asserting 90% would be
+    # false in exactly the run that exercises this branch.
+    Write-Warning ("$DllName is $dllBytes B, past the $WarnBytes B warning " +
+        "threshold. NFR section 4's cap is $ComponentCapBytes B. This is not a " +
+        "release blocker. Record the figure in the size series in " +
+        "docs/specs/0001-c-abi.md and say what moved it.")
+} else {
+    Check "under the $WarnBytes B warning threshold"
+}
 
 # --- Stamp: the version, from the one place that defines it (ADR-0025) --------
 
