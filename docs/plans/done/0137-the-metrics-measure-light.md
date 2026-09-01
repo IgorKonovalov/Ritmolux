@@ -2,7 +2,7 @@
 
 > **Status:** done — closed 2026-09-01. Six phases in eight commits (`efde516`,
 > `69da480`, `98977ff`, `2e1552a`, `4512095`, `5bf9dd6`, `32754b5`, plus the
-> close block). Mode 4 verdict: **no blockers, one major, four minors.** Verified
+> close block). Mode 4 verdict: **no blockers, one major, four minors, one nit.** Verified
 > independently at the close: `cargo nextest run --workspace` **1499 passed, 5
 > skipped**, `fmt` and `clippy --workspace --all-targets -D warnings` clean, all
 > five Node gates green; one Rust sRGB decode left in the workspace; and the
@@ -12,7 +12,7 @@
 > **23 %** on `star_rosewindow` and repaired in the close commit.
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
-> **Related ADRs:** [0150](../../adrs/0150-the-level-question-is-asked-in-linear-light.md) (proposed),
+> **Related ADRs:** [0150](../../adrs/0150-the-level-question-is-asked-in-linear-light.md) (accepted 2026-09-01, with an Outcome),
 > [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0132, 0130, 0151, 0152.
 
