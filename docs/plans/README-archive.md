@@ -2409,7 +2409,7 @@ were superseded orderings of the active roster.
   `prewarm = 0` (cover `0.0074`, 0 of 10 radial shells) and passes it at `prewarm = 1` (`0.1470`,
   10 of 10). Reactivity is the one still short — `0.0195` against `0.02` — on a draft nobody
   tuned for it. **No gate's capture length, floor or statistic moved**, which is what [backlog
-  0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+  0068](../design-backlog-archive.md)
   named as the wrong answer; the warm-up got attacked instead. Two deviations, both improvements
   and both declared in their commits: `spawn_fade` landed CPU-side at the draw site rather than
   in the shader (the emitter resolves brightness on the CPU, and the draw site is the seam where

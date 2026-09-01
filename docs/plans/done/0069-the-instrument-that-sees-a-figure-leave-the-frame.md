@@ -27,7 +27,7 @@
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev
 > **Related ADRs:** [0083](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) (**accepted with an Outcome section** at this close), supplementing [0067](../../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md)
-> **Closes:** [design-backlog 0054](../../design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor) (archived at this close)
+> **Closes:** [design-backlog 0054](../../design-backlog-archive.md) (archived at this close)
 
 ## TL;DR
 
@@ -191,7 +191,7 @@ impl DrawExtent {
   (`0.3659`), are the lowest *by design*. See
   [ADR-0083's Outcome](../../adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md).
   What this leaves open is filed as
-  [backlog 0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report).
+  [backlog 0070](../../design-backlog.md).
 - The particle families' equivalent, if wanted, is a genuinely different design: they have no
   segment list and their "figure" is a statistical cloud. Do not assume it is this measure with a
   different input. **Still open and correctly parked** — it needs a reference case before it is

@@ -45,7 +45,7 @@ had to be taken inside each scene. It does not.
 aspect, in one place, for all four line-family scenes. The quantity ADR-0067 wanted is computable
 there, from data already in hand, without any scene knowing it is being measured.
 
-Recorded as [design-backlog 0054](../design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor) (archived at Plan 0069's close).
+Recorded as [design-backlog 0054](../design-backlog-archive.md) (archived at Plan 0069's close).
 
 ## Decision
 
@@ -126,7 +126,7 @@ the finding that makes a new measure necessary at all.
   trusted: `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge` as a frozen fixture (the total
   case), and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case.
 - The world rectangle is `[-aspect, aspect] x [-1, 1]` — the line renderer maps two world units to
-  the frame **height**, which is also why [backlog 0016](../design-backlog-archive.md#0016--the-spectrum-readout-has-no-width-control-and-density-makes-it-worse)'s
+  the frame **height**, which is also why [backlog 0016](../design-backlog-archive.md)'s
   `span` is a world quantity rather than a fraction of the width.
 
 ## Outcome (added at Plan 0069's close, 2026-08-06)

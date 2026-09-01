@@ -4,8 +4,8 @@
 > **Created:** 2026-07-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md)
-> **Closes backlog:** [0020](../../design-backlog.md#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music)
-> (the harness half), [0022](../../design-backlog.md#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)
+> **Closes backlog:** [0020](../../design-backlog.md)
+> (the harness half), [0022](../../design-backlog.md)
 
 ## TL;DR
 
@@ -130,7 +130,7 @@ flowchart TB
 - **Files touched:** `docs/capturing.md`, `presets/README.md`, `docs/presets.md`.
 - **Done when:** an author reading `presets/README.md` on how to write a `select()` threshold is told
   what range the bands actually occupy, in that document, without needing to open a preset to find it.
-  Also fold in backlog [0027](../../design-backlog.md#0027--two-engine-behaviours-that-are-correct-non-obvious-and-undocumented):
+  Also fold in backlog [0027](../../design-backlog.md):
   `color_center` is cyclic (a negative centre wraps into the bright end, it does not clamp toward the
   dark one), and the ink pass is `mix(paper, ink, luminance)` and therefore **interpolates**, so
   inverting its poles does not darken a continuous field. Both cost the content lane multiple render

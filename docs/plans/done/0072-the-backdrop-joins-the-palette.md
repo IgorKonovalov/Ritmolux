@@ -12,7 +12,7 @@
 > `Outcome`** — the two fixtures it ordered re-blessed pin no pixels, and its
 > "fifteen" is 18 by its own grep.
 > **ADR:** [0086](../../adrs/0086-the-backdrop-colours-through-the-preset-palette.md)
-> **Raised by:** [design-backlog 0059](../../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)
+> **Raised by:** [design-backlog 0059](../../design-backlog.md)
 > **Owner skill(s):** dev, human
 
 ## TL;DR

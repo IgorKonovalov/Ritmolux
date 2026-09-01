@@ -26,7 +26,7 @@ genuine 3D attractors rendering today. Points-in-3D is solved; surfaces-in-3D is
 
 **Everything this engine draws is emissive, and that is a deeper constraint than the missing depth
 buffer.** Nothing computes a surface normal or evaluates a light
-([backlog 0092](../design-backlog.md#0092--every-figure-this-engine-draws-is-unlit-and-two-reference-images-ask-for-a-shaded-one)).
+([backlog 0092](../design-backlog.md)).
 The composite is additive, [ADR-0056](0056-additive-scenes-emit-premultiplied-alpha.md) makes alpha
 *be* the falloff, [ADR-0046](0046-linear-light-hdr-composite-bloom-tonemap.md) orders the terminal
 stages for additive accumulation, and

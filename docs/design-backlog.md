@@ -363,7 +363,7 @@ measure 0.301 when measured to settlement. So "even" is a ~1.8x gap from what th
 produce, in either ordering, at any exponent.
 
 **The want is legitimate and has been asked for twice.** This is the half of
-[0006](design-backlog-archive.md#0006--smoothing-is-a-one-pole-low-pass-no-attackrelease-split-no-s-curve) that
+[0006](design-backlog-archive.md) that
 [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) deliberately did not take — 0006's origin
 ask was literally "use some qubic bezziere function or something", and the asymmetric one-pole
 answered the *symmetry* half of that defect while leaving the *shape* half untouched. A meter that
@@ -507,7 +507,7 @@ point this entry is the starting measurement rather than a fresh investigation.
 - **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
 - **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
   call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
-  directly. It pairs naturally with [0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
+  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
   against a composite whose behaviour has changed under them.
 
 The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
@@ -682,7 +682,7 @@ time here too.
 ## Entry 0069 — from Plan 0070's close (2026-08-05)
 
 Its sibling
-**[0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+**[0068](design-backlog-archive.md)
 closed 2026-08-15** at [Plan 0090](plans/done/0090-the-emitters-source-moves.md)'s close — both
 options delivered — and its body is in the archive.
 
@@ -768,7 +768,7 @@ ordering or sorting story the additive pipeline has never required — a filled 
 nothing in this engine has ever had to decide what is in front. That is why
 [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) rejected it as a
 bundled decision (Alternative B) rather than on its merits. It also sits adjacent to
-[0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+[0040](design-backlog-archive.md)
 and its plan, which is the *other* place the additive model's occlusion behaviour is being
 questioned — anyone taking this should read that first.
 
@@ -982,7 +982,7 @@ The renaissance's first five cohorts (28 worlds, cohort 5 judged live 2026-08-11
 one assembled feedback note. Three of its items are **re-raises** and are recorded as dated
 updates inside [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational),
 [0055](#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
-and [0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+and [0068](design-backlog-archive.md)
 rather than as new entries; the two doc drifts it carried went to
 [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
 below carries a **handoff verdict** — promote or park — per that plan's Decision (promotion on
@@ -1101,7 +1101,7 @@ verdict is the trigger, and it is scheduled.
 
 **Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
 Phase 5, from the three paired runs that closed
-[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against).
+[0083](design-backlog-archive.md).
 **Owner if taken:** `architect`, and only if the governor is revisited.
 
 - **Verified 2026-08-15** — the governor reads the raw series at a miss fraction, not `p99`:
@@ -1114,7 +1114,7 @@ Phase 5, from the three paired runs that closed
   telling a reader the tail is unremovable by an exclusion nobody is applying.
 
 **This is a new entry rather than an edit to
-[0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**,
+[0082](design-backlog-archive.md)**,
 which is closed and archived. It cites it; it does not amend it. 0082 already carries two
 corrections — the governor was built, and it never reads p99. This is a **third**, and it is about
 the half of 0082 that survived both.
@@ -2095,7 +2095,7 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
-### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md); the amplitude constant **stays live and undecided**.
 
 **The amplitude half stopped, on the branch the phase was given for it.** The reference's
 normalization is not derivable from any source available in this environment: there is no MilkDrop
@@ -2138,7 +2138,7 @@ screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
 **So we render 4.7 % SMALLER than the reference at unit scale, not larger.** The ratio is a single
 number — ours is linear to within 0.9 % across a 4x sweep of `wave_scale` (0.3037 / 0.3019 / 0.3009
 at 0.5 / 1.0 / 2.0) — so `draw.rs`'s mode-6/7 factor of `0.15` implies MilkDrop's is ~`0.157`.
-**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md#0123--the-waveform-is-the-one-un-normalized-analysis-output-so-the-os-volume-slider-changes-the-picture--and-the-two-frontends-disagree)**,
+**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md)**,
 the volume dependence, which is now closed — not a missing base amplitude. This entry's own reading
 of that interaction ("an un-normalized trace times an un-normalized `wave_scale` is hypersensitive")
 was right; the half it attributed to `wave_scale` was not there.
