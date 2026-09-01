@@ -371,8 +371,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
 | 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
-| 3 — The row gate reads a row's shape | dev | done | committed with this row |
-| 4 — Backlog references stop using fragments | dev | not started | |
+| 3 — The row gate reads a row's shape | dev | done | `8986147` |
+| 4 — Backlog references stop using fragments | dev | done | committed with this row |
 | 5 — A probe path is checked against the repository | dev | not started | |
 | 6 — The figure gate stops convicting untracked files | dev | not started | |
 | 7 — The gates judge the code this project wrote | dev | not started | |
@@ -394,6 +394,17 @@ flowchart TB
   `docs/plans/README.md:27  a bullet row in a table region (expected a table row; 14 of the 15 rows
   in this region have that form)`. A region split evenly has no majority, so it is reported once at
   its own opening line rather than at a guessed row; `index-rows-red/` seeds that case too.
+- **Phase 4 re-derived the set as 87 links across 29 files**, against the plan's *"roughly 20 files
+  under `docs/adrs/` and `docs/plans/done/`"* and ADR-0149's 24, which is a count of distinct entry
+  NUMBERS rather than of sites. Ten occurrences survive and are all inline code spans in prose that
+  describes the retired form - `.claude/skills/architect/SKILL.md:550`, ADR-0149's own Context and
+  Decision, backlog 0143's body, this plan, and two closed plans.
+- **Phase 4 also repaired an asymmetry the new fixture exposed.** `check-doc-links.mjs`'s inline
+  regex stops at the `#` and its DEFINITION regex ran the target to whitespace, so a `[label]:
+  target#anchor` definition was resolved as a path CONTAINING the fragment and reported as a
+  missing file. No such definition existed in the tree, which is why it was green. Seeding class 4
+  in both link forms produced two findings on one line; the definition target now drops its
+  fragment before the existence check, so both forms answer the same question.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified

@@ -38,7 +38,7 @@ So the question is whether coverage is the right model at all for an additive lo
 arguably wants *no* occlusion — light adds, it does not cover. Nothing is broken today; post-fix is
 brighter than pre-fix at every pixel. This is a look decision.
 
-Recorded as [design-backlog 0040](../design-backlog.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle).
+Recorded as [design-backlog 0040](../design-backlog.md).
 
 ## Decision
 
@@ -127,7 +127,7 @@ documented ceiling on an invited change is a trap with a sign on it rather than 
 ## Notes
 
 - Rendered evidence at both ends is in
-  [backlog 0040](../design-backlog.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle):
+  [backlog 0040](../design-backlog.md):
   `swarm_storm` over `bg_bright = 0.35` at `brightness = 0.02` gives black specks; the same run at
   the shipped floor gives `(71,13,22)` against `(138,67,56)`.
 - The sixteen presets whose floors sit between 0.009 and 0.070 are the population any sample set

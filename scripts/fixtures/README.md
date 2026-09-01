@@ -51,8 +51,8 @@ non-vacuity assertion that is pinned to the real repository rather than to this 
 node scripts/check-doc-links.mjs scripts/fixtures
 ```
 
-Expect **exit 1 and exactly three breaks**, one per class the checker knows about. Class 1 was
-the only one it had until Plan 0084, and checking one of markdown's two link forms was a green
+Expect **exit 1 and exactly five breaks**, across the four classes the checker knows about. Class 1
+was the only one it had until Plan 0084, and checking one of markdown's two link forms was a green
 light over 85 broken links of the other:
 
 | File | Class | Seeded as |
@@ -60,10 +60,27 @@ light over 85 broken links of the other:
 | `doc-links/broken.md` | 1 — inline | a target that does not exist |
 | `doc-links/broken.md` | 2 — definition | a definition whose target does not exist |
 | `doc-links/broken.md` | 3 — use with no definition in this file | a label `doc-links/defines.md` defines and this file does not |
+| `doc-links/broken.md` | 4 — a backlog reference carrying a fragment | **twice**, once per link form: an inline `](design-backlog.md#…)` and a `[label]: design-backlog.md#…` definition |
 
 Class 3 is scoped per file because that is markdown's own scope, and it is what a close ceremony
 breaks when it moves link-dense prose between documents: the *uses* travel with the paragraph and
 the *definitions* stay behind.
+
+**Class 4 is a form rule, not a resolution failure** ([ADR-0149](../../docs/adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md)),
+and `doc-links/design-backlog.md` exists in this tree precisely so the seeded link **resolves** —
+without it one seeded line would produce a class-1 break as well, and the fixture would be
+asserting the wrong thing. That resolution is the whole reason the class needed a rule: the gate
+reported 87 such references clean while every one of them landed at the top of a 280 KB document
+instead of at the entry. It is seeded in both link forms deliberately, since covering one of the
+two is this gate's own founding defect.
+
+Three silences ride with it, and each is load-bearing:
+
+| Case | Seeded in | Expected |
+|------|-----------|----------|
+| the same reference in the form ADR-0149 asks for | `broken.md` — `[backlog 0001](design-backlog.md)` | not reported — this is the fix, and a rule that convicted it would have nowhere to send its reader |
+| a code span describing the retired form | `broken.md` | not reported — a document that *describes* link syntax is not making a link, which is why ADR-0149's own Context survives this gate |
+| an `#anchor` into any other file | `broken.md` — `exists.md#no-such-heading` | not reported — one prohibited form, not a fragment checker; ADR-0149 records that it made a general one less likely |
 
 Note the root: this checker is pointed at `scripts/fixtures`, not at `scripts/fixtures/doc-links`,
 so the run also asserts that the backlog and index-row fixtures' own markdown is link-clean. Keep

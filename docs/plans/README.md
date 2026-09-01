@@ -173,7 +173,7 @@ one of the five closes backlog entries that had been sitting on a demonstrated w
 left unrouted — **both now closed, 2026-08-15**. [0089] is the three-item sitting (a falsified
 invariant plus two doc paragraphs that each named a home and never got a carrier); [0090] came out of
 an interview on the emitter's fixed source line
-([backlog 0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle),
+([backlog 0068](../design-backlog-archive.md),
 option 2, **closed and archived at 0090's close**) and shipped four scalars; the world they exist for
 is its `human` Phase 5 and stands. One item from that pass is deliberately **not** a plan:
 [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md) records the
@@ -908,7 +908,7 @@ the rows above.
   two tunings of one. Both verdicts are a dated `Outcome` on
   [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md).
   **What is left is content-lane work, with the answers in hand:** author the **quiet drifting field**
-  (the sky [backlog 0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+  (the sky [backlog 0068](../design-backlog-archive.md)
   measured the emitter for and could not get past the gates) and the **point fountain / off-centre
   jet** (`source_width = 0` plus `pan_x`), and **rewrite `emitter_perseids.toml`'s header**, which
   still declares that look routed on two walls that are both down. It joins the standing sitting on

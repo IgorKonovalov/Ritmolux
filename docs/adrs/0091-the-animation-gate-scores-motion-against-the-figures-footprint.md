@@ -5,7 +5,7 @@
 > **Date:** 2026-08-11
 > **Related plan(s):** [0077](../plans/done/0077-the-quiet-sky.md)
 > **Resolves:** the live half of
-> [design-backlog 0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+> [design-backlog 0009](../design-backlog.md)
 
 ## Context
 

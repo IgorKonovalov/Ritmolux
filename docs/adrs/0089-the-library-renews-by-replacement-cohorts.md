@@ -20,7 +20,7 @@ free of the library's history. The instinct is well supported by the project's o
   normalized bands, phrase time, seeded `noise()`, shaped marks, the mandala interior, the IFS
   family, the depth levers, the fold-edge choice and the palette-driven backdrop all landed
   after the bulk of the library was authored.
-- **Presets fossilize history.** [Backlog 0060](../design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)
+- **Presets fossilize history.** [Backlog 0060](../design-backlog.md)
   documents three shipped files that kept paying for engine defects after the defects were fixed.
 - The presets authored geometry-first under the current craft principles measure **2-4x better
   on the animation metric** than the set they joined.

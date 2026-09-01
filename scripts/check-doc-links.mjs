@@ -37,6 +37,23 @@
 // fragments, not external URLs (which would make this a network call and a
 // flake).
 //
+// ONE FRAGMENT IS REJECTED OUTRIGHT, as a fourth break class (ADR-0149). A link
+// into docs/design-backlog.md or its archive keeps resolving to a file that
+// exists after the close ceremony moves an entry's body from the one to the
+// other, so this script reported 87 such references clean — every one of them
+// landing at the top of a 280 KB document instead of at the entry. The anchor is
+// the part that rots and the number is not: an entry's heading text IS its
+// anchor, headings get reworded, and the ledger row that replaces an archived
+// body carries the number but not the old heading, so even a fragment checker
+// would only convert silent rot into loud rot at every close. The form is
+// therefore prohibited rather than validated — `[backlog 0072](../design-backlog.md)`,
+// or in prose that already links the file, the bare number. Same answer ADR-0127
+// reached one level down for `.rs` comments: a reference whose form cannot be
+// checked is replaced by one that cannot break.
+//
+// This is NOT a general fragment checker, and ADR-0149 records that it made one
+// less likely. Every other `#anchor` in the repository stays unchecked.
+//
 // Code is skipped — fenced blocks and inline spans alike — because a document
 // that *describes* link syntax is not making a link. This file's own prose in
 // the architect skill was the first false positive.
@@ -83,6 +100,13 @@ function markdownFiles(dir = REPO, found = []) {
 // The target runs to the first `)`, `#`, or whitespace.
 const LINK = /\]\((?!https?:|mailto:|#)([^)#\s]+)/g;
 
+// The one prohibited fragment, in both link forms. Matched on the filename
+// rather than on a resolved path, because the offending link is offending
+// wherever it points from and the target need not exist for the form to be
+// wrong. The `#` is required: dropping it is the whole repair.
+const BACKLOG_FRAGMENT = /\]\(([^)\s]*design-backlog(?:-archive)?\.md)#([^)\s]*)\)/g;
+const BACKLOG_FRAGMENT_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*([^\s]*design-backlog(?:-archive)?\.md)#(\S*)/;
+
 // A link reference definition: up to three spaces, `[label]:`, then the target.
 // An optional `"title"` may follow, which is why the target is one token.
 const DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/;
@@ -118,6 +142,7 @@ function collect() {
     const definitions = new Map(); // label -> { line, target }
     const uses = [];
     const inline = [];
+    const fragments = [];
     let inFence = false;
 
     lines.forEach((raw, i) => {
@@ -138,6 +163,15 @@ function collect() {
           /* leave it as written */
         }
         inline.push({ line: i + 1, target, written: m[1], base });
+      }
+
+      BACKLOG_FRAGMENT.lastIndex = 0;
+      for (const m of line.matchAll(BACKLOG_FRAGMENT)) {
+        fragments.push({ line: i + 1, target: m[1], fragment: m[2] });
+      }
+      const fragDef = line.match(BACKLOG_FRAGMENT_DEFINITION);
+      if (fragDef) {
+        fragments.push({ line: i + 1, target: fragDef[2], fragment: fragDef[3] });
       }
 
       const def = line.match(DEFINITION);
@@ -161,7 +195,7 @@ function collect() {
       }
     });
 
-    parsed.set(file, { definitions, uses, inline });
+    parsed.set(file, { definitions, uses, inline, fragments });
   }
 
   return { parsed, known };
@@ -170,7 +204,7 @@ function collect() {
 const { parsed, known } = collect();
 const broken = [];
 
-for (const [file, { definitions, uses, inline }] of parsed) {
+for (const [file, { definitions, uses, inline, fragments }] of parsed) {
   const show = file.split(sep).join("/");
 
   for (const { line, target, written, base } of inline) {
@@ -181,15 +215,24 @@ for (const [file, { definitions, uses, inline }] of parsed) {
 
   for (const [label, { line, target, base }] of definitions) {
     if (!isRelativeTarget(target)) continue;
-    let decoded = target;
+    // A definition's target runs to whitespace, so it carries any `#fragment`
+    // with it; the inline form's regex stops at the `#`. Strip it here so the
+    // two forms answer the same question — this class is "does the FILE exist",
+    // and without the strip an anchored definition is reported as a missing
+    // path, which names the wrong defect and reports one line twice.
+    let decoded = target.split("#")[0];
     try {
-      decoded = decodeURIComponent(target);
+      decoded = decodeURIComponent(decoded);
     } catch {
       /* leave it as written */
     }
-    if (!existsSync(resolve(base, decoded))) {
+    if (decoded !== "" && !existsSync(resolve(base, decoded))) {
       broken.push(`${show}:${line} -> [${label}]: ${target}`);
     }
+  }
+
+  for (const { line, target, fragment } of fragments) {
+    broken.push(`${show}:${line} -> ${target}#${fragment} (a backlog reference carries no fragment)`);
   }
 
   const reported = new Set();
@@ -221,6 +264,17 @@ console.error(
     "\n" +
     "`[label] (no definition in this file)` is the third class: the use travelled\n" +
     "to another file and its `[label]: target` definition stayed behind. Copy the\n" +
-    "definition into this file — markdown scopes them per document.",
+    "definition into this file — markdown scopes them per document.\n" +
+    "\n" +
+    "`(a backlog reference carries no fragment)` is the fourth class, and it is a\n" +
+    "form rule rather than a resolution failure (ADR-0149): the target exists,\n" +
+    "which is why 87 of these read clean. Drop the `#...` and keep the number:\n" +
+    "  [backlog 0072](../design-backlog.md)\n" +
+    "or, where the file is already linked in the same breath, just `backlog 0072`.\n" +
+    "An entry's heading IS its anchor, and the close ceremony moves the body to\n" +
+    "design-backlog-archive.md leaving a ledger row that carries the number and\n" +
+    "not the heading — so the anchor is the half that cannot survive. Every other\n" +
+    "`#anchor` in this repository stays unchecked; this is one prohibited form,\n" +
+    "not a fragment checker.",
 );
 process.exit(1);

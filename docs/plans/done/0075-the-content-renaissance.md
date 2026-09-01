@@ -13,12 +13,12 @@
 > (the landing route)
 > **Serves:** [roadmap-visual-richness R6](../../roadmap-visual-richness.md)
 > **Closes (Phases 1-3):**
-> [backlog 0072](../../design-backlog-archive.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo),
-> [0067](../../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
-> [0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report),
-> [0061](../../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work),
-> [0062](../../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount),
-> [0063](../../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
+> [backlog 0072](../../design-backlog-archive.md),
+> [0067](../../design-backlog.md),
+> [0070](../../design-backlog.md),
+> [0061](../../design-backlog.md),
+> [0062](../../design-backlog.md),
+> [0063](../../design-backlog.md)
 > **Gated on (Phases 4+ only):** [0071](0071-light-that-adds-without-covering.md),
 > [0064](0064-the-symmetry-stage-and-the-banded-palette.md),
 > [0046](0046-transformed-feedback.md), and [0067](0067-the-curation-route.md)'s Phases 1-2
@@ -99,7 +99,7 @@ flowchart TD
 - **Owner skill:** dev
 - **Area:** core (tests)
 - **What:** resolve
-  [backlog 0072](../../design-backlog-archive.md#0072--sanityrss-coverage-floor-forces-dense-thin-stroke-line-scenes-into-washed-out-tuning-and-it-is-measuring-the-halo):
+  [backlog 0072](../../design-backlog-archive.md):
   at 96x96 the `sanity.rs` coverage statistic cannot see a dense thin-stroke figure (the bare
   rosette and a 46x-denser mandala score identically), so the only lever that clears the floor
   is inflating `glow`/`trails` — the exact look the user rejected. The entry names the two
@@ -120,14 +120,14 @@ flowchart TD
 - **Area:** core, standalone
 - **What:** the two small code items from the sweep.
   1. **`depth_fade` becomes an exact no-op on flat families**
-     ([backlog 0067](../../design-backlog.md#0067--depth_fade-is-a-uniform-dimmer-on-every-flat-family-where-the-other-two-depth-cues-are-exact-no-ops),
+     ([backlog 0067](../../design-backlog.md),
      its option 2): multiply the fade term by the family's has-depth flag, restoring
      ADR-0076's stated property that all three depth cues are identities at zero depth extent.
      The entry records that no shipped preset binds `depth_fade` on a flat family — verify
      with a grep at implementation; if that has changed, the affected baseline moves are
      listed in the commit.
   2. **The in-frame geometry fraction joins `shot --report`**
-     ([backlog 0070](../../design-backlog.md#0070--the-in-frame-geometry-fraction-cannot-gate-new-content-and-the-number-it-computes-for-every-line-preset-is-not-in-the-authors-report)):
+     ([backlog 0070](../../design-backlog.md)):
      the number `LineRenderer::draw` already computes gets a column in the author's own
      metrics table, which is where the over-scale defect class is actually introduced and the
      only place it can be caught for new content (ADR-0083 twice proved no absolute threshold
@@ -145,13 +145,13 @@ flowchart TD
 - **Area:** docs
 - **What:** land the three measured corrections from the Plan 0063 content pass in the two
   files an author reads first:
-  [0061](../../design-backlog.md#0061--perspective-moves-the-figure-far-more-than-it-enlarges-it-so-the-documented-way-to-recover-the-framing-does-not-work)
+  [0061](../../design-backlog.md)
   (`perspective`'s dominant effect is a phase-varying **translation** at ~0.9x the parameter,
   a `zoom` cannot recover it, usable ceiling ~0.3 of the 0.8 legal range),
-  [0062](../../design-backlog.md#0062--depth_hue-is-a-lightness-cue-on-a-lightness-ramp-it-wraps-at-the-ends-and-it-is-structurally-dead-under-ink_amount)
+  [0062](../../design-backlog.md)
   (`depth_hue` reads as a hue cue only on a hue-travel ramp; keep it under
   `2 * min(hue_center, 1 - hue_center)` or it wraps; inert under a duotone remap), and
-  [0063](../../design-backlog.md#0063--spins-usable-ceiling-is-set-by-fade-not-by-taste-and-the-pair-is-undocumented)
+  [0063](../../design-backlog.md)
   (`spin` and `fade` are one look; the "2-4 is where rotation becomes legible" advice is wrong
   for every attractor preset that ships and goes).
 - **Files touched:** `presets/README.md` (depth section), `docs/preset-palettes.md`

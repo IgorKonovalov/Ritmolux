@@ -17,10 +17,10 @@
 > plan is mid-flight, land them in any order.
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0081](../../adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md), supplementing [0017](../../adrs/0017-preset-author-skill-lane.md)
-> **Closes:** [design-backlog 0056](../../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for),
-> [0060](../../design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)
+> **Closes:** [design-backlog 0056](../../design-backlog.md),
+> [0060](../../design-backlog.md)
 > (Phase 4's second trigger), and answers
-> [0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+> [0009](../../design-backlog.md)
 > (Phase 1d)
 
 ## TL;DR
@@ -153,7 +153,7 @@ flowchart TD
 - **Owner skill:** dev
 - **Why it is here:** added 2026-08-04. `core/tests/animation.rs` renders at 96x96 and gates on a
   whole-frame difference above `ANIM_FLOOR = 0.01`.
-  [Backlog 0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+  [Backlog 0009](../../design-backlog.md)
   recorded in July that this penalizes two legitimate designs; it has now **rejected a shipped
   preset's better-looking draft**. `emitter_squall`'s sparse version — the same geometry at a fifth
   of the density, and the one the author preferred — scored `anim` **0.005** with three of four
@@ -223,7 +223,7 @@ flowchart TD
   project has already proved gets skipped.
 
 **A second trigger on the same step, added 2026-08-04 from the `preset-author` handoff
-([backlog 0060](../../design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them)):**
+([backlog 0060](../../design-backlog.md)):**
 *this plan fixed something a preset could have been framed around.*
 
 - **What:** when a plan fixes an engine defect, grep `presets/` for headers citing it before the
@@ -313,7 +313,7 @@ produced.** Both are content findings for the `preset-author` lane; neither bloc
 **Phase 1d's negative result is the one to read twice.** The ladder is flat because `frame_diff`
 scores **occupancy** and occupancy is scale-invariant, so no resolution separates the sparse case
 from the static control. That does not weaken
-[backlog 0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational) —
+[backlog 0009](../../design-backlog.md) —
 it sharpens it into a question that is now earned rather than speculative: the gate needs a
 **coverage-aware** statistic, not a bigger render. A measurement that rules out the cheap fix is
 worth more than one that confirms it.

@@ -852,7 +852,7 @@ system, not just this one), but it does not fix the easing-bypass leg on its own
   ADR-worthy was decided, then **measured and half-falsified**: the ordering stands, but not for the
   "perceptually even fall" reason — see the ADR's Outcome. Read the two consequences it left behind
   before quoting this entry's framing: an even fall is unreachable in any ordering
-  ([0021](design-backlog.md#0021--an-even-fall-is-not-reachable-with-a-one-pole-in-any-ordering)), and `--report`
+  ([0021](design-backlog.md)), and `--report`
   cannot see a curve at all ([0022](#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)).
 
 ---
@@ -1762,7 +1762,7 @@ discriminate half two.
   [Plan 0052](plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md)** — a new
   `SystemKind::Emitter` with analytic ballistics and seeded per-object individuation. The user
   chose the new-scene shape over extending `swarm` or building a per-object expression facility.
-  **[0033](design-backlog.md#0033) stays open** — this is the motion half; marks are still round additive blobs.
+  **[0033](design-backlog.md) stays open** — this is the motion half; marks are still round additive blobs.
   Notes below retained as the origin record.
 
 - **Raised:** 2026-07-30, from `preset-author`, by the Solitaire-cascade request.
@@ -1901,7 +1901,7 @@ structure. Nobody should build that until a real preset is worse off.
   **What this entry got right stands:** a figure and a field want different answers. The verdict is
   `tile` for `attractor_leviathan` and `squash` for `fragment_kaleido` — two scenes, two treatments,
   which is the entire content of the argument for a choice.
-  **The library retune this creates is [0058](design-backlog.md#0058)**, and one lesson from it belongs here:
+  **The library retune this creates is [0058](design-backlog.md)**, and one lesson from it belongs here:
   adopting a fill treatment on Leviathan took two edits, because that preset's `zoom` had been
   pinned under the inscribed radius *precisely to dodge the rays this entry reported*. Removing the
   cause removed the reason for the workaround, and other fold-binding presets carry similar pins.
@@ -2728,7 +2728,7 @@ a plan earlier; the entry asked for this to be judged rather than assumed, and i
 **Clifford is the second instance of the Leviathan pattern**, which is the pass's other finding and
 outlived this entry: a framing pinned to dodge an engine defect, kept after the defect was fixed,
 recoverable only by reading the preset's own header comment. That pattern is
-[live entry 0060](design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them).
+[live entry 0060](design-backlog.md).
 
 ---
 
@@ -3043,7 +3043,7 @@ question, and no calibration of it will help.
   mechanism and its samples, and the answer to "is coverage the right model" was *yes, keep it, and
   make the exception reachable*. The entry's question therefore closes; what it opened does not —
   the retune it invites is Plan 0071 Phase 5, still outstanding and grouped with
-  [0038](design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned).
+  [0038](design-backlog.md).
   Three claims in ADR-0085 were falsified by the implementation and are recorded in its Outcome.
 
 - **PROMOTED 2026-08-04 → [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) +
@@ -3298,7 +3298,7 @@ Coral Oracle", a reaction-diffusion preset — has **never been tracked in git**
 clear deliberately; the other 43 files were retired or stale shipped copies, all recoverable from
 `c11bbf9` / `de707cb`. It is the only non-shipped preset in the user's library.
 
-**It is not a stray.** This is the preset that raised [backlog 0001](design-backlog-archive.md#0001--reaction_diffusion-reaches-only-2-of-the-5-plan-0018-composite-levers)
+**It is not a stray.** This is the preset that raised [backlog 0001](design-backlog-archive.md)
 on 2026-07-24 — the entry that became [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md)
 and [Plan 0025](plans/done/0025-full-composite-coverage.md), i.e. the reason `reaction_diffusion`
 reaches the composite levers at all. The preset that motivated a whole plan then **never came back
@@ -3958,7 +3958,7 @@ design is clean — which is true for two thirds of it.
   over-scale defect is actually introduced. The distribution report in `sanity.rs`'s shape
   stays a candidate second step, not taken.
 - **Raised:** 2026-08-06, at [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)'s
-  Mode 4 review. Successor to archived [0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor),
+  Mode 4 review. Successor to archived [0054](design-backlog-archive.md),
   which asked for a **gate** and got a **paired instrument**.
 - **Verified by measurement:** yes — the numbers below are the printed report from
   `cargo nextest run -p lmv-core --test geometry_extent --no-capture`, reproduced on this box at the
@@ -4093,7 +4093,7 @@ happened.
 
 ### Why this is not the same entry as 0054
 
-[0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+[0054](design-backlog-archive.md)
 and its successor [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
 are about a figure leaving the frame; the in-frame geometry fraction that plan shipped does **not**
 catch this one, because a mandala is entirely inside the frame and scores a clean 1.0. This is the
@@ -5055,7 +5055,7 @@ diagnostic it is today. Whatever is chosen, this measurement is the test case.
   capture path dies at 3,601 frames on both reaction-diffusion worlds after RSS reaches ~2.9 GB, so
   those two were measured at 0.5 simulated minutes rather than 10. **Pre-existing** — the shipped
   `capture_preset` fails identically at the same frame count, run as the control before it was
-  called a finding — and filed as [0093](design-backlog.md#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length).
+  called a finding — and filed as [0093](design-backlog.md).
   Until that is fixed, "N simulated minutes" is bounded by world.
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4, watching Shatter collapse live three times
@@ -5080,7 +5080,7 @@ share a soak recipe.
 ### What a fix would be
 
 **Not a gate.** A minutes-long capture per preset is not a price this suite can pay — see
-[0080](design-backlog-archive.md#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
+[0080](design-backlog-archive.md)
 for what the *seconds* already cost. The honest shape is a documented soak-style spot-check: a
 `shot` mode or recipe that renders N minutes at capture cadence and reports drift statistics
 (population spread, deposit concentration), run by the lane on worlds whose mechanism has an
@@ -5119,8 +5119,8 @@ with its Phase 5, standing in the plans README — this entry's status is unchan
   entry said was missing. **The three paired runs are Phase 5, `human`, and have not been made** —
   they need the live app on a real machine for a real duration, so they carry forward under Standing
   in [`docs/plans/README.md`](plans/README.md) rather than holding the plan open. Its two sibling
-  entries, [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)
-  and [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
+  entries, [0082](design-backlog-archive.md)
+  and [0086](design-backlog-archive.md),
   were discharged in full and are archived. **Nothing about the finding below has been re-measured**,
   so read it as the 2026-08-09 snapshot it is. One thing that *has* changed underneath it:
   [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length)
@@ -5154,7 +5154,7 @@ with its Phase 5, standing in the plans README — this entry's status is unchan
 
   **One thing the runs found that this entry did not ask about, and it falsifies a claim in its
   archived sibling** — filed as
-  [0094](design-backlog.md#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it).
+  [0094](design-backlog.md).
 
 **Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
 that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
@@ -5414,7 +5414,7 @@ separates them, and it is the cheapest thing anyone can do here** — it costs o
 and it decides which of the two the fix has to answer.
 
 It is also **adjacent to, and not the same as,**
-[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
+[0083](design-backlog-archive.md):
 that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
 that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
 currently says they do.
@@ -6721,7 +6721,7 @@ confined fraction grows on its own.
 > at every threshold**. The fix no longer rests on a reading of `draw.rs` alone.
 
 **Raised by:** `dev`, from [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
-(2026-08-19), splitting the x-extent half out of [0120](design-backlog.md#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
+(2026-08-19), splitting the x-extent half out of [0120](design-backlog.md).
 **Owner if taken:** `dev`.
 
 - **Verified 2026-08-19** — the cancelling pair is still both halves, one at the point and one on
@@ -6819,7 +6819,7 @@ size — does not include amplitude.
 
 ### Why it surfaced now, and what it reconciles
 
-It explains a standing contradiction. [0120](design-backlog.md#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
+It explains a standing contradiction. [0120](design-backlog.md)
 reports the waveform figure rendering **larger** than the reference's; the live app at 18 % shows it
 nearly flat. Both are true. An un-normalized trace times an un-normalized `wave_scale` is
 **hypersensitive** — blown out at full scale, dead at listening volume. So 0120's missing base

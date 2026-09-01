@@ -36,7 +36,7 @@ near-indistinguishable. Lorenz therefore ships the threshold pinned at the ceili
 saying to read the pair as *capped, not tuned*. **A threshold in pre-exposure linear units is only
 meaningful while every preset sits near `exposure = 1.0`** — true until that commit, false now.
 
-Recorded as [design-backlog 0057](../design-backlog.md#0057--a-preset-has-no-scene-local-way-to-set-a-figures-level-so-exposure-gets-used-for-it-and-two-other-stages-disagree-with-that-use).
+Recorded as [design-backlog 0057](../design-backlog.md).
 
 ## Decision
 
@@ -69,7 +69,7 @@ which is the entry's whole complaint).
 - **`bloom_threshold` becomes honest at any exposure.** "Bloom what is over the display's ceiling"
   is a claim the parameter can now keep, rather than one true only near `exposure = 1.0`.
 - **`exposure` recovers its designed meaning** — the whole-frame stop that answers the tonemap
-  knee — which is what [backlog 0038](../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
+  knee — which is what [backlog 0038](../design-backlog.md)
   is waiting to use it for.
 
 ### Negative
@@ -169,7 +169,7 @@ tolerance, because the tonemap shoulder flattens a difference between two alread
   (`:2069`) and is applied at `:734`. A `brightness` multiply composes there.
 - Measurement backing the bloom half: rendered on Lorenz at `exposure = 0.03`, `bloom_threshold`
   `0.95` against `8.0`, near-indistinguishable. Recorded in
-  [backlog 0057](../design-backlog.md#0057--a-preset-has-no-scene-local-way-to-set-a-figures-level-so-exposure-gets-used-for-it-and-two-other-stages-disagree-with-that-use)
+  [backlog 0057](../design-backlog.md)
   item 3.
 - The `density`/`exposure` interaction this sits next to is
   [ADR-0065](0065-the-attractor-deposit-is-normalized-by-particle-count.md): density is neutral in
