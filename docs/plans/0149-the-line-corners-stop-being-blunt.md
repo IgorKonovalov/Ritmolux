@@ -402,13 +402,17 @@ pub struct SegmentInstance {
 
 **Lane:** `plan-0149-the-line-corners-stop-being-blunt`, worktree `WORK/lmv-plan-0149`.
 
+**This plan is NOT ready to close.** Four of five phases landed; Phase 2 — the miter, and the
+reason the plan exists — is blocked by its own stop gate on a finding that changes
+[ADR-0158]'s Decision. Backlog 0134 stays live. What follows is a phase record, not a close brief.
+
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
 | 2 — The corner reaches its point | dev | **BLOCKED** — stop gate ran and failed; see Notes | |
-| 3 — A `scallop` refuses a depth it cannot draw | dev | done | committed with this row |
-| 4 — `parametric_curve` reserves what a preset declared | dev | done | committed with this row |
-| 5 — Four contracts that say more than they hold | dev | done | committed with this row |
+| 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
+| 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
+| 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
 
 ### Notes
 
@@ -539,13 +543,30 @@ as a separate quantity with the figures above.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** none. `git diff --name-only main...HEAD -- presets/` is empty.
+- **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144. **0136 and 0144 are
+  discharged** (Phases 3 and 5). **0135 is discharged** (Phase 4), by a different mechanism than
+  the phase named — see the Notes. **0134 is NOT discharged**: it is the blunt corner itself, and
+  Phase 2 is blocked. Its probe was re-pointed at `absent: MITER_LIMIT` on 2026-09-01 and the
+  entry is still live.
+- **What shipped:** a **fix**. Phase 3 is a load-time refusal, Phase 4 an allocation reduction with
+  no rendered change, Phase 5 prose. Phase 1 is a representation change that moves no pixel. No new
+  capability reached a preset author, and the feature this plan exists for — the miter — did not
+  ship.
+- **Operator docs touched:** `docs/nfr.md` §12 (the Rust-state bound, corrected — Phase 4). No
+  scene param was added, renamed or re-defaulted, so `presets/README.md`, `docs/presets.md` and
+  `docs/preset-palettes.md` are untouched by construction. `docs/capturing.md` and
+  `docs/on-device-validation.md` unaffected: no CLI flag or checklist assertion moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **1**, two entries broken,
+  and **both are red-on-delivery rather than decayed** — 0135's probe greps for the
+  `arcs: Vec::with_capacity(max_segments)` Phase 4 removed, and 0144's for the unconditional
+  exactness sentence Phase 5 qualified. Each break is that phase's own evidence. Left untouched:
+  archiving is the close ceremony's judgement, not `dev`'s.
+- **Full suite:** `cargo nextest run --workspace` (default profile, not `-P fast`) —
+  **1502 run, 1502 passed, 5 skipped, exit 0**, 392.577 s. Every golden suite included,
+  `LMV_BLESS` unset, and `git status` shows no baseline file modified across the whole plan.
+- **Outstanding `human` phases:** none — the plan is `dev`-only. **But Phase 2 is blocked on an
+  architect decision**, which is not a `human` phase and is not covered by this field.
 
 ## Followups (after this lands)
 
