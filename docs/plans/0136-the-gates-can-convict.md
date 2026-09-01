@@ -373,8 +373,8 @@ flowchart TB
 | 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
 | 3 — The row gate reads a row's shape | dev | done | `8986147` |
 | 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
-| 5 — A probe path is checked against the repository | dev | done | committed with this row |
-| 6 — The figure gate stops convicting untracked files | dev | not started | |
+| 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
+| 6 — The figure gate stops convicting untracked files | dev | done | committed with this row |
 | 7 — The gates judge the code this project wrote | dev | not started | |
 | 8 — Two entries whose premise the store revocation falsified | dev | not started | |
 | 9 — The image sweep runs again | dev | not started | |
