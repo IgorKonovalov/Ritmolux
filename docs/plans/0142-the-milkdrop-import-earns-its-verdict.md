@@ -85,7 +85,7 @@ flowchart LR
 - **Notes for the implementer:**
   - **Three hypotheses are already dead and the field was ruled clean once.** Do not re-run them;
     read Plan 0111's implementation log first and record which seams it already covered.
-  - Measure in **linear light**, not code values. If [Plan 0137](0137-the-metrics-measure-light.md)
+  - Measure in **linear light**, not code values. If [Plan 0137](done/0137-the-metrics-measure-light.md)
     has landed, use its level statistic rather than writing a fourth private decode — that is exactly
     the duplication it exists to retire.
   - The defect is an **equilibrium**, not a frame: the field converges to the wrong level over time.

@@ -1,10 +1,19 @@
 # 0137 — The metrics measure light
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-01. Six phases in eight commits (`efde516`,
+> `69da480`, `98977ff`, `2e1552a`, `4512095`, `5bf9dd6`, `32754b5`, plus the
+> close block). Mode 4 verdict: **no blockers, one major, four minors.** Verified
+> independently at the close: `cargo nextest run --workspace` **1499 passed, 5
+> skipped**, `fmt` and `clippy --workspace --all-targets -D warnings` clean, all
+> five Node gates green; one Rust sRGB decode left in the workspace; and the
+> Phase 5 probe measured at silent **0.4167** / driven **0.0000**, so both new
+> assertions hold with margin rather than by luck. The major was `docs/capturing.md`
+> promising a 30 % `level` move for a 30 % `brightness` trim — measured at
+> **23 %** on `star_rosewindow` and repaired in the close commit.
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
-> **Related ADRs:** [0150](../adrs/0150-the-level-question-is-asked-in-linear-light.md) (proposed),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0150](../../adrs/0150-the-level-question-is-asked-in-linear-light.md) (proposed),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0132, 0130, 0151, 0152.
 
 ## TL;DR
@@ -43,7 +52,7 @@ and only prose stands between them.**
 ## Decision
 
 **Add the missing level statistic per
-[ADR-0150](../adrs/0150-the-level-question-is-asked-in-linear-light.md), then repair the three
+[ADR-0150](../../adrs/0150-the-level-question-is-asked-in-linear-light.md), then repair the three
 claims the module and its gates make about themselves.** Phase 1 makes the sRGB decode reachable and
 retires the two hand-rolled copies — it is a pure refactor and lands first so the rest builds on one
 decode. Phase 2 adds the statistic. Phase 3 gives it a `--report` column. Phases 4-6 are the
@@ -106,7 +115,7 @@ flowchart TB
     does not know it will eventually "fix" the wrong half.
   - Anchor the statistic with the entry's own measurement as a test: on a frame where the source
     trim is 30 %, the encoded mean moves ~5 % and the linear reading ~13 %. Per
-    [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), state
+    [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), state
     that as a **property** (the linear reading responds substantially more than the encoded one to
     the same trim), not as a frozen pair of numbers — the exact figures are `star_rosewindow` on one
     adapter.

@@ -1,8 +1,8 @@
 # ADR-0150 — The level question is asked in linear light, over the lit set
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-01 (Plan 0137) — see **Outcome**
 > **Date:** 2026-08-29
-> **Related plan(s):** [0137](../plans/0137-the-metrics-measure-light.md)
+> **Related plan(s):** [0137](../plans/done/0137-the-metrics-measure-light.md)
 
 ## Context
 
@@ -120,6 +120,42 @@ and the look gate answers it. Rejected because the look gate should not also hav
 instrument for the *arithmetic*. The retune needed to know the honest size of a profile change
 (1.87x) in order to set a parameter, and it got 33 % from the encoded mean — a plausible number in
 the wrong space, which is worse than no number.
+
+## Outcome — 2026-09-01, at Plan 0137's close
+
+**The decision stands unchanged: the statistic is `mean_lit_level`, it is linear light over
+`coverage`'s lit set, `srgb_decode_lut` is public, no shape statistic moved, and `--report` carries
+a `level` column.** What this section records is that **the motivating figures above are stated
+three ways and at least one pair of them cannot both be right**, and that the review measured the
+shipped column rather than inferring it.
+
+**The inconsistency.** The Context table puts a 30 % source trim on `star_rosewindow` at **5 %** for
+the frame's encoded mean and **13 %** for the frame's linear light. The prose in Context and in
+Alternative A both say a frame mean read that trim as **3 %**, which matches neither cell. Plan
+0137's Phase 2 note copied the table's pair into a done-when, and `metrics.rs`'s new doc comment
+copied the prose's 3 % into the shipped source. No statement names the space it is in, which is the
+defect the plan was written to repair, one level up.
+
+**What was actually measured, at the close.** `star_rosewindow` alone in a scratch library, its
+`brightness` expression multiplied by exactly `0.70`, `shot --report` on the DX12 software adapter:
+
+| quantity | reading |
+|---|---|
+| `level`, shipped preset | `0.0532` |
+| `level`, 30 % trim | `0.0408` |
+| the move | **23 %** |
+
+So the statistic responds at roughly three-quarters of the source trim on a real preset, not at the
+trim and not at the 13 % the table implies for a linear reading. Two mechanisms account for the gap
+and both are the **pipeline**, not the statistic: the tonemap is the identity only below `k = 0.6`
+and compressive above it, so bright content moves less than its source; and the lit set shrinks as
+dimmed pixels fall under `coverage`'s threshold, which lifts the mean of what remains. Neither is a
+defect — seeing a frame that is into the shoulder move *less* than its trim is precisely the
+additive-ceiling reading the Positive section above wanted.
+
+`docs/capturing.md` was repaired at the close to state this measurement with its fixture and adapter
+instead of the synthetic fixture's 30 %. The 3 % in `metrics.rs`'s doc comment is left for `dev` to
+correct in a later pass; this section is the authority on which number is which.
 
 ## Notes
 

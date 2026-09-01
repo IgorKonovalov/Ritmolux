@@ -33,7 +33,6 @@ place. The plan file carries the real link.
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133. ADR-0149 (proposed): a backlog reference drops its fragment. `check-index-rows.mjs` cannot fail today — a detector matching nothing exits 0. **Phases 1-6 need no GPU.** |
-| [0137](0137-the-metrics-measure-light.md) | The metrics measure light | approved | dev | Backlog 0132 + 0130 + 0151 + 0152. ADR-0150 (proposed): a level statistic in linear light over the lit set — the encoded mean reads a 30 % trim as 5 %. Moves no floor, no golden. |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0141](0141-the-plugin-seams-stop-drifting.md) | The plugin's seams stop drifting | approved | dev | Backlog 0117 + 0118 + 0105. Three drifted claims: a menu index used across a modal wait, a stale headroom figure, an unchecked SDK version. Phase 1 contends with Plan 0103. |
@@ -186,7 +185,8 @@ claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; thre
   natural pickup for [0103] Phase 1, which rewrites the same handler.
 - **[0138] belongs immediately after [0137]** — same linear-light seam one layer up. Taking them
   together is one coherent pass; six weeks apart is two half-passes. [0138] also makes backlog 0038
-  measurable for the first time, using the level statistic [0137] adds.
+  measurable for the first time, using the level statistic [0137] adds. **[0137] closed 2026-09-01,
+  so `mean_lit_level` and the `--report` `level` column are on `main` and this is now the moment.**
 - **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
   GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
 - **[0140]'s contention with [0125] is discharged — 0125 closed 2026-08-31.** It still edits five
@@ -214,9 +214,9 @@ Sequencing:
   **[0126] Phase 7 and [0133] now split or contend with a larger file than either was sized
   against** — the roster, the `--help` renderer and the four scan helpers are one contiguous,
   self-contained block beside the config helpers, which is the seam to move them on.
-- **[0137] contends with nothing** and shares no file with the current roster —
-  `core/src/render/metrics.rs` plus two test files. Its Phases 4 and 6 are prose and need no
-  adapter at all.
+- ~~**[0137] contends with nothing**~~ — **closed 2026-09-01**, and the prediction held: no
+  contention, no golden moved, no floor moved. Its Phase 6 re-measurement falsified the plan's own
+  figures over an 81-preset library rather than the 54 it assumed, which the log records.
 - **Two entries were corrected rather than promoted.** [Backlog 0160](../design-backlog.md)'s
   premise was falsified by ADR-0147 the same morning it was filed, and 0161's severity dropped with
   it; [0136] Phase 6 corrects both in place rather than planning work on a false premise.
@@ -983,6 +983,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md) — closed 2026-09-01. Review: **no blockers, one major, four minors, one nit.** Version: **0.100.0** (minor). Archived [backlog 0130 + 0132 + 0151 + 0152](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0139 - The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md) - closed 2026-09-01. Review: **no blockers, one major, four minors, three nits.** Version: **0.99.0**. Archived [0111 + 0112](../design-backlog-archive.md), filed 0174-0176. [Write-up](README-archive.md).
 - [0146 — The preset sweeps stop being one long test](done/0146-the-preset-sweeps-stop-being-one-long-test.md) — closed 2026-08-31. Review: **one blocker, four majors, eight minors, three nits**, all repaired at the close. Version: **0.98.0** (minor). [Write-up](README-archive.md).
 - [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md) — closed 2026-08-31. Review: **no blockers, no majors, three minors.** Version: **none** (docs/chore-only). [Write-up](README-archive.md).
@@ -1191,7 +1192,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0133]: 0133-the-engine-drives-the-lights.md
 [0135]: done/0135-the-show-night-surfaces-stop-lying.md
 [0136]: 0136-the-gates-can-convict.md
-[0137]: 0137-the-metrics-measure-light.md
+[0137]: done/0137-the-metrics-measure-light.md
 [0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
 [0139]: done/0139-the-render-path-validates-before-it-spends.md
 [0140]: 0140-every-rate-integrates-for-real.md

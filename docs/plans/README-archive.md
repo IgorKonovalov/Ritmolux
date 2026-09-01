@@ -13,6 +13,61 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md)
+  — closed 2026-09-01. Six `dev` phases in eight commits in the `lmv-plan-0137` lane on
+  `plan-0137-metrics-light`, `efde516`..`32754b5`. Mode 4: **no blockers, one major, four minors,
+  one nit.** Version: **0.100.0** (minor) — a new statistic and a new `--report`/`--json` column.
+
+  **What landed.** `metrics` gained `mean_lit_level` — mean linear light over the set `coverage`
+  already calls lit — which is ADR-0150, and `srgb_decode_lut` went public so the two hand-rolled
+  decodes in `ink/tests.rs` and `core/tests/transition.rs` could be deleted. The workspace now holds
+  exactly one Rust sRGB decode; every other `12.92` in it is an *encode*, and the remaining decode is
+  WGSL in `milk/shader.rs`, which no Rust table can serve. `shot --report` and `--json` grew a
+  `level` cell. Phases 4-6 repaired three claims the module and its gates made about themselves:
+  `boundary_density` now says it is perimeter-over-area and therefore bound to the 96x96 capture
+  (it is ~`1/L`, and the docstring's *"near zero however large it is"* was wrong in the size
+  direction specifically); `rosette_spin_only` is now actually asserted on, both halves; and both
+  animation floors name the population they were measured over.
+
+  **The re-measurement falsified the plan's own figures, in both directions, and the log says so.**
+  Over 81 shipped presets rather than the plan's assumed 54: the silent branch carries **74**, whose
+  minimum is `Nocturne` at **0.0155** (the plan expected 0.0201), so `ANIM_FLOOR = 0.01` has 1.55x
+  slack rather than the 2.05x its comment had claimed. The driven branch carries **seven**, minimum
+  `Stipple` **0.0577** — and `Valentine`, which `DRIVEN_FLOOR`'s derivation named as the library
+  minimum, **passes on the silent branch** and was never in that floor's population at all. The
+  re-derivation hazard turned out larger than the plan's example: the top of the unfiltered sweep is
+  `Heart Mono` at **0.0000**, not 0.0025. No constant moved.
+
+  **Verified rather than accepted.** The lane's merge-base was already `main`'s tip, so one run
+  covered the combination: `cargo nextest run --workspace` **1499 passed, 5 skipped** (496 s),
+  matching the log exactly; `fmt` and `clippy --workspace --all-targets -D warnings` clean; all five
+  Node gates green. Phase 5's probe was measured at the close rather than read off the log —
+  `rosette_spin_only` silent **0.4167**, driven **0.0000** — so both new assertions hold with
+  margin, and the mutation `dev` reported (anchoring the differential at `FRAME_A`, which admits
+  0.4167 into the driven column) is exactly right.
+
+  **The major was a number, in the plan that exists to stop numbers being wrong.**
+  `docs/capturing.md` told an author that trimming `brightness` by 30 % moves the new `level` column
+  "about 30 %". That figure came from the synthetic two-grey fixture in `metrics/tests.rs`, which has
+  no scene and no tonemap. Measured at the close on ADR-0150's own fixture, `star_rosewindow`
+  trimmed by exactly 0.70: `level` **0.0532 → 0.0408**, a **23 %** move. The tonemap is the
+  identity only below its knee and compressive above it, and the lit set itself shrinks as dimmed
+  pixels fall under `cover`'s threshold. Both are the pipeline rather than the statistic, and an
+  author told to expect 30 would have read a working column as broken. Repaired in the close commit,
+  with the measurement and its adapter named.
+
+  **The minors.** `metrics.rs`'s new doc comment carries a 3 % frame-mean figure that ADR-0150's own
+  table contradicts (it puts the frame's encoded mean at 5 % and its linear light at 13 %) —
+  recorded as the ADR's dated `Outcome` at accept, since the defect is the ADR's and the code copied
+  it faithfully. `--json`'s new `level` key was missing from `capturing.md`'s schema paragraph, 660
+  lines below the column table that *was* swept. Backlog **0152** was discharged with both its
+  probes still convicting — Phase 6 used different wording from the one the entry suggested, so
+  `check-backlog-claims.mjs` stayed green *because it still believed the defect unfixed*; contrast
+  0132 and 0151, whose probes went red on delivery as designed. And the `preset-author` lane's
+  private `--report` table had been stale since Plan 0121 — six columns against the real eleven —
+  which is exactly the rot the load-bearing-docs rule exists to stop; it now points at
+  `docs/capturing.md` instead of carrying a copy.
+
 - [0139 — The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md)
   — closed 2026-09-01. Three `dev` phases in the `lmv-plan-0139` lane on
   `plan-0139-render-validates`, `5cf50bc`..`4d8e4c8`. Mode 4: **no blockers, one major, four minors,

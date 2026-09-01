@@ -7155,3 +7155,243 @@ arguments so the colour tags cannot be lost); or one line in `docs/capturing.md`
 raw-stream path as the size-control route, which costs nothing and may be the whole answer.
 **No ADR needed. Priority: low** — and it may be **discharged by 0110** rather than on its own,
 since most of those bits are encoding shot noise that should not have been in the picture.
+
+## 0130 — `boundary_density` scales with the capture resolution, and neither it nor its two floors names the 96x96 they were measured at
+
+> **CLOSED 2026-09-01** by [Plan 0137](plans/done/0137-the-metrics-measure-light.md).
+
+**Raised by:** `architect`, at [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md)'s
+Mode 4 review, 2026-08-26. **Owner if taken:** `dev` — it is two doc comments, unless someone wires
+the statistic into `shot --report`, at which point it is a design question first.
+
+- **Verified 2026-08-26** — the statistic is a perimeter count over an area count:
+  `present: pub fn boundary_density in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — the floors it is read against, both measured only at the sanity capture:
+  `present: fn boundary_floor in: core/tests/sanity.rs`
+- **Verified 2026-08-26** — the capture the numbers were taken at, which the two doc comments above
+  do not name: `present: const SIZE: u32 = 96 in: core/tests/sanity.rs`
+- **Verified 2026-08-26** — the convention it departs from, in the same file, three functions away:
+  `present: the sanity suite's 96 in: core/src/render/metrics.rs`
+
+### The finding
+
+`boundary_density` counts lit pixels having an unlit 4-neighbour and divides by lit pixels. The
+numerator scales with the figure's **perimeter** and the denominator with its **area**, so the ratio
+goes as ~1/L in the capture's linear resolution: the same scene captured at 192x192 reads roughly
+half what it reads at 96x96. A solid disc of radius `r` px reads about `2/r`.
+
+Both shipped floors — `0.31` on the default arm, `0.13` on `ShapeCollage` — are measurements taken
+**only** at `SIZE = 96`. `boundary_floor`'s docstring names the date (2026-08-26) and the revision
+(`8389f2a`) the two anchors were read at, which is [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
+ceremony done carefully — but not the capture size, which is the one part of the configuration the
+number is actually bound to. `metrics.rs`'s own convention is to say it: `radial_shell_occupancy`
+names "the sanity suite's 96x96 capture" three times in one doc comment, for a weaker coupling.
+
+The function's docstring points the other way. *"A solid mass carries only its rim on the boundary
+and reads near zero **however large it is**; a hatched, stroked or tiled figure is almost all rim and
+reads near one **however small**"* reads as scale-freeness, and size is exactly the direction where
+it is not free — a 4x4 solid block reads `1.0000`, not near zero. Inside the gate that is harmless,
+because `coverage` disposes of tiny figures on a separate term at a fixed capture. Outside it, the
+sentence is an invitation.
+
+### Why it is worth writing down rather than shrugging at
+
+**Nothing in the repo can catch it.** The gate runs at 96 and only at 96, so no test at the
+configuration this project develops and tests on can distinguish a resolution-bound constant from a
+resolution-free one — the generalized form of [ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s
+habit, applied to a capture size rather than a grid.
+
+And there is a caller waiting. `metrics` is the module `shot --report` consumes, Plan 0119 made this
+function `pub` there rather than leaving it in the test file, and that plan's own Followups propose
+re-using the instrument on the four full-coverage luminous fields (see 0128). A `--report` column
+computed at 1280x720 against a floor derived at 96x96 is off by roughly an order of magnitude, and
+would read as a finding about the presets.
+
+### What a fix looks like
+
+One sentence in `boundary_density`'s docstring saying the reading scales with the capture's linear
+resolution and is comparable only at a fixed one, and "measured at the 96x96 sanity capture" added to
+`boundary_floor`'s derivation paragraph. If it ever reaches `shot --report`, the column needs either
+a fixed internal capture or a documented per-resolution floor — that is the design question, and it
+is not answered here.
+
+## 0132 — the metrics module has no level statistic, and every statistic it does have reads gamma-encoded code values
+
+> **CLOSED 2026-09-01** by [Plan 0137](plans/done/0137-the-metrics-measure-light.md).
+
+**Raised by:** `preset-author`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)
+Phase 6, where the retune brief's own question — *does a crisper stroke read brighter, and roughly
+by how much* — had no instrument and the lane had to write one in a scratch directory.
+**Owner if taken:** `dev`; the decode table and the call sites already exist.
+
+- **Verified 2026-08-26** — the module's one definition of luminance is on 8-bit code values:
+  `present: fn luma\(px: &\[u8\]\) -> f32 in: core/src/render/metrics.rs`
+- **Verified 2026-08-26** — it *does* linearize, for exactly one question, behind a private table:
+  `present: fn srgb_decode_lut\(\) -> &'static \[f32; 256\] in: core/src/render/metrics.rs`
+- **Re-verified 2026-09-01** — the level column now exists, and the probe pins the column set it
+  arrived in rather than the one it was missing from. The numeric cells narrowed from 7 to 6 to buy
+  its width back inside the table's 100-column budget; `rate` keeps 7 because its cell can carry a
+  `+`. A tenth numeric column, or a re-widening, moves this string and is a re-read trigger:
+  `present: \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>6\} \{:>7\} \{:>6\} \{:>6\} \{:>5\} \{:>5\} in: standalone/src/shot/report.rs`
+- **Verified 2026-09-01** — the level statistic itself is reachable and is the one this entry asked
+  for, in linear light over the lit set:
+  `present: pub fn mean_lit_level in: core/src/render/metrics.rs`
+- **Verified 2026-09-01** — the decode table is no longer private, which is what let the other
+  statistics reach it: `present: pub fn srgb_decode_lut in: core/src/render/metrics.rs`
+
+### The finding
+
+`core/src/render/metrics.rs` is the shared instrument for judging a rendered frame, and it answers
+*shape* questions well: `coverage`, `peak_to_mean`, `tonal_flatness`, `boundary_density`,
+`quadrant_spread`, `radial_shell_occupancy`. It answers **no level question at all**. Nothing
+reports how much light a frame carries, so "this change made the library brighter" is not a
+statement anything in this repo can produce a number for, and `shot --report` has no column for it.
+
+The reachable substitute is a mean over `luma()`, and it is in the wrong space. `luma()` is Rec.601
+weights over the stored `u8`, so it measures **gamma-encoded code value**. Trimming a preset's
+`brightness` by 30 % moves the encoded mean by about 11 %, which is close enough to nothing that a
+level match read off it lands nowhere near. Measured on `star_rosewindow` during the Phase 6 retune:
+`brightness` `1.0 → 0.70` moved the frame's encoded mean by 5 % and its **linear** light by 13 %,
+and the honest size of the profile change it was meant to offset was **1.87x**, not the 33 % the
+encoded mean reported.
+
+**The module already contains the argument against itself.** `linear_diff` decodes to linear light
+before differencing, and its doc comment says why in as many words: sRGB's transfer curve is concave,
+so a parameter easing linearly toward its target *"crosses 90 % of its pixel change early on the way
+up and late on the way down, and a symmetric `[smoothing]` entry would measure asymmetric."* That
+reasoning is not specific to a step response — it is the same reasoning for any comparison of two
+levels — but the decode is confined to `frames_to_settle` / `segment_settled` / `step_response`,
+and `srgb_decode_lut` is private. The other statistics never see it.
+
+A third symptom, minor on its own and corroborating: the sRGB decode is re-derived by hand in
+`core/src/render/ink/tests.rs` and `core/tests/transition.rs` rather than shared, because the table
+that already exists cannot be reached.
+
+### Why it matters beyond one retune
+
+Two of this project's standing rules are level claims that nothing measures.
+
+The **additive ceiling** — the first thing `references/craft.md` teaches and the failure behind most
+broken presets — is a statement about light stacking past what the tonemap can hold. `cover` sees a
+frame that has *already* blown out to a wash; it cannot see one approaching. And ADR-0124's own
+Phase 4 asked whether a crisper stroke reads brighter *because no test in this repo settles it*,
+which was true and remains true: the look gate is the right instrument for the judgement, and it
+should not also have to be the instrument for the arithmetic.
+
+The gap is invisible in the usual way. Nothing is broken, every gate is green, and the encoded mean
+produces a plausible number for anyone who does not stop to ask what space it is in — which is the
+same shape as the `thickness` dead zone this plan's own ADR records: the obvious experiment returns
+a reading, and the reading is meaningless.
+
+### The shape of a repair, not a decision
+
+Roughly: make `srgb_decode_lut` reachable inside the module, add a level statistic beside the others
+in **linear light**, and give `shot --report` a column for it. Three things want deciding rather
+than assuming, and they are why this is a note and not a plan:
+
+- **What the statistic is.** Frame-mean linear light is the simple one and is background-dominated
+  — on `star_rosewindow` the background carried enough of the frame that a 30 % source trim read as
+  3 %. Restricting to the lit set (the `coverage` predicate already defines one) made the Phase 6
+  numbers legible, but "lit" is a threshold in code space and so inherits the problem one level up.
+- **Whether a `--report` column earns its width.** The table is already nine columns, and a level
+  number with no baseline to compare against is not obviously actionable per-preset.
+- **Whether the existing statistics should move too.** Probably not — `coverage` and
+  `peak_to_mean` are threshold and ratio measures where code space is defensible, and `peak_to_mean`
+  documents its 8-bit saturation deliberately. Changing them would move blessed baselines for no
+  gain. The claim here is that the *level* question is missing, not that the shape ones are wrong.
+
+---
+
+## 0151 — the driven floor's sharpest non-vacuity probe is printed and never asserted, and it is the only one that separates "measures the music" from "measures nothing"
+
+> **CLOSED 2026-09-01** by [Plan 0137](plans/done/0137-the-metrics-measure-light.md).
+
+> **Filed 2026-08-28** at the Plan 0123 Mode 4 review, from reading `DRIVEN_FLOOR`'s own derivation
+> against the test file under it.
+
+`core/tests/animation.rs`'s `DRIVEN_FLOOR` doc comment closes its derivation with a non-vacuity pair
+and the sentence *"Both are pinned as standing tests below."* One of the two is pinned.
+`probe_collage_mono_calm` has its own test — `the_driven_branch_carries_the_world_that_is_still_by_design`
+asserts it fails the silent floor and clears the driven one. `rosette_spin_only` has nothing:
+`the_footprint_statistic_separates_the_rejected_draft_from_the_static_control` matches only
+`squall_sparse` and `star_frozen` in its `match *label`, so the rosette's readings are **printed and
+discarded**.
+
+**Why this is the probe that matters, and not an interchangeable second zero.** Measured 2026-08-28
+on the DX12 software adapter:
+
+| probe | silent | driven |
+|---|---|---|
+| `star_frozen` (the pinned control) | 0.0000 | 0.0000 |
+| `rosette_spin_only` (unpinned) | **0.4167** | **0.0000** |
+
+`star_frozen` is frozen in both readings, so its driven zero is consistent with *any* broken driven
+statistic — one that measures nothing at all would satisfy it exactly as well as the correct one
+does. `rosette_spin_only` turns steadily on its own clock and binds no band, so it is the single
+probe in the file that says the driven reading responds to **the music** rather than to motion: a
+figure moving hard at 0.4167 silent must still read 0.0000 driven. If a future edit let autonomous
+motion leak into the driven differential, `star_frozen` would not notice and this one would.
+
+**Impact:** low blast radius, high value per line. The gate is currently correct — this is a missing
+assertion behind a comment that claims it exists, which is the shape that survives review precisely
+because the comment reads like coverage.
+
+**What a fix looks like:** one `match` arm and one assertion, beside the two already there —
+`rosette.driven < DRIVEN_FLOOR` with a message naming what a failure would mean. The silent half
+wants asserting too (`>= ANIM_FLOOR`), so the probe cannot quietly stop moving and make the driven
+zero vacuous. Then the comment's "both" is true.
+
+- **Verified 2026-08-28** — the probe is in the roster: `present: rosette_spin_only in: core/tests/animation.rs`
+- **Verified 2026-09-01** — the driven half is now asserted on it: `present: rosette\.driven < DRIVEN_FLOOR in: core/tests/animation.rs`
+- **Verified 2026-09-01** — and so is the silent half, which is what keeps the driven zero from going vacuous: `present: rosette\.silent >= ANIM_FLOOR in: core/tests/animation.rs`
+
+## 0152 — a disjunctive gate made "the shipped library's minimum" ambiguous, and `ANIM_FLOOR`'s recorded derivation still reads as though there were one population
+
+> **CLOSED 2026-09-01** by [Plan 0137](plans/done/0137-the-metrics-measure-light.md).
+>
+> **Both probes below were still convicting when this closed, and that is the record worth keeping.**
+> Phase 6 named the population in different words from the ones the *What a fix looks like* section
+> suggested — *"the population is the presets that pass on THIS branch"* rather than *"the minimum
+> among presets that pass this branch"* — and it kept `0.0205` deliberately, as the provenance of
+> the stricter of two derivations. So `absent: minimum among presets that pass` and
+> `present: 0\.0205` both still held, `check-backlog-claims.mjs` stayed green *because it still
+> believed the defect unfixed*, and nothing surfaced the discharge. Contrast 0132 and 0151, whose
+> probes went red on delivery as designed. **A probe that quotes the wording a fix is expected to
+> use cannot see a fix that words it differently** — reduce to the property, not the phrasing.
+
+> **Filed 2026-08-28** at the Plan 0123 Mode 4 review. Raised by `dev` in that plan's implementation
+> log as a stale number and left for the close; re-measured here, where it turns out to be an
+> ambiguity rather than staleness. See archived 0145 and
+> [ADR-0136](adrs/0136-the-animation-gate-asks-its-question-in-both-readings.md)'s Outcome.
+
+`ANIM_FLOOR`'s doc comment in `core/tests/animation.rs` derives the floor per ADR-0071: *"The shipped
+library's minimum under the new statistic is 0.0205 (`Banded Mandala`) ... The floor sits at half the
+shipped minimum ... Slack 2.05x."* That derivation was written when the gate had one branch, and
+ADR-0136 gave it two without revisiting it. The phrase now has three defensible readings, measured
+2026-08-28 over all 54 shipped presets on the DX12 software adapter, backdrops suppressed:
+
+| reading | value | preset |
+|---|---|---|
+| the literal library minimum | **0.0025** | `Collage Mono` — passes on the driven branch |
+| the minimum among presets that pass the **silent** branch | **0.0201** | `On White` |
+| what the comment names | 0.0205 | `Banded Mandala` — no longer the minimum of either |
+
+**The floor is not wrong and this is not a correctness bug.** `0.01` sits under 0.0201 with 2.01x
+slack, which is the 2.05x the comment claims to within the rounding. What is wrong is the
+*statement*: a reader re-deriving from the printed sweep — which is exactly what the comment
+instructs, *"a new library minimum is re-derived from the printed numbers, not nudged until green"* —
+now reads 0.0025 off the top of the sorted output and would halve the floor to 0.00125, admitting
+ADR-0091's `1/139 = 0.0072` one-pixel flicker that the same comment's noise-ceiling paragraph exists
+to exclude. The instruction and the arithmetic disagree, and only prose stands between them.
+
+**Impact:** the failure is a future floor derived correctly by procedure and wrong by two orders of
+magnitude, on the gate whose whole job is catching frozen scenes. It also generalizes: `DRIVEN_FLOOR`
+inherited the same phrasing and is currently unambiguous only by luck, because no shipped preset yet
+sits below it on the branch it gates.
+
+**What a fix looks like:** name the population in both derivations — *"the minimum among presets that
+pass this branch"* — and say why the other branch's presets are excluded from it. One sentence each,
+plus the re-measured number and preset. No constant moves.
+
+- **Verified 2026-08-28** — the stale number is still the one the comment names: `present: 0\.0205 in: core/tests/animation.rs`
+- **Verified 2026-08-28** — and no derivation names its population: `absent: minimum among presets that pass in: core/tests/animation.rs`
