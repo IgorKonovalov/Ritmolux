@@ -25,8 +25,16 @@ committed (ADR-0115 Alternative A). To stage it:
 That downloads the **pinned** release against a SHA-256 and unpacks it here. The
 pin lives in [`packaging/foobar/sdk-pin.ps1`](../packaging/foobar/sdk-pin.ps1),
 which is the one file a bump edits and which explains why the release is pinned
-rather than tracked. To do it by hand instead, download from
-<https://www.foobar2000.org/SDK> and extract the archive to `plugin-foobar/sdk/`.
+rather than tracked.
+
+To do it by hand instead, extract the archive to `plugin-foobar/sdk/` — but take
+the **pinned** release, not the latest one. `sdk-pin.ps1` holds its exact URL
+(`https://www.foobar2000.org/downloads/SDK-<date>.7z`, stable back to 2011);
+<https://www.foobar2000.org/SDK> serves whatever is current, which is usually a
+different release. `build-component.ps1` reads the staged tree's own version out
+of `sdk-readme.html` and **fails the build** when it disagrees with the pin, so a
+hand-staged latest SDK stops at a named error rather than shipping a component
+whose `READ-ME-FIRST.txt` claims a build against something it never touched.
 
 Toolchain: MSVC (VS Build Tools 2022, x64).
 

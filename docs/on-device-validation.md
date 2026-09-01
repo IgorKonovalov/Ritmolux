@@ -408,7 +408,7 @@ or an older copy shadows the one under test and the version check means nothing.
       confirms two filed defects rather than finding new ones; anything else is new.
       _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
 
-- [x] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
+- [ ] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
       can reach lives on one menu since [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md),
       and CI builds no C++, so this is the only place any of it is exercised. Mid-playback, in this
       order:
@@ -447,7 +447,20 @@ or an older copy shadows the one under test and the version check means nothing.
       still gets the component's menu instead of Cut / Copy / Replace / Remove.
       **Still open:** whether an explicit Reload visibly re-seeds the running scene — this run did
       not look, and it is cheap to settle next time on a long-trail preset.
-      _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18; run 2026-08-24.)_
+      **RE-OPENED 2026-09-01 at Plan 0141's close — (a) only; (b) through (d) stand.** Plan 0141
+      Phase 1 changed how a menu click is dispatched: it resolves the preset **by name against a
+      freshly read roster** instead of by the index the submenu item carried, because
+      `TrackPopupMenu` pumps `WM_TIMER` and the roster can be reloaded under an open menu. The
+      2026-08-24 run above passed (a) against a `foo_lmv.dll` that predates that change, and this
+      item's own warning — *date the installed artifact before trusting a carried-forward check* —
+      is exactly what applies to it now. This was the plan's only behavioral change to shipped
+      code and CI builds no C++, so **(a) is the only thing anywhere that exercises it.**
+      Re-run (a) against a component rebuilt from `main` at `v0.99.1` or later. The interesting
+      case is the one the old index could get wrong: with the menu **open**, have a track boundary
+      or a stream-format change land (or drop a `.toml` into the folder and let a reload happen),
+      then click a preset — the one that starts showing must be the one whose name you clicked.
+      _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18; run 2026-08-24;
+      (a) re-opened by Plan 0141 Phase 1 on 2026-09-01.)_
 
 ## How to run
 
