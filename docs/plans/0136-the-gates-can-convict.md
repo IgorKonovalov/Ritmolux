@@ -1,6 +1,6 @@
 # 0136 — The gates can convict
 
-> **Status:** in-progress
+> **Status:** in-progress (phases 1-9 landed; Phase 10 is `human`)
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (proposed)
@@ -377,7 +377,7 @@ flowchart TB
 | 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
 | 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
 | 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
-| 9 — The image sweep runs again | dev | done | committed with this row |
+| 9 — The image sweep runs again | dev | done | `a87983a`, `7b9a1ae` |
 | 10 — What the pictures are of | human | not started | |
 
 ### Notes
@@ -455,11 +455,6 @@ flowchart TB
   default `softness` - plus `swarm` and `preset-minimal`. `hero`, `fragment_field`,
   `reaction_diffusion`, `attractor`, `emitter` and the five walkthrough steps re-rendered
   byte-identically on this machine.
-- **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
-  `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
-  an `architect` act at the close, and the claim gate's own failure text says repairing a falsified
-  entry is not a `dev` call - so it is left red and recorded here rather than edited. The
-  `Backlog probes` close trigger carries the full roster.
 - **`check-backlog-claims.mjs --self-test` is wired into no call site at all.** Phase 1's note holds
   it up as the model to follow and as the thing that must be wired *"or it is a mechanism nobody
   runs, which is the defect being repaired"*. Grepped 2026-09-01 across `.githooks/`, `.github/` and
@@ -468,15 +463,32 @@ flowchart TB
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no. `git diff --name-only main..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** design-backlog 0104, 0143, 0162, 0127, 0133, 0166, 0170, 0171, 0173
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only, plus one feature. The feature is `check-index-rows.mjs`'s shape check
+  (Phase 3), a class of break the gate could not report before. Everything else repairs an existing
+  instrument or a path: five gates, one test helper, one packaging script, twelve gallery images.
+  No engine code, no C ABI, no preset content.
+- **Operator docs touched:** `docs/images/gallery/` — three images added (`shape_field`,
+  `warp_mesh`, `shape_collage`), six re-shot (`lsystem`, `parametric_curve`, `spectrum`,
+  `star_pattern`, `swarm`, `preset-minimal`). `docs/preset-guide.md` is **not** touched and still
+  carries three `— no picture yet` headings that are now false; see the Notes.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, 11 broken**, across the
+  six entries this plan closes — 0104, 0133, 0162, 0170, 0171, 0173. Every one was written to go red
+  on delivery. 0160's and 0161's probes were re-pointed by Phase 8 and hold; no other entry moved.
+  The gate's `--self-test` is 13 of 13.
+- **Full suite:** `cargo nextest run --workspace` — **exit 0**, 1500 passed, 5 skipped, 15 slow,
+  477.8 s. Run 2026-09-01 on the development machine after the last phase's commit.
+  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` both clean.
+- **Outstanding `human` phases:** Phase 10, and only Phase 10.
 
 ## Followups (after this lands)
 
 - Whether the remaining three Node gates need the `git ls-files` enumeration Phase 7 gives one of
-  them.
+  them. Phase 7 answered it for `check-doc-links.mjs` by giving it the enumeration - the defect was
+  real there, demonstrated - and `check-filter-figures.mjs` reaches the same end by the advisory
+  route. What is left is `check-index-rows.mjs` and `check-backlog-claims.mjs`.
+- **`docs/preset-guide.md` owes three sections a picture.** Its `shape_field`, `warp_mesh` and
+  `shape_collage` headings still read `- no picture yet` and each body says the gallery predates the
+  system, which stopped being true at Phase 9. Alt text has to be written against the rendered
+  images, so it is content work, and the file is in no phase's `Files touched` list.
