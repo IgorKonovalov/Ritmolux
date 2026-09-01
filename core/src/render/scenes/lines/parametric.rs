@@ -166,11 +166,26 @@ impl ParametricCurveScene {
             renderer,
             segments: Vec::with_capacity(max_segments),
             single_buf: Vec::with_capacity(max_segments),
-            arcs: Vec::with_capacity(max_segments),
-            single_arcs: Vec::with_capacity(max_segments),
-            points: Vec::with_capacity(max_segments),
-            pieces: Vec::with_capacity(max_segments),
-            walk: Vec::with_capacity(max_segments),
+            // The four fit buffers reserve nothing here. Every preset in the
+            // shipped library is a chord web, `maurer_rose_pieces` declines the
+            // fit before it fills any of them, and at Rich's `max_segments`
+            // preallocating all four costs 96 B x 60,000 = 5,760,000 B that is
+            // never written. They are reserved on the first frame that actually
+            // takes the fitted path — see `reserve_fit_buffers`.
+            arcs: Vec::new(),
+            single_arcs: Vec::new(),
+            pieces: Vec::new(),
+            walk: Vec::new(),
+            // `points` is the exception and stays preallocated: the walk is
+            // written into it on **every** frame, fitted or not.
+            //
+            // `max_segments + 1`, not `max_segments`. `maurer_rose_pieces`
+            // pushes `drawn + 1` points for `drawn` chords — the walk has one
+            // more point than it has segments — and `drawn` reaches
+            // `max_segments` when a preset binds `samples` at the cap. One short
+            // is a reallocation inside a path whose own doc says it is
+            // allocation-free.
+            points: Vec::with_capacity(max_segments + 1),
             max_segments,
             mirror_overflow: None,
             family: CurveFamily::MaurerRose,
@@ -213,6 +228,43 @@ impl ParametricCurveScene {
     /// [`color_along_path`] gives: a chord's place on the curve belongs to the
     /// curve, so a `draw_progress` reveal draws the gradient on rather than
     /// re-tinting it.
+    /// Give the four fit buffers their steady-state capacity, on the first frame
+    /// that actually fits a curve.
+    ///
+    /// **Why not at load, the way `star.rs` sizes its arc buffers.** A star's
+    /// roster is structural: the preset declares its circular motifs, so the
+    /// count is known at `configure`. Whether a Maurer walk fits is not declared
+    /// — it is read off the walk, per frame, and `d` is an expression that can
+    /// cross `curves::SMOOTH_CORNER_SHARE` mid-show.
+    /// [`curves::maurer_rose_pieces`] states it: the decision cannot be made at
+    /// load, only from the walk in hand.
+    ///
+    /// So the shape is lazy rather than eager. A chord-web preset — every one in
+    /// the shipped library — never reaches here and commits nothing. A preset
+    /// that fits pays **one** growth on its first fitted frame and is
+    /// allocation-free from the second, which is the property the per-frame path
+    /// documents. `reserve_exact`, because these settle at a known ceiling and
+    /// have no reason to carry a doubling's slack.
+    fn reserve_fit_buffers(&mut self) {
+        let cap = self.max_segments;
+        if self.pieces.capacity() < cap {
+            let extra = cap.saturating_sub(self.pieces.len());
+            self.pieces.reserve_exact(extra);
+        }
+        if self.walk.capacity() < cap {
+            let extra = cap.saturating_sub(self.walk.len());
+            self.walk.reserve_exact(extra);
+        }
+        if self.single_arcs.capacity() < cap {
+            let extra = cap.saturating_sub(self.single_arcs.len());
+            self.single_arcs.reserve_exact(extra);
+        }
+        if self.arcs.capacity() < cap {
+            let extra = cap.saturating_sub(self.arcs.len());
+            self.arcs.reserve_exact(extra);
+        }
+    }
+
     fn split_pieces(&mut self, samples: usize, ramp: ColorRamp, color: [f32; 3], width: f32) {
         self.single_buf.clear();
         self.single_arcs.clear();
@@ -379,6 +431,23 @@ impl Scene for ParametricCurveScene {
         self.palette = palette.clone();
     }
 
+    /// Give the four fit buffers their steady-state capacity, on the first frame
+    /// that actually fits a curve.
+    ///
+    /// **Why not at load, the way `star.rs` sizes its arc buffers.** A star's
+    /// roster is structural: the preset declares its circular motifs and the
+    /// count is known at `configure`. Whether a Maurer walk fits is not
+    /// declared — it is read off the walk, per frame, and `d` is an expression
+    /// that can cross `SMOOTH_CORNER_SHARE` mid-show. `curves::maurer_rose_pieces`
+    /// says so in its own doc block: *"the decision cannot be made at load - only
+    /// from the walk in hand"*.
+    ///
+    /// So the shape is lazy rather than eager. A chord-web preset — every one in
+    /// the shipped library — never reaches here and commits nothing. A preset
+    /// that fits pays **one** growth on its first fitted frame and is
+    /// allocation-free from the second, which is the property the per-frame path
+    /// documents. `reserve_exact`, because these settle at a known ceiling and
+    /// have no reason to carry a doubling's slack.
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
         // A curve preset records its family here (off the hot path). Later
         // phases' generator config variants are for the generator scenes; this
@@ -458,6 +527,7 @@ impl Scene for ParametricCurveScene {
             ),
         };
         if fitted {
+            self.reserve_fit_buffers();
             self.split_pieces(samples, ramp, color, width);
         } else {
             match self.family {
@@ -551,6 +621,72 @@ mod tests {
     use super::*;
 
     const SAMPLES: usize = 240;
+
+    /// The two allocation claims behind this scene's buffer sizing, asserted on
+    /// the sampler rather than on the struct — `Vec::new().capacity() == 0` is a
+    /// tautology, and what actually matters is what the walk writes.
+    ///
+    /// **One: a chord web fills none of the fit buffers.** `pieces` and `walk`
+    /// are written only when `maurer_rose_pieces` fits the walk to an arc chain,
+    /// and every `d` in the shipped library webs. Preallocating them — and the
+    /// two arc buffers they feed — to `max_segments` committed Rust heap that is
+    /// never written: 96 B x `max_segments`, which at Rich's 60,000 is
+    /// 5,760,000 B on top of the buffers that are used.
+    ///
+    /// **Two: `points` needs `drawn + 1`.** A polyline has one more point than it
+    /// has chords, and `drawn` reaches `max_segments` when a preset binds
+    /// `samples` at the per-frame clamp. At a capacity of exactly `max_segments`
+    /// the last push reallocates, inside a path whose own doc block calls itself
+    /// allocation-free.
+    #[test]
+    fn the_walk_writes_one_more_point_than_it_has_chords_and_a_web_fits_nothing() {
+        let web = curves::RoseParams {
+            n: 6.0,
+            // A shipped-shape chord web: `maurer_rose_pieces` declines this.
+            d: 71.0,
+            phase: 0.0,
+            radial_offset: 0.0,
+            samples: SAMPLES,
+            scale: 0.9,
+            rotation: 0.0,
+            draw_progress: 1.0,
+            color: [1.0, 1.0, 1.0],
+            width: 0.01,
+        };
+
+        let mut points = Vec::with_capacity(SAMPLES + 1);
+        let mut pieces = Vec::new();
+        let mut walk = Vec::new();
+
+        let fitted = curves::maurer_rose_pieces(web, &mut points, &mut pieces, &mut walk);
+
+        assert!(!fitted, "d = 71 is a chord web and declines the fit");
+        assert!(
+            pieces.is_empty() && walk.is_empty(),
+            "a declined fit writes neither buffer, so reserving for them commits \
+             heap nothing ever touches"
+        );
+        assert_eq!(
+            pieces.capacity(),
+            0,
+            "and it does not even grow them: reserving nothing costs nothing"
+        );
+        assert_eq!(walk.capacity(), 0);
+
+        // The walk itself is always written, fit or no fit, and it is one longer
+        // than the chord count.
+        assert_eq!(
+            points.len(),
+            SAMPLES + 1,
+            "the walk has one more point than it has chords"
+        );
+        assert_eq!(
+            points.capacity(),
+            SAMPLES + 1,
+            "so a capacity of `samples` exactly would have reallocated on the \
+             final push"
+        );
+    }
 
     /// `spin` integrates rather than multiplying the clock (ADR-0135), and at a
     /// constant rate the two agree — which is what makes "no golden moves" a

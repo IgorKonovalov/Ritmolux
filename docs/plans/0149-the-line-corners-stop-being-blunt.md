@@ -407,7 +407,7 @@ pub struct SegmentInstance {
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
 | 2 — The corner reaches its point | dev | **BLOCKED** — stop gate ran and failed; see Notes | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | committed with this row |
-| 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
+| 4 — `parametric_curve` reserves what a preset declared | dev | done | committed with this row |
 | 5 — Four contracts that say more than they hold | dev | not started | |
 
 ### Notes
@@ -502,6 +502,40 @@ golden for a second unrelated reason. Filed for `architect` as its own entry.
 
 The scratch probe that produced the table was removed rather than committed; it
 is reproducible from the two orientations and four targets above.
+
+**Phase 4 deviates from the phase's stated method, and delivers its done-when.**
+
+The phase says to size the buffers *"at load from what the preset actually
+declares, the way `star.rs` already does"*. That is not available here, and the
+plan contains the sentence that says why: `curves::maurer_rose_pieces`'s own doc
+block reads *"the decision cannot be made at load - only from the walk in hand"*.
+A star's arc roster is **structural** — the preset declares its circular motifs,
+so `configure` can count them. Whether a Maurer walk fits is **read off the walk
+per frame**, and `d` is an expression that can cross `SMOOTH_CORNER_SHARE`
+mid-show, so no load-time inspection can decide it.
+
+Implemented lazily instead: the four fit buffers start at capacity zero and are
+`reserve_exact`-ed on the first frame that actually fits a curve
+(`reserve_fit_buffers`). A chord-web preset — every one in the shipped library —
+never reaches that path and commits nothing. A preset that does fit pays one
+growth on its first fitted frame and is allocation-free from the second.
+
+**The done-when is met as written**: a shipped preset reserves nothing for the
+four buffers it never fills. What changed is the mechanism, not the outcome.
+
+**The measured numbers, and one correction to the plan's arithmetic.** Element
+sizes measured rather than assumed: `SegmentInstance` 44 B, `ArcInstance` 36 B,
+`Piece` 24 B, walk point 8 B, walk offset 4 B. At Rich's `max_segments = 60_000`
+the scene held **11,760,008 B** and now holds **5,760,008 B** — **5,999,992 B**
+not committed. The phase says 6,480,000 B, which is the 108 B x 60,000 for all
+**five** buffers; `points` is the fifth and stays preallocated, because the walk
+is written into it on every frame whether the fit is taken or not. It also grew
+by one element for the off-by-one.
+
+`docs/nfr.md` §12's *"our own Rust state stays <~1 MB"* was **false by roughly an
+order of magnitude** and is corrected rather than softened: it now bounds DSP and
+audio state, which is what it was measured against, and scene geometry is named
+as a separate quantity with the figures above.
 
 ### Close triggers
 
