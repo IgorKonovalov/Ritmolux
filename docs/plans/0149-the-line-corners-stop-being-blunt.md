@@ -405,8 +405,8 @@ pub struct SegmentInstance {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
-| 2 — The corner reaches its point | dev | not started (block amended 2026-09-01) | |
-| 3 — A `scallop` refuses a depth it cannot draw | dev | not started | |
+| 2 — The corner reaches its point | dev | **BLOCKED** — stop gate ran and failed; see Notes | |
+| 3 — A `scallop` refuses a depth it cannot draw | dev | done | committed with this row |
 | 4 — `parametric_curve` reserves what a preset declared | dev | not started | |
 | 5 — Four contracts that say more than they hold | dev | not started | |
 
@@ -463,6 +463,45 @@ included, `LMV_BLESS` unset, and `git status` shows no baseline file modified.
 `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
 `node scripts/check-comment-hygiene.mjs` and `node scripts/check-doc-links.mjs`
 all clean.
+
+**Phase 2's stop gate ran, and it failed. The phase is blocked.**
+
+The gate asks whether the space the extension is applied in is the space the
+producer measures its angle in. Measured on the Phase 1 tree with a flat `width`
+and no miter, a stroke's on-screen thickness against its orientation:
+
+| target | aspect | vertical / horizontal thickness |
+|---|---|---|
+| 1000x1000 | 1.0000 | **1.0000** |
+| 1280x800 | 1.6000 | **1.5789** |
+| 1920x1080 | 1.7778 | **1.7843** |
+| 800x1280 | 0.6250 | **0.6333** |
+
+`half_width = 0.10`, lit threshold `0.05`, hardware adapter; residuals are pixel
+quantization on counts of 76-182. **The ratio tracks the aspect, not 1.0.** The
+width offset is applied along a normal computed in NDC, where x is compressed by
+the aspect, so it is not perpendicular on screen and its length varies with
+orientation.
+
+**So the producer cannot compute the miter from world coordinates.** Phase 2's
+own rule sends this to `architect` rather than to an approximation, and it is not
+a small amendment: every fix — passing the neighbour direction, passing the
+bisector, handing the producer the aspect — changes what `SegmentInstance`
+carries, which is [ADR-0158]'s Decision.
+
+**A second finding, larger than this plan and outside it.** The measurement above
+is of the *existing* stroke, with no miter anywhere in the tree. A vertical
+stroke is **1.78x thicker on screen than a horizontal one at 1920x1080**, in
+every line scene, today. Two shipped doc comments state the opposite —
+`renderer.rs`'s *"so the perpendicular offset is a uniform on-screen thickness
+whatever the segment's orientation"* and `SegmentInstance::width`'s *"uniform on
+screen after the aspect divide"*. Every line golden was blessed against the
+behaviour rather than the claim. **This is not Plan 0149's to fix** — it predates
+it, it is not what backlog 0134 reported, and correcting it would move every line
+golden for a second unrelated reason. Filed for `architect` as its own entry.
+
+The scratch probe that produced the table was removed rather than committed; it
+is reproducible from the two orientations and four targets above.
 
 ### Close triggers
 

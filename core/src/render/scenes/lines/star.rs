@@ -775,7 +775,7 @@ impl Motif {
     /// Whether this motif is the closed [`Scallop`](Motif::Scallop) boundary,
     /// whose ring is **one chain of `count` lobes** rather than `count` copies
     /// of anything.
-    fn is_scallop(self) -> bool {
+    pub(crate) fn is_scallop(self) -> bool {
         matches!(self, Motif::Scallop)
     }
 
@@ -1076,8 +1076,11 @@ pub const MIN_SCALLOP_LOBES: u32 = 3;
 fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
     let apex = base + depth;
     let denom = 2.0 * (apex - base * half_span.cos());
-    // `apex - base * cos` is positive for every depth a preset can reach
-    // (`ring_scale` clamps at zero), so this only guards the exactly-flat case.
+    // `apex - base * cos` is positive for every depth a preset can reach, so
+    // this only guards the exactly-flat case. What makes that true is the
+    // load-time refusal of a negative structural ring `scale` on a scallop
+    // (`preset::schema`) — **not** the `ring_scale` clamp, which is the bindable
+    // per-frame multiplier and a different quantity.
     let centre = if denom.abs() > f32::EPSILON {
         (apex * apex - base * base) / denom
     } else {
@@ -1093,7 +1096,10 @@ fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
         start,
         // The lobe runs the short way from one end to the other, which is
         // outward past the apex: the two ends straddle the axis and the sweep
-        // between them is under half a turn for any depth.
+        // between them is under half a turn for **every depth this can be
+        // called with**, which is what the load-time refusal above buys. At a
+        // negative depth past `-R * (cos(s) + sin(s) - 1)` the ends cross over
+        // and this sweep runs the long way instead.
         sweep: (end - start).rem_euclid(TAU),
     }
 }
