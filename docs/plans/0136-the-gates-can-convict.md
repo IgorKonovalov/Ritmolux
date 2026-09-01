@@ -372,8 +372,8 @@ flowchart TB
 | 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
 | 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
 | 3 — The row gate reads a row's shape | dev | done | `8986147` |
-| 4 — Backlog references stop using fragments | dev | done | committed with this row |
-| 5 — A probe path is checked against the repository | dev | not started | |
+| 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
+| 5 — A probe path is checked against the repository | dev | done | committed with this row |
 | 6 — The figure gate stops convicting untracked files | dev | not started | |
 | 7 — The gates judge the code this project wrote | dev | not started | |
 | 8 — Two entries whose premise the store revocation falsified | dev | not started | |
@@ -405,6 +405,11 @@ flowchart TB
   missing file. No such definition existed in the tree, which is why it was green. Seeding class 4
   in both link forms produced two findings on one line; the definition target now drops its
   fragment before the existence check, so both forms answer the same question.
+- **`scripts/check-backlog-claims.mjs` held a NUL byte on `main`**, in the advisory's dedup key
+  (`${probe.entry}` NUL `${probe.path}`, where a space was meant). git classified the file as
+  binary, so `git diff` printed nothing for it and `grep` skipped it. Replaced with a space in this
+  phase's commit, since the file is Phase 5's own and the defect makes the gate undiffable. Not
+  found by a gate - found by `grep` refusing to search it.
 - **Entry 0104's own probe goes red on delivery**, from Phase 1 onward:
   `absent: self-test in: scripts/check-index-rows.mjs` now matches. Archiving a discharged entry is
   an `architect` act at the close, and the claim gate's own failure text says repairing a falsified

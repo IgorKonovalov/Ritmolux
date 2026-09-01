@@ -45,9 +45,17 @@
 //   `present: <regex> in: <path>`    some line under <path> matches <regex>
 //   `unprobeable: <why>`             this claim cannot be reduced; say why
 //
-// <path> is a file or a directory, resolved from the root. <regex> is JS regex
-// source, so `.` needs escaping when a literal dot is meant: `G = C / 0\.85`
-// matches the rule and `G = C / 0.85` also matches `0-85`.
+// <path> is a file or a directory, resolved from the root, and it must be
+// TRACKED — a path that exists only in a working tree is reported, because the
+// two local call sites read ignored files and the CI one cannot, so such a probe
+// passes wherever the fix would be cheap and fails only after the push.
+//
+// <regex> is JS regex source, so `.` needs escaping when a literal dot is meant:
+// `G = C / 0\.85` matches the rule and `G = C / 0.85` also matches `0-85`. A RUN
+// OF SPACES IS LITERAL TOO and survives into the match — a bullet that wraps
+// across source lines has its newline and continuation indent absorbed to one
+// space, and nothing else in the span is touched. `\s{2,}` still reads better
+// than a typed run, because a run is invisible in a rendered page.
 //
 // WHY THIS PARSES A GRAMMAR INSTEAD OF RUNNING A SHELL: the natural spelling of
 // a probe is a backticked `grep -rn ... core/src/` and re-running it would be
@@ -140,10 +148,53 @@ function firstMatch(pathAbs, re, root) {
 }
 
 /**
+ * Which of `paths` the repository tracks, as a Set of the paths themselves.
+ *
+ * ONE INVOCATION FOR THE WHOLE PROBE SET, the way the staleness advisory batches
+ * its `git log`. `git ls-files -- <path>` lists the tracked FILES under a path
+ * rather than echoing the path, which is what makes it work for a directory —
+ * probe paths are as often `core/src` as a single file — so a path counts as
+ * tracked when some listed file is it or sits under it.
+ *
+ * Output is relative to the cwd git is run in, which is the scan root, which is
+ * what the probe paths are relative to as well. `-z` because a path may hold a
+ * character git would otherwise quote.
+ *
+ * Returns null when git cannot answer at all: not a repo, no git on PATH. A
+ * shallow clone is NOT such a case — the index is complete there, which is
+ * exactly why this check works on the CI runner where the staleness half cannot.
+ */
+function trackedPaths(paths, root) {
+  if (paths.length === 0) return new Set();
+  let listed;
+  try {
+    const out = execFileSync("git", ["ls-files", "-z", "--", ...paths], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    listed = out.split("\0").filter(Boolean);
+  } catch {
+    return null;
+  }
+
+  const tracked = new Set();
+  for (const path of paths) {
+    const norm = path.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (listed.some((f) => f === norm || f.startsWith(`${norm}/`))) tracked.add(path);
+  }
+  return tracked;
+}
+
+/**
  * Resolve one parsed probe against a tree.
  * Returns `{ ok }` or `{ ok: false, detail }` — never throws for author error.
+ *
+ * `tracked` is the set from `trackedPaths`, or null when git could not answer;
+ * null skips the trackedness question rather than failing every entry on it.
  */
-function runProbe(probe, root) {
+function runProbe(probe, root, tracked = null) {
   if (probe.verb === "unprobeable") return { ok: true };
 
   let re;
@@ -156,6 +207,22 @@ function runProbe(probe, root) {
   const pathAbs = resolve(root, probe.path);
   if (!existsSync(pathAbs)) {
     return { ok: false, detail: `probe path does not exist: ${probe.path}` };
+  }
+  // EXISTING IS NOT THE SAME QUESTION AS TRACKED, and the gap is one-directional:
+  // the two local call sites read a full working tree, ignored files included,
+  // and the CI `links` job reads a checkout that by definition holds none. So a
+  // probe into `renders/`, `target/` or `spike/` passes wherever the fix would
+  // still be cheap and fails only after the push. The message matters as much as
+  // the check — a CI reader was told "does not exist" about a file sitting in
+  // front of them in their own tree.
+  if (tracked !== null && !tracked.has(probe.path)) {
+    return {
+      ok: false,
+      detail:
+        `probe path is not tracked: ${probe.path} — it exists in this working tree and in ` +
+        "no checkout, so this probe can only ever fail on CI. Take the " +
+        "`unprobeable:` opt-out, or point the probe at something committed",
+    };
   }
 
   const hit = firstMatch(pathAbs, re, root);
@@ -221,8 +288,17 @@ function readBullets(root) {
       block.push(next);
     }
 
+    // THE WRAP IS ABSORBED AND NOTHING ELSE IS. A markdown bullet may break
+    // across source lines mid-span, so a newline and the continuation indent
+    // behind it become one space. A run of spaces the AUTHOR typed inside the
+    // pattern is left exactly as written: collapsing every whitespace run
+    // silently rewrote any probe whose regex held two or more consecutive
+    // spaces into a different regex, one matching single-spaced text the tree
+    // does not contain. It did not error and it did not warn — it reported `no
+    // match` and read exactly like decay, so a probe about a run of spaces
+    // could never fire. Both of entry 0168's were dead on arrival that way.
     const spans = [...block.join("\n").matchAll(/`([^`]+)`/g)]
-      .map((m) => m[1].replace(/\s+/g, " ").trim())
+      .map((m) => m[1].replace(/\r?\n[ \t]*/g, " ").trim())
       .filter((s) => VERB.test(s));
 
     bullets.push({ entry: entry ?? "(outside any entry)", line: i + 1, stamped: stamp[1], spans });
@@ -233,7 +309,11 @@ function readBullets(root) {
 
 /**
  * Parse and resolve every probe in a tree.
- * Returns `{ breaks, probes, unprobeable, entries }`.
+ * Returns `{ breaks, probes, unprobeable, entries, untracked }`.
+ *
+ * Parsing and resolving are two passes rather than one because the trackedness
+ * question is asked of git ONCE for the whole probe set, and the set is not
+ * known until the parse has finished.
  */
 function check(root) {
   const parsed = readBullets(root);
@@ -243,6 +323,7 @@ function check(root) {
   const probes = [];
   const unprobeable = [];
   const stamped = new Set();
+  const pending = [];
 
   for (const bullet of parsed.bullets) {
     if (bullet.entry) stamped.add(bullet.entry);
@@ -267,19 +348,28 @@ function check(root) {
         continue;
       }
 
-      const probe = {
-        entry: bullet.entry,
-        line: bullet.line,
-        verb,
-        pattern: split[1],
-        path: split[2],
-        stamped: bullet.stamped,
-        source: span,
-      };
-      const result = runProbe(probe, root);
-      if (result.ok) probes.push(probe);
-      else breaks.push(`${at} \`${span}\` — ${result.detail}`);
+      pending.push({
+        at,
+        span,
+        probe: {
+          entry: bullet.entry,
+          line: bullet.line,
+          verb,
+          pattern: split[1],
+          path: split[2],
+          stamped: bullet.stamped,
+          source: span,
+        },
+      });
     }
+  }
+
+  const tracked = trackedPaths([...new Set(pending.map((p) => p.probe.path))], root);
+
+  for (const { at, span, probe } of pending) {
+    const result = runProbe(probe, root, tracked);
+    if (result.ok) probes.push(probe);
+    else breaks.push(`${at} \`${span}\` — ${result.detail}`);
   }
 
   for (const heading of parsed.headings) {
@@ -292,7 +382,13 @@ function check(root) {
     );
   }
 
-  return { breaks, probes, unprobeable, entries: new Set(parsed.headings.map((h) => h.entry)) };
+  return {
+    breaks,
+    probes,
+    unprobeable,
+    entries: new Set(parsed.headings.map((h) => h.entry)),
+    tracked,
+  };
 }
 
 // --- the advisory ------------------------------------------------------------
@@ -368,7 +464,7 @@ function advisory(probes, unprobeable, root) {
     if (!seen.has(probe.path)) seen.set(probe.path, lastTouched(probe.path, root));
     const touched = seen.get(probe.path);
     if (!touched || touched <= probe.stamped) continue;
-    const key = `${probe.entry} ${probe.path}`;
+    const key = `${probe.entry} ${probe.path}`;
     if (!moved.has(key)) moved.set(key, { ...probe, touched });
   }
   return { moved: [...moved.values()], shallow: false, unprobeable };
@@ -450,8 +546,37 @@ function selfTest() {
   );
   record(
     "fixture: nothing else reported",
-    f.breaks.length === 5 && f.probes.length === 2 && f.entries.size === 7,
+    f.breaks.length === 5 && f.probes.length === 4 && f.entries.size === 7,
     `${f.breaks.length} breaks, ${f.probes.length} holding probes, ${f.entries.size} live entries`,
+  );
+  record(
+    "fixture: a probe holding a run of spaces FIRES",
+    f.probes.some((p) => /SEEDED_SPACE_RUN {2,}/.test(p.pattern)),
+    "the pattern must reach runProbe with its run intact, or it can never match",
+  );
+  record(
+    "fixture: a probe wrapped across source lines still resolves",
+    f.probes.some((p) => p.pattern === "SEEDED_PRESENT_RULE applies to every preset"),
+    "the wrap must still be absorbed to a single space — that is what the collapse was for",
+  );
+
+  // The trackedness check, asserted against the real repository because that is
+  // the only tree where "tracked" and "present on disk" can be made to disagree.
+  // `target` is gitignored in every checkout and `git ls-files` returns nothing
+  // for it whether or not a build has created it, which is what makes it a
+  // stable negative; this script itself is the positive.
+  const probed = trackedPaths(["scripts/check-backlog-claims.mjs", "target"], REPO_DEFAULT);
+  record(
+    "trackedness: this script is tracked, `target` is not",
+    probed !== null &&
+      probed.has("scripts/check-backlog-claims.mjs") &&
+      !probed.has("target"),
+    probed === null ? "git could not answer" : `tracked: ${[...probed].join(", ") || "nothing"}`,
+  );
+  record(
+    "trackedness: a directory answers for the files under it",
+    probed !== null && trackedPaths(["scripts"], REPO_DEFAULT)?.has("scripts") === true,
+    "probe paths are as often a directory as a file",
   );
 
   const zeroEightyTwo = { verb: "absent", pattern: "sustained_miss", path: "core/src" };

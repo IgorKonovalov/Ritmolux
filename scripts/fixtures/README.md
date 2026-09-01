@@ -34,16 +34,42 @@ above the `Open entries` marker, whose probe is deliberately violated and must n
 | 0003 | a malformed probe (unclosed regex group) | reported as malformed, **never a crash and never a silent skip** |
 | 0004 | a verification bullet with no probe and no opt-out | reported |
 | 0005 | a valid `unprobeable:` opt-out | **not** reported; rostered in the summary |
-| 0006 | two probes that still hold | not reported |
+| 0006 | four probes that still hold, two of them about whitespace | not reported |
 | 0007 | a live entry with **no verification bullet at all** | reported at the heading's own line |
+
+Two of 0006's four are the pair that pins how a span is read, and they pull in opposite directions
+so neither can be satisfied by deleting the other:
+
+| Probe | Asserts | Dies to |
+|-------|---------|---------|
+| `present: SEEDED_SPACE_RUN     is separated in: presets/README.md` | a run of spaces the author typed reaches the matcher intact | collapsing every whitespace run — which rewrites the pattern into one matching single-spaced text the tree does not hold, reports `no match`, and reads exactly like decay |
+| a span that **wraps across two source lines** mid-pattern | the newline and its continuation indent still become one space | leaving whitespace alone entirely, which is why the collapse was written |
+
+Restoring the collapse takes this fixture from five breaks to **six**, and the sixth is the
+space-run probe reported as `no match` with the run silently gone from the message. That is the
+whole of the defect: a probe that satisfies the letter of ADR-0108 and can never fire.
 
 0004 and 0007 are the two halves of ADR-0108's Decision sentence and they fail differently: 0004
 has a bullet with nothing runnable in it, 0007 has no bullet, which a check built out of the
 bullets it finds cannot see. 0007 is last in the fixture on purpose — its absence runs to the end
 of the file, the one position a heading-driven check could get wrong.
 
-The same seven run inside `node scripts/check-backlog-claims.mjs --self-test`, together with the
-non-vacuity assertion that is pinned to the real repository rather than to this tree.
+The same seven run inside `node scripts/check-backlog-claims.mjs --self-test` (13 of 13), together
+with three assertions pinned to the **real repository** rather than to this tree, because that is
+the only place they mean anything:
+
+- the non-vacuity one, reconstructing entry 0082's own claim and requiring it to **fail**;
+- that this script is tracked and `target` is not — the trackedness check, which cannot be seeded
+  here because an untracked file is by definition absent from the fixture;
+- that a **directory** answers for the files under it, since probe paths are as often `core/src`
+  as a single file.
+
+**Trackedness is a different question from existence**, and the gap runs one way: the pre-push
+hook and the close ceremony read a full working tree with ignored files in it, and the CI `links`
+job reads a checkout that by definition holds none. A probe into `renders/`, `target/` or `spike/`
+therefore passed at both local call sites and could only ever fail on the runner, after the push.
+Seeded by hand to confirm the repair — a probe naming a file under `renders/` reports *"probe path
+is not tracked"* locally, where before it reported nothing at all.
 
 ## `doc-links/` — for `check-doc-links.mjs`
 
