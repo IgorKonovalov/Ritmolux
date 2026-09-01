@@ -1057,9 +1057,6 @@ fn arc_diff(a: &[f32], b: &[f32]) -> (f32, u8) {
     )
 }
 
-/// The golden suite's tolerances, quoted rather than re-invented — Phase 1's
-/// done-when is "within the golden suite's own drift tolerance", and these are
-/// the two numbers `core/tests/golden.rs` holds every baseline to.
 /// The `softness` at which the profile is the **pre-Plan-0114 fragment, term
 /// for term** — `g = u²`, the shape every closed form in this file is written
 /// against.
@@ -1071,6 +1068,13 @@ fn arc_diff(a: &[f32], b: &[f32]) -> (f32, u8) {
 /// taste.
 const SOFT_PROFILE: f32 = 1.0;
 
+/// The golden suite's tolerances, quoted rather than re-invented — the arc
+/// comparison's done-when is "within the golden suite's own drift tolerance",
+/// and these are the two numbers `core/tests/golden.rs` holds every baseline to.
+///
+/// Per ADR-0071 they are a *quoted* bound rather than a measurement of their own:
+/// what makes them defensible here is that they are the same two constants, not
+/// that this comparison was tuned until it passed under them.
 const ARC_MEAN_TOL: f32 = 0.02;
 const ARC_OUTLIER_TOL: u8 = 48;
 
