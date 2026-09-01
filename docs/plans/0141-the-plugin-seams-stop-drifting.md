@@ -1,6 +1,6 @@
 # 0141 — The plugin's seams stop drifting
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev
 > **Related ADRs:** none — three mechanical repairs, no rejected alternative worth recording.
@@ -178,3 +178,25 @@ flowchart TB
 - **It does not move the NFR soft cap.** Phase 2 corrects what is claimed about the headroom; whether
   ~10 MB is still the right cap is a different question and nothing here argues it.
 - **It does not repair whatever Phase 3 finds.** An attributable and unwanted 400 KB is a new entry.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/lmv-plan-0141` on `plan-0141-plugin-seams`, branched from `main` at `f2b37d5`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The preset menu selects by name | dev | done | committed with this row |
+| 2 — The size table becomes a dated series | dev | not started | — |
+| 3 — Attribute the 400 KB | dev | not started | — |
+| 4 — The recipe reads the SDK's own version | dev | not started | — |
+
+### Notes
+
+- Phase 1's done-when reads as a live check ("a menu click selects the preset whose name was
+  displayed"), which needs foobar2000 running with the component installed. Verified instead by
+  build and by call-site sweep: `lmv_select_preset` has exactly two call sites, one of them inside
+  `select_preset_named` against a snapshot that helper read itself, and the menu path now routes
+  through the helper. The live click is carried, not run.
