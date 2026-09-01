@@ -306,7 +306,7 @@ ffmpeg -hide_banner -nostats -y -f yuv4mpegpipe -i pipe:0 -i track.wav \
   -map 0:v:0 -map 1:a:0 \
   -c:v libx264 -preset medium -crf 18 \
   -pix_fmt yuv420p -color_range pc -colorspace bt709 -color_primaries bt709 \
-  -color_trc bt709 \
+  -color_trc bt709 -x264-params colorprim=bt709:transfer=bt709 \
   -c:a aac -b:a 192k -shortest track.mp4
 ```
 
@@ -342,6 +342,25 @@ likely to ship wrong — an untagged file is one the player expands from studio
 swing and shows washed out. `-color_trc bt709` rather than `iec61966-2-1`: the
 tap hands over sRGB-encoded samples and the two are close, but every player
 assumes the former and some ignore the latter outright.
+
+**Two of those four need saying twice, and that is why `-x264-params` is on the
+line.** The `-colorspace` flag is honoured by the libx264 path; `-color_primaries`
+and `-color_trc` are dropped by it. A file written with all three reads back
+
+```
+color_range=pc  color_space=bt709  color_primaries=unknown  color_transfer=unknown
+```
+
+from `ffprobe -v error -select_streams v:0 -show_entries stream=color_range,\
+color_space,color_primaries,color_transfer`. It is not a reporting convention:
+asking the same command for `bt2020`/`smpte2084` moves the matrix and leaves the
+other two `unknown`, so the loss is in the encoder wrapper. Setting them on x264
+directly lands all four, and the flags stay beside it — they carry the same
+values and are what a build that honours them reads. Nothing about the encoded
+picture changes; this is metadata. `the_four_colour_tags_survive_into_the_container`
+in `standalone/tests/shot_cli.rs` reads them back off a produced file wherever
+`ffmpeg` and a GPU are both present, so the claim above is checked rather than
+asserted.
 
 **A dead encoder reports the encoder's failure, not our broken pipe.** The child's
 stderr is drained on a thread — echoed line by line as it arrives, and kept — so

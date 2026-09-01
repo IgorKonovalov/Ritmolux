@@ -276,8 +276,8 @@ $ComponentWarnBytes = 11324620
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `--render` is held to spending nothing | dev | done | d527820 |
-| 2 — `shot`'s help cannot fall behind its parser | dev | committed with this row | |
-| 3 — What the container actually carries | dev | not started | |
+| 2 — `shot`'s help cannot fall behind its parser | dev | done | 277e372 |
+| 3 — What the container actually carries | dev | committed with this row | |
 | 4 — The recipe reads its own output's length | dev | not started | |
 | 5 — The second bisect | dev | not started | |
 

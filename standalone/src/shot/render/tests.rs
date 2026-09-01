@@ -483,11 +483,18 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
 
     // The colour declaration, which is the half most likely to ship wrong: an
     // untagged file gets expanded from studio swing and shows washed out.
+    //
+    // These assert the *command line*, which is all this pure function can be
+    // held to, and asserting only this is what let two of the four tags be
+    // dropped between here and the file. `the_four_colour_tags_survive_into_the
+    // _container` in `standalone/tests/shot_cli.rs` is the assertion on the
+    // artifact, and it is the one that convicts.
     for tag in [
         "-color_range pc",
         "-colorspace bt709",
         "-color_primaries bt709",
         "-color_trc bt709",
+        "-x264-params colorprim=bt709:transfer=bt709",
     ] {
         assert!(line.contains(tag), "missing `{tag}` in: {line}");
     }

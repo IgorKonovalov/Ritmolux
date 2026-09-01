@@ -1467,6 +1467,93 @@ fn one_command_over_a_wav_produces_an_mp4_with_audio() {
     }
 }
 
+/// **The four colour tags, read back off the artifact rather than off the
+/// command line.**
+///
+/// `docs/capturing.md` calls these *"the half most likely to ship wrong"* — an
+/// untagged file is one a player expands from studio swing and shows washed
+/// out — and until this assertion existed the only check was that the flags
+/// appeared in the generated arguments. Two of them did not survive: a file
+/// written with `-colorspace bt709 -color_primaries bt709 -color_trc bt709`
+/// reads back `bt709/unknown/unknown`, because the libx264 path honours the
+/// first and drops the other two. They are set on x264 directly as well, and
+/// this is what holds that.
+///
+/// Gated on `ffmpeg_on_path()` and on an adapter, so it is a no-op where either
+/// is missing — which is most CI runners, and is why it cannot be the only
+/// guard. The unit test over `ffmpeg_args` is the half that runs everywhere;
+/// this is the half that convicts.
+#[test]
+fn the_four_colour_tags_survive_into_the_container() {
+    if !ffmpeg_on_path() {
+        return;
+    }
+    let clip = render_clip("colour-tags.wav", 48_000, 0.5);
+    let mp4 = scratch("colour-tags").join("tagged.mp4");
+    let _ = std::fs::remove_file(&mp4);
+
+    let out = run(&[
+        "--preset-file",
+        SHIPPED_PRESET_FILE,
+        "--render",
+        &clip.to_string_lossy(),
+        "--fps",
+        "30",
+        "--size",
+        "64x48",
+        "--ffmpeg",
+        "ffmpeg",
+        "--out",
+        &mp4.to_string_lossy(),
+    ]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "the encode failed\nstderr: {}",
+        stderr(&out)
+    );
+
+    let probe = Command::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=color_range,color_space,color_primaries,color_transfer",
+            "-of",
+            "default=noprint_wrappers=1",
+        ])
+        .arg(&mp4)
+        .output();
+    let probe = match probe {
+        Ok(p) if p.status.success() => String::from_utf8_lossy(&p.stdout).into_owned(),
+        _ => {
+            eprintln!("skipped: `ffprobe` did not run, so the container was not read back");
+            return;
+        }
+    };
+    // `unknown` is what a dropped tag reads as, and naming it separately from the
+    // value keeps the failure legible: a tag that arrives with the *wrong* value
+    // is a different defect from one that never arrived.
+    for (key, value) in [
+        ("color_range", "pc"),
+        ("color_space", "bt709"),
+        ("color_primaries", "bt709"),
+        ("color_transfer", "bt709"),
+    ] {
+        let line = format!("{key}={value}");
+        assert!(
+            probe.contains(&line),
+            "the container does not carry `{line}` — a tag on the command line \
+             that does not reach the file is a guarantee stated and not held\n\
+             ffprobe:\n{probe}"
+        );
+    }
+}
+
 /// **Phase 2's second done-when**: an encoder that dies mid-render makes `shot`
 /// exit non-zero **with the encoder's own message**.
 ///

@@ -446,6 +446,16 @@ pub fn render_frames(
 ///   `bt709` transfer rather than `iec61966-2-1`: the tap hands over sRGB-encoded
 ///   samples and the two are close, but every player assumes the former and some
 ///   ignore the latter outright.
+/// - `-x264-params colorprim=bt709:transfer=bt709` — **the two tags that do not
+///   otherwise reach the file.** `-colorspace` is honoured by the libx264 path
+///   and `-color_primaries` / `-color_trc` are dropped by it: a file written with
+///   all three reads back `bt709/unknown/unknown` from `ffprobe -show_streams`,
+///   and asking for `bt2020`/`smpte2084` moves the matrix while leaving the other
+///   two unknown — so the loss is in the encoder wrapper, not in the container or
+///   in what `ffprobe` reports. Setting them on x264 directly lands all four. The
+///   flags above stay: they carry the same values, they are what a build that
+///   honours them reads, and the range tag comes from that half. This is
+///   metadata only — no encoded sample changes.
 /// - `-shortest` — the trailing partial frame makes the video a fraction longer
 ///   than the audio, and they should end together.
 /// - `-crf` — the one argument a caller may move, because it is the only one that
@@ -483,6 +493,8 @@ pub fn ffmpeg_args(clip: &std::path::Path, out: &std::path::Path, crf: u8) -> Ve
             "bt709",
             "-color_trc",
             "bt709",
+            "-x264-params",
+            "colorprim=bt709:transfer=bt709",
             "-c:a",
             "aac",
             "-b:a",
