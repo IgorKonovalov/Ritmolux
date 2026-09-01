@@ -1,6 +1,6 @@
 # 0148 — The shipped artifacts carry their own guarantees
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
@@ -271,11 +271,11 @@ $ComponentWarnBytes = 11324620
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, worktree `WORK/lmv-plan-0148`, forked from `main` at `fd54b43`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--render` is held to spending nothing | dev | not started | |
+| 1 — `--render` is held to spending nothing | dev | committed with this row | |
 | 2 — `shot`'s help cannot fall behind its parser | dev | not started | |
 | 3 — What the container actually carries | dev | not started | |
 | 4 — The recipe reads its own output's length | dev | not started | |
