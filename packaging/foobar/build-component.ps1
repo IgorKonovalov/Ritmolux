@@ -1,8 +1,8 @@
 # Build, assemble, stamp, package and VERIFY the foobar2000 component
 # (Plan 0102 Phase 2, ADR-0115).
 #
-# Produces target/dist/light-music-visualizer-v<version>-foobar2000-component.zip,
-# whose single top-level folder holds foo_lmv.fb2k-component and
+# Produces target/dist/ritmolux-v<version>-foobar2000-component.zip,
+# whose single top-level folder holds foo_ritmolux.fb2k-component and
 # READ-ME-FIRST.txt.
 #
 # This script is checked in rather than inlined into the release workflow so
@@ -18,7 +18,7 @@
 #
 #   Usage:  packaging\foobar\build-component.ps1 [-SkipBuild] [-WarnBytes <n>]
 #
-#   -SkipBuild   Reuse plugin-foobar/build/foo_lmv.dll already on disk. For
+#   -SkipBuild   Reuse plugin-foobar/build/foo_ritmolux.dll already on disk. For
 #                iterating on the package layout without paying for a
 #                lto = "fat" rebuild of the core; never used by CI.
 #   -WarnBytes   Lower the size warning's threshold. Its default sits about
@@ -50,18 +50,18 @@ if ($WarnBytes -le 0) { $WarnBytes = $ComponentWarnBytes }
 
 $script:here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo = Split-Path -Parent (Split-Path -Parent $script:here)
-. (Join-Path $script:here "lmv-version.ps1")
+. (Join-Path $script:here "rlx-version.ps1")
 . (Join-Path $script:here "sdk-pin.ps1")
 
 $pluginDir = Join-Path $repo "plugin-foobar"
 $sdkDir = Join-Path $pluginDir "sdk"
-$dll = Join-Path $pluginDir "build\foo_lmv.dll"
+$dll = Join-Path $pluginDir "build\foo_ritmolux.dll"
 
-# The component's filename is contractual, not cosmetic: foo_lmv.cpp declares
-# VALIDATE_COMPONENT_FILENAME("foo_lmv.dll") and foobar2000 refuses to load a
+# The component's filename is contractual, not cosmetic: foo_ritmolux.cpp declares
+# VALIDATE_COMPONENT_FILENAME("foo_ritmolux.dll") and foobar2000 refuses to load a
 # component whose DLL was renamed.
-$DllName = "foo_lmv.dll"
-$ComponentName = "foo_lmv.fb2k-component"
+$DllName = "foo_ritmolux.dll"
+$ComponentName = "foo_ritmolux.fb2k-component"
 
 function Die($message) { Write-Host ""; throw "build-component.ps1: FAILED: $message" }
 function Step($message) { Write-Host ""; Write-Host "==> $message" }
@@ -76,7 +76,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
 # Compress-Archive and .NET Framework's ZipFile.CreateFromDirectory both emit
 # BACKSLASH separators on Windows PowerShell 5.1 and forward slashes on pwsh 7 -
 # and the zip format specifies forward slashes. A component archive whose entry
-# reads `x64\foo_lmv.dll` is one foobar2000 build away from installing nothing,
+# reads `x64\foo_ritmolux.dll` is one foobar2000 build away from installing nothing,
 # and it would pass a check that read the same archive back through the same
 # broken API. Naming every entry by hand removes the variable entirely.
 function New-ZipWithEntries {
@@ -315,7 +315,7 @@ if ($dllBytes -gt $WarnBytes) {
 # --- Stamp: the version, from the one place that defines it (ADR-0025) --------
 
 $version = Get-LmvWorkspaceVersion -RepoRoot $repo
-$stageName = "light-music-visualizer-v$version-foobar2000-component"
+$stageName = "ritmolux-v$version-foobar2000-component"
 $outDir = Join-Path $repo "target\dist"
 $stage = Join-Path $outDir $stageName
 $zipPath = Join-Path $outDir "$stageName.zip"
@@ -399,14 +399,14 @@ Check "$DllName exports foobar2000_get_interface"
 # 4. The declared version. DECLARE_COMPONENT_VERSION stores it as a literal in
 #    the image, so the version foobar2000 will show in its component list is
 #    readable here - which is the only way to check that the build really did
-#    substitute it rather than fall through to foo_lmv.cpp's #ifndef default.
-if (-not $pe.Text.Contains("Light Music Visualizer")) {
+#    substitute it rather than fall through to foo_ritmolux.cpp's #ifndef default.
+if (-not $pe.Text.Contains("Ritmolux")) {
     Die "$DllName does not carry its DECLARE_COMPONENT_VERSION name string"
 }
 if ($pe.Text.Contains("0.0.0-dev")) {
     Die @"
-$DllName carries the "0.0.0-dev" fallback from foo_lmv.cpp's #ifndef, so the
-version was NOT substituted: build/foo_lmv_version.h was missing or not on the
+$DllName carries the "0.0.0-dev" fallback from foo_ritmolux.cpp's #ifndef, so the
+version was NOT substituted: build/foo_ritmolux_version.h was missing or not on the
 include path. The component would ship claiming a version it is not.
 "@
 }

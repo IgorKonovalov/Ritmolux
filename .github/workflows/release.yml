@@ -91,7 +91,7 @@ jobs:
               throw "could not parse [workspace.package] version from Cargo.toml"
           }
           $version = $Matches[1]
-          $name = "light-music-visualizer-v$version-windows-x64"
+          $name = "ritmolux-v$version-windows-x64"
           $dist = "target/dist"
           $stage = "$dist/$name"
           $zip = "$dist/$name.zip"
@@ -99,12 +99,12 @@ jobs:
 
           if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
           New-Item -ItemType Directory -Force "$stage/presets" | Out-Null
-          Copy-Item target/release/lmv.exe $stage
+          Copy-Item target/release/ritmolux.exe $stage
           # *.toml only - presets/README.md is the authoring reference, not
           # preset content, and the zip is for a tester rather than an author.
           Copy-Item presets/*.toml "$stage/presets/"
           Copy-Item packaging/windows/READ-ME-FIRST.md "$stage/READ-ME-FIRST.txt"
-          # Spout is Simplified BSD and is STATICALLY linked into lmv.exe, so
+          # Spout is Simplified BSD and is STATICALLY linked into ritmolux.exe, so
           # clause 2 binds this archive: a binary redistribution must reproduce
           # the notice in the materials shipped with it. No SpoutDX.dll travels
           # (build.rs links SpoutDX_static.lib) - the notice does.
@@ -128,12 +128,12 @@ jobs:
           # host we happened to try it on is not a check.
           $entries = $entries | ForEach-Object { $_.Replace('\', '/') }
 
-          foreach ($required in "$name/lmv.exe", "$name/READ-ME-FIRST.txt", "$name/spout-license.txt") {
+          foreach ($required in "$name/ritmolux.exe", "$name/READ-ME-FIRST.txt", "$name/spout-license.txt") {
               if ($entries -notcontains $required) {
                   throw "zip is missing $required"
               }
           }
-          Write-Host "    ok: zip top level holds lmv.exe, READ-ME-FIRST.txt and spout-license.txt"
+          Write-Host "    ok: zip top level holds ritmolux.exe, READ-ME-FIRST.txt and spout-license.txt"
 
           $repoCount = (Get-ChildItem presets/*.toml).Count
           $zipCount = ($entries | Where-Object { $_ -like "$name/presets/*.toml" }).Count
@@ -237,7 +237,7 @@ jobs:
           - **Windows** (x64): unsigned, so SmartScreen warns once - More info,
             then Run anyway.
           - **foobar2000 component** (x64 only, foobar2000 v2): unzip, then
-            install foo_lmv.fb2k-component from File - Preferences - Components.
+            install foo_ritmolux.fb2k-component from File - Preferences - Components.
             It reads what foobar2000 is already decoding, so unlike the
             standalone app there is no audio capture to permit.
 

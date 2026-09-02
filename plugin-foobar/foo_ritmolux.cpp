@@ -1,4 +1,4 @@
-// foo_lmv — foobar2000 visualization component for light-music-visualizer.
+// foo_ritmolux — foobar2000 visualization component for light-music-visualizer.
 //
 // A thin shim per ADR-0001: pulls PCM from foobar's visualisation_stream,
 // forwards it across rlx-core's C ABI, and hosts the core's wgpu output in a
@@ -31,29 +31,29 @@
 #include "rlx_core.h"
 
 // Component version, single-sourced from the workspace Cargo version (ADR-0025).
-// build.ps1 generates foo_lmv_version.h into build/ (on the include path) from
+// build.ps1 generates foo_ritmolux_version.h into build/ (on the include path) from
 // root Cargo.toml's [workspace.package] version; the fallback keeps a compile
 // outside build.ps1 (editor tooling, a stray direct cl) building as 0.0.0-dev.
-#if __has_include("foo_lmv_version.h")
-#  include "foo_lmv_version.h"
+#if __has_include("foo_ritmolux_version.h")
+#  include "foo_ritmolux_version.h"
 #endif
-#ifndef FOO_LMV_VERSION
-#  define FOO_LMV_VERSION "0.0.0-dev"
+#ifndef FOO_RITMOLUX_VERSION
+#  define FOO_RITMOLUX_VERSION "0.0.0-dev"
 #endif
 
 // foobar2000 x64 uses 64-bit audio_sample; rlx-core takes f32, so chunks are
 // converted through a fixed buffer on the way in (see push_converted).
 
 DECLARE_COMPONENT_VERSION(
-    "Light Music Visualizer", FOO_LMV_VERSION,
-    "Light Music Visualizer\n"
+    "Ritmolux", FOO_RITMOLUX_VERSION,
+    "Ritmolux\n"
     "Audio-reactive scenes - fragment fields, particle swarm, line geometry "
     "(curves / L-systems / star patterns), reaction-diffusion and attractor "
     "flows - rendered by the shared rlx-core Rust engine (wgpu).\n"
     "Dockable as a Default UI panel or opened from the View menu. "
     "Space cycles scenes; right-click to pick one by name, reload the preset "
     "folder, or open it.");
-VALIDATE_COMPONENT_FILENAME("foo_lmv.dll");
+VALIDATE_COMPONENT_FILENAME("foo_ritmolux.dll");
 
 namespace {
 
@@ -993,7 +993,7 @@ public:
         // functions are stable, so a newer core is fine - require >= built ABI.
         g_abi_ok = (core_abi >= RLX_ABI_VERSION);
         if (!g_abi_ok) {
-            console::printf("foo_lmv: rlx-core ABI too old (core reports %u, "
+            console::printf("foo_ritmolux: rlx-core ABI too old (core reports %u, "
                             "shim needs >= %u); preset loading and diagnostics "
                             "disabled",
                             static_cast<unsigned>(core_abi),

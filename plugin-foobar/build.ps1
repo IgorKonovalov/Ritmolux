@@ -1,8 +1,8 @@
-# Builds foo_lmv.dll (x64 Release): the foobar2000 component that wraps
+# Builds foo_ritmolux.dll (x64 Release): the foobar2000 component that wraps
 # rlx-core's C ABI. Requires VS Build Tools 2022 (C++ workload), rustup, and
 # the foobar2000 SDK unpacked at plugin-foobar/sdk (see README.md).
 #
-#   .\build.ps1            # build plugin-foobar/build/foo_lmv.dll
+#   .\build.ps1            # build plugin-foobar/build/foo_ritmolux.dll
 #   .\build.ps1 -Install   # ...then copy it into the foobar2000 v2 profile
 
 param([switch]$Install)
@@ -65,16 +65,16 @@ New-Item -ItemType Directory -Force $build | Out-Null
 # Single-source the component version (ADR-0025): read the workspace version
 # from root Cargo.toml - anchored to the [workspace.package] section so a
 # member-crate or profile version can never match - and emit the header
-# foo_lmv.cpp includes. The header lands in build/ (gitignored); never committed.
+# foo_ritmolux.cpp includes. The header lands in build/ (gitignored); never committed.
 #
-# The read itself lives in packaging/foobar/lmv-version.ps1, so this script and
+# The read itself lives in packaging/foobar/rlx-version.ps1, so this script and
 # the packaging recipe that verifies its output cannot disagree about what the
 # version is (Plan 0102 Phase 2).
-. (Join-Path $repo "packaging\foobar\lmv-version.ps1")
+. (Join-Path $repo "packaging\foobar\rlx-version.ps1")
 $version = Get-LmvWorkspaceVersion -RepoRoot $repo
-Set-Content -Path (Join-Path $build "foo_lmv_version.h") -Encoding ascii `
-    -Value "#define FOO_LMV_VERSION `"$version`""
-Write-Host "version: $version -> $build\foo_lmv_version.h"
+Set-Content -Path (Join-Path $build "foo_ritmolux_version.h") -Encoding ascii `
+    -Value "#define FOO_RITMOLUX_VERSION `"$version`""
+Write-Host "version: $version -> $build\foo_ritmolux_version.h"
 
 $libs = @(
     (Join-Path $sdk "foobar2000\SDK\x64\Release\foobar2000_SDK.lib"),
@@ -91,16 +91,16 @@ $libs = @(
 $libArgs = ($libs | ForEach-Object { "`"$_`"" }) -join " "
 $cl = "cl /nologo /std:c++17 /EHsc /MD /O2 /W3 /DNDEBUG /DUNICODE /D_UNICODE " +
     "/I `"$sdk`" /I `"$sdk\foobar2000`" /I `"$repo\core-cabi\include`" /I `"$build`" " +
-    "/Fo`"$build\\`" `"$root\foo_lmv.cpp`" " +
-    "/link /DLL /OUT:`"$build\foo_lmv.dll`" $libArgs"
+    "/Fo`"$build\\`" `"$root\foo_ritmolux.cpp`" " +
+    "/link /DLL /OUT:`"$build\foo_ritmolux.dll`" $libArgs"
 cmd /c "`"$vcvars`" >nul && $cl"
 if ($LASTEXITCODE -ne 0) { throw "cl failed" }
-Write-Host "built: $build\foo_lmv.dll"
+Write-Host "built: $build\foo_ritmolux.dll"
 
 # --- 5. Optional install into the foobar2000 v2 profile ---
 if ($Install) {
-    $dest = Join-Path $env:APPDATA "foobar2000-v2\user-components-x64\foo_lmv"
+    $dest = Join-Path $env:APPDATA "foobar2000-v2\user-components-x64\foo_ritmolux"
     New-Item -ItemType Directory -Force $dest | Out-Null
-    Copy-Item (Join-Path $build "foo_lmv.dll") $dest -Force
-    Write-Host "installed: $dest\foo_lmv.dll (restart foobar2000)"
+    Copy-Item (Join-Path $build "foo_ritmolux.dll") $dest -Force
+    Write-Host "installed: $dest\foo_ritmolux.dll (restart foobar2000)"
 }

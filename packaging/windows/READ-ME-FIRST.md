@@ -4,7 +4,7 @@ Light Music Visualizer - Windows
 A music visualizer that listens to whatever your PC is playing and draws to it.
 
 This is an early test build. It is not code-signed, so Windows will warn about
-it once. Nothing to install - unzip anywhere and run lmv.exe.
+it once. Nothing to install - unzip anywhere and run ritmolux.exe.
 
 
 1. Let it run
@@ -79,7 +79,7 @@ This build can run with NO WINDOW and hand its picture straight to another
 application on the same PC - TouchDesigner, Resolume, OBS - over Spout. No
 recording, no codec, a frame or two of delay.
 
-  lmv.exe --stream --size 1280x720 --fps 60
+  ritmolux.exe --stream --size 1280x720 --fps 60
 
 Then in TouchDesigner add a "Syphon Spout In" TOP (that is its real name; there
 is no operator called just "Spout In") and set its Sender Name to what the
@@ -94,11 +94,11 @@ certainly why. Spout can only hand a picture to a program running on the SAME
 graphics chip, and Windows gives a window-less program the power-saving one
 while TouchDesigner uses the fast one. Run:
 
-  lmv.exe --list-adapters
+  ritmolux.exe --list-adapters
 
 and then name the one TouchDesigner is using:
 
-  lmv.exe --stream --gpu "RTX 3080"
+  ritmolux.exe --stream --gpu "RTX 3080"
 
 Ctrl-C stops it and prints how many frames it sent.
 

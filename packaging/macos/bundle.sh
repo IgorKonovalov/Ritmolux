@@ -2,8 +2,8 @@
 #
 # Build, bundle, ad-hoc sign and zip the macOS standalone (Plan 0036, ADR-0038).
 #
-# Produces <target-dir>/dist/light-music-visualizer-v<version>-macos-universal.zip,
-# whose single top-level folder holds LightMusicVisualizer.app (a universal
+# Produces <target-dir>/dist/ritmolux-v<version>-macos-universal.zip,
+# whose single top-level folder holds Ritmolux.app (a universal
 # arm64 + x86_64 binary), a reference copy of presets/*.toml, and
 # READ-ME-FIRST.txt.
 #
@@ -17,7 +17,7 @@
 #
 #   Usage:  packaging/macos/bundle.sh [--skip-build]
 #
-#   --skip-build   Reuse the two <target-dir>/<triple>/release/lmv binaries on
+#   --skip-build   Reuse the two <target-dir>/<triple>/release/ritmolux binaries on
 #                  disk. For iterating on the bundle layout without paying for
 #                  a `lto = "fat"` rebuild twice; never used by CI.
 #
@@ -25,9 +25,9 @@
 
 set -euo pipefail
 
-APP_NAME="LightMusicVisualizer"
+APP_NAME="Ritmolux"
 BUNDLE_DIR="${APP_NAME}.app"
-BIN_NAME="lmv"
+BIN_NAME="ritmolux"
 ARM_TARGET="aarch64-apple-darwin"
 INTEL_TARGET="x86_64-apple-darwin"
 
@@ -89,7 +89,7 @@ read_workspace_version() {
 version="$(read_workspace_version)"
 [ -n "$version" ] || die "could not parse [workspace.package] version from Cargo.toml"
 
-stage_name="light-music-visualizer-v${version}-macos-universal"
+stage_name="ritmolux-v${version}-macos-universal"
 out_dir="${target_dir}/dist"
 stage="${out_dir}/${stage_name}"
 bundle="${stage}/${BUNDLE_DIR}"

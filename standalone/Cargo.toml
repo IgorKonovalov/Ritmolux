@@ -18,7 +18,7 @@ name = "standalone"
 path = "src/lib.rs"
 
 [[bin]]
-name = "lmv"
+name = "ritmolux"
 path = "src/main.rs"
 
 [lints]
