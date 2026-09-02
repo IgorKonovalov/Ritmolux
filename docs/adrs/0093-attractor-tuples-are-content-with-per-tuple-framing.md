@@ -5,7 +5,7 @@
 > was falsified, and three things happened that this ADR does not describe
 > **Date:** 2026-08-11
 > **Related plan(s):** [0079](../plans/done/0079-the-attractor-learns-new-figures.md)
-> **Resolves:** [design-backlog 0055](../design-backlog.md#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
+> **Resolves:** [design-backlog 0055](../design-backlog.md)
 > **Supplements:** [ADR-0068](0068-the-projection-basis-is-a-per-family-property.md) (the per-family projection),
 > [ADR-0066](0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) (reseed semantics this must not break)
 

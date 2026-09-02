@@ -209,7 +209,7 @@ cutoffs on any of the three sources at capture resolution. `kaleido_inner` is th
   Related to [design-backlog 0010](../../design-backlog.md).
 - **The attractor sheets are near-black** because `trails = 0` was set globally, and an attractor *is*
   its accumulation. Written up as
-  [backlog 0079](../../design-backlog.md#0079--an-accumulating-figure-rendered-with-trails--0-is-not-a-sparse-source-it-is-a-blank-one-and-a-whole-third-of-a-decision-grid-was-unreadable-because-of-it);
+  [backlog 0079](../../design-backlog.md);
   it cost the plan its sparse-source evidence, which Phase 6 had to answer live instead.
 
 ### Phase 5 — lock it in: a fixture that would notice, and the doc sweep

@@ -852,7 +852,7 @@ system, not just this one), but it does not fix the easing-bypass leg on its own
   ADR-worthy was decided, then **measured and half-falsified**: the ordering stands, but not for the
   "perceptually even fall" reason — see the ADR's Outcome. Read the two consequences it left behind
   before quoting this entry's framing: an even fall is unreachable in any ordering
-  ([0021](design-backlog.md#0021--an-even-fall-is-not-reachable-with-a-one-pole-in-any-ordering)), and `--report`
+  ([0021](design-backlog.md)), and `--report`
   cannot see a curve at all ([0022](#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)).
 
 ---
@@ -1762,7 +1762,7 @@ discriminate half two.
   [Plan 0052](plans/done/0052-the-emitter-objects-that-spawn-fall-and-die.md)** — a new
   `SystemKind::Emitter` with analytic ballistics and seeded per-object individuation. The user
   chose the new-scene shape over extending `swarm` or building a per-object expression facility.
-  **[0033](design-backlog.md#0033) stays open** — this is the motion half; marks are still round additive blobs.
+  **[0033](design-backlog.md) stays open** — this is the motion half; marks are still round additive blobs.
   Notes below retained as the origin record.
 
 - **Raised:** 2026-07-30, from `preset-author`, by the Solitaire-cascade request.
@@ -1901,7 +1901,7 @@ structure. Nobody should build that until a real preset is worse off.
   **What this entry got right stands:** a figure and a field want different answers. The verdict is
   `tile` for `attractor_leviathan` and `squash` for `fragment_kaleido` — two scenes, two treatments,
   which is the entire content of the argument for a choice.
-  **The library retune this creates is [0058](design-backlog.md#0058)**, and one lesson from it belongs here:
+  **The library retune this creates is [0058](design-backlog.md)**, and one lesson from it belongs here:
   adopting a fill treatment on Leviathan took two edits, because that preset's `zoom` had been
   pinned under the inscribed radius *precisely to dodge the rays this entry reported*. Removing the
   cause removed the reason for the workaround, and other fold-binding presets carry similar pins.
@@ -2728,7 +2728,7 @@ a plan earlier; the entry asked for this to be judged rather than assumed, and i
 **Clifford is the second instance of the Leviathan pattern**, which is the pass's other finding and
 outlived this entry: a framing pinned to dodge an engine defect, kept after the defect was fixed,
 recoverable only by reading the preset's own header comment. That pattern is
-[live entry 0060](design-backlog.md#0060--an-engine-fix-leaves-its-preset-side-workarounds-standing-and-only-a-header-comment-remembers-them).
+[live entry 0060](design-backlog.md).
 
 ---
 
@@ -3043,7 +3043,7 @@ question, and no calibration of it will help.
   mechanism and its samples, and the answer to "is coverage the right model" was *yes, keep it, and
   make the exception reachable*. The entry's question therefore closes; what it opened does not —
   the retune it invites is Plan 0071 Phase 5, still outstanding and grouped with
-  [0038](design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned).
+  [0038](design-backlog.md).
   Three claims in ADR-0085 were falsified by the implementation and are recorded in its Outcome.
 
 - **PROMOTED 2026-08-04 → [ADR-0085](adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) +
@@ -3298,7 +3298,7 @@ Coral Oracle", a reaction-diffusion preset — has **never been tracked in git**
 clear deliberately; the other 43 files were retired or stale shipped copies, all recoverable from
 `c11bbf9` / `de707cb`. It is the only non-shipped preset in the user's library.
 
-**It is not a stray.** This is the preset that raised [backlog 0001](design-backlog-archive.md#0001--reaction_diffusion-reaches-only-2-of-the-5-plan-0018-composite-levers)
+**It is not a stray.** This is the preset that raised [backlog 0001](design-backlog-archive.md)
 on 2026-07-24 — the entry that became [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md)
 and [Plan 0025](plans/done/0025-full-composite-coverage.md), i.e. the reason `reaction_diffusion`
 reaches the composite levers at all. The preset that motivated a whole plan then **never came back
@@ -3958,7 +3958,7 @@ design is clean — which is true for two thirds of it.
   over-scale defect is actually introduced. The distribution report in `sanity.rs`'s shape
   stays a candidate second step, not taken.
 - **Raised:** 2026-08-06, at [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)'s
-  Mode 4 review. Successor to archived [0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor),
+  Mode 4 review. Successor to archived [0054](design-backlog-archive.md),
   which asked for a **gate** and got a **paired instrument**.
 - **Verified by measurement:** yes — the numbers below are the printed report from
   `cargo nextest run -p lmv-core --test geometry_extent --no-capture`, reproduced on this box at the
@@ -4093,7 +4093,7 @@ happened.
 
 ### Why this is not the same entry as 0054
 
-[0054](design-backlog-archive.md#0054--pixel-coverage-cannot-see-a-figure-whose-tips-leave-the-frame-and-an-in-frame-geometry-fraction-is-the-successor)
+[0054](design-backlog-archive.md)
 and its successor [Plan 0069](plans/done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
 are about a figure leaving the frame; the in-frame geometry fraction that plan shipped does **not**
 catch this one, because a mandala is entirely inside the frame and scores a clean 1.0. This is the
@@ -5055,7 +5055,7 @@ diagnostic it is today. Whatever is chosen, this measurement is the test case.
   capture path dies at 3,601 frames on both reaction-diffusion worlds after RSS reaches ~2.9 GB, so
   those two were measured at 0.5 simulated minutes rather than 10. **Pre-existing** — the shipped
   `capture_preset` fails identically at the same frame count, run as the control before it was
-  called a finding — and filed as [0093](design-backlog.md#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length).
+  called a finding — and filed as [0093](design-backlog.md).
   Until that is fixed, "N simulated minutes" is bounded by world.
 
 **Raised by:** `preset-author`, Plan 0075 cohort 4, watching Shatter collapse live three times
@@ -5080,7 +5080,7 @@ share a soak recipe.
 ### What a fix would be
 
 **Not a gate.** A minutes-long capture per preset is not a price this suite can pay — see
-[0080](design-backlog-archive.md#0080--the-reactivity-gate-pays-18x-to-render-frames-it-throws-away-because-warm-up-and-measurement-share-one-capture-path)
+[0080](design-backlog-archive.md)
 for what the *seconds* already cost. The honest shape is a documented soak-style spot-check: a
 `shot` mode or recipe that renders N minutes at capture cadence and reports drift statistics
 (population spread, deposit concentration), run by the lane on worlds whose mechanism has an
@@ -5119,8 +5119,8 @@ with its Phase 5, standing in the plans README — this entry's status is unchan
   entry said was missing. **The three paired runs are Phase 5, `human`, and have not been made** —
   they need the live app on a real machine for a real duration, so they carry forward under Standing
   in [`docs/plans/README.md`](plans/README.md) rather than holding the plan open. Its two sibling
-  entries, [0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)
-  and [0086](design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument),
+  entries, [0082](design-backlog-archive.md)
+  and [0086](design-backlog-archive.md),
   were discharged in full and are archived. **Nothing about the finding below has been re-measured**,
   so read it as the 2026-08-09 snapshot it is. One thing that *has* changed underneath it:
   [0093](#0093--the-headless-capture-path-dies-past-a-few-thousand-frames-so-the-horizon-cannot-reach-its-own-headline-length)
@@ -5154,7 +5154,7 @@ with its Phase 5, standing in the plans README — this entry's status is unchan
 
   **One thing the runs found that this entry did not ask about, and it falsifies a claim in its
   archived sibling** — filed as
-  [0094](design-backlog.md#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it).
+  [0094](design-backlog.md).
 
 **Raised by:** `architect`, at [Plan 0046](plans/done/0046-transformed-feedback.md)'s close, from
 that plan's Phase 5 measurement. **Owner if taken:** `dev` (a measurement first, not a fix).
@@ -5414,7 +5414,7 @@ separates them, and it is the cheapest thing anyone can do here** — it costs o
 and it decides which of the two the fix has to answer.
 
 It is also **adjacent to, and not the same as,**
-[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against):
+[0083](design-backlog-archive.md):
 that is the *live app's* resident set under preset switching, this is a *headless offscreen loop*
 that never rebuilds a surface. If they share a cause it would be worth knowing, and nothing
 currently says they do.
@@ -6721,7 +6721,7 @@ confined fraction grows on its own.
 > at every threshold**. The fix no longer rests on a reading of `draw.rs` alone.
 
 **Raised by:** `dev`, from [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5
-(2026-08-19), splitting the x-extent half out of [0120](design-backlog.md#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw).
+(2026-08-19), splitting the x-extent half out of [0120](design-backlog.md).
 **Owner if taken:** `dev`.
 
 - **Verified 2026-08-19** — the cancelling pair is still both halves, one at the point and one on
@@ -6819,7 +6819,7 @@ size — does not include amplitude.
 
 ### Why it surfaced now, and what it reconciles
 
-It explains a standing contradiction. [0120](design-backlog.md#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
+It explains a standing contradiction. [0120](design-backlog.md)
 reports the waveform figure rendering **larger** than the reference's; the live app at 18 % shows it
 nearly flat. Both are true. An un-normalized trace times an un-normalized `wave_scale` is
 **hypersensitive** — blown out at full scale, dead at listening volume. So 0120's missing base
@@ -7699,5 +7699,460 @@ has already spent a plan on an arm whose stated contract and actual behaviour di
   identity. Item 4 landed in `shape_field/tests.rs`, not `marks/tests.rs` where the plan looked for
   it. The doc-block nit backlog 0134 carried travelled with it. This entry probe went red on
   delivery.
+## 0104 — `check-index-rows.mjs` has no assertion that it can convict, so a dead detector reads exactly like a clean tree
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phases 1-2.
+>
+> `--self-test` asserts the fixture's exact counts, a floor on the repository's, and the red fixture's reporting path, and it is wired into the pre-push hook and the CI `links` job. Re-running this entry's own reduction at the close: the mutated gate still exits 0 on a plain run and collapses the self-test to **1/10**.
+
+Found at Plan 0105's close (2026-08-16), reviewing the gate that plan built.
+
+Of the three checkers in `scripts/`, this is the only one whose fixture asserts **exit 0**.
+`scripts/fixtures/README.md` argues the inversion is correct — *"a byte cap is trivially red on any
+tree with a fat row in it, so the interesting assertion is the reverse"* — and that was true of the
+tree it was written against, which still held 136 over-cap rows. **Phases 2-4 of the same plan made
+it false.** Nothing in the repo now contains a row the gate would reject, so nothing anywhere
+exercises its ability to reject one.
+
+The consequence is that the checker's row detection is unasserted. Demonstrated at the close by
+copying the script and replacing `TABLE_ROW` and `BULLET` with regexes that match nothing: the
+fixture reports `3 regions, 0 rows, 0 over cap` and **exits 0**, and so does the repo run. Every one
+of the three call sites — pre-push, the CI `links` job, the architect close ceremony — goes green.
+The per-file region and row counts the script prints are the documented mitigation, and they are
+*printed*, not asserted; nothing compares them to an expected number.
+
+This is the same non-vacuity class the other two gates were repaired for.
+[Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) found the link checker
+covering one of markdown's two link forms, and
+[Plan 0094](plans/done/0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name
+skip swallowing a real tree and a whole half of ADR-0108's rule invisible to a bullet-driven check.
+Both now ship fixtures that expect **exit 1 with an exact break count**, and
+`check-backlog-claims.mjs` additionally carries a `--self-test` whose non-vacuity assertion is
+pinned to the real repository rather than to the fixture.
+
+- **Verified 2026-08-16** — the script has no self-test:
+  `absent: self-test in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-16** — its fixture is documented as the one that passes rather than fails:
+  `present: Expect \*\*exit 0\*\* in: scripts/fixtures/README.md`
+- **Verified 2026-08-16** — the sibling gate has the mechanism this one lacks:
+  `present: --self-test in: scripts/check-backlog-claims.mjs`
+
+### What a fix would be
+
+Two shapes, and they are not exclusive. A **second fixture root** — `scripts/fixtures/index-rows-red/`
+with one over-cap row inside a marked region, run as its own root and expected to exit 1 with
+exactly one break — keeps the existing green fixture's four negative assertions intact rather than
+flipping them. Or a **`--self-test`** on the model `check-backlog-claims.mjs` already carries,
+asserting the green fixture's own counts (3 regions, 4 rows) so a detector that finds nothing fails
+loudly. The `--self-test` is the cheaper of the two and covers the demonstrated mutation; the red
+fixture additionally covers the reporting path, which nothing currently runs either.
+
+[ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) names the *marker*
+hole in its Negative section and pins it as deliberate behavior in the fixture. It does not name
+this one, and its dated `Outcome` now says so.
+
+### Priority
+
+**Medium.** Nothing is broken today — the gate was verified working by hand at Plan 0105's close,
+and the fix is small. What makes it worth an entry is the failure mode: a silent one, in a gate
+whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md))
+is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
+same rule wearing a green tick.
+
+---
+
+## 0127 — the figure gate walks the working tree, so a gitignored local note can redden a push
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 6.
+>
+> The scan still walks the working tree, which was the half worth keeping; a hit in an untracked file became an advisory that never touches the exit code. Verified both ways at the close - the same figure seeded into `renders/README.md` reports and exits 0, and into `docs/capturing.md` fails.
+
+**Raised by:** `architect`, at Plan 0106's close (2026-08-25), when the gate the same plan shipped
+convicted a **gitignored** provenance file under `renders/` that had never been and could never be
+committed. **Owner if taken:** `dev` — it is a scan-set question in one script, not a design one.
+
+- **Verified 2026-08-25** — the walk is filesystem-based and consults no ignore rules:
+  `present: readdirSync in: scripts/check-filter-figures.mjs`
+
+### The finding
+
+`scripts/check-filter-figures.mjs` enumerates candidate markdown by walking directories, skipping a
+hardcoded set (`node_modules`, `target`, `.git`, and the seeded-fixture tree). It never asks git what
+is tracked, so **any local file naming `sd-filter` and carrying a figure fails the pre-push hook** —
+scratch notes, a pasted measurement, a downloaded README. The author's fix is to edit or delete a
+file the repository will never see.
+
+**CI is unaffected and that is why this is small.** The `links` job checks out the tracked tree, so
+gitignored files do not exist there; only the local hook can fire on this. That also means the gate's
+*enforcement* is sound — nothing wrong can reach `main` through this hole — and what is wrong is the
+**local ergonomics**, which is a weaker complaint than it first looks.
+
+**The counter-argument is real and should be costed before this is taken.** A gitignored copy of a
+cost figure still misleads whoever reads it, and this repository's whole reason for the gate is that
+*the copy that broke it was the one outside the list anyone was checking*
+([ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)). Restricting the scan to
+`git ls-files` buys ergonomics and gives up exactly that reach. A middle option — scan the working
+tree, but report an untracked hit as a **warning that does not set the exit code**, in the shape
+`check-backlog-claims.mjs`'s advisory block already uses — keeps both and is probably the answer.
+
+**Not urgent.** One close hit it, once, and editing the offending file took a minute.
+
+## 0133 — `docs-shots.mjs` cannot run at all, so the operator-doc image sweep has been dead since 2026-08-15
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 9.
+>
+> The three missing manifest entries landed, and the manifest-vs-`SystemKind` cross-check moved into `core/tests/hygiene.rs`, where it is pure text and fails on the commit that ships a scene rather than eleven days later. Verified: a thirteenth `SystemKind` fails it in 8 ms with no GPU.
+
+**Raised by:** `architect`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s
+close, attempting the operator-doc image refresh that close ceremony owes.
+**Owner if taken:** `dev` — three manifest entries plus a re-run, unless someone first decides what
+`warp_mesh` should be a picture *of*, which is a content question.
+
+- **Verified 2026-08-26** — the guard that aborts the run, and its message:
+  `present: the gallery does not match SystemKind::from_name in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — the three systems the manifest has no gallery entry for; each of these
+  reds the moment its entry is added, which is the intended re-read trigger:
+  `absent: gallery/shape_field\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — `absent: gallery/warp_mesh\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — `absent: gallery/shape_collage\.png in: scripts/docs-shots.mjs`
+- **Verified 2026-08-26** — all three are real systems the cross-check reads out of:
+  `present: "shape_collage" => SystemKind:: in: core/src/preset/schema.rs`
+
+### The finding
+
+`scripts/docs-shots.mjs` is the committed instrument
+[ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md) makes every committed
+documentation image depend on, and its own header states the contract in as many words: *"an image
+set nobody can re-shoot without remembering a command line is an image set that goes stale"*, and
+*"freshness is a human duty at a named cadence (the close-ceremony operator-doc sweep), not a
+check."*
+
+**It throws before rendering anything.** Its manifest holds nine gallery entries; `SystemKind`
+now has twelve. The script cross-checks the two and turns a mismatch into a hard error, so
+`shape_field`, `warp_mesh` and `shape_collage` having no gallery image takes down the *whole*
+run — including the eight images that are nothing to do with them.
+
+**The guard is not the bug; the cadence is.** The cross-check is doing exactly what its comment
+says it is for — *"a hardcoded list of nine names would let a tenth system ship with no gallery
+picture"* — and it caught precisely that. What failed is that the only thing which executes it is a
+human running it at a close, and ADR-0100 deliberately keeps it out of CI (renders are not
+byte-reproducible; a CI diff would be permanently red). So the guard fired into an empty room:
+`shape_field` entered `SystemKind` on **2026-08-15** (`78d1671`, Plan 0091 Phase 3), `warp_mesh` on
+2026-08-16 and `shape_collage` on 2026-08-25, and no close in the eleven days since could have
+re-shot an image even if it had tried.
+
+**What it is currently hiding.** Plan 0114 moved the line stroke's default `softness` and retuned
+six line presets, so `parametric_curve.png`, `lsystem.png`, `star_pattern.png` and `spectrum.png`
+all show a stroke the engine no longer draws. That is four of the nine gallery images stale, with
+no way to refresh them and nothing that reports it.
+
+### What a fix looks like
+
+Three manifest entries and one run. The only real decision is what each new picture should be of —
+`shape_field` and `shape_collage` have obvious shipped worlds (`shape_pulse`, `collage_suprematist`),
+while `warp_mesh` ships none, so it needs a fixture bundle or a converted `.milk` named in the
+manifest's provenance line like every other entry.
+
+**The separable question worth deciding once**, because this will recur on the thirteenth system:
+whether "every system has a gallery image" should be asserted somewhere that runs *without*
+rendering. The cross-check is pure text — it reads the manifest and `schema.rs` and needs no GPU —
+so it could live in `core/tests/` or in the `links` CI job and fail on the commit that ships a
+scene, instead of silently disabling the sweep until someone tries to use it. That is a different
+claim from "the images are current", which is the one ADR-0100 correctly refuses to gate.
+
+## 0143 — 20 of the 24 `design-backlog.md#NNNN` anchors in the repo point at bodies that now live in the archive
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 4.
+>
+> The entry's own count was the low one - 87 links across 29 files, not the 24 entry NUMBERS the ADR measured. See that ADR's dated Outcome, which also records the inline-vs-definition asymmetry the new rule exposed in the gate.
+
+**Raised by:** `architect`, at [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)'s
+close, 2026-08-27, while repairing the two that plan's own implementation log had noticed.
+**Owner if taken:** `dev` — the repointing is mechanical; what is *not* mechanical is the scope
+call in the last paragraph, which is an `architect` decision to make first.
+
+- **Verified 2026-08-27** — the link gate says in its own header that it tests the file and not the
+  fragment: `present: fragments, not external URLs in: scripts/check-doc-links.mjs`
+- **Verified 2026-08-27** — an archived body still addressed by a live anchor:
+  `present: ^## 0072 in: docs/design-backlog-archive.md`
+
+### The finding
+
+The close ceremony archives a discharged backlog entry by moving its body verbatim to
+`design-backlog-archive.md` and leaving a ledger row behind. Anchors aimed at the moved body —
+`(../design-backlog.md#0072--sanityrss-coverage-floor-forces-...)` — keep resolving to a **file that
+exists**, so `scripts/check-doc-links.mjs` reports them clean: it validates paths and never
+fragments. The link lands at the top of the live backlog instead of at the entry, silently.
+
+Measured across every `.md` in the repo: **24 distinct entry numbers are addressed by anchor, and 20
+of them are archived** — `0009 0020 0022 0027 0033 0040 0055 0056 0057 0058 0059 0060 0061 0062
+0063 0067 0070 0084 0085 0088` — across roughly 20 files, mostly ADRs and closed plans. Two more
+(`0072`, twice in [Plan 0075](plans/done/0075-the-content-renaissance.md)) were repaired at Plan
+0118's close and are the reason this was measured at all.
+
+This is the same silent-rot family ADR-0127 retired one level down: a reference whose *form* cannot
+be checked, decaying on a routine ceremony step, visible only to a human who follows it. Step 3c of
+the architect skill already names it — *"the one class of break here that no gate will catch for
+you"* — which is why the accumulation is evidence that naming it was not enough.
+
+### The scope call, which is the actual question
+
+Most of the 20 sites are **append-only** documents: accepted ADRs and closed plans. Repointing them
+edits a historical record to keep a convenience link working, which cuts against the append-only
+rule. Three defensible answers, and one should be chosen before any editing:
+
+1. Repoint everything, treating a link target as mechanical rather than as content.
+2. Repoint only live documents and leave the historical ones, accepting that an old ADR's anchor
+   lands at the top of the backlog.
+3. Drop the anchor half repo-wide — `[backlog 0072](../design-backlog.md)` plus the bare number,
+   which is exactly ADR-0127's answer to the same problem in `.rs`, and would make the whole class
+   uncheckable-but-unbreakable.
+
+Option 3 also makes the gate question moot; options 1 and 2 leave a class that wants a fragment
+check in `check-doc-links.mjs` to stay repaired.
+
+---
+
+## 0162 - the claim gate resolves a probe path against the working tree, so a path inside `.gitignore` verifies locally and can only ever fail on CI
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 5.
+>
+> One batched `git ls-files` answers for the whole probe set, and the message names the real problem instead of saying *"does not exist"* about a file in the reader's own tree. Verified at the close by probing a present-but-gitignored `renders/README.md`.
+
+> **Filed 2026-08-29** from a red CI `links` job whose one broken probe was entry 0161's own,
+> written hours earlier by the close that filed it and green on the machine that wrote it.
+
+`runProbe` resolves `<path>` with `existsSync` against the working tree and asks nothing further. A
+path that exists but is **not in the repo** is indistinguishable from one that is, so a probe
+pointing into gitignored territory - `renders/`, `target/`, `spike/` - passes at every call site
+that runs on the authoring machine and fails only at the one that does not.
+
+Two of the three call sites are on that machine: the `pre-push` hook and the architect close
+ceremony both read a full working tree, ignored files included. The third is the CI `links` job,
+which [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) names the
+un-bypassable one, and it checks out a clone that by definition contains no ignored file. So the
+gate is green wherever the fix would still be cheap and red only once the push has happened.
+
+**The instance.** Entry 0161's second bullet probed `renders/plan-0106-p6/run.sh`. `renders/` is
+ignored in full, so that script exists on the authoring machine and in no checkout anywhere. It
+went green at the close that filed it and green at pre-push, then broke the `links` job on the
+first push that carried it - which was a push of 12 accumulated commits, so the breakage surfaced
+against an unrelated fix rather than against the close that caused it. Repaired in place by taking
+the `unprobeable:` opt-out, which is the honest reduction here: nothing in a checkout can see it.
+
+**Impact.** Low severity, and it recurs by construction rather than by accident. The cost is not
+the one broken entry - it is that the local gate whose entire purpose is to pre-empt a red CI
+reports OK, so the author learns from a runner, after pushing, that a claim they verified does not
+verify. The lag is unbounded: an unpushed close can sit for days before a push exposes it.
+
+**What a fix looks like:** one git question beside the `existsSync`. `git ls-files -- <path>`
+returns nothing for a path the repo does not track and handles directories, which probe paths often
+are, so a non-empty result is the whole test; `git check-ignore -q` answers it from the other side.
+Either lets the probe report *"probe path is not tracked"* rather than today's *"does not exist"*,
+which is the message a CI reader currently gets for a file sitting in front of them in their own
+tree. One invocation covering the whole probe set keeps it to a single process, the way the
+staleness advisory already batches its `git log`.
+
+- **Verified 2026-08-29** - the probe path is resolved against the filesystem and nothing else: `present: if \(!existsSync\(pathAbs\)\) in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nothing asks git whether that path is ignored: `absent: check-ignore in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - nor whether it is tracked: `absent: ls-files in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-29** - `renders/` is ignored in full, so nothing beneath it reaches a checkout: `present: ^renders/$ in: .gitignore`
+- **Verified 2026-08-29** - the local call site that goes green regardless: `present: check-backlog-claims in: .githooks/pre-push`
+
+## 0166 - the index-row gate measures a row's bytes and never its shape, so a closed-plan bullet dropped into the active-plans table passes
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 3.
+>
+> A region's kind is the **majority** form of its rows, not the first row's - which the implementation measured and rejected, because the stray row is the one a first-row rule adopts as the region's form, reporting 14 breaks with the mistake not among them. Verified: the seeded bullet is reported alone, at its own line.
+
+> **Filed 2026-08-30** at Plan 0134's close, by the reviewer making the mistake and having the gate
+> wave it through. Not reported by a lane - found by inspection after the fact.
+
+`scripts/check-index-rows.mjs` enforces [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md):
+every row inside a `<!-- roster:begin cap=N -->` region is a pointer, held to N bytes. **Bytes is
+the only thing it measures.** Inside a region it accepts a line matching either `TABLE_ROW` or
+`BULLET`, records `{ line, bytes, cap }`, and asks nothing about which of the two the surrounding
+region is made of.
+
+`docs/plans/README.md` has two regions and they are different kinds: the **active-plans** region is
+a markdown table (`| Plan | Title | Status | Owner | Live constraint |`), the **recently-closed**
+region is a bullet list. A closed-plan bullet inserted into the table region is a `BULLET` inside a
+region, under cap, so the gate reports `0 over cap` and exits 0.
+
+**Observed 2026-08-30**, during this plan's own close: a `- [0134 ...] - closed 2026-08-30 ...`
+bullet landed immediately under the active roster's `roster:begin` and above its table header,
+because the insertion anchored on the first `Recently closed` string in the file rather than the
+section. `check-index-rows.mjs` passed it (`2 regions, 117 rows, 0 over cap`) and
+`check-doc-links.mjs` passed it too - the link resolves, it just points from the wrong list. It was
+caught by eye before the commit, and nothing in the toolchain would have caught it after.
+
+**Impact.** Low severity, high silence. The failure mode is a closed plan that reads as active, or
+an active plan that reads as closed, in the one file `docs/plans/README.md` that every session opens
+first - and both rosters keep passing. It is the same class as the rot ADR-0116 was written for: the
+convention is stated in prose above the markers and nothing holds anyone to it.
+
+**What a fix looks like:** infer each region's kind from its first measured row and reject rows of
+the other kind - roughly four lines, in the loop that already classifies every line as `TABLE_ROW`
+or `BULLET`. A region containing both is a real possibility elsewhere, so the honest form is
+per-region and inferred rather than a hardcoded expectation per file. `scripts/fixtures/` already
+holds seeded bite checks for these gates, so the fix comes with a fixture that is a bullet in a
+table region.
+
+- **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
+- **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 3** (added at that plan's 2026-09-01 amendment). A shape check
+  lands **beside** the length check, not instead of it: a 200-byte bullet in a table region is under cap
+  and still wrong.
+
+## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7.
+>
+> Enumeration moved to `git ls-files`, which makes *"code we own"* and *"code this gate judges"* the same set by construction; the by-name `.venv` and `VENDORED_TREES` patches came out with it. `check-doc-links.mjs` was found to share the defect outright and got the same treatment.
+
+> **Filed 2026-08-30** while pushing the Plan 0134 close. Found because the gate went from green
+> to 490 findings between two pushes twenty minutes apart, with no commit in between touching it.
+
+`scripts/check-comment-hygiene.mjs` enumerates with `readdirSync` from the repo root and skips a
+hardcoded `SKIP_DIRS` set. **It never asks git what is tracked.** A gitignored directory is
+therefore absent from CI's fresh clone - so the CI job is green by construction - and present in
+every working tree, where it is scanned in full.
+
+Two such trees exist here, both third-party, both gitignored, neither ours to judge:
+
+- `.venv/` (`.gitignore:68`) - the Python virtualenv `tools/sd-filter` installs into. Its
+  `site-packages` ship torch, numpy and markupsafe C and C++ headers: **419 findings**, all
+  `plan-relative narration` on words like `used to` and `no longer` in vendor comments.
+- `plugin-foobar/sdk/` (`.gitignore:15`) - the foobar2000 SDK. **71 findings**, same class.
+
+**Impact.** It blocks `git push` outright, for everyone whose working tree has either directory,
+with a diagnostic pointing at files no one in this project wrote. The natural escape is
+`--no-verify`, which is what makes it worth recording: a gate that fires on vendor code teaches its
+users to skip the gate that fires on theirs. The immediate instances are patched by name at Plan
+0134's close (`SKIP_DIRS` gained `.venv`, a new `VENDORED_TREES` holds the SDK path), which fixes
+these two and not the class - the next `pip install` or unpacked SDK re-breaks it.
+
+**What a fix looks like:** enumerate from `git ls-files` rather than `readdirSync`, which makes
+"code we own" and "code the gate judges" the same set by construction and costs one call. The one
+thing to preserve is the seeded bite check - `node scripts/check-comment-hygiene.mjs scripts/fixtures`
+must still report its 10 findings, and those fixtures are tracked, so `ls-files` reaches them. Worth
+checking whether the sibling gates share the shape: `check-doc-links.mjs` walks markdown the same
+way and is green today only because neither vendored tree happens to carry a relative-linked `.md`.
+
+- **Verified 2026-08-30** - the walk is a filesystem walk with no git in it: `present: readdirSync\(dir, \{ withFileTypes: true \}\) in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - nothing consults git's ignore rules: `absent: check-ignore in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - the by-name patch this entry says is not the fix is present: `present: const VENDORED_TREES = new Set in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-30** - and both ignore rules that make the trees invisible to CI still stand: `present: plugin-foobar/sdk/ in: .gitignore`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), taking the
+  `git ls-files` enumeration this entry names as the fix, and **removing the by-name patches** Plan 0134's
+  close added. The sibling question this entry raises about `check-doc-links.mjs` is in that phase's
+  done-when, and silence on it is not an answer.
+
+## 0171 - a backlog probe about a run of spaces is collapsed to one space before it is matched, so it can never fire
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 5.
+>
+> Only the wrap is absorbed now - a newline and its continuation indent - and a run of spaces the author typed inside the pattern survives into the match. The fixture carries a probe asserting on a five-space run, and it **fires**, which is what separates fixed from described.
+
+> **Filed 2026-08-31** at Plan 0144's review, by moving 0168 into the probed section and watching
+> the gate hand its own probe back with the spaces gone.
+
+`scripts/check-backlog-claims.mjs:225` extracts each probe from its bullet with
+
+```js
+.map((m) => m[1].replace(/\s+/g, " ").trim())
+```
+
+which is right for the reason it was written - a markdown bullet may wrap across source lines, and
+the pattern has to survive that - and wrong for one class of claim. **A probe whose regex contains a
+run of two or more spaces is silently rewritten into a different regex**, one that matches
+single-spaced text the tree does not contain. It does not error, it does not warn; it reports `no
+match` and reads exactly like decay.
+
+**The instance, which is the reason this is filed rather than noticed.** Entry 0168 is *about* the
+broken-literal defect - a string carrying a run of spaces mid-sentence - and both of its probes
+quoted the run verbatim:
+
+```
+present: cannot be longer      than it in: core/src/dsp/mod.rs
+present: is not a flag, but the                  embedded set in: standalone/src/stream.rs
+```
+
+Neither has ever been capable of matching. That went unseen for a second reason - 0168 sat above
+`## Open entries`, where nothing probes at all - so the two defects hid each other, and the entry
+looked green by being unread. Both probes now use `\s{2,}`, which carries the same claim and holds
+no space character to collapse.
+
+**Impact.** Low frequency, and bounded: after 0168's repair no live probe contains a space run.
+It is filed because the failure is silent in the direction that matters - an author writes the
+claim they mean, the gate accepts the bullet, and the probe is dead on arrival. ADR-0108's whole
+argument is that a claim about the repo carries something re-runnable; a probe that cannot fire is
+the one shape that satisfies the letter of that and none of it.
+
+**What a fix looks like.** Two options, and the cheap one is probably right. **Refuse it:** after
+collapsing, if the extracted span differs from the source span, print the entry and the probe and
+exit non-zero - the author is told to use `\s{2,}` and nothing is silently rewritten. Roughly five
+lines, and it converts an unfalsifiable probe into a build error the moment it is written. **Or
+preserve it:** join wrapped bullet lines with a single space but leave interior runs alone, which
+is more faithful and more code, and needs care where a bullet wraps mid-pattern. The gate's own
+grammar note already says *"Regex source, so a literal dot needs escaping"*; whichever way this
+lands, it should say the same about a space.
+
+- **Verified 2026-08-31** - the collapse is still unconditional and still happens before the verb is read: `present: replace\(/\\s\+/g, " "\) in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-31** - and nothing tells the author it happened: there is no diagnostic on the rewrite, which is the whole of why the probe reads as decay rather than as a mistake: `absent: collapse in: scripts/check-backlog-claims.mjs`
+- **Verified 2026-08-31** - the grammar note tells an author to escape a dot and says nothing about a space: `present: a literal dot needs escaping in: scripts/check-backlog-claims.mjs`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 5** (added at that plan's 2026-09-01 amendment), as a done-when
+  on the phase that already opens `check-backlog-claims.mjs`. The wrap must still be absorbed; what stops
+  is a run of spaces inside a pattern being collapsed - proved by a fixture probe that **fires**.
+
+## 0173 - the literal gate is blind to the defect in its unrejoined form, and the fixture README states that silence as a general truth
+
+> **CLOSED 2026-09-02** by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7.
+>
+> The continuation-indent arm now runs ahead of the newline exclusion, so the unrejoined form - the shape an author actually types - is reported. `scripts/fixtures/README.md` no longer states that silence as a general truth.
+
+> **Filed 2026-08-31** at Plan 0144's review, by seeding a two-line literal under
+> `scripts/fixtures/` and watching the gate stay silent.
+
+Plan 0144 Phase 4 gave `scripts/check-comment-hygiene.mjs` a string-literal pass, which is what
+closed 0168. `brokenLiteral` decodes each literal the way rustc does and then **returns `null` for
+any literal whose decoded text still contains a newline**, on the stated grounds that such a literal
+is a formatted block whose column spacing is layout the author typed - *"prose does not carry a
+newline in the middle of itself"*.
+
+**A lost `\` continuation is prose carrying a newline in the middle of itself.** That is the whole
+mechanism: the newline survives, the next line's indent survives, and the reader gets a run of
+spaces mid-sentence. So the gate catches the defect only *after* someone joins the lines, and is
+silent on it in the form an author actually types. The finding message it prints - `(a line break
+with no trailing \)` - names the shape it structurally cannot see.
+
+**Why this is low and not a re-opening of 0168.** Every instance this tree has held arrived already
+single-line: `core/src/dsp/mod.rs:57`, `standalone/src/stream.rs:393` and `milkconv/src/convert.rs:430`
+were all one source line with the run baked in, which is why the 12-space rule convicted 15 sites and
+`cargo fmt` never disturbed them. The authoring path that produces this defect here emits the joined
+form. The gap is real and the gate's own documentation overstates itself; the frequency is not known
+to be nonzero.
+
+**What a fix looks like.** One more arm, not a rewrite: alongside the single-line run, report a
+**newline immediately followed by 12 or more spaces and then a non-space** - which is precisely a
+continuation indent and is not what a column table looks like, since a table's rows start at a
+column and carry interior runs rather than a leading one. Seed both spellings. Failing that, the
+honest minimum is to correct `scripts/fixtures/README.md`'s silence row and the `LITERAL_RUN`
+comment so neither claims a generality the check does not have.
+
+**Also here, because it is one line of the same file.** The finding message's `\` is written `\)`
+inside a JS template literal, so it is consumed as an escape and the operator reads `(a line break
+with no trailing )`. It needs `\`.
+
+**Impact:** low. Nothing is mis-reported; a class is under-reported, and the documentation says
+otherwise, which is the property that gets the next reader to stop looking.
+
+- **Verified 2026-08-31** - the newline exclusion is still unconditional and still ahead of the run check, so the unrejoined form still returns before it is judged: `present: text\.includes.{0,40}return null in: scripts/check-comment-hygiene.mjs`
+- **Verified 2026-08-31** - the fixture roster still states the silence as a general property: `present: prose does not carry one mid-sentence in: scripts/fixtures/README.md`
+- **Verified 2026-08-31** - the swallowed backslash is still in the message the operator reads: `present: with no trailing \\\) in: scripts/check-comment-hygiene.mjs`
+- **PROMOTED 2026-09-01 -> [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), which takes
+  the unrejoined form **and** the fixture README sentence that states the gate's blindness as a general
+  truth.
 
 ---

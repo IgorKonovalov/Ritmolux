@@ -16,7 +16,7 @@ the two failures share one cause.
 
 **The first failure is a whole class of dead presets.** The `preset-author` lane's 2026-07-28 library
 audit (design-backlog
-[0020](../design-backlog.md#0020--the-shipped-library-is-gained-against-stimuli-6-100x-hotter-than-real-music))
+[0020](../design-backlog.md))
 found that comparison gates across the shipped set were written against `--set bass=1` magnitudes
 rather than measured audio. Measured through `shot --signal dynamic:110`, bass means `0.040` and mid
 and treb mean `0.006`; the three-band sum peaks near `0.157`. Against that, thresholds like
@@ -32,7 +32,7 @@ still dead today.
 happily and the differential columns record a lively preset. The instrument all three lanes
 self-verify through is the one thing that could not see the defect.
 
-**The second failure is design-backlog [0022](../design-backlog.md#0022--reports-reactivity-columns-are-structurally-blind-to-a-level-curve)**,
+**The second failure is design-backlog [0022](../design-backlog.md)**,
 and it has the same root. `curve` is `level^curve`, and at a level of `1.0` that is the identity at
 any exponent — so a full-scale stimulus is *mathematically incapable* of seeing the compression a
 level curve buys. A preset could ship `curve = 0.05` and the report would show nothing but the
@@ -134,7 +134,7 @@ also yields *which* gate, which a differential never could.
 Add the behavioral test in the same plan and fix the presets to make it pass. **Rejected on
 sequencing.** At least nine shipped presets would fail on day one, so the gate lands red and blocks
 everyone until an unrelated content pass completes. Backlog
-[0009](../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
+[0009](../design-backlog.md)
 already set the precedent that a harness measurement earns a gate only once there is a fair floor and
 a clean library; this has neither yet. Advisory now, gate later, is the same path
 `reactivity`/`animation` took.

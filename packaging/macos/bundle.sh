@@ -2,7 +2,7 @@
 #
 # Build, bundle, ad-hoc sign and zip the macOS standalone (Plan 0036, ADR-0038).
 #
-# Produces target/dist/light-music-visualizer-v<version>-macos-universal.zip,
+# Produces <target-dir>/dist/light-music-visualizer-v<version>-macos-universal.zip,
 # whose single top-level folder holds LightMusicVisualizer.app (a universal
 # arm64 + x86_64 binary), a reference copy of presets/*.toml, and
 # READ-ME-FIRST.txt.
@@ -17,7 +17,7 @@
 #
 #   Usage:  packaging/macos/bundle.sh [--skip-build]
 #
-#   --skip-build   Reuse the two target/<triple>/release/lmv binaries already on
+#   --skip-build   Reuse the two <target-dir>/<triple>/release/lmv binaries on
 #                  disk. For iterating on the bundle layout without paying for
 #                  a `lto = "fat"` rebuild twice; never used by CI.
 #
@@ -46,6 +46,26 @@ die() { echo "bundle.sh: FAILED: $*" >&2; exit 1; }
 step() { echo ""; echo "==> $*"; }
 check() { echo "    ok: $*"; }
 
+# --- Where cargo writes, which is not necessarily "${repo_root}/target" -------
+#
+# The two coincide under the default layout and diverge under any
+# `build.target-dir`, so this asks cargo instead of assuming: the answer is right
+# under either, which is why plugin-foobar/build.ps1 asks the same question.
+# `--no-deps` keeps it to the workspace manifest, which is all target_directory
+# needs. This is the one path here that is a RELEASE path.
+#
+# Parsed with sed rather than jq, because jq is not on a stock macOS and this
+# script has to run on a bare Mac. `target_directory` is a top-level string in
+# `--format-version 1`, and on a Mac its value carries neither a quote nor a
+# backslash, so there is no JSON escape for the pattern to get wrong.
+read_target_dir() {
+    cargo metadata --format-version 1 --no-deps --manifest-path "${repo_root}/Cargo.toml" |
+        sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p'
+}
+
+target_dir="$(read_target_dir)"
+[ -n "$target_dir" ] || die "could not read target_directory from cargo metadata"
+
 # --- Version: the single source of truth, section-anchored (ADR-0025) ---------
 #
 # Anchored to [workspace.package] exactly as plugin-foobar/build.ps1:57 is: a
@@ -70,7 +90,7 @@ version="$(read_workspace_version)"
 [ -n "$version" ] || die "could not parse [workspace.package] version from Cargo.toml"
 
 stage_name="light-music-visualizer-v${version}-macos-universal"
-out_dir="${repo_root}/target/dist"
+out_dir="${target_dir}/dist"
 stage="${out_dir}/${stage_name}"
 bundle="${stage}/${BUNDLE_DIR}"
 zip_path="${out_dir}/${stage_name}.zip"
@@ -96,8 +116,8 @@ if [ "$skip_build" -eq 0 ]; then
     done
 fi
 
-arm_bin="${repo_root}/target/${ARM_TARGET}/release/${BIN_NAME}"
-intel_bin="${repo_root}/target/${INTEL_TARGET}/release/${BIN_NAME}"
+arm_bin="${target_dir}/${ARM_TARGET}/release/${BIN_NAME}"
+intel_bin="${target_dir}/${INTEL_TARGET}/release/${BIN_NAME}"
 [ -f "$arm_bin" ] || die "missing $arm_bin (drop --skip-build?)"
 [ -f "$intel_bin" ] || die "missing $intel_bin (drop --skip-build?)"
 

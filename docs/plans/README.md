@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0150** (ADRs are a separate sequence — next free there is **0161**.)
+**Next free number: 0151** (ADRs are a separate sequence — next free there is **0163**.)
 
 ## Active roster
 
@@ -26,21 +26,29 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
+| [0150](0150-the-application-becomes-ritmolux.md) | The application becomes Ritmolux | approved | dev, human | ADR-0162 (proposed): 1,318 live sites take `rlx`/Ritmolux; the 990-site record keeps `lmv`. **Phase 1 trademark half discharged 2026-09-02**; the freeze half stands. **Blocks 0143 and 0103.** |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. |
+| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. **Phases 4-6 wait on 0150.** |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133 + **0166 + 0170 + 0171 + 0173** (amended 2026-09-01, now 10 phases). ADR-0149 (proposed). 0170 blocks every local push. **Phases 1-8 need no GPU.** |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Build on `main`, not a worktree.** |
+| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved, PARKED | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Parked until 0150 lands.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved | dev | Backlog 0175 + 0176 + 0174 + 0177 + 0178. ADR-0159 (proposed): a 12,582,912 B component cap the recipe reads. Phases 1-2 are pure test additions. No GPU, no `human`. |
 | [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | in-progress, **Phase 2a next** | dev, human | 0135/0136/0144 closed; **0134 open**. Gained Phase 2a on ADR-0160: the stroke moves to world space. 7 phases. |
 <!-- roster:end -->
+
+**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**
+ADR-0162 chose Ritmolux; the plan sweeps 1,318 live sites across every crate and so cannot be merged
+against a parallel branch. Its Phase 1 is a `human` stop gate that does not release `dev` until
+`git worktree list` prints one line — today that means [0148] and [0149] close first — and **no lane
+opens between that gate and Phase 9.** That gate's other half, the trademark check, was discharged
+2026-09-02: a knockout search found no `Ritmolux` on any register, and the risk of stopping there was
+accepted for a non-commercial project. So the freeze is the only thing left holding this plan.
 
 **Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
 — three new plans and one amendment, taking 21 of the ~30 live entries no plan claimed. The round's
@@ -84,6 +92,7 @@ shape, because most of what it decided was sequencing rather than design:
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: 0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: 0149-the-line-corners-stop-being-blunt.md
+[0150]: 0150-the-application-becomes-ritmolux.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
 [ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
 
@@ -175,7 +184,7 @@ one of the five closes backlog entries that had been sitting on a demonstrated w
 left unrouted — **both now closed, 2026-08-15**. [0089] is the three-item sitting (a falsified
 invariant plus two doc paragraphs that each named a home and never got a carrier); [0090] came out of
 an interview on the emitter's fixed source line
-([backlog 0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle),
+([backlog 0068](../design-backlog-archive.md),
 option 2, **closed and archived at 0090's close**) and shipped four scalars; the world they exist for
 is its `human` Phase 5 and stands. One item from that pass is deliberately **not** a plan:
 [ADR-0102](../adrs/0102-a-palette-coordinates-edge-is-a-per-preset-choice.md) records the
@@ -910,7 +919,7 @@ the rows above.
   two tunings of one. Both verdicts are a dated `Outcome` on
   [ADR-0104](../adrs/0104-the-emitters-source-is-authorable-geometry.md).
   **What is left is content-lane work, with the answers in hand:** author the **quiet drifting field**
-  (the sky [backlog 0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+  (the sky [backlog 0068](../design-backlog-archive.md)
   measured the emitter for and could not get past the gates) and the **point fountain / off-centre
   jet** (`source_width = 0` plus `pan_x`), and **rewrite `emitter_perseids.toml`'s header**, which
   still declares that look routed on two walls that are both down. It joins the standing sitting on
@@ -1030,6 +1039,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0136 - The gates can convict](done/0136-the-gates-can-convict.md) - closed 2026-09-02. Review: **one blocker, two majors, two minors, one nit.** Version: **0.100.1** (patch). Archived [nine backlog entries](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md) — closed 2026-09-01. Review: **no blockers, one major, four minors, one nit.** Version: **0.100.0** (minor). Archived [backlog 0130 + 0132 + 0151 + 0152](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0141 — The plugin's seams stop drifting](done/0141-the-plugin-seams-stop-drifting.md) — closed 2026-09-01. Review: **no blockers, two majors, three minors, two nits.** Version: **0.99.1** (patch). Archived [0105 + 0117 + 0118](../design-backlog-archive.md), filed 0177-0178. [Write-up](README-archive.md).
 - [0139 - The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md) - closed 2026-09-01. Review: **no blockers, one major, four minors, three nits.** Version: **0.99.0**. Archived [0111 + 0112](../design-backlog-archive.md), filed 0174-0176. [Write-up](README-archive.md).
@@ -1239,7 +1249,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0131]: done/0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
 [0135]: done/0135-the-show-night-surfaces-stop-lying.md
-[0136]: 0136-the-gates-can-convict.md
+[0136]: done/0136-the-gates-can-convict.md
 [0137]: done/0137-the-metrics-measure-light.md
 [0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
 [0139]: done/0139-the-render-path-validates-before-it-spends.md

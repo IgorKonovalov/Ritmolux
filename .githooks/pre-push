@@ -111,9 +111,19 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # archived the plan write-ups, and the section regrew 7.1x in eight days under its
 # own "One line per plan" heading). Same cost class again — a walk of the markdown
 # tree and a byte count per row.
+#
+# THAT GATE IS INVOKED TWICE, and the second invocation is not redundant. The
+# plain run exits 0 on a tree with no fat row in it and exits 0 on a detector that
+# has stopped matching anything, and those two states were indistinguishable at
+# all three of its call sites: replacing its row regexes with regexes that match
+# nothing reports `0 rows, 0 over cap` and goes green everywhere (backlog 0104).
+# `--self-test` is where the assertion lives - the fixture's exact counts, a floor
+# on the repository's, and the `file:line  N bytes (cap C)` reporting path, which
+# no other run of this gate reaches at all. Same cost class again, two more walks.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
+    run_step "node scripts/check-index-rows.mjs --self-test" node scripts/check-index-rows.mjs --self-test
     run_step "node scripts/check-backlog-claims.mjs" node scripts/check-backlog-claims.mjs
     run_step "node scripts/check-filter-figures.mjs" node scripts/check-filter-figures.mjs
     run_step "node scripts/check-comment-hygiene.mjs" node scripts/check-comment-hygiene.mjs

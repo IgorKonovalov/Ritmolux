@@ -18,7 +18,7 @@
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0082](../../adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) (**accepted** at this close, carrying the dated `Outcome` this plan wrote), supplementing [0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)
-> **Closes:** [design-backlog 0042](../../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback) — answered in place, append-only, original entry untouched.
+> **Closes:** [design-backlog 0042](../../design-backlog.md) — answered in place, append-only, original entry untouched.
 > **Leaves open:** the repair itself. A downbeat cue that is not bass energy has **no ADR and no
 > plan**; it stays a backlog pointer until someone takes it, because the fork it would decide
 > (a stronger accent feature versus a longer history window) is not yet a real fork — ADR-0082's

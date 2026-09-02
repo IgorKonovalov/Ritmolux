@@ -14,7 +14,7 @@ that could carry one. The only other mark-making model is the line families, whi
 generator's path: one figure, centred, whole-frame, and stroke-only.
 
 This surfaced from two user requests in one session
-([design-backlog 0033](../design-backlog.md#0033--every-mark-the-engine-can-draw-is-a-round-additive-blob-or-a-stroked-curve-so-no-object-has-a-shape)):
+([design-backlog 0033](../design-backlog.md)):
 a Solitaire-style cascade of hearts, and small seven-, eight- and nine-pointed stars twinkling on
 bass and beat. Both were rendered as far as the current surface reaches. The star half is the
 instructive one: `swarm` can put ten thousand small marks anywhere, but they are round;
@@ -166,7 +166,7 @@ variation. That gap is design-backlog 0068.
 
 - Measured evidence that the outline half is genuinely blocked and not merely untried: the cardioid
   through `parametric_curve` at `ink_amount = 1`, white paper, renders grey. Recorded in
-  [backlog 0033](../design-backlog.md#0033--every-mark-the-engine-can-draw-is-a-round-additive-blob-or-a-stroked-curve-so-no-object-has-a-shape).
+  [backlog 0033](../design-backlog.md).
 - The falloff to preserve is `g = max(0, 1 - d)^2` — quadratic, and the reason a wider `thickness`
   on the line family reads as *out of focus* past a point. The same curve over an SDF distance keeps
   the family's look consistent; changing the curve at the same time as the silhouette would make any

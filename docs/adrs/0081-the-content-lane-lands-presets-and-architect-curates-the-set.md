@@ -22,7 +22,7 @@ the worst kind, because nobody can tell whether it is load-bearing.
 `%APPDATA%\light-music-visualizer\presets\chthonic_coral_oracle.toml` — a reaction-diffusion preset
 composing Pearson-regime drift on bass, beat-stamped `inject` growth, trails and a breathing fold —
 **has never been tracked in git**. It is the preset that raised
-[backlog 0001](../design-backlog-archive.md#0001--reaction_diffusion-reaches-only-2-of-the-5-plan-0018-composite-levers)
+[backlog 0001](../design-backlog-archive.md)
 on 2026-07-24, which became [ADR-0026](0026-full-composite-coverage-fullscreen-scenes.md) and
 [Plan 0025](../plans/done/0025-full-composite-coverage.md). The preset that motivated a whole plan
 never came back into the repo, and the levers it asked for landed without the look that asked for
@@ -117,7 +117,7 @@ an existing ritual get run; calendars do not.
 ## Notes
 
 - The concrete case this was written against is
-  [backlog 0056](../design-backlog.md#0056--a-user-authored-preset-has-been-living-outside-the-repo-for-six-weeks-and-it-is-a-curation-candidate-the-boundary-has-no-route-for),
+  [backlog 0056](../design-backlog.md),
   which also records two rot findings in that file (`bar` is no longer a variable; `kaleido_order`
   is eased through non-integer values) — read them before rendering it, and render it before
   judging it.

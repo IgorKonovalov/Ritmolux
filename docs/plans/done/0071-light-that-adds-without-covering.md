@@ -16,7 +16,7 @@
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0085](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md), supplementing [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md)
-> **Closes:** [design-backlog 0040](../../design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+> **Closes:** [design-backlog 0040](../../design-backlog-archive.md)
 
 ## TL;DR
 
@@ -187,8 +187,8 @@ Two observations, offered as orientation and **not** as the Phase 3 verdict:
   ceiling is adjustable.
 - **Files touched:** presets under `presets/`.
 - **Done when:** judged in motion. **Worth running together with
-  [backlog 0038](../../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned)
-  and [0058](../../design-backlog.md#0058--thirteen-presets-bind-the-fold-and-eleven-of-them-have-not-chosen-an-edge-treatment-because-until-now-there-was-nothing-to-choose)**
+  [backlog 0038](../../design-backlog.md)
+  and [0058](../../design-backlog.md)**
   — all three are retunes of the same shipped set against a composite that moved underneath it, all
   three are judged over a lit backdrop, and doing them separately means walking the same presets
   three times.
