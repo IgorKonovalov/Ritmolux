@@ -1683,8 +1683,7 @@ fn drawn_calls(renderer: &mut Renderer, name: &str) -> u32 {
         &AnalysisFrame::default(),
         &mut encoder,
         &view,
-        width,
-        height,
+        (width, height),
         super::scenes::FALLBACK_DT,
         super::SaltMode::Pinned,
     );
