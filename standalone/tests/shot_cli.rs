@@ -1707,6 +1707,12 @@ fn a_render_that_cannot_name_its_preset_spends_nothing() {
     let out = run(&[
         "--render",
         &clip.to_string_lossy(),
+        // Pin the roster to this repository. Without it the resolver reads the
+        // per-user preset directory, which outranks the embedded set and is
+        // seeded write-if-absent - so a preset renamed under `presets/` leaves a
+        // stale copy there and the two key assertions below keep passing off it.
+        "--presets",
+        "presets",
         "--preset",
         "attractor_leviathan",
         "--ffmpeg",

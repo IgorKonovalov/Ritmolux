@@ -345,7 +345,8 @@ assumes the former and some ignore the latter outright.
 
 **Two of those four need saying twice, and that is why `-x264-params` is on the
 line.** The `-colorspace` flag is honoured by the libx264 path; `-color_primaries`
-and `-color_trc` are dropped by it. A file written with all three reads back
+and `-color_trc` are dropped by it. That was measured on **ffmpeg 8.1 (gyan.dev
+full build)** and on no second build. A file written with all three reads back
 
 ```
 color_range=pc  color_space=bt709  color_primaries=unknown  color_transfer=unknown

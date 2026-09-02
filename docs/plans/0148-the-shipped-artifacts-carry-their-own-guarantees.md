@@ -328,6 +328,7 @@ $ComponentWarnBytes = 11324620
 | 3 — What the container actually carries | dev | done | 393a332 |
 | 4 — The recipe reads its own output's length | dev | done | 690fb29 |
 | 5 — The second bisect | dev | **not run — held** | |
+| 6 — The repairs the close review found | dev | done | committed with this row |
 
 ### Notes
 
