@@ -490,33 +490,31 @@ impl Renderer {
         ))
     }
 
-    /// Renderer targeting a native Win32 window the host owns — the C ABI
-    /// path (foobar2000 shim). Starts with the embedded default presets (no
-    /// ABI surface for preset selection yet).
+    /// Renderer targeting a surface the host owns and built the handle for —
+    /// the C ABI path, and the only constructor that does not create its own
+    /// surface. Starts with the embedded default presets (no ABI surface for
+    /// preset selection yet).
+    ///
+    /// **The platform lives on the caller's side of this seam, not here**
+    /// (ADR-0001, ADR-0072): the host knows what kind of window it has and
+    /// builds the [`wgpu::SurfaceTargetUnsafe`] for it, so `core` stays
+    /// source-agnostic and platform-free. `core-cabi` is the one that knows
+    /// about `HWND`.
     ///
     /// Auto tier: the plugin gets rich-with-governor, because the C ABI stays v4
     /// and a plugin-side tier picker is a future ABI question rather than part of
     /// ADR-0045.
     ///
     /// # Safety
-    /// `hwnd` must be a valid window handle that outlives this renderer.
-    #[cfg(windows)]
-    pub unsafe fn new_from_win32_hwnd(
-        hwnd: std::num::NonZeroIsize,
+    /// `target`'s handles must be valid and must outlive this renderer.
+    pub unsafe fn new_from_surface_target(
+        target: wgpu::SurfaceTargetUnsafe,
         width: u32,
         height: u32,
     ) -> Result<Self, RenderError> {
-        let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-            raw_display_handle: Some(wgpu::rwh::RawDisplayHandle::Windows(
-                wgpu::rwh::WindowsDisplayHandle::new(),
-            )),
-            raw_window_handle: wgpu::rwh::RawWindowHandle::Win32(
-                wgpu::rwh::Win32WindowHandle::new(hwnd),
-            ),
-        };
         // The `unsafe` is exactly the surface-from-raw-handle call: the caller's
-        // promise about `hwnd`'s validity and lifetime. Construction past that
-        // point is the same safe code the other two paths run.
+        // promise about the handles' validity and lifetime. Construction past
+        // that point is the same safe code the other two paths run.
         // `RendererOptions::default()` carries `AdapterChoice::Default`, which
         // is the request this path made before the choice was a parameter — the
         // shim has no flag surface to select an adapter with, and the C ABI
