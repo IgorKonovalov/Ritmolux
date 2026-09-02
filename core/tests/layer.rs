@@ -713,7 +713,7 @@ fn a_dark_particle_layer_in_a_multiply_slot() {
 /// capability — a dark figure on a light ground, which is the one thing in this
 /// suite that would notice the darkening modes regressing into additive ones.
 ///
-/// `LMV_BLESS=1 cargo test -p rlx-core --test layer` rewrites these two — and,
+/// `RLX_BLESS=1 cargo test -p rlx-core --test layer` rewrites these two — and,
 /// run against the whole suite instead of this one binary, **every other
 /// baseline as well**. Bless by `--test layer` and check `git status`. Both
 /// baselines were adapter-compared before blessing (the ADR-0058 standing
@@ -732,7 +732,7 @@ fn layered_fixtures_match_golden_baselines() {
         return;
     };
     let frame = fixed_frame();
-    let bless = std::env::var_os("LMV_BLESS").is_some();
+    let bless = std::env::var_os("RLX_BLESS").is_some();
     std::fs::create_dir_all(&golden_dir).expect("create tests/golden");
 
     let decode = |path: &PathBuf| -> CaptureImage {
@@ -788,7 +788,7 @@ fn layered_fixtures_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test layer`",
+            "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test layer`",
             path.display()
         );
         let baseline = decode(&path);
@@ -806,7 +806,7 @@ fn layered_fixtures_match_golden_baselines() {
     assert!(
         failures.is_empty(),
         "layered golden drift beyond tolerance — the join's routing, the blend, or a \
-         layer scene's rendering has changed. Bless with LMV_BLESS=1 only if intended: \
+         layer scene's rendering has changed. Bless with RLX_BLESS=1 only if intended: \
          {failures:#?}"
     );
 }

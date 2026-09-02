@@ -46,7 +46,7 @@ const CHAR_W: f32 = ROW_SIZE * 0.62;
 const COL_CHARS: usize = 26;
 /// Characters of the **name** a column can show before [`fit`] truncates it. The
 /// longest shipped preset name is 15, so truncation never fires on the embedded
-/// set; it exists for a custom `LMV_PRESET_DIR`.
+/// set; it exists for a custom `RLX_PRESET_DIR`.
 pub const NAME_CHARS: usize = COL_CHARS - 2;
 /// Gap between columns, so two full-width names do not touch.
 const COL_GUTTER: f32 = 24.0;

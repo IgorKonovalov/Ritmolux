@@ -55,9 +55,9 @@
 //!   --help, -h               print the usage text and exit 0
 //!
 //! Which preset library is used, highest precedence first: `--preset-file`,
-//! `--presets`, the `LMV_PRESET_DIR` override, the per-user preset directory,
+//! `--presets`, the `RLX_PRESET_DIR` override, the per-user preset directory,
 //! the embedded defaults. The app resolves the last three through the very same
-//! `standalone` library function (ADR-0014), so `LMV_PRESET_DIR=./presets` points
+//! `standalone` library function (ADR-0014), so `RLX_PRESET_DIR=./presets` points
 //! the running window and a headless capture at one editable folder.
 //!
 //! Exit code is non-zero with a message on any bad argument or failure.
@@ -141,7 +141,7 @@ struct Args {
     /// `--tier floor|rich`: the quality tier to capture at. **Floor by default**
     /// — a capture is a pure function of its inputs (NFR §6) and every golden
     /// baseline is blessed at the floor, so raising it is an explicit act. There
-    /// is deliberately no `LMV_TIER` read here: an ambient environment variable
+    /// is deliberately no `RLX_TIER` read here: an ambient environment variable
     /// silently changing what a capture renders is the reproducibility hazard the
     /// pin exists to prevent (ADR-0045).
     tier: Tier,
@@ -393,7 +393,7 @@ fn print_usage() {
         "shot — headless capture / visual-QA (Plan 0013)\n\
          \n\
          --preset <name>            single-shot the named preset (needs --out)\n\
-         --presets <dir>            library directory (beats LMV_PRESET_DIR)\n\
+         --presets <dir>            library directory (beats RLX_PRESET_DIR)\n\
          --preset-file <path>       one preset from a file (beats --presets)\n\
          --set k=v,...              bass,mid,treb,onset (normalized 0..1) and\n\
          their bass_raw,mid_raw,treb_raw,onset_raw twins,\n\
@@ -442,7 +442,7 @@ fn print_usage() {
 
 /// Load the preset library, highest precedence first: `--preset-file` (a
 /// one-entry roster), `--presets <dir>`, the shared resolver (which honors
-/// `LMV_PRESET_DIR`, else the per-user directory), the embedded defaults.
+/// `RLX_PRESET_DIR`, else the per-user directory), the embedded defaults.
 /// Returns the presets and a label naming which source won.
 ///
 /// The two explicit flags are errors when they yield nothing — an agent that

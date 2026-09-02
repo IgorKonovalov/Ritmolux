@@ -2,7 +2,7 @@
 //! This guard defends **engine rendering determinism**, not shipped content: it
 //! renders one **frozen per-system fixture** headless on the software adapter
 //! and compares each frame against a committed baseline PNG within a mean +
-//! max-outlier tolerance. `LMV_BLESS=1` rewrites the baselines.
+//! max-outlier tolerance. `RLX_BLESS=1` rewrites the baselines.
 //!
 //! The fixtures live as do-not-tune TOML under `tests/fixtures/`, one per
 //! [`SystemKind`], selected by an **exhaustive** match (see [`fixture`]) so a new
@@ -165,7 +165,7 @@ fn scenes_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame_spectrum();
-    let bless = std::env::var_os("LMV_BLESS").is_some();
+    let bless = std::env::var_os("RLX_BLESS").is_some();
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
@@ -188,7 +188,7 @@ fn scenes_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test golden`",
+            "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test golden`",
             path.display()
         );
         let baseline = common::decode(&path);
@@ -215,7 +215,7 @@ fn scenes_match_golden_baselines() {
 
     assert!(
         failures.is_empty(),
-        "golden drift beyond tolerance (bless with LMV_BLESS=1 if intended): {failures:#?}"
+        "golden drift beyond tolerance (bless with RLX_BLESS=1 if intended): {failures:#?}"
     );
 }
 

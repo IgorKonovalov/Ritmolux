@@ -11,7 +11,7 @@ and reach neither the binary nor the behavioral suite.
 **Shipping one is a `git mv` into `presets/`**, gated on `cargo nextest run -p rlx-core` — the same
 gate every other preset passes. Nothing else has to change.
 
-**To work on one in the running app**, point `LMV_PRESET_DIR` at this directory (ADR-0014); the app
+**To work on one in the running app**, point `RLX_PRESET_DIR` at this directory (ADR-0014); the app
 hot-reloads it on a ~150 ms poll exactly as it does the shipped folder.
 
 This directory is **not** a parking lot for work in progress or for looks that failed on their

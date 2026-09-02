@@ -138,7 +138,7 @@ impl Default for Hud {
 ///
 /// Persisted because a pin is a property of the *machine*, not of a run: an
 /// operator who has decided their iGPU wants the floor should not have to pass
-/// `--tier floor` at every launch. `--tier` and `LMV_TIER` still win over this,
+/// `--tier floor` at every launch. `--tier` and `RLX_TIER` still win over this,
 /// in that order.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]

@@ -44,7 +44,7 @@ pub const DWELL_CEILING: u32 = 900;
 pub enum TierState {
     /// The engine resolved it and the governor may still demote it.
     Auto,
-    /// Explicitly pinned — at launch (`--tier`, `LMV_TIER`, `[quality] tier`) or
+    /// Explicitly pinned — at launch (`--tier`, `RLX_TIER`, `[quality] tier`) or
     /// by this menu / the `[` `]` keys.
     Pinned,
     /// The frame-time governor took it down. Distinguished from `Pinned` because
@@ -346,7 +346,7 @@ impl SettingsRow {
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
             SettingsRow::Console => SettingsAction::ToggleConsole,
             // Read-only: it tells you where presets are loaded from, which is a
-            // launch-time resolution (`LMV_PRESET_DIR`, then the per-user dir),
+            // launch-time resolution (`RLX_PRESET_DIR`, then the per-user dir),
             // not a thing a menu can move.
             SettingsRow::Presets => SettingsAction::None,
         }

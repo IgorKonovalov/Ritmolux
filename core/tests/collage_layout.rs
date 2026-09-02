@@ -9,7 +9,7 @@
 //!
 //! # Where the images go, and why they are not committed
 //!
-//! `LMV_SAMPLE_DIR=<dir> cargo test -p rlx-core --test collage_layout` writes the
+//! `RLX_SAMPLE_DIR=<dir> cargo test -p rlx-core --test collage_layout` writes the
 //! sheet there and prints the path. Without the variable the sweep still runs
 //! and asserts, and writes nothing: these are **samples for a human to look at
 //! once**, not baselines. Committing twenty PNGs that no test compares against
@@ -184,16 +184,16 @@ fn a_seed_and_a_grammar_both_reach_the_frame() {
 }
 
 /// **The sample sheet.** Writes one PNG per `(grammar, seed)` cell at 1080p into
-/// `$LMV_SAMPLE_DIR` and prints the path. Without that variable it renders
+/// `$RLX_SAMPLE_DIR` and prints the path. Without that variable it renders
 /// nothing and says so — see the module docs on why these are not committed.
 ///
 /// Hardware if there is any: these are looked at, and the software rasterizer
 /// would take minutes to draw twenty 1080p frames for no gain in what they show.
 #[test]
 fn the_sample_sheet_renders() {
-    let Some(dir) = std::env::var_os("LMV_SAMPLE_DIR") else {
+    let Some(dir) = std::env::var_os("RLX_SAMPLE_DIR") else {
         eprintln!(
-            "skipped: set LMV_SAMPLE_DIR=<dir> to write the Phase 5 sample sheet \
+            "skipped: set RLX_SAMPLE_DIR=<dir> to write the Phase 5 sample sheet \
              ({} grammars x {} seeds at {WIDTH}x{HEIGHT})",
             GRAMMARS.len(),
             SEEDS.len(),

@@ -729,7 +729,7 @@ authoritative table for what each does.
 **Converted MilkDrop presets do not ship** (Plan 0100 Phase 8, user's call 2026-08-16: decided
 later, nothing distributed now). The public `.milk` collections have no clear licensing, so no
 converted preset enters this repository or a release; the `milkconv` converter plus a directory
-you point `LMV_PRESET_DIR` at is the whole import path. The question is re-raised when the
+you point `RLX_PRESET_DIR` at is the whole import path. The question is re-raised when the
 conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 
 > **If you already have a converted directory, re-run `milkconv` over it.** The feedback field now
@@ -1283,18 +1283,18 @@ why "edit once, both frontends see it" works.
    | macOS | `~/Library/Application Support/light-music-visualizer/presets` |
    | Linux/other | `$XDG_DATA_HOME/light-music-visualizer/presets` (or `~/.local/share/light-music-visualizer/presets`) |
 
-### A custom preset folder: `LMV_PRESET_DIR`
+### A custom preset folder: `RLX_PRESET_DIR`
 
-Set the **`LMV_PRESET_DIR`** environment variable to point the Rust frontends at
+Set the **`RLX_PRESET_DIR`** environment variable to point the Rust frontends at
 any folder instead of the per-user directory above
 ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)):
 
 ```bash
 # Windows (PowerShell) — run the app against a folder you keep elsewhere
-$env:LMV_PRESET_DIR = "D:\my-presets"; cargo run -p standalone --release
+$env:RLX_PRESET_DIR = "D:\my-presets"; cargo run -p standalone --release
 
 # macOS / Linux
-LMV_PRESET_DIR=~/my-presets cargo run -p standalone --release
+RLX_PRESET_DIR=~/my-presets cargo run -p standalone --release
 ```
 
 - Both the **standalone app** and the headless **`shot` CLI** honor it, through

@@ -4,7 +4,7 @@ One preset, kept so the **same frame** can be re-measured after the dither lands
 A before/after taken on two different pictures would prove nothing, and the
 temporary directory the original measurement ran in does not survive a session.
 
-Not a fixture. Nothing includes it, no test names it, `LMV_BLESS` does not touch
+Not a fixture. Nothing includes it, no test names it, `RLX_BLESS` does not touch
 it, and `core/build.rs` cannot see it (it globs `presets/*.toml` only). Same
 arrangement as [`scratch-0046/`](../scratch-0046/README.md), for the same reason:
 a phase that needs a preset needs somewhere to keep one.
@@ -33,7 +33,7 @@ To look at it live instead — the app hot-reloads an edit within ~150 ms, so th
 exponent can be swept without restarting:
 
 ```sh
-LMV_PRESET_DIR=core/tests/fixtures/scratch-0082 cargo run -p standalone --release
+RLX_PRESET_DIR=core/tests/fixtures/scratch-0082 cargo run -p standalone --release
 ```
 
 ## What was measured, 2026-08-12, before the dither
@@ -100,7 +100,7 @@ depend on this picture.
 ## The by-eye verdict, 2026-08-12 — **it looks fine**
 
 Plan 0082's Phase 5, the `human` one, run on this preset in the live app: release
-build, `LMV_PRESET_DIR` pointed here, `rich` tier (pinned by the operator's own
+build, `RLX_PRESET_DIR` pointed here, `rich` tier (pinned by the operator's own
 `config.toml`, which is a *different* tier from every capture above — captures
 pin `floor`; the backdrop has no tier-dependent budget, so the ramp is the same
 one). The user's verdict on both halves was **"looks fine"**.

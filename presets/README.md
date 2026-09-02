@@ -12,7 +12,7 @@ copy. Point both frontends at this folder instead and edit in place — the app
 hot-reloads within ~150 ms, no rebuild:
 
 ```sh
-$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerShell
+$env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerShell
 cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --out a.png
 ```
 

@@ -32,7 +32,7 @@
 //!
 //! The two are **not** redundant, and neither replaces the other. The baseline
 //! catches a silent change; the relative assertion says *why* the change
-//! matters. So the relative assertion runs **first, including under `LMV_BLESS`**
+//! matters. So the relative assertion runs **first, including under `RLX_BLESS`**
 //! — the notch therefore cannot be blessed back in by someone who reads the diff
 //! as drift, because the bless never runs. That ordering is the whole answer to
 //! "a baseline can always be re-blessed".
@@ -45,7 +45,7 @@
 //! The pin follows `composite.rs` rather than joining `golden.rs`: that roster is
 //! one fixture per `SystemKind`, enforced by `systems_rosters_every_variant`, and
 //! a second `spectrum` entry would break the invariant ADR-0023 rests on. Its own
-//! binary also means `LMV_BLESS=1 cargo test -p rlx-core --test line_joints`
+//! binary also means `RLX_BLESS=1 cargo test -p rlx-core --test line_joints`
 //! rewrites **this** baseline and cannot reach the roster.
 
 use rlx_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
@@ -331,17 +331,17 @@ fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
 /// probes do not look — a gentler turn, a free end, the falloff — moves a file
 /// instead of passing quietly. It is the coarse net under the sharp claim.
 ///
-/// `LMV_BLESS=1 cargo test -p rlx-core --test line_joints` rewrites this one
+/// `RLX_BLESS=1 cargo test -p rlx-core --test line_joints` rewrites this one
 /// baseline. Scoped to this binary it **cannot** reach the `golden.rs` roster:
 /// that suite renders `SystemKind::ALL` and is not built by this invocation. Run
-/// against the whole suite (`cargo test` with `LMV_BLESS` set) it would rewrite
+/// against the whole suite (`cargo test` with `RLX_BLESS` set) it would rewrite
 /// every baseline in the repository — bless by `--test line_joints` and check
 /// `git status`, the trap that cost Plan 0039 two manual restores.
 fn compare_against_baseline(img: &CaptureImage) {
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
     let path = common::golden_dir().join(format!("{BASELINE_STEM}.png"));
 
-    if std::env::var_os("LMV_BLESS").is_some() {
+    if std::env::var_os("RLX_BLESS").is_some() {
         common::encode(img, &path);
         println!("blessed {}", path.display());
         return;
@@ -349,7 +349,7 @@ fn compare_against_baseline(img: &CaptureImage) {
 
     assert!(
         path.exists(),
-        "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test line_joints`",
+        "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test line_joints`",
         path.display()
     );
     let baseline = common::decode(&path);
@@ -363,7 +363,7 @@ fn compare_against_baseline(img: &CaptureImage) {
         "the joined polyline has drifted from its baseline: mean {mean:.4} / outlier \
          {outlier} exceeds tolerance. The stroke still passes the local-minimum claim, \
          so this is a change in *how* the joint renders rather than the notch \
-         reopening. Bless with LMV_BLESS=1 only if that change was intended \
+         reopening. Bless with RLX_BLESS=1 only if that change was intended \
          (ADR-0041)."
     );
 }

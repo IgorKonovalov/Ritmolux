@@ -45,12 +45,12 @@ audio one of two ways:
 
 ## Pointing `shot` at your draft — just name the file
 
-There is no `%APPDATA%` copy-over dance (that was true before `LMV_PRESET_DIR` landed). Precedence,
+There is no `%APPDATA%` copy-over dance (that was true before `RLX_PRESET_DIR` landed). Precedence,
 highest first:
 
 1. `--preset-file <path>` — exactly one preset from that file. `--preset` is then unnecessary.
 2. `--presets <dir>` — every `*.toml` in that directory.
-3. `LMV_PRESET_DIR` — the environment override.
+3. `RLX_PRESET_DIR` — the environment override.
 4. The per-user preset directory.
 5. The presets compiled into the binary.
 
@@ -61,7 +61,7 @@ capture prints a `[source]` label naming the winner, so a PNG's provenance is ne
 The live-iteration loop is the same override in a shell:
 
 ```powershell
-$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release   # app reloads an edit in ~150 ms
+$env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # app reloads an edit in ~150 ms
 ```
 
 The app **never seeds** into an override folder — it is yours.

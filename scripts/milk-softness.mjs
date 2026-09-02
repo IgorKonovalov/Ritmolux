@@ -252,7 +252,7 @@ const index = [
   "  Copy the `.milk` files from this directory into it. In the MilkDrop window,",
   "  `L` opens the preset browser and `SCROLL LOCK` pins the current preset.",
   "- **Our side:** `target\\release\\lmv.exe`. It does not read `.milk`, so point",
-  "  `LMV_PRESET_DIR` at this directory — the `.toml` bundles beside them are the",
+  "  `RLX_PRESET_DIR` at this directory — the `.toml` bundles beside them are the",
   "  same presets converted, and `Tab` filters by name.",
   "- **One track in foobar feeds both**: the component reads it directly and `lmv`",
   "  picks it up over loopback. Play the same thing for both sides.",

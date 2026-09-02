@@ -174,7 +174,7 @@ pub fn golden_dir() -> PathBuf {
         .join("golden")
 }
 
-/// Write a capture out as the baseline PNG at `path`. `LMV_BLESS=1` is what
+/// Write a capture out as the baseline PNG at `path`. `RLX_BLESS=1` is what
 /// reaches this.
 pub fn encode(img: &CaptureImage, path: &Path) {
     let buffer = image::RgbaImage::from_raw(img.width, img.height, img.rgba.clone())

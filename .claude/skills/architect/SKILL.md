@@ -595,7 +595,7 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    actually landed, per ADR-0005.
 
    The version lives once, in root `Cargo.toml` `[workspace.package].version`; both crates inherit
-   it. This is a separate axis from the C ABI version (`LMV_ABI_VERSION`), which moves only on an
+   it. This is a separate axis from the C ABI version (`RLX_ABI_VERSION`), which moves only on an
    `extern "C"` shape change (ADR-0003) — never couple the two.
 
    **If a parallel lane is live, `cargo release` will refuse** — it aborts on *any* dirty file

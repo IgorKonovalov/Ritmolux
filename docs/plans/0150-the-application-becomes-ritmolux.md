@@ -360,8 +360,8 @@ flowchart TB
 | 1 — the name is cleared and the tree is frozen | human | done | no files touched |
 | 2 — the crates take the prefix | dev | done | c093dc7 |
 | 3 — the C ABI takes the prefix | dev | done | 55fa009 |
-| 4 — the shipped artifacts take the name | dev | done | committed with this row |
-| 5 — the environment takes the prefix | dev | not started | |
+| 4 — the shipped artifacts take the name | dev | done | 3d0b223 |
+| 5 — the environment takes the prefix | dev | done | committed with this row |
 | 6 — the user's machine is migrated | dev | not started | |
 | 7 — the strings a user reads | dev | not started | |
 | 8 — the live documentation, and the gates that name paths | dev | not started | |
@@ -467,6 +467,49 @@ image. The DLL is 9,804,288 B, 77.9 % of NFR section 4's 12,582,912 B cap.
 Visualizer` prose in the three `READ-ME-FIRST.md`, the window and `ui_element` titles in
 `foo_ritmolux.cpp` (Phase 7), and the `%APPDATA%\light-music-visualizer` paths in the same file
 (Phase 6). Phase 8's grep matches `light.music.visualizer` and is what closes the remainder.
+
+**Three scene seeds are the old name in ASCII, and Phase 5's done-when as written would have
+moved their goldens.** `reaction_diffusion.rs`, `swarm.rs` and `emitter.rs` each hold a `SEED: u64`
+whose bytes spell a prefixed name — `0x4C4D_565F_5244_5F31`, `0x4C4D_565F_5357_524D`,
+`0x4C4D_565F_454D_4954` — each with a comment quoting that spelling. The done-when says no `LMV_`
+may survive anywhere, and the obvious way to satisfy it is to re-spell the comment *and* the
+constant. **The constant is the RNG seed**, so re-spelling it changes the scatter, every particle's
+start state and every spawn, and moves the goldens of three scenes — which is the one thing this
+plan forbids. **The values are unchanged and only the comments moved**, rewritten to carry the trap
+(the bytes are a number, not a label) instead of the old spelling. Anyone reading the done-when
+without running the suite lands on the wrong side of this.
+
+**A fourth seed escapes every grep in the plan.** `reaction_diffusion.rs`'s
+`INJECT_SEED = 0x4C4D_5244_494E_4A31` is ASCII `"LMRDINJ1"` — no `LMV_`, no `lmv[-_]`, so neither
+Phase 5's grep nor Phase 8's sees it. Left as it is, for the same reason: changing it would move a
+golden.
+
+**Phase 5's grep reaches well past "all seven environment variables move".** Satisfying it also
+required the five WGSL warp constants in `core/src/render/feedback.rs`, the `LMV_ABI_VERSION`
+references in `Cargo.toml`, `release.toml`, `core/src/diag/mod.rs`, `docs/releasing.md` and the
+architect skill, a comment naming a hypothetical `LMV_INPUT` in `standalone/src/main.rs`, and two
+**live plans** (0126 and 0133) that the grep's exclusion list does not exempt. The done-when is the
+contract, so all of them moved; none is an environment variable.
+
+**`RLX_BLESS` was verified by observation, and the verification itself moved a golden.** Running
+the golden target under `RLX_BLESS=1` rewrote `shape_collage.png` — which is the proof the variable
+is wired, since an unread variable and a satisfied one are indistinguishable from a passing test.
+The rewrite produced **different bytes for an image whose comparison had just passed**, the local
+re-encode drift already on record for this repo. It was restored from `HEAD` and verified
+byte-identical. **No golden has moved in this plan**; this one moved under a deliberate bless and
+was put back.
+
+**The rule applied to dated documents, after Phase 4's finding:** a *quoted observation* keeps the
+old name, a *named tool that still exists* takes the new one. So `"Components list reads
+Light Music Visualizer 0.70.0 / foo_lmv"` stayed in Phase 4, while `LMV_BLESS` and
+`LMV_PRESET_DIR` inside methodological guidance in `docs/plans/README.md`,
+`docs/design-backlog.md` and `docs/on-device-validation.md` became `RLX_*` — a reader told *"that
+is the form to reuse"* needs the name that works today.
+
+**Pre-existing drift, noticed and deliberately not fixed:** `core/src/diag/mod.rs` states that the
+ABI version *"is still 4"* when it is 6, and points at `core/tests/ffi.rs` when the file is
+`core-cabi/tests/ffi.rs`. Both predate this plan and neither is a rename defect; fixing them here
+would be scope this plan did not ask for.
 
 ### Close triggers
 

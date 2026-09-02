@@ -1695,7 +1695,7 @@ At least four routes, and they differ on the question this project has already d
 than on mechanism:
 
 1. **Ship nothing, load from the user's own `textures/` directory** — the same shape as
-   `LMV_PRESET_DIR` today. No provenance question at all, because nothing third-party enters the
+   `RLX_PRESET_DIR` today. No provenance question at all, because nothing third-party enters the
    repository; the user who has the preset pack already has its textures. Cheapest, and the most
    consistent with Phase 8's standing answer.
 2. **Substitute procedurally.** The six built-in noise textures already exist and 51 % of the corpus

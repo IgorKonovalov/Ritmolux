@@ -20,7 +20,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   diagnostics overlay and on stderr, never silently. There is no auto-promotion: a demotion is
   predictable and testable, where an oscillating or continuously feature-shedding design is
   neither (ADR-0045 Alternatives A/B).
-- **Pinning:** `--tier floor|rich`, `LMV_TIER`, or `config.toml`'s `[quality] tier`, in that
+- **Pinning:** `--tier floor|rich`, `RLX_TIER`, or `config.toml`'s `[quality] tier`, in that
   precedence. A pin is honoured in both directions and the governor never touches it — which is
   the escape hatch for a capable machine that a transient stall demoted. An **in-app** change also
   pins, and clears the governor's demotion latch: ADR-0045's "the latch is never cleared" narrows
@@ -408,7 +408,7 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
 - **A show configuration is a different workload, and it plateaus near ~800 MB (measured
   2026-08-29/30, the first full live set).** 8h08m, 3,505,083 frames, **zero dropped**, 120.0 fps
   flat end to end, on the show notebook — **not** the reference AMD iGPU box — at Rich tier with the
-  operator console open and 18 presets rotating from an `LMV_PRESET_DIR`. Working set was 678 MB
+  operator console open and 18 presets rotating from an `RLX_PRESET_DIR`. Working set was 678 MB
   early, climbed to ~795 MB, then went **flat**: three consecutive half-hours at 795.4 MB, later
   settling 799.5 → 808.3 MB in discrete steps with flat stretches between. Handles pinned at exactly
   370 across six hours, threads at 5, `gpu_bytes` at 15.8 MB from first sample to last. The

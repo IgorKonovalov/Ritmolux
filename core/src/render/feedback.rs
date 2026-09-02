@@ -291,17 +291,17 @@ impl Transform {
 pub(crate) const TRANSFORM_WGSL: &str = r#"
 // The `[feedback] warp` roster, as the CPU writes it — keep in step with
 // `feedback::Warp::code`.
-const LMV_WARP_SWIRL:   f32 = 1.0;
-const LMV_WARP_RIPPLE:  f32 = 2.0;
-const LMV_WARP_FISHEYE: f32 = 3.0;
+const RLX_WARP_SWIRL:   f32 = 1.0;
+const RLX_WARP_RIPPLE:  f32 = 2.0;
+const RLX_WARP_FISHEYE: f32 = 3.0;
 
 // Radius (in frame-heights) at which the swirl has faded to ~1/e of its centre
 // strength. Just over half a frame-height, so the vortex is a whole-frame gesture
 // that still leaves the corners nearly still.
-const LMV_SWIRL_SIGMA: f32 = 0.35;
+const RLX_SWIRL_SIGMA: f32 = 0.35;
 // Ripple spatial frequency, rad per frame-height: ~2.9 wave crests between the
 // centre and the top edge.
-const LMV_RIPPLE_FREQ: f32 = 18.0;
+const RLX_RIPPLE_FREQ: f32 = 18.0;
 
 // The curated procedural warp, in the same centred isotropic space the affine
 // works in and about the same `fb_center_*`. Displaces the SOURCE coordinate, so
@@ -314,21 +314,21 @@ fn lmv_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
     let kind = wp.x;
     let k = wp.y;
     let r = length(p);
-    if (kind == LMV_WARP_SWIRL) {
+    if (kind == RLX_WARP_SWIRL) {
         // Rotate by an angle that falls off as a Gaussian in radius — smooth
         // everywhere, unlike a linear falloff's kink at the cutoff radius.
-        let a = k * exp(-(r * r) / (2.0 * LMV_SWIRL_SIGMA * LMV_SWIRL_SIGMA));
+        let a = k * exp(-(r * r) / (2.0 * RLX_SWIRL_SIGMA * RLX_SWIRL_SIGMA));
         let c = cos(a);
         let s = sin(a);
         return vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);
     }
-    if (kind == LMV_WARP_RIPPLE) {
+    if (kind == RLX_WARP_RIPPLE) {
         // Radial displacement by a standing wave in r. The guarded divide keeps
         // the direction defined at the exact centre, where there is no direction.
         let dir = p / max(r, 1e-4);
-        return p - dir * (k * sin(r * LMV_RIPPLE_FREQ));
+        return p - dir * (k * sin(r * RLX_RIPPLE_FREQ));
     }
-    if (kind == LMV_WARP_FISHEYE) {
+    if (kind == RLX_WARP_FISHEYE) {
         return p * (1.0 + k * r * r);
     }
     return p;

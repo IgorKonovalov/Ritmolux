@@ -51,7 +51,7 @@ pub use crate::dsp::downbeat::DownbeatTerms;
 /// compile-time assertion over there rather than left to whoever edits this line.
 pub(crate) const RING: usize = 240;
 
-/// A snapshot of the current diagnostics, mirroring the C ABI `LmvMetrics`
+/// A snapshot of the current diagnostics, mirroring the C ABI `RlxMetrics`
 /// struct (ADR-0008) on the native side so both frontends surface identical
 /// numbers from one computation.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -78,7 +78,7 @@ pub struct Metrics {
 ///
 /// # Why this is a second struct rather than six more fields on `Metrics`
 ///
-/// [`Metrics`] claims, in its doc comment, to mirror the C ABI's `LmvMetrics`.
+/// [`Metrics`] claims, in its doc comment, to mirror the C ABI's `RlxMetrics`.
 /// Growing it would either widen the C ABI or quietly make that claim false, and
 /// ADR-0052 chose neither: these values stay **native-only**, so the split makes
 /// "does not cross the ABI" a property of the type instead of a comment on a
@@ -90,10 +90,10 @@ pub struct Metrics {
 /// diagnostics **programmatically** — no `lmv_get_metrics` counterpart, so
 /// nothing on that path can compute a lock rate — and it is the one frontend
 /// that never touches loopback capture. It does get them **on screen**: this
-/// overlay is core-drawn, so a host setting `LMV_DEBUG_OVERLAY` paints the same
+/// overlay is core-drawn, so a host setting `RLX_DEBUG_OVERLAY` paints the same
 /// six rows the standalone's `F3` does (Plan 0049 close review corrected
 /// ADR-0052 on that point; see its Outcome section). If the estimator ever needs
-/// the machine-readable half on that path, `LmvMetrics` still leads with
+/// the machine-readable half on that path, `RlxMetrics` still leads with
 /// `struct_size`, so the growth is available — behind a superseding ADR.
 ///
 /// Exactly the six values Plan 0048 Phase 6 needs to make its two judgements:
@@ -501,12 +501,12 @@ mod tests {
         assert!(downbeat_locked);
     }
 
-    /// ADR-0052 keeps `Metrics`'s "mirrors `LmvMetrics`" claim literally true by
+    /// ADR-0052 keeps `Metrics`'s "mirrors `RlxMetrics`" claim literally true by
     /// putting the analysis values on their own type. This exhaustive destructure
     /// is what enforces it: adding a field to `Metrics` stops compiling here, so a
     /// later plan has to come and read this comment before widening the mirror.
-    /// `core/tests/ffi.rs` holds the other half — `LmvMetrics` is still 56 bytes
-    /// and `LMV_ABI_VERSION` is still 4.
+    /// `core/tests/ffi.rs` holds the other half — `RlxMetrics` is still 56 bytes
+    /// and `RLX_ABI_VERSION` is still 4.
     #[test]
     fn metrics_still_carries_exactly_the_mirrored_fields() {
         let Metrics {

@@ -19,7 +19,7 @@ default-members = ["core", "rlx-ring", "standalone"]
 [workspace.package]
 # Single source of truth for the application version (ADR-0005). Member crates
 # inherit it via `version.workspace = true`; cargo-release bumps this one line
-# once per plan at the architect close. Separate axis from LMV_ABI_VERSION.
+# once per plan at the architect close. Separate axis from RLX_ABI_VERSION.
 version = "0.102.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"

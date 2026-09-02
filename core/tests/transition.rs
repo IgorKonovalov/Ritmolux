@@ -7,7 +7,7 @@
 //! rather than a jump, that it is reproducible from the injected `dt`, and that
 //! ink's poles move continuously across a dissolve between two inked presets.
 //!
-//! Set `LMV_TRANSITION_STRIP=<dir>` to also write each transition window as a
+//! Set `RLX_TRANSITION_STRIP=<dir>` to also write each transition window as a
 //! filmstrip PNG for eyeballing; the assertions below are what actually guards
 //! the behavior.
 
@@ -57,11 +57,11 @@ fn capture_run(renderer: &mut Renderer, frame: &AnalysisFrame, count: usize) -> 
 }
 
 /// Write the captured window as a horizontal filmstrip, when
-/// `LMV_TRANSITION_STRIP` names a **directory**. Purely for eyeballing — never
+/// `RLX_TRANSITION_STRIP` names a **directory**. Purely for eyeballing — never
 /// asserted on. `label` names the file, so the tests (which the harness runs on
 /// separate threads) never race onto one path.
 fn maybe_write_strip(frames: &[CaptureImage], every: usize, label: &str) {
-    let Some(dir) = std::env::var_os("LMV_TRANSITION_STRIP") else {
+    let Some(dir) = std::env::var_os("RLX_TRANSITION_STRIP") else {
         return;
     };
     let path = std::path::Path::new(&dir).join(format!("{label}.png"));

@@ -8,7 +8,7 @@
 # dependency - it never enters the shipped binary or the cargo-deny audit surface.
 #
 # Usage at close: `cargo release <patch|minor> --no-push` (add `--dry-run` to
-# preview). One bump per plan; the C ABI version (LMV_ABI_VERSION) is a separate
+# preview). One bump per plan; the C ABI version (RLX_ABI_VERSION) is a separate
 # axis and is never touched here.
 
 # One shared version and one tag for the whole workspace, not per-crate.

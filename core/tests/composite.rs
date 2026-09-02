@@ -180,7 +180,7 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 
 /// Both post stages, composited and pinned to a baseline.
 ///
-/// `LMV_BLESS=1 cargo test -p rlx-core --test composite` rewrites these two —
+/// `RLX_BLESS=1 cargo test -p rlx-core --test composite` rewrites these two —
 /// and, run against the whole suite instead of this one binary, **every other
 /// baseline as well**. Bless by `--test composite` and check `git status`.
 #[test]
@@ -189,7 +189,7 @@ fn composite_stages_match_golden_baselines() {
         return;
     };
     let frame = common::fixed_frame();
-    let bless = std::env::var_os("LMV_BLESS").is_some();
+    let bless = std::env::var_os("RLX_BLESS").is_some();
     std::fs::create_dir_all(common::golden_dir()).expect("create tests/golden");
 
     let mut failures = Vec::new();
@@ -204,7 +204,7 @@ fn composite_stages_match_golden_baselines() {
             .expect("capture fixture");
         let path = common::golden_dir().join(format!("{stem}.png"));
 
-        // Checked ahead of the bless branch on purpose: a `LMV_BLESS` run must
+        // Checked ahead of the bless branch on purpose: a `RLX_BLESS` run must
         // not be able to write a clipped baseline and call it the new truth.
         if stem == OVERLAP {
             let clipped = fresh
@@ -233,7 +233,7 @@ fn composite_stages_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test composite`",
+            "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test composite`",
             path.display()
         );
         let baseline = common::decode(&path);
@@ -252,7 +252,7 @@ fn composite_stages_match_golden_baselines() {
     assert!(
         failures.is_empty(),
         "composite drift beyond tolerance — a stage's routing, grid, or the aspect it \
-         hands the scene has changed (ADR-0037). Bless with LMV_BLESS=1 only if intended: \
+         hands the scene has changed (ADR-0037). Bless with RLX_BLESS=1 only if intended: \
          {failures:#?}"
     );
 }
