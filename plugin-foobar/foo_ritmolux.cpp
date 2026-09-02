@@ -1,4 +1,4 @@
-// foo_ritmolux — foobar2000 visualization component for light-music-visualizer.
+// foo_ritmolux — foobar2000 visualization component for Ritmolux.
 //
 // A thin shim per ADR-0001: pulls PCM from foobar's visualisation_stream,
 // forwards it across rlx-core's C ABI, and hosts the core's wgpu output in a
@@ -177,7 +177,7 @@ bool g_abi_ok = false;
 // authority once running.
 uint32_t g_debug_flags = RLX_DEBUG_OFF;
 
-// %APPDATA%\light-music-visualizer - the app dir the standalone shares. Empty on
+// %APPDATA%\Ritmolux - the app dir the standalone shares. Empty on
 // failure. The diagnostics log lives here, next to the shared presets dir.
 std::wstring plugin_app_dir_w() {
     const DWORD need = GetEnvironmentVariableW(L"APPDATA", nullptr, 0);
@@ -186,11 +186,11 @@ std::wstring plugin_app_dir_w() {
     const DWORD got = GetEnvironmentVariableW(L"APPDATA", wide.data(), need);
     if (got == 0 || got >= need) return {};
     wide.resize(got);
-    wide += L"\\light-music-visualizer";
+    wide += L"\\Ritmolux";
     return wide;
 }
 
-// The shared per-user preset directory: %APPDATA%\light-music-visualizer\presets
+// The shared per-user preset directory: %APPDATA%\Ritmolux\presets
 // - the exact path the standalone seeds and watches, so both frontends share one
 // library. Empty on failure (the core then keeps its embedded defaults).
 //
@@ -438,7 +438,7 @@ void VizSession::reattach_at_current_size() {
     ensure_handle(r, c); // fresh rlx_create + rlx_attach_window at the real size
 }
 
-// Append a diagnostics sample to %APPDATA%\light-music-visualizer\
+// Append a diagnostics sample to %APPDATA%\Ritmolux\
 // plugin-diagnostics.log at ~1 Hz. RSS is not logged: it is host-process-owned
 // (ADR-0008) and would mean "all of foobar", not "us".
 void VizSession::maybe_log_metrics() {

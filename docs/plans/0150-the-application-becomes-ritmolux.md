@@ -361,8 +361,8 @@ flowchart TB
 | 2 — the crates take the prefix | dev | done | c093dc7 |
 | 3 — the C ABI takes the prefix | dev | done | 55fa009 |
 | 4 — the shipped artifacts take the name | dev | done | 3d0b223 |
-| 5 — the environment takes the prefix | dev | done | committed with this row |
-| 6 — the user's machine is migrated | dev | not started | |
+| 5 — the environment takes the prefix | dev | done | 1198b53 |
+| 6 — the user's machine is migrated | dev | done | committed with this row |
 | 7 — the strings a user reads | dev | not started | |
 | 8 — the live documentation, and the gates that name paths | dev | not started | |
 | 9 — the repository takes the name | human | not started | |
@@ -510,6 +510,34 @@ is the form to reuse"* needs the name that works today.
 ABI version *"is still 4"* when it is 6, and points at `core/tests/ffi.rs` when the file is
 `core-cabi/tests/ffi.rs`. Both predate this plan and neither is a rename defect; fixing them here
 would be scope this plan did not ask for.
+
+**The migration is not called from the resolver, and that is a deliberate departure from the
+phase's wording.** Phase 6 says *"on resolution"*, and the natural reading is to move the directory
+inside `resolve_preset_dir()`. That function is called by an existing unit test, by `shot`, and
+twice by the app — so putting a `fs::rename` behind it means **`cargo test` moves the real
+`%APPDATA%` directory of whatever machine runs the suite**, including CI. Instead
+`migrate_app_dir_in(root)` takes its root as an argument and is exercised against a scratch
+directory, `migrate_app_dir()` wraps it for the real root behind a `Once`, and `main()` calls it
+once at startup ahead of the `--list-*` aids. `resolve_preset_dir()` stays free of side effects and
+says so. **`shot` therefore does not migrate** — it only reads, and it has `--presets` and
+`RLX_PRESET_DIR` for explicit control; the app is what carries the directory across.
+
+**The four tests were mutation-checked rather than trusted.** Inverting the legacy-directory guard
+in `migrate_app_dir_in` failed exactly those four and nothing else; restoring it returned 107/107.
+A test that passes against both the code and its inverse is not evidence, and these are not that.
+
+**`AppDirMigration` carries two outcomes the phase does not enumerate**, because both are reachable
+and neither should be silent: `BothPresent`, where the new directory already exists and the legacy
+one is left untouched (merging two libraries would be a guess, discarding either would be the loss
+this migration exists to prevent), and `Failed`, where the rename errors and the app continues on a
+fresh directory rather than refusing to start (NFR section 10). Each prints one line.
+
+**The plugin does not migrate, only its literals move.** `foo_ritmolux.cpp` resolves
+`%APPDATA%\Ritmolux` on its own, as the phase's file list asks. **A foobar user who has never run
+the standalone therefore sees an empty library**: their presets sit under the old name and nothing
+on the plugin path carries them across. Not a defect against this phase as written, but it is a
+real user-visible consequence and the on-device item added in Phase 4 will not catch it — flagging
+it for the close rather than widening the phase.
 
 ### Close triggers
 
