@@ -69,7 +69,7 @@ use std::rc::Rc;
 
 use super::super::Scene;
 use super::super::common;
-use super::renderer::{JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+use super::renderer::{LineRenderer, SegmentInstance, StrokeMetric, miter_extension};
 use super::{
     CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, replicate_mirror,
 };
@@ -358,7 +358,8 @@ pub(crate) fn build(
                     // Isolated: one segment per element, both ends free. Bars
                     // must keep exactly their previous geometry, or a bar would
                     // hang below `baseline` and break the centre-mirror.
-                    joined: 0,
+                    ext_a: 0.0,
+                    ext_b: 0.0,
                 });
             }
         }
@@ -374,28 +375,42 @@ pub(crate) fn build(
             let point = |i: usize, length: f32| -> [f32; 2] {
                 turn([-place.span + step * i as f32, place.baseline + length])
             };
+            // Point `i` of the readout, for the neighbours a joint's interior
+            // angle needs. Out of range reads as a zero length, which the two
+            // free ends never consult.
+            let pt = |i: usize| point(i, lengths.get(i).copied().unwrap_or(0.0));
             let mut prev = point(0, lengths.first().copied().unwrap_or(0.0));
             for (i, &length) in lengths.iter().enumerate().skip(1) {
                 let next = point(i, length);
-                // Chained (ADR-0041): consecutive segments share a point, so
-                // every interior endpoint is a joint. Only the two ends of the
-                // whole figure are free — segment `i` runs from point `i - 1` to
-                // point `i`, so its `a` is joined for every segment but the
-                // first and its `b` for every segment but the last.
-                let mut joined = 0;
-                if i > 1 {
-                    joined |= JOINED_A;
-                }
-                if i < gaps {
-                    joined |= JOINED_B;
-                }
+                // Chained (ADR-0158): consecutive segments share a point, so
+                // every interior endpoint is a joint and reaches its corner's
+                // point by the miter the two arms subtend. Only the two ends of
+                // the whole figure are free — segment `i` runs from point
+                // `i - 1` to point `i`, so its `a` is joined for every segment
+                // but the first and its `b` for every segment but the last.
+                //
+                // The extension is resolved against **this segment's own**
+                // width: `width_of` is per element, so a neighbour's is not
+                // necessarily the same number.
+                let width = width_of(i);
+                let ext_a = if i > 1 {
+                    miter_extension(width, pt(i - 2), prev, next)
+                } else {
+                    0.0
+                };
+                let ext_b = if i < gaps {
+                    miter_extension(width, prev, next, pt(i + 1))
+                } else {
+                    0.0
+                };
                 out.push(SegmentInstance {
                     a: prev,
                     b: next,
                     color: color_of(i),
-                    width: width_of(i),
+                    width,
                     alpha: 1.0,
-                    joined,
+                    ext_a,
+                    ext_b,
                 });
                 prev = next;
             }
@@ -418,7 +433,8 @@ pub(crate) fn build(
                     alpha: 1.0,
                     // Isolated, like the bars: a spoke that extended inward
                     // would grow through `radius` and fill the inner circle.
-                    joined: 0,
+                    ext_a: 0.0,
+                    ext_b: 0.0,
                 });
             }
         }
@@ -832,6 +848,7 @@ impl Scene for SpectrumScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
                 &[],
@@ -844,6 +861,7 @@ impl Scene for SpectrumScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
             );

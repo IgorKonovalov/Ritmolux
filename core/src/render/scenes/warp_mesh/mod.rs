@@ -2209,6 +2209,21 @@ impl Scene for WarpMeshScene {
             // `softness` is MILKDROP_SOFTNESS and not the line default: this
             // surface is judged against foo_vis_milk2, not against Plan 0114 -
             // see the constant.
+            //
+            // `StrokeMetric::Clip` is the same argument, one space over, and it
+            // is a DATED DEFERRAL rather than a decision (ADR-0160). Every other
+            // producer strokes in world space, where a half-width is a thickness
+            // on screen at any orientation; this one keeps the clip metric, in
+            // which a vertical stroke is `aspect` times thicker than a
+            // horizontal one. It stays because Plan 0142 is taking foo_vis_milk2
+            // readings on this surface and moving the instrument between the
+            // question and the answer is a mistake, not a tradeoff.
+            //
+            // **Revisit at Plan 0142's close**, and note the open possibility
+            // that the clip metric is CORRECT here rather than merely deferred:
+            // MilkDrop authors in a square space and its own stroke may be
+            // anisotropic on screen too, in which case matching it is
+            // compatibility. Nobody has measured that against the reference rig.
             res.lines.draw_split(
                 queue,
                 encoder,
@@ -2216,6 +2231,7 @@ impl Scene for WarpMeshScene {
                 aspect,
                 1.0,
                 MILKDROP_SOFTNESS,
+                lines::StrokeMetric::Clip,
                 lines::ViewTransform::default(),
                 &self.geometry.segments,
                 self.geometry.segments_additive,

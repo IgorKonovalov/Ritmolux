@@ -274,7 +274,8 @@ fn a_figure_with_radial_spread_still_ramps_across_it() {
         color: [0.0; 3],
         width: 0.01,
         alpha: 1.0,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
     };
     // Three concentric chords at radii 0.2, 0.5 and 0.9.
     let segs = vec![
@@ -435,7 +436,8 @@ fn an_absent_roster_builds_no_ornament_at_all() {
             color: [0.0; 3],
             width: 1.0,
             alpha: 1.0,
-            joined: 0,
+            ext_a: 0.0,
+            ext_b: 0.0,
         };
         3
     ];
@@ -1439,12 +1441,16 @@ fn the_ring_levers_are_bindable_and_default_to_the_static_configuration() {
     );
 }
 
-/// A closed outline is a closed chain and every vertex is a joint
-/// (ADR-0041); an open one is free at its two ends only. Getting this wrong
-/// leaves a notch in the stroke at every motif vertex, which at the counts a
-/// mandala uses is the whole figure.
+/// A closed outline is a closed chain and every vertex is a joint (ADR-0158);
+/// an open one is free at its two ends only, **and every joint reaches the
+/// point its own interior angle asks for**. Getting the first wrong leaves a
+/// notch in the stroke at every motif vertex, which at the counts a mandala
+/// uses is the whole figure; getting the second wrong draws a stroke of the
+/// wrong length there instead, which nothing downstream can see.
 #[test]
 fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
+    use crate::render::scenes::lines::{MITER_SLACK, expected_miter};
+
     // The polyline family only. Neither the circular motifs nor the fitted
     // ones have interior vertices to join — which
     // `a_circular_motif_is_one_arc_with_no_interior_joint` and
@@ -1459,11 +1465,44 @@ fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
             &mut out,
             &mut Vec::new(),
         );
-        let flags: Vec<u32> = out.iter().map(|s| s.joined).collect();
+        // In units of `PLACEHOLDER_WIDTH`: the outlines are cached geometry, so
+        // a joined end carries the placeholder half-width and the scene's
+        // per-frame restyle rescales it.
+        let ends: Vec<(bool, bool)> = out.iter().map(|s| (s.ext_a > 0.0, s.ext_b > 0.0)).collect();
+
+        // Every joined end carries the miter its own vertex subtends. The
+        // neighbours come from the emitted chain itself — segment `i`'s `a` end
+        // is shared with segment `i - 1`'s `b` end — so this checks the produced
+        // geometry rather than re-deriving the outline.
+        for i in 0..out.len() {
+            let before = out[(i + out.len() - 1) % out.len()];
+            let after = out[(i + 1) % out.len()];
+            if out[i].ext_a > 0.0 {
+                let want = expected_miter(PLACEHOLDER_WIDTH, before.a, out[i].a, out[i].b);
+                assert!(
+                    (out[i].ext_a - want).abs() <= want * MITER_SLACK,
+                    "{}: segment {i}'s `a` joint carries {} against the miter \
+                     {want} its interior angle asks for",
+                    m.name(),
+                    out[i].ext_a
+                );
+            }
+            if out[i].ext_b > 0.0 {
+                let want = expected_miter(PLACEHOLDER_WIDTH, out[i].a, out[i].b, after.b);
+                assert!(
+                    (out[i].ext_b - want).abs() <= want * MITER_SLACK,
+                    "{}: segment {i}'s `b` joint carries {} against the miter \
+                     {want} its interior angle asks for",
+                    m.name(),
+                    out[i].ext_b
+                );
+            }
+        }
+
         if m.is_closed() {
             assert!(
-                flags.iter().all(|&f| f == JOINED_A | JOINED_B),
-                "{}: a closed outline joins at every vertex, got {flags:?}",
+                ends.iter().all(|&e| e == (true, true)),
+                "{}: a closed outline joins at every vertex, got {ends:?}",
                 m.name()
             );
             // ...and it really does close: the last segment's `b` end is the
@@ -1476,15 +1515,95 @@ fn closed_motifs_join_everywhere_and_open_ones_only_inside() {
                 m.name()
             );
         } else {
-            assert_eq!(flags.first().copied(), Some(JOINED_B), "{}", m.name());
-            assert_eq!(flags.last().copied(), Some(JOINED_A), "{}", m.name());
-            for (i, &f) in flags.iter().enumerate() {
-                if i > 0 && i + 1 < flags.len() {
-                    assert_eq!(f, JOINED_A | JOINED_B, "{} interior {i}", m.name());
+            assert_eq!(ends.first().copied(), Some((false, true)), "{}", m.name());
+            assert_eq!(ends.last().copied(), Some((true, false)), "{}", m.name());
+            for (i, &e) in ends.iter().enumerate() {
+                if i > 0 && i + 1 < ends.len() {
+                    assert_eq!(e, (true, true), "{} interior {i}", m.name());
                 }
             }
         }
     }
+}
+
+/// **The measured defect, on its own fixture** — the `diamond`'s 61.9-degree
+/// vertex, which reported 26 px of flat stroke and then nothing where it needed
+/// 26.3 px of a 13.5 px half-width, and whose inner side summed to 1.38x the
+/// stroke (backlog 0134). Both halves are the one missing factor.
+///
+/// # Read on the CPU, and stated as a closed form
+///
+/// `theta` is in hand here — the outline's own vertices give it — where a
+/// rendered frame would only show it through a stroke profile, quantized and
+/// blurred by the softness ramp. So the assertion is against
+/// `1 / sin(theta / 2)` derived from those vertices, not against a frozen
+/// reading of a picture (ADR-0071).
+///
+/// The `diamond` outline is `(+-0.5, 0)` and `(0, +-0.3)`, so the sharp vertex's
+/// two edges are `(-0.5, +-0.3)` and its interior angle is
+/// `acos(0.16 / 0.34) = 61.93 degrees`. The factor is **1.9437**, comfortably
+/// inside [`MITER_LIMIT`] — so this corner is served exactly and the clamp is
+/// not what is being tested here.
+///
+/// [`MITER_LIMIT`]: crate::render::scenes::lines::MITER_LIMIT
+#[test]
+fn the_diamonds_sharp_vertex_reaches_its_point_rather_than_stopping_flat() {
+    use crate::render::scenes::lines::{MITER_LIMIT, MITER_SLACK};
+
+    let mut out = Vec::new();
+    build_rings(
+        &[ring(Motif::Diamond, 1, 0.5, 0.3)],
+        RingMotion::STATIC,
+        CAP,
+        &mut out,
+        &mut Vec::new(),
+    );
+    assert_eq!(out.len(), 4, "a diamond is four edges");
+
+    // The two vertex kinds, from the outline's own coordinates.
+    let sharp = 1.0 / ((0.16f32 / 0.34).acos() * 0.5).sin();
+    let blunt = 1.0 / ((-0.16f32 / 0.34).acos() * 0.5).sin();
+    assert!(
+        (sharp - 1.9437).abs() < 5e-4 && sharp < MITER_LIMIT,
+        "the closed form itself: the 61.93-degree vertex needs {sharp} \
+         half-widths, which must be about 1.9437 and inside the {MITER_LIMIT} \
+         limit"
+    );
+    assert!(
+        blunt < sharp,
+        "the 118-degree vertex is the blunter one and must reach less far"
+    );
+
+    // Every one of the eight ends is a joint - the outline closes - and each
+    // carries the miter of the vertex it sits on. The sharp vertices are
+    // `(+-0.5, 0)`, which `place` has rotated and offset; a similarity preserves
+    // angles, so the two lengths are all that distinguish them.
+    let mut seen = [0usize; 2];
+    for (i, seg) in out.iter().enumerate() {
+        for (side, got) in [("a", seg.ext_a), ("b", seg.ext_b)] {
+            let want_sharp = PLACEHOLDER_WIDTH * sharp;
+            let want_blunt = PLACEHOLDER_WIDTH * blunt;
+            if (got - want_sharp).abs() <= want_sharp * MITER_SLACK {
+                seen[0] += 1;
+            } else if (got - want_blunt).abs() <= want_blunt * MITER_SLACK {
+                seen[1] += 1;
+            } else {
+                panic!(
+                    "edge {i}'s `{side}` end extends {got}, which is neither the \
+                     sharp vertex's {want_sharp} nor the blunt one's \
+                     {want_blunt}. A flat half-width would be \
+                     {PLACEHOLDER_WIDTH}, which is the bevel this fixture \
+                     exists to convict"
+                );
+            }
+        }
+    }
+    assert_eq!(
+        seen,
+        [4, 4],
+        "a diamond has two sharp vertices and two blunt ones, and every vertex \
+         is shared by two edges — so four ends of each"
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -1560,6 +1679,7 @@ fn round_capture(segments: &[SegmentInstance], arcs: &[ArcInstance]) -> Option<V
         1.0,
         1.0,
         crate::render::scenes::lines::DEFAULT_SOFTNESS,
+        crate::render::scenes::lines::StrokeMetric::World,
         ViewTransform::default(),
         segments,
         arcs,
@@ -1776,7 +1896,8 @@ fn a_circle_motif_is_round_and_unbeaded_at_ornament_scale_and_full_frame() {
                 b: [b[0] * MOTIF_SCALE, b[1] * MOTIF_SCALE],
                 color: [1.0, 1.0, 1.0],
                 width: 0.012,
-                joined: JOINED_A | JOINED_B,
+                ext_a: PLACEHOLDER_WIDTH,
+                ext_b: PLACEHOLDER_WIDTH,
                 alpha: 1.0,
             })
         })

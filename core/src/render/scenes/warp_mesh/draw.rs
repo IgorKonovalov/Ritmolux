@@ -44,9 +44,9 @@
 //! - **A dot is a very short segment with both caps extended.** `wave_usedots`
 //!   draws points; the line renderer draws quads between endpoints, and its
 //!   falloff runs across the stroke only — so a short segment is round *because*
-//!   [`JOINED_A`]`|`[`JOINED_B`] push the quad past both ends by the half-width
-//!   (ADR-0041), not because it is short. Without the flags it is a sub-pixel
-//!   dash; see `dots`.
+//!   both endpoint extensions push the quad past it by the half-width
+//!   (ADR-0158), not because it is short. Without them it is a sub-pixel dash;
+//!   see `dots`.
 //! - **`wave_mystery` means something different in every mode**, which is the
 //!   reference's own design rather than a simplification here.
 //! - **Mode 6 and 7's line does not drift.** Its angle is `wave_mystery` alone;
@@ -68,7 +68,7 @@
 use crate::dsp::WAVE_SAMPLES;
 use crate::milk::outputs::FrameOutputs;
 use crate::milk::{MAX_SHAPE_SIDES, MilkRuntime};
-use crate::render::scenes::lines::{JOINED_A, JOINED_B, SegmentInstance};
+use crate::render::scenes::lines::SegmentInstance;
 
 /// One vertex of a filled custom shape.
 #[repr(C)]
@@ -353,13 +353,8 @@ fn polyline(
         let Some((b, _)) = points.get((i + 1) % n) else {
             continue;
         };
-        let mut joined = 0;
-        if closed || i > 0 {
-            joined |= JOINED_A;
-        }
-        if closed || i + 2 < n {
-            joined |= JOINED_B;
-        }
+        let ext_a = if closed || i > 0 { width } else { 0.0 };
+        let ext_b = if closed || i + 2 < n { width } else { 0.0 };
         geometry.push_segment(
             SegmentInstance {
                 a: *a,
@@ -367,7 +362,8 @@ fn polyline(
                 color: light.rgb,
                 width,
                 alpha: light.coverage,
-                joined,
+                ext_a,
+                ext_b,
             },
             additive,
         );
@@ -402,10 +398,10 @@ fn emit_trace(
 
 /// Push each point as its own dot.
 ///
-/// **Both ends are flagged joined, and that is what makes a dot a dot** (Plan
-/// 0108 Phase 4). The line renderer's falloff runs *across* the stroke only; the
-/// quad simply ends at each endpoint unless [`JOINED_A`]/[`JOINED_B`] push it
-/// past by the half-width (ADR-0041). Without those flags a mark is a hard-edged
+/// **Both ends are extended by a half-width, and that is what makes a dot a
+/// dot** (Plan 0108 Phase 4). The line renderer's falloff runs *across* the
+/// stroke only; the quad simply ends at each endpoint unless `ext_a`/`ext_b`
+/// push it past (ADR-0158). Without that extension a mark is a hard-edged
 /// [`DOT_LENGTH`] x `2 * width` rectangle — **3.3x wider than it is long**, a
 /// sub-pixel dash lying across the trace rather than the round dot this module's
 /// header describes. Measured at 1080p on one drawn frame, that cost 300 pixels
@@ -413,7 +409,7 @@ fn emit_trace(
 /// left **2**, which is design-backlog 0107's "the `wave_usedots` beads never
 /// appear".
 ///
-/// With both ends flagged the quad extends by the half-width at each cap, so the
+/// With both ends extended the quad grows by the half-width at each cap, so the
 /// mark is `DOT_LENGTH + 2 * width` long against `2 * width` across — round
 /// enough that the falloff reads as a bead at any resolution, through the
 /// mechanism that already exists rather than a new constant.
@@ -431,7 +427,11 @@ fn dots(geometry: &mut DrawGeometry, points: &[Point], width: f32, additive: boo
                 color: light.rgb,
                 width,
                 alpha: light.coverage,
-                joined: JOINED_A | JOINED_B,
+                // A cap, not a miter: this is the half-width that rounds the
+                // mark, and a zero-length segment has no interior angle to
+                // compute one from.
+                ext_a: width,
+                ext_b: width,
             },
             additive,
         );
@@ -886,7 +886,8 @@ fn motion_vectors(
                     color: colour.rgb,
                     width: THIN,
                     alpha: colour.coverage,
-                    joined: 0,
+                    ext_a: 0.0,
+                    ext_b: 0.0,
                 },
                 false,
             );

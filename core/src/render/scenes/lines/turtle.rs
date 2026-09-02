@@ -24,7 +24,8 @@
 
 use std::f32::consts::FRAC_PI_2;
 
-use super::renderer::{JOINED_A, JOINED_B, SegmentInstance};
+use super::PLACEHOLDER_WIDTH;
+use super::renderer::{SegmentInstance, miter_extension};
 
 /// Walk `s` into `out` (cleared first) as base geometry — positions only; the
 /// scene fills colour/width per frame. `angle` is in radians. Segments beyond
@@ -77,13 +78,22 @@ pub fn walk_with_depths(
                 let nx = x + dx * step;
                 let ny = y + dy * step;
                 if out.len() < max_segments {
-                    // One joint, flagged from both sides. A turn does not break
+                    // One joint, extended from both sides. A turn does not break
                     // the run — `+`/`-` only change heading — which is why the
                     // state is a run rather than a look at the previous char.
-                    let mut joined = 0;
+                    //
+                    // The extension is in units of the placeholder `width`
+                    // below; `LineInstance::styled` rescales it to whatever
+                    // half-width the frame is drawn at.
+                    let mut ext_a = 0.0;
                     if let Some(prev) = run.and_then(|i| out.get_mut(i)) {
-                        prev.joined |= JOINED_B;
-                        joined |= JOINED_A;
+                        // The turn `+`/`-` made between the two draws IS the
+                        // joint's interior angle, and both sides of a joint
+                        // reach the same corner point, so one length serves the
+                        // pair.
+                        let ext = miter_extension(PLACEHOLDER_WIDTH, prev.a, prev.b, [nx, ny]);
+                        prev.ext_b = ext;
+                        ext_a = ext;
                     }
                     run = Some(out.len());
                     // Generation depth = how many branch pushes are still open.
@@ -92,9 +102,10 @@ pub fn walk_with_depths(
                         a: [x, y],
                         b: [nx, ny],
                         color: [1.0, 1.0, 1.0],
-                        width: 0.01,
+                        width: PLACEHOLDER_WIDTH,
                         alpha: 1.0,
-                        joined,
+                        ext_a,
+                        ext_b: 0.0,
                     });
                 } else {
                     dropped += 1;
@@ -184,39 +195,80 @@ mod tests {
         assert_eq!(out.len(), 3, "trunk + branch + trunk");
     }
 
-    /// Plan 0039 Phase 3 done-when 2 and 4 (ADR-0041). The turtle is the tricky
-    /// producer: it is a chain, but the chain **breaks** every time the pen stops
-    /// continuing from where it was — at a branch push or pop, and at a
-    /// move-without-draw. Asserted on the flag pattern rather than on pixels.
+    /// The turtle is the tricky producer: it is a chain, but the chain
+    /// **breaks** every time the pen stops continuing from where it was — at a
+    /// branch push or pop, and at a move-without-draw. Asserted on the extension
+    /// pattern rather than on pixels (ADR-0158); the lengths are in
+    /// [`PLACEHOLDER_WIDTH`], the units a cached walk stores them in, and
+    /// `LineInstance::styled` rescales them per frame.
+    ///
+    /// **A straight joint carries exactly the flat half-width**, which is what
+    /// makes `F F` and `F + F` different assertions rather than one: the
+    /// straight run is the miter's `theta = pi` case and the right-angle turn is
+    /// `theta = pi / 2`, so `1 / sin(pi / 4) = sqrt(2)`.
     #[test]
     fn the_turtle_joins_within_a_run_and_breaks_at_a_branch() {
+        use crate::render::scenes::lines::{MITER_SLACK, expected_miter};
+
+        const W: f32 = PLACEHOLDER_WIDTH;
         let mut out = Vec::with_capacity(16);
-        // Trunk of two, a one-segment branch, then a trunk of two more.
+        // Trunk of two, a one-segment branch, then a trunk of two more. `[+F]`
+        // turns before drawing, so the two trunk runs are collinear and every
+        // joint here is straight — the miter is exactly the flat half-width.
         walk("FF[+F]FF", FRAC_PI_2, 100, &mut out);
         assert_eq!(out.len(), 5, "two trunk, one branch, two trunk");
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A, 0, JOINED_B, JOINED_A],
-            "joined inside each run, free on both sides of the branch"
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, W), (W, 0.0), (0.0, 0.0), (0.0, W), (W, 0.0)],
+            "joined inside each run, free on both sides of the branch; a \
+             straight joint's miter IS the flat half-width"
         );
         // The branch segment starts at the same point the first run ended, and
-        // that is exactly the case the flag must *not* claim: it is a new stroke,
-        // not a continuation, so extending it backward would run along the
-        // branch's own direction into space it never covered.
+        // that is exactly the case the extension must *not* claim: it is a new
+        // stroke, not a continuation, so extending it backward would run along
+        // the branch's own direction into space it never covered.
         assert_eq!(
             out[1].b, out[2].a,
             "the branch does start at the trunk's end"
         );
-        assert_eq!(out[2].joined, 0, "and is still free at both ends");
+        assert_eq!(
+            (out[2].ext_a, out[2].ext_b),
+            (0.0, 0.0),
+            "and is still free at both ends"
+        );
 
         // A turn is not a break — that is the whole reason the walk tracks a run
-        // rather than looking at the previous character.
+        // rather than looking at the previous character — and the turn IS the
+        // joint's interior angle. A right angle needs `1 / sin(pi / 4)`.
         out.clear();
         walk("F+F", FRAC_PI_2, 100, &mut out);
-        assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A],
-            "a turn keeps the pen on the paper"
+        let want = expected_miter(W, out[0].a, out[0].b, out[1].b);
+        assert!(
+            (want - W * std::f32::consts::SQRT_2).abs() <= W * MITER_SLACK,
+            "the reference itself: a right-angle joint is sqrt(2) half-widths, \
+             got {want}"
+        );
+        assert!(
+            out[0].ext_a == 0.0
+                && out[1].ext_b == 0.0
+                && (out[0].ext_b - want).abs() <= want * MITER_SLACK
+                && (out[1].ext_a - want).abs() <= want * MITER_SLACK,
+            "a turn keeps the pen on the paper, and the joint reaches the \
+             corner the turn makes: got {:?} against {want} at the joint",
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>()
+        );
+
+        // A gentler turn is a longer reach, which is the whole property: the
+        // extension has to track the angle rather than being a constant with an
+        // angle-shaped comment.
+        out.clear();
+        walk("F+F", FRAC_PI_2 / 3.0, 100, &mut out);
+        let gentle = expected_miter(W, out[0].a, out[0].b, out[1].b);
+        assert!(
+            gentle < want && (out[0].ext_b - gentle).abs() <= gentle * MITER_SLACK,
+            "a 30-degree turn is a shallower corner than a right angle, so it \
+             reaches {gentle} against the right angle's {want}; got {}",
+            out[0].ext_b
         );
 
         // A move-without-draw is: the pen teleports, so the next segment starts
@@ -224,8 +276,8 @@ mod tests {
         out.clear();
         walk("FfF", 0.0, 100, &mut out);
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![0, 0],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, 0.0), (0.0, 0.0)],
             "`f` breaks the run"
         );
         assert_ne!(out[0].b, out[1].a, "and the two really are disjoint");
@@ -235,8 +287,8 @@ mod tests {
         let dropped = walk("FFFF", 0.0, 2, &mut out);
         assert_eq!((out.len(), dropped), (2, 2));
         assert_eq!(
-            out.iter().map(|s| s.joined).collect::<Vec<_>>(),
-            vec![JOINED_B, JOINED_A],
+            out.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
+            vec![(0.0, W), (W, 0.0)],
             "the kept prefix keeps its own joint and claims none past the cap"
         );
     }

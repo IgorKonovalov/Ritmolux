@@ -110,12 +110,17 @@ fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).into_owned()
 }
 
-/// A unique scratch directory for output files, under `target/` so it never
-/// escapes the build tree. Keyed by process id so concurrent test binaries do not
-/// collide.
+/// A unique scratch directory for output files, inside the build tree so it never
+/// escapes it. Keyed by process id so concurrent test binaries do not collide.
+///
+/// The root is `CARGO_TARGET_TMPDIR`, which cargo sets to a per-test-binary
+/// directory inside the target directory it is actually writing to, and which
+/// exists for exactly this. Deriving it from `CARGO_MANIFEST_DIR` instead names
+/// the SOURCE location, so the path tracks the worktree rather than the build
+/// output and the sentence above is a promise it cannot keep under any
+/// `build.target-dir`. Backlog 0160 and ADR-0147 carry the reasoning.
 fn scratch(name: &str) -> PathBuf {
-    let dir = repo_root()
-        .join("target")
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join("shot-cli-tests")
         .join(format!("{}-{}", std::process::id(), name));
     std::fs::create_dir_all(&dir).expect("create scratch dir");

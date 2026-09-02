@@ -70,8 +70,8 @@
 // accumulation argument does not cost anything by moving.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { basename, relative, resolve, sep } from "node:path";
+import { existsSync, rmSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 
 // ---------------------------------------------------------------------------
 // The manifest
@@ -85,17 +85,22 @@ import { basename, relative, resolve, sep } from "node:path";
 /// picture, and an unexplained number would look like a typo.
 ///
 /// The gallery holds exactly one entry per system name in `SystemKind::from_name`
-/// and is filed under that name, so a system added later shows up as a missing
-/// file rather than as a silent gap. Four families have exactly one preset and
-/// choose themselves; the other five had a real choice and were **judged at the
-/// Plan 0088 close** (Phase 7) — the entries below carry the verdict where one
-/// pick displaced another. A later swap is one line here plus a re-run.
+/// and is filed under that name. That correspondence is asserted in
+/// `core/tests/hygiene.rs`, not here — see the block below the manifest.
 ///
-/// Two of the single-preset families came out of that pass with a picture that
-/// is accepted rather than good, and the fix is content work rather than a hop:
+/// **EVERY FAMILY NOW SHIPS SEVERAL PRESETS, so every slot below is a choice.**
+/// Nine were judged at the Plan 0088 close (Phase 7) and carry the verdict where
+/// one pick displaced another; four of those nine were chosen when the family
+/// held exactly one preset, so they were never a comparison and are marked
+/// UNJUDGED. The three newest families were picked by `dev`; `warp_mesh` was
+/// judged and kept at Plan 0136 Phase 10, and the other two were seen at that
+/// same look and left standing. A swap is one line here plus a re-run.
+///
+/// Two slots came out of the Plan 0088 pass with a picture that is accepted
+/// rather than good, and the fix is content work rather than a hop:
 /// `emitter_perseids` bunches its fan into the right half at every hop tried,
 /// and `star_rosewindow`'s outermost ring runs off all four edges. Both are
-/// recorded as content-lane notes at the Plan 0088 close, not as manifest bugs.
+/// recorded as content-lane notes at that close, not as manifest bugs.
 const IMAGES = [
   {
     // Judged at the Plan 0088 close (Phase 7) against fragment_supernova,
@@ -186,7 +191,8 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // lsystem — the only lsystem preset.
+    // lsystem — UNJUDGED. Chosen when this family shipped one preset; 5 ship
+    // now and none has been compared against vellum.
     out: "docs/images/gallery/lsystem.png",
     presetFile: "presets/lsystem_vellum.toml",
     signal: "dynamic:110",
@@ -195,7 +201,9 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // star_pattern — the only star_pattern preset.
+    // star_pattern — UNJUDGED. Chosen when this family shipped one preset; 4
+    // ship now. The Plan 0088 close notes this picture's outermost ring runs off
+    // all four edges, and called that content work rather than a hop.
     out: "docs/images/gallery/star_pattern.png",
     presetFile: "presets/star_rosewindow.toml",
     signal: "dynamic:110",
@@ -222,7 +230,8 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // spectrum — the only spectrum preset.
+    // spectrum — UNJUDGED. Chosen when this family shipped one preset; 5 ship
+    // now and none has been compared against halo.
     out: "docs/images/gallery/spectrum.png",
     presetFile: "presets/spectrum_halo.toml",
     signal: "dynamic:110",
@@ -231,7 +240,62 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // emitter — the only emitter preset.
+    // shape_field — the first shipped world on the system (ADR-0105), and the
+    // one that shows what the family is FOR: the scene hands the palette a
+    // FIGURE COORDINATE rather than a level, so `palette_steps` turns it into
+    // flat graphic bands and `palette_contour` draws the hairline between them.
+    // Chosen over shape_aperture and shape_facet on that ground; the three mono
+    // worlds are deliberate two-ink prints and read as a different family at
+    // gallery size.
+    out: "docs/images/gallery/shape_field.png",
+    presetFile: "presets/shape_pulse.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // warp_mesh — JUDGED at Plan 0136 Phase 10 and kept. Backlog 0133 and that
+    // plan both record that this family ships no preset, which had stopped being
+    // true: four warp worlds ship, and all four were shot at this hop and
+    // compared. A fifth, `warp_smoke`, was authored during that same phase and
+    // was NOT taken for this slot - the plume is a stronger picture of smoke than
+    // wellhead is of the family.
+    //
+    // The whole family is SOFT — a warp field has no edges of its own, it only
+    // moves what is already there — so the question is which world still has a
+    // readable subject at gallery size. Wellhead does: a dark star-shaped
+    // aperture against teal, with the ring feeding it legible as depth. Cauldron
+    // held this slot first and lost it on that ground, being a symmetric bloom
+    // with no hard edge anywhere in it; millrace is one crescent on black, and
+    // sirocco is a horizontal drape that reads as an abstract gradient.
+    //
+    // Confirmed at that phase's own look. A later swap is one line here plus a
+    // re-run.
+    out: "docs/images/gallery/warp_mesh.png",
+    presetFile: "presets/warp_wellhead.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // shape_collage — the first shipped world on the system (ADR-0123), and the
+    // only family here that draws a GRAPHIC rather than light: a pixel starts at
+    // the paper colour and composites each element with `over`, so the array
+    // index is the depth. Chosen over the three others for the same reason
+    // shape_pulse was — collage_mono and collage_onwhite are two-ink by intent.
+    out: "docs/images/gallery/shape_collage.png",
+    presetFile: "presets/collage_suprematist.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    // emitter — UNJUDGED. Chosen when this family shipped one preset; 5 ship
+    // now. The Plan 0088 close notes this picture bunches its fan into the right
+    // half at every hop tried, and called that content work rather than a hop.
     out: "docs/images/gallery/emitter.png",
     presetFile: "presets/emitter_perseids.toml",
     signal: "dynamic:110",
@@ -279,42 +343,28 @@ function check(entry, index) {
 
 IMAGES.forEach(check);
 
-/// The system roster, read out of the Rust rather than mirrored here.
-///
-/// `SystemKind::from_name` is the source of truth for what a system *is*, so it
-/// is also the source of truth for what the gallery owes a picture of. A
-/// hardcoded list of nine names would let a tenth system ship with no gallery
-/// image and nothing saying so — which is the exact silent gap this check exists
-/// to turn into a loud one. Same discipline as `tuple-sheets.mjs` reading the
-/// attractor roster out of `family.rs`.
-function systemNames() {
-  const path = "core/src/preset/schema.rs";
-  const src = readFileSync(path, "utf8");
-  const start = src.indexOf("pub fn from_name(name: &str) -> Option<Self> {");
-  if (start < 0) throw new Error(`could not find SystemKind::from_name in ${path}`);
-  const body = src.slice(start, src.indexOf("}", src.indexOf("_ => return None", start)));
-  const names = [...body.matchAll(/"([a-z_]+)" => SystemKind::/g)].map((m) => m[1]);
-  if (names.length === 0) throw new Error(`read no system names out of ${path}`);
-  return names;
-}
-
-/// Every system has exactly one gallery image, filed under its own name.
-{
-  const gallery = new Set(
-    IMAGES.map((e) => e.out)
-      .filter((out) => out.includes("gallery/"))
-      .map((out) => basename(out, ".png")),
-  );
-  const missing = systemNames().filter((name) => !gallery.has(name));
-  const extra = [...gallery].filter((name) => !systemNames().includes(name));
-  if (missing.length > 0 || extra.length > 0) {
-    throw new Error(
-      "the gallery does not match SystemKind::from_name" +
-        (missing.length ? `\n  no image for: ${missing.join(", ")}` : "") +
-        (extra.length ? `\n  not a system: ${extra.join(", ")}` : ""),
-    );
-  }
-}
+// ---------------------------------------------------------------------------
+// THE GALLERY-vs-`SystemKind` CROSS-CHECK IS NOT HERE. It lives in
+// core/tests/hygiene.rs, `every_system_has_a_gallery_image`.
+//
+// It used to run at the top of this file, and it was doing exactly what its
+// comment said: `SystemKind::from_name` is the source of truth for what a system
+// IS, so it is the source of truth for what the gallery owes a picture of, and a
+// hardcoded roster would let a system ship with no picture and nothing saying so.
+// It caught precisely that — and then took the whole run down with it, including
+// the eight images that had nothing to do with the missing systems.
+//
+// The guard was never the bug; the cadence was. The check is PURE TEXT — the
+// manifest and schema.rs, no GPU — and the only thing executing it was a human
+// running this script at a plan close, so three systems accumulated over eleven
+// days and the sweep was silently dead the whole time. Moved into a test, it
+// fails on the commit that ships a scene.
+//
+// What did NOT move, and must not: "the images are current". Renders are not
+// byte-reproducible across machines, so ADR-0100 keeps that out of CI and leaves
+// it a human duty at a named cadence. Two different claims; only the mechanical
+// one is gated.
+// ---------------------------------------------------------------------------
 
 // Checked up front, all of them, before the first render: a manifest typo in the
 // last entry should not cost the eight renders before it.

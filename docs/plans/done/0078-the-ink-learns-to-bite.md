@@ -8,7 +8,7 @@
 > **Related ADRs:** [0092](../../adrs/0092-the-ink-remap-gains-a-contrast-exponent.md) (the
 > lever and its shape), [0028](../../adrs/0028-final-stage-ink-tone-remap.md) (the stage it
 > supplements)
-> **Closes:** [design-backlog 0084](../../design-backlog.md#0084--the-ink-stage-has-no-contrast-lever-and-three-worlds-in-two-cohorts-paid-for-it)
+> **Closes:** [design-backlog 0084](../../design-backlog.md)
 > **Queued:** after [Plan 0076](0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
 > 2026-08-11 handoff decision.
 

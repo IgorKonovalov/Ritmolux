@@ -126,6 +126,16 @@ pub(super) fn mark_distance(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]
 /// **The CPU mirror of `mark_boundary_radius`** (Plan 0098 Phase 2). Kept
 /// identical by inspection, the same arrangement [`mark_distance`]'s own mirror
 /// uses and for the same reason.
+///
+/// **One expression is not literally identical, and it is the heart arm's ray
+/// direction.** The WGSL normalizes `vec2(abs(p.x), p.y) + vec2(1e-20, 0.0)` —
+/// the epsilon is added to the x component — where this divides by
+/// `max(length(p), 1e-20)`. The two differ only at `p == (0, 0)`, where the WGSL
+/// direction is `(1, 0)` and this one is `(0, 0)`; every other input takes the
+/// same branch and the same value to within `f32` rounding. That point is the
+/// figure's own centre, where the boundary radius is a ray's length from a point
+/// to itself and the coordinate it feeds is `0` either way — which is why the
+/// divergence is recorded rather than removed.
 pub(crate) fn mark_boundary_radius(p: [f32; 2], shape: f32, points: f32, star: [f32; 3]) -> f32 {
     if shape < 0.5 {
         return 1.0;

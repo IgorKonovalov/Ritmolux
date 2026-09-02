@@ -134,10 +134,10 @@ use std::sync::OnceLock;
 use super::super::Scene;
 use super::super::common;
 use super::biarc::{self, Piece};
-use super::renderer::{ArcInstance, JOINED_A, JOINED_B, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric, miter_extension};
 use super::{
-    CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, hankin,
-    replicate_mirror, transform_cached, turtle,
+    CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, PLACEHOLDER_WIDTH,
+    ViewTransform, hankin, replicate_mirror, transform_cached, turtle,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
@@ -775,7 +775,7 @@ impl Motif {
     /// Whether this motif is the closed [`Scallop`](Motif::Scallop) boundary,
     /// whose ring is **one chain of `count` lobes** rather than `count` copies
     /// of anything.
-    fn is_scallop(self) -> bool {
+    pub(crate) fn is_scallop(self) -> bool {
         matches!(self, Motif::Scallop)
     }
 
@@ -1076,8 +1076,11 @@ pub const MIN_SCALLOP_LOBES: u32 = 3;
 fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
     let apex = base + depth;
     let denom = 2.0 * (apex - base * half_span.cos());
-    // `apex - base * cos` is positive for every depth a preset can reach
-    // (`ring_scale` clamps at zero), so this only guards the exactly-flat case.
+    // `apex - base * cos` is positive for every depth a preset can reach, so
+    // this only guards the exactly-flat case. What makes that true is the
+    // load-time refusal of a negative structural ring `scale` on a scallop
+    // (`preset::schema`) — **not** the `ring_scale` clamp, which is the bindable
+    // per-frame multiplier and a different quantity.
     let centre = if denom.abs() > f32::EPSILON {
         (apex * apex - base * base) / denom
     } else {
@@ -1093,7 +1096,10 @@ fn scallop_lobe(base: f32, depth: f32, half_span: f32) -> ArcShape {
         start,
         // The lobe runs the short way from one end to the other, which is
         // outward past the apex: the two ends straddle the axis and the sweep
-        // between them is under half a turn for any depth.
+        // between them is under half a turn for **every depth this can be
+        // called with**, which is what the load-time refusal above buys. At a
+        // negative depth past `-R * (cos(s) + sin(s) - 1)` the ends cross over
+        // and this sweep runs the long way instead.
         sweep: (end - start).rem_euclid(TAU),
     }
 }
@@ -1435,7 +1441,6 @@ pub(crate) fn build_rings(
         // the two buffers they belong to.
         if let Some(chain) = ring.motif.chain() {
             let closed = ring.motif.is_closed();
-            let last = chain.len().saturating_sub(1);
             for i in 0..count {
                 let theta = TAU * i as f32 / count as f32 + base_phase;
                 let (sin, cos) = theta.sin_cos();
@@ -1467,26 +1472,24 @@ pub(crate) fn build_rings(
                             width: 0.01,
                         }),
                         Piece::Line { a, b } => {
-                            // A chain is a chain (ADR-0041): every piece
+                            // A chain is a chain (ADR-0158): every piece
                             // continues its neighbour, and a closed one
                             // continues it at both ends. That is true across a
-                            // corner too — the join is what covers the wedge
-                            // between two strokes, and a corner is exactly
-                            // where there is one.
-                            let mut joined = 0;
-                            if closed || k > 0 {
-                                joined |= JOINED_A;
-                            }
-                            if closed || k < last {
-                                joined |= JOINED_B;
-                            }
+                            // corner too — the extension is what covers the
+                            // wedge between two strokes, and a corner is exactly
+                            // where there is one, so the length is the miter the
+                            // two arms subtend.
+                            //
+                            let (ext_a, ext_b) =
+                                Piece::chain_extensions(chain, k, PLACEHOLDER_WIDTH, closed);
                             out.push(SegmentInstance {
                                 a: place(a),
                                 b: place(b),
                                 color: [1.0, 1.0, 1.0],
-                                width: 0.01,
+                                width: PLACEHOLDER_WIDTH,
                                 alpha: 1.0,
-                                joined,
+                                ext_a,
+                                ext_b,
                             });
                         }
                     }
@@ -1517,26 +1520,31 @@ pub(crate) fn build_rings(
                     continue;
                 };
                 // A closed outline is a closed chain, so every vertex is a joint
-                // (ADR-0041); an open one is free at its two ends only.
-                let joined = if ring.motif.is_closed() {
-                    JOINED_A | JOINED_B
-                } else {
-                    let mut j = 0;
-                    if e > 0 {
-                        j |= JOINED_A;
-                    }
-                    if e + 1 < edges {
-                        j |= JOINED_B;
-                    }
-                    j
-                };
+                // (ADR-0158); an open one is free at its two ends only. A joint
+                // reaches its corner's point by the miter its two edges subtend,
+                // measured on the UNPLACED outline — `place` is a similarity and
+                // a similarity preserves angles.
+                let closed = ring.motif.is_closed();
+                let ext_a = (closed || e > 0)
+                    .then(|| pts.get((e + n - 1) % n))
+                    .flatten()
+                    .map_or(0.0, |&before| {
+                        miter_extension(PLACEHOLDER_WIDTH, before, a, b)
+                    });
+                let ext_b = (closed || e + 1 < edges)
+                    .then(|| pts.get((e + 2) % n))
+                    .flatten()
+                    .map_or(0.0, |&after| {
+                        miter_extension(PLACEHOLDER_WIDTH, a, b, after)
+                    });
                 out.push(SegmentInstance {
                     a: place(a),
                     b: place(b),
                     color: [1.0, 1.0, 1.0],
-                    width: 0.01,
+                    width: PLACEHOLDER_WIDTH,
                     alpha: 1.0,
-                    joined,
+                    ext_a,
+                    ext_b,
                 });
             }
         }
@@ -1833,6 +1841,7 @@ impl Scene for StarPatternScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
                 &self.arc_draw_buf,
@@ -1845,6 +1854,7 @@ impl Scene for StarPatternScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
                 &self.arc_draw_buf,
