@@ -276,7 +276,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 |---|---|---|---|
 | 1 — `warp_mesh/` takes the `particles/` shape | dev | done | committed with this row |
 | 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | committed with this row |
-| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | not started | |
+| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | committed with this row |
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | not started | |
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | not started | |
 | 6 — The two seams go home | dev | not started | |
@@ -348,6 +348,51 @@ The same line-by-line audit as Phase 1: of `HEAD`'s `mod.rs`, 161 lines have no
 counterpart, and every one is a `pub(super)` widening, one of the three retired
 `#[allow]`s, an argument the bundles absorbed, or one of the two evaluation
 copies `evaluate_side` replaced.
+
+**Phase 3.** `schema.rs` 2,414 lines becomes `schema/{mod,system,easing,error,load}.rs`
+plus `schema/raw/` (the eight subsystem tables the plan names, plus `preset.rs`
+for the four preset-level ones -- `RawPreset`, `RawLayer`, `RawLatch`, `RawSeed`
+-- which belong to no subsystem). `from_toml_str` 294 -> 233, `build_layer`
+183 -> 113. `presets/README.md` and the `presets/` tree are untouched, and
+`core/tests/preset.rs` passes **66/66** unchanged (the plan says 56; the suite
+grew since it was written).
+
+**Deviation on `variant_roster_reminder`, and it is the one to look at.** The
+plan says to delete it because "the array length is the reminder". It is not: a
+variant added to the enum forces nothing, because an enum has no length -- the
+reminder's *exhaustive match* was the only thing making a new variant fail the
+build. Deleting it would have removed a guarantee while claiming to preserve it,
+so it was **replaced** rather than deleted, by `SystemKind::row`, which returns
+the variant's index into `TABLE` and is exhaustive for the same reason. Verified
+by experiment: a scratch 13th variant fails at `system.rs:144`, which is `row`.
+A `const _` block asserts each `TABLE` row sits at its own variant's `row()`.
+The five parallel rosters are down to **one table and one index match**, and
+`ALL`, `from_name`, `as_str` and `param_names` all read `TABLE`.
+
+The ~80 duplicated lines between `from_toml_str` and `build_layer` become
+`compile_bindings`, `fold_smoothing` and `warn_vertex_use`, taking a `Surface`
+(`Preset` or `Layer`) that carries the three things the two surfaces differ in:
+the message prefix, which TOML table a message names, and whether a compositing
+parameter counts as known. **Every warning string is byte-identical** to what
+each surface emitted before.
+
+Two path repairs, both outside the phase's file list and both authorized before
+the phase began:
+
+- **`core/tests/hygiene.rs`** read `preset/schema.rs` by path, and its
+  `system_names` parsed `from_name`'s match arms -- a shape `TABLE` does not
+  have. It now reads `schema/system.rs` and takes the quoted strings out of the
+  `TABLE` block, which is also rustfmt-proof. Its non-vacuity assertion
+  (>= 12 names) still passes, so the parse is not silently empty.
+- **`docs/design-backlog.md`: eight live probes**, not the three predicted --
+  Phases 1 and 2 broke five more that nobody ran the gate against at the time.
+  Seven are pure `in:` path repointing. The eighth (entry 0142) is not: rustfmt
+  wrapped `scene_for_mut`'s signature across four lines once `pub(super)` made it
+  long, and the probe was a single-line regex on that signature. It is
+  re-anchored on the body line that carries the claim -- `.find(|(kind, _)| *kind
+  == system)` -- which is what that same entry's own 2026-08-28 note says to do
+  when a probe is anchored on a name instead of on the claim.
+  `check-backlog-claims.mjs` exits 0.
 
 ### Close triggers
 

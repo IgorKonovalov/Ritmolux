@@ -527,7 +527,7 @@ fn collapse_whitespace(text: &str) -> String {
 /// The check lives here rather than inside `scripts/docs-shots.mjs`, whose
 /// manifest it reads, because there it can only run behind a GPU and the only
 /// thing that executes that script is a human at a plan close. It is pure text -
-/// the manifest and `schema.rs`, no render - so it belongs where it fails on the
+/// the manifest and the system roster, no render - so it belongs where it fails on the
 /// commit that ships a scene. Inside the script a system with no gallery entry
 /// is a hard error that takes the whole sweep down, including the images that
 /// have nothing to do with it: three systems accumulated over eleven days behind
@@ -548,9 +548,10 @@ fn every_system_has_a_gallery_image() {
         root.join("core")
             .join("src")
             .join("preset")
-            .join("schema.rs"),
+            .join("schema")
+            .join("system.rs"),
     )
-    .expect("core/src/preset/schema.rs is readable");
+    .expect("core/src/preset/schema/system.rs is readable");
 
     let systems = system_names(&schema);
     assert!(
@@ -593,28 +594,36 @@ fn every_system_has_a_gallery_image() {
     }
 }
 
-/// The names `SystemKind::from_name` maps, read out of the Rust rather than
-/// mirrored, so a system added later cannot be absent from both sides at once.
+/// The canonical system names, read out of `SystemKind`'s own roster rather
+/// than mirrored, so a system added later cannot be absent from both sides at
+/// once.
+///
+/// Every string literal inside the `const TABLE` block is a canonical name --
+/// the table's other two columns are a `SystemKind` variant and a `PARAMS` path,
+/// neither of which is quoted. Reading the quotes rather than a per-row pattern
+/// is what makes this survive rustfmt wrapping one row across four lines and
+/// leaving the next on one.
 fn system_names(schema: &str) -> Vec<String> {
     let mut out = Vec::new();
-    let start = match schema.find("pub fn from_name(name: &str) -> Option<Self> {") {
+    let start = match schema.find("const TABLE:") {
         Some(i) => i,
         None => return out,
     };
     let end = schema[start..]
-        .find("_ => return None")
+        .find("\n};")
         .map(|i| start + i)
         .unwrap_or(schema.len());
-    for line in schema[start..end].lines() {
-        let Some((quoted, rest)) = line.split_once("\" => SystemKind::") else {
-            continue;
+    let mut rest = &schema[start..end];
+    while let Some(open) = rest.find('"') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('"') else {
+            break;
         };
-        let _ = rest;
-        if let Some(name) = quoted.rsplit('"').next()
-            && !name.is_empty()
-        {
+        let name = &after[..close];
+        if !name.is_empty() {
             out.push(name.to_string());
         }
+        rest = &after[close + 1..];
     }
     out
 }
