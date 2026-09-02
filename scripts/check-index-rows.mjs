@@ -57,8 +57,9 @@
 //
 // TWO THINGS ARE MEASURED PER ROW, AND THEY ARE DIFFERENT ASSERTIONS. Bytes is
 // the cap. SHAPE is the check that a row's form matches its region's: each
-// region takes its kind from its first measured row and a row of the other kind
-// is reported, naming the form that was expected. docs/plans/README.md holds one
+// region takes its kind from the MAJORITY of its rows — see scan() for why the
+// first row's form is the one answer that cannot work — and a row of the other
+// kind is reported, naming the form expected. docs/plans/README.md holds one
 // region of each kind — the active roster is a table, `## Recently closed` is a
 // bullet list — and a closed-plan bullet dropped into the table region is a
 // BULLET inside a region and under cap, so a length check alone reports it as

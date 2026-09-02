@@ -546,9 +546,16 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
 
    Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
    how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
-   the ledger row, then **re-point any `#NNNN--…` anchor a still-live entry aimed at the moved body**
-   to `design-backlog-archive.md#NNNN--…`. `scripts/check-doc-links.mjs` does **not** validate
-   fragments, so those are the one class of break here that no gate will catch for you.
+   the ledger row, then **re-point any reference a still-live entry aimed at the moved body** to the
+   bare-number-plus-file-link form — `[backlog 0072](design-backlog-archive.md)`, or just
+   `backlog 0072` where the file is already linked in the same breath.
+   **A fragment is prohibited, not repaired** ([ADR-0149](../../../docs/adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md)):
+   an entry's anchor is generated from the full text of its heading, so it breaks when the heading is
+   reworded and again when the body is archived, and it resolves to the top of a 4,000-line file
+   either way. `scripts/check-doc-links.mjs` rejects any `design-backlog.md#…` or
+   `design-backlog-archive.md#…` link, so this class *is* gated now — it is the one thing here you
+   do not have to catch by eye. What it still cannot see is a fragment written inside a code span
+   rather than a link, which is how this very sentence used to prescribe the retired form.
 
    **The ledger row is a pointer too — number, one line of what it was, where it went, under 320
    bytes:**

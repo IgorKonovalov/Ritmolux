@@ -74,10 +74,8 @@ the params then animate it.
 ## 2. The systems
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
-comparable. Each is a real shipped preset — the file name is under the picture. **Three of the
-twelve have no picture yet and that is not an omission:** the gallery was captured when the engine
-had nine systems, and `shape_field`, `warp_mesh` and `shape_collage` are described at the end
-instead. Every system is listed here either way; the roster and the full parameter tables live in
+comparable. Each is a real shipped preset — the file name is under the picture. All twelve systems
+have one; the roster and the full parameter tables live in
 [`../presets/README.md`](../presets/README.md).
 
 ### `fragment_field`
@@ -204,10 +202,14 @@ whose population is not fixed — which is precisely what the swarm's wrap-aroun
 **Reach for this when** the look is made of *discrete events*: fireworks, meteors, sparks, anything
 that should be triggered by a beat rather than modulated by a band.
 
-### `shape_field` — no picture yet
+### `shape_field`
 
-Two worlds ship on it (`presets/shape_facet.toml`, `presets/shape_pulse.toml`); the gallery predates
-them, so there is no image here. It draws one
+![Concentric heart-shaped bands in crimson, rose and peach on black, nested around a black heart at
+the centre and drawing out into fine parallel striations at the corners](images/gallery/shape_field.png)
+
+*`presets/shape_pulse.toml`*
+
+It draws one
 of five silhouettes — `disc`, `ring`, `polygon`, `star`, `heart` — as a **fullscreen distance
 field**, which makes the palette coordinate a *distance*: turn `palette_steps` up and you get
 concentric **offset contours of that shape**, not concentric circles. `palette_contour` then draws a
@@ -217,9 +219,14 @@ hairline at each band edge.
 heart, rings travelling outward from a shape. The full parameter roster and three worked reactivity
 recipes are in [`../presets/README.md`](../presets/README.md).
 
-### `warp_mesh` — no picture yet
+### `warp_mesh`
 
-The only system with **no shipped preset**, so there is nothing to photograph. It covers the frame
+![A soft teal and steel-blue field with a black star-shaped aperture at its centre, ringed by a pale
+glow that reads as depth receding into the hole](images/gallery/warp_mesh.png)
+
+*`presets/warp_wellhead.toml`*
+
+It covers the frame
 with a grid of cells and resamples the **previous** frame through it, giving every grid vertex its
 own zoom, rotation, stretch and drift — so the past can spiral in one corner and drift in another,
 which no single whole-frame `fb_*` transform can express. It is also the only scene with nothing of
@@ -230,10 +237,14 @@ tunnels, vortices, anything where what you are looking at is where the last fram
 MilkDrop preset brings its own draw layer and is the exception; see the `[milk]` table in
 [`../presets/README.md`](../presets/README.md).
 
-### `shape_collage` — no picture yet
+### `shape_collage`
 
-The newest system, shipping `presets/collage_suprematist.toml` and `presets/collage_onwhite.toml`;
-the gallery predates both. It is the engine's only **graphic** world rather than a luminous one.
+![Flat opaque bars, squares, triangles and discs in charcoal, blue, red, ochre, green and mauve,
+tilted and overlapping on a warm off-white ground](images/gallery/shape_collage.png)
+
+*`presets/collage_suprematist.toml`*
+
+The newest system. It is the engine's only **graphic** world rather than a luminous one.
 Every other system emits additive light, which has no notion of one object being in front of
 another — a black bar over a red one simply adds. This one *paints*: each pixel starts at the
 **paper** colour and walks an array of flat elements in array order, compositing each with `over`,

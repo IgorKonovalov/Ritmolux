@@ -13,6 +13,59 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0136 — The gates can convict](done/0136-the-gates-can-convict.md)
+  — closed 2026-09-02. Nine `dev` phases and one `human` phase in thirteen commits in the
+  `lmv-plan-0136` lane on `plan-0136-the-gates-can-convict`, `df9b7a1`..`93e40bb`, plus `53e5aa1`
+  for the review blocker. Mode 4: **one blocker, two majors, two minors, one nit.** Version:
+  **0.100.1** (patch) — five gates, one test helper, one packaging script and twelve images; no
+  engine, app or C ABI change.
+
+  **What landed.** `check-index-rows.mjs` gained a `--self-test` wired into both call sites, a
+  `scripts/fixtures/index-rows-red/` tree that exits 1, and a **shape** check beside the length one.
+  `check-backlog-claims.mjs` asks git whether a probe path is tracked and stopped collapsing runs of
+  spaces inside a probe's own regex. `check-filter-figures.mjs` demotes an untracked hit to an
+  advisory. `check-comment-hygiene.mjs` and `check-doc-links.mjs` both enumerate from `git ls-files`
+  instead of walking the filesystem, and the by-name `.venv` / `VENDORED_TREES` patches came out.
+  `check-doc-links.mjs` rejects a `design-backlog*.md#` fragment (ADR-0149), and 87 such links
+  across 29 files were rewritten. `docs-shots.mjs` renders again; the gallery is twelve images, and
+  its manifest-vs-`SystemKind` cross-check moved into `core/tests/hygiene.rs`, where it runs in
+  8 ms with no GPU.
+
+  **The blocker is the plan's own thesis, applied to the plan.** `cargo clippy --workspace
+  --all-targets -- -D warnings` — what pre-push and CI both run — failed on Phase 9's new
+  `system_names` helper, while the close block reported it clean. Nothing but re-running it would
+  have found that, which is the argument the whole plan is built on.
+
+  **Every done-when was verified by execution, not by reading.** Backlog 0104's own mutation —
+  `TABLE_ROW` and `BULLET` replaced with a never-matching regex — still exits 0 on a plain run and
+  now collapses `--self-test` to **1/10**. A closed-plan bullet seeded into the active-plans table
+  region is reported at its own line, with the majority rule naming it rather than the thirteen
+  correct rows around it. A present-but-gitignored probe path is named *"not tracked"* instead of
+  *"does not exist"*. A seeded `.venv/pkg/` is invisible to both enumeration gates. A thirteenth
+  `SystemKind` fails the cross-check. Full suite green on the merged branch: **1503 passed, 5
+  skipped**.
+
+  **What the log caught on itself, and is worth keeping.** The fixture bite is **13** findings, not
+  the 10 the plan and backlog 0170 both quoted — those were stale before the plan was written.
+  `warp_mesh` ships four presets, against backlog 0133's and the plan's claim of none, so Phase 10
+  was a real judgement between five candidates once `main`'s `warp_smoke` landed mid-phase;
+  `warp_wellhead` kept the slot because it is the better picture of the *family*. Four manifest
+  provenance lines said "the only X preset" and none was true. And 0173's first probe stays green
+  while the claim it stands for went false — green means the reduction still matches the tree, which
+  is all the gate ever promised.
+
+  **Two majors were the class returning by another door.** The close ceremony's own step 3c still
+  instructed the archived-anchor form ADR-0149 had just prohibited — invisible to the new rule
+  because it sits in a code span, not a link — and would have regenerated it at this very close.
+  And `docs/preset-guide.md`, the illustrated entrance, still carried three *"no picture yet"*
+  headings for systems that now have pictures, including one asserting `warp_mesh` has no shipped
+  preset. Both repaired here.
+
+  **What outlived the plan.** `check-backlog-claims.mjs --self-test` runs at no call site at all —
+  Phase 1 held it up as the model to follow and as the thing that must be wired *"or it is a
+  mechanism nobody runs, which is the defect being repaired"*. The plan's own argument applies to it
+  verbatim, and it fell outside every phase's file list.
+
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md)
   — closed 2026-09-01. Six `dev` phases in eight commits in the `lmv-plan-0137` lane on
   `plan-0137-metrics-light`, `efde516`..`32754b5`. Mode 4: **no blockers, one major, four minors,

@@ -170,7 +170,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115), Outcome, refines 0125 |
 | [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | accepted 2026-08-30 (Plan 0134), Outcome, supersedes 0141 in part |
 | [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | accepted 2026-08-30 (Plan 0135) |
-| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |
+| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | accepted 2026-09-02 (Plan 0136), extends 0127, Outcome |
 | [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | accepted 2026-09-01 (Plan 0137), Outcome |
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
