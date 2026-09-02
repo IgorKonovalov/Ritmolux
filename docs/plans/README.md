@@ -26,7 +26,7 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0150](0150-the-application-becomes-ritmolux.md) | The application becomes Ritmolux | approved | dev, human | ADR-0160 (proposed): 1,318 live sites take `rlx`/Ritmolux; the 990-site record keeps `lmv`. **Phase 1 is a `human` stop gate**: an unrun trademark check and the freeze. **Blocks 0143 and 0103.** |
+| [0150](0150-the-application-becomes-ritmolux.md) | The application becomes Ritmolux | approved | dev, human | ADR-0160 (proposed): 1,318 live sites take `rlx`/Ritmolux; the 990-site record keeps `lmv`. **Phase 1 trademark half discharged 2026-09-02**; the freeze half stands. **Blocks 0143 and 0103.** |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. **Phases 4-6 wait on 0150.** |
@@ -46,8 +46,9 @@ place. The plan file carries the real link.
 ADR-0160 chose Ritmolux; the plan sweeps 1,318 live sites across every crate and so cannot be merged
 against a parallel branch. Its Phase 1 is a `human` stop gate that does not release `dev` until
 `git worktree list` prints one line — today that means [0148] and [0149] close first — and **no lane
-opens between that gate and Phase 9.** The same gate carries the one check nobody has run: Ritmolux
-against a live trademark register, with Lumefall the recorded fallback if it convicts.
+opens between that gate and Phase 9.** That gate's other half, the trademark check, was discharged
+2026-09-02: a knockout search found no `Ritmolux` on any register, and the risk of stopping there was
+accepted for a non-commercial project. So the freeze is the only thing left holding this plan.
 
 **Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
 — three new plans and one amendment, taking 21 of the ~30 live entries no plan claimed. The round's

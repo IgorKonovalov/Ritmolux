@@ -86,13 +86,28 @@ flowchart TB
 
 ### Phase 1 — the name is cleared and the tree is frozen
 - **Owner skill:** human
-- **What:** The two gates that must hold before a workspace-wide sweep starts — the one check
-  nobody has run, and the absence of any parallel lane.
+- **What:** The two gates that must hold before a workspace-wide sweep starts — the trademark
+  check, and the absence of any parallel lane. **The first is discharged; the second is not.**
 - **What the user does:**
-  1. **Clear Ritmolux on a trademark register.** Every register serves an Altcha proof-of-work
-     challenge, so no part of this can be automated — it is the one axis no screening has covered,
-     and the only failure that invalidates the plan *after* it has landed. **If it convicts, this
-     plan stops and Lumefall is the fallback** — ADR-0160 records why.
+  1. **Clear Ritmolux on a trademark register — DISCHARGED 2026-09-02, and the risk accepted.**
+
+     **What was found:** a knockout search returned **no `Ritmolux` anywhere** — no exact mark and
+     no near-exact one. `Ritmo` and `Lux` each return many marks *separately*, which is the
+     expected result for two dictionary-adjacent elements and not a partial hit: confusion is
+     judged on the mark as a whole, and a crowded field around a shared element narrows what any
+     one owner of that element can claim. `-lux` is exactly such a crowd.
+
+     **What was not verified**, and is recorded here rather than implied away: the per-register
+     rows this phase's done-when originally asked for (register, date, exact query, classes, hit
+     count) were not captured; the class-filtered `ritmo` pass in 9 / 42 / 41 was not reported
+     back; and the storefront sweep below was not reported back. **This is a knockout search, not a
+     clearance opinion.**
+
+     **Why that is sufficient here — the user's call, 2026-09-02:** this is not intended as a
+     commercial product and no registration is planned, so the exposure a fuller search buys down
+     is not exposure this project carries. **The plan proceeds on the name.** If commercial
+     distribution is ever contemplated, this is the decision to revisit first, and the method below
+     is retained for that — and for screening Lumefall, which stays the recorded fallback.
 
      **Registers, in descending order of value.** The first covers most of the ground; stop early
      only if it convicts.
@@ -123,16 +138,17 @@ flowchart TB
   2. **Confirm the freeze.** Plans 0148 and 0149 closed and merged; no other lane opens until
      Phase 9 lands.
 - **Files touched:** none.
-- **Done when:** the register search is recorded in the implementation log as one row per register
-  — register, date, the exact query string, the classes filtered to, the hit count, and the verdict
-  — so that a later reader can tell a search that found nothing from a search that was never run;
-  `git worktree list` prints exactly one line; `git status --porcelain` is empty. **If any of the
-  three fails, `dev` does not start Phase 2.** That is this phase's purpose.
-- **Not covered by any register, and worth the extra ten minutes:** US common-law rights arise from
-  *use* rather than registration, so an unregistered product already shipping under this name
-  creates real risk that no register will show. Sweep Steam, the Microsoft Store, the Mac App
-  Store, Google Play and itch.io for `Ritmolux`. The domain and repository screening behind
-  ADR-0160 did not cover storefronts.
+- **Done when:** the trademark half is already discharged above, so what remains is the freeze —
+  `git worktree list` prints exactly one line and `git status --porcelain` is empty. **If either
+  fails, `dev` does not start Phase 2.** That is what is left of this phase's purpose, and it is
+  the half that cannot be discharged in advance: a lane opened between this gate and Phase 9 would
+  conflict with the sweep on nearly every file it touched.
+- **Not covered by any register, and not swept:** US common-law rights arise from *use* rather than
+  registration, so a product already shipping under this name creates risk no register shows. A
+  storefront sweep — Steam, the Microsoft Store, the Mac App Store, Google Play, itch.io — would
+  cover it in ten minutes and has not been run. Left open deliberately under the risk decision
+  above; it is cheap to run later and would change nothing structural if it found something, since
+  the fallback is a different name and not a different plan.
 
 ### Phase 2 — the crates take the prefix
 - **Owner skill:** dev
@@ -294,9 +310,13 @@ flowchart TB
 
 ## Risks & open questions
 
-- **The trademark register is the one check nobody has run**, and it is the only failure that
-  invalidates this plan after it lands rather than before it starts. Phase 1 is a stop gate for
-  exactly this reason, and Lumefall is the recorded fallback.
+- **The trademark position is a knockout search plus an accepted risk, not a clearance.** The
+  search found no `Ritmolux` on any register (Phase 1, 2026-09-02), and the user's decision is that
+  a non-commercial project with no registration planned does not need more. What that leaves open:
+  a class-filtered `ritmo` pass, a storefront sweep for unregistered common-law use, and the
+  per-register record itself. **The trigger to revisit is commercial distribution**, and the
+  remedy at that point is a different name — Lumefall — not a different plan, since every phase
+  here is name-agnostic.
 - **A blind textual substitution can corrupt what it does not understand.** `lmv` appears 879 times
   as a bare word and 1,020 times as an identifier prefix, and the repository contains binary golden
   baselines. Any scripted sweep must be word-boundary aware and must exclude binary files; the
@@ -318,7 +338,8 @@ flowchart TB
 
 - **It does not rewrite the record.** `docs/adrs/`, `docs/plans/done/` and the two archives keep
   `lmv` in 990 places, by design. ADR-0160 exists to make them legible.
-- **It does not clear a trademark** — Phase 1 asks the user to, and stops if it fails.
+- **It does not clear a trademark.** Phase 1 records a knockout search and an accepted risk; a
+  clearance opinion is a different exercise, and the trigger for it is commercial distribution.
 - **It does not publish anything.** The docs site is [0143](0143-the-documentation-gets-a-front-end.md);
   the component submission, the repository metadata and the posts are
   [0103](0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both

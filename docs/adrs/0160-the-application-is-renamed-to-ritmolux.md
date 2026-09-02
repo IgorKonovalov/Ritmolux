@@ -29,8 +29,14 @@ the GitHub user and organization namespace, and on `.com .app .dev .io .net .org
 .co.uk .info`, with the typo domains `rhythmolux.com` and `ritmoluxe.com` also free. It returns no
 company in English or Russian and no repository on GitHub. The single hit is `ritmolux.ai`,
 registered 2026-08-08 and serving an unrelated application whose own brand is a different name.
-**No candidate was cleared against a live trademark register** — USPTO, WIPO and Justia all refuse
-automated queries — and that check remains outstanding at the time of this decision.
+**The trademark position is a knockout search and an accepted risk, not a clearance.** Every
+register serves a proof-of-work challenge, so the search is manual; run on 2026-09-02 it returned
+**no `Ritmolux` on any register**. `Ritmo` and `Lux` each return many marks separately, which is
+the expected result for two dictionary-adjacent elements rather than a partial hit — confusion is
+judged on the mark as a whole, and a crowded field around a shared element narrows what any owner
+of that element can claim. What was not done: a class-filtered `ritmo` pass in Nice 9 / 42 / 41,
+and a storefront sweep for unregistered common-law use. **The user's decision is that this is
+sufficient** for a project not intended as a commercial product and with no registration planned.
 
 **The project is pre-1.0** (`0.100.1`), so nothing here owes backward compatibility; the cheapest
 moment to break every identifier is now, and it stops being cheap the moment either blocked plan
@@ -90,8 +96,13 @@ anything can consult it. Bumping it would assert a shape change that did not hap
   not cheap after Plan 0103 Phase 5.
 - **GitHub Pages does not redirect, and the old repository name must never be reused** — recreating
   `light-music-visualizer` would silently break every redirect the rename set up.
-- **The trademark register is still unchecked.** This decision is made on namespace and taste
-  evidence alone, and a register hit would invalidate it after the sweep has landed.
+- **The name is knocked out, not cleared, and that is a deliberate ceiling.** A knockout search
+  answers whether the name is *obviously* taken; it does not answer whether a similar mark in a
+  related class could be asserted. The gap is accepted because this is not a commercial product and
+  no registration is planned — **so the decision carries a condition rather than a guarantee: if
+  commercial distribution is ever contemplated, this is the first thing to revisit**, and the
+  remedy is a different name (Lumefall), not a different architecture. Every phase of Plan 0150 is
+  name-agnostic, so a second rename would cost the same sweep again and nothing more.
 
 ### Neutral
 
@@ -152,7 +163,8 @@ compromised namespace.
 **Lumefall** is fully clear on every registry and TLD checked, and lost by one vowel:
 `lumifall.com` is a live home-and-office LED lighting business. Trade-class proximity is the axis a
 trademark examiner weighs, and this project sells light. Ritmolux has no such neighbour. Lumefall
-remains the fallback if the outstanding trademark check convicts Ritmolux.
+remains the fallback if the name is ever revisited — note that its own defect is precisely a
+trade-class one, so it would need the class-filtered search Ritmolux was not put through.
 
 ## Notes
 
