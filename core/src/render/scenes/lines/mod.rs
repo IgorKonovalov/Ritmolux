@@ -34,7 +34,7 @@ pub mod turtle;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
-pub use renderer::{ArcInstance, LineRenderer, SegmentInstance};
+pub use renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
 

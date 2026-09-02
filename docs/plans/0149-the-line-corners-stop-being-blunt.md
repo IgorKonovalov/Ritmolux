@@ -595,17 +595,19 @@ pub struct SegmentInstance {
 
 **Lane:** `plan-0149-the-line-corners-stop-being-blunt`, worktree `WORK/lmv-plan-0149`.
 
-**This plan is NOT ready to close.** Four of five phases landed; Phase 2 — the miter, and the
-reason the plan exists — is blocked by its own stop gate on a finding that changes
-[ADR-0158]'s Decision. Backlog 0134 stays live. What follows is a phase record, not a close brief.
+**This plan is NOT ready to close.** Phase 2a has landed and unblocked Phase 2. What follows is a
+phase record, not a close brief.
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
-| 2 — The corner reaches its point | dev | **BLOCKED** — stop gate ran and failed; see Notes | |
+| 2a — The stroke is measured where the screen is isotropic | dev | done | committed with this row |
+| 2 — The corner reaches its point | dev | not started | |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
 | 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
 | 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
+| 6 — Judge what the corrected stroke weighs | human | not started | |
+| 7 — Apply the calibration verdict | dev | not started | |
 
 ### Notes
 
@@ -733,6 +735,86 @@ by one element for the off-by-one.
 order of magnitude** and is corrected rather than softened: it now bounds DSP and
 audio state, which is what it was measured against, and scene geometry is named
 as a separate quantity with the figures above.
+
+**Phase 2a's oracle, and what it read.** The metric is a per-draw parameter,
+`StrokeMetric`, on the segment uniform's `v.w`. The new fixture is
+`the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation` in
+`lines/renderer/tests.rs`: a world-vertical and a world-horizontal stroke in one
+frame, their on-screen thicknesses counted off cross-sections that miss the
+crossing, at two non-square targets and under **both** metrics.
+
+| target | aspect | metric | vertical px | horizontal px | ratio |
+|---|---|---|---|---|---|
+| 1920x1080 | 1.7778 | World | 204 | 204 | **1.0000** |
+| 1920x1080 | 1.7778 | Clip | 362 | 204 | **1.7745** |
+| 800x1280 | 0.6250 | World | 242 | 242 | **1.0000** |
+| 800x1280 | 0.6250 | Clip | 152 | 242 | **0.6281** |
+
+Byte-identical on the software adapter and on this box's hardware one — the same
+four rows from both, which is the adapter comparison the bless below was taken
+under.
+
+**The plan asked for the pre-fix sanity reading as a one-off; it is a permanent
+control instead.** `StrokeMetric::Clip` renders exactly the arithmetic the phase
+moves away from, so asserting that arm reads the *aspect* is the same
+measurement the plan wanted taken once, and it also makes the fixture
+non-vacuous by construction — a probe that could not see the defect would read
+`1.0` under both metrics. The tolerance is `2 / (n - 1)` on the smaller of the
+two counts actually taken, from one pixel of lattice quantization on each; it
+comes out near 1 % and is computed per case rather than frozen.
+
+**The baseline split, both halves.** `LMV_BLESS=1` on `--test composite` alone,
+then `git status`: **exactly eight files modified**, every one of the
+`parametric_curve` fixtures. `composite_symmetry.png` and
+`composite_kaleido_squash.png` — the two `fragment_field` ones — are byte-
+identical and untouched, so no restore was needed. `golden` (128x128),
+`line_joints` (512x512), `spectrum` and `warp_mesh` (96x96) are unmoved and
+unblessed, as is `milkconv/tests/draw_layer.rs`.
+
+**Deviation: the metric parameter is on four entry points, not three.**
+[ADR-0160] names `draw`, `draw_split` and `draw_opaque`. `draw_arcs` is a fourth
+public entry point that also draws segments — it is what `parametric` and `star`
+call — so leaving it out would have hidden the metric at two of the six line
+call sites, against that ADR's own reason for making it explicit. The user's
+call at the pre-implementation gate.
+
+**Deviation: the call site is in `warp_mesh/mod.rs`, not `warp_mesh/draw.rs`.**
+The phase's file list names `draw.rs` and its done-when says *"its two call
+sites"*. `draw.rs` builds geometry and calls no draw entry point; `warp_mesh` has
+exactly **one** `LineRenderer` call, `res.lines.draw_split` in `mod.rs`. The
+`StrokeMetric::Clip` argument and the dated deferral comment are there. Same
+class as Phase 1's file-list mismatch.
+
+**Deviation: `an_arc_draws_the_same_curve_as_a_dense_polyline` needed a fixture
+change, and here is the measurement behind it.** The phase made it fail at
+outlier **114** against its bound of 48, with mean 0.0000. Diagnosed rather than
+blessed around: exactly **4 pixels of 76,800** disagreed, at sample indices
+64/192/320/448 — the four polyline vertices that land on the render lattice's
+diagonals — and at each of them the polyline read **exactly 2x** the arc. That is
+the control's own additive joint bead, doubled where a pixel centre falls in the
+overlap wedge two adjacent chords share; the arc has no joints. The fifth-worst
+pixel differed by **1 byte**.
+
+Readings taken, all on this fixture at three softness values:
+
+| tree | sampling phase | worst byte | lit pixels (poly / arc) |
+|---|---|---|---|
+| pre-2a (`ba887cc`, rebuilt) | 0 | **1** | 628 / 632 |
+| post-2a | 0 | **114** (4 px) | 540 / 540 |
+| post-2a | 0.25 | 38 | 536 / 540 |
+| post-2a | 0.37 | 2 | 540 / 540 |
+| post-2a | 0.5 | **2** | 540 / 540 |
+
+So the two primitives agree *better* after the phase, not worse — the lit counts
+become identical and 76,796 pixels sit within 1 byte — and the 48-byte bound was
+never slack absorbed by beads. The walk now starts at `ARC_SAMPLE_PHASE = 0.5`,
+which is the furthest every vertex can be from the lattice's symmetry axes; the
+constant's doc carries the mechanism and the sweep above. **No tolerance was
+moved.** The pre-2a row was measured by checking `ba887cc` out over
+`core/src/render/scenes/` and rebuilding, not by restoring files with preserved
+mtimes.
+
+**`WIDTH_SCALE` did not move**, per the phase.
 
 ### Close triggers
 

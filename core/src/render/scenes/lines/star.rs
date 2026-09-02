@@ -134,7 +134,7 @@ use std::sync::OnceLock;
 use super::super::Scene;
 use super::super::common;
 use super::biarc::{self, Piece};
-use super::renderer::{ArcInstance, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, PLACEHOLDER_WIDTH,
     ViewTransform, hankin, replicate_mirror, transform_cached, turtle,
@@ -1843,6 +1843,7 @@ impl Scene for StarPatternScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
                 &self.arc_draw_buf,
@@ -1855,6 +1856,7 @@ impl Scene for StarPatternScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
                 &self.arc_draw_buf,

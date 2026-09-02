@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------
 
 use super::super::ViewTransform;
-use super::{DrawExtent, SegmentInstance, measure_extent};
+use super::{DrawExtent, SegmentInstance, StrokeMetric, measure_extent};
 use crate::render::gpu;
 
 /// A segment with everything but its endpoints held constant — colour, width
@@ -915,6 +915,25 @@ const ARC_ASPECT: f32 = ARC_W as f32 / ARC_H as f32;
 /// difference the comparison finds is the primitive's and not the sampling's.
 const ARC_SAMPLES: usize = 512;
 
+/// Where the polyline's walk starts, in samples — **half a step, and that is
+/// load-bearing**.
+///
+/// At zero the vertices at `k = N/8, 3N/8, 5N/8, 7N/8` land on the render
+/// lattice's diagonals, and there a pixel centre falls inside the wedge two
+/// adjacent chords overlap in at their shared joint, where the additive seam
+/// draws twice what a single stroke covers. Measured on this fixture, worst
+/// single-channel byte against the arc: **114 at phase 0** — 4 pixels of 76,800,
+/// exactly the four diagonal vertices, each reading exactly `2x` the arc — then
+/// **38 at 0.25**, **2 at 0.37** and **2 at 0.5**.
+///
+/// **That bead is the polyline's, not the arc's.** An arc has no joints, which
+/// is the whole point of the primitive; the question this fixture asks is
+/// whether the two draw the same *curve*, and a control whose vertices sit on
+/// the lattice's own symmetry axes answers a different one. Half a step is the
+/// furthest every vertex can be from those axes, not a value tuned until the
+/// comparison passed.
+const ARC_SAMPLE_PHASE: f32 = 0.5;
+
 /// The stroke the comparison is drawn at, in NDC-y half-width — `thickness`
 /// around 2, which is what the line presets actually ship (`presets/README.md`
 /// gives the working range as 1.5 to 3.2).
@@ -993,6 +1012,7 @@ fn arc_capture(
         ARC_ASPECT,
         1.0,
         softness,
+        StrokeMetric::World,
         ViewTransform::default(),
         segments,
         arcs,
@@ -1017,7 +1037,7 @@ fn arc_capture(
 /// question here is whether the two draw the same *curve*.
 fn sampled_circle(centre: [f32; 2], radius: f32, width: f32) -> Vec<SegmentInstance> {
     let point = |k: usize| {
-        let t = std::f32::consts::TAU * k as f32 / ARC_SAMPLES as f32;
+        let t = std::f32::consts::TAU * (k as f32 + ARC_SAMPLE_PHASE) / ARC_SAMPLES as f32;
         [centre[0] + radius * t.cos(), centre[1] + radius * t.sin()]
     };
     (0..ARC_SAMPLES)
@@ -1537,6 +1557,7 @@ fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
             1.0,
             1.0,
             0.0,
+            StrokeMetric::World,
             ViewTransform::default(),
             &segments,
             &[],
@@ -1549,6 +1570,7 @@ fn overlap_capture(opaque: bool) -> Option<Vec<f32>> {
             1.0,
             1.0,
             0.0,
+            StrokeMetric::World,
             ViewTransform::default(),
             &segments,
         );
@@ -1647,6 +1669,7 @@ fn profile_capture(
     width: u32,
     height: u32,
     softness: f32,
+    metric: StrokeMetric,
     segments: &[SegmentInstance],
 ) -> Option<Vec<f32>> {
     use crate::render::capture;
@@ -1699,6 +1722,7 @@ fn profile_capture(
         width as f32 / height as f32,
         1.0,
         softness,
+        metric,
         ViewTransform::default(),
         segments,
     );
@@ -1805,6 +1829,7 @@ fn the_edge_term_never_exceeds_the_softness_term() {
             width,
             height,
             super::super::DEFAULT_SOFTNESS,
+            StrokeMetric::World,
             &slanted_stroke(half_width),
         ) else {
             return;
@@ -1866,7 +1891,13 @@ fn the_edge_is_a_width_in_pixels_not_a_fraction_of_the_stroke() {
 
     let mut half_px_seen: Vec<f32> = Vec::new();
     for (width, height) in [(1920u32, 1080u32), (1280, 800)] {
-        let Some(drawn) = profile_capture(width, height, 0.0, &flat_stroke(HALF_WIDTH)) else {
+        let Some(drawn) = profile_capture(
+            width,
+            height,
+            0.0,
+            StrokeMetric::World,
+            &flat_stroke(HALF_WIDTH),
+        ) else {
             return;
         };
         let half_px = HALF_WIDTH * height as f32 / 2.0;
@@ -1941,7 +1972,13 @@ fn a_low_softness_puts_a_plateau_across_the_stroke() {
 
     let mut plateaus: Vec<(f32, usize, usize)> = Vec::new();
     for softness in [1.0f32, 0.5, 0.25, 0.0] {
-        let Some(drawn) = profile_capture(W, H, softness, &flat_stroke(HALF_WIDTH)) else {
+        let Some(drawn) = profile_capture(
+            W,
+            H,
+            softness,
+            StrokeMetric::World,
+            &flat_stroke(HALF_WIDTH),
+        ) else {
             return;
         };
         let column = (W / 2) as usize;
@@ -1994,4 +2031,153 @@ fn a_low_softness_puts_a_plateau_across_the_stroke() {
          {footprint_solid} across the `softness` range — the parameter is \
          changing the stroke's WIDTH, which is `thickness`'s job"
     );
+}
+
+// -----------------------------------------------------------------------
+// The space the stroke is measured in (Plan 0149 Phase 2a, ADR-0160)
+// -----------------------------------------------------------------------
+
+/// A world-**vertical** and a world-**horizontal** stroke in one frame, crossing
+/// at the origin, both running well past the frame on their own axis so neither
+/// end cap is ever in view.
+///
+/// One frame rather than two captures, so the two thicknesses compared below are
+/// measured on one adapter, in one draw, under one uniform — the ratio is then a
+/// property of the shader and not of two renders that might differ for some
+/// other reason. They are measured off cross-sections far from the crossing:
+/// the vertical stroke's at NDC y = 0.75, the horizontal one's at NDC x = -0.75,
+/// each of which is outside the other stroke's footprint at every size and
+/// metric used here.
+fn crossing_strokes(half_width: f32) -> [SegmentInstance; 2] {
+    let axis = |a: [f32; 2], b: [f32; 2]| SegmentInstance {
+        a,
+        b,
+        color: [1.0, 1.0, 1.0],
+        width: half_width,
+        ext_a: 0.0,
+        ext_b: 0.0,
+        alpha: 1.0,
+    };
+    [axis([-8.0, 0.0], [8.0, 0.0]), axis([0.0, -4.0], [0.0, 4.0])]
+}
+
+/// How many pixels of `row` are lit, at the threshold this fixture reads at.
+fn lit_in_row(pixels: &[f32], width: u32, row: usize) -> usize {
+    (0..width as usize)
+        .filter(|col| pixels[(row * width as usize + col) * 4] > METRIC_LIT)
+        .count()
+}
+
+/// How many pixels of `col` are lit, at the threshold this fixture reads at.
+fn lit_in_column(pixels: &[f32], width: u32, height: u32, col: usize) -> usize {
+    (0..height as usize)
+        .filter(|row| pixels[(row * width as usize + col) * 4] > METRIC_LIT)
+        .count()
+}
+
+/// The coverage a pixel must carry to count as inside the stroke.
+///
+/// Any value strictly between 0 and the peak works: at `DEFAULT_SOFTNESS` the
+/// profile is `(u / 0.25)²` capped at 1, so a threshold `t` puts the lit edge at
+/// `|side| = 1 - 0.25·sqrt(t)` — a **fixed fraction of the footprint**, the same
+/// fraction for every stroke in the frame whatever its width. It therefore
+/// cancels out of the ratio below exactly, which is why the assertion needs no
+/// term for it.
+const METRIC_LIT: f32 = 0.05;
+
+/// **The stroke is the same thickness on screen whatever the segment's
+/// orientation** — [`StrokeMetric::World`], ADR-0160 — and the clip metric
+/// `warp_mesh` still passes is the same measurement reading the aspect instead.
+///
+/// # Why no square target can pin this
+///
+/// The whole line golden corpus renders square: `golden.rs` at 128x128,
+/// `line_joints.rs` at 512x512, `spectrum.rs` and `warp_mesh.rs` at 96x96.
+/// There the two spaces are not merely close, they are **identical in `f32`** —
+/// `inv_aspect` is exactly `1.0` and every multiplication by it is exact — so no
+/// capture in that corpus can distinguish the metrics, and a fully green suite
+/// is no evidence at all about this property. That is ADR-0037's rule applied to
+/// a space rather than to a size, and it is why this fixture renders at 16:9 and
+/// at 5:8 and not at all where the golden suite does.
+///
+/// # What is asserted, and why it is a property rather than a measurement
+///
+/// Both terms are stroke thicknesses in **pixels**, measured the same way, in
+/// one frame, on one adapter. Their ratio is dimensionless and
+/// target-independent, so `1.0` is a property of the shader and not a reading
+/// off this particular render (ADR-0074). The **clip** arm is the control: it is
+/// the same fixture on the same two frames and it must read the target's aspect,
+/// which is both the non-vacuity check — a fixture that could not see the defect
+/// would read `1.0` there too — and the pin on the metric `warp_mesh` is
+/// deliberately left on.
+///
+/// # The tolerance, derived
+///
+/// Each thickness is a count of pixel centres falling inside an interval of real
+/// length `L`, so it is `floor(L)` or `ceil(L)` and departs from `L` by strictly
+/// less than one pixel. For two such counts the ratio's worst case is
+/// `(L + 1) / (L - 1)`, so the bound is `2 / (n - 1)` on the **smaller of the two
+/// counts actually taken** — about 1 % at the extents here. It is derived per
+/// case from the counts the render produced, not frozen: a fatter stroke or a
+/// taller target tightens it on its own.
+#[test]
+fn the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation() {
+    /// Fat enough that each cross-section counts a couple of hundred pixels,
+    /// which is what puts the derived tolerance near 1 %. Small enough that the
+    /// vertical stroke stays clear of the column the horizontal one is read in,
+    /// at both sizes and under both metrics.
+    const HALF_WIDTH: f32 = 0.2;
+
+    // 16:9 and 5:8 — the anisotropy runs both ways, and the clip metric's error
+    // is above 1 at one and below at the other.
+    for (width, height) in [(1920u32, 1080u32), (800, 1280)] {
+        let aspect = width as f32 / height as f32;
+        for metric in [StrokeMetric::World, StrokeMetric::Clip] {
+            let Some(drawn) = profile_capture(
+                width,
+                height,
+                super::super::DEFAULT_SOFTNESS,
+                metric,
+                &crossing_strokes(HALF_WIDTH),
+            ) else {
+                return;
+            };
+            // NDC y = 0.75 and NDC x = -0.75: each cross-section is far outside
+            // the other stroke's footprint, so it measures one stroke alone.
+            let across_vertical = lit_in_row(&drawn, width, (height / 8) as usize);
+            let across_horizontal = lit_in_column(&drawn, width, height, (width / 8) as usize);
+
+            let smaller = across_vertical.min(across_horizontal);
+            assert!(
+                smaller >= 64,
+                "{width}x{height} {metric:?}: the thinner cross-section is only \
+                 {smaller} px, too few for the ratio below to mean anything"
+            );
+            let tol = 2.0 / (smaller as f32 - 1.0);
+            let ratio = across_vertical as f32 / across_horizontal as f32;
+            // World: the two strokes are the same thickness. Clip: the vertical
+            // one is `aspect` times the horizontal one, which is the defect.
+            let want = match metric {
+                StrokeMetric::World => 1.0,
+                StrokeMetric::Clip => aspect,
+            };
+            eprintln!(
+                "{width}x{height} (aspect {aspect:.4}) {metric:?}: vertical \
+                 {across_vertical} px across, horizontal {across_horizontal} px, \
+                 ratio {ratio:.4} against {want:.4} (tolerance {tol:.4})"
+            );
+            assert!(
+                (ratio - want).abs() <= want * tol,
+                "{width}x{height} (aspect {aspect:.4}) under {metric:?}: a \
+                 vertical stroke measures {across_vertical} px across and a \
+                 horizontal one {across_horizontal} px, a ratio of {ratio:.4} \
+                 where {want:.4} is the property (tolerance {tol:.4}, derived \
+                 from one pixel of quantization on each of {smaller}+ counted). \
+                 Under World the half-width is applied in the isotropic space \
+                 and the two must agree; under Clip it is applied where one x \
+                 unit is `aspect` times as many pixels as one y unit, and the \
+                 ratio must BE the aspect"
+            );
+        }
+    }
 }

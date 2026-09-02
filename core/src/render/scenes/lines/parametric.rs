@@ -38,7 +38,7 @@ use std::rc::Rc;
 use super::super::common;
 use super::super::{FALLBACK_DT, Phase, Scene};
 use super::biarc::Piece;
-use super::renderer::{ArcInstance, LineRenderer, SegmentInstance};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
 use super::{
     CapOverflow, ColorRamp, CurveFamily, GeneratorConfig, MirrorSpec, OverflowContext,
     ViewTransform, curves, replicate_mirror,
@@ -594,6 +594,7 @@ impl Scene for ParametricCurveScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
                 &self.arcs,
@@ -606,6 +607,7 @@ impl Scene for ParametricCurveScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
                 &self.arcs,
