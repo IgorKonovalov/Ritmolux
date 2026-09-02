@@ -382,7 +382,7 @@ or an older copy shadows the one under test and the version check means nothing.
       starts, so it is worst for a user who looks before pressing play.
       **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog.md): the panel's
       right-click shadows foobar2000's layout-edit menu, so Remove is unreachable.
-      **(f) Pass** — `%APPDATA%\ritmolux\` is present and shared; the component wrote
+      **(f) Pass** — `%APPDATA%\light-music-visualizer\` is present and shared; the component wrote
       `plugin-diagnostics.log` there during the run. **Noted, not a component defect:** that
       library held **76** presets against the **40** the repo ships, because seeding is
       write-if-absent and never deletes. 36 retired presets from earlier cohorts are still live in
@@ -415,7 +415,7 @@ or an older copy shadows the one under test and the version check means nothing.
       **(e)** in layout-editing mode, right-click the panel and check whether Remove is reachable —
       this is [backlog 0103](design-backlog.md), expected to fail, and confirming it on a second
       machine is worth the ten seconds;
-      **(f)** `%APPDATA%\ritmolux\` exists and is the same folder the standalone uses.
+      **(f)** `%APPDATA%\Ritmolux\` exists and is the same folder the standalone uses.
       **Escalation:** a failure is a new backlog entry or a followup plan, never a re-opened plan —
       on-device checks do not gate closes here. (b) and (e) failing is the *expected* result and
       confirms two filed defects rather than finding new ones; anything else is new.
@@ -513,7 +513,7 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 The 1 Hz log lands at:
 
 ```
-%APPDATA%\ritmolux\diagnostics.log
+%APPDATA%\Ritmolux\diagnostics.log
 ```
 
 Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes

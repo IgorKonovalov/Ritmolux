@@ -1,12 +1,24 @@
 # 0150 — The application becomes Ritmolux
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-02. All nine phases landed: 2-8 by `dev` on `main`
+> (`c093dc7`..`688ae88`), and Phase 9's repository half was verified done at the close - `origin`
+> is `IgorKonovalov/Ritmolux.git`, the checkout is `WORK/Ritmolux`, `foo_ritmolux.dll` is installed
+> and no `foo_lmv` remains. **Two Phase 9 items are the user's and outstanding:** restarting
+> foobar2000 so it rescans `user-components-x64` (the component was copied in while it was running),
+> and re-pointing every Spout receiver at the `Ritmolux` sender.
+> Mode 4 review: **no blockers, four majors, two minors.** The full suite was re-run against the
+> finished tree - **1518 passed, 5 skipped, 0 failed, 419.5 s** - and every golden is byte-identical
+> to the pre-rename baseline `47432ca`, so the plan's central safety property holds as claimed. All
+> four majors were doc-integrity defects from the sweep and were repaired in the close commit: four
+> `WORK/` pointers renamed to directories that do not exist, this plan's own index row inverted to
+> say the record keeps `ritmolux`, three dated observations falsified, and a closed plan retitled
+> away from its own H1. The two minors are filed as backlog 0180 and 0181.
 > **Created:** 2026-09-02
 > **Approved:** 2026-09-02 (user) - runs next, once the lanes now live have closed
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md)
-> **Blocks:** [0143](0143-the-documentation-gets-a-front-end.md) (parked in writing on this
-> decision) and [0103](0103-the-project-gets-an-audience.md) Phases 4-6 (repository metadata,
+> **Related ADRs:** [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md)
+> **Blocks:** [0143](../0143-the-documentation-gets-a-front-end.md) (parked in writing on this
+> decision) and [0103](../0103-the-project-gets-an-audience.md) Phases 4-6 (repository metadata,
 > component submission, three posts). Neither may ship before this lands.
 > **Lane guidance:** `main` directly, with **no other lane live** — see Phase 1. A worktree buys
 > nothing here (the sweep touches every crate, so the lane pays a cold `target/` for no isolation)
@@ -26,10 +38,10 @@ them legible. When this lands, Plans 0143 and 0103 unpark.
 ## Context & problem
 
 The name is a description that was never chosen as a product name, and two approved plans are now
-waiting on it. [Plan 0143](0143-the-documentation-gets-a-front-end.md) is parked in its own header —
+waiting on it. [Plan 0143](../0143-the-documentation-gets-a-front-end.md) is parked in its own header —
 *"the rename is itself parked … that decision is the named trigger for this one"* — because a
 GitHub Pages project site lives at a path derived from the repository name and **a renamed
-repository does not redirect its Pages URLs**. [Plan 0103](0103-the-project-gets-an-audience.md)
+repository does not redirect its Pages URLs**. [Plan 0103](../0103-the-project-gets-an-audience.md)
 Phase 5 submits the component to the foobar2000 component repository, and
 `VALIDATE_COMPONENT_FILENAME("foo_lmv.dll")` makes that filename a contract with every installed
 copy — foobar2000 refuses to load the component if the file is renamed. Publish either, and the
@@ -340,9 +352,9 @@ flowchart TB
   `lmv` in 990 places, by design. ADR-0162 exists to make them legible.
 - **It does not clear a trademark.** Phase 1 records a knockout search and an accepted risk; a
   clearance opinion is a different exercise, and the trigger for it is commercial distribution.
-- **It does not publish anything.** The docs site is [0143](0143-the-documentation-gets-a-front-end.md);
+- **It does not publish anything.** The docs site is [0143](../0143-the-documentation-gets-a-front-end.md);
   the component submission, the repository metadata and the posts are
-  [0103](0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both
+  [0103](../0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both
   are waiting.
 - **It does not move to 1.0.** The version bump at close is an ordinary one, decided by the
   architect against what shipped. Whether the rename and 1.0 coincide is a separate call.
@@ -400,7 +412,7 @@ the lock stale.
 
 **The C ABI has fifteen `extern "C"` functions, not sixteen.** Phase 3's own text, the plan's
 TL;DR and ADR-0162's Context and Decision all say sixteen.
-[`docs/specs/0001-c-abi.md`](../specs/0001-c-abi.md) — which `CLAUDE.md` names as the authority on
+[`docs/specs/0001-c-abi.md`](../../specs/0001-c-abi.md) — which `CLAUDE.md` names as the authority on
 the ABI's shape — says **fifteen** normatively (*"MUST be exactly these fifteen functions and no
 others"*) and calls a sixteenth *"widening the surface … an ADR-worthy event"*. The header agrees
 at fifteen. The sixteen appears to be a count of distinct `lmv_*` tokens in the header, which
@@ -669,8 +681,8 @@ body below it is byte-identical — the diff is 1 insertion, 1 deletion.
 
 ## Followups (after this lands)
 
-- Unpark [0143](0143-the-documentation-gets-a-front-end.md): remove the `Parked until` block and
+- Unpark [0143](../0143-the-documentation-gets-a-front-end.md): remove the `Parked until` block and
   choose the Pages subpath under the new repository name.
-- Unblock [0103](0103-the-project-gets-an-audience.md) Phases 4-6.
+- Unblock [0103](../0103-the-project-gets-an-audience.md) Phases 4-6.
 - Decide whether the rename and 1.0 coincide, and whether `RLX_ABI_VERSION` moves at 1.0 for
   reasons of its own.

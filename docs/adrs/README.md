@@ -183,5 +183,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | accepted 2026-09-02 (Plan 0148), Outcome, amends nfr.md 4 |
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | accepted 2026-09-02 (Plan 0149), supersedes the metric half of 0041, unblocks 0158 |
 | [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | accepted 2026-09-02 (Plan 0149), falsifies 0130's default floor arm |
-| [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | proposed 2026-09-02 (Plan 0150) |
+| [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | accepted 2026-09-02 (Plan 0150), Outcome |
 <!-- roster:end -->

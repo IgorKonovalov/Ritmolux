@@ -1058,7 +1058,7 @@ Highest precedence first:
 2. `--presets <dir>` — every `*.toml` in that directory.
 3. **`RLX_PRESET_DIR`** — the environment override
    ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)).
-4. The per-user preset directory (`%APPDATA%\ritmolux\presets` on
+4. The per-user preset directory (`%APPDATA%\Ritmolux\presets` on
    Windows; see [`presets.md`](presets.md#where-preset-files-live)).
 5. The presets compiled into the binary.
 

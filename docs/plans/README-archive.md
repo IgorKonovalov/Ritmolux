@@ -13,6 +13,70 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md)
+  — closed 2026-09-02. Nine phases (seven `dev`, two `human`) on `main` directly with no worktree,
+  `c093dc7`..`688ae88`. Version: **0.103.0** (minor) — the binary, the component, the release zips,
+  seven environment variables, the Spout sender and the per-user directory all changed name, which
+  every operator sees. Review: **no blockers, four majors, two minors.**
+
+  **The plan's central safety property held, and it was the right property to choose.** Nothing here
+  was supposed to change what is rendered, and nothing did: the full suite re-run at the close is
+  1518 passed / 5 skipped / 0 failed in 419.5 s, and `git diff 47432ca..HEAD` over the golden
+  baselines is empty. `dev` took a pre-rename baseline on `47432ca` before touching a file, so "no
+  golden moved" is measured rather than asserted. The one bless that did run — to prove `RLX_BLESS`
+  was actually wired, since an unread variable and a satisfied one are indistinguishable from a
+  passing test — rewrote `shape_collage.png` with the local re-encode drift already on record here,
+  and was restored byte-identical.
+
+  **Seven ASCII seeds spell the old name and all seven were left alone.** `reaction_diffusion.rs`,
+  `swarm.rs` and `emitter.rs` hold `SEED` constants whose bytes read `LMV_*`; three more sit in
+  `particles/`, and `INJECT_SEED` is a seventh. Three of them matched Phase 5's done-when grep, so
+  the obvious way to satisfy it was to re-spell constant and comment together — which would have
+  moved three scenes' goldens, the one thing the plan forbade. Only the comments moved. This is the
+  sharpest instance of the plan's own risk section: a done-when written as a grep can be satisfied
+  by an edit that breaks the thing the plan exists to protect.
+
+  **A ``-anchored grep is the wrong tool for a prefix that is usually glued to something.**
+  `lmv[-_]` — the pattern Phases 3, 5 and 8 all gate on — cannot match `foo_lmv`, `_lmv_uv`,
+  `g_lmv_ui_element_factory` or `play_callback_lmv`, because the neighbouring `_` is a word
+  character. Every one had to be found by reading. `LmvHandle` and `LmvMetrics` escaped for the same
+  reason. Two more classes escaped every phase: `CARGO_BIN_EXE_lmv` in `help_cli.rs` (a compile-time
+  macro named after the `[[bin]]`, so Phase 4 was a build break until it moved) and
+  `Info.plist.in`'s `CFBundleExecutable`, which Phase 4 left at `lmv` — a macOS bundle that would
+  not have launched, caught in Phase 8 and guarded by nothing but a comment.
+
+  **The review's four majors were all one defect wearing four hats: the sweep rewrote sentences that
+  were *about* the old name.** ADR-0162 drew the "kept" set by directory, and the operative property
+  is not where a sentence lives but whether it is a dated claim about what was observed. `dev` found
+  this in Phase 4 and restored four `foo_lmv` component-list records; the close found seven more
+  sites. Four `WORK/` pointers had been renamed to directories that do not exist — the lanes and
+  probe folders outside the repo really are still called `lmv-*`, and Plan 0133 was about to run
+  against `WORK/ritmolux-lighting-probes/`. This plan's own roster row had been inverted to say *"the
+  990-site record keeps `ritmolux`"*, clobbering the one word the sentence existed to say. Three more
+  dated observations were falsified, and the recently-closed bullet for Plan 0004 had been retitled
+  away from its own H1. All repaired in the close commit. The log claimed the `WORK/` paths were
+  "left alone deliberately" — true only of the plan's own file, which its greps excluded.
+
+  **`/lmv/v1` is not renamed, and that is the plan's most valuable omission.** No phase's done-when
+  matches it (the character after `lmv` is `/`), and every OSC address bound in a console, a show
+  file or TouchDesigner begins with it — the 2026-08-29 live set ran eight hours on that path.
+  Renaming it would have broken every bound mapping for no criterion. It moves at 1.0 behind the
+  `/v1` the address already carries, which is what that segment is for: **a decision, not a sweep.**
+
+  **Phase 6's migration is deliberately not called from the resolver**, because a `fs::rename` behind
+  `resolve_preset_dir()` would move the real `%APPDATA%` of any machine running `cargo test`.
+  `migrate_app_dir_in(root)` takes its root as an argument and `main()` calls the wrapper once at
+  startup. The protection is partial: `help_cli.rs` spawns the binary, two of its cases reach
+  `main()`, and the suite migrated this machine's directory during Phase 6's own verification —
+  correctly, 123 files with timestamps intact, but before any human had launched the app. Filed as
+  backlog 0181 with backlog 0180 (a doc comment asserting `RLX_ABI_VERSION` is 4 when it is 6).
+
+  **ADR-0162 was accepted with an Outcome correcting three of its own claims:** the ABI has fifteen
+  functions and not sixteen (the spec was normative and right all along), `DEFAULT_SENDER` is not
+  the only identifier living outside the repository, and "three characters replace three, so no
+  formatted line re-wraps" is true of `rlx` and false of `ritmolux` — `rustfmt` re-wrapped the help
+  banner and `use` statements had to re-sort.
+
 - [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md)
   — closed 2026-09-02. Six `dev` phases, no `human` phase, in the `lmv-plan-0148` lane on
   `plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, `d527820`..`65ac7c1`. Version:
