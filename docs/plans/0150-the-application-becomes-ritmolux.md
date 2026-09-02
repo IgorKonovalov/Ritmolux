@@ -364,8 +364,8 @@ flowchart TB
 | 5 — the environment takes the prefix | dev | done | 1198b53 |
 | 6 — the user's machine is migrated | dev | done | d9e234a |
 | 7 — the strings a user reads | dev | done | 15cc07a |
-| 8 — the live documentation, and the gates that name paths | dev | done | committed with this row |
-| 9 — the repository takes the name | human | not started | |
+| 8 — the live documentation, and the gates that name paths | dev | done | 688ae88 |
+| 9 — the repository takes the name | human | **owed — `dev` stops here** | |
 
 ### Notes
 
@@ -618,13 +618,37 @@ body below it is byte-identical — the diff is 1 insertion, 1 deletion.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, but **no preset content**. `presets/README.md` and
+  `presets/pending/README.md` only, for the `RLX_*` environment variables they document. No
+  `*.toml` under `presets/` changed, so the shipped library is byte-identical and nothing here
+  bears on curation.
+- **Plan header `Closes:`** none.
+- **What shipped:** a **feature**, and a user-visible one. The binary is `ritmolux`, the component
+  is `foo_ritmolux.dll` declaring itself Ritmolux, the release zips are `ritmolux-v<version>-*`,
+  the seven environment variables are `RLX_*`, the Spout sender is `Ritmolux`, and the per-user
+  directory moves to `%APPDATA%\Ritmolux` carrying an existing one across. Also one defect fix that
+  is not a rename: `Info.plist.in`'s `CFBundleExecutable` disagreed with `bundle.sh`'s output name
+  from Phase 4 until Phase 8.
+- **Operator docs touched:** `capturing.md`, `on-device-validation.md` (which also gains a **new
+  item** for what no gate can check — that foobar2000 loads the renamed component, lists it as
+  Ritmolux, keeps an existing panel layout, and that the old `foo_lmv` is removed rather than left
+  to load alongside it), `releasing.md`, `presets.md`, `preset-guide.md`, `nfr.md`,
+  `diffusion-filter.md`, `roadmap-visual-richness.md`, `design-backlog.md`, and both files under
+  `docs/specs/` (living contracts, not record).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 0.** It was **red for three
+  probes** from Phase 4 until Phase 8 repaired them — all three named
+  `plugin-foobar/foo_lmv.cpp`. All five gates exit 0 at the tip.
+- **Full suite:** `cargo nextest run --workspace` — **exit 0**, **1518 passed, 5 skipped, 0
+  failed**, 397 s. The pre-rename baseline on `47432ca` was **1513 passed, 5 skipped**; the five
+  added tests are the four directory-migration tests (Phase 6) and the sender-default guard
+  (Phase 7). **No golden was re-blessed at any phase**, and the committed baselines are
+  byte-identical to `47432ca`.
+- **Outstanding `human` phases:** **Phase 9, in full.** Rename the repository on GitHub, never
+  recreate the old name, `git remote set-url`, rename the local checkout, install
+  `foo_ritmolux.fb2k-component` and remove the old `foo_lmv` through Preferences, and re-point
+  every Spout receiver at the `Ritmolux` sender. **Also unpushed:** the seven commits of this plan
+  sit on local `main` along with ten that preceded it, and `Cargo.toml`'s `repository` key already
+  names the post-rename URL, so it is correct only after Phase 9 step 1.
 
 ## Followups (after this lands)
 
