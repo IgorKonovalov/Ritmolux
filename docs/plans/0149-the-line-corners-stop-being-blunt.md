@@ -642,7 +642,7 @@ that has not run, and Phase 7 sits behind it. What follows is a phase record, no
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
 | 2a — The stroke is measured where the screen is isotropic | dev | done | c801f43 |
-| 2 — The corner reaches its point | dev | done | committed with this row |
+| 2 — The corner reaches its point | dev | done | d0d596e |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
 | 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
 | 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
@@ -959,12 +959,34 @@ baselines: `mean 0.0001 / max_outlier 1` on `parametric_curve` and
 than committed; it is `common::headless_hardware_for` plus `golden.rs`'s own
 fixture table and `frame_diff`.
 
-**The judging sheet Phase 6 consumes is rendered against this commit**, and its
-inventory lands as its own `docs(plans)` commit rather than inside this one: the
-sheet's "before" arm is a rebuild from the pre-2a commit, which needs a clean
-tree to check out over. The pre-existing `target/plan0149/sheet_*` and `panel_*`
-renders answer the **miter-limit** question and are a different comparison;
-Phase 6 asks the `WIDTH_SCALE` one.
+**Phase 6's sheet, and what it is.** Four files, uncommitted under
+`target/plan0149/`:
+
+| file | arm | size |
+|---|---|---|
+| `sheet_pre2a_1080.png` | before Phase 2a (`ba887cc`, rebuilt) | 1920x1080 |
+| `sheet_post2_1080.png` | after Phase 2 (`d0d596e`) | 1920x1080 |
+| `sheet_pre2a_1280.png` | before Phase 2a (`ba887cc`, rebuilt) | 1280x800 |
+| `sheet_post2_1280.png` | after Phase 2 (`d0d596e`) | 1280x800 |
+
+Each is the twenty-preset line roster in a 5x4 labelled grid, from
+`target/plan0149/roster/`. One command per file:
+
+```
+cargo run --release -p standalone --example shot -- \
+  --presets target/plan0149/roster --all --size <WxH> --out <file>
+```
+
+No `--set`, so both arms are captured under the same resting stimulus and the
+only difference between them is the tree. The **before** arm is a rebuild:
+`git checkout ba887cc -- core/src standalone/src`, render, then
+`git checkout HEAD -- core/src standalone/src` — not a restored file, because
+`Copy-Item` preserves mtime and cargo would serve the reverted code as fresh.
+`ba887cc` carries Phases 1, 3, 4 and 5 and neither 2a nor 2, which is exactly
+the arm Phase 6 asks for.
+
+The pre-existing `target/plan0149/sheet_{nomiter,clamp,bevel}_*` and `panel_*`
+renders answer the **miter-limit** question and are a different comparison.
 
 ### Close triggers
 
