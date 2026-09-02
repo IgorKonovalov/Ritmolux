@@ -624,8 +624,8 @@ point Phase 6's migration at the new name as its source and silently never find 
 
 **Repaired here as the phase requires:** the three `check-backlog-claims` probes (ADR-0108
 anticipated exactly this), and `Cargo.toml`'s `repository` key, which carried pre-existing drift
-(`eastsphere/`) and now reads `https://github.com/IgorKonovalov/ritmolux` — correct only once
-Phase 9 renames the repository. `README.md`'s anchor into `docs/capturing.md` was re-pointed at the
+(`eastsphere/`) and now reads `https://github.com/IgorKonovalov/Ritmolux`, matching the
+repository as it was actually renamed. `README.md`'s anchor into `docs/capturing.md` was re-pointed at the
 renamed heading by hand; `check-doc-links.mjs` verifies files, never `#anchor`, so nothing would
 have caught it.
 

@@ -153,7 +153,7 @@ other off-site target. `dev` should not re-raise this.
 - **Owner skill:** dev
 - **What:** A remark plugin that rewrites every relative markdown link at build time — targets
   inside the published set become site routes, targets outside it become absolute
-  `https://github.com/IgorKonovalov/ritmolux/blob/<ref>/<path>` URLs — plus a gate that
+  `https://github.com/IgorKonovalov/Ritmolux/blob/<ref>/<path>` URLs — plus a gate that
   checks the *built output*, because this is the one class of breakage the source cannot show.
 - **Files touched:** `site/src/plugins/rewrite-links.mjs`, `site/astro.config.mjs`,
   `scripts/check-site-links.mjs`.
