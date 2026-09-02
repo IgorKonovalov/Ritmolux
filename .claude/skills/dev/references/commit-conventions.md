@@ -80,7 +80,7 @@ with an SPSC ring so the audio thread only does a memcpy and returns.
 ```
 
 ```
-feat(ffi): expose lmv_create / lmv_push_samples / lmv_render / lmv_free
+feat(ffi): expose rlx_create / rlx_push_samples / rlx_render / rlx_free
 
 Minimal versioned C ABI. Panics are caught at the boundary and mapped
 to error codes so a fault never crosses FFI into the C++ host as UB.

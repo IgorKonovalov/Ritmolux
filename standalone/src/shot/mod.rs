@@ -17,7 +17,7 @@
 //! the GPU half of each is one function it calls.
 //!
 //! **`image` stays a dev-dependency.** The PNG codec is deliberately out of the
-//! shipped `lmv.exe` (ADR-0011, ADR-0033 Alt E), so nothing here names an
+//! shipped `ritmolux.exe` (ADR-0011, ADR-0033 Alt E), so nothing here names an
 //! `image` type: the filmstrip's *layout* arithmetic lives in [`film`] and the
 //! pixel blit stays in the example, and [`glyph`] returns bitmap rows the
 //! example rasterizes.

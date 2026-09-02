@@ -1,4 +1,4 @@
-//! `lmv --stream`: the headless live video source (ADR-0125).
+//! `ritmolux --stream`: the headless live video source (ADR-0125).
 //!
 //! No window and no swapchain. Loopback audio drives the analyzer, the renderer
 //! draws through the same `draw_frame` the window presents through, the frame

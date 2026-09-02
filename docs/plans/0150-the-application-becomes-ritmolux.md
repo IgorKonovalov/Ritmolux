@@ -363,8 +363,8 @@ flowchart TB
 | 4 — the shipped artifacts take the name | dev | done | 3d0b223 |
 | 5 — the environment takes the prefix | dev | done | 1198b53 |
 | 6 — the user's machine is migrated | dev | done | d9e234a |
-| 7 — the strings a user reads | dev | done | committed with this row |
-| 8 — the live documentation, and the gates that name paths | dev | not started | |
+| 7 — the strings a user reads | dev | done | 15cc07a |
+| 8 — the live documentation, and the gates that name paths | dev | done | committed with this row |
 | 9 — the repository takes the name | human | not started | |
 
 ### Notes
@@ -562,6 +562,59 @@ the full-name substitutions.** `rustfmt` re-wrapped the help banner because `rit
 than `lmv`, and Phase 2 had already had to re-sort `use` statements because `rlx_core` sorts where
 `lmv_core` did not. The claim is true of the prefix and false of the product name; both were caught
 by `cargo fmt --check` rather than by review.
+
+**The `/lmv/v1` OSC address prefix is NOT renamed, and ADR-0162's claim that `DEFAULT_SENDER` is
+*"the one identifier here that lives outside this repository entirely"* is wrong.** The OSC prefix
+is a second one and the more expensive of the two: every address an operator has bound in a
+console, a show file or TouchDesigner begins with it, and the 2026-08-29 live set ran eight hours on
+that path. **Phase 8's done-when does not ask for it** — `\blmv[-_]` does not match `/lmv/v1`,
+because the character after `lmv` is `/` — so renaming it would have broken every bound mapping in
+the rig for no criterion. Left alone deliberately. It is the natural thing to move at 1.0 behind the
+`/v1` the address already carries, which is what that segment is for; **it needs a decision, not a
+sweep.**
+
+**Phase 4 shipped a macOS bundle that would not launch, and Phase 8 is where it was caught.**
+`packaging/macos/Info.plist.in` sets `CFBundleExecutable` to the binary inside `Contents/MacOS/`,
+and its own comment says *"Matches bundle.sh's lipo output name"*. Phase 4 moved `BIN_NAME` to
+`ritmolux` and left the plist at `lmv`, so the `.app` would have carried a `CFBundleExecutable`
+naming a file that is not in it. **Nothing catches this**: the macOS packaging job runs only on a
+tag, and no test asserts the pair. Fixed here; the invariant its comment states is still enforced by
+nothing but that comment.
+
+**The word-boundary blind spot in this plan's own greps bit four separate times.** `\blmv[-_]` —
+the pattern Phases 3, 5 and 8 all gate on — cannot match `foo_lmv`, `_rlx_uv`'s predecessor
+`_lmv_uv`, `g_lmv_ui_element_factory` or `play_callback_lmv`, because in each the neighbouring `_`
+is a word character and kills the `\b`. Every one had to be found by reading rather than by the
+gate, and it is why `check-backlog-claims` stayed red through two passes of this phase: the three
+probes it reported name `plugin-foobar/foo_lmv.cpp`. **A grep anchored on `\b` is the wrong tool for
+a prefix that is usually glued to something.**
+
+**Three more ASCII seeds, left entirely alone.** `particles/family.rs`, `particles/ifs.rs` and
+`particles/mod.rs` hold `0x4C4D_5641_5455_5031`, `0x4C4D_5641_4946_5300` and
+`0x4C4D_5641_5454_5231` — `"LMVATUP1"`, `"LMVAIFS\0"`, `"LMVATTR1"`. Unlike Phase 5's three,
+these match **no** grep in the plan, so they were not half-renamed: the comment and the value still
+agree, and the value is the RNG seed. With Phase 5's `INJECT_SEED` that is **seven** seeds in the
+tree whose bytes spell the old name and whose values are load-bearing.
+
+**Also left, each on the same principle — the text names a thing that really is called that:**
+`WORK/lmv-lighting-probes/` and `WORK/lmv-0127-gate/` (directories outside this repository),
+`WORK/lmv-plan-0087` (a specific stale lane), the four dated `foo_lmv` observations in
+`on-device-validation.md`, `kGuidLmvMenu` / `kGuidLmvElement` (the plan says the GUIDs are not
+touched), `igorkonovalov.github.io/lmv/` (the Pages subpath parked Plan 0143 chooses when it
+unparks), and **`LEGACY_APP_DIR_NAME`'s value**, which is the load-bearing one: sweeping it would
+point Phase 6's migration at the new name as its source and silently never find the user's data,
+**and every test would still pass**, because they use the constant symbolically.
+
+**Repaired here as the phase requires:** the three `check-backlog-claims` probes (ADR-0108
+anticipated exactly this), and `Cargo.toml`'s `repository` key, which carried pre-existing drift
+(`eastsphere/`) and now reads `https://github.com/IgorKonovalov/ritmolux` — correct only once
+Phase 9 renames the repository. `README.md`'s anchor into `docs/capturing.md` was re-pointed at the
+renamed heading by hand; `check-doc-links.mjs` verifies files, never `#anchor`, so nothing would
+have caught it.
+
+**`packaging/spout/spout-license.txt` was edited, and only its first line.** That line is our own
+sentence stating what the SDK is redistributed with, which is now `ritmolux.exe`. The vendor licence
+body below it is byte-identical — the diff is 1 insertion, 1 deletion.
 
 ### Close triggers
 

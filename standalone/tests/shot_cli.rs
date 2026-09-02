@@ -10,7 +10,7 @@
 //!
 //! `shot` is deliberately **not** promoted to a `[[bin]]` so `CARGO_BIN_EXE_shot`
 //! would resolve it (ADR-0033 Alternative E): `image` is a dev-dependency precisely
-//! to keep the PNG codec out of the shipped `lmv.exe`, and a `[[bin]]` does not get
+//! to keep the PNG codec out of the shipped `ritmolux.exe`, and a `[[bin]]` does not get
 //! dev-dependencies. It would also rename every documented invocation, including
 //! ones in `.claude/skills/**` that cannot be edited. So the binary is located
 //! under `target/<profile>/examples/` instead.
@@ -1795,7 +1795,7 @@ fn parser_flag_literals(source: &str) -> Vec<String> {
     found
 }
 
-/// **The drift gate `lmv` has and `shot` did not.** ADR-0148 gave the app's
+/// **The drift gate `ritmolux` has and `shot` did not.** ADR-0148 gave the app's
 /// roster a test so a flag cannot be added to a scanner and left out of
 /// `--help`. `shot` has the same failure mode: its flags are matched in one arm
 /// each and re-typed by hand into `print_usage()` and again into

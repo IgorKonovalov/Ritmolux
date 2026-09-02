@@ -318,7 +318,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0168 | The broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 4, as a repo-wide scan in `check-comment-hygiene.mjs`; the unrejoined form is still unseen, see 0173. **Closed 2026-08-31** |
 | 0169 | `cargo doc` emits intra-doc-link warnings and nothing in the project runs `cargo doc` | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 6: 71 cleared, then `RUSTDOCFLAGS=-D warnings` added to CI. **Closed 2026-08-31** |
 | 0117 | The preset menu dispatches a snapshot index across a modal wait, and "nothing can reload" is not sound | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 1, via `select_preset_named`. **Closed 2026-09-01** |
-| 0118 | `foo_lmv.dll` grew ~400 KB and the spec still advertised the old headroom | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phases 2-3: a dated series, 98.4 % of it Plan 0100; the later window is open, see 0178. **Closed 2026-09-01** |
+| 0118 | `foo_ritmolux.dll` grew ~400 KB and the spec still advertised the old headroom | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phases 2-3: a dated series, 98.4 % of it Plan 0100; the later window is open, see 0178. **Closed 2026-09-01** |
 | 0105 | READ-ME-FIRST states an SDK version that nothing checks on the pre-staged route | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 4: the recipe reads the staged tree's own marker and dies on disagreement. **Closed 2026-09-01** |
 | 0130 | `boundary_density` scales with the capture resolution, and neither it nor its floors named the 96x96 | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 4, as documentation — the statistic is ~`1/L` and stays so. **Closed 2026-09-01** |
 | 0132 | The metrics module has no level statistic, and every statistic it has reads gamma-encoded code values | [ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md) + [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phases 1-3. **Closed 2026-09-01** |
@@ -1473,7 +1473,7 @@ A Default UI panel is created **0x0** and sized by the layout afterwards. `VizSe
 on `WM_CREATE`, so `ensure_handle` attaches the wgpu surface at the `1x1` fallback and sets
 `needs_reattach = (w == 0 || ht == 0)`. The shim expects the first real `WM_SIZE` to call
 `reattach_at_current_size()` — and in practice that does not reliably happen. The panel then
-**renders without presenting**: `lmv_get_metrics` reports a healthy `draw_calls` (30-31 observed)
+**renders without presenting**: `rlx_get_metrics` reports a healthy `draw_calls` (30-31 observed)
 against a black panel, and `gpu_bytes` reports the *config* size rather than the surface's, so it
 looks correctly sized while nothing appears.
 
@@ -1484,7 +1484,7 @@ black and then come alive on a track boundary, with no user action — the repor
 *"gut feeling that it started working after the next track came by itself"*.
 
 - **Verified 2026-08-16** — the degenerate-attach flag exists and is set from the client rect:
-  `present: needs_reattach = \(w == 0 \|\| ht == 0\) in: plugin-foobar/foo_lmv.cpp`
+  `present: needs_reattach = \(w == 0 \|\| ht == 0\) in: plugin-foobar/foo_ritmolux.cpp`
 
 ### Why it is filed rather than fixed
 
@@ -1526,7 +1526,7 @@ tier, or the GPU being busy.
 
 - **Verified 2026-08-16** — the field an operator would reach for cannot arbitrate this, exactly as
   this entry already says: `gpu_bytes` was identical in the 6.5 fps and 57 fps stretches:
-  `present: gpu_bytes in: plugin-foobar/foo_lmv.cpp`
+  `present: gpu_bytes in: plugin-foobar/foo_ritmolux.cpp`
 
 **What this adds to the diagnosis.** A surface attached at a size that does not match the window
 does not only fail to present — it can present *expensively*, which looks like nothing being wrong
@@ -1579,7 +1579,7 @@ overrides setup menu"*. The workaround is Preferences → Display → Default Us
 tree, which is not discoverable from the panel.
 
 - **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
-  `absent: is_edit_mode_enabled in: plugin-foobar/foo_lmv.cpp`
+  `absent: is_edit_mode_enabled in: plugin-foobar/foo_ritmolux.cpp`
 - **Seen on-device 2026-08-24**, post-0107, at [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)
   Phase 5: layout-edit right-click still surfaces the component's menu — now Preset ▸ and four
   items — wholly in place of Cut / Copy / Replace / Remove. The entry's evidence was a code probe
@@ -2087,7 +2087,7 @@ to be amplitude-revealing.
 (`nWaveMode = 6`, `fWaveScale = 1.0`, `fWaveSmoothing = 0`, `fWaveParam = 0`, warp/zoom/rot/echo
 neutral, a thin opaque white line on black) and drove both `foo_vis_milk2` 0.2.0.0 and this engine
 from one 60 s 48 kHz full-scale 200 Hz sine, verified 0.0 dBFS peak. Two readings, each with the
-screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
+screenshot it came from, in `WORK/ritmolux-0127-gate/` outside the repo:
 
 | | reference (`foo_vis_milk2`) | ours |
 |---|---|---|
@@ -2469,7 +2469,7 @@ every large dark mass red.
 
 `presets/fragment_tiledmono.toml` is finished and user-approved, sitting **untracked** in the working
 tree — not committed, because `core/build.rs` globs `presets/` and landing it would take CI red.
-Note that the same glob picks up untracked files, so a local `cargo nextest run -p lmv-core` fails on
+Note that the same glob picks up untracked files, so a local `cargo nextest run -p rlx-core` fails on
 it today until this is settled or the file is parked elsewhere.
 
 ### Measured against the real scene, 2026-08-25 — and `dev` has already hit the other half
@@ -3106,7 +3106,7 @@ both branches exercised. The plan's Phase 7 documentation then generalized that 
 **Three committed scripts still do**, and they resolve cargo *output*, so a redirect points them at
 a path that does not exist:
 
-- `packaging/macos/bundle.sh` - `${repo_root}/target/${triple}/release/lmv` for both Apple targets
+- `packaging/macos/bundle.sh` - `${repo_root}/target/${triple}/release/ritmolux` for both Apple targets
   before the `lipo`. Inert today because the config is Windows-only and no Mac has opted in; it is
   the one on a **release** path, so it is the one that matters if that changes.
 - `renders/plan-0106-p6/run.sh` and `renders/plan-0106-p7/run.sh` - `SHOT=target/release/examples/shot.exe`.
@@ -3340,7 +3340,7 @@ the running adapter has already landed and is what makes any of this attributabl
 > **Updated 2026-08-31, at Plan 0144's close. Half discharged: the lever landed, the measurement did
 > not.** [ADR-0155](adrs/0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) gave
 > `--gpu` to the windowed path exactly as the fix above describes, and it was observed working —
-> `lmv --gpu 1` put this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)`
+> `ritmolux --gpu 1` put this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)`
 > with the startup line reading `(pinned by --gpu)`. The dual-GPU question this entry said *"wants
 > measuring before it is promised"* is answered for the surface-creation half: a named adapter that
 > cannot present is refused by name rather than silently swapped.
@@ -3376,7 +3376,7 @@ while the new file arrives beside it on the next launch.
 
 **What that adds up to on a machine that has tracked this project for a while.** The shipped set is
 81 presets with no duplicate display name. The development box's own
-`%APPDATA%\light-music-visualizer\presets` holds **118**, and two of them are named `Coral`.
+`%APPDATA%\ritmolux\presets` holds **118**, and two of them are named `Coral`.
 `Renderer::select_preset_by_name` takes the first exact match, so the second is unreachable by name
 from the window, from `--stream`, and from anything else that selects by name - while both still
 appear in the browse overlay and both still take a turn in the rotation.
@@ -3446,7 +3446,7 @@ Two candidate cadences, and the choice between them is the design question:
 - **At the close.** One line in the architect ceremony's gate list, beside the `nextest --workspace`
   it already owes once per plan. Costs ~10 s on a warm tree, catches it before the tag rather than
   after. Cheapest, and it is the cadence at which visibility actually changes.
-- **In the hook, scoped.** `cargo doc -p lmv-core --no-deps` rather than `--workspace`, which is
+- **In the hook, scoped.** `cargo doc -p rlx-core --no-deps` rather than `--workspace`, which is
   where every public surface in this project lives. Needs measuring against ADR-0033's budget
   before anyone claims it fits — the figure above is a warm-tree guess and nothing here measured it.
 

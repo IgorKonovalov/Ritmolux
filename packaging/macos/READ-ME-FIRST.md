@@ -1,4 +1,4 @@
-Light Music Visualizer - macOS
+Ritmolux - macOS
 ==============================
 
 A music visualizer that listens to whatever your Mac is playing and draws to it.
@@ -35,7 +35,7 @@ official route also counts as screen recording, so that is the permission it
 asks for. We do not record, keep, or send your screen - the app throws the video
 away and keeps the sound.
 
-When the prompt appears, allow it. It should name "Light Music Visualizer".
+When the prompt appears, allow it. It should name "Ritmolux".
 
 Then quit the app and open it again. This part is easy to miss: the app cannot
 pick the permission up while it is running, so the first launch after granting
@@ -69,7 +69,7 @@ Send back whichever you get - that line is the whole answer.
 If neither is available for some reason, the fallback is to run the app from
 Terminal, which prints the same reason on startup - cd into this folder and run:
 
-    ./Ritmolux.app/Contents/MacOS/lmv
+    ./Ritmolux.app/Contents/MacOS/ritmolux
 
 
 4. Controls
@@ -90,7 +90,7 @@ fullscreen first or press Command-Q.)
 5. Where it keeps its files
 ---------------------------
 
-    ~/Library/Application Support/light-music-visualizer/
+    ~/Library/Application Support/ritmolux/
 
 That folder has an editable copy of the presets, a config.toml with your
 settings, and diagnostics.log. Deleting the folder resets the app; it will be
@@ -106,7 +106,7 @@ does not load it - it has its own built in.
 Six things, however roughly:
 
   - Did the app open at all?
-  - Did the permission prompt say "Light Music Visualizer"?
+  - Did the permission prompt say "Ritmolux"?
   - After granting and reopening, do the visuals react to music?
   - What frame rate does F3 show, and what does its "audio" line say?
   - The contents of the diagnostics.log file from the folder in step 5.

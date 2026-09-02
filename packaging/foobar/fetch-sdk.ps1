@@ -23,9 +23,9 @@ $ErrorActionPreference = "Stop"
 
 $script:root = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $script:root "sdk-pin.ps1")
-$SdkVersion = $LmvSdkVersion
-$SdkUrl = $LmvSdkUrl
-$SdkSha256 = $LmvSdkSha256
+$SdkVersion = $RlxSdkVersion
+$SdkUrl = $RlxSdkUrl
+$SdkSha256 = $RlxSdkSha256
 $repo = Split-Path -Parent (Split-Path -Parent $script:root)
 $pluginDir = Join-Path $repo "plugin-foobar"
 $sdkDir = Join-Path $pluginDir "sdk"

@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn seed_dir_writes_all_then_nothing() {
-        let dir = std::env::temp_dir().join("lmv_seed_dir_test");
+        let dir = std::env::temp_dir().join("rlx_seed_dir_test");
         let _ = std::fs::remove_dir_all(&dir);
 
         // First seed into an empty dir: every embedded preset is written.

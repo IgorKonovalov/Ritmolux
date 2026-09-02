@@ -140,8 +140,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // uniforms, so evaluating the unused one costs a few ALU and no divergence —
     // which also keeps `textureSample` out of non-uniform control flow.
     let moved = u.v.z != 0.0;
-    let suv = select(in.uv, lmv_source_uv(in.uv, u.xf, u.tr, u.wp), moved);
-    let inside = select(1.0, lmv_inside(suv), moved);
+    let suv = select(in.uv, rlx_source_uv(in.uv, u.xf, u.tr, u.wp), moved);
+    let inside = select(1.0, rlx_inside(suv), moved);
     let faded = textureSample(t_accum, samp, suv) * inside * u.v.x;
 
     // The deposit (ADR-0048). `max` is the default and the arm that ran before the

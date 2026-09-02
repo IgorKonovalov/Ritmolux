@@ -9,7 +9,7 @@
 # read a member crate's inherited line or a [profile] key, and nothing
 # downstream would catch the wrong string.
 
-function Get-LmvWorkspaceVersion {
+function Get-RlxWorkspaceVersion {
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
     $cargoToml = Join-Path $RepoRoot "Cargo.toml"

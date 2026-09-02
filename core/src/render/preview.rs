@@ -61,7 +61,7 @@ impl PreviewTarget {
     ) -> Self {
         let (width, height) = (width.max(1), height.max(1));
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("lmv-preview-intermediate"),
+            label: Some("rlx-preview-intermediate"),
             size: wgpu::Extent3d {
                 width,
                 height,

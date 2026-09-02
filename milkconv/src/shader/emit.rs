@@ -318,12 +318,12 @@ impl Emitter {
             "rand_frame" => v("U.rand_frame", Ty::Vec(4)),
             "rand_preset" => v("U.rand_preset", Ty::Vec(4)),
             "decay" => v("U.misc.x", Ty::F32),
-            "uv" => v("_lmv_uv", Ty::Vec(2)),
-            "uv_orig" => v("_lmv_uv_orig", Ty::Vec(2)),
-            "rad" => v("_lmv_rad", Ty::F32),
-            "ang" => v("_lmv_ang", Ty::F32),
-            "ret" => v("_lmv_ret", Ty::Vec(3)),
-            "hue_shader" => v("_lmv_hue", Ty::Vec(3)),
+            "uv" => v("_rlx_uv", Ty::Vec(2)),
+            "uv_orig" => v("_rlx_uv_orig", Ty::Vec(2)),
+            "rad" => v("_rlx_rad", Ty::F32),
+            "ang" => v("_rlx_ang", Ty::F32),
+            "ret" => v("_rlx_ret", Ty::Vec(3)),
+            "hue_shader" => v("_rlx_hue", Ty::Vec(3)),
             "slow_roam_cos" => v("U.roam[0]", Ty::Vec(4)),
             "roam_cos" => v("U.roam[1]", Ty::Vec(4)),
             "slow_roam_sin" => v("U.roam[2]", Ty::Vec(4)),
@@ -735,19 +735,19 @@ impl Emitter {
             "GetPixel" | "GetMain" => {
                 let uv = self.arg(args, 0, name)?;
                 let uv = self.convert(uv, Ty::Vec(2))?;
-                Ok((format!("lmv_GetPixel({uv})"), Ty::Vec(3)))
+                Ok((format!("rlx_GetPixel({uv})"), Ty::Vec(3)))
             }
             "GetBlur1" | "GetBlur2" | "GetBlur3" => {
                 let level = name.as_bytes().last().map_or(1, |b| b - b'0');
                 self.blur = self.blur.max(level);
                 let uv = self.arg(args, 0, name)?;
                 let uv = self.convert(uv, Ty::Vec(2))?;
-                Ok((format!("lmv_{name}({uv})"), Ty::Vec(3)))
+                Ok((format!("rlx_{name}({uv})"), Ty::Vec(3)))
             }
             "lum" => {
                 let c = self.arg(args, 0, name)?;
                 let c = self.convert(c, Ty::Vec(3))?;
-                Ok((format!("lmv_lum({c})"), Ty::F32))
+                Ok((format!("rlx_lum({c})"), Ty::F32))
             }
             "mul" => {
                 let l = self.arg(args, 0, name)?;
@@ -1400,14 +1400,14 @@ impl Emitter {
             Stage::Warp => out.push_str(
                 "@fragment\n\
                  fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) -> @location(0) vec4<f32> {\n\
-                 \x20   var _lmv_uv: vec2<f32> = _in_uv;\n\
-                 \x20   var _lmv_uv_orig: vec2<f32> = _in_uv_orig;\n",
+                 \x20   var _rlx_uv: vec2<f32> = _in_uv;\n\
+                 \x20   var _rlx_uv_orig: vec2<f32> = _in_uv_orig;\n",
             ),
             Stage::Comp => out.push_str(
                 "@fragment\n\
                  fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {\n\
-                 \x20   var _lmv_uv: vec2<f32> = _in_uv;\n\
-                 \x20   var _lmv_uv_orig: vec2<f32> = _in_uv;\n",
+                 \x20   var _rlx_uv: vec2<f32> = _in_uv;\n\
+                 \x20   var _rlx_uv_orig: vec2<f32> = _in_uv;\n",
             ),
         }
         // MilkDrop's `rad`/`ang` normalization — the longer axis reads 1, so the
@@ -1415,14 +1415,14 @@ impl Emitter {
         // (`MilkRuntime::run_vertex`). `U.aspect.zw` is that pair in both
         // orientations.
         out.push_str(
-            "    let _lmv_p = (_lmv_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;\n\
-             \x20   var _lmv_rad: f32 = length(_lmv_p);\n\
-             \x20   var _lmv_ang: f32 = atan2(_lmv_p.y, _lmv_p.x);\n\
-             \x20   var _lmv_ret: vec3<f32> = vec3<f32>(0.0);\n\
-             \x20   var _lmv_hue: vec3<f32> = mix(\n\
-             \x20       mix(U.hue[0].xyz, U.hue[1].xyz, _lmv_uv.x),\n\
-             \x20       mix(U.hue[2].xyz, U.hue[3].xyz, _lmv_uv.x),\n\
-             \x20       _lmv_uv.y);\n",
+            "    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;\n\
+             \x20   var _rlx_rad: f32 = length(_rlx_p);\n\
+             \x20   var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);\n\
+             \x20   var _rlx_ret: vec3<f32> = vec3<f32>(0.0);\n\
+             \x20   var _rlx_hue: vec3<f32> = mix(\n\
+             \x20       mix(U.hue[0].xyz, U.hue[1].xyz, _rlx_uv.x),\n\
+             \x20       mix(U.hue[2].xyz, U.hue[3].xyz, _rlx_uv.x),\n\
+             \x20       _rlx_uv.y);\n",
         );
         for (shadow, source) in std::mem::take(&mut self.shadow_inits) {
             out.push_str(&format!("    {shadow} = {source};\n"));
@@ -1434,7 +1434,7 @@ impl Emitter {
         match self.stage {
             // **The reference's target was 8-bit, and this reproduces both ends
             // of that bound.** The clamp is the ceiling — what keeps a
-            // `decay >= 1` preset bounded here too. `lmv_quantize` is the floor
+            // `decay >= 1` preset bounded here too. `rlx_quantize` is the floor
             // and the ladder between (ADR-0118): the reference's `decay` times a
             // dim pixel truncates to zero in its 8-bit target, and without that
             // every dim residual survives in `Rgba16Float` and integrates. The
@@ -1447,17 +1447,17 @@ impl Emitter {
             // spreading. It runs BEFORE the quantizer, which would otherwise
             // propagate the NaN through its own arithmetic.
             Stage::Warp => out.push_str(
-                "    var _lmv_o = clamp(_lmv_ret, vec3<f32>(0.0), vec3<f32>(1.0));\n\
-                 \x20   _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);\n\
-                 \x20   _lmv_o = lmv_quantize(_lmv_o, U.misc.w);\n\
-                 \x20   return vec4<f32>(_lmv_o, 1.0);\n}\n",
+                "    var _rlx_o = clamp(_rlx_ret, vec3<f32>(0.0), vec3<f32>(1.0));\n\
+                 \x20   _rlx_o = select(vec3<f32>(0.0), _rlx_o, _rlx_o == _rlx_o);\n\
+                 \x20   _rlx_o = rlx_quantize(_rlx_o, U.misc.w);\n\
+                 \x20   return vec4<f32>(_rlx_o, 1.0);\n}\n",
             ),
             // The composite goes to the screen: brightness scales the light,
             // occlude is the coverage the backdrop blend reads (ADR-0085).
             Stage::Comp => out.push_str(
-                "    var _lmv_o = max(_lmv_ret, vec3<f32>(0.0));\n\
-                 \x20   _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);\n\
-                 \x20   return vec4<f32>(_lmv_o * U.misc.y, U.misc.z);\n}\n",
+                "    var _rlx_o = max(_rlx_ret, vec3<f32>(0.0));\n\
+                 \x20   _rlx_o = select(vec3<f32>(0.0), _rlx_o, _rlx_o == _rlx_o);\n\
+                 \x20   return vec4<f32>(_rlx_o * U.misc.y, U.misc.z);\n}\n",
             ),
         }
         Ok(out)

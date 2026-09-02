@@ -610,7 +610,7 @@ void announce_current() {
     if (playback_control::get()->get_now_playing(track)) announce(track);
 }
 
-class play_callback_lmv : public play_callback_static {
+class play_callback_rlx : public play_callback_static {
 public:
     // Track changes drive the banner; start/stop/pause drive the render
     // cadence, which is otherwise only noticed on the render timer's own next
@@ -644,7 +644,7 @@ public:
     void on_volume_change(float) override {}
 };
 
-play_callback_static_factory_t<play_callback_lmv> g_play_callback_factory;
+play_callback_static_factory_t<play_callback_rlx> g_play_callback_factory;
 
 bool VizSession::claim(HWND host) {
     if (owner != nullptr) return false; // another host drives the core
@@ -962,7 +962,7 @@ void open_window() {
         nullptr);
 }
 
-class mainmenu_commands_lmv : public mainmenu_commands {
+class mainmenu_commands_rlx : public mainmenu_commands {
 public:
     t_uint32 get_command_count() override { return 1; }
     GUID get_command(t_uint32) override { return kGuidLmvMenu; }
@@ -977,12 +977,12 @@ public:
     void execute(t_uint32, service_ptr_t<service_base>) override { open_window(); }
 };
 
-mainmenu_commands_factory_t<mainmenu_commands_lmv> g_mainmenu_factory;
+mainmenu_commands_factory_t<mainmenu_commands_rlx> g_mainmenu_factory;
 
 // Tear the pop-out down before the app finishes shutting down. Panels are
 // destroyed by the Default UI host; whichever owned the session releases it
 // via WM_DESTROY, so the handle is freed exactly once.
-class initquit_lmv : public initquit {
+class initquit_rlx : public initquit {
 public:
     // Runtime ABI handshake: the shim links the core's C ABI compiled
     // separately, so a version mismatch is caught here rather than by calling a
@@ -1007,7 +1007,7 @@ public:
     }
 };
 
-initquit_factory_t<initquit_lmv> g_initquit_factory;
+initquit_factory_t<initquit_rlx> g_initquit_factory;
 
 // ---- Default UI panel (ui_element) -------------------------------------
 
@@ -1081,6 +1081,6 @@ public:
     }
 };
 
-service_factory_single_t<rlx_ui_element> g_lmv_ui_element_factory;
+service_factory_single_t<rlx_ui_element> g_rlx_ui_element_factory;
 
 } // namespace

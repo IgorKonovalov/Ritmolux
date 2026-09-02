@@ -82,7 +82,7 @@ by name if you can.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/lmv-plan-NNNN` on
+**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-NNNN` on
 `plan-NNNN-<slug>`)_
 
 | phase | owner | state | commit |

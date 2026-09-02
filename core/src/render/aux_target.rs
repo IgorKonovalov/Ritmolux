@@ -91,7 +91,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 impl Blit {
     fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("lmv-console-blit-layout"),
+            label: Some("rlx-console-blit-layout"),
             entries: &[
                 gpu::uniform(0, wgpu::ShaderStages::VERTEX),
                 gpu::texture(1, true),
@@ -99,7 +99,7 @@ impl Blit {
             ],
         });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("lmv-console-blit"),
+            label: Some("rlx-console-blit"),
             source: wgpu::ShaderSource::Wgsl(BLIT_WGSL.into()),
         });
         let pipeline = gpu::fullscreen_pipeline(
@@ -108,13 +108,13 @@ impl Blit {
             &[&layout],
             format,
             wgpu::BlendState::REPLACE,
-            "lmv-console-blit",
+            "rlx-console-blit",
         );
         Self {
             pipeline,
             layout,
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some("lmv-console-blit-sampler"),
+                label: Some("rlx-console-blit-sampler"),
                 // Linear: the preview is a heavy minification of the show and a
                 // nearest sample of it aliases into unreadable noise. Exactness
                 // is the output copy's job, not this one's.
@@ -124,7 +124,7 @@ impl Blit {
             }),
             rect: gpu::uniform_buffer(
                 device,
-                "lmv-console-blit-rect",
+                "rlx-console-blit-rect",
                 std::mem::size_of::<[f32; 4]>(),
             ),
             bound: None,
@@ -141,7 +141,7 @@ impl Blit {
         let generation = preview.generation();
         if self.bound.as_ref().is_none_or(|(g, _)| *g != generation) {
             let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("lmv-console-blit-group"),
+                label: Some("rlx-console-blit-group"),
                 layout: &self.layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -326,7 +326,7 @@ impl AuxTarget {
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-console-frame"),
+                label: Some("rlx-console-frame"),
             });
 
         self.text.queue(runs);
@@ -359,7 +359,7 @@ impl AuxTarget {
         {
             let mut pass = gpu::color_pass(
                 &mut encoder,
-                "lmv-console-pass",
+                "rlx-console-pass",
                 &view,
                 wgpu::LoadOp::Clear(CLEAR),
             );

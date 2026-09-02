@@ -1,4 +1,4 @@
-# Diagram examples — light-music-visualizer
+# Diagram examples — ritmolux
 
 Project-specific mermaid patterns. Copy one and adapt. Keep diagrams small (<~12 nodes) and use
 `subgraph` to mark boundaries — what's inside `core/`, what's a shell, what's external.
@@ -42,10 +42,10 @@ sequenceDiagram
   participant Shim as plugin-foobar (C++)
   participant Core as core (Rust, via C ABI)
   FB->>Shim: visualisation_stream chunk
-  Shim->>Core: lmv_push_samples(handle, ptr, len, rate, ch)
+  Shim->>Core: rlx_push_samples(handle, ptr, len, rate, ch)
   Note over Core: copy into ring buffer, return immediately
   FB->>Shim: paint(hwnd, dt)
-  Shim->>Core: lmv_render(handle, target)
+  Shim->>Core: rlx_render(handle, target)
   Core-->>Shim: ok / error code
 ```
 

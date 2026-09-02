@@ -1,4 +1,4 @@
-//! Host-side helpers shared by the `lmv` binary and the `shot` example: the
+//! Host-side helpers shared by the `ritmolux` binary and the `shot` example: the
 //! per-OS path resolution below, plus [`shot`]'s pure CLI helpers (which live
 //! here so `cargo test` actually runs their tests — an `examples/` target's
 //! `#[test]` does not).
@@ -20,7 +20,7 @@
 //! root, so the headless `shot` stays quiet where the app logs.
 //!
 //! **This covers the Rust side only.** The foobar2000 plugin resolves the same
-//! `%APPDATA%` directory independently in C++ (`plugin-foobar/foo_lmv.cpp`,
+//! `%APPDATA%` directory independently in C++ (`plugin-foobar/foo_ritmolux.cpp`,
 //! `resolve_preset_dir_utf8`) because it is compiled separately, and it does
 //! **not** honor [`PRESET_DIR_ENV`]. A change to [`APP_DIR_NAME`] or the layout
 //! below has to be mirrored there by hand.

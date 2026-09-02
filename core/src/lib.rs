@@ -1,4 +1,4 @@
-//! rlx-core — the shared, source-agnostic brain of light-music-visualizer.
+//! rlx-core — the shared, source-agnostic brain of ritmolux.
 //!
 //! Takes PCM frames in (it never knows whether they came from loopback capture
 //! or foobar2000), runs DSP (spectrum, onset/beat), and renders scenes via wgpu.

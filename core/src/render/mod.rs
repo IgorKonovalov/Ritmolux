@@ -2037,7 +2037,7 @@ impl Renderer {
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-frame"),
+                label: Some("rlx-frame"),
             });
 
         // After the acquire, so a dropped frame does not leave a second copy of
@@ -2476,7 +2476,7 @@ impl Renderer {
         {
             if text_layer.prepare(&ctx.device, &ctx.queue, width, height) {
                 // Load: composite over the scene already in the view.
-                let mut pass = gpu::color_pass(encoder, "lmv-text-pass", view, wgpu::LoadOp::Load);
+                let mut pass = gpu::color_pass(encoder, "rlx-text-pass", view, wgpu::LoadOp::Load);
                 text_layer.render(&mut pass);
                 draw_calls += 1;
             }

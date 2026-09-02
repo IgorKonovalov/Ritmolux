@@ -1,4 +1,4 @@
-# light-music-visualizer
+# ritmolux
 
 A lightweight, real-time music visualizer built around one **shared Rust core** that
 turns a stream of PCM audio samples into GPU-rendered visuals. Two frontends consume
@@ -51,7 +51,7 @@ core/                # Rust library crate — the shared brain. DSP + render eng
                      #   shader emitter a converted preset drives. Distinct from milkconv/, which
                      #   is the ahead-of-time converter and never ships.
 core-cabi/           # The C ABI, and nothing else (ADR-0072) — the only crate declaring
-                     #   cdylib/staticlib, plus include/lmv_core.h. Deliberately OUTSIDE the
+                     #   cdylib/staticlib, plus include/rlx_core.h. Deliberately OUTSIDE the
                      #   workspace `default-members`, so a bare `cargo build` never emits it;
                      #   `--workspace` (CI, pre-push) and `-p rlx-core-cabi` do.
 rlx-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
@@ -135,7 +135,7 @@ scripts/             # Repo maintenance. Five Node gates, all run by pre-push an
 
 **Every worktree compiles into its own `target/`.** The one machine-local override is the MSVC
 linker, and it lives in a file one directory *above* the worktrees — `WORK/.cargo/config.toml`,
-beside `light-music-visualizer/` rather than inside it — so cargo's ancestor walk finds it from
+beside `ritmolux/` rather than inside it — so cargo's ancestor walk finds it from
 whichever lane is building and a new lane needs no setup of its own:
 
 ```toml

@@ -15,7 +15,7 @@ gate holds them to that
 followup adds a section here rather than a fourth copy elsewhere.
 
 **Nothing here ships.** No model, no weights and no Python runtime are in the
-release zip; `lmv.exe` and `foo_lmv.dll` do not change size, and
+release zip; `ritmolux.exe` and `foo_ritmolux.dll` do not change size, and
 [NFR §4](nfr.md#4-size-and-dependencies)'s size budget is untouched. The
 repository carries a script and a `requirements.txt` — that is the whole of it.
 This is creator tooling you build yourself from a source checkout.

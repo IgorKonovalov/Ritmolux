@@ -99,7 +99,7 @@ const OUTPUT_RATE: [bool; 9] = [false, true, false, false, true, true, false, fa
 pub const Q_COUNT: usize = 32;
 
 /// A converted preset's compiled programs: what a bundle carries beyond an
-/// ordinary LMV preset.
+/// ordinary Ritmolux preset.
 ///
 /// Cloned into the warp mesh's structural config at load and never touched again
 /// — the runtime state lives in [`MilkRuntime`], not here, so the same bundle can

@@ -1676,7 +1676,7 @@ fn drawn_calls(renderer: &mut Renderer, name: &str) -> u32 {
         .ctx
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("lmv-test-draw-calls"),
+            label: Some("rlx-test-draw-calls"),
         });
     renderer.time += super::scenes::FALLBACK_DT;
     let calls = renderer.draw_frame(

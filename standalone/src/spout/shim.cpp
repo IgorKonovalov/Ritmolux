@@ -4,8 +4,8 @@
 // the C++ side stays narrow and everything above it is Rust: the same
 // discipline plugin-foobar/ runs over the core's C ABI, pointing the other way.
 //
-// Ownership: `lmv_spout_create` returns an opaque heap pointer the caller must
-// hand back to `lmv_spout_destroy` exactly once. Nothing here is thread-safe -
+// Ownership: `rlx_spout_create` returns an opaque heap pointer the caller must
+// hand back to `rlx_spout_destroy` exactly once. Nothing here is thread-safe -
 // `spoutDX` owns a D3D11 device and its immediate context, so one sender
 // belongs to one thread. The Rust side holds it behind a raw pointer, which
 // makes the wrapper !Send and !Sync without saying so.
@@ -22,23 +22,23 @@
 
 // One sender, heap-allocated so the Rust side holds a pointer-sized opaque
 // handle rather than mirroring a C++ layout it cannot see.
-struct LmvSpout {
+struct RlxSpout {
     spoutDX sender;
 };
 
 extern "C" {
 
 // How many graphics adapters the machine has, or 0 if that cannot be answered.
-// Paired with `lmv_spout_adapter_name` so a caller can name them in a message
+// Paired with `rlx_spout_adapter_name` so a caller can name them in a message
 // rather than printing an index nobody can interpret.
-int lmv_spout_adapter_count() {
+int rlx_spout_adapter_count() {
     spoutDX probe;
     return probe.GetNumAdapters();
 }
 
 // Write adapter `index`'s name into `buffer`, NUL-terminated. Returns 1 on
 // success, 0 on failure or a bad index.
-int lmv_spout_adapter_name(int index, char *buffer, int length) {
+int rlx_spout_adapter_name(int index, char *buffer, int length) {
     if (buffer == nullptr || length <= 0) {
         return 0;
     }
@@ -72,26 +72,26 @@ int lmv_spout_adapter_name(int index, char *buffer, int length) {
 // alone, and both formats were checked against a real receiver to establish it.
 //
 // `width` and `height` are validated and no more: the shared texture and the
-// sender registration are created by the first `lmv_spout_send`, because the
+// sender registration are created by the first `rlx_spout_send`, because the
 // SDK's eager path (`spoutDX::CheckSender`) is protected. So a receiver lists
 // this sender from the first frame, not from this call.
 //
 // The NAME, however, is settled here and is worth reading back: `SetSenderName`
 // resolves a collision by incrementing (name, name_1, name_2 ...) when an
 // earlier run left its registration behind, so what a receiver lists is what
-// `lmv_spout_name` returns and not necessarily what was asked for.
+// `rlx_spout_name` returns and not necessarily what was asked for.
 // Registration applies no further increment on top of that.
 //
 // `RLX_SPOUT_LOG` in the environment turns on the SDK's own verbose log. It is
 // read here rather than passed in because it configures the SDK's global
 // logger rather than this sender, and it is the only thing that reports what
 // the D3D11 layer actually did.
-LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned int height,
+RlxSpout *rlx_spout_create(const char *sender_name, unsigned int width, unsigned int height,
                            int adapter) {
     if (sender_name == nullptr || width == 0 || height == 0) {
         return nullptr;
     }
-    LmvSpout *spout = new (std::nothrow) LmvSpout();
+    RlxSpout *spout = new (std::nothrow) RlxSpout();
     if (spout == nullptr) {
         return nullptr;
     }
@@ -124,7 +124,7 @@ LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned
 // 0 to row 0. A width or height differing from the last call is handled inside
 // `SendImage`, which re-creates the shared texture under the same sender name -
 // which is why there is no resize entry point here.
-int lmv_spout_send(LmvSpout *spout, const unsigned char *rgba, unsigned int width,
+int rlx_spout_send(RlxSpout *spout, const unsigned char *rgba, unsigned int width,
                    unsigned int height) {
     if (spout == nullptr || rgba == nullptr || width == 0 || height == 0) {
         return 0;
@@ -133,9 +133,9 @@ int lmv_spout_send(LmvSpout *spout, const unsigned char *rgba, unsigned int widt
 }
 
 // The name the sender is actually registered under, which is what a receiver
-// lists and is not necessarily what `lmv_spout_create` was asked for. Points
-// into the sender's own storage and stays valid until `lmv_spout_destroy`.
-const char *lmv_spout_name(LmvSpout *spout) {
+// lists and is not necessarily what `rlx_spout_create` was asked for. Points
+// into the sender's own storage and stays valid until `rlx_spout_destroy`.
+const char *rlx_spout_name(RlxSpout *spout) {
     if (spout == nullptr) {
         return nullptr;
     }
@@ -145,6 +145,6 @@ const char *lmv_spout_name(LmvSpout *spout) {
 // Release the sender and free the handle. Null is a no-op, and a handle must
 // not be passed twice. `~spoutDX` already calls ReleaseSender and
 // CloseDirectX11, so the delete is the whole teardown.
-void lmv_spout_destroy(LmvSpout *spout) { delete spout; }
+void rlx_spout_destroy(RlxSpout *spout) { delete spout; }
 
 } // extern "C"

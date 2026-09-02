@@ -1,7 +1,7 @@
 //! Per-user operator config for the live-show standalone (Plan 0009).
 //!
 //! A small `config.toml` under the same per-user app dir the presets live in
-//! (`%APPDATA%\light-music-visualizer\` on Windows). Read once at startup and
+//! (`%APPDATA%\ritmolux\` on Windows). Read once at startup and
 //! written back whenever a hotkey changes a choice, so a stage setup survives a
 //! restart. Only the fields the live-show features need — the full
 //! settings-persistence UX stays a later roadmap item.

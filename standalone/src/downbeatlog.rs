@@ -252,7 +252,7 @@ mod tests {
     /// A scratch path that cleans itself up, keyed by the caller so parallel tests
     /// in this binary never share a file.
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lmv-downbeatlog-{name}"));
+        let dir = std::env::temp_dir().join(format!("rlx-downbeatlog-{name}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("create the scratch dir");
         dir.join("downbeat.log")

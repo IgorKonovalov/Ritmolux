@@ -310,7 +310,7 @@ const RLX_RIPPLE_FREQ: f32 = 18.0;
 // A `kind` selector rather than four pipelines: coexisting pipelines with matching
 // bind-group layouts mis-render on the DX12 WARP software adapter (ADR-0058), and
 // the branch here is uniform across the draw anyway.
-fn lmv_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
+fn rlx_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
     let kind = wp.x;
     let k = wp.y;
     let r = length(p);
@@ -340,7 +340,7 @@ fn lmv_warp_source(p: vec2<f32>, wp: vec4<f32>) -> vec2<f32> {
 // The centred coordinate is made isotropic by scaling x by `xf.w`, which is the
 // RENDER TARGET's aspect and never the accumulation grid's (ADR-0037), so the
 // rotation is a rotation and not a shear; the scale-back on the way out cancels it.
-fn lmv_source_uv(uv: vec2<f32>, xf: vec4<f32>, tr: vec4<f32>, wp: vec4<f32>) -> vec2<f32> {
+fn rlx_source_uv(uv: vec2<f32>, xf: vec4<f32>, tr: vec4<f32>, wp: vec4<f32>) -> vec2<f32> {
     let aspect = xf.w;
     let centre = tr.zw;
     var p = uv - centre;
@@ -351,7 +351,7 @@ fn lmv_source_uv(uv: vec2<f32>, xf: vec4<f32>, tr: vec4<f32>, wp: vec4<f32>) -> 
     p = p - tr.xy;
     p = vec2<f32>(p.x * xf.x + p.y * xf.y, p.y * xf.x - p.x * xf.y);
     p = p * xf.z;
-    p = lmv_warp_source(p, wp);
+    p = rlx_warp_source(p, wp);
     p.x = p.x / aspect;
     return p + centre;
 }
@@ -359,7 +359,7 @@ fn lmv_source_uv(uv: vec2<f32>, xf: vec4<f32>, tr: vec4<f32>, wp: vec4<f32>) -> 
 // The transparent-border edge policy: `1.0` inside the accumulation, `0.0`
 // outside it. Off-frame reads contribute NOTHING — clamping would re-deposit the
 // border texel every frame until the edge became a permanent bar of colour.
-fn lmv_inside(uv: vec2<f32>) -> f32 {
+fn rlx_inside(uv: vec2<f32>) -> f32 {
     return f32(all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0)));
 }
 "#;
@@ -414,8 +414,8 @@ impl PingPongField {
                 view_formats: &[],
             })
         };
-        let tex_a = make("lmv-ppf-a");
-        let tex_b = make("lmv-ppf-b");
+        let tex_a = make("rlx-ppf-a");
+        let tex_b = make("rlx-ppf-b");
         let view_a = tex_a.create_view(&wgpu::TextureViewDescriptor::default());
         let view_b = tex_b.create_view(&wgpu::TextureViewDescriptor::default());
         Self {

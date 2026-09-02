@@ -1,4 +1,4 @@
-# light-music-visualizer
+# ritmolux
 
 ![A neon kaleidoscopic mandala: a deep violet eight-lobed core ringed by cyan and magenta
 petals, with pale swept arcs opening outward into black](docs/images/hero.png)
@@ -72,7 +72,7 @@ device's cadence, frames render at the display's, and neither loop drives the ot
 core/                # Rust library crate — the shared brain: DSP + render engine + scenes.
                      #   Native Rust API (standalone) + C ABI (foobar plugin). No audio-source code.
 core-cabi/           # The C ABI and nothing else — the only crate emitting a cdylib/staticlib,
-                     #   plus include/lmv_core.h. Outside `default-members`, so a bare `cargo build`
+                     #   plus include/rlx_core.h. Outside `default-members`, so a bare `cargo build`
                      #   never emits it; `--workspace` and `-p rlx-core-cabi` do. See ADR-0072.
 rlx-ring/            # The lock-free SPSC ring, split out zero-dependency so Miri can check it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
@@ -116,14 +116,14 @@ preset files they document.
 ## Download
 
 Prebuilt binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/light-music-visualizer/releases). Three zips per
+[Releases page](https://github.com/IgorKonovalov/ritmolux/releases). Three zips per
 release, each carrying a `READ-ME-FIRST.txt`:
 
 | Zip | What's in it |
 |-----|--------------|
-| `…-macos-universal.zip` | `LightMusicVisualizer.app` — universal (Apple Silicon + Intel), **macOS 13+** |
-| `…-windows-x64.zip` | `lmv.exe` — Windows x64 |
-| `…-foobar2000-component.zip` | `foo_lmv.fb2k-component` — foobar2000 v2, **x64 only** |
+| `…-macos-universal.zip` | `Ritmolux.app` — universal (Apple Silicon + Intel), **macOS 13+** |
+| `…-windows-x64.zip` | `ritmolux.exe` — Windows x64 |
+| `…-foobar2000-component.zip` | `foo_ritmolux.fb2k-component` — foobar2000 v2, **x64 only** |
 
 The two standalone zips also carry a reference copy of the presets.
 
@@ -132,7 +132,7 @@ protected your PC" → More info → Run anyway. On macOS, the app is ad-hoc sig
 right-click it and choose **Open**, or strip the quarantine attribute first:
 
 ```sh
-xattr -dr com.apple.quarantine LightMusicVisualizer.app
+xattr -dr com.apple.quarantine Ritmolux.app
 ```
 
 The macOS build then asks for the **Screen Recording** permission — that is the only first-party
@@ -142,7 +142,7 @@ prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the r
 ### The foobar2000 component
 
 Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
-`foo_lmv.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
+`foo_ritmolux.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
 Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
 scenes; **right-click** for the menu: **Preset ▸** picks one by name (the choice is remembered
 across restarts), **Reload presets** picks up a file you just dropped into the preset folder, and
@@ -166,7 +166,7 @@ the repo root:
 cargo run -p standalone --release
 ```
 
-That builds and launches `lmv`, the standalone window. **On Windows it captures whatever is
+That builds and launches `ritmolux`, the standalone window. **On Windows it captures whatever is
 already playing** (system audio, via WASAPI loopback) — start some music, and the visuals react.
 `--release` is recommended: this is real-time graphics, and the debug build is noticeably slower.
 
@@ -254,10 +254,10 @@ restart. Off means no track ever reaches the visualizer.
 
 ### Flags & environment
 
-**`lmv --help` prints the roster and exits** — that is the authority on what this
+**`ritmolux --help` prints the roster and exits** — that is the authority on what this
 binary accepts, and a test holds it in step with the scanners, so a flag that
 exists is a flag `--help` names. An argument no flag claims is a **startup
-error** that names it and the nearest spelling: `lmv --ocs 127.0.0.1:9000` exits
+error** that names it and the nearest spelling: `ritmolux --ocs 127.0.0.1:9000` exits
 rather than starting a visualizer that publishes no telemetry. The list below
 says what each flag is *for*, which is the part a roster line has no room for.
 
@@ -277,16 +277,16 @@ says what each flag is *for*, which is the part a roster line has no room for.
 - `--stream` — run **headless** as a live video source and publish every frame as a **Spout
   sender**, for TouchDesigner (or any Spout receiver) on the same machine. No window, no swapchain,
   no codec. Windows-only, and present only in a build with the `spout` feature — the release
-  `lmv.exe` has it; a plain `cargo build` does not, and `--stream` there fails with a named error
+  `ritmolux.exe` has it; a plain `cargo build` does not, and `--stream` there fails with a named error
   saying so. Presets rotate on the operator config's dwell timer exactly as they do in the window
   (rotation is **on** here even where `[rotate] auto` is off, since a headless source has nobody to
   press `Space`). Ctrl-C stops it and prints the run's frames, wall clock and scene clock.
   Companion flags, `--stream`-only: `--size WxH` (default `1280x720`), `--fps N` (default 60),
-  `--sender <name>` to change the published sender name (default `lmv`), and `--frames N` for a
+  `--sender <name>` to change the published sender name (default `ritmolux`), and `--frames N` for a
   bounded, self-terminating run. Passing one of these **without** `--stream` is a startup error
   naming both flags, rather than the silence it used to be. `--gpu` and `--preset` are not on this
   list — they work in the window too, below.
-  See [docs/capturing.md](docs/capturing.md#the-live-video-out-lmv---stream) for the
+  See [docs/capturing.md](docs/capturing.md#the-live-video-out-rlx---stream) for the
   TouchDesigner side.
 - `--gpu <name|index>` — which graphics adapter to render on, named from `--list-adapters`.
   Works for **both** the window and `--stream`.

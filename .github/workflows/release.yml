@@ -78,7 +78,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          # --features spout is what makes `lmv --stream` exist in the shipped
+          # --features spout is what makes `ritmolux --stream` exist in the shipped
           # binary; without it the mode fails with a named error saying so.
           cargo build --release -p standalone --features spout
           if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }

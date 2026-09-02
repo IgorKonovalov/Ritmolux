@@ -1,4 +1,4 @@
-The Spout SDK is redistributed with lmv.exe in binary form under the licence
+The Spout SDK is redistributed with ritmolux.exe in binary form under the licence
 below. Clause 2 requires that this notice travel with the distribution, which
 is why this file is committed while the SDK itself never is (Plan 0115,
 ADR-0125; the same split ADR-0115 makes for the foobar2000 SDK).

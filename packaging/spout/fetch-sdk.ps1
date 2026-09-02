@@ -29,7 +29,7 @@ $script:root = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $script:root "sdk-pin.ps1")
 $repo = Split-Path -Parent (Split-Path -Parent $script:root)
 $sdkDir = Join-Path $repo "standalone\spout-sdk"
-$archive = Join-Path $repo "standalone\Spout-SDK-$LmvSpoutVersion.zip"
+$archive = Join-Path $repo "standalone\Spout-SDK-$RlxSpoutVersion.zip"
 # The one file build.rs needs to find. Checked after extraction, so a release
 # that reorganises its layout fails here rather than as a confusing C++ error.
 $marker = Join-Path $sdkDir "include\SpoutDX\SpoutDX.h"
@@ -40,15 +40,15 @@ function Step($message) { Write-Host ""; Write-Host "==> $message" }
 function Check($message) { Write-Host "    ok: $message" }
 
 if ((Test-Path $marker) -and (Test-Path $libMarker) -and (-not $Force)) {
-    Write-Host "fetch-sdk.ps1: Spout SDK $LmvSpoutVersion already staged at $sdkDir (use -Force to replace)"
+    Write-Host "fetch-sdk.ps1: Spout SDK $RlxSpoutVersion already staged at $sdkDir (use -Force to replace)"
     exit 0
 }
 
 # --- Download -----------------------------------------------------------------
 
 if ((-not (Test-Path $archive)) -or $Force) {
-    Step "download Spout SDK $LmvSpoutVersion"
-    Write-Host "    $LmvSpoutUrl"
+    Step "download Spout SDK $RlxSpoutVersion"
+    Write-Host "    $RlxSpoutUrl"
     # Windows PowerShell 5.1's Invoke-WebRequest negotiates TLS 1.0 by default
     # against a server that requires 1.2, which surfaces as a bare "connection
     # closed" rather than as a protocol error.
@@ -58,7 +58,7 @@ if ((-not (Test-Path $archive)) -or $Force) {
     $priorProgress = $ProgressPreference
     $ProgressPreference = "SilentlyContinue"
     try {
-        Invoke-WebRequest -Uri $LmvSpoutUrl -OutFile $archive -UseBasicParsing
+        Invoke-WebRequest -Uri $RlxSpoutUrl -OutFile $archive -UseBasicParsing
     }
     finally {
         $ProgressPreference = $priorProgress
@@ -76,13 +76,13 @@ else {
 
 Step "verify SHA-256"
 $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
-if ($actual -ne $LmvSpoutSha256.ToUpperInvariant()) {
+if ($actual -ne $RlxSpoutSha256.ToUpperInvariant()) {
     Remove-Item -Force $archive
     Die @"
 Spout SDK checksum mismatch - refusing to build against it.
-  expected: $($LmvSpoutSha256.ToUpperInvariant())
+  expected: $($RlxSpoutSha256.ToUpperInvariant())
   actual:   $actual
-  url:      $LmvSpoutUrl
+  url:      $RlxSpoutUrl
 The pinned archive has been removed. A published release that changes its bytes
 is the supply-chain case ADR-0115 named, so this is not a checksum to "just
 update": establish why it moved first. If the release was legitimately
@@ -132,5 +132,5 @@ Copy-Item -Path $license -Destination (Join-Path $sdkDir "spout-license.txt") -F
 Check "spout-license.txt staged"
 
 Write-Host ""
-Write-Host "fetch-sdk.ps1: OK -> Spout SDK $LmvSpoutVersion staged at $sdkDir"
+Write-Host "fetch-sdk.ps1: OK -> Spout SDK $RlxSpoutVersion staged at $sdkDir"
 Write-Host "               build with: cargo build -p standalone --features spout"

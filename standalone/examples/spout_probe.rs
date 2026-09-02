@@ -65,7 +65,7 @@ const BAND_H: u32 = 40;
 
 /// The sender name a receiver lists. Not necessarily the one it gets — see the
 /// increment note in `standalone/src/spout/shim.cpp`.
-const SENDER_NAME: &str = "lmv-probe";
+const SENDER_NAME: &str = "rlx-probe";
 
 fn main() {
     let rgba = reference_image();

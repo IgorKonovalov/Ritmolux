@@ -236,7 +236,7 @@ footprint so the vendor spread is on record.
       ADR territory by that entry's own argument. _(Plan 0130 Phase 5 bullet 4, extracted at that
       plan's close.)_
 - [ ] **The live video-out's size ceiling (Plan 0115 Phase 6, item 2 — the one item that phase did
-      not answer).** `lmv --stream` is proved steady at **1280x720 at 60 fps**: 108,000 frames in
+      not answer).** `ritmolux --stream` is proved steady at **1280x720 at 60 fps**: 108,000 frames in
       1800.00 s wall against 1799.99 s scene, +2.0 MB resident, per-stage 3.67-7.82 ms
       render+readback against 0.27-0.58 ms Spout send, on the RTX 3080. **The largest size and rate
       that hold was deferred for time and is still unmeasured**, which matters because ADR-0125
@@ -293,7 +293,7 @@ footprint so the vendor spread is on record.
       > 2026-08-30 is therefore an iGPU figure. The startup note that says which adapter is running
       > is what makes any of these numbers attributable.
       >
-      > **`--gpu` now reaches the window** (ADR-0155), and `lmv --gpu 1` has been observed putting
+      > **`--gpu` now reaches the window** (ADR-0155), and `ritmolux --gpu 1` has been observed putting
       > this box's window on `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` with the
       > startup line reading `(pinned by --gpu)`. What that unblocks and nobody has yet done: **re-take
       > the windowed frame-time figures on the discrete adapter and compare them against the iGPU
@@ -382,7 +382,7 @@ or an older copy shadows the one under test and the version check means nothing.
       starts, so it is worst for a user who looks before pressing play.
       **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog.md): the panel's
       right-click shadows foobar2000's layout-edit menu, so Remove is unreachable.
-      **(f) Pass** — `%APPDATA%\light-music-visualizer\` is present and shared; the component wrote
+      **(f) Pass** — `%APPDATA%\ritmolux\` is present and shared; the component wrote
       `plugin-diagnostics.log` there during the run. **Noted, not a component defect:** that
       library held **76** presets against the **40** the repo ships, because seeding is
       write-if-absent and never deletes. 36 retired presets from earlier cohorts are still live in
@@ -392,9 +392,9 @@ or an older copy shadows the one under test and the version check means nothing.
 - [ ] **The renamed component loads, and the old one is gone.** Nothing in CI can check this: the
       component's filename is validated by foobar2000 itself, so a rename is only proven by a host
       that accepts it. Install `foo_ritmolux.fb2k-component`, then confirm
-      **(a)** the Components list reads **Ritmolux**, not Light Music Visualizer;
+      **(a)** the Components list reads **Ritmolux**, not Ritmolux;
       **(b)** the pop-out opens from View → Ritmolux and renders;
-      **(c)** nothing named `foo_lmv` remains under
+      **(c)** nothing named `foo_ritmolux` remains under
       `%APPDATA%\foobar2000-v2\user-components-x64\` — `VALIDATE_COMPONENT_FILENAME` means the
       old and new components have different filenames and **both load**, so the old one must be
       removed through Preferences rather than left to be shadowed;
@@ -410,12 +410,12 @@ or an older copy shadows the one under test and the version check means nothing.
       up black — this is [backlog 0102](design-backlog.md), which says the panel renders without
       presenting and revives only at a track boundary, and one reporter's account is all the
       evidence there is;
-      **(c)** open the pop-out from View → Light Music Visualizer;
+      **(c)** open the pop-out from View → Ritmolux;
       **(d)** play a track, confirm it reacts, change track, press `Space` a few times;
       **(e)** in layout-editing mode, right-click the panel and check whether Remove is reachable —
       this is [backlog 0103](design-backlog.md), expected to fail, and confirming it on a second
       machine is worth the ten seconds;
-      **(f)** `%APPDATA%\light-music-visualizer\` exists and is the same folder the standalone uses.
+      **(f)** `%APPDATA%\ritmolux\` exists and is the same folder the standalone uses.
       **Escalation:** a failure is a new backlog entry or a followup plan, never a re-opened plan —
       on-device checks do not gate closes here. (b) and (e) failing is the *expected* result and
       confirms two filed defects rather than finding new ones; anything else is new.
@@ -432,7 +432,7 @@ or an older copy shadows the one under test and the version check means nothing.
       without restarting foobar2000, and the preset you were watching is still the one showing.
       Drop a deliberately malformed `.toml` too: it must be **absent** from the list, since the
       list is the core's roster and not a directory listing;
-      **(c)** right-click → **Open presets folder** lands in `…\light-music-visualizer\presets`
+      **(c)** right-click → **Open presets folder** lands in `…\ritmolux\presets`
       itself, not its parent;
       **(d)** exit foobar2000 **fully** and relaunch — the preset from (a) is rendering and carries
       the mark. Then delete that preset's file and relaunch again — the component comes up on the
@@ -480,7 +480,7 @@ or an older copy shadows the one under test and the version check means nothing.
 From the repo root on the target box:
 
 ```
-cargo build -p standalone --release --bin lmv
+cargo build -p standalone --release --bin ritmolux
 ./target/release/ritmolux.exe --tier floor
 ```
 
@@ -513,13 +513,13 @@ Play any audio (loopback capture feeds the visuals). Then, in the window:
 The 1 Hz log lands at:
 
 ```
-%APPDATA%\light-music-visualizer\diagnostics.log
+%APPDATA%\ritmolux\diagnostics.log
 ```
 
 Columns: `unix_ms  fps  frame_ms_avg  frame_ms_p99  frames_total  frames_dropped  gpu_bytes  rss_bytes
 bass  mid  treb  onset  downbeat_confidence  downbeat_locked  capture`.
 `rss_bytes` is the working set. For private commit too, run the throwaway floor spike or read
-`PrivateMemorySize64` via `Get-Process lmv` (the ADR-0010 method).
+`PrivateMemorySize64` via `Get-Process ritmolux` (the ADR-0010 method).
 
 The six analysis columns are the analysis snapshot (Plan 0049 / ADR-0052) — native-only, so the
 plugin's `plugin-diagnostics.log` has no counterpart. `downbeat_locked` is `0`/`1`, so the

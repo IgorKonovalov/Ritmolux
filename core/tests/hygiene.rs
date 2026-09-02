@@ -650,7 +650,7 @@ fn gallery_names(manifest: &str) -> Vec<String> {
 /// arithmetic is checked here so the two cannot drift apart independently.
 #[test]
 fn the_component_size_cap_agrees_between_the_recipe_and_the_nfr() {
-    /// NFR §4's cap for `foo_lmv.dll`, as a number.
+    /// NFR §4's cap for `foo_ritmolux.dll`, as a number.
     const CAP: u64 = 12_582_912;
     /// 90 % of it, which is where the recipe warns.
     const WARN: u64 = 11_324_620;

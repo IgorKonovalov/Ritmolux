@@ -71,7 +71,7 @@ New-Item -ItemType Directory -Force $build | Out-Null
 # the packaging recipe that verifies its output cannot disagree about what the
 # version is (Plan 0102 Phase 2).
 . (Join-Path $repo "packaging\foobar\rlx-version.ps1")
-$version = Get-LmvWorkspaceVersion -RepoRoot $repo
+$version = Get-RlxWorkspaceVersion -RepoRoot $repo
 Set-Content -Path (Join-Path $build "foo_ritmolux_version.h") -Encoding ascii `
     -Value "#define FOO_RITMOLUX_VERSION `"$version`""
 Write-Host "version: $version -> $build\foo_ritmolux_version.h"

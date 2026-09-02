@@ -135,7 +135,7 @@ unsafe impl Sync for OutputIvars {}
 define_class!(
     #[unsafe(super(NSObject))]
     #[thread_kind = AllocAnyThread]
-    #[name = "LmvStreamOutput"]
+    #[name = "RlxStreamOutput"]
     #[ivars = OutputIvars]
     struct StreamOutput;
 
@@ -306,7 +306,7 @@ pub fn start() -> Result<(CaptureHandle, SampleConsumer), CaptureError> {
 
     // 4. Stream + audio output on a dedicated serial queue.
     let output = StreamOutput::new(producer);
-    let queue = DispatchQueue::new("lmv-sck-audio", None);
+    let queue = DispatchQueue::new("rlx-sck-audio", None);
     let stream = unsafe {
         SCStream::initWithFilter_configuration_delegate(SCStream::alloc(), &filter, &config, None)
     };

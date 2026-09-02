@@ -5,7 +5,7 @@
 # edit here rather than several that can disagree.
 #
 # PINNED, NOT LATEST - the trade ADR-0115 records for the foobar SDK applies
-# unchanged. Tracking latest would mean lmv.exe silently rebuilt against an SDK
+# unchanged. Tracking latest would mean ritmolux.exe silently rebuilt against an SDK
 # nobody sent a frame through. Pinning instead means the SDK can go stale, and
 # the thing that finds out is a person.
 #
@@ -26,10 +26,10 @@
 # frame into a real Syphon Spout In TOP before shipping. A bump is its own
 # commit.
 
-$LmvSpoutVersion = "2.007.017"
-$LmvSpoutUrl = "https://github.com/leadedge/Spout2/releases/download/2.007.017/Spout-SDK-binaries_2-007-017_1.zip"
+$RlxSpoutVersion = "2.007.017"
+$RlxSpoutUrl = "https://github.com/leadedge/Spout2/releases/download/2.007.017/Spout-SDK-binaries_2-007-017_1.zip"
 # Verified 2026-08-29 against the published GitHub release asset (3,472,666 bytes).
-$LmvSpoutSha256 = "695f20e3505fa0da51b2eb959af359f5d9e2c914bb9676e9118d19f6a5424bf4"
+$RlxSpoutSha256 = "695f20e3505fa0da51b2eb959af359f5d9e2c914bb9676e9118d19f6a5424bf4"
 
 # NOT a build input, and deliberately not fetched by fetch-sdk.ps1: the same
 # release also publishes SPOUT_2007-017.zip (12,422,533 bytes, sha256

@@ -52,7 +52,7 @@ fn main() {
         .std("c++17")
         .file("src/spout/shim.cpp")
         .include(&include)
-        .compile("lmv_spout_shim");
+        .compile("rlx_spout_shim");
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=SpoutDX_static");

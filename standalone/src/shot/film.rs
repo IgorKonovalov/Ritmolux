@@ -2,7 +2,7 @@
 //! canvas the captures tile into.
 //!
 //! The **layout** is here and the pixel blit is not, deliberately: `image` is a
-//! dev-dependency so the PNG codec stays out of the shipped `lmv.exe` (ADR-0011,
+//! dev-dependency so the PNG codec stays out of the shipped `ritmolux.exe` (ADR-0011,
 //! ADR-0033 Alt E). Dimensions and offsets are the part that can be wrong in a
 //! way a human would not notice, so they are the part worth testing.
 

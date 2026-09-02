@@ -43,7 +43,7 @@ to three sticks at 170 pixels. That was established by probe, and it is the fact
 on: the eventual picture path is a downsample and a copy, not a transport problem, provided the
 emitter is in the same process as the renderer.
 
-**What exists today, and where.** `WORK/lmv-lighting-probes/` holds thirteen throwaway instruments
+**What exists today, and where.** `WORK/ritmolux-lighting-probes/` holds thirteen throwaway instruments
 plus the hardened show path built on 2026-08-29 (`show.py`, `showrun.ps1`). None of it is in version
 control, and it encodes rig facts — latching nodes, full-universe frames, the height coordinate, the
 WireGuard capture of `192.168.1.0/24` — that cost an evening to establish and will cost another to
@@ -61,7 +61,7 @@ live set. The picture path is last and behind its own dependency.
 
 ```mermaid
 flowchart LR
-    subgraph vis["visualizer machine — lmv.exe (one process)"]
+    subgraph vis["visualizer machine — ritmolux.exe (one process)"]
         direction TB
         wasapi["WASAPI loopback"]
         ring[["SPSC ring"]]
