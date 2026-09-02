@@ -1643,62 +1643,59 @@ impl Scene for StarPatternScene {
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
         // Record the construction and build the first rosette off the hot path.
-        // Other config variants belong to sibling line scenes and are ignored.
-        match cfg {
-            GeneratorConfig::Star {
-                order,
-                contact_angle_deg,
-                rings,
-            } => {
-                self.order = *order;
-                self.base_contact_deg = *contact_angle_deg;
-                // The previous preset's rosette is not this preset's, whatever
-                // angle it happens to sit at.
-                self.cache.invalidate();
-                // The ornament is placement arithmetic over a validated roster,
-                // built here at the **static** motion and re-placed thereafter
-                // only when a bound lever has moved a whole step (Phase 4). The
-                // cap truncates **silently**, exactly as the turtle's has since
-                // ADR-0007: nothing detects it, and `presets/README.md`
-                // documents it.
-                self.rings.clear();
-                self.rings.extend_from_slice(rings);
-                self.built_motion = RingMotion::STATIC;
-                let _dropped = build_rings(
-                    &self.rings,
-                    RingMotion::STATIC,
-                    self.max_segments,
-                    &mut self.ring_segments,
-                    &mut self.ring_arcs,
-                );
-                // The arc buffers are sized here, from the roster the preset
-                // actually declared, so the per-frame transform and mirror
-                // allocate nothing — and a preset with no circular motif
-                // reserves nothing at all.
-                // The mirror is the multiplier, and its order is capped at
-                // load (`MAX_MIRROR_ORDER`), reflection doubling it once more.
-                let arc_room = self
-                    .ring_arcs
-                    .len()
-                    .saturating_mul(2 * super::MAX_MIRROR_ORDER as usize)
-                    .min(self.max_segments);
-                self.single_arc_buf.reserve(self.ring_arcs.len());
-                self.arc_draw_buf.reserve(arc_room);
-                if !self.has_ornament() {
-                    // A switch *away* from a mandala must not leave its buffers
-                    // behind for `base` to pick up.
-                    self.combined.clear();
-                    self.combined_radii.clear();
-                    self.combined_arcs.clear();
-                    self.combined_arc_radii.clear();
-                }
-                self.refresh();
+        // Every other variant belongs to a sibling scene and is not named:
+        // matching only this one is what keeps a new variant from editing four
+        // scenes that do not use it, and `GeneratorConfig::element_count` is the
+        // one place that still has to acknowledge every variant.
+        if let GeneratorConfig::Star {
+            order,
+            contact_angle_deg,
+            rings,
+        } = cfg
+        {
+            self.order = *order;
+            self.base_contact_deg = *contact_angle_deg;
+            // The previous preset's rosette is not this preset's, whatever
+            // angle it happens to sit at.
+            self.cache.invalidate();
+            // The ornament is placement arithmetic over a validated roster,
+            // built here at the **static** motion and re-placed thereafter
+            // only when a bound lever has moved a whole step (Phase 4). The
+            // cap truncates **silently**, exactly as the turtle's has since
+            // ADR-0007: nothing detects it, and `presets/README.md`
+            // documents it.
+            self.rings.clear();
+            self.rings.extend_from_slice(rings);
+            self.built_motion = RingMotion::STATIC;
+            let _dropped = build_rings(
+                &self.rings,
+                RingMotion::STATIC,
+                self.max_segments,
+                &mut self.ring_segments,
+                &mut self.ring_arcs,
+            );
+            // The arc buffers are sized here, from the roster the preset
+            // actually declared, so the per-frame transform and mirror
+            // allocate nothing — and a preset with no circular motif
+            // reserves nothing at all.
+            // The mirror is the multiplier, and its order is capped at
+            // load (`MAX_MIRROR_ORDER`), reflection doubling it once more.
+            let arc_room = self
+                .ring_arcs
+                .len()
+                .saturating_mul(2 * super::MAX_MIRROR_ORDER as usize)
+                .min(self.max_segments);
+            self.single_arc_buf.reserve(self.ring_arcs.len());
+            self.arc_draw_buf.reserve(arc_room);
+            if !self.has_ornament() {
+                // A switch *away* from a mandala must not leave its buffers
+                // behind for `base` to pick up.
+                self.combined.clear();
+                self.combined_radii.clear();
+                self.combined_arcs.clear();
+                self.combined_arc_radii.clear();
             }
-            GeneratorConfig::Curve { .. }
-            | GeneratorConfig::LSystem { .. }
-            | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::Spectrum { .. }
-            | GeneratorConfig::WarpMesh { .. } => {}
+            self.refresh();
         }
         // A rosette is `2 * n` segments for the small regular tilings v1 allows
         // (n <= 12), far under the cap — no truncation to surface.

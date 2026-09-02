@@ -277,7 +277,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 1 — `warp_mesh/` takes the `particles/` shape | dev | done | committed with this row |
 | 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | committed with this row |
 | 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | committed with this row |
-| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | not started | |
+| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | committed with this row |
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | not started | |
 | 6 — The two seams go home | dev | not started | |
 | 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
@@ -393,6 +393,33 @@ the phase began:
   == system)` -- which is what that same entry's own 2026-08-28 note says to do
   when a probe is anchored on a name instead of on the claim.
   `check-backlog-claims.mjs` exits 0.
+
+**Phase 4.** The four line scenes' `configure` matches become `if let` on their
+own variant, which is the shape `particles` and `warp_mesh` already had -- the
+two that never carried the fan-out. Each of the four now names
+`GeneratorConfig` **twice** (its signature and its own variant), down from six.
+
+**Which of the plan's two options, and why.** The plan offered routing through
+the factory instead. `scenes::create` keys by `SystemKind` and never sees a
+`GeneratorConfig`, so that option meant adding routing the factory does not have.
+The exhaustive-match policy `spectrum.rs` stated in a comment -- *"a new config
+variant has to be acknowledged rather than silently ignored"* -- is preserved
+whole, because `GeneratorConfig::element_count` is exhaustive and a new variant
+must answer it. What changes is that it is acknowledged in **one** place rather
+than five. Each scene's comment now says so.
+
+**The experiment, run and reverted.** A scratch `Probe { n: u32 }` variant fails
+to compile at **exactly one site in exactly one file** --
+`core/src/render/scenes/mod.rs:244`, `element_count`'s match. Zero scene files,
+which is one fewer than the done-when allows for.
+
+**The audit for other enums matched inside more than one scene found none.**
+Eleven types appear across two or more scene files; seven are `wgpu`'s
+(`BindingType`, `ShaderSource`, `LoadOp`, `BufferUsages`, `BindingResource`,
+`BufferBindingType`, `TextureSampleType`) and every use is a construction, not a
+match. `OverflowContext` is constructed at five sites and matched at none;
+`Piece` is `matches!`-filtered; `SystemKind` in `common.rs` is an `ALL` iteration.
+`GeneratorConfig` was the only exhaustive fan-out.
 
 ### Close triggers
 
