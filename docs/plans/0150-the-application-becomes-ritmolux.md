@@ -89,17 +89,50 @@ flowchart TB
 - **What:** The two gates that must hold before a workspace-wide sweep starts — the one check
   nobody has run, and the absence of any parallel lane.
 - **What the user does:**
-  1. **Clear Ritmolux on a trademark register.** USPTO, WIPO and Justia all refuse automated
-     queries, so this is the one axis no screening has covered, and it is the only failure that
-     invalidates the plan *after* it has landed. Search `tmsearch.uspto.gov` for `Ritmolux` and for
-     `Ritmo` in the software, lighting and audio classes. **If it convicts, this plan stops and
-     Lumefall is the fallback** — ADR-0160 records why.
+  1. **Clear Ritmolux on a trademark register.** Every register serves an Altcha proof-of-work
+     challenge, so no part of this can be automated — it is the one axis no screening has covered,
+     and the only failure that invalidates the plan *after* it has landed. **If it convicts, this
+     plan stops and Lumefall is the fallback** — ADR-0160 records why.
+
+     **Registers, in descending order of value.** The first covers most of the ground; stop early
+     only if it convicts.
+
+     | register | scope |
+     |---|---|
+     | `branddb.wipo.int` | 90+ national registers plus Madrid international marks, in one query |
+     | `tmsearch.uspto.gov` | the US register — the one most likely to matter for distribution |
+     | `euipo.europa.eu/eSearch` | the EU trade mark register |
+     | `fips.ru` (Rospatent) | Russia, where `-люкс` is a crowded suffix; search Cyrillic too |
+
+     **Terms.** Examiners weigh sound and meaning, not spelling, so the phonetic neighbours matter
+     as much as the exact string: `ritmolux`, `ritmolux*`, `*ritmolux*`, `ritmo lux` (spaced),
+     `rhythmolux`, `ritmoluxe`, `ritmoluks`, `rithmolux`, and — **within the four classes below
+     only**, since it is a common word unfiltered — `ritmo*`. On Rospatent add `Ритмолюкс`,
+     `Ритмо люкс`, `Ритмо*`.
+
+     **Classes (Nice).** **9** downloadable software (primary) · **42** software as a service and
+     software development · **11** lighting apparatus, which matters *specifically* because
+     ADR-0145 puts this application next to lighting hardware · **41** entertainment and live
+     performance.
+
+     **Reading the result** — the test is likelihood of confusion, so relatedness of goods governs.
+     An identical mark in an unrelated class does not block; a *similar* mark in class 9, 42, 11 or
+     41 does. Live applications count as much as registrations, since a pending one ahead of us can
+     mature. Dead marks do not block, but a recently-dead one names a party who may refile.
+     `RITMIX` is the known near neighbour — different mark, but check which classes it holds.
   2. **Confirm the freeze.** Plans 0148 and 0149 closed and merged; no other lane opens until
      Phase 9 lands.
 - **Files touched:** none.
-- **Done when:** the register search is recorded in the implementation log with what was searched
-  and what came back; `git worktree list` prints exactly one line; `git status --porcelain` is
-  empty. **If any of the three fails, `dev` does not start Phase 2.** That is this phase's purpose.
+- **Done when:** the register search is recorded in the implementation log as one row per register
+  — register, date, the exact query string, the classes filtered to, the hit count, and the verdict
+  — so that a later reader can tell a search that found nothing from a search that was never run;
+  `git worktree list` prints exactly one line; `git status --porcelain` is empty. **If any of the
+  three fails, `dev` does not start Phase 2.** That is this phase's purpose.
+- **Not covered by any register, and worth the extra ten minutes:** US common-law rights arise from
+  *use* rather than registration, so an unregistered product already shipping under this name
+  creates real risk that no register will show. Sweep Steam, the Microsoft Store, the Mac App
+  Store, Google Play and itch.io for `Ritmolux`. The domain and repository screening behind
+  ADR-0160 did not cover storefronts.
 
 ### Phase 2 — the crates take the prefix
 - **Owner skill:** dev
