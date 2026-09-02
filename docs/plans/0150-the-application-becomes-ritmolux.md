@@ -522,6 +522,23 @@ once at startup ahead of the `--list-*` aids. `resolve_preset_dir()` stays free 
 says so. **`shot` therefore does not migrate** — it only reads, and it has `--presets` and
 `RLX_PRESET_DIR` for explicit control; the app is what carries the directory across.
 
+**That protection is partial, and the gap showed up on the dev box.** Keeping the rename out of the
+resolver stops every *in-process* test from moving a real directory, but `standalone/tests/
+help_cli.rs` **spawns the binary as a subprocess**, and two of its cases
+(`an_unknown_preset_exits_without_opening_a_window`,
+`the_windowed_preset_flag_is_not_refused_for_a_missing_stream`) get past the argument gate into
+`main()` proper — which is exactly where the migration is called. So the suite migrated this
+machine's `%APPDATA%` during Phase 6's own verification run, before any human ran the app.
+
+The outcome was correct: `%APPDATA%\light-music-visualizer` became `%APPDATA%\Ritmolux` with all
+123 files intact, the directory's `CreationTime` still 2026-07-21 and the live set's
+`config.toml.showbak` and `plugin-diagnostics.log` carried across, which is what a rename preserves
+and a fresh seed would not. But **"running the test suite migrates the operator's data directory"
+is a real property of this design and it is not written anywhere except here.** A machine with no
+legacy directory takes the `NotNeeded` arm, so CI is unaffected; a developer's box is not. Whether
+a subprocess test should be launching the app's startup path at all is a question for the review,
+not something to change under a plan that did not ask.
+
 **The four tests were mutation-checked rather than trusted.** Inverting the legacy-directory guard
 in `migrate_app_dir_in` failed exactly those four and nothing else; restoring it returned 107/107.
 A test that passes against both the code and its inverse is not evidence, and these are not that.
