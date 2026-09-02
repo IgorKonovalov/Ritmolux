@@ -1,4 +1,4 @@
-//! `lmv --help`, run the way a guard runs it (Plan 0135 Phase 2, ADR-0148).
+//! `ritmolux --help`, run the way a guard runs it (Plan 0135 Phase 2, ADR-0148).
 //!
 //! The property under test is not the text — `main.rs`'s own unit tests assert
 //! that the roster is printed in full. It is that the process **answers and
@@ -32,7 +32,7 @@ use std::time::{Duration, Instant};
 /// cold cache, not to measure printing.
 const RESPONDS_WITHIN: Duration = Duration::from_secs(1);
 
-/// Run `lmv` with `args` and return its exit code, stdout and how long it took.
+/// Run `ritmolux` with `args` and return its exit code, stdout and how long it took.
 fn run(args: &[&str]) -> (Option<i32>, String, Duration) {
     let (code, stdout, _, elapsed) = run_both(args);
     (code, stdout, elapsed)
@@ -45,7 +45,7 @@ fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
     let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .args(args)
         .output()
-        .expect("failed to spawn the lmv binary");
+        .expect("failed to spawn the ritmolux binary");
     let elapsed = started.elapsed();
     (
         output.status.code(),
@@ -62,14 +62,14 @@ fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
 fn help_prints_the_roster_and_exits_zero() {
     for flag in ["--help", "-h"] {
         let (code, stdout, elapsed) = run(&[flag]);
-        assert_eq!(code, Some(0), "`lmv {flag}` did not exit 0");
+        assert_eq!(code, Some(0), "`ritmolux {flag}` did not exit 0");
         assert!(
             elapsed < RESPONDS_WITHIN,
-            "`lmv {flag}` took {elapsed:?}, which is long enough to have built something"
+            "`ritmolux {flag}` took {elapsed:?}, which is long enough to have built something"
         );
         assert!(
-            stdout.contains("usage: lmv"),
-            "`lmv {flag}` printed no usage to stdout: {stdout:?}"
+            stdout.contains("usage: ritmolux"),
+            "`ritmolux {flag}` printed no usage to stdout: {stdout:?}"
         );
         // One flag from each of the two scanner families the roster spans, so a
         // roster that printed only what `main.rs` parses fails here.
@@ -84,7 +84,7 @@ fn help_prints_the_roster_and_exits_zero() {
 fn help_is_answered_even_beside_an_unrecognized_argument() {
     let (code, stdout, _) = run(&["--ocs", "127.0.0.1:9000", "--help"]);
     assert_eq!(code, Some(0));
-    assert!(stdout.contains("usage: lmv"));
+    assert!(stdout.contains("usage: ritmolux"));
 }
 
 /// **The roster gate, asserted on the process rather than on the function.**
@@ -96,7 +96,7 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
         .arg("--ocs")
         .arg("127.0.0.1:9000")
         .output()
-        .expect("failed to spawn the lmv binary");
+        .expect("failed to spawn the ritmolux binary");
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -111,7 +111,7 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
     let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .arg("--definitely-not-a-flag")
         .output()
-        .expect("failed to spawn the lmv binary");
+        .expect("failed to spawn the ritmolux binary");
     assert_eq!(output.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("--definitely-not-a-flag"),
@@ -142,10 +142,14 @@ fn a_stream_only_flag_without_stream_exits_without_starting() {
         ["--frames", "100"].as_slice(),
     ] {
         let (code, _, stderr, _) = run_both(args);
-        assert_eq!(code, Some(2), "`lmv {args:?}` did not exit 2: {stderr:?}");
+        assert_eq!(
+            code,
+            Some(2),
+            "`ritmolux {args:?}` did not exit 2: {stderr:?}"
+        );
         assert!(
             stderr.contains("--stream"),
-            "`lmv {args:?}` did not name the missing companion: {stderr:?}"
+            "`ritmolux {args:?}` did not name the missing companion: {stderr:?}"
         );
     }
 }

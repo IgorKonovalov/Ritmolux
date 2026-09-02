@@ -51,7 +51,7 @@ const HIDDEN_TICK: Duration = Duration::from_millis(100);
 
 /// Window-title prefix: app name plus the application version. `CARGO_PKG_VERSION`
 /// resolves at compile time to the single [workspace.package].version (ADR-0005).
-const APP_TITLE: &str = concat!("light-music-visualizer ", env!("CARGO_PKG_VERSION"));
+const APP_TITLE: &str = concat!("Ritmolux ", env!("CARGO_PKG_VERSION"));
 
 /// How often to re-scan the preset directory for edits. Tight enough that an
 /// edit to a `.toml` reads as immediate while authoring (ADR-0014); the scan
@@ -73,7 +73,7 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 /// and a light near-white color legible over most scenes.
 /// The operator console's window title, so it is tellable from the show's in a
 /// taskbar and by a window manager.
-const CONSOLE_TITLE: &str = concat!("lmv console ", env!("CARGO_PKG_VERSION"));
+const CONSOLE_TITLE: &str = concat!("Ritmolux console ", env!("CARGO_PKG_VERSION"));
 /// The console's default size. Wide enough for the browser's multi-column list
 /// at its current column width, short enough to sit beside other desk windows.
 const CONSOLE_WIDTH: u32 = 900;
@@ -2651,7 +2651,7 @@ const FLAGS: &[FlagSpec] = &[
         name: "--sender",
         takes_value: true,
         requires: Some("--stream"),
-        help: "<name> the published Spout sender name (default lmv)",
+        help: "<name> the published Spout sender name (default Ritmolux)",
     },
     FlagSpec {
         name: "--preset",
@@ -2686,7 +2686,8 @@ fn print_help() {
 /// The name column is sized to the longest entry (`--list-adapters`) plus a
 /// gap, so adding a longer flag needs the width moved with it.
 fn help_text() -> String {
-    let mut text = String::from("lmv — a real-time music visualizer\n\nusage: lmv [flags]\n\n");
+    let mut text =
+        String::from("ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]\n\n");
     for spec in FLAGS {
         // The dependency is rendered from `requires`, never read out of `help`:
         // one field feeds both the printed line and the refusal below, so a
@@ -4394,6 +4395,20 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **The advertised sender default is the actual one.** `--sender`'s help
+    /// spells the default in prose while [`crate::stream::DEFAULT_SENDER`] holds it as
+    /// a value, and nothing but this test couples them — so the roster can
+    /// advertise a name no run will ever publish.
+    #[test]
+    fn the_help_text_names_the_real_sender_default() {
+        let text = help_text();
+        assert!(
+            text.contains(crate::stream::DEFAULT_SENDER),
+            "--help advertises a sender default that is not `{}`: {text:?}",
+            crate::stream::DEFAULT_SENDER
+        );
     }
 
     /// **`--help` prints the whole roster.** The roster is what an operator

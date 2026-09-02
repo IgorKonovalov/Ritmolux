@@ -362,8 +362,8 @@ flowchart TB
 | 3 — the C ABI takes the prefix | dev | done | 55fa009 |
 | 4 — the shipped artifacts take the name | dev | done | 3d0b223 |
 | 5 — the environment takes the prefix | dev | done | 1198b53 |
-| 6 — the user's machine is migrated | dev | done | committed with this row |
-| 7 — the strings a user reads | dev | not started | |
+| 6 — the user's machine is migrated | dev | done | d9e234a |
+| 7 — the strings a user reads | dev | done | committed with this row |
 | 8 — the live documentation, and the gates that name paths | dev | not started | |
 | 9 — the repository takes the name | human | not started | |
 
@@ -538,6 +538,30 @@ the standalone therefore sees an empty library**: their presets sit under the ol
 on the plugin path carries them across. Not a defect against this phase as written, but it is a
 real user-visible consequence and the on-device item added in Phase 4 will not catch it — flagging
 it for the close rather than widening the phase.
+
+**`--help` advertised a sender name no run would ever publish, and only the full suite caught
+it.** `--sender`'s roster entry spells its default in prose — `"(default lmv)"` — while
+`stream::DEFAULT_SENDER` holds it as a value, and nothing coupled the two. Phase 7 moved the
+constant and left the prose, so the built binary told operators to expect a sender it does not
+create. Fixed, and `the_help_text_names_the_real_sender_default` now binds the roster text to the
+constant; it was mutation-checked (drift the advertised default, the test fails; restore it, it
+passes). **This is the one place in the plan where a phase's own done-when was satisfied while the
+behaviour was wrong**: `ritmolux --help` did name `ritmolux` in the banner and the usage line, as
+asked, and the defect was three lines further down.
+
+**Two `help_cli` guards asserted `"usage: lmv"`** and failed on the renamed banner. They are in no
+phase's file list — the same gap Phase 4 hit with `CARGO_BIN_EXE_lmv` in the same file.
+
+**`DEFAULT_SENDER` is now `Ritmolux`, and it is the one identifier in this plan that lives outside
+the repository.** Every saved Spout source in a receiver — OBS, Resolume, a show file — still binds
+the old string and must be re-pointed by hand. Phase 9 carries the item; the live rig is the
+artifact this affects.
+
+**ADR-0162's *"three characters replace three, so … no formatted line re-wraps"* does not hold for
+the full-name substitutions.** `rustfmt` re-wrapped the help banner because `ritmolux` is longer
+than `lmv`, and Phase 2 had already had to re-sort `use` statements because `rlx_core` sorts where
+`lmv_core` did not. The claim is true of the prefix and false of the product name; both were caught
+by `cargo fmt --check` rather than by review.
 
 ### Close triggers
 

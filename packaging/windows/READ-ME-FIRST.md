@@ -85,7 +85,7 @@ Then in TouchDesigner add a "Syphon Spout In" TOP (that is its real name; there
 is no operator called just "Spout In") and set its Sender Name to what the
 window-less run prints, usually:
 
-  publishing 1280x720 at 60 fps as Spout sender 'lmv'
+  publishing 1280x720 at 60 fps as Spout sender 'Ritmolux'
 
 Nothing to configure for colour - it should look the same as the app does.
 

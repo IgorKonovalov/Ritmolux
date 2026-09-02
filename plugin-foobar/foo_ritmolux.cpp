@@ -717,7 +717,7 @@ void paint_placeholder(HWND wnd, HDC hdc) {
     RECT rc = {};
     GetClientRect(wnd, &rc);
     FillRect(hdc, &rc, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
-    const wchar_t *msg = L"Light Music Visualizer is active in another window";
+    const wchar_t *msg = L"Ritmolux is active in another window";
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(180, 180, 180));
     // Word-wrap, then vertically centre the wrapped block within the client.
@@ -956,7 +956,7 @@ void open_window() {
     }
     ensure_window_class();
     g_popup_hwnd = CreateWindowExW(
-        0, kWindowClass, L"Light Music Visualizer",
+        0, kWindowClass, L"Ritmolux",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1024, 640,
         core_api::get_main_window(), nullptr, core_api::get_my_instance(),
         nullptr);
@@ -967,10 +967,10 @@ public:
     t_uint32 get_command_count() override { return 1; }
     GUID get_command(t_uint32) override { return kGuidLmvMenu; }
     void get_name(t_uint32, pfc::string_base &out) override {
-        out = "Light Music Visualizer";
+        out = "Ritmolux";
     }
     bool get_description(t_uint32, pfc::string_base &out) override {
-        out = "Opens the Light Music Visualizer window (Space cycles scenes).";
+        out = "Opens the Ritmolux window (Space cycles scenes).";
         return true;
     }
     GUID get_parent() override { return mainmenu_groups::view; }
@@ -1058,7 +1058,7 @@ public:
         return ui_element_subclass_playback_visualisation;
     }
     void get_name(pfc::string_base &out) override {
-        out = "Light Music Visualizer";
+        out = "Ritmolux";
     }
     ui_element_instance_ptr instantiate(
         fb2k::hwnd_t parent, ui_element_config::ptr,
