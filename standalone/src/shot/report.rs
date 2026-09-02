@@ -23,7 +23,7 @@ use rlx_core::render::metrics::{
     StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, quadrant_spread,
     segment_settled, step_response, struct_diff,
 };
-use rlx_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
+use rlx_core::render::metrics::{set_extent_diagnostic, take_draw_extent};
 use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 use crate::shot::film::FILMSTRIP_WARMUP;

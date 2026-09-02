@@ -258,8 +258,20 @@ pub unsafe extern "C" fn rlx_attach_window(
         let Some(hwnd) = std::num::NonZeroIsize::new(hwnd as isize) else {
             return RLX_ERR_INVALID_ARG;
         };
+        // The Win32 handle is built **here**, not in `core`: `core` stays
+        // platform-free and takes the surface target it is handed
+        // (ADR-0001, ADR-0072). This crate is already Windows-only for the
+        // attach path, so the knowledge costs nothing it did not already carry.
+        let target = rlx_core::wgpu::SurfaceTargetUnsafe::RawHandle {
+            raw_display_handle: Some(rlx_core::wgpu::rwh::RawDisplayHandle::Windows(
+                rlx_core::wgpu::rwh::WindowsDisplayHandle::new(),
+            )),
+            raw_window_handle: rlx_core::wgpu::rwh::RawWindowHandle::Win32(
+                rlx_core::wgpu::rwh::Win32WindowHandle::new(hwnd),
+            ),
+        };
         catch_unwind(AssertUnwindSafe(|| {
-            match unsafe { Renderer::new_from_win32_hwnd(hwnd, width, height) } {
+            match unsafe { Renderer::new_from_surface_target(target, width, height) } {
                 Ok(mut renderer) => {
                     let state = unsafe { &mut *handle.render.get() };
                     // Apply any presets loaded before the window existed.

@@ -279,7 +279,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | committed with this row |
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | committed with this row |
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | committed with this row |
-| 6 — The two seams go home | dev | not started | |
+| 6 — The two seams go home | dev | done | committed with this row |
 | 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
 | 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | not started | |
 
@@ -454,6 +454,39 @@ Three path repairs, same class as the earlier phases:
 
 `KIND_QUAD` and its seven siblings survive as `const`s defined from
 `Kind::as_f32()`, because ~40 authored spec sites name them.
+
+**Phase 6.** Both grep gates are clean:
+`grep -rn "cfg(windows)\|cfg(target_os" core/src` returns **nothing**, and
+`grep -rn "thread_local" core/src/render/scenes` returns **one line**, in
+`shape_collage/tests.rs` -- a counting allocator in a test module, not the
+production sink the finding named. `RLX_ABI_VERSION` is **6** on both sides and
+`core-cabi/include/` has no diff; the conformance suite passes 9/9, `shot_cli`
+25/25, `geometry_extent` and `golden` unblessed.
+
+**Seam 1.** `new_from_win32_hwnd` becomes the platform-free
+`Renderer::new_from_surface_target(SurfaceTargetUnsafe, w, h)`, and `core-cabi`
+builds the Win32 handle itself. That needs `wgpu` types on the ABI side, and
+rather than give `core-cabi` a second `wgpu` dependency, **`core` re-exports its
+own** (`pub use wgpu;`): the two must be the same version or the target type does
+not match, and a re-export makes that structural instead of a manifest promise.
+
+**Seam 2 is where the plan asks for something it also forbids, and this is the
+finding to look at.** It says to key the diagnostic "to the `Renderer` rather
+than a `thread_local!`". The measurement happens inside `LineRenderer::draw`,
+which the four line scenes reach through an `Rc<RefCell<..>>` owned by the scene
+registry; there is no `&mut` path from the `Renderer` down to that call without a
+new `Scene` trait parameter -- and **"Does not change the `Scene` trait"** is in
+this plan's own *What this plan does NOT do*. So the thread-local **mechanism
+stays** and only its **home** moves: `DrawExtent`, the two thread-locals and the
+two accessors are now in `render::metrics`, and `lines/renderer.rs` reaches them
+through two new functions (`extent_diagnostic_on`, `record_draw_extent`) instead
+of touching the cells directly. That discharges what the finding actually
+objected to -- a `thread_local!` five modules deep in a scene, and a shell
+reaching `rlx_core::render::scenes::lines::renderer::` to read a diagnostic.
+`shot/report.rs`, `core/tests/golden.rs` and `core/tests/geometry_extent.rs` all
+import from `rlx_core::render::metrics` now. The relocated comment states the
+reachability argument rather than the old "rather than a field on
+`LineRenderer`" one.
 
 ### Close triggers
 
