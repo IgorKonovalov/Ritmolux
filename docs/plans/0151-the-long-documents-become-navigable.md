@@ -298,16 +298,25 @@ const anchor = (heading) =>
 - **Both archives are past 512 KB**, where GitHub's markdown rendering may not reach the targets a
   contents block points at. The block still works in an editor and locally. Not mitigated, and
   recorded in ADR-0163's Negative section as the price of not splitting.
-- **[0126](0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126` and the
-  file sets are disjoint — take this plan on `main`, not in a worktree.** 0126 touches `core/`,
-  `core-cabi/`, `standalone/`, `plugin-foobar/` and its own plan file; this plan touches `docs/`,
-  `presets/README.md`, `scripts/`, `.githooks/pre-push`, `.github/workflows/ci.yml` and `CLAUDE.md`.
-  Checked: `CLAUDE.md` names none of the six files 0126 splits, so 0126's close has no edit to make
-  there. This plan compiles nothing, so a second worktree would buy isolation nothing needs and cost
-  a second `target/` under ADR-0147. The **one** shared file is `docs/plans/README.md` at the two
-  closes — both remove a roster row and add a recently-closed bullet — so whoever closes second
-  re-merges `main` and resolves. Phase 2 pins its deletion by content rather than by line number for
-  exactly this reason.
+- **[0126](0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126`, and
+  this plan runs beside it in its own lane per ADR-0053.** The file sets are disjoint: 0126 takes
+  `core/`, `core-cabi/`, `standalone/`, `plugin-foobar/` and its own plan file; this plan takes
+  `docs/`, `presets/README.md`, `scripts/`, `.githooks/pre-push`, `.github/workflows/ci.yml` and
+  `CLAUDE.md`. Checked: `CLAUDE.md` names none of the six files 0126 splits, so 0126's close has no
+  edit to make there, and 0126 appears nowhere in the 335 lines Phase 2 removes. Working trees are
+  separate, so ADR-0053's `cargo release` dirty-tree abort — which bit Plan 0060 from a parallel
+  session in **one** checkout — does not reach across lanes.
+- **The one shared file is `docs/plans/README.md`, at the two closes.** Both remove a roster row and
+  add a recently-closed bullet, at opposite ends of the file and far from Phase 2's region, so a
+  3-way merge handles it; whoever closes second re-merges `main` first. Phase 2 pins its deletion by
+  content rather than by line number precisely so the other close moving lines is harmless.
+- **Disk is the live constraint, not correctness.** Measured 2026-09-02: 42 GB free of 954 GB (96 %
+  used), with `main/target` at 24 GB and `rlx-plan-0126/target` at 7.4 GB. Under ADR-0147 this lane
+  gets its own store, and it costs **nothing** as long as no `cargo` runs in it — this plan compiles
+  nothing. The one step that would build is verifying Phase 6's `pre-push` change; run
+  `node scripts/toc.mjs --check` directly instead, and let the full hook fire once from `main` after
+  the fast-forward. If a lane `target/` does appear, ADR-0053's recorded failure is ~8 GB of
+  `target/debug/incremental` filling the disk mid-session.
 - **Phase 6 arms `toc.mjs --check` in `pre-push` while 0126's lane is live.** Once 0126 merges
   `main` its pushes run the new check. It edits no markdown carrying markers, so it passes; the case
   that would bite is a close that adds or removes a heading in a file with a block without
