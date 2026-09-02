@@ -38,7 +38,7 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved, PARKED | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Parked until 0150 lands.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
-| [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved, PARKED | dev | Phases 1-4 landed and reviewed, no blockers. **Phase 5 needs the box quiet; Phase 6 is the review's repairs.** Backlog 0174-0177 done, 0178 open. **Holds 0150's gate.** |
+| [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved, IN FLIGHT | dev | 4 of 6 phases landed. **Phase 6, then Phase 5.** Backlog 0174-0177 done, 0178 open. **Holds 0150's gate.** |
 <!-- roster:end -->
 
 **Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**
@@ -64,11 +64,12 @@ shape, because most of what it decided was sequencing rather than design:
   multiplying a band term into a physical output. The rest of 0147 does not gate 0133.
 - **[0148] was the free one, and it is now the only lane open.** No `human` phase, no GPU, no preset,
   no golden. Phases 1-4 landed and passed their close review on 2026-09-01 with no blockers; the plan
-  is **parked mid-flight**, not finished. Two phases are owed: **Phase 5**, the component-size bisect,
-  which its own method constraint forbids running while any other lane builds — satisfied for the
-  first time now that [0136] and [0149] are gone — and **Phase 6**, the four repairs that review
-  found. Until both land and the plan closes, this lane is what holds [0150]'s freeze gate, and
-  [0150] holds [0143] and [0103].
+  is **unparked and mid-flight**, not finished. Two phases are owed: **Phase 6**, the four repairs
+  that review found, which runs first because it makes the tree correct before the bisect reads it,
+  and then **Phase 5**, the component-size bisect, whose own method constraint forbids running while
+  any other lane builds — satisfied for the first time now that [0136] and [0149] are gone, and only
+  until the next lane opens. Until both land and the plan closes, this lane is what holds [0150]'s
+  freeze gate, and [0150] holds [0143] and [0103].
 - **The gate entries folded into [0136] rather than becoming a fourth plan**, which was the user's
   call at the interview: a second lane over `scripts/check-*.mjs` would contend with 0136 on the
   same six files for no benefit. That amendment took it from 8 phases to 10 and **falsified its own
