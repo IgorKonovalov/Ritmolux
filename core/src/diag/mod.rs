@@ -87,7 +87,7 @@ pub struct Metrics {
 /// (`novelty` is already marked native-API-only on the frame itself).
 ///
 /// The named cost, from the same ADR: the foobar plugin gets no analysis
-/// diagnostics **programmatically** — no `lmv_get_metrics` counterpart, so
+/// diagnostics **programmatically** — no `rlx_get_metrics` counterpart, so
 /// nothing on that path can compute a lock rate — and it is the one frontend
 /// that never touches loopback capture. It does get them **on screen**: this
 /// overlay is core-drawn, so a host setting `RLX_DEBUG_OVERLAY` paints the same

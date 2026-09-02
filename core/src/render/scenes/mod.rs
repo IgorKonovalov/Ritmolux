@@ -36,7 +36,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::SystemKind;
 use crate::render::palette::Palette;
 
-/// The `dt` (seconds) the C ABI's legacy `lmv_render` and the headless capture
+/// The `dt` (seconds) the C ABI's legacy `rlx_render` and the headless capture
 /// primitives inject when a caller has no real elapsed time to supply — the
 /// former fixed scene step, now demoted to a fallback (Plan 0014 Phase 2, ADR-0012).
 /// The live frontends measure and inject real `dt` instead, so animation is

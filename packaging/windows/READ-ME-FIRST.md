@@ -1,4 +1,4 @@
-Light Music Visualizer - Windows
+Ritmolux - Windows
 ================================
 
 A music visualizer that listens to whatever your PC is playing and draws to it.
@@ -62,7 +62,7 @@ frame budget.
 4. Where it keeps its files
 ---------------------------
 
-    %APPDATA%\light-music-visualizer\
+    %APPDATA%\ritmolux\
 
 Paste that into the Explorer address bar. It holds an editable copy of the
 presets, a config.toml with your settings, and diagnostics.log. Deleting the

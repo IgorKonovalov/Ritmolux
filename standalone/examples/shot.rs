@@ -2,7 +2,7 @@
 //! renders presets with **no window** and writes PNGs the agent can Read, or a
 //! metrics report (text / JSON) the agent can parse. It links the same
 //! `rlx-core` the app does; `image` (a dev-dependency, ADR-0011) only encodes
-//! and tiles, so the shipped `lmv.exe` is untouched.
+//! and tiles, so the shipped `ritmolux.exe` is untouched.
 //!
 //! What is left here is what an `examples/` target has to own: argument parsing,
 //! GPU capture, and file I/O. Every **pure** helper lives in

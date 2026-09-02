@@ -1,4 +1,4 @@
-//! A parsed `.milk` file → a loadable LMV bundle (Plan 0100 Phase 3).
+//! A parsed `.milk` file → a loadable Ritmolux bundle (Plan 0100 Phase 3).
 //!
 //! # The roster is the spec
 //!

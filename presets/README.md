@@ -16,7 +16,7 @@ $env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerSh
 cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --out a.png
 ```
 
-See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-lmv_preset_dir)
+See [`../docs/presets.md`](../docs/presets.md#a-custom-preset-folder-rlx_preset_dir)
 and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
 > **This file is the parameter roster, not the way in.** If you have not written a preset before,

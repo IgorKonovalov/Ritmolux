@@ -241,19 +241,19 @@ bar rather than a looser one. Invoke it as `bash packaging/linux/stage.sh` rathe
 executable, for the same reason the macOS job does — this repo is developed on Windows with
 `core.filemode=false`.
 
-Write `packaging/linux/READ-ME-FIRST.md` mirroring the Windows one: `chmod +x lmv` then run it, the
+Write `packaging/linux/READ-ME-FIRST.md` mirroring the Windows one: `chmod +x ritmolux` then run it, the
 same Controls table, F3's audio line reading `live PulseAudio 48000/2` when capture works, and the
-per-user directory at `~/.local/share/light-music-visualizer/`.
+per-user directory at `~/.local/share/ritmolux/`.
 
 **Done when:**
 
-- `stage.sh` produces `target/dist/light-music-visualizer-v<version>-linux-x64.tar.gz`, whose single
-  top-level entry is a folder of that name holding `lmv`, `presets/*.toml` and `READ-ME-FIRST.txt`.
+- `stage.sh` produces `target/dist/ritmolux-v<version>-linux-x64.tar.gz`, whose single
+  top-level entry is a folder of that name holding `ritmolux`, `presets/*.toml` and `READ-ME-FIRST.txt`.
 - The version is parsed **section-anchored** from `[workspace.package]` in root `Cargo.toml` per
   [ADR-0025](../adrs/0025-foobar-component-version-single-sourced.md), not by a first-match
   `version =` — a naive match reads a member crate's line or a `[profile]` key.
 - The script **verifies from the archive it wrote**, not from the staging directory, and makes the
-  same four assertions the Windows job makes: `lmv` and `READ-ME-FIRST.txt` are at the top level, the
+  same four assertions the Windows job makes: `ritmolux` and `READ-ME-FIRST.txt` are at the top level, the
   `.toml` count equals `presets/*.toml` in the repo, and no `.md` file is present.
 - The `release` job's `needs:` gains `linux`, and **its count guard learns about the second archive
   kind**: it asserts exactly **3 `.zip` and exactly 1 `.tar.gz`** (macOS, Windows and foobar being
@@ -299,7 +299,7 @@ Phase 4 (from a `workflow_dispatch` run, or from a local `stage.sh`) on the Ubun
 - Music plays and the visuals react to it.
 - **F3's audio line reads `live PulseAudio 48000/2`.** A `failed PulseAudio …` line is a finding
   with its reason attached; `unsupported` means the wrong arm compiled.
-- `~/.local/share/light-music-visualizer/` appears and holds `config.toml`, a preset copy and
+- `~/.local/share/ritmolux/` appears and holds `config.toml`, a preset copy and
   `diagnostics.log`; `diagnostics.log`'s `capture` column carries the same verdict token.
 - `F` (fullscreen) works. `D` (next monitor) works, or is a no-op — expected under Wayland, per
   ADR-0131's Negative, and recorded either way rather than treated as a bug.

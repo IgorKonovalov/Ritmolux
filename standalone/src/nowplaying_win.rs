@@ -88,7 +88,7 @@ impl NowPlayingSource {
         let worker_slot = Arc::clone(&slot);
         let worker_stop = Arc::clone(&stop);
         let worker = std::thread::Builder::new()
-            .name("lmv-nowplaying".to_owned())
+            .name("rlx-nowplaying".to_owned())
             .spawn(move || watch(&worker_slot, &worker_stop))
             .ok()
             .map(|handle| handle.thread().clone());

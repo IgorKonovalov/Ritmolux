@@ -1,8 +1,8 @@
 # The MilkDrop converter (Plan 0100 / ADR-0113). **Never ships.**
 #
 # It parses `.milk` text, compiles EEL2 to the bytecode `rlx-core` executes and
-# (from Phase 6) HLSL to WGSL, and emits an LMV bundle — all ahead of time. None
-# of that enters `lmv.exe` or `foo_lmv.dll`; what those link is the VM and the
+# (from Phase 6) HLSL to WGSL, and emits an Ritmolux bundle — all ahead of time. None
+# of that enters `ritmolux.exe` or `foo_ritmolux.dll`; what those link is the VM and the
 # bundle loader in `core/src/milk/`, which is small Rust with no parser in it.
 #
 # Deliberately OUTSIDE the workspace `default-members`, exactly as `rlx-core-cabi`

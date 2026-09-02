@@ -50,7 +50,7 @@ not let you close your own plan.
 The skeleton lives in `.claude/skills/architect/references/templates/plan.md`. If the plan predates
 it, copy the skeleton in rather than skipping the log.
 
-- **`**Lane:**`** — `main` directly, or the worktree path plus its branch (`WORK/lmv-plan-NNNN` on
+- **`**Lane:**`** — `main` directly, or the worktree path plus its branch (`WORK/rlx-plan-NNNN` on
   `plan-NNNN-<slug>`). Architect's worktree-close sequence takes both from this line instead of
   asking the user, so give it both. Write it on the first phase commit.
 - **The table** — `phase | owner | state | commit`. `state` is `done` / `not started` /
@@ -93,7 +93,7 @@ Written *after* the close block is committed. Three lines, nothing else:
 
 ```
 Plan 0001 — <plan title>  (`docs/plans/0001-<slug>.md`)
-Lane: `main`   (or: `WORK/lmv-plan-0001` on branch `plan-0001-<slug>`)
+Lane: `main`   (or: `WORK/rlx-plan-0001` on branch `plan-0001-<slug>`)
 Next: start a fresh session and run `/architect close plan 0001`
 ```
 

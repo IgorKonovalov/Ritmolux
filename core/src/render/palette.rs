@@ -328,7 +328,7 @@ pub fn lut_texture(device: &wgpu::Device, label: &str) -> wgpu::Texture {
 /// the single-row `v`.
 pub fn lut_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("lmv-lut-sampler"),
+        label: Some("rlx-lut-sampler"),
         address_mode_u: wgpu::AddressMode::Repeat,
         address_mode_v: wgpu::AddressMode::ClampToEdge,
         address_mode_w: wgpu::AddressMode::ClampToEdge,

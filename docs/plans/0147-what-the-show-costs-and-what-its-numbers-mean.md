@@ -208,7 +208,7 @@ flowchart TB
 
 ### Phase 6 — Human: the first frame-time row that names the discrete GPU
 - **Owner skill:** human
-- **What:** re-take the standalone's windowed frame-time figures with `lmv --gpu <discrete>` and
+- **What:** re-take the standalone's windowed frame-time figures with `ritmolux --gpu <discrete>` and
   record them as a **new row beside** the existing ones. Backlog 0165's remaining half.
 - **Files touched:** `docs/nfr.md` (a second column or a second row, not an edit to the first),
   `docs/on-device-validation.md`, backlog 0165 (a dated update).

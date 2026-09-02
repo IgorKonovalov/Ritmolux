@@ -36,7 +36,7 @@ this document does not duplicate them.
 ## Quickstart: your first preset
 
 1. **Find your preset directory** (see [Where preset files live](#where-preset-files-live)).
-   On Windows that is `%APPDATA%\light-music-visualizer\presets`. Both the
+   On Windows that is `%APPDATA%\ritmolux\presets`. Both the
    standalone app and the foobar2000 plugin read this same folder — it is seeded
    with the curated set on first run.
 
@@ -1279,9 +1279,9 @@ why "edit once, both frontends see it" works.
 
    | OS | Preset directory |
    |----|------------------|
-   | Windows | `%APPDATA%\light-music-visualizer\presets` |
-   | macOS | `~/Library/Application Support/light-music-visualizer/presets` |
-   | Linux/other | `$XDG_DATA_HOME/light-music-visualizer/presets` (or `~/.local/share/light-music-visualizer/presets`) |
+   | Windows | `%APPDATA%\ritmolux\presets` |
+   | macOS | `~/Library/Application Support/ritmolux/presets` |
+   | Linux/other | `$XDG_DATA_HOME/ritmolux/presets` (or `~/.local/share/ritmolux/presets`) |
 
 ### A custom preset folder: `RLX_PRESET_DIR`
 
@@ -1337,7 +1337,7 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
   engine rejected is absent from it, which is how you tell a malformed file from
   a missed one.
 - **foobar loads on init, and re-loads on demand.** The plugin calls the core's
-  `lmv_load_presets` (C ABI v2, [ADR-0006](adrs/0006-c-abi-v2-preset-loading.md))
+  `rlx_load_presets` (C ABI v2, [ADR-0006](adrs/0006-c-abi-v2-preset-loading.md))
   against the shared directory when it starts, so it seeds and renders the same
   library — no loopback capture needed on that path. It has no file watcher: a
   file dropped in afterwards appears on right-click → **Reload presets**, which

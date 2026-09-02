@@ -1,8 +1,8 @@
 # Spec — Ring seam + DSP determinism
 
 > **Subsystem:** The lock-free SPSC ring buffer that decouples audio from render, and the pure-function DSP that consumes it (FFT/spectrum, onset, tempo/beat).
-> **Source:** `lmv-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
-> **Reconciled-through:** Plan 0005 (ring extracted to `lmv-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*); Plan 0060 (which scoped the bit-identity clause to one build on one machine, after a frozen-literal test read as though cross-architecture reproduction followed from it); Plan 0127 (the waveform joined the levelled outputs, so the trace is history-dependent too and publishes its divisor). Reconciled 2026-08-28.
+> **Source:** `rlx-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
+> **Reconciled-through:** Plan 0005 (ring extracted to `rlx-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*); Plan 0060 (which scoped the bit-identity clause to one build on one machine, after a frozen-literal test read as though cross-architecture reproduction followed from it); Plan 0127 (the waveform joined the levelled outputs, so the trace is history-dependent too and publishes its divisor). Reconciled 2026-08-28.
 > **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (normalization is analysis-layer state); [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the beat clock and the gated bar trio); [0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (the waveform is levelled and its divisor published); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
 
 ## Invariants
@@ -14,7 +14,7 @@
   producer (the audio thread) and one consumer (the render thread). Neither loop is driven
   directly off the other; the ring absorbs the cadence mismatch. (CLAUDE.md)
 - The ring MUST be **data-race-free** under concurrent single-producer/single-consumer access.
-  It lives in `lmv-ring` — a workspace member with **no dependencies**, so Miri can interpret its
+  It lives in `rlx-ring` — a workspace member with **no dependencies**, so Miri can interpret its
   `unsafe` without compiling the wgpu/naga graph — and the CI `miri` job proves it on every push.
   (Plan 0005, `.github/workflows/ci.yml`)
 - DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, the band axis, the normalized
@@ -51,7 +51,7 @@
   behavioral claim the DSP tests defend).
 - WHEN the same audio window is analyzed twice THEN the onset envelope, tempo/BPM estimate, and
   band energies are bit-for-bit identical (no wall-clock, no unseeded RNG in the path).
-- WHEN `cargo +nightly miri test -p lmv-ring` runs (the CI `miri` job, Plan 0005) THEN the SPSC
+- WHEN `cargo +nightly miri test -p rlx-ring` runs (the CI `miri` job, Plan 0005) THEN the SPSC
   ring's cross-thread test reports no undefined behavior.
 
 ## Known gaps / honest nulls

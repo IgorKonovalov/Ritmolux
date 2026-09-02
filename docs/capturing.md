@@ -74,7 +74,7 @@ of claim that quietly stops being true.
 > the size you are judging.
 
 Everything here is **dev/agent tooling**. The `image` crate is a *dev-dependency*
-only (ADR-0011), so the shipped `lmv.exe` is untouched; the CLI is a
+only (ADR-0011), so the shipped `ritmolux.exe` is untouched; the CLI is a
 `cargo run --example`, not a subcommand of the app.
 
 > Package name note: the standalone crate is `standalone`, so the invocation is
@@ -252,7 +252,7 @@ RGBA frame is 8.29 MB and four minutes at 60 fps is 119 GB, so the frames can
 never reach disk before the encoder — a pipe is the only viable shape, not an
 optimization. A static encoder is in turn larger than this application's whole
 [size budget](nfr.md#4-size-and-dependencies). So `ffmpeg` is a documented
-prerequisite for this one feature, and `lmv.exe` does not change size.
+prerequisite for this one feature, and `ritmolux.exe` does not change size.
 
 **What makes this worth having is that it cannot drop a frame.** Every live
 visualizer's render loop is welded to a real-time audio device, so its "export"
@@ -1058,7 +1058,7 @@ Highest precedence first:
 2. `--presets <dir>` — every `*.toml` in that directory.
 3. **`RLX_PRESET_DIR`** — the environment override
    ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)).
-4. The per-user preset directory (`%APPDATA%\light-music-visualizer\presets` on
+4. The per-user preset directory (`%APPDATA%\ritmolux\presets` on
    Windows; see [`presets.md`](presets.md#where-preset-files-live)).
 5. The presets compiled into the binary.
 
@@ -1315,7 +1315,7 @@ is reading a different statistic.
 first two together. Keep the provenance when you consume it: a flag only ever
 means *not observed under this stimulus*.
 
-## The live video-out: `lmv --stream`
+## The live video-out: `ritmolux --stream`
 
 Every other instrument on this page writes a **file**. This one writes a **live
 video stream** into another application on the same machine — TouchDesigner,
@@ -1325,19 +1325,19 @@ window on our side, no codec anywhere, and a latency of a frame or two
 
 ```bash
 # The whole thing. Open a Syphon Spout In TOP in TouchDesigner and set its
-# Sender Name to `lmv`.
-lmv --stream --size 1280x720 --fps 60
+# Sender Name to `ritmolux`.
+ritmolux --stream --size 1280x720 --fps 60
 ```
 
 **It exists only in a build with the `spout` feature.** The shipped release
-`lmv.exe` has it; a plain `cargo build` does not, and `--stream` there fails
+`ritmolux.exe` has it; a plain `cargo build` does not, and `--stream` there fails
 with a named error rather than starting and publishing nowhere. To build it
 yourself you need the SDK staged first — it is third-party, pinned by hash and
 never committed:
 
 ```bash
 powershell -File packaging/spout/fetch-sdk.ps1
-cargo run -p standalone --bin lmv --features spout --release -- --stream
+cargo run -p standalone --bin ritmolux --features spout --release -- --stream
 ```
 
 ### The TouchDesigner side
@@ -1352,7 +1352,7 @@ publishing 1280x720 at 60 fps as Spout sender 'Ritmolux'
 ```
 
 `SetSenderName` **increments on collision** — a run that was force-killed leaves
-its registration behind, and the next one comes up as `lmv_1`, then `lmv_2`. The
+its registration behind, and the next one comes up as `rlx_1`, then `rlx_2`. The
 mode prints the name it actually got for exactly this reason. A TOP pointed at a
 name nobody is publishing reports `No Active Sender Found`.
 
@@ -1377,8 +1377,8 @@ reports only `Unable to open shared Spout Texture`, naming neither adapter nor
 the mismatch.
 
 ```bash
-lmv --list-adapters              # both rosters, with their own indices
-lmv --stream --gpu "RTX 3080"    # one name moves the renderer AND the sender
+ritmolux --list-adapters              # both rosters, with their own indices
+ritmolux --stream --gpu "RTX 3080"    # one name moves the renderer AND the sender
 ```
 
 `--list-adapters` prints **two** lists because there are two enumerations, and
@@ -1469,8 +1469,8 @@ outcome, not its per-beat terms, so three different failures fit the same readin
 
 ```bash
 # Windows: a row per detected beat, alongside the 1 Hz diagnostics.log
-lmv.exe --downbeat-log
-lmv.exe --downbeat-log C:\path\to\downbeat.log     # or --downbeat-log=<path>
+ritmolux.exe --downbeat-log
+ritmolux.exe --downbeat-log C:\path\to\downbeat.log     # or --downbeat-log=<path>
 ```
 
 A bare flag writes `downbeat.log` beside `diagnostics.log` under the per-user app
@@ -1549,10 +1549,10 @@ Three things to know before running one:
 
 ## `milkconv`: looking at a converted MilkDrop preset
 
-`milkconv` turns a `.milk` file into an LMV preset ahead of time
+`milkconv` turns a `.milk` file into an Ritmolux preset ahead of time
 ([ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)).
 It is a **developer tool and never ships** — it sits outside the workspace's
-`default-members`, exactly as `lmv-core-cabi` does, so a bare `cargo build` does
+`default-members`, exactly as `rlx-core-cabi` does, so a bare `cargo build` does
 not compile it:
 
 ```bash
@@ -1796,8 +1796,8 @@ Most differential tests render on the **software adapter** (`prefer_software`) s
 they hold on any GPU; the exceptions say so below. Run the whole suite:
 
 ```bash
-cargo nextest run -p lmv-core     # what CI runs (per-test process isolation)
-cargo test -p lmv-core            # single binaries only — see the two caveats below
+cargo nextest run -p rlx-core     # what CI runs (per-test process isolation)
+cargo test -p rlx-core            # single binaries only — see the two caveats below
 ```
 
 > **Use `nextest` for the whole suite**, for two independent reasons.
@@ -2026,9 +2026,9 @@ Golden baselines live in `core/tests/golden/*.png` and are ordinary PNGs
 change:
 
 ```bash
-RLX_BLESS=1 cargo test -p lmv-core --test golden
-RLX_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselines
-RLX_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
+RLX_BLESS=1 cargo test -p rlx-core --test golden
+RLX_BLESS=1 cargo test -p rlx-core --test composite     # the post-stage baselines
+RLX_BLESS=1 cargo test -p rlx-core --test line_joints   # the joined-polyline baseline
 ```
 
 Only the first of those owns the per-`SystemKind` roster. Every

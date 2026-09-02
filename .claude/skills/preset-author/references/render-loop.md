@@ -8,7 +8,7 @@
 
 A headless capture **example** in the `standalone` crate. It loads a preset library, renders
 without a window, and writes a PNG (or a metrics report). It is an example, not a shipped binary,
-so it never bloats `lmv.exe`.
+so it never bloats `ritmolux.exe`.
 
 ```sh
 cargo run -p standalone --example shot -- <flags>

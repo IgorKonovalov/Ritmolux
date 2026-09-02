@@ -848,7 +848,7 @@ fn each_partly_absent_shader_surface_builds_and_renders() {
 
 /// **The blur chain is load-bearing on the picture.**
 ///
-/// Both fixture bodies read `lmv_GetBlur1`, `lmv_GetBlur2` and `lmv_GetBlur3` by
+/// Both fixture bodies read `rlx_GetBlur1`, `rlx_GetBlur2` and `rlx_GetBlur3` by
 /// construction, so a surface built with no chain must resolve those three
 /// bindings to *something*, and what that something is decides whether the two
 /// arms can differ at all.
@@ -880,7 +880,7 @@ fn the_blur_chain_changes_the_picture() {
     assert!(
         difference > 0.01,
         "`blur_level = 0` renders identically to `blur_level = 3` (frame_diff \
-         {difference:.4}), yet both fixture bodies read `lmv_GetBlur3`. Record \
+         {difference:.4}), yet both fixture bodies read `rlx_GetBlur3`. Record \
          what bindings 12..14 resolve to with no chain built - do not tune the \
          fixture to make this pass"
     );
@@ -1138,7 +1138,7 @@ fn the_quantized_field_reaches_exact_zero() {
         0,
         "the quantized field never reached zero: its brightest channel is {} \
          after {QUANTIZE_FRAMES} frames with the deposit off, against an \
-         unquantized control at {}. The warp epilogue's `lmv_quantize` is not \
+         unquantized control at {}. The warp epilogue's `rlx_quantize` is not \
          flooring dim pixels",
         peak(&on),
         peak(&off)
@@ -1189,11 +1189,11 @@ fn the_quantize_switch_reaches_the_shader() {
 
     // ...and `0` really is the off path rather than a step count that happens to
     // round to the same picture: a second value below 1 must agree with it to
-    // the byte, which only the early return in `lmv_quantize` gives.
+    // the byte, which only the early return in `rlx_quantize` gives.
     let half = quantize_probe(&mut renderer, "switch-half", "0.5", "600");
     assert_eq!(
         off.rgba, half.rgba,
-        "`quantize_steps = 0` and `= 0.5` must both take `lmv_quantize`'s early \
+        "`quantize_steps = 0` and `= 0.5` must both take `rlx_quantize`'s early \
          return and so render identically; they differ, so the off path is doing \
          arithmetic"
     );

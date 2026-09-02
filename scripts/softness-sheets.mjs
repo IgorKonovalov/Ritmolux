@@ -151,7 +151,7 @@ const index = [
 
 for (const subject of SUBJECTS) {
   const src = readFileSync(join("presets", `${subject.file}.toml`), "utf8");
-  const dir = mkdtempSync(join(tmpdir(), `lmv-softness-${subject.file}-`));
+  const dir = mkdtempSync(join(tmpdir(), `rlx-softness-${subject.file}-`));
   index.push(`## ${subject.file}`, "", `${subject.note}.`, "");
   try {
     for (const softness of SOFTNESS) {

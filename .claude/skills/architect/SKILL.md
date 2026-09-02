@@ -1,11 +1,11 @@
 ---
 name: architect
-description: Acts as the lead architect for the light-music-visualizer project. Designs implementation plans, writes Architecture Decision Records (ADRs), draws mermaid diagrams, and reviews implementations against the agreed design. Use this skill whenever the user wants to plan a new feature, decide a design tradeoff, document architecture, refresh a diagram, or have recently-written code reviewed against the plan — even if they don't say "architect", "ADR", or "plan". Trigger on phrases like "how should we build X", "design the capture layer", "should we use A or B", "let's plan the scene system", "review the implementation of plan N", or any request that touches cross-component design in this repo.
+description: Acts as the lead architect for the ritmolux project. Designs implementation plans, writes Architecture Decision Records (ADRs), draws mermaid diagrams, and reviews implementations against the agreed design. Use this skill whenever the user wants to plan a new feature, decide a design tradeoff, document architecture, refresh a diagram, or have recently-written code reviewed against the plan — even if they don't say "architect", "ADR", or "plan". Trigger on phrases like "how should we build X", "design the capture layer", "should we use A or B", "let's plan the scene system", "review the implementation of plan N", or any request that touches cross-component design in this repo.
 ---
 
-# architect — light-music-visualizer
+# architect — ritmolux
 
-You are the lead architect for `light-music-visualizer`. Your job is not to write
+You are the lead architect for `ritmolux`. Your job is not to write
 production code — it is to help the user **think clearly about design before code is
 written**, capture the decisions, and verify that what gets built matches what was decided.
 
@@ -614,7 +614,7 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
 
 ### Closing a plan that was built in a worktree
 
-Since Plan 0047 this project runs plan lanes in **git worktrees** — `WORK/lmv-plan-NNNN` on a
+Since Plan 0047 this project runs plan lanes in **git worktrees** — `WORK/rlx-plan-NNNN` on a
 `plan-NNNN-<slug>` branch, alongside the main checkout. That is
 [ADR-0053](../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md); read it once, then follow
 the order, because getting the merge direction backwards puts a merge commit and possibly a
@@ -675,7 +675,7 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    0054 and 0056 together reclaimed **32 GB** (14 + 18). Two idle lanes can plausibly fill the disk.
 
    ```sh
-   git worktree remove ../lmv-plan-NNNN   # from the main checkout, never from inside the lane
+   git worktree remove ../rlx-plan-NNNN   # from the main checkout, never from inside the lane
    git worktree prune                     # drops registrations whose directory is already gone
    ```
 

@@ -551,9 +551,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The 8-bit floor an MD1-era preset's feedback field had (ADR-0118). A
     // bundle with no custom warp shader takes THIS path, so the quantizer has to
     // reach it too or a whole era of the corpus washes out unfixed. Off — every
-    // native `warp_mesh` preset — `lmv_quantize` returns its argument, so this
+    // native `warp_mesh` preset — `rlx_quantize` returns its argument, so this
     // line is an exact identity.
-    return vec4<f32>(lmv_quantize(faded.rgb, wu.misc3.x), faded.a);
+    return vec4<f32>(rlx_quantize(faded.rgb, wu.misc3.x), faded.a);
 }
 "#;
 
@@ -2071,7 +2071,7 @@ impl Scene for WarpMeshScene {
             // The *unclamped* per-second decay: a custom warp shader applies
             // decay itself, and the reference's bound is its 8-bit target — both
             // ends of which the shader epilogue now reproduces. The clamp is the
-            // ceiling; `lmv_quantize`, driven by the step count passed here, is
+            // ceiling; `rlx_quantize`, driven by the step count passed here, is
             // the floor that makes a `decay`-scaled dim pixel reach zero instead
             // of integrating forever (ADR-0118).
             queue.write_buffer(

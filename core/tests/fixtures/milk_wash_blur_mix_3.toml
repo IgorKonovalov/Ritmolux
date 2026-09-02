@@ -443,62 +443,62 @@ struct MilkU {
 @group(1) @binding(13) var t_blur2: texture_2d<f32>;
 @group(1) @binding(14) var t_blur3: texture_2d<f32>;
 
-fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
-fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn rlx_GetPixel(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
 }
 
-fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_encode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x * 12.92;
     let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
     return select(hi, lo, x <= vec3<f32>(0.0031308));
 }
-fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_decode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x / 12.92;
     let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
     return select(hi, lo, x <= vec3<f32>(0.04045));
 }
-fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
     let n = abs(steps);
     if (n < 1.0) { return c; }
-    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let e = rlx_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
     if (steps < 0.0) {
         return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
     }
-    return lmv_srgb_decode(floor(e * n) / n);
+    return rlx_srgb_decode(floor(e * n) / n);
 }
 
 @fragment
 fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) -> @location(0) vec4<f32> {
-    var _lmv_uv: vec2<f32> = _in_uv;
-    var _lmv_uv_orig: vec2<f32> = _in_uv_orig;
-    let _lmv_p = (_lmv_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
-    var _lmv_rad: f32 = length(_lmv_p);
-    var _lmv_ang: f32 = atan2(_lmv_p.y, _lmv_p.x);
-    var _lmv_ret: vec3<f32> = vec3<f32>(0.0);
-    var _lmv_hue: vec3<f32> = mix(
-        mix(U.hue[0].xyz, U.hue[1].xyz, _lmv_uv.x),
-        mix(U.hue[2].xyz, U.hue[3].xyz, _lmv_uv.x),
-        _lmv_uv.y);
-    _lmv_ret = (textureSampleLevel(t_main, s_fw, _lmv_uv, 0.0)).xyz;
-    _lmv_ret = ((_lmv_ret) + ((((textureSampleLevel(t_blur2, s_fc, _lmv_uv, 0.0)).xyz) * (0.1))));
-    _lmv_ret = ((_lmv_ret) / (1.1));
-    _lmv_ret = ((_lmv_ret) - (0.02));
-    var _lmv_o = clamp(_lmv_ret, vec3<f32>(0.0), vec3<f32>(1.0));
-    _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);
-    _lmv_o = lmv_quantize(_lmv_o, U.misc.w);
-    return vec4<f32>(_lmv_o, 1.0);
+    var _rlx_uv: vec2<f32> = _in_uv;
+    var _rlx_uv_orig: vec2<f32> = _in_uv_orig;
+    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    var _rlx_rad: f32 = length(_rlx_p);
+    var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);
+    var _rlx_ret: vec3<f32> = vec3<f32>(0.0);
+    var _rlx_hue: vec3<f32> = mix(
+        mix(U.hue[0].xyz, U.hue[1].xyz, _rlx_uv.x),
+        mix(U.hue[2].xyz, U.hue[3].xyz, _rlx_uv.x),
+        _rlx_uv.y);
+    _rlx_ret = (textureSampleLevel(t_main, s_fw, _rlx_uv, 0.0)).xyz;
+    _rlx_ret = ((_rlx_ret) + ((((textureSampleLevel(t_blur2, s_fc, _rlx_uv, 0.0)).xyz) * (0.1))));
+    _rlx_ret = ((_rlx_ret) / (1.1));
+    _rlx_ret = ((_rlx_ret) - (0.02));
+    var _rlx_o = clamp(_rlx_ret, vec3<f32>(0.0), vec3<f32>(1.0));
+    _rlx_o = select(vec3<f32>(0.0), _rlx_o, _rlx_o == _rlx_o);
+    _rlx_o = rlx_quantize(_rlx_o, U.misc.w);
+    return vec4<f32>(_rlx_o, 1.0);
 }
 '''
 
@@ -547,60 +547,60 @@ struct MilkU {
 @group(0) @binding(13) var t_blur2: texture_2d<f32>;
 @group(0) @binding(14) var t_blur3: texture_2d<f32>;
 
-fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
-fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn rlx_GetPixel(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
 }
 
-fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_encode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x * 12.92;
     let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
     return select(hi, lo, x <= vec3<f32>(0.0031308));
 }
-fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_decode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x / 12.92;
     let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
     return select(hi, lo, x <= vec3<f32>(0.04045));
 }
-fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
     let n = abs(steps);
     if (n < 1.0) { return c; }
-    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let e = rlx_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
     if (steps < 0.0) {
         return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
     }
-    return lmv_srgb_decode(floor(e * n) / n);
+    return rlx_srgb_decode(floor(e * n) / n);
 }
 
 @fragment
 fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {
-    var _lmv_uv: vec2<f32> = _in_uv;
-    var _lmv_uv_orig: vec2<f32> = _in_uv;
-    let _lmv_p = (_lmv_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
-    var _lmv_rad: f32 = length(_lmv_p);
-    var _lmv_ang: f32 = atan2(_lmv_p.y, _lmv_p.x);
-    var _lmv_ret: vec3<f32> = vec3<f32>(0.0);
-    var _lmv_hue: vec3<f32> = mix(
-        mix(U.hue[0].xyz, U.hue[1].xyz, _lmv_uv.x),
-        mix(U.hue[2].xyz, U.hue[3].xyz, _lmv_uv.x),
-        _lmv_uv.y);
-    _lmv_ret = (((((((((((textureSampleLevel(t_main, s_fw, _lmv_uv, 0.0)).xyz) * (1.0))) + (((lmv_GetBlur1(_lmv_uv)) * (3.0))))) + (((lmv_GetBlur2(_lmv_uv)) * (0.0))))) + (((lmv_GetBlur3(_lmv_uv)) * (0.0))))) + (0.0));
-    _lmv_ret = ((_lmv_ret) + (lmv_GetBlur2(((((((_lmv_uv) - (0.5))) * (0.333))) + (0.5)))));
-    _lmv_ret = ((_lmv_ret) * (1.0));
-    var _lmv_o = max(_lmv_ret, vec3<f32>(0.0));
-    _lmv_o = select(vec3<f32>(0.0), _lmv_o, _lmv_o == _lmv_o);
-    return vec4<f32>(_lmv_o * U.misc.y, U.misc.z);
+    var _rlx_uv: vec2<f32> = _in_uv;
+    var _rlx_uv_orig: vec2<f32> = _in_uv;
+    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
+    var _rlx_rad: f32 = length(_rlx_p);
+    var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);
+    var _rlx_ret: vec3<f32> = vec3<f32>(0.0);
+    var _rlx_hue: vec3<f32> = mix(
+        mix(U.hue[0].xyz, U.hue[1].xyz, _rlx_uv.x),
+        mix(U.hue[2].xyz, U.hue[3].xyz, _rlx_uv.x),
+        _rlx_uv.y);
+    _rlx_ret = (((((((((((textureSampleLevel(t_main, s_fw, _rlx_uv, 0.0)).xyz) * (1.0))) + (((rlx_GetBlur1(_rlx_uv)) * (3.0))))) + (((rlx_GetBlur2(_rlx_uv)) * (0.0))))) + (((rlx_GetBlur3(_rlx_uv)) * (0.0))))) + (0.0));
+    _rlx_ret = ((_rlx_ret) + (rlx_GetBlur2(((((((_rlx_uv) - (0.5))) * (0.333))) + (0.5)))));
+    _rlx_ret = ((_rlx_ret) * (1.0));
+    var _rlx_o = max(_rlx_ret, vec3<f32>(0.0));
+    _rlx_o = select(vec3<f32>(0.0), _rlx_o, _rlx_o == _rlx_o);
+    return vec4<f32>(_rlx_o * U.misc.y, U.misc.z);
 }
 '''
 

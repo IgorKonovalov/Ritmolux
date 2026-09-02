@@ -821,7 +821,7 @@ struct Decay {
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // The past, resampled through this frame's `fb_*` transform (ADR-0048) — the
     // second of the engine's two accumulation sinks, running the same
-    // `lmv_source_uv` the trails stage does.
+    // `rlx_source_uv` the trails stage does.
     //
     // **Only the past.** The fresh points are drawn additively over this bed in
     // the same render pass, at their own projected positions, so the transform
@@ -829,8 +829,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // untransformed preset samples the LITERAL `in.uv` and every attractor golden
     // is byte-identical.
     let moved = decay.k.z != 0.0;
-    let suv = select(in.uv, lmv_source_uv(in.uv, decay.xf, decay.tr, decay.wp), moved);
-    let inside = select(1.0, lmv_inside(suv), moved);
+    let suv = select(in.uv, rlx_source_uv(in.uv, decay.xf, decay.tr, decay.wp), moved);
+    let inside = select(1.0, rlx_inside(suv), moved);
     let c = textureSampleLevel(prev, samp, suv, 0.0).rgb * (decay.k.x * inside);
     return vec4<f32>(c, 1.0);
 }

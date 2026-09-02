@@ -32,7 +32,7 @@ core/            # Rust library crate — DSP + render engine + scenes + preset 
                  #   from milkconv/, the ahead-of-time converter below.
   src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
 core-cabi/       # the C ABI and nothing else (ADR-0072) — the only crate declaring
-                 #   cdylib/staticlib, emitted stem `rlx_core_c`. src/lib.rs + include/lmv_core.h
+                 #   cdylib/staticlib, emitted stem `rlx_core_c`. src/lib.rs + include/rlx_core.h
                  #   + tests/ffi.rs. OUTSIDE workspace `default-members`, so `--workspace` is
                  #   load-bearing on every test/clippy invocation that must cover the ABI.
 rlx-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
@@ -96,7 +96,7 @@ Rust (run from repo root):
 - Lints (treated as errors): `cargo clippy --workspace --all-targets -- -D warnings`
 - Format check: `cargo fmt --all --check`  (apply: `cargo fmt --all`)
 - Build the C-ABI artifacts: `cargo build -p rlx-core-cabi` (emits `rlx_core_c.lib`/`.dll`; the
-  header is hand-maintained at `core-cabi/include/lmv_core.h`, no `cbindgen` — ADR-0003)
+  header is hand-maintained at `core-cabi/include/rlx_core.h`, no `cbindgen` — ADR-0003)
 
 **`--workspace` is load-bearing, not stylistic** (ADR-0072): `rlx-core-cabi` is outside the workspace
 `default-members`, so the bare forms come back green having never touched the C ABI.

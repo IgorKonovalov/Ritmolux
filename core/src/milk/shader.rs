@@ -123,26 +123,26 @@ pub const ROT_MATRICES: usize = 24;
 ///   Reachable from the same lane on purpose — the fallback is a parameter
 ///   change, not a rebuild.
 pub const QUANTIZE_WGSL: &str = "\
-fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_encode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x * 12.92;
     let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
     return select(hi, lo, x <= vec3<f32>(0.0031308));
 }
-fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_decode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x / 12.92;
     let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
     return select(hi, lo, x <= vec3<f32>(0.04045));
 }
-fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
     let n = abs(steps);
     if (n < 1.0) { return c; }
-    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let e = rlx_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
     if (steps < 0.0) {
         return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
     }
-    return lmv_srgb_decode(floor(e * n) / n);
+    return rlx_srgb_decode(floor(e * n) / n);
 }
 ";
 
@@ -183,7 +183,7 @@ struct MilkU {
 
 /// The whole fixed half of a converted fragment module: the uniform block, the
 /// binding declarations at `group`, and MilkDrop's own prelude helpers
-/// (`lum`, `GetPixel`, `GetBlur1..3`) under collision-proof `lmv_` names.
+/// (`lum`, `GetPixel`, `GetBlur1..3`) under collision-proof `rlx_` names.
 ///
 /// Helpers are declared whether or not the preset calls them — an uncalled
 /// function does not put its bindings in the entry point's resource set, so a
@@ -214,17 +214,17 @@ pub fn fragment_prelude(group: u32) -> String {
         out.push('\n');
     }
     out.push_str(
-        "\nfn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }\n\
-         fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {\n\
+        "\nfn rlx_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }\n\
+         fn rlx_GetPixel(uv: vec2<f32>) -> vec3<f32> {\n\
          \x20   return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;\n\
          }\n\
-         fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {\n\
+         fn rlx_GetBlur1(uv: vec2<f32>) -> vec3<f32> {\n\
          \x20   return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;\n\
          }\n\
-         fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {\n\
+         fn rlx_GetBlur2(uv: vec2<f32>) -> vec3<f32> {\n\
          \x20   return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;\n\
          }\n\
-         fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {\n\
+         fn rlx_GetBlur3(uv: vec2<f32>) -> vec3<f32> {\n\
          \x20   return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;\n\
          }\n\n",
     );
@@ -272,7 +272,7 @@ mod tests {
         for group in [WARP_GROUP, COMP_GROUP] {
             let module = format!(
                 "{}\n@fragment fn fs_main() -> @location(0) vec4<f32> {{\n\
-                 \x20   return vec4<f32>(U.clock.x, lmv_lum(lmv_GetPixel(vec2<f32>(0.5))), 0.0, 1.0);\n\
+                 \x20   return vec4<f32>(U.clock.x, rlx_lum(rlx_GetPixel(vec2<f32>(0.5))), 0.0, 1.0);\n\
                  }}\n",
                 fragment_prelude(group)
             );

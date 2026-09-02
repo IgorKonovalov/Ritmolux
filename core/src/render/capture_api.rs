@@ -72,7 +72,7 @@ impl Renderer {
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-capture-frame"),
+                label: Some("rlx-capture-frame"),
             });
         // The preview intermediate, when one is open, sits between the draw and
         // the destination here exactly as it does on the present path — same
@@ -137,7 +137,7 @@ impl Renderer {
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-capture-preset"),
+                label: Some("rlx-capture-preset"),
             });
         capture::record_clear(&mut encoder, &view);
         let _ = self.draw_frame(
@@ -199,7 +199,7 @@ impl Renderer {
                 self.ctx
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("lmv-capture-over"),
+                        label: Some("rlx-capture-over"),
                     });
             capture::record_clear(&mut encoder, &view);
             let _ = self.draw_frame(
@@ -296,7 +296,7 @@ impl Renderer {
                 self.ctx
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("lmv-capture-at"),
+                        label: Some("rlx-capture-at"),
                     });
             capture::record_clear(&mut encoder, &view);
             let _ = self.draw_frame(
@@ -388,7 +388,7 @@ impl Renderer {
                 self.ctx
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("lmv-capture-stream"),
+                        label: Some("rlx-capture-stream"),
                     });
             capture::record_clear(&mut encoder, &view);
             let _ = self.draw_frame(
@@ -532,7 +532,7 @@ impl Renderer {
                     self.ctx
                         .device
                         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("lmv-capture-audio"),
+                            label: Some("rlx-capture-audio"),
                         });
                 capture::record_clear(&mut encoder, &view);
                 let _ = self.draw_frame(
@@ -602,7 +602,7 @@ impl Renderer {
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-capture-step"),
+                label: Some("rlx-capture-step"),
             });
         capture::record_clear(&mut encoder, view);
         let _ = self.draw_frame(
@@ -699,7 +699,7 @@ impl Renderer {
             .ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lmv-frame-tap"),
+                label: Some("rlx-frame-tap"),
             });
         capture::record_clear(&mut encoder, &tap.view);
         let _ = self.draw_frame(

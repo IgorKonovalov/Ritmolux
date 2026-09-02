@@ -334,7 +334,7 @@ fn roster_snapshot_and_select_over_the_abi() {
     const H: u32 = 240;
 
     let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
-    let title: Vec<u16> = "lmv ffi roster\0".encode_utf16().collect();
+    let title: Vec<u16> = "ritmolux ffi roster\0".encode_utf16().collect();
     let hwnd = unsafe {
         CreateWindowExW(
             0,

@@ -408,7 +408,7 @@ impl RenderContext {
     ) -> Result<Self, RenderError> {
         let adapter = resolve_adapter(instance, choice, Some(&surface))?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("lmv-device"),
+            label: Some("rlx-device"),
             ..Default::default()
         }))
         .map_err(RenderError::RequestDevice)?;
@@ -484,7 +484,7 @@ impl RenderContext {
         // on the machine is a candidate and there is no compatibility to check.
         let adapter = resolve_adapter(&instance, choice, None)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("lmv-headless-device"),
+            label: Some("rlx-headless-device"),
             ..Default::default()
         }))
         .map_err(RenderError::RequestDevice)?;

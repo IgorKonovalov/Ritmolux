@@ -1136,7 +1136,7 @@ paper_hue  = "0.1"
 /// frontend can point the author at the file.
 #[test]
 fn load_dir_reports_warnings_alongside_the_loaded_presets() {
-    let dir = std::env::temp_dir().join("lmv_warn_dir_test");
+    let dir = std::env::temp_dir().join("rlx_warn_dir_test");
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create temp dir");
     std::fs::write(
@@ -1969,7 +1969,7 @@ fn documentation_example_presets_all_parse() {
 fn load_dir_loads_the_good_and_reports_the_bad() {
     use std::fs;
 
-    let dir = std::env::temp_dir().join("lmv_preset_load_test");
+    let dir = std::env::temp_dir().join("rlx_preset_load_test");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create temp preset dir");
     fs::write(

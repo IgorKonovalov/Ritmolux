@@ -16,27 +16,27 @@ use std::ptr::NonNull;
 
 /// The opaque handle `shim.cpp` hands back. Never dereferenced on this side.
 #[repr(C)]
-struct LmvSpout {
+struct RlxSpout {
     _private: [u8; 0],
 }
 
 unsafe extern "C" {
-    fn lmv_spout_adapter_count() -> c_int;
-    fn lmv_spout_adapter_name(index: c_int, buffer: *mut c_char, length: c_int) -> c_int;
-    fn lmv_spout_create(
+    fn rlx_spout_adapter_count() -> c_int;
+    fn rlx_spout_adapter_name(index: c_int, buffer: *mut c_char, length: c_int) -> c_int;
+    fn rlx_spout_create(
         sender_name: *const c_char,
         width: c_uint,
         height: c_uint,
         adapter: c_int,
-    ) -> *mut LmvSpout;
-    fn lmv_spout_send(
-        spout: *mut LmvSpout,
+    ) -> *mut RlxSpout;
+    fn rlx_spout_send(
+        spout: *mut RlxSpout,
         rgba: *const u8,
         width: c_uint,
         height: c_uint,
     ) -> c_int;
-    fn lmv_spout_name(spout: *mut LmvSpout) -> *const c_char;
-    fn lmv_spout_destroy(spout: *mut LmvSpout);
+    fn rlx_spout_name(spout: *mut RlxSpout) -> *const c_char;
+    fn rlx_spout_destroy(spout: *mut RlxSpout);
 }
 
 /// Why a sender could not be created or a frame could not be published.
@@ -125,7 +125,7 @@ impl std::error::Error for SpoutError {}
 /// raw pointer gives that for free, and it is the property that matters: one
 /// sender belongs to one thread.
 pub struct SpoutSender {
-    handle: NonNull<LmvSpout>,
+    handle: NonNull<RlxSpout>,
     /// The name the sender was actually registered under, read back once at
     /// construction. Not the requested name where a stale registration forced
     /// an increment.
@@ -142,14 +142,14 @@ pub struct SpoutSender {
 pub fn adapters() -> Vec<String> {
     // SAFETY: no arguments and no shared state — the callee builds a temporary
     // sender to enumerate through and drops it before returning.
-    let count = unsafe { lmv_spout_adapter_count() }.max(0);
+    let count = unsafe { rlx_spout_adapter_count() }.max(0);
     (0..count)
         .map(|index| {
             let mut buffer = [0u8; 256];
             // SAFETY: `buffer` is a live, writable array of exactly the length
             // passed, and the callee NUL-terminates within it.
             let ok = unsafe {
-                lmv_spout_adapter_name(
+                rlx_spout_adapter_name(
                     index,
                     buffer.as_mut_ptr().cast::<c_char>(),
                     buffer.len() as c_int,
@@ -204,7 +204,7 @@ impl SpoutSender {
         // call, the dimensions are non-zero and `pick` is either -1 or an index
         // checked against the roster above. The callee copies the name and
         // returns either null or a handle this type takes sole ownership of.
-        let raw = unsafe { lmv_spout_create(c_name.as_ptr(), width, height, pick) };
+        let raw = unsafe { rlx_spout_create(c_name.as_ptr(), width, height, pick) };
         let handle = NonNull::new(raw).ok_or_else(|| SpoutError::CreateFailed {
             name: name.to_string(),
             width,
@@ -214,7 +214,7 @@ impl SpoutSender {
         // destroyed. The returned pointer is the sender's own storage, valid
         // until destroy, so it is copied out before anything else can run.
         let registered = unsafe {
-            let ptr = lmv_spout_name(handle.as_ptr());
+            let ptr = rlx_spout_name(handle.as_ptr());
             if ptr.is_null() {
                 name.to_string()
             } else {
@@ -248,7 +248,7 @@ impl SpoutSender {
         // SAFETY: `handle` is owned and live; `rgba` is checked above to hold
         // exactly `width * height * 4` bytes, which is what the callee reads,
         // and it is borrowed for the duration of the call.
-        let ok = unsafe { lmv_spout_send(self.handle.as_ptr(), rgba.as_ptr(), width, height) };
+        let ok = unsafe { rlx_spout_send(self.handle.as_ptr(), rgba.as_ptr(), width, height) };
         if ok == 0 {
             return Err(SpoutError::SendFailed { width, height });
         }
@@ -275,6 +275,6 @@ impl Drop for SpoutSender {
         // SAFETY: the handle came from a successful create, is destroyed exactly
         // once because this type is the sole owner and is not `Copy`, and is
         // never used afterwards.
-        unsafe { lmv_spout_destroy(self.handle.as_ptr()) };
+        unsafe { rlx_spout_destroy(self.handle.as_ptr()) };
     }
 }

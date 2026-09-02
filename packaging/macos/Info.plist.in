@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Template for LightMusicVisualizer.app's Info.plist (Plan 0036, ADR-0038).
+  Template for Ritmolux.app's Info.plist (Plan 0036, ADR-0038).
 
   @VERSION@ is substituted by packaging/macos/bundle.sh from root Cargo.toml's
   [workspace.package] version. There is deliberately no second version string
@@ -15,14 +15,14 @@
 
 	<!-- The binary inside Contents/MacOS/. Matches bundle.sh's lipo output name. -->
 	<key>CFBundleExecutable</key>
-	<string>lmv</string>
+	<string>ritmolux</string>
 
 	<!--
 	  The identity TCC binds the Screen Recording grant to (ADR-0038 fact 2).
 	  Reverse-DNS under a domain the user controls: github.com/IgorKonovalov.
 	-->
 	<key>CFBundleIdentifier</key>
-	<string>io.github.igorkonovalov.light-music-visualizer</string>
+	<string>io.github.igorkonovalov.ritmolux</string>
 
 	<!--
 	  Two names on purpose. CFBundleName matches the .app directory name, which
@@ -31,9 +31,9 @@
 	  Recording prompt shows the tester.
 	-->
 	<key>CFBundleName</key>
-	<string>LightMusicVisualizer</string>
+	<string>Ritmolux</string>
 	<key>CFBundleDisplayName</key>
-	<string>Light Music Visualizer</string>
+	<string>Ritmolux</string>
 
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>

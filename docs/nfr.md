@@ -108,7 +108,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   (from 17.2 µs), against the ~11 ms allocated here — roughly 350x headroom. Cold start
   now publishes its first frame at ~171 ms instead of ~43 ms, once per stream.
 - **This budget binds the window, and the streamed picture sits outside it.**
-  `lmv --stream` ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md))
+  `ritmolux --stream` ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md))
   publishes frames to another application, which then composites and presents them on its own
   schedule — so what a viewer of that composite sees is governed by the receiver's pipeline, not
   by anything measurable here. Our half adds a GPU readback and an upload to the numbers above;
@@ -121,7 +121,7 @@ contradicts this file is a plan bug — surface it, don't guess.
 - **Soft cap 10,000,000 B** for the standalone release exe. The unit is in the number because
   "~10 MB" reads two ways 4.9 % apart and nothing here said which; the *value* is the inherited
   one, and it has never been measured against what the exe actually contains.
-- **Soft cap 12,582,912 B (12 MiB)** for the foobar2000 component, `foo_lmv.dll` — its own figure
+- **Soft cap 12,582,912 B (12 MiB)** for the foobar2000 component, `foo_ritmolux.dll` — its own figure
   rather than "the same ballpark", because the two artifacts do not carry the same things. The
   component carries the whole core, the embedded preset library and the SDK shim, and carries
   neither `winit`, the window, nor the WASAPI capture stack. Derived in
@@ -161,9 +161,9 @@ contradicts this file is a plan bug — surface it, don't guess.
   runners running `cargo build`, `cargo nextest run`, `cargo test --doc`,
   `cargo clippy --all-targets -- -D warnings`, `cargo fmt --all --check` on every push.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
-  and it is load-bearing rather than stylistic: `lmv-core-cabi` is deliberately outside the workspace
+  and it is load-bearing rather than stylistic: `rlx-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **eight** single-runner gates: `cargo deny check` (supply chain), Miri over `lmv-ring`'s
+- Plus **eight** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
   `unsafe` (UB), the coverage ratchet below, and the five Node doc gates that share the `links`
   job — `check-doc-links.mjs` (every relative markdown link resolves — Plan 0061 Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
@@ -188,10 +188,10 @@ contradicts this file is a plan bug — surface it, don't guess.
   so the GPU suites skip there with a printed reason. Real-GPU-vendor and live-loopback checks
   stay manual — see [`on-device-validation.md`](on-device-validation.md).
 - **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):
-  a Windows-only job runs `cargo llvm-cov nextest -p lmv-core --fail-under-lines $COVERAGE_FLOOR`,
-  and since ADR-0072 a second, smaller gate beside it on `-p lmv-core-cabi` against
+  a Windows-only job runs `cargo llvm-cov nextest -p rlx-core --fail-under-lines $COVERAGE_FLOOR`,
+  and since ADR-0072 a second, smaller gate beside it on `-p rlx-core-cabi` against
   `$CABI_COVERAGE_FLOOR` — without which the C ABI's coverage would silently stop being watched the
-  moment it left `lmv-core`. Neither gates `standalone/`: it is a `winit` event loop plus two platform
+  moment it left `rlx-core`. Neither gates `standalone/`: it is a `winit` event loop plus two platform
   capture backends no runner can execute. Both floors live in exactly one place, the `env:` block in
   `ci.yml`, and are a **ratchet, not a target**: set from measurement, raised at a close ceremony when
   a plan improves coverage, lowered only with a note naming the plan and the reason. `COVERAGE_FLOOR`
@@ -230,12 +230,12 @@ Delivered by `.github/workflows/release.yml` on a pushed `v*` tag
 **Three** zips, attached to a GitHub **prerelease** — a plain download URL, no account needed,
 because the repository is public.
 
-- **Windows**: `lmv.exe`, x64, **unsigned** (SmartScreen warning accepted).
-- **macOS**: a **universal** (arm64 + Intel) `LightMusicVisualizer.app`, **ad-hoc signed and
+- **Windows**: `ritmolux.exe`, x64, **unsigned** (SmartScreen warning accepted).
+- **macOS**: a **universal** (arm64 + Intel) `Ritmolux.app`, **ad-hoc signed and
   unnotarized**. Ad-hoc signing buys a stable code identity for the Screen Recording grant to
   bind to; it is *not* Developer ID, so Gatekeeper still quarantines the download and the grant
   does not survive a rebuild. Requires macOS 13+.
-- **foobar2000 component**: `foo_lmv.fb2k-component`, **x64 only**, for foobar2000 v2. Built
+- **foobar2000 component**: `foo_ritmolux.fb2k-component`, **x64 only**, for foobar2000 v2. Built
   by `packaging/foobar/build-component.ps1` against a **pinned, checksummed** SDK release that
   the workflow fetches (`packaging/foobar/sdk-pin.ps1`). Unsigned, like the rest.
 - All three zips carry a `READ-ME-FIRST.txt`; the two standalone ones also carry a reference
@@ -319,7 +319,7 @@ reachable on a DX12/wgpu app; the backend-trim is retired as a *memory* lever (i
 win under §4). See ADR-0010 for the decision and rejected alternatives.
 
 Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostics harness
-(`diagnostics.log`, `lmv_get_metrics`):
+(`diagnostics.log`, `rlx_get_metrics`):
 
 - **No session growth (the requirement that matters).** Working set / private commit stays flat over a
   session — no monotonic growth across the §10 ≥4-hour soak. A leak is the real live-show failure; the
@@ -422,7 +422,7 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   fits a convincing line. The discipline is to hold the measurement until two consecutive
   half-hours agree.
 
-Measurement method (repeatable): PowerShell `Get-Process lmv` → `WorkingSet64` vs `PrivateMemorySize64`,
+Measurement method (repeatable): PowerShell `Get-Process ritmolux` → `WorkingSet64` vs `PrivateMemorySize64`,
 `.Modules` by mapped size, and which backend loader DLLs are mapped. The private-vs-working-set split is
 what proved the cost is driver heap, not our code.
 

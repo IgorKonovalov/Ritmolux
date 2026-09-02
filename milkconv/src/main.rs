@@ -1,4 +1,4 @@
-//! `milkconv` — convert a `.milk` preset into an LMV bundle.
+//! `milkconv` — convert a `.milk` preset into an Ritmolux bundle.
 //!
 //! ```text
 //! milkconv <input.milk> [--out <file.toml>]

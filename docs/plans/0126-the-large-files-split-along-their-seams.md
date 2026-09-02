@@ -7,12 +7,12 @@
 
 **Drafted without an interview at the user's request.** The guesses: (1) a split is a *move*,
 never a rewrite — every phase is gated on the golden suite unblessed and on `cargo public-api`-
-style stability of `lmv_core`'s two-deep surface the shells use; (2) the `particles/` directory
+style stability of `rlx_core`'s two-deep surface the shells use; (2) the `particles/` directory
 (`mod.rs` + `shaders.rs` + `resources.rs` + `encode.rs` + `family.rs`) is the template every other
 split copies, because it already exists and the review found it the healthiest large scene;
 (3) the two seam moves (the Win32 constructor into `core-cabi`, the `shot` diagnostic
 thread-local into `render::metrics`) are small enough to carry here rather than earn an ADR each —
-neither reverses a recorded decision, both *enforce* one; (4) the `foo_lmv.cpp` split is in
+neither reverses a recorded decision, both *enforce* one; (4) the `foo_ritmolux.cpp` split is in
 scope but last, because `plugin-foobar/build.ps1` compiles one file and must learn a list.
 
 ## TL;DR
@@ -21,7 +21,7 @@ Seven files carry the review's structural majors: two 400-line functions in `war
 a 429-line `draw_frame` in `render/mod.rs` with a four-times-repeated closure, a `schema.rs`
 holding nine responsibilities and five hand-kept parallel `SystemKind` tables, `star.rs` with a
 motif roster and a ring ornament that never talk, a 28-field `AppState` in `standalone/main.rs`,
-and a 189-line `wnd_proc` in `foo_lmv.cpp`. Plus one genuine OCP violation — `GeneratorConfig`
+and a 189-line `wnd_proc` in `foo_ritmolux.cpp`. Plus one genuine OCP violation — `GeneratorConfig`
 fans into four unrelated line scenes' `configure` matches — and two layering seams that leaked.
 This plan splits each file along the seams the review named, one file per phase, moving code
 without changing it, and closes the OCP hole and the two seams while the files are open. **Every
@@ -51,7 +51,7 @@ The review's per-file findings, confirmed at the line:
 - **`standalone/src/main.rs`** (1692) — `AppState` 28 fields, 7-arg ctor; CLI `:1383-1481`,
   preset-dir seeding `:1512-1570`, HUD `:810-914` (whose own comment `:75-77` admits drift from
   `overlay.rs`), input `:921-1135`, capture bootstrap `:1137-1229` all still in the shell entry.
-- **`plugin-foobar/foo_lmv.cpp`** (1076) — `wnd_proc` `:738-926` with the context menu built
+- **`plugin-foobar/foo_ritmolux.cpp`** (1076) — `wnd_proc` `:738-926` with the context menu built
   inline `:816-902`; five file-scope mutable globals (`g_session`, `g_popup_hwnd`, `g_abi_ok`,
   `g_debug_flags`, `g_cfg_preset`); `maybe_log_metrics` `:454-478` reopens its file and calls
   `CreateDirectoryW` + `GetFileAttributesW` every second.
@@ -63,7 +63,7 @@ The review's per-file findings, confirmed at the line:
   that do not use it.
 - **Two seams**: `core/src/render/mod.rs:1195 #[cfg(windows)] new_from_win32_hwnd` is the only
   platform branch in `core/`; `standalone/src/shot/report.rs:26,296` reaches
-  `lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent}` — a
+  `rlx_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent}` — a
   `thread_local!` inside a scene renderer, five modules deep.
 
 ## Decision
@@ -76,7 +76,7 @@ edits are the three the review called bugs-adjacent — the `SystemKind` table c
 `GeneratorConfig` `_ => {}` arm, and the `shape_collage` `enum Kind` — each with a test that fails
 on the old shape. We rejected a single big-bang reorganisation (unreviewable diff, and the
 golden gate would fire once at the end where it can no longer say which move broke it); rejected
-leaving `foo_lmv.cpp` alone (it is the file with the least test coverage and the most globals);
+leaving `foo_ritmolux.cpp` alone (it is the file with the least test coverage and the most globals);
 and rejected making the seam moves separate ADRs (they reverse nothing — ADR-0072 already says
 `core-cabi` owns the ABI-side construction, and the diagnostic already has a home in `metrics`).
 
@@ -180,7 +180,7 @@ flowchart LR
   from `core` as a platform-free `Renderer::new_from_surface_target(SurfaceTargetUnsafe, …)`.
   Move `set_extent_diagnostic`/`take_draw_extent` from `lines/renderer.rs` into `render::metrics`
   as fields on the existing diagnostics facade, keyed to the `Renderer` rather than a
-  `thread_local!`; `shot/report.rs` imports from `lmv_core::render::metrics`.
+  `thread_local!`; `shot/report.rs` imports from `rlx_core::render::metrics`.
 - **Files touched:** `core/src/render/mod.rs`, `core-cabi/src/lib.rs`, `core/src/render/metrics.rs`,
   `core/src/render/scenes/lines/renderer.rs`, `standalone/src/shot/report.rs`.
 - **Done when:** `grep -rn "cfg(windows)\|cfg(target_os" core/src` returns nothing outside
@@ -203,14 +203,14 @@ flowchart LR
   states any row it could not match); `standalone/tests/*` pass; the `--help` text is
   byte-identical before and after (`diff` it).
 
-### Phase 8 — `foo_lmv.cpp` splits and `build.ps1` learns a list
+### Phase 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list
 - **Owner skill:** dev
 - **What:** `viz_session.cpp/.h` (`VizSession`, now owning `abi_ok` and `debug_flags`),
   `presets.cpp` (the roster over the C ABI), `host_window.cpp` (`wnd_proc` with
   `build_context_menu` / `dispatch_menu_command` extracted, class registration, pop-out),
-  leaving `foo_lmv.cpp` as component metadata + service registration. `maybe_log_metrics` opens
+  leaving `foo_ritmolux.cpp` as component metadata + service registration. `maybe_log_metrics` opens
   its file once and keeps the handle. `build.ps1` compiles a source list.
-- **Files touched:** `plugin-foobar/{foo_lmv,viz_session,presets,host_window}.cpp`,
+- **Files touched:** `plugin-foobar/{foo_ritmolux,viz_session,presets,host_window}.cpp`,
   `plugin-foobar/viz_session.h`, `plugin-foobar/build.ps1`.
 - **Done when:** `build.ps1` produces a component that loads in foobar2000 and renders a preset
   (this project's on-device check, `docs/on-device-validation.md`); no function in
@@ -270,7 +270,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`WORK/lmv-plan-0126` on `plan-0126-the-large-files-split-along-their-seams`)_
+**Lane:** _(`WORK/rlx-plan-0126` on `plan-0126-the-large-files-split-along-their-seams`)_
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -281,7 +281,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | not started | |
 | 6 — The two seams go home | dev | not started | |
 | 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
-| 8 — `foo_lmv.cpp` splits and `build.ps1` learns a list | dev | not started | |
+| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | not started | |
 
 ### Notes
 

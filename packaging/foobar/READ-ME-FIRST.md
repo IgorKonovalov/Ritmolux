@@ -1,4 +1,4 @@
-Light Music Visualizer - foobar2000 component
+Ritmolux - foobar2000 component
 =============================================
 
 An audio-reactive visualizer that draws to whatever foobar2000 is playing.
@@ -31,7 +31,7 @@ Built against the foobar2000 SDK release @SDK_VERSION@.
      this folder). You can also drag that file onto the Components list.
   3. Click Apply. foobar2000 will ask to restart - let it.
 
-After the restart, "Light Music Visualizer @VERSION@" appears in the Components
+After the restart, "Ritmolux @VERSION@" appears in the Components
 list. If the version there does not match this file, an older copy is still
 installed - remove it from the same screen first.
 
@@ -43,10 +43,10 @@ To uninstall: the same Components screen, select it, Remove, Apply, restart.
 
 Two ways, and you can use both at once:
 
-  - View -> Light Music Visualizer opens it as its own window.
+  - View -> Ritmolux opens it as its own window.
   - Or dock it into the layout: right-click an empty part of the foobar2000
     window, choose Layout -> Enable layout editing mode, right-click a panel,
-    then Replace UI Element (or Split) and pick "Light Music Visualizer" under
+    then Replace UI Element (or Split) and pick "Ritmolux" under
     Playback visualisation. Turn layout editing back off when you are done.
 
 Press Space with the visualizer focused to cycle scenes, or right-click it for
@@ -68,7 +68,7 @@ GPU session, not one per panel.
 4. Where it keeps its files
 ---------------------------
 
-    %APPDATA%\light-music-visualizer\
+    %APPDATA%\ritmolux\
 
 Paste that into the Explorer address bar - or use Open presets folder in the
 right-click menu, which lands in the presets subfolder directly. It holds an

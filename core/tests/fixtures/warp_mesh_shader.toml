@@ -18,7 +18,7 @@
 #
 # What the two bodies reach, and why a shorter shader would pin less:
 #
-#  - `lmv_GetPixel` (binding 1) in BOTH stages, so the `bind_a`/`bind_b` pair -
+#  - `rlx_GetPixel` (binding 1) in BOTH stages, so the `bind_a`/`bind_b` pair -
 #    the two bind groups that differ only in which half of the ping-pong field
 #    is `t_main` - are each exercised on the frame they read.
 #  - A 2D noise sampler in each stage, and the two arms of the generator are
@@ -28,7 +28,7 @@
 #    sampler quartet, two of the noise set's two shapes.
 #  - A 3D volume in each stage - `t_noisevol_lq` and `t_noisevol_hq` - which is
 #    the only thing in the suite that asks an adapter for `texture_3d` at all.
-#  - `lmv_GetBlur1`, `lmv_GetBlur2` AND `lmv_GetBlur3`, which is what forces
+#  - `rlx_GetBlur1`, `rlx_GetBlur2` AND `rlx_GetBlur3`, which is what forces
 #    `blur_level = 3` to build the whole chain rather than a prefix of it. Read
 #    only `GetBlur1` and levels 2 and 3 would be 1x1 stand-ins and the six
 #    encoded blur passes would be two.
@@ -36,7 +36,7 @@
 #    `U.roam`, `U.rot`, `U.hue`, plus `U.aspect` and all three of `U.misc`'s
 #    live lanes - so `fill_uniform`'s output is load-bearing ON THE PICTURE
 #    rather than merely written to a buffer nothing samples.
-#  - The warp epilogue's `lmv_quantize(o, U.misc.w)` and the comp's
+#  - The warp epilogue's `rlx_quantize(o, U.misc.w)` and the comp's
 #    `U.misc.y`/`U.misc.z`, exactly as `milkconv`'s emitter writes them, so the
 #    two stages' output conventions are the shipped ones.
 #
@@ -75,7 +75,7 @@ color_span     = "1.0"
 brightness     = "1.0"
 
 [milk]
-# Three levels, because both bodies below read `lmv_GetBlur3`.
+# Three levels, because both bodies below read `rlx_GetBlur3`.
 blur_level = 3
 
 per_frame_init = """
@@ -202,40 +202,40 @@ struct MilkU {
 @group(1) @binding(13) var t_blur2: texture_2d<f32>;
 @group(1) @binding(14) var t_blur3: texture_2d<f32>;
 
-fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
-fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn rlx_GetPixel(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
 }
 
-fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_encode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x * 12.92;
     let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
     return select(hi, lo, x <= vec3<f32>(0.0031308));
 }
-fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_decode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x / 12.92;
     let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
     return select(hi, lo, x <= vec3<f32>(0.04045));
 }
-fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
     let n = abs(steps);
     if (n < 1.0) { return c; }
-    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let e = rlx_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
     if (steps < 0.0) {
         return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
     }
-    return lmv_srgb_decode(floor(e * n) / n);
+    return rlx_srgb_decode(floor(e * n) / n);
 }
 
 @fragment
@@ -248,7 +248,7 @@ fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) 
 
     // Binding 1, through the prelude's own helper. `_in_uv` here is the WARPED
     // source uv the shared vertex stage computed, so this is the feedback read.
-    let past = lmv_GetPixel(_in_uv);
+    let past = rlx_GetPixel(_in_uv);
 
     // The interpolated noise arm through the filtering+wrapping sampler, and a
     // 3D volume walked along z by the clock.
@@ -256,7 +256,7 @@ fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) 
     let n3 = textureSampleLevel(t_noisevol_lq, s_fw, vec3<f32>(_in_uv * 2.0, U.clock.x * 0.07), 0.0).xyz;
 
     // All three levels: this is what forces the whole chain to be built.
-    let glow = lmv_GetBlur1(_in_uv) * 0.5 + lmv_GetBlur2(_in_uv) * 0.3 + lmv_GetBlur3(_in_uv) * 0.2;
+    let glow = rlx_GetBlur1(_in_uv) * 0.5 + rlx_GetBlur2(_in_uv) * 0.3 + rlx_GetBlur3(_in_uv) * 0.2;
 
     // The q bridge, two rot rows and a hue corner.
     let q = U.q[0].x + U.q[0].y;
@@ -266,13 +266,13 @@ fn fs_main(@location(0) _in_uv: vec2<f32>, @location(1) _in_uv_orig: vec2<f32>) 
     var ret = past * U.misc.x;
     ret = ret + glow * (0.06 + 0.22 * U.bands.x);
     ret = ret + tint * (n2.x * 0.05 * (0.5 + 0.5 * sin(ang * 3.0 + q + spin)));
-    ret = ret + tint.zyx * (n3.y * 0.04 * lmv_lum(past));
+    ret = ret + tint.zyx * (n3.y * 0.04 * rlx_lum(past));
 
     // The emitter's own warp epilogue, verbatim in shape: clamp, scrub a NaN out
     // of the feedback loop, then the ADR-0118 quantizer off `U.misc.w`.
     var o = clamp(ret, vec3<f32>(0.0), vec3<f32>(1.0));
     o = select(vec3<f32>(0.0), o, o == o);
-    o = lmv_quantize(o, U.misc.w);
+    o = rlx_quantize(o, U.misc.w);
     return vec4<f32>(o, 1.0);
 }
 """
@@ -321,40 +321,40 @@ struct MilkU {
 @group(0) @binding(13) var t_blur2: texture_2d<f32>;
 @group(0) @binding(14) var t_blur3: texture_2d<f32>;
 
-fn lmv_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
-fn lmv_GetPixel(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_lum(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.32, 0.49, 0.29)); }
+fn rlx_GetPixel(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_main, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur1(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur1, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur2(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur2, s_fc, uv, 0.0).xyz;
 }
-fn lmv_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
+fn rlx_GetBlur3(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(t_blur3, s_fc, uv, 0.0).xyz;
 }
 
-fn lmv_srgb_encode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_encode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x * 12.92;
     let hi = 1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - 0.055;
     return select(hi, lo, x <= vec3<f32>(0.0031308));
 }
-fn lmv_srgb_decode(c: vec3<f32>) -> vec3<f32> {
+fn rlx_srgb_decode(c: vec3<f32>) -> vec3<f32> {
     let x = max(c, vec3<f32>(0.0));
     let lo = x / 12.92;
     let hi = pow((x + 0.055) / 1.055, vec3<f32>(2.4));
     return select(hi, lo, x <= vec3<f32>(0.04045));
 }
-fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
+fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
     let n = abs(steps);
     if (n < 1.0) { return c; }
-    let e = lmv_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let e = rlx_srgb_encode(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)));
     if (steps < 0.0) {
         return select(c, vec3<f32>(0.0), e < vec3<f32>(1.0 / n));
     }
-    return lmv_srgb_decode(floor(e * n) / n);
+    return rlx_srgb_decode(floor(e * n) / n);
 }
 
 @fragment
@@ -362,8 +362,8 @@ fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {
     let p = (_in_uv - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
     let rad = length(p);
 
-    let field = lmv_GetPixel(_in_uv);
-    let glow = lmv_GetBlur1(_in_uv) * 0.6 + lmv_GetBlur2(_in_uv) * 0.3 + lmv_GetBlur3(_in_uv) * 0.1;
+    let field = rlx_GetPixel(_in_uv);
+    let glow = rlx_GetBlur1(_in_uv) * 0.6 + rlx_GetBlur2(_in_uv) * 0.3 + rlx_GetBlur3(_in_uv) * 0.1;
 
     // The per-texel noise arm through the POINT+wrapping sampler, and the high
     // quality volume through the filtering one.

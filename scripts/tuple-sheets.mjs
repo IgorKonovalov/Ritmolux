@@ -114,7 +114,7 @@ const index = [
 for (const family of FAMILIES) {
   const tuples = roster(src, family).map((row) => row.slice(0, MEANINGFUL[family]));
   const snake = SNAKE[family];
-  const dir = mkdtempSync(join(tmpdir(), `lmv-tuples-${snake}-`));
+  const dir = mkdtempSync(join(tmpdir(), `rlx-tuples-${snake}-`));
   try {
     tuples.forEach((coeffs, i) => {
       const file = join(dir, `${snake}-${String(i).padStart(2, "0")}.toml`);

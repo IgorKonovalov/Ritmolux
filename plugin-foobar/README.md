@@ -54,11 +54,11 @@ holding the **name**, restored after the window attaches and the library loads.
 ## Building
 
 ```powershell
-.\build.ps1            # -> plugin-foobar\build\foo_lmv.dll
+.\build.ps1            # -> plugin-foobar\build\foo_ritmolux.dll
 .\build.ps1 -Install   # ...then copy it into the local foobar2000 v2 profile
 ```
 
-`-Install` writes to `%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\` —
+`-Install` writes to `%APPDATA%\foobar2000-v2\user-components-x64\foo_ritmolux\` —
 the development inner loop. It is **not** how a release is produced, and it is
 deliberately not what Plan 0102 Phase 5 tests: an artifact that only ever gets
 installed over its own build directory has never exercised the path a user takes.
@@ -70,14 +70,14 @@ installed over its own build directory has never exercised the path a user takes
 ```
 
 Builds, assembles, stamps the version, packages and **verifies**
-`target/dist/light-music-visualizer-v<version>-foobar2000-component.zip`, which
-holds `foo_lmv.fb2k-component` and a `READ-ME-FIRST.txt`. Pass `-SkipBuild` to
+`target/dist/ritmolux-v<version>-foobar2000-component.zip`, which
+holds `foo_ritmolux.fb2k-component` and a `READ-ME-FIRST.txt`. Pass `-SkipBuild` to
 reuse the DLL already in `build/`.
 
 The verification lives in the script rather than in the release workflow, so a
 local run is held to the same bar as CI (ADR-0038's model, applied by ADR-0115).
 Every check is fatal, and two of them are why the script exists rather than a
-`Compress-Archive` line: the component archive must hold `x64/foo_lmv.dll` and
+`Compress-Archive` line: the component archive must hold `x64/foo_ritmolux.dll` and
 nothing else — foobar2000 extracts a component's whole archive into the user's
 components folder, so a stray file is a real defect — and the DLL must carry the
-workspace version rather than `foo_lmv.cpp`'s `0.0.0-dev` fallback.
+workspace version rather than `foo_ritmolux.cpp`'s `0.0.0-dev` fallback.

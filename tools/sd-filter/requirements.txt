@@ -1,7 +1,7 @@
 # Plan 0106 - the environment the diffusion filter runs in.
 #
 # NOTHING HERE SHIPS. No model, no weights and no Python runtime are in the
-# release zip; `lmv.exe` and `foo_lmv.dll` do not change size, and NFR section 4's
+# release zip; `ritmolux.exe` and `foo_ritmolux.dll` do not change size, and NFR section 4's
 # ~10 MB soft cap is untouched. This file exists so a creator can build the
 # sidecar, not so the project can depend on it.
 #

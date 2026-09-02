@@ -23,7 +23,7 @@ fn view() -> SettingsView {
         preset_name: true,
         now_playing: true,
         console: false,
-        preset_dir: r"C:\Users\x\AppData\Roaming\light-music-visualizer\presets".to_owned(),
+        preset_dir: r"C:\Users\x\AppData\Roaming\ritmolux\presets".to_owned(),
     }
 }
 

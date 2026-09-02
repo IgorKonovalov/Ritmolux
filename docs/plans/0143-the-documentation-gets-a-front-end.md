@@ -3,7 +3,7 @@
 > **Status:** approved, **parked 2026-09-01**
 > **Parked until:** the application's new name is chosen. The site bakes the project name into
 > the Starlight title, the Pages subpath every published URL carries, and the header of every
-> page — so publishing under `light-music-visualizer` buys a full republish and a dead set of
+> page — so publishing under `ritmolux` buys a full republish and a dead set of
 > external links as soon as the rename lands. The rename is itself parked with a shortlist
 > (Ritmolux, Clavilux) and no ADR or plan yet; **that decision is the named trigger for this one**.
 > **Created:** 2026-08-30
@@ -70,7 +70,7 @@ archives stay unpublished; links into them become absolute GitHub URLs.
 
 ```mermaid
 flowchart LR
-    subgraph repo["light-music-visualizer (single source)"]
+    subgraph repo["ritmolux (single source)"]
         DOCS["docs/*.md<br/>docs/specs/*.md"]
         ROSTER["presets/README.md<br/>264 KB roster"]
         IMG["docs/images/**"]
@@ -153,7 +153,7 @@ other off-site target. `dev` should not re-raise this.
 - **Owner skill:** dev
 - **What:** A remark plugin that rewrites every relative markdown link at build time — targets
   inside the published set become site routes, targets outside it become absolute
-  `https://github.com/IgorKonovalov/light-music-visualizer/blob/<ref>/<path>` URLs — plus a gate that
+  `https://github.com/IgorKonovalov/ritmolux/blob/<ref>/<path>` URLs — plus a gate that
   checks the *built output*, because this is the one class of breakage the source cannot show.
 - **Files touched:** `site/src/plugins/rewrite-links.mjs`, `site/astro.config.mjs`,
   `scripts/check-site-links.mjs`.
@@ -228,8 +228,8 @@ other off-site target. `dev` should not re-raise this.
 
 ### Phase 7 — Pages is enabled and the demo is retired
 - **Owner skill:** human
-- **What:** Enable GitHub Pages on `light-music-visualizer` with the Actions source, push the branch,
-  confirm the deploy, and replace the `lmv/` copy on the personal site with a redirect or remove it.
+- **What:** Enable GitHub Pages on `ritmolux` with the Actions source, push the branch,
+  confirm the deploy, and replace the `ritmolux/` copy on the personal site with a redirect or remove it.
 - **Notes:** pushing Phase 6's workflow file **requires the `workflow` OAuth scope on the git
   credential**; without it the push is rejected. `gh auth refresh -s workflow` is the fix, and it is
   worth doing before the push rather than diagnosing the rejection after.

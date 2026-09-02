@@ -1,5 +1,5 @@
 //! Bare-wgpu driver-floor spike (Plan 0012 Phase 2). NOT shipped — a Cargo
-//! `examples/` target never links into the `lmv` binary, so it cannot grow the
+//! `examples/` target never links into the `ritmolux` binary, so it cannot grow the
 //! release footprint it measures.
 //!
 //! Stands up ONLY the wgpu context — a winit window + `RenderContext::new` —
@@ -52,7 +52,7 @@ impl ApplicationHandler for FloorProbe {
         }
         // Same 1080p size the real app and the NFR 1 perf floor are quoted at.
         let attrs = Window::default_attributes()
-            .with_title("lmv floor spike")
+            .with_title("ritmolux floor spike")
             .with_inner_size(winit::dpi::PhysicalSize::new(1920u32, 1080u32));
         let window = match event_loop.create_window(attrs) {
             Ok(window) => Arc::new(window),

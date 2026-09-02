@@ -27,7 +27,7 @@
 //! # The hypothesis, with its arithmetic
 //!
 //! `shader/emit.rs`'s warp epilogue builds the polar pair as
-//! `_lmv_p = (uv_orig - 0.5) * vec2<f32>(2.0, -2.0) * U.aspect.zw`, so
+//! `_rlx_p = (uv_orig - 0.5) * vec2<f32>(2.0, -2.0) * U.aspect.zw`, so
 //! `p.y = -(uv_orig.y - 0.5) * 2 * ay` — texture space is y-down and the polar
 //! pair is taken y-**up**. A preset that reconstructs `uv` from `ang`, the
 //! `uv = 0.5 + 0.5 * float2(cos(ang), sin(ang)) * rad` idiom most tunnel presets
@@ -171,7 +171,7 @@ fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
 ///
 /// It settles the **mechanism**: a converted warp shader that rebuilds `uv` from
 /// `ang` does not get the identity out of this engine, it gets a vertical
-/// mirror, and the mirror comes from the sign in `emit.rs`'s `_lmv_p` rather
+/// mirror, and the mirror comes from the sign in `emit.rs`'s `_rlx_p` rather
 /// than from a sampler address mode. That is the reported fingerprint, produced
 /// on demand from eleven lines of HLSL.
 ///
@@ -187,7 +187,7 @@ fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
 ///    `run_vertex`'s own doc states it: the reference's per-vertex space is
 ///    +y up while its `x`/`y` inputs are y-down.
 /// 3. **The two polar pairs agree today, and in MilkDrop they are the same
-///    numbers.** `emit.rs`'s `_lmv_p` is
+///    numbers.** `emit.rs`'s `_rlx_p` is
 ///    `(uv_orig - 0.5) * (2, -2) * U.aspect.zw`, and with
 ///    `fill_uniform`'s `aspect.zw = (1, 1/aspect)` at `aspect >= 1` that is
 ///    `(nx, ny/aspect)` — exactly `run_vertex`'s `(px, py)`. In the reference
@@ -196,7 +196,7 @@ fn mirror_asymmetry(image: &CaptureImage, axis: Axis) -> f32 {
 ///    fragment's sign alone would put the engine in a state the reference cannot
 ///    be in. Flipping both is a much larger claim than this seam — it moves
 ///    every converted preset's geometry — and it needs the reference on screen
-///    beside `lmv.exe`, which is Plan 0108's Phase 6.
+///    beside `ritmolux.exe`, which is Plan 0108's Phase 6.
 ///
 /// So this test pins the mechanism and holds the sign still. Making its mirror
 /// go away by editing `emit.rs` would be tuning the engine to a guess.
@@ -260,7 +260,7 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
          vertical mirror against the control's {direct:.4}. That rules the \
          hypothesis out and leaves design-backlog 0107's seam unexplained, \
          alongside the already-falsified `s_fw` address mode — record it, and \
-         read `emit.rs`'s `_lmv_p` against the reference's own varyings before \
+         read `emit.rs`'s `_rlx_p` against the reference's own varyings before \
          changing anything"
     );
 }

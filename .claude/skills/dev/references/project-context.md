@@ -21,12 +21,12 @@ core/            # package `rlx-core` — DSP + render + scenes + preset engine.
 core-cabi/       # package `rlx-core-cabi` — the C ABI and nothing else (ADR-0072).
                  #   The ONLY crate declaring cdylib/staticlib; emitted lib stem is `rlx_core_c`.
   src/lib.rs     #   the extern "C" surface (was core/src/ffi.rs)
-  include/       #   lmv_core.h — the C mirror the shim compiles against
+  include/       #   rlx_core.h — the C mirror the shim compiles against
   tests/ffi.rs   #   the ABI conformance suite
                  #   OUTSIDE workspace `default-members` — see the commands table below
 rlx-ring/        # package `rlx-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
-standalone/      # package `standalone`, binary `lmv` — winit + wgpu + loopback capture
-  examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of lmv.exe)
+standalone/      # package `standalone`, binary `ritmolux` — winit + wgpu + loopback capture
+  examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of ritmolux.exe)
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
 milkconv/        # package `milkconv` — the MilkDrop `.milk` -> preset converter (ADR-0113).
                  #   NEVER ships and nothing shipped depends on it, so it is OUTSIDE

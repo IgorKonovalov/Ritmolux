@@ -66,8 +66,8 @@ first because every later phase increases the number of people who meet the defe
 - **What:** Fix [design-backlog 0102](../design-backlog.md) — the panel attaches its wgpu surface
   before it has a real client rect — and [design-backlog 0103](../design-backlog.md) — the panel's
   `WM_CONTEXTMENU` shadows foobar2000's layout-edit menu, so it cannot be removed by the documented
-  route. Both pre-date this plan and both live in `plugin-foobar/foo_lmv.cpp`.
-- **Files touched:** `plugin-foobar/foo_lmv.cpp`; an ADR if the decision below goes the way it
+  route. Both pre-date this plan and both live in `plugin-foobar/foo_ritmolux.cpp`.
+- **Files touched:** `plugin-foobar/foo_ritmolux.cpp`; an ADR if the decision below goes the way it
   probably has to.
 - **Notes for the implementer — read the backlog entries first; the 2026-08-16 evidence narrows
   the choice they leave open.** Entry 0102 offers two fixes: **defer the attach** until a
@@ -178,7 +178,7 @@ first because every later phase increases the number of people who meet the defe
 - **This plan cannot promise adoption** and does not. Every done-when is an artifact. **Phase 1 is
   the one exception to that and is held to a measured property instead**, which is the right trade
   but a different kind of promise from the rest of the plan.
-- **Phase 1 is the third change to `foo_lmv.cpp`'s window/ownership path**, after `1016777`'s render
+- **Phase 1 is the third change to `foo_ritmolux.cpp`'s window/ownership path**, after `1016777`'s render
   timer and the surface work before it. [Backlog 0102](../design-backlog.md) says in as many words
   that it *"wants a design pass over surface lifetime, not another edge case handled"* — and that
   it was filed rather than fixed precisely to avoid *"a third guess layered on two"*. Treat a fix
@@ -191,7 +191,7 @@ first because every later phase increases the number of people who meet the defe
   fixed component only reaches anyone on the next `v*` tag — which means the ordering constraint is
   stronger than "Phase 1 first": **the tag has to be pushed and its release green before Phase 5
   submits anything.**
-- **Contention:** `plugin-foobar/foo_lmv.cpp` (Phase 1), `README.md`, `docs/images/`, `scripts/`.
+- **Contention:** `plugin-foobar/foo_ritmolux.cpp` (Phase 1), `README.md`, `docs/images/`, `scripts/`.
   Nothing on the roster touches these except a close ceremony's image re-render, which
   [0087](done/0087-the-line-renderer-draws-a-curve.md) owes — sequence if they land together.
 

@@ -47,7 +47,7 @@ pub(crate) fn create_target(
     height: u32,
 ) -> (wgpu::Texture, wgpu::TextureView) {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("lmv-capture-target"),
+        label: Some("rlx-capture-target"),
         size: wgpu::Extent3d {
             width,
             height,
@@ -82,7 +82,7 @@ pub(crate) fn create_readback(
 ) -> (wgpu::Buffer, u32) {
     let padded_bpr = padded_row_bytes(width);
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("lmv-capture-readback"),
+        label: Some("rlx-capture-readback"),
         size: padded_bpr as u64 * height as u64,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
@@ -95,7 +95,7 @@ pub(crate) fn create_readback(
 pub(crate) fn record_clear(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
     gpu::color_pass(
         encoder,
-        "lmv-capture-clear",
+        "rlx-capture-clear",
         view,
         wgpu::LoadOp::Clear(wgpu::Color::BLACK),
     );
@@ -197,7 +197,7 @@ pub(crate) fn create_linear_readback(
 ) -> (wgpu::Buffer, u32) {
     let padded_bpr = row_bytes(width, LINEAR_BYTES_PER_PIXEL);
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("lmv-capture-linear-readback"),
+        label: Some("rlx-capture-linear-readback"),
         size: padded_bpr as u64 * height as u64,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,

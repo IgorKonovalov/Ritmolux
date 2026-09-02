@@ -181,7 +181,7 @@ for (const [family, pairs] of Object.entries(PAIRS)) {
       );
       continue;
     }
-    const dir = mkdtempSync(join(tmpdir(), `lmv-path-${family}-`));
+    const dir = mkdtempSync(join(tmpdir(), `rlx-path-${family}-`));
     try {
       for (let i = 0; i < STEPS; i += 1) {
         const morph = (i / (STEPS - 1)).toFixed(3);

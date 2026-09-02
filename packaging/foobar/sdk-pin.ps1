@@ -25,8 +25,8 @@
 # on-device check before shipping. A bump is its own commit - never fold one
 # into an unrelated change, which is the exact failure mode the pin prevents.
 
-$LmvSdkVersion = "2025-03-07"
-$LmvSdkUrl = "https://www.foobar2000.org/downloads/SDK-2025-03-07.7z"
+$RlxSdkVersion = "2025-03-07"
+$RlxSdkUrl = "https://www.foobar2000.org/downloads/SDK-2025-03-07.7z"
 # Verified 2026-08-16: the published archive is byte-identical to the copy this
 # project has built against since Plan 0001.
-$LmvSdkSha256 = "ccda3c5840e66e0e28a7e4fe36407c4e78581aa30c40c362a188fcbaae799a3e"
+$RlxSdkSha256 = "ccda3c5840e66e0e28a7e4fe36407c4e78581aa30c40c362a188fcbaae799a3e"

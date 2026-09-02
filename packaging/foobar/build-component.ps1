@@ -251,11 +251,11 @@ from the official archive.
 "@
 }
 $stagedSdkVersion = $sdkMatch.Groups[1].Value.Trim()
-if ($stagedSdkVersion -ne $LmvSdkVersion) {
+if ($stagedSdkVersion -ne $RlxSdkVersion) {
     Die @"
 the staged SDK is not the pinned one.
   staged (plugin-foobar\sdk\sdk-readme.html): $stagedSdkVersion
-  pinned (packaging\foobar\sdk-pin.ps1):      $LmvSdkVersion
+  pinned (packaging\foobar\sdk-pin.ps1):      $RlxSdkVersion
 READ-ME-FIRST.txt states the pin, so this build would ship a version claim that
 never touched it. Run packaging\foobar\fetch-sdk.ps1 -Force to stage the pinned
 release, or bump the pin if the move is deliberate - sdk-pin.ps1 says what a
@@ -314,7 +314,7 @@ if ($dllBytes -gt $WarnBytes) {
 
 # --- Stamp: the version, from the one place that defines it (ADR-0025) --------
 
-$version = Get-LmvWorkspaceVersion -RepoRoot $repo
+$version = Get-RlxWorkspaceVersion -RepoRoot $repo
 $stageName = "ritmolux-v$version-foobar2000-component"
 $outDir = Join-Path $repo "target\dist"
 $stage = Join-Path $outDir $stageName
@@ -323,7 +323,7 @@ $componentPath = Join-Path $stage $ComponentName
 $readmePath = Join-Path $stage "READ-ME-FIRST.txt"
 
 Write-Host ""
-Write-Host "build-component.ps1: version $version, SDK $LmvSdkVersion -> $stageName.zip"
+Write-Host "build-component.ps1: version $version, SDK $RlxSdkVersion -> $stageName.zip"
 
 # --- Assemble -----------------------------------------------------------------
 
@@ -352,7 +352,7 @@ $readmeSource = Join-Path $script:here "READ-ME-FIRST.md"
 if (-not (Test-Path $readmeSource)) { Die "missing $readmeSource" }
 $readmeText = Get-Content -Raw $readmeSource
 $readmeText = $readmeText.Replace("@VERSION@", $version)
-$readmeText = $readmeText.Replace("@SDK_VERSION@", $LmvSdkVersion)
+$readmeText = $readmeText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 # .txt so a double-click opens it, matching the two existing zips. Written
 # without a BOM: Notepad is fine either way, but a BOM is the kind of thing that
 # shows up as a stray glyph in whatever the recipient actually opens it with.
