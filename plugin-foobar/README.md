@@ -1,7 +1,7 @@
 # plugin-foobar
 
 The foobar2000 visualization component: a thin C++ shim over rlx-core's C ABI
-(`core-cabi/include/lmv_core.h`). Windows-only per ADR-0001, x64 only.
+(`core-cabi/include/rlx_core.h`). Windows-only per ADR-0001, x64 only.
 
 ## SDK location (Plan 0001 Phase 7)
 
@@ -43,7 +43,7 @@ Toolchain: MSVC (VS Build Tools 2022, x64).
 Everything the shim offers a user sits on one right-click menu (Plan 0107):
 **Preset ▸** (the core's roster, flat, marked on the one showing — selection
 goes over C ABI v6, [ADR-0117](../docs/adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md)),
-**Next scene**, **Reload presets** (re-calls `lmv_load_presets`, then re-selects
+**Next scene**, **Reload presets** (re-calls `rlx_load_presets`, then re-selects
 the current preset *by name* — `set_presets` keeps the index, not the name),
 **Open presets folder**, and the diagnostics-overlay toggle. `Space` is the
 keyboard form of Next scene.

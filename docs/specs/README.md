@@ -15,10 +15,10 @@ Three artifacts answer three different questions; keep them distinct:
 | **Plans** (`plans/`) | *What are we building next?* | Expire → `git mv` to `plans/done/` at close |
 | **ADRs** (`adrs/`) | *Why did we choose this over the alternatives?* | Append-only; superseded, never edited |
 | **Specs** (here) | *What does the system do now, by behavior?* | Living — reconciled best-effort at close |
-| `core/include/lmv_core.h` | *What is the mechanical C surface?* (signatures) | Mirrors `core/src/ffi.rs` |
+| `core/include/rlx_core.h` | *What is the mechanical C surface?* (signatures) | Mirrors `core/src/ffi.rs` |
 
-A spec is **behavioral intent**, not mechanical surface: "`lmv_push_samples` MUST NOT
-allocate or block" belongs here; the exact C signature of `lmv_push_samples` belongs in the
+A spec is **behavioral intent**, not mechanical surface: "`rlx_push_samples` MUST NOT
+allocate or block" belongs here; the exact C signature of `rlx_push_samples` belongs in the
 header. Specs are per *subsystem behavioral contract*, not per file — a subsystem with no
 non-obvious invariant gets no spec. This layer also overlaps CLAUDE.md's non-negotiables and
 the module doc headers on purpose: the specs are the *granular, checkable* form (MUST-

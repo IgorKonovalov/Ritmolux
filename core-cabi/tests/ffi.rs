@@ -1,22 +1,22 @@
 //! First automated coverage of the C ABI (the long-standing zero-CI-coverage
-//! gap noted in the Plan 0001/0002 reviews). Drives lmv_create ->
-//! lmv_load_presets -> lmv_free across the FFI boundary against a temp dir,
+//! gap noted in the Plan 0001/0002 reviews). Drives rlx_create ->
+//! rlx_load_presets -> rlx_free across the FFI boundary against a temp dir,
 //! confirms the version handshake, and exercises the null-path error path
 //! (no UB, documented negative code). Most of it runs headless, where
-//! lmv_load_presets stashes the loaded set as pending until a renderer exists
+//! rlx_load_presets stashes the loaded set as pending until a renderer exists
 //! and still reports the loaded count.
 //!
 //! One test is the exception and says so in its own doc: v6's roster surface
-//! (ADR-0117) only exists after lmv_attach_window, so it opens a hidden Win32
+//! (ADR-0117) only exists after rlx_attach_window, so it opens a hidden Win32
 //! window and drives the real attach path — the first coverage that entry has
 //! had.
 
 use std::path::Path;
 
 use rlx_core_c::{
-    LMV_ABI_VERSION, LMV_DEBUG_OVERLAY, LMV_ERR_INVALID_ARG, LMV_ERR_NO_WINDOW, LMV_OK, LmvMetrics,
-    lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_get_presets, lmv_load_presets,
-    lmv_render, lmv_render_dt, lmv_select_preset, lmv_set_debug, lmv_set_now_playing,
+    RLX_ABI_VERSION, RLX_DEBUG_OVERLAY, RLX_ERR_INVALID_ARG, RLX_ERR_NO_WINDOW, RLX_OK, RlxMetrics,
+    rlx_abi_version, rlx_create, rlx_free, rlx_get_metrics, rlx_get_presets, rlx_load_presets,
+    rlx_render, rlx_render_dt, rlx_select_preset, rlx_set_debug, rlx_set_now_playing,
 };
 
 /// Count the `.toml` files in `dir` (0 if it can't be read).
@@ -33,20 +33,20 @@ fn toml_count(dir: &Path) -> usize {
 
 #[test]
 fn load_presets_seeds_and_installs_over_the_abi() {
-    let dir = std::env::temp_dir().join("lmv_ffi_load_presets_test");
+    let dir = std::env::temp_dir().join("rlx_ffi_load_presets_test");
     let _ = std::fs::remove_dir_all(&dir);
 
-    let handle = lmv_create(48_000, 2);
+    let handle = rlx_create(48_000, 2);
     assert!(
         !handle.is_null(),
-        "lmv_create returns a handle for a valid format"
+        "rlx_create returns a handle for a valid format"
     );
 
     // Loading against a fresh dir seeds the curated set and installs every
     // valid preset; the return is that count.
     let path = dir.to_str().expect("temp path is valid UTF-8");
     let bytes = path.as_bytes();
-    let installed = unsafe { lmv_load_presets(handle, bytes.as_ptr(), bytes.len()) };
+    let installed = unsafe { rlx_load_presets(handle, bytes.as_ptr(), bytes.len()) };
 
     let expected = rlx_core::preset::default_presets().len() as i32;
     assert!(installed > 0, "at least one curated preset installs");
@@ -61,59 +61,59 @@ fn load_presets_seeds_and_installs_over_the_abi() {
     );
 
     // A null path is rejected with the documented error and no UB.
-    let err = unsafe { lmv_load_presets(handle, std::ptr::null(), 0) };
-    assert_eq!(err, LMV_ERR_INVALID_ARG, "null path -> invalid arg");
+    let err = unsafe { rlx_load_presets(handle, std::ptr::null(), 0) };
+    assert_eq!(err, RLX_ERR_INVALID_ARG, "null path -> invalid arg");
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Lockstep guard: the Rust `LmvMetrics` must be exactly the 56 bytes the C
-/// header's `static_assert(sizeof(LmvMetrics) == 56)` expects. If this breaks,
+/// Lockstep guard: the Rust `RlxMetrics` must be exactly the 56 bytes the C
+/// header's `static_assert(sizeof(RlxMetrics) == 56)` expects. If this breaks,
 /// the header's assert would too — fix both together (no cbindgen, ADR-0003).
 #[test]
-fn lmv_metrics_is_56_bytes() {
-    assert_eq!(std::mem::size_of::<LmvMetrics>(), 56);
-    assert_eq!(std::mem::align_of::<LmvMetrics>(), 8);
+fn rlx_metrics_is_56_bytes() {
+    assert_eq!(std::mem::size_of::<RlxMetrics>(), 56);
+    assert_eq!(std::mem::align_of::<RlxMetrics>(), 8);
 }
 
 #[test]
 fn abi_version_is_six() {
-    assert_eq!(lmv_abi_version(), 6, "runtime ABI version is v6");
-    assert_eq!(LMV_ABI_VERSION, 6, "compile-time ABI version is v6");
+    assert_eq!(rlx_abi_version(), 6, "runtime ABI version is v6");
+    assert_eq!(RLX_ABI_VERSION, 6, "compile-time ABI version is v6");
 }
 
-/// v4 render entry (ADR-0013): `lmv_render_dt` takes a real `dt` and behaves
-/// exactly like `lmv_render` for a windowless handle — both drain audio and
-/// return `LMV_ERR_NO_WINDOW` (no surface attached here), and both reject a null
+/// v4 render entry (ADR-0013): `rlx_render_dt` takes a real `dt` and behaves
+/// exactly like `rlx_render` for a windowless handle — both drain audio and
+/// return `RLX_ERR_NO_WINDOW` (no surface attached here), and both reject a null
 /// handle without UB. This guards the added surface + the null path; the actual
 /// frame-rate-independent draw is a windowed on-device check (like the plugin's
 /// other done-whens).
 #[test]
 fn render_dt_matches_render_windowless() {
-    let handle = lmv_create(48_000, 2);
-    assert!(!handle.is_null(), "lmv_create returns a handle");
+    let handle = rlx_create(48_000, 2);
+    assert!(!handle.is_null(), "rlx_create returns a handle");
 
     // No window attached: both entries report NO_WINDOW, never UB or panic.
     assert_eq!(
-        unsafe { lmv_render(handle) },
-        LMV_ERR_NO_WINDOW,
-        "lmv_render (1/60 wrapper) -> no window"
+        unsafe { rlx_render(handle) },
+        RLX_ERR_NO_WINDOW,
+        "rlx_render (1/60 wrapper) -> no window"
     );
     assert_eq!(
-        unsafe { lmv_render_dt(handle, 1.0 / 144.0) },
-        LMV_ERR_NO_WINDOW,
-        "lmv_render_dt -> no window"
+        unsafe { rlx_render_dt(handle, 1.0 / 144.0) },
+        RLX_ERR_NO_WINDOW,
+        "rlx_render_dt -> no window"
     );
 
     // Null handle is the documented invalid-arg error on the new entry too.
     assert_eq!(
-        unsafe { lmv_render_dt(std::ptr::null_mut(), 0.016) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_render_dt(std::ptr::null_mut(), 0.016) },
+        RLX_ERR_INVALID_ARG,
         "null handle -> invalid arg"
     );
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
 }
 
 /// v3 diagnostics ABI (ADR-0008): set the overlay flag and pull a metrics
@@ -121,62 +121,62 @@ fn render_dt_matches_render_windowless() {
 /// that guard against a silent Rust/C layout mismatch. Null-arg paths return the
 /// documented error with no UB.
 ///
-/// Note: this runs headless (no window), so `lmv_render` returns
-/// `LMV_ERR_NO_WINDOW` and the timing fields stay zero — populating them is a
+/// Note: this runs headless (no window), so `rlx_render` returns
+/// `RLX_ERR_NO_WINDOW` and the timing fields stay zero — populating them is a
 /// windowed runtime check (an attached surface), like the plugin's on-device
 /// done-whens. The struct contract this test guards is the silent-memory-bug
 /// risk ADR-0008 actually calls out.
 #[test]
 fn set_debug_and_get_metrics_over_the_abi() {
-    let handle = lmv_create(48_000, 2);
-    assert!(!handle.is_null(), "lmv_create returns a handle");
+    let handle = rlx_create(48_000, 2);
+    assert!(!handle.is_null(), "rlx_create returns a handle");
 
     // Toggling the overlay flag is accepted (idempotent, cheap, pre-window).
-    let rc = unsafe { lmv_set_debug(handle, LMV_DEBUG_OVERLAY) };
-    assert_eq!(rc, LMV_OK, "lmv_set_debug(OVERLAY) -> OK");
+    let rc = unsafe { rlx_set_debug(handle, RLX_DEBUG_OVERLAY) };
+    assert_eq!(rc, RLX_OK, "rlx_set_debug(OVERLAY) -> OK");
 
     // Pull the snapshot into a caller-allocated, size-declared struct.
-    let mut out: LmvMetrics = unsafe { std::mem::zeroed() };
-    out.struct_size = std::mem::size_of::<LmvMetrics>() as u32;
-    let rc = unsafe { lmv_get_metrics(handle, &mut out) };
-    assert_eq!(rc, LMV_OK, "lmv_get_metrics -> OK");
+    let mut out: RlxMetrics = unsafe { std::mem::zeroed() };
+    out.struct_size = std::mem::size_of::<RlxMetrics>() as u32;
+    let rc = unsafe { rlx_get_metrics(handle, &mut out) };
+    assert_eq!(rc, RLX_OK, "rlx_get_metrics -> OK");
     assert_eq!(out.abi_version, 6, "core stamps the current abi_version");
     assert_eq!(
         out.struct_size,
-        std::mem::size_of::<LmvMetrics>() as u32,
+        std::mem::size_of::<RlxMetrics>() as u32,
         "core stamps the bytes it wrote (full struct here)"
     );
 
     // Headless renders are no-ops (no window); they must not UB or panic.
     for _ in 0..3 {
-        let _ = unsafe { lmv_render(handle) };
+        let _ = unsafe { rlx_render(handle) };
     }
 
     // Null-arg error paths: documented negative code, no UB.
     assert_eq!(
-        unsafe { lmv_set_debug(std::ptr::null_mut(), LMV_DEBUG_OVERLAY) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_set_debug(std::ptr::null_mut(), RLX_DEBUG_OVERLAY) },
+        RLX_ERR_INVALID_ARG,
         "null handle -> invalid arg"
     );
     assert_eq!(
-        unsafe { lmv_get_metrics(handle, std::ptr::null_mut()) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_get_metrics(handle, std::ptr::null_mut()) },
+        RLX_ERR_INVALID_ARG,
         "null out -> invalid arg"
     );
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
 }
 
 /// v5's text entry point (ADR-0110). Every rejection the boundary promises,
 /// exercised for real: the validate-at-the-boundary rule is only worth stating
 /// if the invalid cases are the ones that got tested.
 ///
-/// Headless, so the accepting path lands on `LMV_ERR_NO_WINDOW` rather than
-/// `LMV_OK` — which is itself the documented behaviour before a window is
+/// Headless, so the accepting path lands on `RLX_ERR_NO_WINDOW` rather than
+/// `RLX_OK` — which is itself the documented behaviour before a window is
 /// attached, and distinguishable from every argument rejection below.
 #[test]
 fn set_now_playing_validates_at_the_boundary() {
-    let handle = lmv_create(48_000, 2);
+    let handle = rlx_create(48_000, 2);
     assert!(!handle.is_null());
 
     let track = "Boards of Canada - Roygbiv";
@@ -184,30 +184,30 @@ fn set_now_playing_validates_at_the_boundary() {
 
     // Valid UTF-8, valid handle, no window yet: past every argument check.
     assert_eq!(
-        unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), bytes.len()) },
-        LMV_ERR_NO_WINDOW,
+        unsafe { rlx_set_now_playing(handle, bytes.as_ptr(), bytes.len()) },
+        RLX_ERR_NO_WINDOW,
         "a well-formed call reaches the renderer check, not an arg rejection"
     );
 
     // A null handle.
     assert_eq!(
-        unsafe { lmv_set_now_playing(std::ptr::null_mut(), bytes.as_ptr(), bytes.len()) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_set_now_playing(std::ptr::null_mut(), bytes.as_ptr(), bytes.len()) },
+        RLX_ERR_INVALID_ARG,
         "null handle -> invalid arg"
     );
 
     // A null pointer, with a length that would otherwise be read.
     assert_eq!(
-        unsafe { lmv_set_now_playing(handle, std::ptr::null(), bytes.len()) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_set_now_playing(handle, std::ptr::null(), bytes.len()) },
+        RLX_ERR_INVALID_ARG,
         "null text -> invalid arg"
     );
 
     // A zero length — rejected before the pointer is dereferenced, so this is
     // safe even though the pointer is valid.
     assert_eq!(
-        unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), 0) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_set_now_playing(handle, bytes.as_ptr(), 0) },
+        RLX_ERR_INVALID_ARG,
         "zero length -> invalid arg"
     );
 
@@ -216,8 +216,8 @@ fn set_now_playing_validates_at_the_boundary() {
     // its string is text.
     for bad in [&[0x80u8][..], &[0xE2, 0x82][..]] {
         assert_eq!(
-            unsafe { lmv_set_now_playing(handle, bad.as_ptr(), bad.len()) },
-            LMV_ERR_INVALID_ARG,
+            unsafe { rlx_set_now_playing(handle, bad.as_ptr(), bad.len()) },
+            RLX_ERR_INVALID_ARG,
             "invalid UTF-8 -> invalid arg"
         );
     }
@@ -227,30 +227,30 @@ fn set_now_playing_validates_at_the_boundary() {
     // blank without reporting anything.
     let bjork = "Björk - Jóga".as_bytes();
     assert_eq!(
-        unsafe { lmv_set_now_playing(handle, bjork.as_ptr(), bjork.len()) },
-        LMV_ERR_NO_WINDOW,
+        unsafe { rlx_set_now_playing(handle, bjork.as_ptr(), bjork.len()) },
+        RLX_ERR_NO_WINDOW,
         "multi-byte UTF-8 passes the boundary check"
     );
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
 }
 
 /// v6's roster surface (ADR-0117) on the path every host hits first: the roster
-/// installs at `lmv_attach_window`, so before that both new entries report
-/// `LMV_ERR_NO_WINDOW` rather than an empty list — which a menu would render as
+/// installs at `rlx_attach_window`, so before that both new entries report
+/// `RLX_ERR_NO_WINDOW` rather than an empty list — which a menu would render as
 /// "this build ships no presets", the one lie the ADR rejected Alternative B to
 /// avoid.
 #[test]
 fn get_presets_and_select_report_no_window_before_attach() {
-    let handle = lmv_create(48_000, 2);
-    assert!(!handle.is_null(), "lmv_create returns a handle");
+    let handle = rlx_create(48_000, 2);
+    assert!(!handle.is_null(), "rlx_create returns a handle");
 
     // A sentinel the core must not touch on a failed call.
     let mut current: i32 = i32::MIN;
     assert_eq!(
-        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) },
-        LMV_ERR_NO_WINDOW,
-        "pre-attach lmv_get_presets -> no window"
+        unsafe { rlx_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) },
+        RLX_ERR_NO_WINDOW,
+        "pre-attach rlx_get_presets -> no window"
     );
     assert_eq!(
         current,
@@ -259,35 +259,35 @@ fn get_presets_and_select_report_no_window_before_attach() {
     );
 
     assert_eq!(
-        unsafe { lmv_select_preset(handle, 0) },
-        LMV_ERR_NO_WINDOW,
-        "pre-attach lmv_select_preset -> no window"
+        unsafe { rlx_select_preset(handle, 0) },
+        RLX_ERR_NO_WINDOW,
+        "pre-attach rlx_select_preset -> no window"
     );
 
     // Null handles are rejected at the boundary, before anything is read.
     assert_eq!(
         unsafe {
-            lmv_get_presets(
+            rlx_get_presets(
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 0,
                 std::ptr::null_mut(),
             )
         },
-        LMV_ERR_INVALID_ARG,
+        RLX_ERR_INVALID_ARG,
         "null handle -> invalid arg"
     );
     assert_eq!(
-        unsafe { lmv_select_preset(std::ptr::null_mut(), 0) },
-        LMV_ERR_INVALID_ARG,
+        unsafe { rlx_select_preset(std::ptr::null_mut(), 0) },
+        RLX_ERR_INVALID_ARG,
         "null handle -> invalid arg"
     );
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
 }
 
 /// The windowed half of v6's coverage (Plan 0107 Phase 1), and the first test in
-/// this repo to drive `lmv_attach_window` at all.
+/// this repo to drive `rlx_attach_window` at all.
 ///
 /// Everything the roster surface promises is only observable **after** attach —
 /// the pending set installs there — so the claims below (call-twice sizing, the
@@ -304,7 +304,7 @@ fn get_presets_and_select_report_no_window_before_attach() {
 fn roster_snapshot_and_select_over_the_abi() {
     use std::ffi::c_void;
 
-    use rlx_core_c::lmv_attach_window;
+    use rlx_core_c::rlx_attach_window;
 
     // Declared here rather than pulled in as a dependency: three symbols from a
     // library every Windows process already links (ADR-0001's "every new crate
@@ -353,21 +353,21 @@ fn roster_snapshot_and_select_over_the_abi() {
     };
     assert!(!hwnd.is_null(), "CreateWindowExW(STATIC) returns a window");
 
-    let handle = lmv_create(48_000, 2);
-    assert!(!handle.is_null(), "lmv_create returns a handle");
+    let handle = rlx_create(48_000, 2);
+    assert!(!handle.is_null(), "rlx_create returns a handle");
 
-    let rc = unsafe { lmv_attach_window(handle, hwnd, W, H) };
-    if rc != LMV_OK {
-        eprintln!("skipping: lmv_attach_window -> {rc} (no adapter can present here)");
-        unsafe { lmv_free(handle) };
+    let rc = unsafe { rlx_attach_window(handle, hwnd, W, H) };
+    if rc != RLX_OK {
+        eprintln!("skipping: rlx_attach_window -> {rc} (no adapter can present here)");
+        unsafe { rlx_free(handle) };
         unsafe { DestroyWindow(hwnd) };
         return;
     }
 
-    let dir = std::env::temp_dir().join("lmv_ffi_roster_test");
+    let dir = std::env::temp_dir().join("rlx_ffi_roster_test");
     let _ = std::fs::remove_dir_all(&dir);
     let path = dir.to_str().expect("temp path is valid UTF-8");
-    let installed = unsafe { lmv_load_presets(handle, path.as_bytes().as_ptr(), path.len()) };
+    let installed = unsafe { rlx_load_presets(handle, path.as_bytes().as_ptr(), path.len()) };
     assert!(
         installed > 3,
         "the seeded library installs more than the index selected below"
@@ -384,7 +384,7 @@ fn roster_snapshot_and_select_over_the_abi() {
 
     // 1. The sizing call: exact byte count, and it writes nothing.
     let mut current: i32 = i32::MIN;
-    let needed = unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) };
+    let needed = unsafe { rlx_get_presets(handle, std::ptr::null_mut(), 0, &raw mut current) };
     let expected_bytes: usize = expected.iter().map(|n| n.len() + 1).sum();
     assert_eq!(
         needed as usize, expected_bytes,
@@ -398,7 +398,7 @@ fn roster_snapshot_and_select_over_the_abi() {
     // 2. One byte short is still nothing written — never a partial list.
     let mut buf = vec![0xAA_u8; needed as usize];
     let short = unsafe {
-        lmv_get_presets(
+        rlx_get_presets(
             handle,
             buf.as_mut_ptr(),
             buf.len() - 1,
@@ -413,7 +413,7 @@ fn roster_snapshot_and_select_over_the_abi() {
 
     // 3. The fill: every installed name, NUL-terminated, in roster order.
     let filled =
-        unsafe { lmv_get_presets(handle, buf.as_mut_ptr(), buf.len(), std::ptr::null_mut()) };
+        unsafe { rlx_get_presets(handle, buf.as_mut_ptr(), buf.len(), std::ptr::null_mut()) };
     assert_eq!(filled, needed);
     assert_eq!(buf.last(), Some(&0), "the last name is NUL-terminated too");
     let names: Vec<&str> = buf
@@ -424,7 +424,7 @@ fn roster_snapshot_and_select_over_the_abi() {
     assert_eq!(
         names.len(),
         installed as usize,
-        "as many names as lmv_load_presets reported installed"
+        "as many names as rlx_load_presets reported installed"
     );
     assert_eq!(
         names,
@@ -435,10 +435,10 @@ fn roster_snapshot_and_select_over_the_abi() {
     // 4. Select: the reported index is the dissolve's target, immediately —
     //    which is what lets a host menu tick the user's choice, not the frame
     //    the dissolve happens to be on.
-    assert_eq!(unsafe { lmv_select_preset(handle, 3) }, LMV_OK);
+    assert_eq!(unsafe { rlx_select_preset(handle, 3) }, RLX_OK);
     let mut after: i32 = i32::MIN;
     assert_eq!(
-        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut after) },
+        unsafe { rlx_get_presets(handle, std::ptr::null_mut(), 0, &raw mut after) },
         needed
     );
     assert_eq!(after, 3, "out_current_index reads back the selected index");
@@ -447,14 +447,14 @@ fn roster_snapshot_and_select_over_the_abi() {
     //    moves the show.
     for bad in [-1, installed] {
         assert_eq!(
-            unsafe { lmv_select_preset(handle, bad) },
-            LMV_ERR_INVALID_ARG,
+            unsafe { rlx_select_preset(handle, bad) },
+            RLX_ERR_INVALID_ARG,
             "index {bad} is out of range -> invalid arg"
         );
     }
     let mut unchanged: i32 = i32::MIN;
     assert_eq!(
-        unsafe { lmv_get_presets(handle, std::ptr::null_mut(), 0, &raw mut unchanged) },
+        unsafe { rlx_get_presets(handle, std::ptr::null_mut(), 0, &raw mut unchanged) },
         needed
     );
     assert_eq!(
@@ -463,7 +463,7 @@ fn roster_snapshot_and_select_over_the_abi() {
     );
 
     // The window must outlive the renderer that holds a surface on it.
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
     unsafe { DestroyWindow(hwnd) };
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -475,21 +475,21 @@ fn roster_snapshot_and_select_over_the_abi() {
 /// builds can see even when a plain run cannot.
 #[test]
 fn set_now_playing_does_not_retain_the_callers_buffer() {
-    let handle = lmv_create(48_000, 2);
+    let handle = rlx_create(48_000, 2);
     assert!(!handle.is_null());
 
     {
         let owned = String::from("Sigur Ros - Svefn-g-englar");
         let bytes = owned.as_bytes();
-        let _ = unsafe { lmv_set_now_playing(handle, bytes.as_ptr(), bytes.len()) };
+        let _ = unsafe { rlx_set_now_playing(handle, bytes.as_ptr(), bytes.len()) };
         drop(owned); // the caller may free immediately
     }
 
     // Anything the core does with the string from here on would touch freed
     // memory if it had kept the pointer.
     for _ in 0..3 {
-        let _ = unsafe { lmv_render(handle) };
+        let _ = unsafe { rlx_render(handle) };
     }
 
-    unsafe { lmv_free(handle) };
+    unsafe { rlx_free(handle) };
 }
