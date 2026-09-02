@@ -1,6 +1,6 @@
 # 0126 — The large files split along their seams
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the `Scene` seam stays where it is), [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (where the Win32 constructor moves to), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
@@ -270,11 +270,11 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`WORK/rlx-plan-0126` on `plan-0126-the-large-files-split-along-their-seams`)_
+**Lane:** `WORK/rlx-plan-0126` on `plan-0126-the-large-files-split-along-their-seams`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `warp_mesh/` takes the `particles/` shape | dev | not started | |
+| 1 — `warp_mesh/` takes the `particles/` shape | dev | done | committed with this row |
 | 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | not started | |
 | 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | not started | |
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | not started | |
@@ -284,6 +284,42 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | not started | |
 
 ### Notes
+
+**Phase 1.** `mod.rs` 2,288 -> 771 lines. Longest fn in the four new files:
+`encode::upload_uniforms`, **115 lines**. Longest fn anywhere under
+`warp_mesh/`: `shader.rs::build`, **331** — with `draw.rs::waveform_figure`
+(222) and `shader.rs::build_blur` (161) behind it. **The done-when's "no fn in
+`warp_mesh/` exceeds 150 lines" is therefore unmet as literally stated**, and
+was not attempted: `shader.rs` and `draw.rs` are not in the phase's
+`Files touched`, and splitting the converted-shader runtime is a change to
+allocation order this phase's golden gate exists to hold still.
+
+Three deviations, all forced by the move:
+
+- **`core/src/render/palette.rs` is edited and is not in the file list.** Its
+  `band_contour` drift guard reads `scenes/warp_mesh/mod.rs` through
+  `include_str!`; the WGSL now lives in `shaders.rs`, so the guard was pointed
+  at it (and its label updated). It failed before the repair, which is the
+  guard working. It now reads exactly like the `particles/shaders.rs` entry
+  beside it.
+- **Six `&x` -> `x` and one `&mut x` -> `x`** in `resources.rs` / `encode.rs`:
+  the stage functions take by reference what was a local by value, so the
+  borrow was redundant. Caught by clippy, not by hand.
+- **The four new files name `shaders.rs` beside the existing `shader.rs`.** The
+  plan's filename; the two are unrelated (`shader.rs` is the converted-shader
+  runtime), and the header of each says so.
+
+`WARP_SHADER`, `Resources`, `MeshState`, `build_indices`, `FIELD_FORMAT` and
+`Vertex` widened from private-to-`warp_mesh` to `pub(super)` in their new files,
+which is the same reach. `clamp_grid`, `vertex_count`, `vertex_position` and the
+three grid bounds were `pub` and are re-exported from `mod.rs`, so every
+`warp_mesh::` path outside the module is unchanged.
+
+Verification beyond the done-when: every content line of `HEAD`'s `mod.rs` was
+matched against the five files after the split; the 143 unmatched lines are the
+visibility widenings, the `self.` -> `scene.` rename in the free functions, the
+seven borrow fixes above, and rustfmt rewrapping three statements that fit at
+the shallower indent.
 
 ### Close triggers
 

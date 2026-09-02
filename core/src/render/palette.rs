@@ -965,7 +965,7 @@ fn band_contour(
     /// 0121 Phase 5, and its copy had drifted (`dd` for `d`) — so the test that
     /// exists to catch drift could not have caught this one, because the site it
     /// lived at was never iterated.
-    const WARP_MESH_SRC: &str = include_str!("scenes/warp_mesh/mod.rs");
+    const WARP_MESH_SRC: &str = include_str!("scenes/warp_mesh/shaders.rs");
 
     #[test]
     fn every_wgsl_sample_site_carries_the_same_banding_expression() {
@@ -994,7 +994,7 @@ fn band_contour(
             ("fragment_field.rs", FRAGMENT_FIELD_SRC),
             ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
             ("shape_field.rs", SHAPE_FIELD_SRC),
-            ("warp_mesh/mod.rs", WARP_MESH_SRC),
+            ("warp_mesh/shaders.rs", WARP_MESH_SRC),
         ] {
             assert!(
                 src.contains(BAND_CONTOUR_WGSL),
