@@ -304,3 +304,40 @@ fn tiling_none_draws_the_ornament_alone_and_needs_one() {
     // tiling vocabulary is still rejected.
     assert!(star("tiling = \"nonsense\"\n").is_err());
 }
+
+/// The roster is one table and everything else reads it, so the three
+/// projections cannot disagree — this is what asserts they do not.
+///
+/// **Written against the array's own length, not against a literal 12.**
+/// `SystemKind::ALL` is typed `[SystemKind; VARIANT_COUNT]` and built from
+/// `TABLE`, which is typed the same way, so a variant added to the enum without
+/// a `TABLE` row fails to compile at `SystemKind::row` — the one exhaustive
+/// match over the enum — before it can reach this test.
+#[test]
+fn every_system_round_trips_through_its_one_roster() {
+    assert_eq!(
+        SystemKind::ALL.len(),
+        SystemKind::VARIANT_COUNT,
+        "the roster's length is its type; this can only fail if the type changed"
+    );
+    let mut seen: Vec<&str> = Vec::new();
+    for kind in SystemKind::ALL {
+        let name = kind.as_str();
+        assert_eq!(
+            SystemKind::from_name(name),
+            Some(kind),
+            "{name} does not round-trip as_str -> from_name"
+        );
+        assert!(
+            !kind.param_names().is_empty(),
+            "{name} declares no parameters, so the loader's typo check (ADR-0020) \
+             would reject every binding a preset writes for it"
+        );
+        assert!(
+            !seen.contains(&name),
+            "{name} appears in the roster twice, so one variant is carrying \
+             another's name and params"
+        );
+        seen.push(name);
+    }
+}

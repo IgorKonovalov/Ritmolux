@@ -371,7 +371,7 @@ answer a `dev` finding, and left a real want with nowhere to live.
   spectrum scene's per-element easing calls the same method.
 - **Verified 2026-08-15** — the mechanism citation still resolves, and the rate-limited release
   this entry proposes as the cheap shape is still unbuilt:
-  `present: Easing in: core/src/preset/schema.rs`, `absent: slew in: core/src`. The evenness
+  `present: Easing in: core/src/preset/schema/easing.rs`, `absent: slew in: core/src`. The evenness
   arithmetic itself is not a repo claim and is not reduced here.
 
 **The measurement, for the record.** An exponential spends **30 %** of its settling time covering the
@@ -797,7 +797,7 @@ paints flat opaque elements on its own paper in painter order, so a black bar ge
 front of a red one and a fill with a contrasting outline is drawable today — two elements, the
 smaller later in the array. `the_later_element_wins_the_overlap` renders the pair in **both** array
 orders and asserts the overlap takes the later element's colour each time, which is the mechanism
-rather than an example of it: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
+rather than an example of it: `present: SystemKind::ShapeCollage in: core/src/preset/schema/system.rs`
 
 **And it cost no composite change**, which is the half of this entry's own pricing that was wrong.
 This entry has sat at **Low** since 2026-08-05 because it was priced as a composite redesign.
@@ -1945,7 +1945,7 @@ threshold here would be adapter-dependent; the probe asserts none.
 Phase 5 look gate (2026-08-19). **Owner if taken:** `dev`.
 
 - **Verified 2026-08-19** — the wrap is unconditional and has no continuity treatment:
-  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mod.rs`
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mesh.rs`
 
 ### The finding
 
@@ -2012,7 +2012,7 @@ stopped on**, and one source clears all three — which is the argument for trea
 procurement question rather than three engineering ones.
 
 - **Verified 2026-08-20** — the wrap is still unconditional and still has no continuity treatment:
-  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mod.rs`
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mesh.rs`
 
 ---
 
@@ -2271,7 +2271,7 @@ threshold to retune.
   section calls *"about to stop holding"* has stopped holding. Its `coverage_floor` is derived from
   the family's own distribution (0.13, half `On White`'s 0.2677) rather than resting on the
   `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
-  instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
+  instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema/system.rs`
 
 ### Re-opened 2026-09-02 by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) — the discharge above is falsified, and the fringe mechanism this entry named is why
 
@@ -2585,7 +2585,7 @@ advances twice.
   **Owner if taken:** `dev`, but the design question is `architect`'s: see below.
 - **Verified 2026-08-27** — the scene is resolved by system, so both sides of a same-system dissolve
   get one instance:
-  `present: fn scene_for_mut\(scenes: &mut SceneRoster, system: SystemKind\) in: core/src/render/mod.rs`
+  `present: \.find\(\|\(kind, _\)\| \*kind == system\) in: core/src/render/routing.rs`
 - **Verified 2026-08-28** — and `update` carries per-frame state that is not idempotent. Re-pointed
   at [Plan 0122](plans/done/0122-every-rate-integrates.md)'s close: the accumulator survives
   unchanged, `advance_spin` does not — it collapsed into the shared `scenes::Phase` and this probe
@@ -2658,11 +2658,11 @@ coordinate, so `palette_steps` quantizes the light going in rather than the stru
   is effectively unavailable to any hard-ink or posterized look.
 - **Verified 2026-08-27** — the palette coordinate is the deposit's own angle, computed in the
   deposit pass:
-  `present: let coord = dp\.c\.y \+ dp\.c\.z \* \(ang / 6\.2831853\); in: core/src/render/scenes/warp_mesh/mod.rs`
+  `present: let coord = dp\.c\.y \+ dp\.c\.z \* \(ang / 6\.2831853\); in: core/src/render/scenes/warp_mesh/shaders.rs`
 - **Verified 2026-08-31** — and the banding constants ride the deposit uniform, not the present one.
   Plan 0125 moved the field into the shared colour block, so the spelling changed and the claim did
   not: the call sits in the same `DepositUniform` write it always did.
-  `present: palette::band_steps\(self\.colour\.steps\), in: core/src/render/scenes/warp_mesh/mod.rs`
+  `present: palette::band_steps\(scene\.colour\.steps\), in: core/src/render/scenes/warp_mesh/encode.rs`
 - **Verified 2026-08-27** — `unprobeable: that the present pass performs no palette lookup is an
   absence inside one function of a file whose other function does perform one, so no file-scoped
   reduction separates them; read PRESENT_SRC's body.`
@@ -3398,7 +3398,7 @@ about it. A `--list-presets` flag - the one `stream.rs`'s own error message says
 would serve the same end deliberately rather than as a side effect.
 
 - **Verified 2026-08-31** - seeding is write-if-absent and has no removal arm: `present: if !path.exists\(\) in: core/src/preset/mod.rs`
-- **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/mod.rs`
+- **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/roster.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
 
 ## 0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push
