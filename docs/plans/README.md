@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0150** (ADRs are a separate sequence — next free there is **0158**.)
+**Next free number: 0150** (ADRs are a separate sequence — next free there is **0160**.)
 
 ## Active roster
 
@@ -32,7 +32,6 @@ place. The plan file carries the real link.
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_lmv.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0136](0136-the-gates-can-convict.md) | The gates can convict | approved | dev, human | Backlog 0104 + 0143 + 0162 + 0127 + 0133 + **0166 + 0170 + 0171 + 0173** (amended 2026-09-01, now 10 phases). ADR-0149 (proposed). 0170 blocks every local push. **Phases 1-8 need no GPU.** |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
@@ -1028,6 +1027,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0136 - The gates can convict](done/0136-the-gates-can-convict.md) - closed 2026-09-02. Review: **one blocker, two majors, two minors, one nit.** Version: **0.100.1** (patch). Archived [nine backlog entries](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md) — closed 2026-09-01. Review: **no blockers, one major, four minors, one nit.** Version: **0.100.0** (minor). Archived [backlog 0130 + 0132 + 0151 + 0152](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0141 — The plugin's seams stop drifting](done/0141-the-plugin-seams-stop-drifting.md) — closed 2026-09-01. Review: **no blockers, two majors, three minors, two nits.** Version: **0.99.1** (patch). Archived [0105 + 0117 + 0118](../design-backlog-archive.md), filed 0177-0178. [Write-up](README-archive.md).
 - [0139 - The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md) - closed 2026-09-01. Review: **no blockers, one major, four minors, three nits.** Version: **0.99.0**. Archived [0111 + 0112](../design-backlog-archive.md), filed 0174-0176. [Write-up](README-archive.md).
@@ -1237,7 +1237,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0131]: done/0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
 [0135]: done/0135-the-show-night-surfaces-stop-lying.md
-[0136]: 0136-the-gates-can-convict.md
+[0136]: done/0136-the-gates-can-convict.md
 [0137]: done/0137-the-metrics-measure-light.md
 [0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
 [0139]: done/0139-the-render-path-validates-before-it-spends.md

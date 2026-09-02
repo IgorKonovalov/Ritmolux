@@ -115,8 +115,9 @@ scripts/             # Repo maintenance. Five Node gates, all run by pre-push an
                      #   `links` job; the first three also by the architect close ceremony, because
                      #   a close is what breaks them. check-doc-links.mjs asserts every relative
                      #   markdown link resolves (moving a plan to plans/done/ breaks links in both
-                     #   directions); check-index-rows.mjs holds every roster row to 320 bytes
-                     #   (ADR-0116); check-backlog-claims.mjs re-runs each live backlog entry's
+                     #   directions, and rejects a design-backlog fragment outright per ADR-0149);
+                     #   check-index-rows.mjs holds every roster row to 320 bytes AND to its
+                     #   region's form (ADR-0116); check-backlog-claims.mjs re-runs each live entry's
                      #   probe (ADR-0108); check-filter-figures.mjs keeps the diffusion filter's
                      #   cost figures on one page; check-comment-hygiene.mjs rejects relative links
                      #   and plan-relative narration in .rs and .cpp/.h comments (ADR-0127).
