@@ -44,7 +44,16 @@ pub mod spout;
 
 /// Per-user application directory name, used under the OS data root for the
 /// shared preset directory, the diagnostics log, and `config.toml`.
-pub const APP_DIR_NAME: &str = "light-music-visualizer";
+pub const APP_DIR_NAME: &str = "Ritmolux";
+
+/// The directory name [`migrate_app_dir_in`] reads from. A machine that has run
+/// an earlier build keeps its presets, `config.toml` and diagnostics log under
+/// this name, so resolving [`APP_DIR_NAME`] without carrying them across would
+/// look exactly like data loss.
+///
+/// `plugin-foobar/foo_ritmolux.cpp` resolves the same per-user path on its own
+/// and must be kept in step with [`APP_DIR_NAME`]; it does not migrate.
+pub const LEGACY_APP_DIR_NAME: &str = "light-music-visualizer";
 
 /// Environment variable naming a preset directory that overrides the per-user
 /// default (ADR-0014). Set it to the repo's `presets/` for the edit-live loop,
@@ -157,8 +166,70 @@ impl PresetDir {
 /// Resolve the preset directory: `RLX_PRESET_DIR` wins when set to a non-empty
 /// path, otherwise the per-OS default under [`preset_data_root`], otherwise
 /// [`PresetDir::Unresolved`].
+///
+/// Deliberately free of side effects: [`migrate_app_dir`] is a separate call, so
+/// that resolving a path in a test can never move a directory on the machine
+/// running it.
 pub fn resolve_preset_dir() -> PresetDir {
     resolve_preset_dir_from(std::env::var_os(PRESET_DIR_ENV), preset_data_root())
+}
+
+/// What [`migrate_app_dir_in`] did, so the caller can report it once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppDirMigration {
+    /// No directory under [`LEGACY_APP_DIR_NAME`]; nothing to carry across.
+    NotNeeded,
+    /// The legacy directory now lives under [`APP_DIR_NAME`].
+    Moved { from: PathBuf, to: PathBuf },
+    /// Both names exist. [`APP_DIR_NAME`] is used and the legacy directory is
+    /// left untouched — merging two libraries would be a guess, and discarding
+    /// either would be the data loss this migration exists to avoid.
+    BothPresent { legacy: PathBuf },
+    /// The rename failed. The legacy directory is still there and still
+    /// readable by hand; the app carries on with a fresh directory rather than
+    /// refusing to start (NFR §10).
+    Failed { from: PathBuf, error: String },
+}
+
+/// Carry a per-user directory left under [`LEGACY_APP_DIR_NAME`] across to
+/// [`APP_DIR_NAME`], as a function of `root` so it is testable without touching
+/// the real `%APPDATA%`.
+///
+/// A plain rename, not a copy: both names sit directly under the same data root,
+/// so the move is within one volume and cannot half-succeed.
+pub fn migrate_app_dir_in(root: &Path) -> AppDirMigration {
+    let legacy = root.join(LEGACY_APP_DIR_NAME);
+    let current = root.join(APP_DIR_NAME);
+    if !legacy.is_dir() {
+        return AppDirMigration::NotNeeded;
+    }
+    if current.exists() {
+        return AppDirMigration::BothPresent { legacy };
+    }
+    match std::fs::rename(&legacy, &current) {
+        Ok(()) => AppDirMigration::Moved {
+            from: legacy,
+            to: current,
+        },
+        Err(error) => AppDirMigration::Failed {
+            from: legacy,
+            error: error.to_string(),
+        },
+    }
+}
+
+/// Run [`migrate_app_dir_in`] against the real data root, at most once per
+/// process. Returns [`AppDirMigration::NotNeeded`] on every call after the
+/// first, and when no data root resolves at all.
+pub fn migrate_app_dir() -> AppDirMigration {
+    static DONE: std::sync::Once = std::sync::Once::new();
+    let mut outcome = AppDirMigration::NotNeeded;
+    DONE.call_once(|| {
+        if let Some(root) = preset_data_root() {
+            outcome = migrate_app_dir_in(&root);
+        }
+    });
+    outcome
 }
 
 /// The resolution rule as a pure function of its two inputs, so it is testable
@@ -228,6 +299,115 @@ mod tests {
         assert_eq!(
             resolve_preset_dir_from(Some(OsString::new()), root),
             PresetDir::Default(PathBuf::from("/data").join(APP_DIR_NAME).join("presets"))
+        );
+    }
+
+    /// A scratch data root under the OS temp dir, emptied first so a previous
+    /// run's leftovers cannot decide the outcome. Named per test, because these
+    /// four run concurrently.
+    fn scratch_root(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("rlx-appdir-{name}"));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("create scratch root");
+        root
+    }
+
+    /// A directory under `root` holding one file, so the assertions can tell a
+    /// carried-across directory from a freshly created empty one.
+    fn seed_dir(root: &Path, name: &str, marker: &str) -> PathBuf {
+        let dir = root.join(name).join("presets");
+        std::fs::create_dir_all(&dir).expect("create dir");
+        std::fs::write(dir.join("marker.toml"), marker).expect("write marker");
+        root.join(name)
+    }
+
+    #[test]
+    fn a_legacy_directory_alone_is_carried_across_and_nothing_is_left_behind() {
+        let root = scratch_root("moved");
+        seed_dir(&root, LEGACY_APP_DIR_NAME, "legacy");
+
+        let outcome = migrate_app_dir_in(&root);
+
+        assert_eq!(
+            outcome,
+            AppDirMigration::Moved {
+                from: root.join(LEGACY_APP_DIR_NAME),
+                to: root.join(APP_DIR_NAME),
+            }
+        );
+        // The data arrived, contents intact...
+        assert_eq!(
+            std::fs::read_to_string(root.join(APP_DIR_NAME).join("presets/marker.toml")).unwrap(),
+            "legacy"
+        );
+        // ...and nothing is left at the old name, which is what stops the next
+        // run from seeing both and taking the BothPresent arm forever.
+        assert!(!root.join(LEGACY_APP_DIR_NAME).exists());
+    }
+
+    #[test]
+    fn both_present_leaves_the_legacy_directory_untouched_and_reads_the_new_one() {
+        let root = scratch_root("both");
+        seed_dir(&root, LEGACY_APP_DIR_NAME, "legacy");
+        seed_dir(&root, APP_DIR_NAME, "current");
+
+        let outcome = migrate_app_dir_in(&root);
+
+        assert_eq!(
+            outcome,
+            AppDirMigration::BothPresent {
+                legacy: root.join(LEGACY_APP_DIR_NAME),
+            }
+        );
+        // Neither side was written: the current directory still reads as itself,
+        // and the legacy one still holds every byte it held.
+        assert_eq!(
+            std::fs::read_to_string(root.join(APP_DIR_NAME).join("presets/marker.toml")).unwrap(),
+            "current"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join(LEGACY_APP_DIR_NAME).join("presets/marker.toml"))
+                .unwrap(),
+            "legacy"
+        );
+    }
+
+    #[test]
+    fn neither_present_creates_nothing_and_resolves_exactly_as_before() {
+        let root = scratch_root("fresh");
+
+        assert_eq!(migrate_app_dir_in(&root), AppDirMigration::NotNeeded);
+
+        // A migration that finds nothing must not create the directory itself —
+        // seeding is the app's job, and an empty directory here would suppress it.
+        assert!(!root.join(APP_DIR_NAME).exists());
+        assert!(!root.join(LEGACY_APP_DIR_NAME).exists());
+        assert_eq!(
+            resolve_preset_dir_from(None, Some(root.clone())),
+            PresetDir::Default(root.join(APP_DIR_NAME).join("presets"))
+        );
+    }
+
+    #[test]
+    fn the_override_wins_over_a_pending_migration() {
+        let root = scratch_root("override");
+        seed_dir(&root, LEGACY_APP_DIR_NAME, "legacy");
+
+        // A migration is pending — not yet run — and the override still decides.
+        assert_eq!(
+            resolve_preset_dir_from(Some(OsString::from("/repo/presets")), Some(root.clone())),
+            PresetDir::Override(PathBuf::from("/repo/presets"))
+        );
+
+        // And it still decides after the migration has moved the directory, so
+        // the override's precedence does not depend on when the move happened.
+        assert!(matches!(
+            migrate_app_dir_in(&root),
+            AppDirMigration::Moved { .. }
+        ));
+        assert_eq!(
+            resolve_preset_dir_from(Some(OsString::from("/repo/presets")), Some(root)),
+            PresetDir::Override(PathBuf::from("/repo/presets"))
         );
     }
 

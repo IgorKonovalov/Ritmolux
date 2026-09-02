@@ -35,8 +35,8 @@ use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierSta
 use soak::SoakLog;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::{
-    APP_DIR_NAME, PRESET_DIR_ENV, PresetDir, preset_data_root, resolve_preset_dir, resolve_tier,
-    rss, tier_env,
+    APP_DIR_NAME, AppDirMigration, PRESET_DIR_ENV, PresetDir, migrate_app_dir, preset_data_root,
+    resolve_preset_dir, resolve_tier, rss, tier_env,
 };
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
@@ -3382,6 +3382,32 @@ fn main() {
         );
         eprintln!("either add `{companion}` or drop `{}`", spec.name);
         std::process::exit(2);
+    }
+
+    // Carry a per-user directory left under the earlier name across to
+    // APP_DIR_NAME, before anything reads or seeds it. It runs here rather than
+    // inside the resolver so that resolving a path never moves a directory, and
+    // ahead of the `--list-*` aids so that even a run that exits early leaves
+    // the machine in the migrated state.
+    match migrate_app_dir() {
+        AppDirMigration::Moved { from, to } => {
+            eprintln!("moved {} to {}", from.display(), to.display());
+        }
+        AppDirMigration::BothPresent { legacy } => {
+            eprintln!(
+                "{} also exists and is not being read; delete it once you have \
+                 anything you want from it",
+                legacy.display()
+            );
+        }
+        AppDirMigration::Failed { from, error } => {
+            eprintln!(
+                "could not move {}: {error}; continuing with a fresh directory, \
+                 the old one is untouched",
+                from.display()
+            );
+        }
+        AppDirMigration::NotNeeded => {}
     }
 
     // Startup aid: print the enumerable audio endpoints and exit, so the
