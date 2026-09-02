@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use lmv_core_c::{
+use rlx_core_c::{
     LMV_ABI_VERSION, LMV_DEBUG_OVERLAY, LMV_ERR_INVALID_ARG, LMV_ERR_NO_WINDOW, LMV_OK, LmvMetrics,
     lmv_abi_version, lmv_create, lmv_free, lmv_get_metrics, lmv_get_presets, lmv_load_presets,
     lmv_render, lmv_render_dt, lmv_select_preset, lmv_set_debug, lmv_set_now_playing,
@@ -48,7 +48,7 @@ fn load_presets_seeds_and_installs_over_the_abi() {
     let bytes = path.as_bytes();
     let installed = unsafe { lmv_load_presets(handle, bytes.as_ptr(), bytes.len()) };
 
-    let expected = lmv_core::preset::default_presets().len() as i32;
+    let expected = rlx_core::preset::default_presets().len() as i32;
     assert!(installed > 0, "at least one curated preset installs");
     assert_eq!(
         installed, expected,
@@ -304,7 +304,7 @@ fn get_presets_and_select_report_no_window_before_attach() {
 fn roster_snapshot_and_select_over_the_abi() {
     use std::ffi::c_void;
 
-    use lmv_core_c::lmv_attach_window;
+    use rlx_core_c::lmv_attach_window;
 
     // Declared here rather than pulled in as a dependency: three symbols from a
     // library every Windows process already links (ADR-0001's "every new crate
@@ -375,7 +375,7 @@ fn roster_snapshot_and_select_over_the_abi() {
 
     // The order the ABI must report, read from the same loader the boundary
     // calls — so this asserts *roster order*, not merely "some names".
-    let expected: Vec<String> = lmv_core::preset::load_dir(&dir)
+    let expected: Vec<String> = rlx_core::preset::load_dir(&dir)
         .presets
         .iter()
         .map(|p| p.name.clone())

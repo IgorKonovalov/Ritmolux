@@ -9,7 +9,7 @@
 //! deterministic and unit-testable (NFR section 6): the shell owns the clock,
 //! the director owns the policy.
 
-use lmv_core::dsp::AnalysisFrame;
+use rlx_core::dsp::AnalysisFrame;
 
 use crate::config;
 

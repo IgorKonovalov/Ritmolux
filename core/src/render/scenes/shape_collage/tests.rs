@@ -247,7 +247,7 @@ fn a_thousand_recompositions_never_reallocate() {
 /// # This takes the whole lib test binary's one allocator slot
 ///
 /// A crate may install exactly one `#[global_allocator]`, and `#[cfg(test)]`
-/// modules all compile into a **single** `lmv-core` unit-test binary — so this
+/// modules all compile into a **single** `rlx-core` unit-test binary — so this
 /// declaration, written for one scene's element builder, is now the allocator
 /// for every unit test in `core/src/**`. It costs those tests nothing (a
 /// thread-local increment on a pass-through), but the slot is taken: a second

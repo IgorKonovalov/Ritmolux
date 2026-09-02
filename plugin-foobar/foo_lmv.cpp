@@ -1,7 +1,7 @@
 // foo_lmv — foobar2000 visualization component for light-music-visualizer.
 //
 // A thin shim per ADR-0001: pulls PCM from foobar's visualisation_stream,
-// forwards it across lmv-core's C ABI, and hosts the core's wgpu output in a
+// forwards it across rlx-core's C ABI, and hosts the core's wgpu output in a
 // plain Win32 window. All logic lives in the Rust core; this file only
 // bridges foobar2000 conventions to the ABI in core-cabi/include/lmv_core.h.
 //
@@ -41,7 +41,7 @@
 #  define FOO_LMV_VERSION "0.0.0-dev"
 #endif
 
-// foobar2000 x64 uses 64-bit audio_sample; lmv-core takes f32, so chunks are
+// foobar2000 x64 uses 64-bit audio_sample; rlx-core takes f32, so chunks are
 // converted through a fixed buffer on the way in (see push_converted).
 
 DECLARE_COMPONENT_VERSION(
@@ -49,7 +49,7 @@ DECLARE_COMPONENT_VERSION(
     "Light Music Visualizer\n"
     "Audio-reactive scenes - fragment fields, particle swarm, line geometry "
     "(curves / L-systems / star patterns), reaction-diffusion and attractor "
-    "flows - rendered by the shared lmv-core Rust engine (wgpu).\n"
+    "flows - rendered by the shared rlx-core Rust engine (wgpu).\n"
     "Dockable as a Default UI panel or opened from the View menu. "
     "Space cycles scenes; right-click to pick one by name, reload the preset "
     "folder, or open it.");
@@ -993,7 +993,7 @@ public:
         // functions are stable, so a newer core is fine - require >= built ABI.
         g_abi_ok = (core_abi >= LMV_ABI_VERSION);
         if (!g_abi_ok) {
-            console::printf("foo_lmv: lmv-core ABI too old (core reports %u, "
+            console::printf("foo_lmv: rlx-core ABI too old (core reports %u, "
                             "shim needs >= %u); preset loading and diagnostics "
                             "disabled",
                             static_cast<unsigned>(core_abi),
@@ -1076,7 +1076,7 @@ public:
     bool get_description(pfc::string_base &out) override {
         out = "Audio-reactive visuals - fragment fields, particle swarm, line "
               "geometry, reaction-diffusion and attractor scenes - from "
-              "lmv-core. Space cycles scenes.";
+              "rlx-core. Space cycles scenes.";
         return true;
     }
 };

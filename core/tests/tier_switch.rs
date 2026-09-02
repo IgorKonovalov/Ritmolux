@@ -8,7 +8,7 @@
 //! surface needs a window, and there is none in CI, so every renderer this file
 //! can build is the headless one `set_tier` is defined to ignore. That asymmetry
 //! is exactly why ADR-0054's condition lives in
-//! [`lmv_core::render::tier::tier_change_permitted`] as a **value** rather than as
+//! [`rlx_core::render::tier::tier_change_permitted`] as a **value** rather than as
 //! a branch inside the mutator: the unit test beside it
 //! (`a_tier_change_is_permitted_only_where_there_is_a_surface`) asserts both
 //! directions, so "permits a surfaced context" is pinned somewhere even though
@@ -21,7 +21,7 @@
 //!
 //! Skips with no adapter per ADR-0016.
 
-use lmv_core::render::{Tier, TierConfig};
+use rlx_core::render::{Tier, TierConfig};
 
 mod common;
 

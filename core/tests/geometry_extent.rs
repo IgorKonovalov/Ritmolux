@@ -32,7 +32,7 @@
 //! mid-run, which `composite.rs` documents as changing what the software adapter
 //! resolves.
 
-use lmv_core::{
+use rlx_core::{
     dsp::{AnalysisFrame, SPECTRUM_BINS},
     preset::{Preset, SystemKind, default_presets},
     render::{

@@ -20,9 +20,9 @@
 //! background-gradient coexistence `background_composite.rs` documents). Skips
 //! with no adapter per ADR-0016.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::CaptureImage;
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::CaptureImage;
 
 mod common;
 

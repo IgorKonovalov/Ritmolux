@@ -1,5 +1,5 @@
 //! **The EEL2 conformance suite** (Plan 0100 Phase 2's done-when): snippets
-//! compiled by `milkconv` and executed by `lmv-core`'s VM, checked against the
+//! compiled by `milkconv` and executed by `rlx-core`'s VM, checked against the
 //! values the MilkDrop authoring reference specifies.
 //!
 //! # Why this file is here and not in `core`
@@ -21,17 +21,17 @@
 //! case says so, because those are exactly the places a converted preset would
 //! render subtly wrong with a green suite.
 
-use lmv_core::milk::bytecode::COMPARE_EPSILON;
-use lmv_core::milk::vm::{Budget, VmState, run};
-use lmv_core::milk::{MilkRuntime, NOMINAL_FPS};
 use milkconv::eel::{Symbols, compile_bundle, compile_into};
+use rlx_core::milk::bytecode::COMPARE_EPSILON;
+use rlx_core::milk::vm::{Budget, VmState, run};
+use rlx_core::milk::{MilkRuntime, NOMINAL_FPS};
 
 /// Compile `src` as a standalone program and run it, returning its value.
 fn eval(src: &str) -> f32 {
     let mut symbols = Symbols::new();
     let code =
         compile_into(src, &mut symbols).unwrap_or_else(|e| panic!("compiling `{src}` failed: {e}"));
-    let program = lmv_core::milk::bytecode::EelProgram::new(code, symbols.names().to_vec())
+    let program = rlx_core::milk::bytecode::EelProgram::new(code, symbols.names().to_vec())
         .unwrap_or_else(|e| panic!("`{src}` compiled to invalid bytecode: {e}"));
     let mut state = VmState::new(program.register_count(), program.stack_depth(), 0);
     run(&program, &mut state, Budget::FRAME)
@@ -372,7 +372,7 @@ fn the_q_and_t_bridges_are_one_register_file() {
 
     let mut runtime = MilkRuntime::new(bundle, 0);
     runtime.run_frame(
-        &lmv_core::dsp::AnalysisFrame::default(),
+        &rlx_core::dsp::AnalysisFrame::default(),
         0.0,
         1.0 / 60.0,
         (8, 8),
@@ -407,7 +407,7 @@ fn a_preset_shaped_bundle_drives_the_mesh() {
     .expect("the preset-shaped bundle compiles");
 
     let mut runtime = MilkRuntime::new(bundle, 0);
-    let frame = lmv_core::dsp::AnalysisFrame {
+    let frame = rlx_core::dsp::AnalysisFrame {
         bass: 0.5,
         ..Default::default()
     };
@@ -457,6 +457,6 @@ fn compilation_is_deterministic() {
     // ...and it decodes back to the same program, which is the seam's whole
     // round-trip in one line.
     let text = assemble();
-    let back = lmv_core::milk::bytecode::EelProgram::from_assembly(&text).expect("decodes");
+    let back = rlx_core::milk::bytecode::EelProgram::from_assembly(&text).expect("decodes");
     assert_eq!(back.to_assembly(), text);
 }

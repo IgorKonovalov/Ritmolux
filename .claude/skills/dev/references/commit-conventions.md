@@ -43,7 +43,7 @@ Smallest meaningful scope. Omit if a commit truly spans many (usually a sign to 
 |--------------|------|
 | `core`       | `core/` generally |
 | `audio`      | `core/src/audio.rs` — sample intake |
-| `ring`       | `lmv-ring/` — the extracted SPSC ring |
+| `ring`       | `rlx-ring/` — the extracted SPSC ring |
 | `dsp`        | `core/src/dsp/` — FFT, onset, beat, bands |
 | `render`     | `core/src/render/` — wgpu layer, composite stages |
 | `scenes`     | `core/src/render/scenes/` |

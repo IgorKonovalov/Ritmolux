@@ -312,7 +312,7 @@ fn a_narrow_console_drops_what_it_cannot_draw() {
 /// dwell well inside its range, so a step is a step and not a clamp.
 fn view() -> crate::settings::SettingsView {
     crate::settings::SettingsView {
-        tier: lmv_core::render::Tier::Rich,
+        tier: rlx_core::render::Tier::Rich,
         tier_state: crate::settings::TierState::Pinned,
         auto_rotate: true,
         min_dwell_secs: 20,
@@ -441,8 +441,8 @@ fn the_staging_line_names_the_successor_and_the_rotation_state() {
 /// successor, which `a_roster_of_one_stages_nothing_and_says_so` covers.
 #[test]
 fn the_staged_name_is_the_one_the_rotation_then_takes() {
-    use lmv_core::dsp::AnalysisFrame;
-    use lmv_core::render::{HeadlessOptions, RenderError, Renderer};
+    use rlx_core::dsp::AnalysisFrame;
+    use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
 
     let mut renderer = match Renderer::new_headless(HeadlessOptions {
         width: 64,
@@ -503,7 +503,7 @@ fn the_staged_name_is_the_one_the_rotation_then_takes() {
 /// the indexed selector the core already exposes.
 #[test]
 fn prev_lands_on_the_predecessor_using_only_the_indexed_selector() {
-    use lmv_core::render::{HeadlessOptions, RenderError, Renderer};
+    use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
 
     let mut renderer = match Renderer::new_headless(HeadlessOptions {
         width: 64,

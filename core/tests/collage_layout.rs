@@ -9,7 +9,7 @@
 //!
 //! # Where the images go, and why they are not committed
 //!
-//! `LMV_SAMPLE_DIR=<dir> cargo test -p lmv-core --test collage_layout` writes the
+//! `LMV_SAMPLE_DIR=<dir> cargo test -p rlx-core --test collage_layout` writes the
 //! sheet there and prints the path. Without the variable the sweep still runs
 //! and asserts, and writes nothing: these are **samples for a human to look at
 //! once**, not baselines. Committing twenty PNGs that no test compares against
@@ -38,9 +38,9 @@
 
 use std::path::PathBuf;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer};
 
 mod common;
 

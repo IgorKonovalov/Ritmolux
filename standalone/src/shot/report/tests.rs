@@ -13,9 +13,9 @@
 // Tests index, expect and panic freely; this is not the render path.
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-use lmv_core::preset::{GateFlag, GateKind};
-use lmv_core::render::CaptureImage;
-use lmv_core::render::metrics::StepResponse;
+use rlx_core::preset::{GateFlag, GateKind};
+use rlx_core::render::CaptureImage;
+use rlx_core::render::metrics::StepResponse;
 
 use super::*;
 
@@ -440,7 +440,7 @@ fn probe_response_survives_a_capture_shorter_than_the_probe_window() {
 /// gate on the same preset must not.
 #[test]
 fn a_dead_gate_on_a_layer_binding_flags_in_the_reachability_walk() {
-    let preset = lmv_core::preset::Preset::from_toml_str(
+    let preset = rlx_core::preset::Preset::from_toml_str(
         "system = \"fragment_field\"\n\
          [params]\nwarp = \"select(onset > 0.2, 0.6, 0.3)\"\n\
          [layer]\nsystem = \"swarm\"\njoin = \"over\"\n\
@@ -764,7 +764,7 @@ fn fit_name_keeps_short_names_whole_and_elides_the_middle_of_long_ones() {
 #[test]
 fn every_shipped_preset_name_fits_to_a_distinct_label() {
     let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    for preset in lmv_core::preset::default_presets() {
+    for preset in rlx_core::preset::default_presets() {
         let label = fit_name(&preset.name);
         assert!(
             label.chars().count() <= NAME_WIDTH,

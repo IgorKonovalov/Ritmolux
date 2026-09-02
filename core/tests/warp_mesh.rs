@@ -33,14 +33,14 @@
 //! comparison the three new bind-group layouts owe
 //! ([`the_adapters_agree_on_the_warp_mesh`]).
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
-use lmv_core::preset::{Preset, SystemKind};
-use lmv_core::render::{
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
+use rlx_core::preset::{Preset, SystemKind};
+use rlx_core::render::{
     CaptureImage, Renderer,
     metrics::{coverage, footprint_diff, frame_diff, quadrant_spread, tonal_flatness},
 };
-use lmv_core::signal::{bass_sine, chord, click_track, treble_tone};
+use rlx_core::signal::{bass_sine, chord, click_track, treble_tone};
 
 mod common;
 
@@ -130,7 +130,7 @@ fn loud() -> AnalysisFrame {
         onset: 1.0,
         beat: true,
         bar: 0.5,
-        spectrum: [1.0; lmv_core::dsp::SPECTRUM_BINS],
+        spectrum: [1.0; rlx_core::dsp::SPECTRUM_BINS],
         ..Default::default()
     }
 }
@@ -474,7 +474,7 @@ fn the_bundle_and_not_the_defaults_drives_the_transform() {
     assert!(
         matches!(
             control.config.as_ref(),
-            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh { milk: None, .. })
+            Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh { milk: None, .. })
         ),
         "the control must carry no bundle, or it proves nothing"
     );
@@ -521,7 +521,7 @@ fn shader_fixture() -> Preset {
     // Both modules and the full chain reached the bundle — `validate_wgsl` ran
     // over each at load, so a broken module is a named load error above rather
     // than a pipeline failure at first render.
-    let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+    let Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh {
         milk: Some(bundle), ..
     }) = preset.config.as_ref()
     else {
@@ -545,10 +545,10 @@ fn shader_fixture() -> Preset {
 /// fixture silently pinning a surface the engine does not emit.
 #[test]
 fn the_fixture_shaders_begin_with_the_prelude() {
-    use lmv_core::milk::shader::{COMP_GROUP, WARP_GROUP, fragment_prelude};
+    use rlx_core::milk::shader::{COMP_GROUP, WARP_GROUP, fragment_prelude};
 
     let preset = shader_fixture();
-    let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+    let Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh {
         milk: Some(bundle), ..
     }) = preset.config.as_ref()
     else {
@@ -666,7 +666,7 @@ fn the_shaders_and_not_the_defaults_drive_the_picture() {
     assert!(
         matches!(
             control.config.as_ref(),
-            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+            Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh {
                 milk: Some(bundle), ..
             }) if bundle.warp_wgsl.is_none() && bundle.comp_wgsl.is_none()
         ),
@@ -804,7 +804,7 @@ fn each_partly_absent_shader_surface_builds_and_renders() {
             "the `{name}` variant must load clean, got {:?}",
             preset.warnings
         );
-        let Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh {
+        let Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh {
             milk: Some(bundle), ..
         }) = preset.config.as_ref()
         else {
@@ -938,7 +938,7 @@ fn a_lit_backdrop_survives_where_the_draw_layer_drew_nothing() {
     assert!(
         matches!(
             preset.config.as_ref(),
-            Some(lmv_core::render::scenes::GeneratorConfig::WarpMesh { milk: Some(_), .. })
+            Some(rlx_core::render::scenes::GeneratorConfig::WarpMesh { milk: Some(_), .. })
         ),
         "the fixture must carry a `[milk]` table — without one the scene draws no \
          MilkDrop layer at all and there is no seam under test"

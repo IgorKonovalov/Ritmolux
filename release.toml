@@ -1,7 +1,7 @@
 # cargo-release configuration - ADR-0005, plan 0006.
 #
 # The workspace ships ONE application version: root [workspace.package].version,
-# inherited by lmv-core and standalone (`version.workspace = true`). cargo-release
+# inherited by rlx-core and standalone (`version.workspace = true`). cargo-release
 # bumps that single string once per plan at the architect close, then tags it.
 #
 # cargo-release is a dev tool (`cargo install cargo-release`), NOT a workspace

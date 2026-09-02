@@ -53,8 +53,8 @@
 //! off instead of flattening; generalizing the assertion into a suite-wide
 //! no-255 gate would fail on frames that are behaving correctly.
 
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, metrics::frame_diff};
 
 mod common;
 
@@ -180,7 +180,7 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 
 /// Both post stages, composited and pinned to a baseline.
 ///
-/// `LMV_BLESS=1 cargo test -p lmv-core --test composite` rewrites these two —
+/// `LMV_BLESS=1 cargo test -p rlx-core --test composite` rewrites these two —
 /// and, run against the whole suite instead of this one binary, **every other
 /// baseline as well**. Bless by `--test composite` and check `git status`.
 #[test]
@@ -233,7 +233,7 @@ fn composite_stages_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test composite`",
+            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test composite`",
             path.display()
         );
         let baseline = common::decode(&path);

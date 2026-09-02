@@ -30,7 +30,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use lmv_core::render::now_playing::SEPARATOR;
+use rlx_core::render::now_playing::SEPARATOR;
 use windows::Foundation::TypedEventHandler;
 use windows::Media::Control::{
     CurrentSessionChangedEventArgs, GlobalSystemMediaTransportControlsSession as Session,

@@ -872,7 +872,7 @@ fn the_over_blend_alpha_is_frame_rate_independent() {
 /// `#[ignore]`d and run explicitly:
 ///
 /// ```text
-/// cargo test -p lmv-core --release --lib mesh_cost_by_grid -- --ignored --nocapture
+/// cargo test -p rlx-core --release --lib mesh_cost_by_grid -- --ignored --nocapture
 /// ```
 ///
 /// It times exactly what the capacity bounds: one frame of per-vertex evaluation

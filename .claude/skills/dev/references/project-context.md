@@ -8,7 +8,7 @@ Intended shape for orientation, not an inventory — trust `Glob`/`git` for what
 today (the tree has grown well past the founding scaffold).
 
 ```
-core/            # package `lmv-core` — DSP + render + scenes + preset engine. NO C ABI.
+core/            # package `rlx-core` — DSP + render + scenes + preset engine. NO C ABI.
                  #   crate-type = ["rlib"] ONLY (ADR-0072)
   build.rs       #   globs presets/*.toml into the EMBEDDED table (ADR-0022) — generated, not edited
   src/audio.rs   #   source-agnostic sample intake, validated at the boundary
@@ -18,13 +18,13 @@ core/            # package `lmv-core` — DSP + render + scenes + preset engine.
                  #   Not milkconv/ — that is the ahead-of-time converter and never ships.
   src/render/    #   wgpu layer, the composite stages, and scenes/ (NOT core/src/scenes/)
   tests/         #   incl. the behavioral gates: sanity.rs, reactivity.rs, animation.rs, golden.rs
-core-cabi/       # package `lmv-core-cabi` — the C ABI and nothing else (ADR-0072).
-                 #   The ONLY crate declaring cdylib/staticlib; emitted lib stem is `lmv_core_c`.
+core-cabi/       # package `rlx-core-cabi` — the C ABI and nothing else (ADR-0072).
+                 #   The ONLY crate declaring cdylib/staticlib; emitted lib stem is `rlx_core_c`.
   src/lib.rs     #   the extern "C" surface (was core/src/ffi.rs)
   include/       #   lmv_core.h — the C mirror the shim compiles against
   tests/ffi.rs   #   the ABI conformance suite
                  #   OUTSIDE workspace `default-members` — see the commands table below
-lmv-ring/        # package `lmv-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
+rlx-ring/        # package `rlx-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
 standalone/      # package `standalone`, binary `lmv` — winit + wgpu + loopback capture
   examples/shot.rs #  the headless capture CLI (an example, not a bin — keeps `image` out of lmv.exe)
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
@@ -60,7 +60,7 @@ builds correctly, just with the default linker — so every command below is unc
 [ADR-0147](../../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
 revoked it, because **the worktree path is not in cargo's fingerprint** — two lanes with the same
 layout and dependency graph are indistinguishable, so cargo hands one lane the other's compiled
-`lmv-core` and calls it fresh. Plan 0115's lane hit `no method named open_tap found for struct
+`rlx-core` and calls it fresh. Plan 0115's lane hit `no method named open_tap found for struct
 Renderer` against source that defines it. **If you see a compile error naming a symbol you can read
 in the file, suspect this before you suspect your code** — and check that no `[build] target-dir`
 has reappeared in that config. The linker half above is not implicated.
@@ -74,23 +74,23 @@ What this leaves you:
 
 ## Canonical commands (run from repo root)
 
-**The core package is `lmv-core`, not `core`** — `cargo test -p core` fails with "package ID
+**The core package is `rlx-core`, not `core`** — `cargo test -p core` fails with "package ID
 specification `core` did not match any packages". The directory and the package name differ.
 
 | Task                         | Command |
 |------------------------------|---------|
 | Build all                    | `cargo build` |
 | Run the standalone           | `cargo run -p standalone` |
-| Test all / just core         | `cargo test --workspace` / `cargo test -p lmv-core` |
+| Test all / just core         | `cargo test --workspace` / `cargo test -p rlx-core` |
 | **Test, per phase**          | `cargo nextest run --workspace -P fast` — the narrowed set, plus **2 presets per family** (ADR-0156, ADR-0157) |
 | **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, **all 81 presets**, owed once per plan |
 | Lints (errors)               | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format check / apply         | `cargo fmt --all --check` / `cargo fmt --all` |
-| Build C-ABI artifacts        | `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib` / `.dll`) |
+| Build C-ABI artifacts        | `cargo build -p rlx-core-cabi` (emits `rlx_core_c.lib` / `.dll`) |
 | Headless render check        | `cargo run -p standalone --example shot -- <flags>` (`docs/capturing.md`) |
 
 **`--workspace` is load-bearing on BOTH test rows and on the clippy row, not a stylistic
-flourish** (ADR-0072). `lmv-core-cabi` sits outside the workspace `default-members`, which is what
+flourish** (ADR-0072). `rlx-core-cabi` sits outside the workspace `default-members`, which is what
 makes a bare `cargo build` stop re-emitting ~550 MB of artifacts nothing links — and the same
 exclusion means a bare `cargo nextest run` silently skips the ABI conformance suite and a bare
 `cargo clippy` silently stops linting the C ABI. Both come back green while covering nothing.

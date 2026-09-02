@@ -15,7 +15,7 @@
 # we never build.
 #
 # NOTE: this does NOT prune ttf-parser. That crate enters via the glyphon text
-# stack (ttf-parser -> fontdb -> cosmic-text -> glyphon -> lmv-core, ADR-0009's
+# stack (ttf-parser -> fontdb -> cosmic-text -> glyphon -> rlx-core, ADR-0009's
 # `text` feature) and is present on BOTH shipped targets, so the target list
 # has no effect on it - see the RUSTSEC-2026-0192 ignore below.
 targets = [
@@ -31,7 +31,7 @@ ignore = [
     # RUSTSEC-2026-0192: ttf-parser is unmaintained. This is an UNMAINTAINED
     # notice, NOT a vulnerability or unsound finding (those stay hard errors).
     # ttf-parser is load-bearing via the glyphon text stack
-    # (ttf-parser -> fontdb -> cosmic-text -> glyphon -> lmv-core), enabled by
+    # (ttf-parser -> fontdb -> cosmic-text -> glyphon -> rlx-core), enabled by
     # ADR-0009's `text` feature on both shipped targets. cosmic-text 0.19 pins
     # ttf-parser 0.25 (both latest), so there is no update or clean drop without
     # reversing ADR-0009 or patching upstream. cargo-deny silences only this
@@ -61,7 +61,7 @@ allow = [
 [bans]
 # A wildcard (`*`) version requirement on a registry crate fails the build...
 wildcards = "deny"
-# ...but the intra-workspace path dep (standalone -> lmv-core, no version) is
+# ...but the intra-workspace path dep (standalone -> rlx-core, no version) is
 # a legitimate wildcard, not a supply-chain risk.
 allow-wildcard-paths = true
 # Duplicate versions are an audit/size smell but not a hard failure yet.

@@ -31,7 +31,7 @@
 //! on this repository's dev box from a *clean* tree — so the diff would name
 //! files the change never touched, which is how an unrelated drift gets blessed
 //! in while someone reads it as noise. Its
-//! own binary means `LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails`
+//! own binary means `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails`
 //! can reach nothing else. Same posture `line_joints.rs` documents.
 //!
 //! **Device state.** `composite.rs` keeps one stage per fixture and its own
@@ -49,8 +49,8 @@
 //! cannot see an ADR-0037 confusion between them — which is the bug that has
 //! shipped three times, once on this very scene.
 
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, metrics::frame_diff};
 
 mod common;
 
@@ -101,7 +101,7 @@ fn capture() -> Option<CaptureImage> {
 
 /// The scene's own accumulation and the engine stage's, composited and pinned.
 ///
-/// `LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails` rewrites this
+/// `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites this
 /// baseline and — because this is its own binary — can reach no other.
 #[test]
 fn the_attractor_over_the_trails_stage_matches_its_baseline() {
@@ -136,7 +136,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
 
     assert!(
         path.exists(),
-        "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails`",
+        "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails`",
         path.display()
     );
     let baseline = common::decode(&path);

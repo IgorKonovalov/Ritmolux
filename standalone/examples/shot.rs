@@ -1,7 +1,7 @@
 //! `shot` — headless capture / visual-QA CLI (Plan 0013). Dev/agent tooling: it
 //! renders presets with **no window** and writes PNGs the agent can Read, or a
 //! metrics report (text / JSON) the agent can parse. It links the same
-//! `lmv-core` the app does; `image` (a dev-dependency, ADR-0011) only encodes
+//! `rlx-core` the app does; `image` (a dev-dependency, ADR-0011) only encodes
 //! and tiles, so the shipped `lmv.exe` is untouched.
 //!
 //! What is left here is what an `examples/` target has to own: argument parsing,
@@ -64,10 +64,10 @@
 
 use std::path::{Path, PathBuf};
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::{Preset, SystemKind, default_presets, load_dir};
-use lmv_core::render::{CaptureImage, Tier};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::{Preset, SystemKind, default_presets, load_dir};
+use rlx_core::render::{CaptureImage, Tier};
 use standalone::shot::args::{
     BandLevels, apply_set, band_levels, parse_hops, parse_size, synth_signal,
 };
@@ -485,7 +485,7 @@ fn load_library(args: &Args) -> Result<(Vec<Preset>, String), String> {
 
 /// Surface malformed files on stderr — a preset being silently absent from a
 /// capture is the confusing failure this CLI exists to avoid.
-fn report_errors(report: &lmv_core::preset::LoadReport) {
+fn report_errors(report: &rlx_core::preset::LoadReport) {
     for (path, err) in &report.errors {
         eprintln!("shot: preset {}: {err}", path.display());
     }

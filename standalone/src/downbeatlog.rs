@@ -16,7 +16,7 @@
 //!
 //! ## What it costs the estimator: nothing
 //!
-//! [`Analyzer::downbeat_terms`](lmv_core::dsp::Analyzer::downbeat_terms) takes
+//! [`Analyzer::downbeat_terms`](rlx_core::dsp::Analyzer::downbeat_terms) takes
 //! `&self`, allocates nothing and reads no clock, so being observed cannot change
 //! what is observed. The write itself lives on the render/UI thread — never the
 //! capture callback — and is event-paced rather than clock-paced: at 120 BPM that
@@ -33,8 +33,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lmv_core::diag::DownbeatTerms;
-use lmv_core::dsp::AnalysisFrame;
+use rlx_core::diag::DownbeatTerms;
+use rlx_core::dsp::AnalysisFrame;
 
 /// Column header written when a fresh log is created.
 ///
@@ -44,7 +44,7 @@ use lmv_core::dsp::AnalysisFrame;
 /// value's formatting.
 ///
 /// The `s0..s3` block is the fold's own output and is as wide as
-/// [`BEATS_PER_BAR`](lmv_core::dsp::downbeat::BEATS_PER_BAR) — a test pins that
+/// [`BEATS_PER_BAR`](rlx_core::dsp::downbeat::BEATS_PER_BAR) — a test pins that
 /// rather than leaving it to whoever changes the meter assumption.
 ///
 /// **Columns are appended, never interleaved** — the frozen-prefix rule
@@ -214,9 +214,9 @@ mod tests {
     use std::f32::consts::TAU;
     use std::io::Read as _;
 
-    use lmv_core::audio::AudioFormat;
-    use lmv_core::dsp::downbeat::BEATS_PER_BAR;
-    use lmv_core::dsp::{Analyzer, HOP_SIZE};
+    use rlx_core::audio::AudioFormat;
+    use rlx_core::dsp::downbeat::BEATS_PER_BAR;
+    use rlx_core::dsp::{Analyzer, HOP_SIZE};
 
     use super::*;
 

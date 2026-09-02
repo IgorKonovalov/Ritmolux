@@ -45,12 +45,12 @@
 //! The pin follows `composite.rs` rather than joining `golden.rs`: that roster is
 //! one fixture per `SystemKind`, enforced by `systems_rosters_every_variant`, and
 //! a second `spectrum` entry would break the invariant ADR-0023 rests on. Its own
-//! binary also means `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`
+//! binary also means `LMV_BLESS=1 cargo test -p rlx-core --test line_joints`
 //! rewrites **this** baseline and cannot reach the roster.
 
-use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, metrics::frame_diff};
 
 mod common;
 
@@ -331,7 +331,7 @@ fn assert_the_outer_ends_are_free(img: &CaptureImage, dimmest_interior: f32) {
 /// probes do not look — a gentler turn, a free end, the falloff — moves a file
 /// instead of passing quietly. It is the coarse net under the sharp claim.
 ///
-/// `LMV_BLESS=1 cargo test -p lmv-core --test line_joints` rewrites this one
+/// `LMV_BLESS=1 cargo test -p rlx-core --test line_joints` rewrites this one
 /// baseline. Scoped to this binary it **cannot** reach the `golden.rs` roster:
 /// that suite renders `SystemKind::ALL` and is not built by this invocation. Run
 /// against the whole suite (`cargo test` with `LMV_BLESS` set) it would rewrite
@@ -349,7 +349,7 @@ fn compare_against_baseline(img: &CaptureImage) {
 
     assert!(
         path.exists(),
-        "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test line_joints`",
+        "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test line_joints`",
         path.display()
     );
     let baseline = common::decode(&path);

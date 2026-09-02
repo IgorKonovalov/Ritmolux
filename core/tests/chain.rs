@@ -1,6 +1,6 @@
 //! Full-chain end-to-end: PCM in, pixels out (Plan 0032 Phase 1, ADR-0033 tier 4).
 //!
-//! Every other suite covers **one** box of the architecture. `lmv-ring`'s unit
+//! Every other suite covers **one** box of the architecture. `rlx-ring`'s unit
 //! tests and Miri cover the SPSC ring in isolation; `core/tests/dsp.rs` covers the
 //! analyzer; `golden.rs` covers the renderer. Nothing followed a sample all the way
 //! across, so the sentence CLAUDE.md opens with — *the ring buffer is the seam
@@ -8,7 +8,7 @@
 //! runs.
 //!
 //! This suite joins the halves. Synthetic PCM is pushed into a real
-//! [`lmv_core::audio::intake`] pair in capture-callback-sized bursts, drained
+//! [`rlx_core::audio::intake`] pair in capture-callback-sized bursts, drained
 //! through `pop_samples` into a fixed scratch buffer, fed to a real `Analyzer`, and
 //! rendered by a real `Renderer` to real pixels. Nothing is mocked and nothing is
 //! shortcut: `Renderer::capture_audio` would be the convenient path, but it *starts*
@@ -25,11 +25,11 @@
 //! those skip with a printed reason exactly as `golden.rs` does (ADR-0016). The
 //! boundary-validation claim needs no adapter and runs everywhere.
 
-use lmv_core::audio::{self, AudioFormat, FormatError, SampleConsumer};
-use lmv_core::dsp::Analyzer;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
-use lmv_core::signal::{bass_sine, noise};
+use rlx_core::audio::{self, AudioFormat, FormatError, SampleConsumer};
+use rlx_core::dsp::Analyzer;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::signal::{bass_sine, noise};
 
 mod common;
 

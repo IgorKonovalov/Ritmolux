@@ -53,8 +53,8 @@ core/                # Rust library crate — the shared brain. DSP + render eng
 core-cabi/           # The C ABI, and nothing else (ADR-0072) — the only crate declaring
                      #   cdylib/staticlib, plus include/lmv_core.h. Deliberately OUTSIDE the
                      #   workspace `default-members`, so a bare `cargo build` never emits it;
-                     #   `--workspace` (CI, pre-push) and `-p lmv-core-cabi` do.
-lmv-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
+                     #   `--workspace` (CI, pre-push) and `-p rlx-core-cabi` do.
+rlx-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, `shot`.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links core's C ABI. Windows-first.
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113). A full workspace member
@@ -159,7 +159,7 @@ file.** [ADR-0141](docs/adrs/0141-one-artifact-store-serves-every-lane.md) point
 one store; [ADR-0147](docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
 revoked that half, because **the worktree path is not in cargo's fingerprint** — two lanes with the
 same layout and dependency graph are indistinguishable, so one lane is served the other's compiled
-`lmv-core` as fresh. Plan 0115's lane hit `no method named open_tap found for struct Renderer`
+`rlx-core` as fresh. Plan 0115's lane hit `no method named open_tap found for struct Renderer`
 against committed source that defines it. The failure is silent, it is not a cache miss, and no gate
 catches it. The linker half above is not implicated and stays.
 

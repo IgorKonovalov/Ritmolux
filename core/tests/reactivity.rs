@@ -7,7 +7,7 @@
 //!
 //! **The stimuli are PCM, and every number here comes out of the real analyzer**
 //! (Plan 0067 Phase 1). The four clips are `core::signal` generators pushed
-//! hop-by-hop through [`Analyzer`](lmv_core::dsp::Analyzer) — FFT, band split,
+//! hop-by-hop through [`Analyzer`](rlx_core::dsp::Analyzer) — FFT, band split,
 //! onset detector, the normalizers of ADR-0049 — and each published
 //! `AnalysisFrame` past the analyzer's warm-up drives one rendered frame (Plan
 //! 0084 Phase 4: the warm-up hops advance the same analyzer and rasterize
@@ -37,11 +37,11 @@
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{HOP_SIZE, WARMUP_HOPS};
-use lmv_core::preset::{Preset, SystemKind, default_presets};
-use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
-use lmv_core::signal::{bass_sine, chord, click_track, treble_tone};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{HOP_SIZE, WARMUP_HOPS};
+use rlx_core::preset::{Preset, SystemKind, default_presets};
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::signal::{bass_sine, chord, click_track, treble_tone};
 
 mod common;
 
@@ -283,7 +283,7 @@ include!(concat!(env!("OUT_DIR"), "/reactivity_tests.rs"));
 /// `mid` column would silently be measuring bass reactivity.
 #[test]
 fn each_stimulus_lands_in_the_band_it_is_named_for() {
-    use lmv_core::dsp::Analyzer;
+    use rlx_core::dsp::Analyzer;
 
     let hop_samples = HOP_SIZE * FORMAT.channels as usize;
     for (label, pcm) in stimuli() {

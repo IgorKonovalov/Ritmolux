@@ -1,7 +1,7 @@
 //! Plan 0001 Phase 3 fixtures: known signals in, expected analysis out.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WAVE_SAMPLES, WINDOW_SIZE};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WAVE_SAMPLES, WINDOW_SIZE};
 
 const SR: u32 = 48_000;
 
@@ -233,7 +233,7 @@ fn normalized_levels_are_portable_across_absolute_gain() {
         sample_rate: SR,
         channels: 2,
     };
-    let groove = lmv_core::signal::dynamic_groove(120.0, 6.0, format);
+    let groove = rlx_core::signal::dynamic_groove(120.0, 6.0, format);
     let hop_samples = HOP_SIZE * format.channels as usize;
 
     let read = |gain: f32| -> Vec<(f32, f32, f32)> {
@@ -301,7 +301,7 @@ fn the_beat_clock_counts_monotonically_and_resets_on_every_beat() {
         channels: 2,
     };
     let bpm = 120.0;
-    let pcm = lmv_core::signal::click_track(bpm, 10.0, format);
+    let pcm = rlx_core::signal::click_track(bpm, 10.0, format);
     let mut analyzer = Analyzer::new(format).expect("valid format");
     let hop_samples = HOP_SIZE * format.channels as usize;
 
@@ -806,7 +806,7 @@ fn the_trace_is_portable_across_absolute_gain() {
         sample_rate: SR,
         channels: 2,
     };
-    let groove = lmv_core::signal::dynamic_groove(120.0, 6.0, format);
+    let groove = rlx_core::signal::dynamic_groove(120.0, 6.0, format);
     let hop_samples = HOP_SIZE * format.channels as usize;
 
     let read = |gain: f32| -> Vec<[f32; WAVE_SAMPLES]> {
@@ -860,7 +860,7 @@ fn a_quiet_passage_still_draws_a_smaller_trace_than_a_loud_one() {
         sample_rate: SR,
         channels: 1,
     };
-    let groove = lmv_core::signal::dynamic_groove(120.0, 8.0, format);
+    let groove = rlx_core::signal::dynamic_groove(120.0, 8.0, format);
     let mut analyzer = Analyzer::new(format).expect("valid format");
     // Peak trace amplitude per beat, at 120 bpm — beats 6 and 7 of each phrase
     // of eight are the rest.

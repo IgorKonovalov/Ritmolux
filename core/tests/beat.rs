@@ -15,11 +15,11 @@
 /// The shared ADR-0016 skip and headless constructors.
 mod common;
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{Analyzer, HOP_SIZE};
-use lmv_core::preset::Preset;
-use lmv_core::render::metrics::frame_diff;
-use lmv_core::signal::click_track;
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{Analyzer, HOP_SIZE};
+use rlx_core::preset::Preset;
+use rlx_core::render::metrics::frame_diff;
+use rlx_core::signal::click_track;
 
 const SIZE: u32 = 96;
 const BPM: f32 = 120.0;

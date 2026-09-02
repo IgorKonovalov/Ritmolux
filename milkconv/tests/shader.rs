@@ -3,7 +3,7 @@
 //! Same placement logic as `conformance.rs` and `draw_layer.rs`: only this
 //! crate can translate HLSL, so the tests that ask "does the translation mean
 //! what the source meant" live here — and every emitted module is pushed
-//! through `lmv_core::milk::shader::validate_wgsl`, which is the *same* naga
+//! through `rlx_core::milk::shader::validate_wgsl`, which is the *same* naga
 //! frontend the engine loads bundles through, so "validates" here is the real
 //! gate rather than a lookalike.
 
@@ -13,7 +13,7 @@ use milkconv::shader::{Stage, translate};
 fn warp(src: &str) -> milkconv::shader::Translated {
     let translated = translate(Stage::Warp, src, true)
         .unwrap_or_else(|e| panic!("must translate: {e}\n---\n{src}"));
-    lmv_core::milk::shader::validate_wgsl(&translated.wgsl)
+    rlx_core::milk::shader::validate_wgsl(&translated.wgsl)
         .unwrap_or_else(|e| panic!("must validate: {e}\n---\n{}", translated.wgsl));
     translated
 }
@@ -138,7 +138,7 @@ fn a_comp_stage_module_validates() {
         false,
     )
     .expect("translates");
-    lmv_core::milk::shader::validate_wgsl(&translated.wgsl).expect("validates");
+    rlx_core::milk::shader::validate_wgsl(&translated.wgsl).expect("validates");
     assert_eq!(translated.blur_level, 3);
 }
 
@@ -312,8 +312,8 @@ fn convert_md2(source: &str) -> milkconv::convert::Converted {
 /// This is the seam Phase 4's waves fell through, asserted for the shaders.
 #[test]
 fn a_milkdrop2_preset_with_both_shaders_converts_and_loads() {
-    use lmv_core::preset::Preset;
-    use lmv_core::render::scenes::GeneratorConfig;
+    use rlx_core::preset::Preset;
+    use rlx_core::render::scenes::GeneratorConfig;
 
     let converted = convert_md2(MD2_PRESET);
     let preset = Preset::from_toml_str(&converted.toml)
@@ -334,7 +334,7 @@ fn a_milkdrop2_preset_with_both_shaders_converts_and_loads() {
 /// this into "loads the rest".
 #[test]
 fn a_bundle_with_invalid_wgsl_is_rejected_at_load() {
-    use lmv_core::preset::Preset;
+    use rlx_core::preset::Preset;
     let toml = "\
 system = \"warp_mesh\"\n\
 name   = \"bad shader\"\n\
@@ -355,10 +355,10 @@ warp_shader = '''\nthis is not wgsl\n'''\n";
 /// Skipped without an adapter (ADR-0016's policy for captures).
 #[test]
 fn a_shader_preset_renders_and_its_shaders_have_effect() {
-    use lmv_core::dsp::AnalysisFrame;
-    use lmv_core::preset::Preset;
-    use lmv_core::render::metrics::coverage;
-    use lmv_core::render::{HeadlessOptions, Renderer};
+    use rlx_core::dsp::AnalysisFrame;
+    use rlx_core::preset::Preset;
+    use rlx_core::render::metrics::coverage;
+    use rlx_core::render::{HeadlessOptions, Renderer};
 
     let mut renderer = match Renderer::new_headless(HeadlessOptions {
         width: 128,
@@ -379,7 +379,7 @@ fn a_shader_preset_renders_and_its_shaders_have_effect() {
         beat: true,
         bar: 0.5,
         waveform: std::array::from_fn(|i| {
-            (i as f32 / lmv_core::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin()
+            (i as f32 / rlx_core::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin()
         }),
         ..Default::default()
     };

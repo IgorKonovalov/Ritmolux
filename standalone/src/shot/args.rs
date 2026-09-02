@@ -3,9 +3,9 @@
 //! function is a total map from its inputs to a value or an error message, and
 //! the error strings are the CLI's user-facing text.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
-use lmv_core::signal::{bass_sine, chord, click_track, dynamic_groove, noise, treble_tone};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
+use rlx_core::signal::{bass_sine, chord, click_track, dynamic_groove, noise, treble_tone};
 
 use super::film::FILMSTRIP_WARMUP;
 

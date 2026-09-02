@@ -10,10 +10,10 @@
 //! frame so reads stay near the write head (NFR section 3).
 //!
 //! This crate is deliberately dependency-free (no wgpu, no audio-source, no
-//! platform types) so `cargo +nightly miri test -p lmv-ring` compiles and runs
+//! platform types) so `cargo +nightly miri test -p rlx-ring` compiles and runs
 //! the SPSC unit tests under Miri in seconds — the fast UB gate the extraction
 //! exists for (Plan 0005). Format validation and the audio-facing `intake`
-//! wrapper live in `lmv-core`'s `audio` module, which re-exports these types.
+//! wrapper live in `rlx-core`'s `audio` module, which re-exports these types.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2). The audio callback and
 // ring must never panic in production; violations fail the build.
@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// Create an SPSC pair over a ring sized to hold at least `capacity_samples`
 /// interleaved samples (rounded up to a power of two so the index mask is
 /// valid). `channels` is the interleaving width the producer rounds pushes to
-/// so a partial write never splits a frame; the caller (lmv-core's `intake`)
+/// so a partial write never splits a frame; the caller (rlx-core's `intake`)
 /// has already validated it.
 pub fn spsc(capacity_samples: usize, channels: u16) -> (SampleProducer, SampleConsumer) {
     let capacity = capacity_samples.max(1).next_power_of_two();

@@ -31,8 +31,8 @@
 //! for this stage does live there — this is the behavioural half beside it. Skips
 //! with no adapter per ADR-0016.
 
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, Tier};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 mod common;
 

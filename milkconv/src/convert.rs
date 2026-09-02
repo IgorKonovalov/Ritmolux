@@ -29,7 +29,7 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use lmv_core::milk::{ElementKind, MilkBundle, MilkElement};
+use rlx_core::milk::{ElementKind, MilkBundle, MilkElement};
 
 use crate::eel::{EelError, Symbols, compile_bundle, compile_into};
 use crate::milk::MilkFile;
@@ -53,7 +53,7 @@ struct Output {
 /// **The whole output roster**, in the reference's own order.
 ///
 /// Every entry is either consumed by
-/// [`warp_mesh`](lmv_core::render::scenes::warp_mesh) or carries the phase that
+/// [`warp_mesh`](rlx_core::render::scenes::warp_mesh) or carries the phase that
 /// owes it. Nothing is silently dropped: the converter walks this list, seeds
 /// each consumed variable from the file's initial condition, and warns by name
 /// for each unconsumed one a preset actually writes.
@@ -351,7 +351,7 @@ pub fn convert(file: &MilkFile, name: &str) -> Result<Converted, ConvertError> {
             })?;
             // The same gate the loader runs, run now — an emitter bug is a
             // converter finding, not a load-time mystery.
-            lmv_core::milk::shader::validate_wgsl(&translated.wgsl).map_err(|err| {
+            rlx_core::milk::shader::validate_wgsl(&translated.wgsl).map_err(|err| {
                 ConvertError::EmitterInvalid {
                     stage: stage.name(),
                     err,
@@ -995,8 +995,8 @@ mod tests {
     /// instead ([`ZOOMEXP_EPILOGUE`]).
     #[test]
     fn every_consumed_output_reaches_the_engine() {
-        use lmv_core::milk::outputs::FRAME_OUTPUT_NAMES;
-        use lmv_core::render::scenes::warp_mesh::PARAMS;
+        use rlx_core::milk::outputs::FRAME_OUTPUT_NAMES;
+        use rlx_core::render::scenes::warp_mesh::PARAMS;
         for out in OUTPUTS {
             if !out.consumed {
                 continue;

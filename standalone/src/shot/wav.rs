@@ -7,7 +7,7 @@
 //! a panic: `shot` is the harness the `preset-author` lane self-verifies through,
 //! and a panic there reads as a broken preset.
 
-use lmv_core::audio::AudioFormat;
+use rlx_core::audio::AudioFormat;
 
 /// Decode uncompressed 16-bit PCM (`fmt ` format tag 1) from a whole WAV file's
 /// bytes into interleaved `-1.0..=1.0` samples plus the header's declared format.

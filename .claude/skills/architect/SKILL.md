@@ -632,12 +632,12 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
 2. **Re-run the whole gate** (`fmt` + `clippy` + `nextest`) after that merge. It is the first moment
    the two lanes' code has met; no earlier run covers the combination.
 
-   **`nextest` here means `--workspace`, not `-p lmv-core`,** and the distinction has already cost a
+   **`nextest` here means `--workspace`, not `-p rlx-core`,** and the distinction has already cost a
    close. Plan 0095 moved the downbeat fold from `beat_index` onto a new bar grid; `standalone/`'s
    `--downbeat-log` writes `beat_index` beside the fold's own alignment scores, so the two columns
    stopped being commensurable and a `standalone` test went red. **`standalone/` was not touched by
    that plan at all** — the diff over its whole range is empty there. `dev`'s close block cited
-   `cargo nextest run -p lmv-core`, the Mode 4 review re-ran the same scope and passed it, and the
+   `cargo nextest run -p rlx-core`, the Mode 4 review re-ran the same scope and passed it, and the
    red was found by the `pre-push` hook — which runs `--workspace` — *after* the plan was closed,
    merged, version-bumped and tagged. A core edit's blast radius does not stop at `core/`, and a
    package-scoped run is structurally unable to see where it lands.

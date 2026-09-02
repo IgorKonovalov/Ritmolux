@@ -97,10 +97,10 @@
 
 use std::io::Write;
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, Tier};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 use super::film::total_hops;
 

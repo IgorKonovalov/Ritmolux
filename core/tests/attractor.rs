@@ -15,10 +15,10 @@
 //! other GPU suites): distinct headless renderers built in parallel each spin up
 //! a WARP device and can crash the software driver.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::scenes::particles::trail_grid_size;
-use lmv_core::render::{
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::scenes::particles::trail_grid_size;
+use rlx_core::render::{
     CaptureImage,
     metrics::{coverage, frame_diff, quadrant_spread},
 };
@@ -782,7 +782,7 @@ fn mean_chroma_over(img: &CaptureImage, mask: &[bool]) -> (f32, f32) {
 /// The cap is a **tier** value now (Plan 0044), so these read the floor tier's —
 /// which is the value they were written against and the one every golden capture
 /// and every `new_headless` renderer uses.
-const CAP: (u32, u32) = lmv_core::render::TierConfig::FLOOR.attractor_trail_cap;
+const CAP: (u32, u32) = rlx_core::render::TierConfig::FLOOR.attractor_trail_cap;
 const CAP_W: u32 = CAP.0;
 const CAP_H: u32 = CAP.1;
 const STEP: u32 = 256;

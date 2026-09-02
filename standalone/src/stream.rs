@@ -295,8 +295,8 @@ pub fn run(
     use std::sync::atomic::Ordering;
     use std::time::Instant;
 
-    use lmv_core::dsp::Analyzer;
-    use lmv_core::render::{HeadlessOptions, Renderer, Tier};
+    use rlx_core::dsp::Analyzer;
+    use rlx_core::render::{HeadlessOptions, Renderer, Tier};
     use standalone::gpu::{self, SenderAdapter};
     use standalone::shot::render::ResidentSet;
     use standalone::spout::{SpoutSender, adapters};

@@ -8,7 +8,7 @@ non-recursive `read_dir` over `presets/` plus a `*.toml` extension filter (ADR-0
 subdirectory is skipped by construction. Files here are version-controlled, reviewable and diffable,
 and reach neither the binary nor the behavioral suite.
 
-**Shipping one is a `git mv` into `presets/`**, gated on `cargo nextest run -p lmv-core` — the same
+**Shipping one is a `git mv` into `presets/`**, gated on `cargo nextest run -p rlx-core` — the same
 gate every other preset passes. Nothing else has to change.
 
 **To work on one in the running app**, point `LMV_PRESET_DIR` at this directory (ADR-0014); the app

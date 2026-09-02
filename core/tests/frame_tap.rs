@@ -21,8 +21,8 @@
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::render::CaptureImage;
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::render::CaptureImage;
 
 mod common;
 

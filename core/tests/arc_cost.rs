@@ -87,9 +87,9 @@ mod common;
 
 use std::time::Instant;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, Tier};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 /// The floor commitment's own resolution (`docs/nfr.md` §1), not the size the
 /// standalone happens to open at: this measurement exists to be read against

@@ -34,7 +34,7 @@ wildcard arm. To add one:
    `EXTRA_FIXTURES` — see below — is a different thing and is not part of adding
    a scene.)
 3. Bless the baseline on Windows WARP:
-   `LMV_BLESS=1 cargo test -p lmv-core --test golden`, then eyeball the new PNG
+   `LMV_BLESS=1 cargo test -p rlx-core --test golden`, then eyeball the new PNG
    under `core/tests/golden/` to confirm the scene actually drew.
 
 Baselines are WARP-only (macOS skips per ADR-0016) and must be blessed on WARP or
@@ -109,7 +109,7 @@ Check `git status` after any bless here and do the same.
 
 Plan 0053 Phase 1, [ADR-0058](../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md).
 It belongs to `core/tests/attractor_trails.rs` and to nothing else, so
-`LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails` rewrites **one**
+`LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites **one**
 file. That is deliberate: `LMV_BLESS` is not scoped to a fixture, so adding this
 to `golden.rs`'s `EXTRA_FIXTURES` would have meant rewriting all 12 of that
 binary's baselines to add one — and three of them (`lsystem`, `parametric_curve`,
@@ -215,7 +215,7 @@ either side of it.
 
 **Since Plan 0040 Phase 1 it also carries a committed baseline**,
 `golden/line_joint_zigzag.png`, blessed with
-`LMV_BLESS=1 cargo test -p lmv-core --test line_joints`. It exists because the
+`LMV_BLESS=1 cargo test -p rlx-core --test line_joints`. It exists because the
 defect that motivated ADR-0041 — the polyline's notch — was pinned by no pixels
 anywhere: `spectrum.toml` below takes the default `bars` layout, and
 `spectrum_ridge` is a shipped preset guarded behaviorally. A shader edit could

@@ -6,7 +6,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-use lmv_core::preset::{Preset, SystemKind, Variables, compile};
+use rlx_core::preset::{Preset, SystemKind, Variables, compile};
 
 /// Global allocator that counts allocation calls **per thread**, so a test can
 /// assert that a region on the current thread performs no heap allocation,
@@ -272,7 +272,7 @@ fn noise_is_continuous_and_bounded_where_hash_is_not() {
     let noise = compile("noise(time)").expect("compiles");
     let hash = compile("hash(time)").expect("compiles");
 
-    let mean_step = |e: &lmv_core::preset::Expr, step: f32| {
+    let mean_step = |e: &rlx_core::preset::Expr, step: f32| {
         let total: f32 = (0..SAMPLES)
             .map(|i| {
                 let t = i as f32 * 0.113;
@@ -403,7 +403,7 @@ fn generator_seed_becomes_the_preset_salt() {
 fn constants_do_not_swallow_unknown_identifiers() {
     assert!(matches!(
         compile("foo"),
-        Err(lmv_core::preset::ExprError::UnknownIdent(name)) if name == "foo"
+        Err(rlx_core::preset::ExprError::UnknownIdent(name)) if name == "foo"
     ));
     // A constant used as a function is an unknown function, not a variable.
     assert!(compile("pi(1)").is_err());
@@ -540,7 +540,7 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
     // A distinct value per field, none of them a plausible neighbour, so a
     // crossed pair reads a wrong number rather than coincidentally matching.
     // `spectrum` is ramped so `bin()` cannot pass by reading a flat array.
-    let frame = lmv_core::dsp::AnalysisFrame {
+    let frame = rlx_core::dsp::AnalysisFrame {
         bass: 0.11,
         mid: 0.22,
         treb: 0.33,
@@ -582,7 +582,7 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.
-    let v = lmv_core::preset::Variables::from_frame(&frame, 7.5);
+    let v = rlx_core::preset::Variables::from_frame(&frame, 7.5);
 
     for (name, expected) in [
         ("bass", 0.11),
@@ -614,13 +614,13 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
 
     // `beat` is a bool on the frame and a float in the grammar, so the
     // conversion is part of the mapping and gets its own claim.
-    let quiet = lmv_core::dsp::AnalysisFrame {
+    let quiet = rlx_core::dsp::AnalysisFrame {
         beat: false,
         ..frame
     };
     let e = compile("beat").expect("compiles");
     assert_eq!(
-        e.eval(&lmv_core::preset::Variables::from_frame(&quiet, 7.5)),
+        e.eval(&rlx_core::preset::Variables::from_frame(&quiet, 7.5)),
         0.0,
         "a frame without a beat must bind `beat` to 0"
     );
@@ -723,13 +723,13 @@ fn bin_is_total_for_every_input() {
 fn bin_is_a_known_function_with_arity_one() {
     assert!(matches!(
         compile("bin(0.1, 0.2)"),
-        Err(lmv_core::preset::ExprError::WrongArity { func, expected: 1, got: 2 }) if func == "bin"
+        Err(rlx_core::preset::ExprError::WrongArity { func, expected: 1, got: 2 }) if func == "bin"
     ));
     assert!(compile("bin()").is_err(), "zero arguments is an error");
     // Bare `bin` is not a variable — the spectrum is reachable only by call.
     assert!(matches!(
         compile("bin"),
-        Err(lmv_core::preset::ExprError::UnknownIdent(name)) if name == "bin"
+        Err(rlx_core::preset::ExprError::UnknownIdent(name)) if name == "bin"
     ));
 }
 
@@ -814,7 +814,7 @@ fn per_element_evaluation_performs_no_heap_allocation() {
 // ---------------------------------------------------------------------------
 
 /// A preset with `body` spliced in after a minimal fragment-field header.
-fn latched(body: &str) -> Result<Preset, lmv_core::preset::PresetError> {
+fn latched(body: &str) -> Result<Preset, rlx_core::preset::PresetError> {
     Preset::from_toml_str(&format!("system = \"fragment_field\"\n{body}"))
 }
 
@@ -1033,9 +1033,9 @@ fn smoothing_a_per_element_binding_warns_instead_of_doing_nothing() {
     };
     assert_eq!(
         tau_of("brightness"),
-        lmv_core::preset::Easing::symmetric(0.3)
+        rlx_core::preset::Easing::symmetric(0.3)
     );
-    assert_eq!(tau_of("thickness"), lmv_core::preset::Easing::INSTANT);
+    assert_eq!(tau_of("thickness"), rlx_core::preset::Easing::INSTANT);
 }
 
 #[test]
@@ -1121,7 +1121,7 @@ paper_hue  = "0.1"
 
     // Every shipped preset is clean — the check must not cry wolf on the
     // curated library.
-    for &(name, src) in lmv_core::preset::EMBEDDED {
+    for &(name, src) in rlx_core::preset::EMBEDDED {
         let preset = Preset::from_toml_str(src)
             .unwrap_or_else(|err| panic!("embedded preset {name} parses: {err}"));
         assert!(
@@ -1150,7 +1150,7 @@ fn load_dir_reports_warnings_alongside_the_loaded_presets() {
     )
     .expect("write preset");
 
-    let report = lmv_core::preset::load_dir(&dir);
+    let report = rlx_core::preset::load_dir(&dir);
     assert_eq!(report.presets.len(), 2, "both presets load");
     assert!(report.errors.is_empty(), "a typo is not an error");
     assert_eq!(report.warnings.len(), 1, "only the typo warns");
@@ -1374,7 +1374,7 @@ const PAN_BLOCK: &[&str] = &["pan_x", "pan_y"];
 /// GPU-backed scenes a headless test cannot instantiate.
 #[test]
 fn declared_params_match_set_param() {
-    use lmv_core::preset::SystemKind;
+    use rlx_core::preset::SystemKind;
 
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
 
@@ -1572,7 +1572,7 @@ fn declared_params_match_set_param() {
 /// lever, and `presets/README.md` explaining the distinction on every mention.
 #[test]
 fn the_additive_particle_scenes_share_one_level_param() {
-    use lmv_core::preset::SystemKind;
+    use rlx_core::preset::SystemKind;
 
     for system in [
         SystemKind::Swarm,
@@ -1735,7 +1735,7 @@ fn bad_presets_are_rejected() {
 /// render a look the author never asked for, with nothing on screen to say so.
 #[test]
 fn the_feedback_table_parses_its_rosters_and_rejects_anything_else() {
-    use lmv_core::render::feedback::{Deposit, Warp};
+    use rlx_core::render::feedback::{Deposit, Warp};
 
     // Absent table: both defaults, i.e. the identity in both fields.
     let bare = Preset::from_toml_str("system = \"swarm\"").expect("valid");
@@ -1788,7 +1788,7 @@ fn the_feedback_table_parses_its_rosters_and_rejects_anything_else() {
 
 #[test]
 fn curve_config_parses_into_structural_config() {
-    use lmv_core::render::scenes::lines::{CurveFamily, GeneratorConfig};
+    use rlx_core::render::scenes::lines::{CurveFamily, GeneratorConfig};
 
     let src = "system = \"parametric_curve\"\n\
                name = \"Rose\"\n\
@@ -1813,7 +1813,7 @@ fn curve_config_parses_into_structural_config() {
 
 #[test]
 fn palette_config_parses_names_stops_and_rejects_bad_tables() {
-    use lmv_core::render::palette::{NamedPalette, Palette, PaletteConfig};
+    use rlx_core::render::palette::{NamedPalette, Palette, PaletteConfig};
 
     // A built-in `name` parses to its config.
     let named = Preset::from_toml_str("system = \"fragment_field\"\n[palette]\nname = \"ember\"\n")
@@ -1876,7 +1876,7 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
 
 #[test]
 fn embedded_default_presets_all_parse() {
-    use lmv_core::preset::{EMBEDDED, Preset, default_presets};
+    use rlx_core::preset::{EMBEDDED, Preset, default_presets};
 
     // The C-ABI / foobar path relies on these rendering without a preset dir.
     // The embedded set is generated from `presets/*.toml` at build time
@@ -1915,7 +1915,7 @@ fn embedded_default_presets_all_parse() {
 /// about whether it teaches what its prose claims.
 #[test]
 fn documentation_example_presets_all_parse() {
-    use lmv_core::preset::Preset;
+    use rlx_core::preset::Preset;
     use std::path::{Path, PathBuf};
 
     // core/tests/ -> core/ -> repo root.
@@ -1984,12 +1984,12 @@ fn load_dir_loads_the_good_and_reports_the_bad() {
     .expect("write bad preset");
     fs::write(dir.join("notes.txt"), "not a preset").expect("write non-toml");
 
-    let report = lmv_core::preset::load_dir(&dir);
+    let report = rlx_core::preset::load_dir(&dir);
     assert_eq!(report.presets.len(), 1, "only the valid .toml loads");
     assert_eq!(report.errors.len(), 1, "the malformed .toml is reported");
 
     // A missing directory is empty, not an error (degrade, never crash).
-    let missing = lmv_core::preset::load_dir(&dir.join("does_not_exist"));
+    let missing = rlx_core::preset::load_dir(&dir.join("does_not_exist"));
     assert!(missing.presets.is_empty() && missing.errors.is_empty());
 
     let _ = fs::remove_dir_all(&dir);
@@ -2010,7 +2010,7 @@ fn load_dir_loads_the_good_and_reports_the_bad() {
 /// that one frame survives would pass on a fix that leaves the state poisoned.
 #[test]
 fn a_non_finite_value_cannot_poison_a_smoother_permanently() {
-    use lmv_core::preset::Easing;
+    use rlx_core::preset::Easing;
     const DT: f32 = 1.0 / 60.0;
     let tau = Easing::symmetric(0.25);
 
@@ -2105,13 +2105,13 @@ fn probed_evaluation_returns_exactly_what_eval_returns_across_the_library() {
     // set rather than a spot check.
     let spectrum: Vec<f32> = (0..64).map(|i| (i as f32 * 0.017).sin().abs()).collect();
     let sweep = variable_sweep(&spectrum);
-    let presets = lmv_core::preset::default_presets();
+    let presets = rlx_core::preset::default_presets();
     assert!(!presets.is_empty(), "the embedded library is not empty");
 
     let mut checked = 0usize;
     for preset in &presets {
         for binding in &preset.params {
-            let mut obs = lmv_core::preset::Observations::new();
+            let mut obs = rlx_core::preset::Observations::new();
             for v in &sweep {
                 let plain = binding.expr.eval(v);
                 let probed = binding.expr.eval_probed(v, &mut obs);
@@ -2140,13 +2140,13 @@ fn a_bare_comparison_is_observed_two_valued_and_arithmetic_is_not_observed_at_al
     // all five attractor presets shipped without ever reseeding.
     let spectrum = [0.0f32; 64];
     let dead = compile("onset > 0.55").expect("compiles");
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for onset in [0.0f32, 0.004, 0.016, 0.1, 0.3] {
         dead.eval_probed(&vars(0.04, 0.006, 0.006, onset, 0.0, 0.0, 0.0), &mut obs);
     }
     assert_eq!(
         obs.node(0),
-        lmv_core::preset::NodeObservation::Compare {
+        rlx_core::preset::NodeObservation::Compare {
             saw_true: false,
             saw_false: true,
         },
@@ -2154,13 +2154,13 @@ fn a_bare_comparison_is_observed_two_valued_and_arithmetic_is_not_observed_at_al
     );
 
     // The same expression against stimuli that straddle 0.55 records both.
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         dead.eval_probed(v, &mut obs);
     }
     assert_eq!(
         obs.node(0),
-        lmv_core::preset::NodeObservation::Compare {
+        rlx_core::preset::NodeObservation::Compare {
             saw_true: true,
             saw_false: true,
         },
@@ -2170,14 +2170,14 @@ fn a_bare_comparison_is_observed_two_valued_and_arithmetic_is_not_observed_at_al
     // Arithmetic carries no branch, so it is not observed — the arena stays
     // sparse rather than growing a slot for every node in the tree.
     let arithmetic = compile("bass + mid").expect("compiles");
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         arithmetic.eval_probed(v, &mut obs);
     }
     assert!(
         obs.nodes()
             .iter()
-            .all(|n| *n == lmv_core::preset::NodeObservation::Untouched),
+            .all(|n| *n == rlx_core::preset::NodeObservation::Untouched),
         "an arithmetic tree records nothing: {:?}",
         obs.nodes()
     );
@@ -2188,7 +2188,7 @@ fn a_condition_that_never_crosses_is_reported_one_sided() {
     // A threshold past even full scale, so this select can only ever pick `y`.
     let dead = compile("select(bass > 1.5, 10, 2)").expect("compiles");
     let spectrum = [0.0f32; 64];
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         dead.eval_probed(v, &mut obs);
     }
@@ -2201,7 +2201,7 @@ fn a_condition_that_never_crosses_is_reported_one_sided() {
     let flag = flags.first().expect("one flag");
     assert_eq!(
         flag.kind,
-        lmv_core::preset::GateKind::Select { always: false },
+        rlx_core::preset::GateKind::Select { always: false },
         "the condition never went true, so the `10` branch is dead"
     );
     assert_eq!(
@@ -2211,7 +2211,7 @@ fn a_condition_that_never_crosses_is_reported_one_sided() {
 
     // ...and a threshold the sweep does cross reports nothing.
     let live = compile("select(bass > 0.05, 10, 2)").expect("compiles");
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         live.eval_probed(v, &mut obs);
     }
@@ -2229,7 +2229,7 @@ fn a_comparison_that_is_a_selects_own_condition_is_not_reported_twice() {
     // check already makes.
     let e = compile("select(bass > 1.5, 10, 2)").expect("compiles");
     let spectrum = [0.0f32; 64];
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         e.eval_probed(v, &mut obs);
     }
@@ -2237,7 +2237,7 @@ fn a_comparison_that_is_a_selects_own_condition_is_not_reported_twice() {
     assert_eq!(flags.len(), 1, "one gate is one finding: {flags:?}");
     assert_eq!(
         flags.first().map(|f| f.kind),
-        Some(lmv_core::preset::GateKind::Select { always: false }),
+        Some(rlx_core::preset::GateKind::Select { always: false }),
         "the surviving flag is the select one, not the comparison"
     );
 }
@@ -2247,7 +2247,7 @@ fn a_bare_comparison_is_reported_as_its_own_gate() {
     // The reseed shape: no `select()` anywhere, so nothing suppresses
     // it and a `select()`-only walk reports nothing.
     let e = compile("onset > 0.55").expect("compiles");
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for onset in [0.0f32, 0.004, 0.016, 0.1, 0.3] {
         e.eval_probed(&vars(0.04, 0.006, 0.006, onset, 0.0, 0.0, 0.0), &mut obs);
     }
@@ -2260,7 +2260,7 @@ fn a_bare_comparison_is_reported_as_its_own_gate() {
     let flag = flags.first().expect("one flag");
     assert_eq!(
         flag.kind,
-        lmv_core::preset::GateKind::Compare { always: false },
+        rlx_core::preset::GateKind::Compare { always: false },
         "the comparison never went true, so the param sat at 0 for the whole run"
     );
     assert_eq!(flag.source, "onset > 0.55", "the flag names the comparison");
@@ -2274,7 +2274,7 @@ fn both_halves_of_a_composite_condition_are_named_separately() {
     // flag whose other half was separately dead. Neither comparison is the
     // `select()`'s direct condition, so neither is suppressed.
     let e = compile("select(min(tempo > 124, bass + treb > 0.38), 4, 1)").expect("compiles");
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     // The probe's own conditions: one BPM, realistic band levels.
     for i in 0..64 {
         let t = i as f32 / 64.0;
@@ -2286,7 +2286,7 @@ fn both_halves_of_a_composite_condition_are_named_separately() {
     let flags = e.flag_gates(&obs);
     let comparisons: Vec<&str> = flags
         .iter()
-        .filter(|f| matches!(f.kind, lmv_core::preset::GateKind::Compare { .. }))
+        .filter(|f| matches!(f.kind, rlx_core::preset::GateKind::Compare { .. }))
         .map(|f| f.source.as_str())
         .collect();
     assert_eq!(
@@ -2306,7 +2306,7 @@ fn both_halves_of_a_composite_condition_are_named_separately() {
     assert_eq!(
         flags
             .iter()
-            .find(|f| matches!(f.kind, lmv_core::preset::GateKind::Select { .. }))
+            .find(|f| matches!(f.kind, rlx_core::preset::GateKind::Select { .. }))
             .map(|f| f.source.as_str()),
         Some("min(tempo > 124, bass + treb > 0.38)"),
     );
@@ -2318,7 +2318,7 @@ fn a_dead_branch_hides_the_gates_inside_it_rather_than_doubling_the_finding() {
     // untouched and silent: fixing the outer gate is what makes it reportable.
     let e = compile("select(bass > 1.5, select(mid > 0.5, 1, 2), 3)").expect("compiles");
     let spectrum = [0.0f32; 64];
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         e.eval_probed(v, &mut obs);
     }
@@ -2341,7 +2341,7 @@ fn a_nodes_index_does_not_move_with_the_branch_the_run_took() {
     let e = compile("select(bass > 0.05, select(mid > 1.5, 1, 2), select(treb < 1.5, 3, 4))")
         .expect("compiles");
     let spectrum = [0.0f32; 64];
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &variable_sweep(&spectrum) {
         e.eval_probed(v, &mut obs);
     }
@@ -2363,13 +2363,13 @@ fn a_clamp_bound_the_value_never_reaches_is_flagged_and_one_it_reaches_is_not() 
     let spectrum = [0.0f32; 64];
     let sweep = variable_sweep(&spectrum);
 
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &sweep {
         decorative.eval_probed(v, &mut obs);
     }
     let flags = decorative.flag_gates(&obs);
     match flags.first().map(|f| f.kind) {
-        Some(lmv_core::preset::GateKind::Clamp {
+        Some(rlx_core::preset::GateKind::Clamp {
             peak_fraction_of_bound,
         }) => assert!(
             peak_fraction_of_bound < 1.0,
@@ -2383,7 +2383,7 @@ fn a_clamp_bound_the_value_never_reaches_is_flagged_and_one_it_reaches_is_not() 
         "the flag names the whole call, bound included"
     );
 
-    let mut obs = lmv_core::preset::Observations::new();
+    let mut obs = rlx_core::preset::Observations::new();
     for v in &sweep {
         reached.eval_probed(v, &mut obs);
     }
@@ -2403,7 +2403,7 @@ fn observations_untouched_by_a_plain_eval_claim_nothing() {
     for _ in 0..100 {
         let _ = e.eval(&v);
     }
-    let untouched = lmv_core::preset::Observations::new();
+    let untouched = rlx_core::preset::Observations::new();
     assert!(untouched.nodes().is_empty(), "eval recorded nothing");
     assert!(
         e.flag_gates(&untouched).is_empty(),
@@ -2445,7 +2445,7 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
         "clamp(bass * 0.001, 0, 0.5) + (mid >= 1.5)",
     ] {
         let e = compile(src).expect("compiles");
-        let mut obs = lmv_core::preset::Observations::new();
+        let mut obs = rlx_core::preset::Observations::new();
         for v in &variable_sweep(&spectrum) {
             e.eval_probed(v, &mut obs);
         }
@@ -2464,7 +2464,7 @@ fn a_flagged_gate_is_named_in_source_that_compiles_back() {
                 "`{}` does not re-render as itself",
                 flag.source
             );
-            if matches!(flag.kind, lmv_core::preset::GateKind::Compare { .. }) {
+            if matches!(flag.kind, rlx_core::preset::GateKind::Compare { .. }) {
                 compared += 1;
             }
         }
@@ -2810,7 +2810,7 @@ fn the_representative_key_defaults_to_false_and_rejects_a_non_boolean() {
 fn every_family_carries_at_least_two_representatives() {
     const FLOOR: usize = 2;
 
-    let presets = lmv_core::preset::default_presets();
+    let presets = rlx_core::preset::default_presets();
     let mut short = Vec::new();
     let mut families = 0usize;
     // `SystemKind::ALL` rather than the families the set happens to contain: it

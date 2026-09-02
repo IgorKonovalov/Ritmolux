@@ -164,11 +164,11 @@ pub enum TierChoice {
 
 impl TierChoice {
     /// The pin this choice represents, or `None` for `auto`.
-    pub fn tier(self) -> Option<lmv_core::render::Tier> {
+    pub fn tier(self) -> Option<rlx_core::render::Tier> {
         match self {
             TierChoice::Auto => None,
-            TierChoice::Floor => Some(lmv_core::render::Tier::Floor),
-            TierChoice::Rich => Some(lmv_core::render::Tier::Rich),
+            TierChoice::Floor => Some(rlx_core::render::Tier::Floor),
+            TierChoice::Rich => Some(rlx_core::render::Tier::Rich),
         }
     }
 }

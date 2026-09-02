@@ -11,8 +11,8 @@
 //! behind. To read the table:
 //!
 //! ```text
-//! cargo nextest run -p lmv-core --test downbeat_probe --no-capture
-//! cargo test -p lmv-core --test downbeat_probe -- --nocapture
+//! cargo nextest run -p rlx-core --test downbeat_probe --no-capture
+//! cargo test -p rlx-core --test downbeat_probe -- --nocapture
 //! ```
 //!
 //! (`.config/nextest.toml` also keeps these two audible on a passing run, the
@@ -23,7 +23,7 @@
 //! two readings taken in the same run, so the machine cancels. No absolute
 //! confidence value is asserted.
 
-use lmv_core::dsp::downbeat::{BEATS_PER_BAR, BarClock, DownbeatTerms, DownbeatTracker};
+use rlx_core::dsp::downbeat::{BEATS_PER_BAR, BarClock, DownbeatTerms, DownbeatTracker};
 
 /// The gate the estimator publishes above. Not re-exported by the module (it is
 /// deliberately private), so it is restated here — if it ever moves, this file's

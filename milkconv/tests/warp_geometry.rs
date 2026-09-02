@@ -37,7 +37,7 @@
 //! the fixed line, which is the reported fingerprint including the ragged edge.
 //!
 //! The negation is **deliberate** and is documented at
-//! [`MilkRuntime::run_vertex`](lmv_core::milk::MilkRuntime::run_vertex): the EEL
+//! [`MilkRuntime::run_vertex`](rlx_core::milk::MilkRuntime::run_vertex): the EEL
 //! per-vertex program's `rad`/`ang` are taken from the +y-up clip-space position
 //! while its `x`/`y` inputs are y-down, and the draw layer reads the same y-down
 //! convention for a shape's own `y` (`draw::uv_to_world`). So the engine carries
@@ -46,9 +46,9 @@
 //! — which is what the test below can and cannot settle, stated in its own
 //! header.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
 /// Capture size, and deliberately **square**: at aspect 1 the polar round trip
 /// is an exact vertical mirror rather than a mirror composed with an aspect

@@ -27,9 +27,9 @@
 
 use std::path::{Path, PathBuf};
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, metrics::frame_diff};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, metrics::frame_diff};
 
 mod common;
 
@@ -288,7 +288,7 @@ fn a_line_on_line_pair_draws_through_two_renderers() {
     // the band levels of `fixed_frame` default to zero — bars of zero height
     // draw nothing. Light the bins so the layer has a figure.
     let mut frame = fixed_frame();
-    frame.spectrum = [0.5; lmv_core::dsp::SPECTRUM_BINS];
+    frame.spectrum = [0.5; rlx_core::dsp::SPECTRUM_BINS];
 
     let toml = "name = \"curve_over_spectrum\"\nsystem = \"parametric_curve\"\n\
                 [params]\nn = \"5\"\nd = \"71\"\n\
@@ -713,7 +713,7 @@ fn a_dark_particle_layer_in_a_multiply_slot() {
 /// capability — a dark figure on a light ground, which is the one thing in this
 /// suite that would notice the darkening modes regressing into additive ones.
 ///
-/// `LMV_BLESS=1 cargo test -p lmv-core --test layer` rewrites these two — and,
+/// `LMV_BLESS=1 cargo test -p rlx-core --test layer` rewrites these two — and,
 /// run against the whole suite instead of this one binary, **every other
 /// baseline as well**. Bless by `--test layer` and check `git status`. Both
 /// baselines were adapter-compared before blessing (the ADR-0058 standing
@@ -788,7 +788,7 @@ fn layered_fixtures_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test layer`",
+            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test layer`",
             path.display()
         );
         let baseline = decode(&path);

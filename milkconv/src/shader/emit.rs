@@ -115,10 +115,10 @@ pub fn emit(stage: Stage, unit: &Unit, tex_wrap: bool) -> Result<Translated, Sha
     }
 
     let group = match stage {
-        Stage::Warp => lmv_core::milk::shader::WARP_GROUP,
-        Stage::Comp => lmv_core::milk::shader::COMP_GROUP,
+        Stage::Warp => rlx_core::milk::shader::WARP_GROUP,
+        Stage::Comp => rlx_core::milk::shader::COMP_GROUP,
     };
-    let mut module = lmv_core::milk::shader::fragment_prelude(group);
+    let mut module = rlx_core::milk::shader::fragment_prelude(group);
 
     // Globals become module-scope `var<private>` — HLSL globals are mutable
     // statics. **Their initializers run at the top of `fs_main`**, not at

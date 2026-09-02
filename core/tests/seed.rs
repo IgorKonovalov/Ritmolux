@@ -16,8 +16,8 @@
 //! if the pin were dropped, the salts it checks differ *are* what the pixels
 //! would then be drawn from.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
 
 mod common;
 

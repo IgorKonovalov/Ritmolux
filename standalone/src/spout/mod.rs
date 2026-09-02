@@ -230,7 +230,7 @@ impl SpoutSender {
     }
 
     /// Publish one frame: tight, row-major, top-to-bottom RGBA8, exactly as
-    /// `lmv_core`'s `CaptureImage` returns it.
+    /// `rlx_core`'s `CaptureImage` returns it.
     ///
     /// A `width` or `height` differing from the last call is handled inside the
     /// SDK, which re-creates the shared texture under the same sender name, so

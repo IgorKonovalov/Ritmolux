@@ -22,7 +22,7 @@ use std::sync::mpsc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
+use rlx_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Media::Audio::{
@@ -119,7 +119,7 @@ impl Drop for CaptureHandle {
 pub enum CaptureError {
     Windows(windows::core::Error),
     UnsupportedMixFormat(String),
-    Format(lmv_core::audio::FormatError),
+    Format(rlx_core::audio::FormatError),
     ThreadDied,
 }
 

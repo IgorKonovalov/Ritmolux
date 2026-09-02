@@ -1,6 +1,6 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows + macOS for every
-# push, plus three single-runner gates - cargo-deny (supply chain), the lmv-core
-# coverage ratchet (ADR-0033), and Miri over lmv-ring's unsafe.
+# push, plus three single-runner gates - cargo-deny (supply chain), the rlx-core
+# coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
 # WARP software adapter makes headless rendering deterministic, which the golden
@@ -15,7 +15,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # ADR-0033 ratchet: line coverage of lmv-core only, measured on Windows where
+  # ADR-0033 ratchet: line coverage of rlx-core only, measured on Windows where
   # the DX12 WARP software adapter makes the render paths genuinely executable.
   # Set from a real measurement minus a margin so an unrelated change does not
   # trip on rounding.
@@ -38,7 +38,7 @@ env:
   # lines, and the denominator moves with any non-test code that lands.
   COVERAGE_FLOOR: "91"
   # The C ABI's own gate (ADR-0072 Negative: without it the ABI's coverage
-  # silently stops being watched the moment it leaves `lmv-core`). Measured
+  # silently stops being watched the moment it leaves `rlx-core`). Measured
   # 56.60% lines. The number is low because most of `core-cabi` is error and
   # null-handle paths plus the catch_unwind wrappers, and it is recorded rather
   # than aspired to - the gate exists to catch a REGRESSION, not to claim the
@@ -62,7 +62,7 @@ jobs:
       # nextest for parallelism + per-test isolation; it does not run doctests,
       # so cover those separately.
       #
-      # `--workspace` is load-bearing since ADR-0072: `lmv-core-cabi` is
+      # `--workspace` is load-bearing since ADR-0072: `rlx-core-cabi` is
       # deliberately outside `default-members` (so a bare `cargo build` stops
       # emitting a cdylib and a 102 MB staticlib nothing links), which means a
       # bare `cargo nextest run` would silently skip the ABI conformance suite
@@ -87,7 +87,7 @@ jobs:
       # has one definition and no consumer can drift from another. Verified by a
       # union check rather than asserted: `-P fast` is a strict SUBSET of the
       # unfiltered `--workspace` set, and every test it defers is in an
-      # `lmv-core` binary.
+      # `rlx-core` binary.
       #
       # SINCE ADR-0157 THE EXCLUSION IS NOT TOTAL, and this job pays for that.
       # The profile unions a 24-preset sample back into `animation`, `reactivity`
@@ -215,7 +215,7 @@ jobs:
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check
 
-  # Coverage ratchet (Plan 0032 Phase 4, ADR-0033). Gates `lmv-core` only:
+  # Coverage ratchet (Plan 0032 Phase 4, ADR-0033). Gates `rlx-core` only:
   # `standalone/` is a winit event loop plus two platform capture backends that
   # no runner can execute, so a workspace-wide number would mostly measure how
   # much of the app is structurally untestable (ADR-0033 Alternative A).
@@ -245,30 +245,30 @@ jobs:
       # nextest` invocation clears stale profile data, so the LAST measuring run
       # is the one the breakdown step below re-reports. This suite is five tests
       # and ~0.1 s, so it costs nothing to put it here.
-      - name: Measure lmv-core-cabi line coverage and enforce its floor
-        run: cargo llvm-cov nextest -p lmv-core-cabi --summary-only --fail-under-lines ${{ env.CABI_COVERAGE_FLOOR }}
-      - name: Measure lmv-core line coverage and enforce the floor
-        run: cargo llvm-cov nextest -p lmv-core --summary-only --fail-under-lines ${{ env.COVERAGE_FLOOR }}
+      - name: Measure rlx-core-cabi line coverage and enforce its floor
+        run: cargo llvm-cov nextest -p rlx-core-cabi --summary-only --fail-under-lines ${{ env.CABI_COVERAGE_FLOOR }}
+      - name: Measure rlx-core line coverage and enforce the floor
+        run: cargo llvm-cov nextest -p rlx-core --summary-only --fail-under-lines ${{ env.COVERAGE_FLOOR }}
       # Re-report from the profile data already collected (no second test run)
       # so the per-file breakdown lands where a reviewer will actually read it.
-      # `-p lmv-core` is load-bearing: without it `report` re-reports every
-      # object in the profile data, which includes lmv-ring, and the summary
+      # `-p rlx-core` is load-bearing: without it `report` re-reports every
+      # object in the profile data, which includes rlx-ring, and the summary
       # under the floor heading would not be the number the step above gates.
       - name: Per-file breakdown in the job summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## lmv-core coverage (floor: ${COVERAGE_FLOOR}% lines)"
+            echo "## rlx-core coverage (floor: ${COVERAGE_FLOOR}% lines)"
             echo ""
             echo '```'
-            cargo llvm-cov report -p lmv-core --summary-only
+            cargo llvm-cov report -p rlx-core --summary-only
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # UB gate (Plan 0005, unblocking Plan 0002's deferred Phase 5). Miri checks
   # the SPSC ring's `unsafe` - the only pure-Rust unsafe in the tree. It runs
-  # against lmv-ring alone: a zero-dependency crate with no wgpu/naga graph, so
+  # against rlx-ring alone: a zero-dependency crate with no wgpu/naga graph, so
   # Miri compiles and interprets it in seconds instead of the whole render
   # stack. Platform-independent unsafe, so once on the cheapest runner.
   miri:
@@ -277,4 +277,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup toolchain install nightly --component miri
       - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly miri test -p lmv-ring
+      - run: cargo +nightly miri test -p rlx-ring

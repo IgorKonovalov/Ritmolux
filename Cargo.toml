@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["core", "core-cabi", "lmv-ring", "milkconv", "standalone"]
+members = ["core", "core-cabi", "rlx-ring", "milkconv", "standalone"]
 # ADR-0072's whole point: `core-cabi` is the only crate emitting a cdylib and a
 # staticlib, and nothing in this workspace links either - the one consumer is
 # the foobar C++ shim, built on demand through plugin-foobar/build.ps1. Leaving
@@ -8,13 +8,13 @@ members = ["core", "core-cabi", "lmv-ring", "milkconv", "standalone"]
 # run` / `cargo nextest run` stop re-emitting ~550 MB of artifacts per core
 # edit. It is still a full member: `--workspace` selects it (CI and the pre-push
 # hook both pass it, so the ABI conformance suite and clippy still cover it),
-# and `cargo build -p lmv-core-cabi` builds it directly.
+# and `cargo build -p rlx-core-cabi` builds it directly.
 #
 # `milkconv` is out for the same reason and a different cost (Plan 0100 / ADR-0113):
 # it is the MilkDrop converter, it NEVER ships, and no shipped artifact depends on
 # it — so the everyday loop should not compile it. Same three ways in: `--workspace`,
 # `-p milkconv`, or its own tests.
-default-members = ["core", "lmv-ring", "standalone"]
+default-members = ["core", "rlx-ring", "standalone"]
 
 [workspace.package]
 # Single source of truth for the application version (ADR-0005). Member crates
@@ -54,7 +54,7 @@ debug = "line-tables-only"
 # that we depend on them.
 #
 # SCOPED TO DEPENDENCIES ON PURPOSE, and widening it is the obvious wrong move:
-# a workspace-wide `opt-level` would optimize `lmv-core` itself, and inlining
+# a workspace-wide `opt-level` would optimize `rlx-core` itself, and inlining
 # muddies the line mapping the ADR-0033 coverage ratchet gates on - so the floor
 # would silently start measuring something other than what it was derived from.
 [profile.dev.package."*"]

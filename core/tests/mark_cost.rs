@@ -82,9 +82,9 @@ mod common;
 
 use std::time::Instant;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer};
 
 /// A realistic frame for this scene, not a stress test: the size the standalone
 /// opens at, where the swarm is one of the heavier families.

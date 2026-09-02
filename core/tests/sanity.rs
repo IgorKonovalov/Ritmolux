@@ -59,7 +59,7 @@
 //! duotone has two large populations, so removing whichever is the ground leaves
 //! the other holding nearly all of what remains either way (ADR-0128).
 
-use lmv_core::{
+use rlx_core::{
     dsp::AnalysisFrame,
     preset::{Preset, SystemKind, default_presets},
     render::{
@@ -350,7 +350,7 @@ const MAX_FLOOR_SLACK: f32 = 2.2;
 /// # What the factor of 2 costs, stated rather than discovered
 ///
 /// This is deliberately the sensitive end of the range, unlike
-/// [`SATURATED_OCCUPANCY`](lmv_core::preset::SATURATED_OCCUPANCY), which took a
+/// [`SATURATED_OCCUPANCY`](rlx_core::preset::SATURATED_OCCUPANCY), which took a
 /// wide margin because a HARD gate firing on good content buys exemptions. The
 /// difference is what "wrong" looks like on each side: an over-driven clamp is a
 /// *number* that stopped moving and a generous threshold still catches it,
@@ -627,7 +627,7 @@ fn excited(level: f32) -> AnalysisFrame {
         onset: level,
         beat: true,
         bar: 0.5,
-        spectrum: [level; lmv_core::dsp::SPECTRUM_BINS],
+        spectrum: [level; rlx_core::dsp::SPECTRUM_BINS],
         ..Default::default()
     }
 }
@@ -1304,7 +1304,7 @@ fn the_pre_repair_ridge_passed_the_old_gate_and_fails_this_one() {
 
     // The historical sampler, reproduced here rather than kept in the file: the
     // frame's own top-left pixel as the background reference.
-    fn corner(img: &lmv_core::render::CaptureImage) -> [u8; 4] {
+    fn corner(img: &rlx_core::render::CaptureImage) -> [u8; 4] {
         [
             img.rgba.first().copied().unwrap_or(0),
             img.rgba.get(1).copied().unwrap_or(0),
@@ -2065,8 +2065,8 @@ fn ground_black(_img: &CaptureImage) -> [u8; 4] {
 /// dominant band, and no shipped preset reaches it (see [`MIN_GROUND_SHARE`]),
 /// so the table is unchanged from the one Phase 2 read.
 ///
-/// [`NO_GROUND`]: lmv_core::render::metrics::NO_GROUND
-/// [`MIN_GROUND_SHARE`]: lmv_core::render::metrics::MIN_GROUND_SHARE
+/// [`NO_GROUND`]: rlx_core::render::metrics::NO_GROUND
+/// [`MIN_GROUND_SHARE`]: rlx_core::render::metrics::MIN_GROUND_SHARE
 fn ground_modal_luma(img: &CaptureImage) -> [u8; 4] {
     modal_ground(img)
 }
@@ -2280,7 +2280,7 @@ fn report_ground_verdict_changes(
 /// Run it with:
 ///
 /// ```text
-/// cargo nextest run -p lmv-core --test sanity --run-ignored all \
+/// cargo nextest run -p rlx-core --test sanity --run-ignored all \
 ///     each_candidate_ground_is_tabled_against_the_library --no-capture
 /// ```
 ///
@@ -2755,7 +2755,7 @@ struct StructureRow {
 /// Run it with:
 ///
 /// ```text
-/// cargo nextest run -p lmv-core --test sanity --run-ignored all ///     each_structure_candidate_is_tabled_against_the_library --no-capture
+/// cargo nextest run -p rlx-core --test sanity --run-ignored all ///     each_structure_candidate_is_tabled_against_the_library --no-capture
 /// ```
 #[test]
 #[ignore = "measurement, not a gate: this informs a mechanical stop condition"]

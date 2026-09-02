@@ -365,7 +365,7 @@ behavioral suite — `sanity`, `reactivity`, `animation` and `distinctness` all 
 embedded set, so a dead or blank preset fails CI for everyone:
 
 ```sh
-cargo nextest run -p lmv-core
+cargo nextest run -p rlx-core
 ```
 
 Know what that green actually covers, because it is weaker than it reads and

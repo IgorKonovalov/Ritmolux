@@ -91,17 +91,17 @@ impl TierSource {
 /// defaulted — an operator who typed `LMV_TIER=rch` is otherwise convinced they
 /// pinned a tier they did not — but the app degrades to the next source down
 /// rather than refusing to start (NFR 10).
-pub fn tier_env() -> Result<Option<lmv_core::render::Tier>, String> {
+pub fn tier_env() -> Result<Option<rlx_core::render::Tier>, String> {
     parse_tier_env(std::env::var_os(TIER_ENV))
 }
 
 /// [`tier_env`]'s rule as a pure function of the raw value.
-fn parse_tier_env(raw: Option<OsString>) -> Result<Option<lmv_core::render::Tier>, String> {
+fn parse_tier_env(raw: Option<OsString>) -> Result<Option<rlx_core::render::Tier>, String> {
     let Some(raw) = raw.filter(|v| !v.is_empty()) else {
         return Ok(None);
     };
     let text = raw.to_string_lossy();
-    lmv_core::render::Tier::from_name(&text)
+    rlx_core::render::Tier::from_name(&text)
         .map(Some)
         .ok_or_else(|| format!("{TIER_ENV}=`{text}`: expected `floor` or `rich`"))
 }
@@ -114,10 +114,10 @@ fn parse_tier_env(raw: Option<OsString>) -> Result<Option<lmv_core::render::Tier
 /// without touching process-global environment state, and a source that failed
 /// to parse is simply `None` here — it does not swallow the sources below it.
 pub fn resolve_tier(
-    flag: Option<lmv_core::render::Tier>,
-    env: Option<lmv_core::render::Tier>,
-    config: Option<lmv_core::render::Tier>,
-) -> (Option<lmv_core::render::Tier>, TierSource) {
+    flag: Option<rlx_core::render::Tier>,
+    env: Option<rlx_core::render::Tier>,
+    config: Option<rlx_core::render::Tier>,
+) -> (Option<rlx_core::render::Tier>, TierSource) {
     match (flag, env, config) {
         (Some(tier), _, _) => (Some(tier), TierSource::Flag),
         (None, Some(tier), _) => (Some(tier), TierSource::Env),
@@ -268,7 +268,7 @@ mod tests {
     /// config beats auto, and each source is reported as what set it.
     #[test]
     fn the_tier_pin_resolves_highest_precedence_first() {
-        use lmv_core::render::Tier;
+        use rlx_core::render::Tier;
 
         // The flag wins even when both lower sources disagree with it.
         assert_eq!(
@@ -294,7 +294,7 @@ mod tests {
     /// would leave the operator convinced they had pinned a tier they had not.
     #[test]
     fn the_tier_env_var_parses_or_reports() {
-        use lmv_core::render::Tier;
+        use rlx_core::render::Tier;
 
         assert_eq!(
             parse_tier_env(Some(OsString::from("floor"))),

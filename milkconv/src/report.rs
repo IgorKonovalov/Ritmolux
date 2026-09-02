@@ -198,10 +198,10 @@ pub fn render_probe(
     report: &mut Report,
     mut progress: impl FnMut(usize, usize),
 ) -> Result<(), String> {
-    use lmv_core::dsp::AnalysisFrame;
-    use lmv_core::preset::Preset;
-    use lmv_core::render::metrics::coverage;
-    use lmv_core::render::{HeadlessOptions, Renderer};
+    use rlx_core::dsp::AnalysisFrame;
+    use rlx_core::preset::Preset;
+    use rlx_core::render::metrics::coverage;
+    use rlx_core::render::{HeadlessOptions, Renderer};
 
     let mut renderer = Renderer::new_headless(HeadlessOptions {
         width: PROBE_SIZE,
@@ -221,9 +221,9 @@ pub fn render_probe(
         onset: 1.0,
         beat: true,
         bar: 0.5,
-        spectrum: [1.0; lmv_core::dsp::SPECTRUM_BINS],
+        spectrum: [1.0; rlx_core::dsp::SPECTRUM_BINS],
         waveform: std::array::from_fn(|i| {
-            (i as f32 / lmv_core::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 4.0).sin()
+            (i as f32 / rlx_core::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 4.0).sin()
         }),
         ..Default::default()
     };
