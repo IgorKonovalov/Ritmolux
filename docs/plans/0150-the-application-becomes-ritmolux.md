@@ -1,7 +1,8 @@
 # 0150 — The application becomes Ritmolux
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-02
+> **Approved:** 2026-09-02 (user) - runs next, once the lanes now live have closed
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0160](../adrs/0160-the-application-is-renamed-to-ritmolux.md)
 > **Blocks:** [0143](0143-the-documentation-gets-a-front-end.md) (parked in writing on this
