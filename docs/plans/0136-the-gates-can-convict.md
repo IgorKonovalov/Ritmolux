@@ -469,6 +469,15 @@ flowchart TB
   *family*, which is what a gallery slot is for. The preset is independent of this
   plan and is not on this branch; `presets/` is still untouched here.
 
+- **The close block's clippy claim below was false when it was written, and is repaired here.**
+  `cargo clippy --workspace --all-targets -- -D warnings` exits 1 on `collapsible_if` at
+  `core/tests/hygiene.rs:608`, the nested `if let` / `if` inside `system_names`. That function is
+  Phase 9's own (`a87983a`) and the shape is already present at `deca944`, the commit that recorded
+  the claim - so the claim did not go stale, it was never true. `main` has never carried the
+  function, so the merge at `332a99e` is not implicated and `main` is not red. Collapsed into an
+  edition-2024 let-chain, which is the lint's own suggestion and changes no behaviour; the four
+  Node gates, `cargo fmt --all --check` and the full suite are green at the tip.
+
 ### Close triggers
 
 - **`presets/` touched:** no. `git diff --name-only main..HEAD -- presets/` is empty.
@@ -485,9 +494,13 @@ flowchart TB
   six entries this plan closes — 0104, 0133, 0162, 0170, 0171, 0173. Every one was written to go red
   on delivery. 0160's and 0161's probes were re-pointed by Phase 8 and hold; no other entry moved.
   The gate's `--self-test` is 13 of 13.
-- **Full suite:** `cargo nextest run --workspace` — **exit 0**, 1500 passed, 5 skipped, 15 slow,
-  477.8 s. Run 2026-09-01 on the development machine after the last phase's commit.
-  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` both clean.
+- **Full suite:** `cargo nextest run --workspace` — **exit 0**, 1503 passed, 5 skipped, 12 slow.
+  Run 2026-09-02 on the development machine at the current tip, which is `main` merged in plus the
+  clippy repair. `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D
+  warnings` are clean at that tip. The earlier reading recorded here — exit 0, 1500 passed, 5
+  skipped, 15 slow, 2026-09-01 after the last phase's commit — was accurate for nextest and **wrong
+  about clippy**; see the last bullet in the Notes. No wall-time figure is given for either run:
+  two sibling lanes exist and neither run was proved to have the machine to itself.
 - **Outstanding `human` phases:** none. Phase 10 was taken 2026-09-01: the twelve
   gallery images were opened and looked at, and `warp_mesh`'s slot was confirmed on
   `warp_wellhead` rather than swapped. Its provenance line in the manifest now records

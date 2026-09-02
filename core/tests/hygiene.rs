@@ -605,10 +605,10 @@ fn system_names(schema: &str) -> Vec<String> {
             continue;
         };
         let _ = rest;
-        if let Some(name) = quoted.rsplit('"').next() {
-            if !name.is_empty() {
-                out.push(name.to_string());
-            }
+        if let Some(name) = quoted.rsplit('"').next()
+            && !name.is_empty()
+        {
+            out.push(name.to_string());
         }
     }
     out
