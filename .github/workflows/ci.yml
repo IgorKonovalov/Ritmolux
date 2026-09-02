@@ -147,6 +147,15 @@ jobs:
       # 188,820 bytes, 16 % of the corpus it indexes, under a convention that
       # had already been written down and had already failed.
       - run: node scripts/check-index-rows.mjs
+      # And that gate's own bite check, which is a separate invocation because the
+      # step above cannot distinguish the two states it exits 0 on: a tree with no
+      # fat row in it, and a row detector that has stopped matching anything.
+      # Replacing its row regexes with regexes that match nothing reports `0 rows,
+      # 0 over cap` and goes green here, at pre-push and at the close alike
+      # (backlog 0104). --self-test asserts the fixture's exact counts, a floor on
+      # the repository's, and the `file:line  N bytes (cap C)` reporting path -
+      # which no other run of this gate executes, since nothing tracked is over cap.
+      - run: node scripts/check-index-rows.mjs --self-test
       # The same job carries the backlog-claim gate (ADR-0108), for the same
       # reason and at the same cost: it re-runs the probes each live entry in
       # docs/design-backlog.md carries beside its claims about this repo. That

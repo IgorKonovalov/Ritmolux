@@ -337,8 +337,23 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   current built-in system set. A single-machine, vendor-dependent tripwire to catch a regression — not
   a portable absolute (a different GPU/driver has a different floor). Vendor spread (Intel iGPU) is a
   pending on-device capture — `docs/on-device-validation.md`.
-- **Our own Rust state stays <~1 MB** (ring buffer ~340 ms of f32, fixed DSP buffers, a few uniform
-  buffers) — unchanged; the target was never our allocations. The **emitter's object pool** (Plan
+- **Our own DSP and audio state stays <~1 MB** (ring buffer ~340 ms of f32, fixed DSP buffers, a few
+  uniform buffers) — unchanged; the target was never our allocations.
+
+  **This line said "our own Rust state" and that was false by roughly an order of magnitude.** A
+  line scene preallocates its geometry buffers to the tier's `max_segments` so the per-frame
+  rebuild and mirror replication never allocate, and those buffers are not DSP state. Measured
+  element sizes are `SegmentInstance` 44 B, `ArcInstance` 36 B, `Piece` 24 B, a walk point 8 B and
+  a walk offset 4 B; at Rich's `max_segments = 60_000` the parametric-curve scene alone holds
+  **5,760,008 B** across `segments`, `single_buf` and `points`. It held **11,760,008 B** until the
+  four fit buffers stopped being preallocated (Plan 0149 Phase 4, closing design-backlog 0135),
+  because `arcs`, `single_arcs`, `pieces` and `walk` are written only by a
+  curve fit that no shipped preset takes.
+
+  The bound this bullet can defend is the one it was measured against, so it now names DSP and
+  audio. **Scene geometry is a separate quantity with a separate ceiling**, and it is a *fixed*
+  allocation in the same sense the emitter pool below is: sized once from the tier, never grown on
+  the hot path. The **emitter's object pool** (Plan
   0052 / [ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) is the
   newest entry here and it stays well inside that line. It is a **fixed** allocation, made once at
   scene construction and never grown — spawning past it drops the spawn rather than reallocating,

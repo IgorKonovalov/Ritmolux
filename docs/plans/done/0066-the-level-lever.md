@@ -12,7 +12,7 @@
 > **Created:** 2026-08-04
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0080](../../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) (accepted 2026-08-05)
-> **Closes:** [design-backlog 0057](../../design-backlog.md#0057--a-preset-has-no-scene-local-way-to-set-a-figures-level-so-exposure-gets-used-for-it-and-two-other-stages-disagree-with-that-use)
+> **Closes:** [design-backlog 0057](../../design-backlog.md)
 
 ## TL;DR
 
@@ -190,7 +190,7 @@ struct Bright {
 - **It does not touch `swarm` or `emitter`.** Both already have `brightness`; this closes the
   asymmetry rather than redesigning the family.
 - **It does not retune the library for the tonemap knee.** That is
-  [backlog 0038](../../design-backlog.md#0038--mid-tone-dominated-presets-lost-8--luminance-to-the-tonemap-knee-and-the-library-has-not-been-retuned),
+  [backlog 0038](../../design-backlog.md),
   already routed to `preset-author`, and it wants `exposure` — which this plan is *freeing up* for
   exactly that use. Doing both at once would confuse which lever bought which change.
 - **It does not move the exposure multiply out of the tonemap.** ADR-0080 Alternative A, rejected

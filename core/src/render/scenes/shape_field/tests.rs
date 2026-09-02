@@ -739,7 +739,7 @@ fn the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets() {
     assert!(
         d_spread > 4.0 * r_spread,
         "the distance mode's spread ({d_spread:.4}) is not meaningfully larger \
-         than the radius mode's ({r_spread:.4}) — on a pentagon an offset curve \
+         than the radius mode's ({r_spread:.4}) — on a triangle an offset curve \
          rounds the corners and a scaled copy keeps them, so if these agree the \
          harness cannot tell the two constructions apart and the assertion above \
          proves nothing"

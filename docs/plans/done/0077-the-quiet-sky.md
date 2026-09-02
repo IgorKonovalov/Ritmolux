@@ -11,11 +11,11 @@
 > **Related ADRs:** [0091](../../adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)
 > (the statistic), [0066](../../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md)
 > (the reseed semantics Phase 3 reuses)
-> **Closes:** [design-backlog 0009](../../design-backlog.md#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational)
-> (the statistic half), [0068](../../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
-> (option 1), [0085](../../design-backlog.md#0085--swarm-has-no-reseed-so-a-flow-field-pile-up-has-no-recovery-lever),
-> [0088](../../design-backlog.md#0088--shot---reports-band-columns-cannot-see-reactivity-spent-on-bloom);
-> discharges [0086](../../design-backlog-archive.md#0086--no-capture-path-reaches-the-minutes-long-horizon-so-a-slow-accumulation-failure-is-invisible-to-every-instrument)'s
+> **Closes:** [design-backlog 0009](../../design-backlog.md)
+> (the statistic half), [0068](../../design-backlog-archive.md)
+> (option 1), [0085](../../design-backlog.md),
+> [0088](../../design-backlog.md);
+> discharges [0086](../../design-backlog-archive.md)'s
 > trigger with a bounded check (0086 itself stays parked)
 > **Queued:** after [Plan 0076](0076-the-second-layer.md) (landed) and Plan 0075's cohort 6, per the
 > 2026-08-11 handoff decision — nothing here gates the collage.

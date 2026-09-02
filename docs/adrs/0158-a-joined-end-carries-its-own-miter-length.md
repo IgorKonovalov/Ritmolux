@@ -1,8 +1,8 @@
 # ADR-0158 — A joined end carries its own miter length, not a flag the shader expands by a half-width
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0149)
 > **Date:** 2026-09-01
-> **Related plan(s):** [0149](../plans/0149-the-line-corners-stop-being-blunt.md)
+> **Related plan(s):** [0149](../plans/done/0149-the-line-corners-stop-being-blunt.md)
 > **Supersedes the geometry half of:** [ADR-0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (its per-endpoint *granularity* stands and is what makes this cheap; what changes is what the
 > endpoint carries)
@@ -10,6 +10,10 @@
 > this grows), [ADR-0023](0023-golden-drift-guard-uses-frozen-fixtures.md) (the golden re-bless this
 > forces)
 > **Backlog entry closed:** [0134](../design-backlog.md)
+> **Depends on:** [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) — the
+> measurement-space question this ADR raised as unresolved was answered, in the negative, by
+> Plan 0149 Phase 2's stop gate. ADR-0160 makes the two spaces similar and this Decision correct
+> as written; see the amended Negative bullet below. **Nothing in the Decision changes.**
 
 ## Context
 
@@ -61,10 +65,24 @@ The producer computes
 
 ```rust
 // illustrative
-ext = (width / (theta * 0.5).sin()).min(MITER_LIMIT * width)
+let miter = width / (theta * 0.5).sin();
+ext = if miter > MITER_LIMIT * width { width } else { miter };
 ```
 
 with `MITER_LIMIT = 4.0`, and passes `0.0` for a free end.
+
+**Corrected 2026-09-02, from Plan 0149 Phase 2's renders.** This block read
+`(width / (theta * 0.5).sin()).min(MITER_LIMIT * width)` — a *truncated miter*, which leaves the
+stroke reaching four half-widths past the vertex along its own direction. The far side of the limit
+turned out not to be the untested edge this ADR assumed: measured on the shipped walks, **86.2 %**
+of `curve_nightbloom`'s joints at `d = 29` are past `28.96` degrees, and **26.4 %** of the
+`parametric_curve` default's, because a Maurer chord web is made of near-reversals. At those shares
+the truncation is visible — the star arms' outer edges grow a burr at 1920x1080. Past the limit the
+joint therefore takes `width`, the flat half-width: a **bevel**, which is what `stroke-miterlimit`
+selects in SVG and what an unmitred joint always drew. The two arms are byte-identical on the
+figures the miter exists for and differ only on the chord webs; the user chose the bevel from the
+rendered comparison. The clamp is recorded here rather than deleted because it is what this ADR
+argued for and what the measurement overturned.
 
 Three properties carry the decision:
 
@@ -75,12 +93,43 @@ Three properties carry the decision:
   around.
 - **`0.0` is exactly "free end", so the flag is not lost, it is subsumed.** A producer that passes
   nothing is byte-identical to today, which is the property ADR-0041 chose its shape for and which
-  keeps `spectrum`'s `Bars` and `RadialRing` baselines still.
+  keeps `spectrum`'s `Bars` and `RadialRing` baselines still. **Scoped to the miter**: it says this
+  decision moves no isolated producer's picture, and nothing more.
+  [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) does move them on any
+  non-square target — a bar is vertical by construction and takes the full aspect factor — for an
+  unrelated reason, and this bullet is not a promise about that.
 - **The miter limit is the near-180-degree rule ADR-0041 had to hand-wave.** `4.0` serves every
-  corner down to `2 * asin(1 / 4) = 28.96 degrees` exactly; below that the extension clamps and the
-  corner bevels as it does today, which is the standard behaviour and a strictly smaller bevel than
-  the current constant produces. The diamond's 61.9-degree vertex needs a factor of **1.945** and
-  is therefore served exactly, with the limit not engaged.
+  corner down to `2 * asin(1 / 4) = 28.96 degrees` exactly; below that the joint takes the flat
+  half-width and bevels exactly as it does today, which is the standard behaviour. The diamond's
+  61.9-degree vertex needs a factor of **1.945** and is therefore served exactly, with the limit not
+  engaged. **This bullet said the extension *clamps* to `MITER_LIMIT * width` and that the far side
+  is a strictly smaller bevel than today's; both are corrected above** — a clamp is larger than
+  today's extension, not smaller, and the far side is the dominant population on a chord web rather
+  than an edge.
+
+**Scope: the four line families, and not `warp_mesh`.** `SegmentInstance` has a seventh producer
+this decision does not reach — `warp_mesh::draw`, the MilkDrop compatibility surface — and it keeps
+the flat half-width at both of its call sites. Three independent reasons, any one sufficient:
+
+- **The premise that supersedes ADR-0041 does not hold there.** This ADR's whole argument is that
+  Plan 0114 took `DEFAULT_SOFTNESS` to `0.25` and left no blur for a blunt corner to hide in.
+  `warp_mesh` does not draw at that value: it pins `MILKDROP_SOFTNESS = 1.0`, the pure quadratic
+  falloff, which is precisely the regime ADR-0041 was reasoning about when it priced a mitred corner
+  and a rounded one as indistinguishable. On that surface **ADR-0041 still stands on its own terms**,
+  and it is not being superseded so much as left alone.
+- **`draw::dots` has no angle to compute one from.** It emits a **zero-length** segment and uses the
+  extension as a **cap**: the half-width at each end is what turns a degenerate quad into a round
+  bead, and without it the mark is a sub-pixel dash that vanishes below 1080p (Plan 0108 Phase 4,
+  design-backlog 0107). `theta` is undefined there, so `width / sin(theta / 2)` is not merely
+  unwanted but meaningless.
+- **It is a measuring instrument with a live measurement pending.** `warp_mesh` is judged against
+  `foo_vis_milk2`, and Plan 0142 is about to write ADR-0113's third Outcome from readings taken on
+  it. Moving its stroke geometry now perturbs the instrument between the question and the answer.
+
+The rule that follows is one line: **the miter is a property of the four line families**
+(`curves`, `parametric`, `turtle`/`lsystem`, `hankin`/`star`, `spectrum`), which draw at
+`DEFAULT_SOFTNESS`. A producer drawing at some other softness passes `width` and keeps ADR-0041's
+geometry.
 
 `MITER_LIMIT = 4.0` is SVG's `stroke-miterlimit` default. It is adopted because it is a published,
 widely-implemented choice for the same geometric problem, not because it was measured here — and
@@ -118,6 +167,33 @@ the plan states it as a named constant with that provenance rather than as a tun
 - **A closed chain's two ends still have no neighbour.** The rosette is closed and every vertex is
   a joint, but a polyline's first and last points are genuinely free and stay bevelled, which is
   correct and is what the existing first/last-point assertion pins.
+- **The miter introduces a dependence on *which space* the angle is measured in, and the flat
+  extension had none.** `width` is a constant: it is the same number at every orientation, so
+  ADR-0041's geometry never had to ask whether the producer's space and the shader's agree. A miter
+  is `width / sin(theta / 2)`, and the shader applies it along `dir` computed **after** the aspect
+  divide, while the producer computes `theta` in **world** coordinates. If those two spaces are not
+  similar, the length is wrong by a factor that varies with the corner's orientation — swept
+  numerically at 16:9 for the diamond's 61.9-degree vertex, the world-space factor lands between
+  **0.705x and 1.609x** of the aspect-corrected one. **It is identically 1.000x at aspect 1.0**,
+  which is the square fixture this ADR's own measurement was taken on and the one the plan specifies.
+  Whether the two spaces are in fact similar is not established here; the plan carries it as a stop
+  gate with a measurement at a non-square target, because no fixture at 1:1 can answer it.
+
+  **Answered 2026-09-01: they are not similar.** Plan 0149 Phase 2's stop gate ran on the Phase 1
+  tree and measured a stroke's on-screen thickness against its orientation at four targets — the
+  vertical/horizontal ratio is `1.0000` at 1000x1000, `1.5789` at 1280x800, `1.7843` at 1920x1080
+  and `0.6333` at 800x1280. **The ratio tracks the aspect**, because the half-width is offset along
+  a normal computed after the aspect divide, in a space where x is compressed relative to y. So a
+  producer cannot compute this ADR's miter length from world coordinates alone, and the phase
+  stopped as instructed.
+
+  **The repair is not in this ADR.** Every option that keeps the clip-space metric changes what
+  `SegmentInstance` carries — the neighbour direction, the bisector, or the aspect handed to
+  producers that build at `configure` — and each was rejected on cost.
+  [ADR-0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) removes the disagreement
+  instead: the stroke moves into world space, `dir` becomes world-space, and the producer's
+  world-space `theta` is then exactly the angle the shader extends along. **This Decision is correct
+  as written and grows the instance by nothing.**
 - **The extension is in world units, so it does not track a per-frame `width` change on its own.**
   Producers recompute per frame anyway — they rebuild the instance buffer — but a future producer
   that caches instances across frames while animating `thickness` would desynchronize the two. The
@@ -144,6 +220,13 @@ hot-path allocation. +4 bytes per existing instance beats +100 % instance count.
 **A true miter computed in the shader, from neighbour endpoints on the instance.** ADR-0041's
 original rejection, and still rejected: 8 floats to 12 is a 50 % instance growth against this
 decision's 10 %, and it duplicates in WGSL an angle the producer already has in Rust.
+
+**Apply the miter to every `SegmentInstance` producer, `warp_mesh` included.** The consistent-looking
+choice, and the one a reader of the Decision would assume. Lost on all three counts in the Scope
+paragraph above, and decisively on the first: `warp_mesh` draws at `MILKDROP_SOFTNESS = 1.0`, so the
+premise this ADR uses to supersede ADR-0041 is simply absent there. Applying it anyway would move
+composite and MilkDrop goldens to fix a defect that surface does not have, and would give
+`draw::dots` a `sin(theta / 2)` with no `theta` in it.
 
 **Widen the constant — extend by `2 * width` instead of `width`.** Cheapest imaginable, one
 character. Lost on being the same error with a different constant: it is exact at

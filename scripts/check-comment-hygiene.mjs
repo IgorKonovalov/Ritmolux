@@ -62,35 +62,26 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
 
-// Build output, vendored deps, and VCS internals hold Rust we do not own.
-// .venv is the Python virtualenv tools/sd-filter installs into: gitignored, and its
-// site-packages ship third-party C and C++ headers this checker is not entitled to
-// judge. The walk reads the filesystem rather than the git index, so an ignored
-// directory is invisible to git status and still scanned here - which is how 490
-// findings in torch and numpy headers came to block a push.
-const SKIP_DIRS = new Set(["target", "node_modules", ".git", ".venv"]);
+// Only the fallback walk below reaches these. Build output and VCS internals
+// hold sources we do not own; the enumeration this script actually uses is git's,
+// which excludes them without being told to.
+const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 
 // The fixture tree carries this checker's own bite check and is skipped on a
 // repo walk, exactly as check-doc-links.mjs skips it; it is scanned when it IS
 // the root, which is the only way its seeded findings are reachable. Skipped BY
 // PATH, not by directory name — the name form also swallowed
 // core/tests/fixtures/ there.
-const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
-
-// Vendored third-party source that lives in the working tree and not in the repo.
-// plugin-foobar/sdk/ is the foobar2000 SDK, gitignored like .venv above: 71 of its
-// C++ files narrate their own history, which is their author's business and not
-// ours to gate. Skipped BY PATH - `sdk` as a bare directory name is generic enough
-// to swallow a directory we do own.
 //
-// Both skips share one cause: this walk reads the filesystem, so a gitignored tree
-// is absent from a fresh CI clone and present locally, and the gate that passes in
-// CI blocks the push that would reach it. Backlog 0170 carries the general form.
-const VENDORED_TREES = new Set([resolve(REPO_ROOT, "plugin-foobar", "sdk")]);
+// This skip is independent of where the file list comes from: these fixtures ARE
+// tracked, so `git ls-files` reaches them and they still have to be excluded
+// whenever they are not the root.
+const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
 
 // Which lexer an extension gets. The two dialects differ in three places that
 // matter to a comment scanner — Rust block comments nest and C's do not, the raw
@@ -106,18 +97,86 @@ const LANGS = new Map([
   [".hpp", "c"],
 ]);
 
-/** Every source file under the root, as `[relative path, lang]` pairs. */
-function sourceFiles(dir = REPO, found = []) {
+/** The lexer for a path's extension, or undefined if this gate does not read it. */
+function langOf(path) {
+  const dot = path.lastIndexOf(".");
+  return dot < 0 ? undefined : LANGS.get(path.slice(dot));
+}
+
+/**
+ * Whether an absolute path sits inside a seeded tree that is not the scan root.
+ *
+ * The root itself is never skipped, which is the whole reason the `root`
+ * argument exists — the seeded findings are reachable only by pointing this
+ * script at them. The filesystem walk got that free by only ever testing a
+ * CHILD directory; enumerating a flat list has to say it.
+ */
+function inSeededTree(abs) {
+  for (const tree of SEEDED_TREES) {
+    if (REPO === tree || REPO.startsWith(tree + sep)) continue; // the root is that tree
+    if (abs === tree || abs.startsWith(tree + sep)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every source file the REPOSITORY holds under the root, as `[path, lang]` pairs.
+ *
+ * ENUMERATED FROM GIT, NOT FROM THE FILESYSTEM, which makes "code we own" and
+ * "code this gate judges" the same set by construction and costs one call. A
+ * filesystem walk cannot tell them apart: a gitignored tree is absent from CI's
+ * fresh clone and present in every working tree, so the CI job is green by
+ * construction and the local push is not. That is not hypothetical — this gate
+ * went from green to 490 findings between two pushes twenty minutes apart with
+ * no commit touching it, 419 of them in `.venv/`'s torch, numpy and markupsafe
+ * headers and 71 in the unpacked foobar2000 SDK, none of it written here. The
+ * natural escape is `--no-verify`, and that is what makes the class worth
+ * closing rather than the instances: a gate that fires on vendor code teaches
+ * its users to skip the gate that fires on theirs. Patching the two trees by
+ * name fixed those two and left the next `pip install` to re-break it.
+ *
+ * The consequence to know: a source file that git has never seen is not judged.
+ * At push time — the only time this runs — every file in the push is committed,
+ * so the window is a file created and not yet added, which is also the window in
+ * which no gate in this repository can see it.
+ */
+function sourceFiles() {
+  try {
+    const out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: REPO,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const found = [];
+    for (const path of out.split("\0")) {
+      if (!path) continue;
+      const lang = langOf(path);
+      if (!lang) continue;
+      if (inSeededTree(resolve(REPO, path))) continue;
+      found.push([path, lang]);
+    }
+    return { files: found, source: "git" };
+  } catch {
+    return { files: walk(), source: "filesystem" };
+  }
+}
+
+/**
+ * The pre-git enumeration, kept as the fallback for a tree git cannot answer for
+ * — no git on PATH, or a source drop that is not a checkout. It is the shape
+ * that produced the 490 findings, so a run that falls back says so rather than
+ * letting a reader assume the tracked set was measured (ADR-0016).
+ */
+function walk(dir = REPO, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      if (VENDORED_TREES.has(full)) continue;
-      sourceFiles(full, found);
+      walk(full, found);
     } else {
-      const dot = entry.name.lastIndexOf(".");
-      const lang = dot < 0 ? undefined : LANGS.get(entry.name.slice(dot));
+      const lang = langOf(entry.name);
       if (lang) found.push([relative(REPO, full), lang]);
     }
   }
@@ -436,9 +495,30 @@ function decodeLiteral(raw) {
   return out;
 }
 
+// The SECOND arm, and the one that catches the defect in the form an author
+// actually types. A raw newline followed immediately by 12 or more spaces and
+// then a non-space is precisely a continuation indent that lost its `\`: the
+// newline survives, the next line's indent survives, and the reader gets a run
+// of spaces mid-sentence. The arm below it catches the same defect only AFTER
+// someone rejoins the lines, which is the form this tree has happened to hold -
+// so the message it prints named a shape it structurally could not see.
+//
+// A formatted block is not this. A table's rows start AT a column and carry
+// their runs between fields; what is rejected here is a leading run, on the
+// line after a break, with text behind it.
+const CONTINUATION_INDENT = /\r?\n {12,}\S/;
+
 /** Report the run and an excerpt for a literal carrying the defect, else null. */
 function brokenLiteral(raw) {
   const text = decodeLiteral(raw);
+
+  // The unrejoined form first, because the newline test below rejects it.
+  const wrapped = CONTINUATION_INDENT.exec(text);
+  if (wrapped) {
+    const run = /\n( +)/.exec(wrapped[0]);
+    return { spaces: run[1].length, excerpt: excerptOf(text), wrapped: true };
+  }
+
   // A literal that still holds a newline after decoding is a formatted BLOCK -
   // a TOML fixture, embedded WGSL, a multi-line report - whose column spacing is
   // layout the author typed. The defect is a wrapped *sentence*: one line of
@@ -453,16 +533,26 @@ function brokenLiteral(raw) {
   if (!/\S/.test(text)) return null;
   const at = hit.index;
   if (at === 0 || at + hit[0].length >= text.length) return null;
-  const excerpt = text.length > 90 ? `${text.slice(0, 87)}...` : text;
-  // A raw newline inside the excerpt would break the one-finding-per-line
-  // report format, so it is shown as the escape it should have been.
-  return { spaces: hit[0].length, excerpt: excerpt.split("\n").join("\\n") };
+  return { spaces: hit[0].length, excerpt: excerptOf(text), wrapped: false };
+}
+
+/**
+ * A one-line excerpt of a literal.
+ *
+ * A raw newline inside it would break the one-finding-per-line report format, so
+ * it is shown as the escape it should have been.
+ */
+function excerptOf(text) {
+  const one = text.split(/\r?\n/).join("\\n");
+  return one.length > 90 ? `${one.slice(0, 87)}...` : one;
 }
 
 const findings = [];
 let escapes = 0;
 
-for (const [file, lang] of sourceFiles()) {
+const { files: sources, source: enumeration } = sourceFiles();
+
+for (const [file, lang] of sources) {
   const show = file.split(sep).join("/");
   const source = readFileSync(join(REPO, file), "utf8");
   const comments = commentLines(source, lang);
@@ -508,17 +598,31 @@ for (const [file, lang] of sourceFiles()) {
     if (allowed.has(line)) continue;
     const broken = brokenLiteral(text);
     if (!broken) continue;
+    // The backslash is doubled because this is a template literal: written once
+    // it is consumed as an escape and the operator reads `with no trailing )`,
+    // which names nothing. The message is about a missing `\`, so it has to
+    // print one.
     findings.push(
       `${show}:${line + 1} -> string literal carries ${broken.spaces} spaces mid-sentence ` +
-        `(a line break with no trailing \): "${broken.excerpt}"`,
+        `(a line break with no trailing \\${broken.wrapped ? ", still unrejoined" : ""}): ` +
+        `"${broken.excerpt}"`,
     );
   }
 }
 
+if (enumeration !== "git") {
+  console.log(
+    "note: git could not list this tree, so the file set came from a filesystem\n" +
+      "      walk. That set includes anything gitignored sitting in the working\n" +
+      "      tree — vendored headers, a virtualenv — which this gate is not\n" +
+      "      entitled to judge and which no checkout contains.",
+  );
+}
+
 if (findings.length === 0) {
   console.log(
-    `comment hygiene: OK (no relative links, no plan-relative narration; ` +
-      `${escapes} escapes in use)`,
+    `comment hygiene: OK (${sources.length} tracked sources, no relative links, ` +
+      `no plan-relative narration; ${escapes} escapes in use)`,
   );
   process.exit(0);
 }

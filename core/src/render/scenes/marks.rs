@@ -20,6 +20,11 @@
 //! `0` at that deepest point, exactly `1` on the outline, and greater than 1
 //! outside it, whatever the shape.
 //!
+//! **One arm is exact only for equal spikes**: a `star` under `star_jitter`
+//! reads `0.076`-`0.085` at the centre rather than `0`, because its divisor is
+//! the unjittered figure's. The section on the repaired reference below carries
+//! why, and it is a property of the shape rather than of this rule.
+//!
 //! Two consequences, both load-bearing:
 //!
 //! - **The `disc` arm is `length(p)` and nothing else.** A unit disc has
@@ -78,8 +83,19 @@
 //! divides by the distance from the origin to its own boundary polyline, walked
 //! from the **unjittered** edge so the divisor stays a property of the figure
 //! rather than of whichever spike a fragment folded onto. `d` is then exactly
-//! `0` at the centre for every curved configuration, and the interior is a
-//! metric field an author can put contours and a `gamma` on. It **changes what a
+//! `0` at the centre **for a figure whose spikes are equal**, and the interior
+//! is a metric field an author can put contours and a `gamma` on.
+//!
+//! **Under `star_jitter` it is not exact, and that is the price of the divisor
+//! being the figure's.** The reference is the unjittered outline while the
+//! distance measured is the fragment's *own* spike's, so the two disagree by
+//! however far that spike was displaced: the coordinate at the centre reads
+//! `0.076`-`0.085` rather than `0` (design-backlog 0144). That is a large
+//! improvement on the `-0.23`..`-0.94` it replaced, and it is the reason the
+//! `star` arm ends in `max(0.0, ...)` — when the asymmetry runs the other way a
+//! fragment can read a hair past its own centre, and a negative coordinate is
+//! what puts a NaN under a bound `gamma`. The guard bounds the error; it does
+//! not remove it. It **changes what a
 //! curved star's interior and exterior look like** — the divisor moved, so the
 //! contour spacing did too — which the straight branch's byte-identity contract
 //! deliberately does not cover, because nothing shipped evaluates the curved one

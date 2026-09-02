@@ -7,11 +7,11 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0160.** *(0120 was reserved for
+**Next free number: 0163.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
-sidecar ADR renumbered to 0122 at its close. The sequence is dense again and nothing is held.)*
+sidecar ADR renumbered to 0122 at its close. **0160 was then claimed twice as well**, on 2026-09-01 by Plan 0149's lane and on 2026-09-02 by Plan 0150 in the main checkout; 0160 stayed with Plan 0149, whose number is cited from Rust doc comments, and the rename ADR took 0162 at Plan 0149's close. The sequence is dense again and nothing is held.)*
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -149,9 +149,9 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | accepted 2026-08-30 (Plan 0115), Outcome, refined by 0146 |
 | [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
 | [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | accepted 2026-08-27 (Plan 0118) |
-| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes - not implementable at Plan 0116, implemented at 0119; completed by 0129, implemented by 0130 |
+| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes; completed by 0129, implemented by 0130, conjunction falsified by 0161 |
 | [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | accepted 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
-| [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119) |
+| [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119), default floor arm falsified by 0161 |
 | [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) | The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm | proposed 2026-08-26 (Plan 0120) |
 | [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
@@ -170,7 +170,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115), Outcome, refines 0125 |
 | [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | accepted 2026-08-30 (Plan 0134), Outcome, supersedes 0141 in part |
 | [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | accepted 2026-08-30 (Plan 0135) |
-| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |
+| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | accepted 2026-09-02 (Plan 0136), extends 0127, Outcome |
 | [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | accepted 2026-09-01 (Plan 0137), Outcome |
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
@@ -179,6 +179,9 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome |
 | [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome |
-| [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | proposed 2026-09-01 (Plan 0149), supersedes the geometry half of 0041 |
+| [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | accepted 2026-09-02 (Plan 0149), supersedes the geometry half of 0041, unblocked by 0160, Decision corrected before acceptance |
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | proposed 2026-09-01 (Plan 0148), amends nfr.md 4 |
+| [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | accepted 2026-09-02 (Plan 0149), supersedes the metric half of 0041, unblocks 0158 |
+| [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | accepted 2026-09-02 (Plan 0149), falsifies 0130's default floor arm |
+| [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | proposed 2026-09-02 (Plan 0150) |
 <!-- roster:end -->

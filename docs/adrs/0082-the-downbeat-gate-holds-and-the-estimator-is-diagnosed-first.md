@@ -36,7 +36,7 @@ bar line was observed — but with the gate shut 97 % of the time there was almo
 one. The mis-accent question is untested, not answered.
 
 There is a tempting move here and it is the wrong one. Recorded as
-[design-backlog 0042](../design-backlog.md#0042--the-downbeat-estimator-locks-on-3--of-audible-time-so-the-gated-bar-variables-are-almost-always-fallback).
+[design-backlog 0042](../design-backlog.md).
 
 ## Decision
 

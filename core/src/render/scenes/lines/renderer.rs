@@ -21,18 +21,99 @@
 
 use crate::render::gpu;
 
-/// [`SegmentInstance::joined`] bit: the `a` end continues a neighbouring
-/// segment, so the quad extends **backward** along its own direction by the
-/// half-width (ADR-0041).
-pub const JOINED_A: u32 = 1 << 0;
-/// [`SegmentInstance::joined`] bit: the `b` end continues a neighbouring
-/// segment, so the quad extends **forward** by the half-width (ADR-0041).
-pub const JOINED_B: u32 = 1 << 1;
+/// The sharpest corner a miter is drawn for, as a multiple of the half-width
+/// the miter would reach (ADR-0158).
+///
+/// A corner of interior angle `theta` needs `width / sin(theta / 2)`, which
+/// grows without bound as the corner sharpens: a spike that doubles back on
+/// itself would reach to infinity and paint a spear across the frame. Past the
+/// limit the joint **reverts to the flat half-width** — a bevel, which is what
+/// `stroke-miterlimit` selects in SVG and what an unmitred joint always drew.
+/// It is a fallback and not a truncation: clamping to `MITER_LIMIT * width`
+/// instead leaves the stroke reaching four half-widths past the vertex along its
+/// own direction, which reads as a burr rather than as a corner.
+///
+/// **`4.0` is adopted, not measured.** It is SVG's `stroke-miterlimit` default,
+/// and it draws exactly every corner at or above
+/// `2 * asin(1 / 4) = 28.96 degrees` — that is the angle at which
+/// `1 / sin(theta / 2)` reaches 4, so the limit is a statement about which
+/// corners are mitred and which are bevelled, not a tuned number (ADR-0071).
+/// `diamond`'s 61.9-degree vertex needs 1.9437 and is well inside it; a Maurer
+/// chord web's near-reversals are the population outside it.
+pub const MITER_LIMIT: f32 = 4.0;
+
+/// The extension a joined end needs to reach its corner's point: the miter
+/// length at `vertex`, where the chain arrives from `prev` and leaves for
+/// `next`, clamped to [`MITER_LIMIT`] half-widths (ADR-0158).
+///
+/// # The expression, and why it carries no trigonometry
+///
+/// For an interior angle `theta` the miter is `width / sin(theta / 2)`. Writing
+/// `d1`, `d2` for the two unit directions, the turn between them is
+/// `theta_turn = pi - theta`, so
+///
+/// ```text
+/// sin(theta / 2) = cos(theta_turn / 2) = sqrt((1 + d1 · d2) / 2)
+/// ```
+///
+/// — a dot product and a square root, with no `acos` to lose precision near the
+/// straight case and no branch on the turn's sign. A straight joint has
+/// `d1 · d2 = 1` and yields exactly `width`, which is the flat half-width, so a
+/// collinear chain is byte-identical to one that extends by `width`.
+///
+/// # Homogeneous of degree 1 in `width`
+///
+/// Both `width / sin(theta / 2)` and the clamp `MITER_LIMIT * width` scale
+/// linearly, so `miter(c * w) == c * miter(w)` and the clamp cannot be engaged
+/// at one width and not another. That is what lets the cached producers compute
+/// this against [`PLACEHOLDER_WIDTH`](super::PLACEHOLDER_WIDTH) at `configure`
+/// and have [`LineInstance::styled`](super::LineInstance::styled) carry it to
+/// this frame's width by the ratio. `theta` survives that too: every transform
+/// between a producer and the shader — uniform scale, rotation, reflection, the
+/// mirror replication, `normalize_fit` — is a similarity, and a similarity
+/// preserves angles.
+///
+/// # Degenerate input
+///
+/// A zero-length arm has no direction, and a chain that doubles back exactly
+/// (`d1 · d2 = -1`) has no reachable point. Both fall back to `width`, the flat
+/// half-width — which is the same value a corner past [`MITER_LIMIT`] takes, so
+/// the degenerate case is the limit case rather than a separate rule.
+pub fn miter_extension(width: f32, prev: [f32; 2], vertex: [f32; 2], next: [f32; 2]) -> f32 {
+    let unit = |from: [f32; 2], to: [f32; 2]| -> Option<[f32; 2]> {
+        let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+        let len = dx.hypot(dy);
+        (len > 1e-9).then(|| [dx / len, dy / len])
+    };
+    let (Some(d1), Some(d2)) = (unit(prev, vertex), unit(vertex, next)) else {
+        return width;
+    };
+    miter_extension_between(width, d1, d2)
+}
+
+/// [`miter_extension`] for a chain that carries its own tangents rather than a
+/// third point — a fitted arc/line chain, where the direction a neighbour
+/// arrives or leaves at is a property of the piece and not of any vertex.
+///
+/// `incoming` and `outgoing` are **unit** directions of travel through the
+/// joint. A G1 joint has them equal, so this returns exactly `width` there and a
+/// tangent-continuous run is byte-identical to one extended by the flat
+/// half-width; only the chain's genuine corners move.
+pub fn miter_extension_between(width: f32, incoming: [f32; 2], outgoing: [f32; 2]) -> f32 {
+    let half = ((1.0 + incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) * 0.5)
+        .max(0.0)
+        .sqrt();
+    if half <= 1.0 / MITER_LIMIT {
+        // Bevel, not a truncated miter — see `MITER_LIMIT`.
+        return width;
+    }
+    width / half
+}
 
 /// One line segment: endpoints `a`/`b` in world space (x is divided by aspect
 /// in the shader, matching the swarm's convention), an RGB colour, a
-/// half-width in NDC-y units (uniform on screen after the aspect divide), and
-/// the per-endpoint connectivity the join needs.
+/// half-width in world units, and the per-endpoint extension length the join
+/// needs.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SegmentInstance {
@@ -42,20 +123,34 @@ pub struct SegmentInstance {
     pub b: [f32; 2],
     /// RGB colour (pre-brightness; additive blend sums overlaps).
     pub color: [f32; 3],
-    /// Half-width in NDC-y units.
+    /// Half-width in **world units** — the isotropic space, where the stroke is
+    /// the same thickness on screen at every orientation (ADR-0160). It is
+    /// numerically an NDC-y half-width: world y and NDC y are the same axis, so
+    /// the horizontal case is the same number in either space and every other
+    /// orientation agrees with it.
+    ///
+    /// **Unless the draw selected [`StrokeMetric::Clip`]**, where this is an NDC
+    /// half-width and the on-screen thickness varies with the segment's
+    /// orientation by up to the aspect. That metric is per draw call rather than
+    /// per instance, and `warp_mesh` is the one surface on it.
     pub width: f32,
-    /// Per-endpoint join flags — [`JOINED_A`] and/or [`JOINED_B`] (ADR-0041).
+    /// How far the quad extends **backward** past `a`, along the segment's own
+    /// direction, in the same world half-width units as [`width`](Self::width).
+    /// `0.0` is a free end (ADR-0158).
     ///
-    /// Connectivity is the **producer's** to declare: only it knows whether an
-    /// end is shared with a neighbour. `0` (neither end joined) renders exactly
-    /// the pre-Plan-0039 geometry, which is what keeps the isolated producers —
-    /// `spectrum`'s `Bars` and `RadialRing` — byte-identical.
+    /// The length is the **producer's** to compute: only it knows whether an end
+    /// is shared with a neighbour and at what interior angle, which is the same
+    /// argument that put connectivity on the producer side. `0.0` renders exactly
+    /// the geometry an unflagged end rendered, because `dir * 0.0` is exactly
+    /// zero — that is what keeps the isolated producers, `spectrum`'s `Bars` and
+    /// `RadialRing`, byte-identical.
     ///
-    /// A bitfield rather than two `f32`s: 4 bytes instead of 8 against
-    /// ADR-0007's fixed-capacity instance buffer, still `Pod` (36 + 4 = 40 with
-    /// no padding at align 4), and it leaves 30 bits for whatever the next
-    /// per-endpoint property turns out to be.
-    pub joined: u32,
+    /// **A length, not a factor.** It is resolved against `width` at
+    /// the moment the producer fills the instance. Every producer in this crate
+    /// rebuilds its instance buffer per frame, so the two cannot drift; a
+    /// producer that ever caches instances across frames while animating
+    /// `thickness` would have to recompute this alongside it.
+    pub ext_a: f32,
     /// **How much of its own footprint this stroke occupies**, on top of the
     /// across-the-stroke falloff — the fragment's alpha is `falloff * alpha`.
     ///
@@ -71,13 +166,23 @@ pub struct SegmentInstance {
     /// producer's real coverage: a MilkDrop waveform at `wave_a = 0.1` must
     /// replace a tenth of what is under it, not all of it (Plan 0100 Phase 4).
     ///
-    /// **Declared last, and that is load-bearing.** `vertex_attr_array!` derives
-    /// each attribute's byte offset from the order of the *shader locations*, so a
-    /// field inserted before `joined` puts location 4 (`Uint32`) over this float
-    /// and location 5 over the flags. The result compiles, renders, and quietly
-    /// reinterprets every stroke's join bits as alpha's mantissa — which is what
-    /// it did, moving five composite golden baselines.
+    /// **Its position in this struct is load-bearing.** `vertex_attr_array!`
+    /// derives each attribute's byte offset from the order of the *shader
+    /// locations*, so a field inserted ahead of this one shifts location 5 onto
+    /// the bytes location 4 is reading and every attribute after it by one slot.
+    /// The result compiles, renders, and quietly reinterprets one field as
+    /// another's mantissa — which is what it did, moving five composite golden
+    /// baselines. **A new field goes last**, which is where
+    /// [`ext_b`](Self::ext_b) is.
     pub alpha: f32,
+    /// How far the quad extends **forward** past `b`. The `b`-end counterpart of
+    /// [`ext_a`](Self::ext_a), in the same units and with the same `0.0`-is-free
+    /// convention.
+    ///
+    /// **Declared last**, for the reason [`alpha`](Self::alpha) records: it was
+    /// appended when the endpoint stopped carrying a flag and started carrying a
+    /// length, and appending is the only placement that re-points nothing.
+    pub ext_b: f32,
 }
 
 /// One **circular arc**: a centre and radius in world space, a signed angular
@@ -91,9 +196,9 @@ pub struct SegmentInstance {
 /// with no vertices at any resolution, where the segment path needs one
 /// instance and one additive joint per sample.
 ///
-/// **No `joined` field: an arc has no interior joints**, which is the whole
-/// point of the primitive. Where two arcs in a chain meet they overlap by
-/// ADR-0041's half-width as any two strokes do, and the additive composite
+/// **No extension fields: an arc has no interior joints**, which is the whole
+/// point of the primitive. Where two arcs in a chain meet they overlap by a
+/// half-width as any two strokes do, and the additive composite
 /// sums that overlap exactly as it does for segments — the bead is reduced by
 /// there being fewer joints, not by a joint doing anything different.
 ///
@@ -121,16 +226,62 @@ pub struct ArcInstance {
     pub angle_sweep: f32,
     /// RGB colour (pre-brightness; additive blend sums overlaps).
     pub color: [f32; 3],
-    /// Half-width in NDC-y units — the same quantity, in the same space, as
+    /// Half-width in world units — the same quantity, in the same space, as
     /// [`SegmentInstance::width`]. Named `width` to match its sibling; it is a
     /// half-width in both.
+    ///
+    /// There is no [`StrokeMetric`] choice here: no arc producer wants the clip
+    /// metric, because `warp_mesh` — the one surface still on it — emits no
+    /// [`ArcInstance`] at all (ADR-0160).
     pub width: f32,
+}
+
+/// **Which space the stroke is measured in** (ADR-0160) — the half-width, the
+/// join extensions and the direction all three are taken along.
+///
+/// A per-draw-call parameter rather than a per-instance field or a second
+/// pipeline: it rides the segment uniform's `v.w`, a lane that was unused, so it
+/// costs no bytes, no bind-group entry and no new resource (ADR-0058).
+///
+/// Explicit at every call site rather than inferred from which entry point the
+/// caller used, so a producer that picks the wrong one is visible in its own
+/// source rather than implicit in a pipeline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StrokeMetric {
+    /// **World space, the isotropic one**: a world displacement `(dx, dy)` lands
+    /// on `(dx * H/2, dy * H/2)` pixels whichever axis it is on, because
+    /// dividing x by the aspect is exactly what squares the space up. So the
+    /// half-width is a thickness on screen and the extension is a length on
+    /// screen, at every orientation.
+    ///
+    /// What the four line families pass, and what makes a producer's
+    /// world-space interior angle the angle the shader extends along (ADR-0158).
+    World,
+    /// **Clip space, the anisotropic one**: one clip x unit is `aspect` times as
+    /// many pixels as one clip y unit, so a vertical stroke is `aspect` times
+    /// thicker on screen than a horizontal one at the same `width`.
+    ///
+    /// `warp_mesh` is the one surface on it, and it is a **dated deferral, not
+    /// an endorsement** — see the comment at its call site.
+    Clip,
+}
+
+impl StrokeMetric {
+    /// The `v.w` lane's value. `World` is `0.0`, so the uniform a line family
+    /// writes is byte-identical to the one written before this existed.
+    fn lane(self) -> f32 {
+        match self {
+            Self::World => 0.0,
+            Self::Clip => 1.0,
+        }
+    }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
-    // x: aspect, y: glow multiplier, z: softness (ADR-0124), w: unused
+    // x: aspect, y: glow multiplier, z: softness (ADR-0124), w: the stroke
+    // metric (ADR-0160) — 0 world, 1 clip
     v: [f32; 4],
     // x: zoom, yz: pan, w: unused — the shared ViewTransform (ADR-0018)
     view: [f32; 4],
@@ -158,8 +309,7 @@ struct Uniforms {
 /// - `0` is a solid stroke whose coverage falls to zero across **one pixel**,
 ///   whatever the stroke width, the resolution or the aspect.
 ///
-/// Shared rather than written twice for the reason [`shader_source`] emits the
-/// join bits from the Rust constants: two copies of a profile is a divergence
+/// Shared rather than written twice: two copies of a profile is a divergence
 /// that compiles, and here it would mean a mandala whose circles and interlace
 /// stop matching.
 ///
@@ -175,9 +325,7 @@ fn stroke_coverage(u: f32, du: f32, softness: f32) -> f32 {
 }
 "#;
 
-/// The WGSL body, minus the join-bit constants and the shared profile —
-/// [`shader_source`] prepends those, the join bits generated from [`JOINED_A`] /
-/// [`JOINED_B`] themselves.
+/// The WGSL body, minus the shared profile — [`shader_source`] prepends that.
 const SHADER_BODY: &str = r#"
 struct Uniforms {
     v: vec4<f32>,
@@ -200,8 +348,9 @@ fn vs_main(
     @location(1) b: vec2<f32>,
     @location(2) color: vec3<f32>,
     @location(3) width: f32,
-    @location(4) joined: u32,
+    @location(4) ext_a: f32,
     @location(5) alpha: f32,
+    @location(6) ext_b: f32,
 ) -> VsOut {
     // (along, side): along runs a->b, side spans -1..1 across the width.
     var corners = array<vec2<f32>, 6>(
@@ -219,10 +368,23 @@ fn vs_main(
     let a_v = a * zoom + pan;
     let b_v = b * zoom + pan;
 
-    // Work in aspect-corrected space so the perpendicular offset is a uniform
-    // on-screen thickness whatever the segment's orientation.
-    let a_s = vec2<f32>(a_v.x * inv_aspect, a_v.y);
-    let b_s = vec2<f32>(b_v.x * inv_aspect, b_v.y);
+    // The stroke is measured in WORLD space, which is the isotropic one: a
+    // world displacement lands on the same number of pixels whichever axis it
+    // is on, because dividing x by the aspect is exactly what squares the space
+    // up. So the perpendicular offset below is a uniform on-screen thickness
+    // whatever the segment's orientation, and the extension is a length on
+    // screen (ADR-0160). The divide happens once, on the way out.
+    //
+    // `v.w` selects the space, per draw call: `warp_mesh` passes the CLIP
+    // metric, which scales x in on the way IN and leaves `out.pos` alone, so
+    // the offset lands in the anisotropic space. Multiplying by exactly 1.0 is
+    // exact in f32, so each arm carries only its own scale - and at aspect 1.0
+    // `inv_aspect` is exactly 1.0 and the two arms are the same arithmetic.
+    let clip_metric = u.v.w > 0.5;
+    let into_stroke = select(1.0, inv_aspect, clip_metric);
+    let out_of_stroke = select(inv_aspect, 1.0, clip_metric);
+    let a_s = vec2<f32>(a_v.x * into_stroke, a_v.y);
+    let b_s = vec2<f32>(b_v.x * into_stroke, b_v.y);
     var dir = b_s - a_s;
     let len = length(dir);
     if (len > 1e-6) {
@@ -232,15 +394,14 @@ fn vs_main(
     }
     let nrm = vec2<f32>(-dir.y, dir.x);
 
-    // Join (ADR-0041): a flagged end continues into a neighbouring segment, so
-    // push the quad past that endpoint by the half-width along its **own**
-    // direction. Adjacent quads then overlap by half a stroke on both sides of
-    // the shared vertex and the additive falloff fills the wedge the two
-    // divergent perpendiculars would otherwise leave. Each end is independent,
-    // and an unflagged end keeps its exact previous geometry — `dir * 0.0` is
-    // exactly zero, so a producer that flags nothing is byte-identical.
-    let ext_a = select(0.0, width, (joined & JOINED_A) != 0u);
-    let ext_b = select(0.0, width, (joined & JOINED_B) != 0u);
+    // Join (ADR-0158): an end that continues into a neighbouring segment is
+    // pushed past that endpoint along its **own** direction by the length the
+    // producer computed for it. Adjacent quads then overlap across the shared
+    // vertex and the additive falloff fills the wedge the two divergent
+    // perpendiculars would otherwise leave. The producer is the only party that
+    // can compute it, because a segment cannot see its neighbour's direction.
+    // Each end is independent, and a free end is exactly `0.0` — `dir * 0.0` is
+    // exactly zero, so a producer that extends nothing is byte-identical.
     let a_j = a_s - dir * ext_a;
     let b_j = b_s + dir * ext_b;
 
@@ -248,7 +409,7 @@ fn vs_main(
     let pos = base + nrm * c.y * width;
 
     var out: VsOut;
-    out.pos = vec4<f32>(pos, 0.0, 1.0);
+    out.pos = vec4<f32>(pos.x * out_of_stroke, pos.y, 0.0, 1.0);
     out.side = c.y;
     out.color = color;
     out.alpha = alpha;
@@ -282,33 +443,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// The full WGSL, with the join bits **generated from the Rust constants**
-/// rather than restated as literals (Plan 0040 Phase 2).
+/// The full WGSL: the shared profile prepended to the body.
 ///
-/// A shader testing `(joined & 1u)` and `(joined & 2u)` against [`JOINED_A`] /
-/// [`JOINED_B`] defined here has nothing tying the two together — a swap or a
-/// renumbering would compile, pass, and render wrongly. Emitting the WGSL
-/// `const`s from the Rust ones makes that divergence **unrepresentable** rather
-/// than merely detected: there is one definition, and the shader reads it by
-/// name. Prepending a generated prelude rather than `format!`-ing the whole body
-/// is deliberate — the body is full of braces, and every one would need
-/// escaping.
+/// **The prelude carries no constants.** An endpoint's extension is an `f32`
+/// length the shader multiplies by a direction (ADR-0158), and a float has no
+/// bit assignment that could disagree with a Rust-side numbering — so there is
+/// nothing here to generate and keep in step.
+///
+/// Prepending rather than `format!`-ing the whole body is deliberate: the body
+/// is full of braces and every one would need escaping.
 ///
 /// Runs once per [`LineRenderer::new`] (pipeline build, not the hot path).
 fn shader_source() -> String {
-    format!(
-        "const JOINED_A: u32 = {JOINED_A}u;\nconst JOINED_B: u32 = \
-         {JOINED_B}u;\n{PROFILE_WGSL}\n{SHADER_BODY}"
-    )
+    format!("{PROFILE_WGSL}\n{SHADER_BODY}")
 }
 
 /// The arc pipeline's full WGSL: [`PROFILE_WGSL`] prepended to [`ARC_SHADER`].
 ///
 /// The two fragments are separate modules, so **the profile is shared by
 /// construction rather than by convention** - the same reason [`shader_source`]
-/// emits the join bits from the Rust constants instead of restating them. Two
-/// hand-kept copies of the expression would compile, render, and give a mandala
-/// whose circles and interlace stop matching.
+/// prepends it instead of the body restating it. Two hand-kept copies of the
+/// expression would compile, render, and give a mandala whose circles and
+/// interlace stop matching.
 ///
 /// Runs once per [`LineRenderer::new_with_arcs`] (pipeline build, not the hot
 /// path).
@@ -332,17 +488,14 @@ fn arc_shader_source() -> String {
 ///
 /// The arc is authored in **world space**, which is isotropic on screen: the
 /// vertex shader divides x by the aspect on the way out, so a world circle is a
-/// circle in pixels. The **stroke**, though, is a half-width in NDC - that is
-/// what the segment path strokes (`nrm * width` is applied after the aspect
-/// divide), and this primitive has to draw the same picture as a densely
-/// sampled polyline of the same arc, not a better one.
+/// circle in pixels. The **stroke** is measured there too (ADR-0160), which is
+/// where the segment path measures it — so the two primitives place geometry
+/// and stroke it in one space, and this arc draws the same picture as a densely
+/// sampled polyline of it.
 ///
-/// So the distance is taken where each half is exact and converted once:
-/// `abs(length(p - c) - r)` is the exact **world** radial distance, and
-/// dividing by the NDC length of that distance's own gradient expresses it in
-/// the NDC metric the stroke is measured in. Outside the angular span the
-/// distance is to the nearer endpoint, which is a point, so that arm
-/// approximates nothing.
+/// So the signed distance is `length(p - c) - r`, the exact world radial
+/// distance, used as it stands. Outside the angular span it is the distance to
+/// the nearer endpoint, which is a point, so that arm is exact too.
 ///
 /// **The aspect is the render target's** (ADR-0037): it arrives in the uniform
 /// `draw` was handed, and there is no internal grid, texture or second size
@@ -421,11 +574,15 @@ fn vs_main(
         }
     }
 
-    // The stroke reaches `width` in NDC on every side, so the world-space pad
-    // is anisotropic even though the stroke is not: one NDC x unit is `aspect`
-    // world units. The 2 % is slack for the distance being a first-order
-    // expression of a curved level set - see the fragment.
-    let pad = vec2<f32>(width * aspect, width) * 1.02;
+    // The stroke reaches `width` in WORLD units on every side (ADR-0160), so
+    // the pad is isotropic in the space this box is built in. The 2 % is slack
+    // for the distance being a first-order expression of a curved level set -
+    // see the fragment.
+    //
+    // The pad has to be at least what the stroke reaches on each axis or the
+    // box clips its own edge, and in world units that is `width` on both -
+    // scaling either axis by the aspect under-pads it on one side of 1.0.
+    let pad = vec2<f32>(width, width) * 1.02;
     let lo_w = centre_v + radius_v * lo_dir - pad;
     let hi_w = centre_v + radius_v * hi_dir + pad;
     let p = mix(lo_w, hi_w, c);
@@ -463,32 +620,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // fragment reads `side` and not `|side|` for the same reason.
     var sd: f32;
     if (t <= in.span.y) {
-        // The exact world radial distance, converted into the NDC metric by
-        // the NDC length of its own gradient: moving one NDC unit along x
-        // covers `aspect` world units, so a radial step is worth that much
-        // less NDC where the arc runs vertically.
-        let dir = select(vec2<f32>(1.0, 0.0), q / len, len > 1e-6);
-        let grad = length(vec2<f32>(dir.x * aspect, dir.y));
-        sd = (len - in.radius) / max(grad, 1e-6);
+        // The exact world radial distance, and the stroke is measured in world
+        // units too (ADR-0160) - so it is used as it stands, with nothing
+        // converted and nothing to keep in step with the segment path.
+        sd = len - in.radius;
     } else {
-        // Past an end: the distance to the nearer endpoint. A point has an
-        // exact NDC distance, so this arm approximates nothing.
+        // Past an end: the world distance to the nearer endpoint. A point has
+        // an exact distance, so this arm approximates nothing.
         let e0 = in.centre + in.radius * vec2<f32>(cos(in.span.x), sin(in.span.x));
         let e1 = in.centre + in.radius * vec2<f32>(cos(in.span.y), sin(in.span.y));
-        let d0 = length(vec2<f32>((p.x - e0.x) / aspect, p.y - e0.y));
-        let d1 = length(vec2<f32>((p.x - e1.x) / aspect, p.y - e1.y));
-        sd = min(d0, d1);
+        sd = min(length(p - e0), length(p - e1));
     }
 
     // The segment path's profile on the arc's own distance - literally the
     // same `stroke_coverage`, prepended to both modules (ADR-0124), so the two
     // fragments cannot draw different strokes on the same figure.
     //
-    // `sd` is an NDC distance and `width` is flat-interpolated, so the
+    // `sd` is a world distance and `width` is flat-interpolated, so the
     // normalized coordinate is `sd / width` and its screen derivative is
-    // `fwidth(sd) / width`: the aspect divides out with the distance it was
-    // already applied to, and the edge stays one pixel of the render target on
-    // a non-16:9 frame. Taken on the signed distance, per its declaration.
+    // `fwidth(sd) / width`. One pixel of the render target is `2 / H` world
+    // units on BOTH axes - `2 * aspect / W` is that same number - so the ramp
+    // is one pixel of the target at every orientation and on any frame. Taken
+    // on the signed distance, per its declaration.
     //
     // Premultiplied, so colour and alpha carry the same coverage and the quad
     // outside the stroke writes nothing at all rather than opaque black
@@ -923,8 +1076,9 @@ impl LineRenderer {
                             1 => Float32x2,
                             2 => Float32x3,
                             3 => Float32,
-                            4 => Uint32,
+                            4 => Float32,
                             5 => Float32,
+                            6 => Float32,
                         ],
                     })],
                 },
@@ -1072,11 +1226,15 @@ impl LineRenderer {
     /// [`lines::DEFAULT_SOFTNESS`](super::DEFAULT_SOFTNESS) for the four line
     /// families, [`warp_mesh::MILKDROP_SOFTNESS`](crate::render::scenes::warp_mesh::MILKDROP_SOFTNESS)
     /// for the MilkDrop surface.
+    ///
+    /// `metric` is the space the stroke is measured in (ADR-0160) and has no
+    /// default either, for the same reason: [`StrokeMetric::World`] for the four
+    /// line families, [`StrokeMetric::Clip`] for `warp_mesh`.
     #[allow(
         clippy::too_many_arguments,
         reason = "distinct GPU handles plus the per-frame draw parameters (aspect, glow, \
-                  softness, view transform); bundling them would only shuffle the same values \
-                  behind a one-use struct"
+                  softness, stroke metric, view transform); bundling them would only shuffle \
+                  the same values behind a one-use struct"
     )]
     pub fn draw(
         &mut self,
@@ -1086,6 +1244,7 @@ impl LineRenderer {
         aspect: f32,
         glow: f32,
         softness: f32,
+        metric: StrokeMetric,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
     ) {
@@ -1096,6 +1255,7 @@ impl LineRenderer {
             aspect,
             glow,
             softness,
+            metric,
             xform,
             segments,
             segments.len(),
@@ -1130,6 +1290,7 @@ impl LineRenderer {
         aspect: f32,
         glow: f32,
         softness: f32,
+        metric: StrokeMetric,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         n_additive: usize,
@@ -1141,6 +1302,7 @@ impl LineRenderer {
             aspect,
             glow,
             softness,
+            metric,
             xform,
             segments,
             n_additive,
@@ -1174,6 +1336,7 @@ impl LineRenderer {
         aspect: f32,
         glow: f32,
         softness: f32,
+        metric: StrokeMetric,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         arcs: &[ArcInstance],
@@ -1185,6 +1348,7 @@ impl LineRenderer {
             aspect,
             glow,
             softness,
+            metric,
             xform,
             segments,
             segments.len(),
@@ -1219,12 +1383,13 @@ impl LineRenderer {
         aspect: f32,
         glow: f32,
         softness: f32,
+        metric: StrokeMetric,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         arcs: &[ArcInstance],
     ) {
         self.draw_all(
-            queue, encoder, view, aspect, glow, softness, xform, segments, 0, arcs, true,
+            queue, encoder, view, aspect, glow, softness, metric, xform, segments, 0, arcs, true,
         );
     }
 
@@ -1245,6 +1410,7 @@ impl LineRenderer {
         aspect: f32,
         glow: f32,
         softness: f32,
+        metric: StrokeMetric,
         xform: super::ViewTransform,
         segments: &[SegmentInstance],
         n_additive: usize,
@@ -1278,7 +1444,7 @@ impl LineRenderer {
             &self.uniforms,
             0,
             bytemuck::bytes_of(&Uniforms {
-                v: [aspect.max(0.1), glow, softness, 0.0],
+                v: [aspect.max(0.1), glow, softness, metric.lane()],
                 view: [xform.zoom, xform.pan[0], xform.pan[1], 0.0],
             }),
         );

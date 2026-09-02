@@ -56,7 +56,7 @@ use std::rc::Rc;
 
 use super::super::Scene;
 use super::super::common;
-use super::renderer::{LineRenderer, SegmentInstance};
+use super::renderer::{LineRenderer, SegmentInstance, StrokeMetric};
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MAX_LSYSTEM_DEPTH, MirrorSpec, OverflowContext,
     ViewTransform, grammar, replicate_mirror, transform_cached, turtle,
@@ -485,6 +485,7 @@ impl Scene for LSystemScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
                 &[],
@@ -497,6 +498,7 @@ impl Scene for LSystemScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.draw_buf,
             );

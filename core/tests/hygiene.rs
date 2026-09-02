@@ -7,7 +7,9 @@
 //!     (`=x.y.z`), per CLAUDE.md ("pin direct dependencies to exact versions").
 //! (c) No scene multiplies the shared clock by a settable field — every bindable
 //!     rate integrates a phase instead (ADR-0132, ADR-0135).
-//! (d) The component size cap in `packaging/foobar/build-component.ps1` is the
+//! (d) Every `SystemKind` has a gallery image in `scripts/docs-shots.mjs`, and
+//!     every gallery entry names a real system (backlog 0133).
+//! (e) The component size cap in `packaging/foobar/build-component.ps1` is the
 //!     one `docs/nfr.md` §4 states (ADR-0159). Two copies of a number is the
 //!     shape this repository keeps finding rot in.
 
@@ -519,8 +521,121 @@ fn collapse_whitespace(text: &str) -> String {
     out
 }
 
+/// (d) Every `SystemKind` has a gallery image in `scripts/docs-shots.mjs`, and
+/// every gallery entry names a real system.
+///
+/// The check lives here rather than inside `scripts/docs-shots.mjs`, whose
+/// manifest it reads, because there it can only run behind a GPU and the only
+/// thing that executes that script is a human at a plan close. It is pure text -
+/// the manifest and `schema.rs`, no render - so it belongs where it fails on the
+/// commit that ships a scene. Inside the script a system with no gallery entry
+/// is a hard error that takes the whole sweep down, including the images that
+/// have nothing to do with it: three systems accumulated over eleven days behind
+/// exactly that, and nothing reported it (backlog 0133).
+///
+/// **It does NOT claim the images are current**, and must not grow into that.
+/// A render is not byte-reproducible across machines - a different GPU, driver
+/// or a WARP fallback moves pixels for reasons unrelated to whether the
+/// documentation is true - so freshness stays a human duty at a named cadence
+/// (ADR-0100). "Every system has a picture" is a different claim, it is
+/// mechanical, and it is the one that failed. Backlog 0133.
+#[test]
+fn every_system_has_a_gallery_image() {
+    let root = workspace_root();
+    let manifest = std::fs::read_to_string(root.join("scripts").join("docs-shots.mjs"))
+        .expect("scripts/docs-shots.mjs is readable");
+    let schema = std::fs::read_to_string(
+        root.join("core")
+            .join("src")
+            .join("preset")
+            .join("schema.rs"),
+    )
+    .expect("core/src/preset/schema.rs is readable");
+
+    let systems = system_names(&schema);
+    assert!(
+        systems.len() >= 12,
+        "read {} system names out of SystemKind::from_name; the parse has broken, \
+         not the roster",
+        systems.len()
+    );
+
+    let gallery = gallery_names(&manifest);
+    assert!(
+        !gallery.is_empty(),
+        "read no gallery entries out of scripts/docs-shots.mjs; the parse has broken"
+    );
+
+    let missing: Vec<&String> = systems.iter().filter(|s| !gallery.contains(*s)).collect();
+    let extra: Vec<&String> = gallery.iter().filter(|g| !systems.contains(*g)).collect();
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "the gallery manifest and SystemKind::from_name disagree.\n  \
+         no docs/images/gallery/<name>.png entry for: {missing:?}\n  \
+         not a system: {extra:?}\n\
+         Add the entry to scripts/docs-shots.mjs and re-run it on a machine with a GPU."
+    );
+
+    // The committed PNG each entry names. Existence, not freshness: a manifest
+    // entry whose file was never rendered is a broken picture in the docs, and
+    // that is checkable without a GPU.
+    for name in &gallery {
+        let png = root
+            .join("docs")
+            .join("images")
+            .join("gallery")
+            .join(format!("{name}.png"));
+        assert!(
+            png.is_file(),
+            "scripts/docs-shots.mjs lists {name} but docs/images/gallery/{name}.png \
+             is not committed"
+        );
+    }
+}
+
+/// The names `SystemKind::from_name` maps, read out of the Rust rather than
+/// mirrored, so a system added later cannot be absent from both sides at once.
+fn system_names(schema: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let start = match schema.find("pub fn from_name(name: &str) -> Option<Self> {") {
+        Some(i) => i,
+        None => return out,
+    };
+    let end = schema[start..]
+        .find("_ => return None")
+        .map(|i| start + i)
+        .unwrap_or(schema.len());
+    for line in schema[start..end].lines() {
+        let Some((quoted, rest)) = line.split_once("\" => SystemKind::") else {
+            continue;
+        };
+        let _ = rest;
+        if let Some(name) = quoted.rsplit('"').next()
+            && !name.is_empty()
+        {
+            out.push(name.to_string());
+        }
+    }
+    out
+}
+
+/// The gallery entries' file stems, read out of the manifest's `out:` fields.
+fn gallery_names(manifest: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in manifest.lines() {
+        let Some((_, rest)) = line.split_once("docs/images/gallery/") else {
+            continue;
+        };
+        let Some((stem, _)) = rest.split_once(".png") else {
+            continue;
+        };
+        if !stem.is_empty() && !out.contains(&stem.to_string()) {
+            out.push(stem.to_string());
+        }
+    }
+    out
 // ---------------------------------------------------------------------------
-// (d) The component's size cap is written down once
+// (e) The component's size cap is written down once
 // ---------------------------------------------------------------------------
 
 /// ADR-0159's stated negative: the recipe now carries a constant that can drift

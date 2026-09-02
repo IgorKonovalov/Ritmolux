@@ -765,8 +765,12 @@ impl Preset {
             };
             let shape = resting("shape").map(crate::render::scenes::marks::mark_shape);
             let mode = resting("coord_mode");
+            // The ceiling is `shape_field`'s own roster, not a literal `1.0`: a
+            // third coordinate would leave a hardcoded bound quietly testing the
+            // wrong thing, and this quantizes the way the scene does.
+            let max_mode = (crate::render::scenes::shape_field::COORD_MODES.len() - 1) as f32;
             if shape == Some(crate::render::scenes::marks::RING_SHAPE)
-                && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, 1.0).round() >= 1.0)
+                && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, max_mode).round() >= 1.0)
             {
                 warnings.push(
                     "parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in \
@@ -2321,6 +2325,22 @@ impl RawGenerator {
             if !raw.radius.is_finite() || !scale.is_finite() || !phase.is_finite() {
                 return Err(PresetError::Config(format!(
                     "ring {i}: radius, scale and phase must all be finite"
+                )));
+            }
+            // A `scallop` reads its ring's `scale` as the lobe's **depth**, and a
+            // negative one is not a shallower dimple: past
+            // `depth = -R * (cos(s) + sin(s) - 1)` the arc's two ends cross to
+            // the far side of its centre, the counter-clockwise sweep runs the
+            // long way round, and the lobe bulges outward to roughly twice the
+            // ring radius. Nothing downstream warns — it is a well-formed arc,
+            // inside the cap, drawn wrong. Refused here rather than drawn,
+            // because whether an inward scallop is a look anyone wants is a
+            // question for the content lane and not a default (ADR-0158's plan,
+            // design-backlog 0136).
+            if motif.is_scallop() && scale < 0.0 {
+                return Err(PresetError::Config(format!(
+                    "ring {i}: a scallop's scale is its lobe depth and must be \
+                     >= 0, got {scale}"
                 )));
             }
             rings.push(RingSpec {

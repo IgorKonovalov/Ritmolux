@@ -13,6 +13,127 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md)
+  — closed 2026-09-02. Six `dev` phases and one `human` phase in the `lmv-plan-0149` lane on
+  `plan-0149-the-line-corners-stop-being-blunt`, `7128ba6`..`d0d596e`. Mode 4: **no blockers, two
+  majors, three minors.** Version: **0.101.0** (minor) — the plan is framed as defect repair and
+  `dev` reported it as a fix, but Phase 2 reverses an accepted architectural decision (ADR-0041
+  priced a mitred corner as indistinguishable from a rounded one) to deliver visibly different
+  geometry in every line preset, and Phase 2a changes the space the whole engine strokes in. That
+  is a feature-grade change of behaviour whatever discharged it.
+
+  **What landed.** `SegmentInstance.joined: u32` became `ext_a: f32` in place at location 4 with
+  `ext_b: f32` appended last (ADR-0158), and every producer in the four line families now computes
+  `width / sin(theta / 2)` for a joined end. `star_zellij`'s outer vertices reach their points and
+  its scalloped border closes. Three riders travelled with it: a load-time refusal of a negative
+  `scallop` ring `scale` (backlog 0136), lazy reservation of `parametric_curve`'s four fit buffers
+  — **5,999,992 B** no longer committed at Rich (backlog 0135) — and four over-stated contracts
+  in `marks.rs` and `schema.rs` (backlog 0144).
+
+  **The plan grew a phase it did not have, and that is the record's most valuable part.** Phase 2
+  carried a stop gate asking whether the space the extension is applied in is the space the
+  producer measures its angle in. It ran and it failed: the vertical/horizontal stroke ratio
+  tracked the aspect — `1.5789` at 1280x800, `1.7843` at 1920x1080, `0.6333` at 800x1280 —
+  because the half-width was offset along a normal computed **after** the aspect divide. Two
+  shipped doc comments asserted the opposite and every line golden had been blessed against the
+  behaviour rather than the claim. Phase 2a (ADR-0160) moved the stroke ahead of the divide, at
+  zero instance cost, and the whole line library now reads a mean **1.52x** lighter at 16:9 — the
+  horizontal thickness it always had. Phase 6 put that to the user from four rendered sheets and
+  the verdict was **no change** to `WIDTH_SCALE`, so Phase 7 landed no commit.
+
+  **Two properties that outlive the plan.** ADR-0037's rule generalizes from a *size* to a
+  *space*: every line fixture renders square — 128x128, 512x512, 96x96 — where world and clip
+  are identical in `f32`, so a fully green suite was no evidence at all. The new
+  `the_stroke_is_as_thick_across_as_it_is_along_whatever_the_orientation` fixture is the answer,
+  and it carries `StrokeMetric::Clip` as a permanent live control that reads the aspect. And
+  `core/tests/sanity.rs`'s `Blown Out` anchor is now a **defect record** (ADR-0161): closing the
+  blot's stepped rim took `boundary_density` under the derived ground from `0.2700` to `0.5697`,
+  because a blot is its own modal band and the term therefore measures its *fringe* —
+  monotonically backwards on the one class of frame it exists to convict. No threshold moved;
+  both assertions were inverted in the `KNOWN_FLAT` shape and each gained the areal reading
+  (`0.0382`) as the positive control that separates a broken statistic from broken conditioning.
+  ADR-0130's default `boundary_floor` arm has no live derivation left.
+
+  **The two majors, both repaired at the close.** ADR-0158's Decision still stated
+  `min(width / sin(theta / 2), MITER_LIMIT * width)` — a truncated miter — where the
+  implementation ships a **bevel** past the limit, a change the user chose from renders after
+  measuring that **86.2 %** of `curve_nightbloom`'s joints at `d = 29` sit past `28.96` degrees
+  and the truncation grows a visible burr. The ADR was still `proposed`, so its Decision and its
+  miter-limit bullet were corrected before acceptance rather than accepted wrong. And five
+  committed documentation images — the four line-scene gallery slots plus `preset-minimal.png`
+  — were rendered at **1280x720** on the pre-miter engine; the close trigger's operator-doc
+  bullet reasoned only about *params*, which is correct and blind to pictures. `docs-shots.mjs`
+  was re-run and **exactly those five moved**; the other fourteen came back byte-identical.
+
+  **The lane also collided with `main` on an ADR number.** This lane wrote ADR-0160 on 2026-09-01
+  and the main checkout wrote a different ADR-0160 for Plan 0150 on 2026-09-02. Neither was
+  pushed; the rename ADR took **0162**, because this lane claimed the number first and its number
+  is cited from twelve Rust doc comments where the rename ADR is cited only from docs. Recorded in
+  the ADR index's numbering note beside the 0120 double-claim.
+
+  **Three minors.** `presets/README.md`'s `thickness` entry called `thickness * 0.003` an *NDC*
+  half-width, which ADR-0160 makes a *world* half-width — the `0.27 px at 1080p` figure survives,
+  only the space label was wrong — **repaired at the close**, with one added line saying the
+  weight is now the same at every orientation, because that is the property an author gained.
+  Left standing: the implementation log is **403 lines against the plan's 343** of
+  `## Implementation phases`, so the report outweighs the contract ADR-0116's argument applies to;
+  and `ArcInstance`'s own doc block says *"a half-width in NDC-y units"* in its header while its
+  `width` field says world units — the two are numerically equal on y, which is exactly why the
+  disagreement is invisible.
+
+- [0136 — The gates can convict](done/0136-the-gates-can-convict.md)
+  — closed 2026-09-02. Nine `dev` phases and one `human` phase in thirteen commits in the
+  `lmv-plan-0136` lane on `plan-0136-the-gates-can-convict`, `df9b7a1`..`93e40bb`, plus `53e5aa1`
+  for the review blocker. Mode 4: **one blocker, two majors, two minors, one nit.** Version:
+  **0.100.1** (patch) — five gates, one test helper, one packaging script and twelve images; no
+  engine, app or C ABI change.
+
+  **What landed.** `check-index-rows.mjs` gained a `--self-test` wired into both call sites, a
+  `scripts/fixtures/index-rows-red/` tree that exits 1, and a **shape** check beside the length one.
+  `check-backlog-claims.mjs` asks git whether a probe path is tracked and stopped collapsing runs of
+  spaces inside a probe's own regex. `check-filter-figures.mjs` demotes an untracked hit to an
+  advisory. `check-comment-hygiene.mjs` and `check-doc-links.mjs` both enumerate from `git ls-files`
+  instead of walking the filesystem, and the by-name `.venv` / `VENDORED_TREES` patches came out.
+  `check-doc-links.mjs` rejects a `design-backlog*.md#` fragment (ADR-0149), and 87 such links
+  across 29 files were rewritten. `docs-shots.mjs` renders again; the gallery is twelve images, and
+  its manifest-vs-`SystemKind` cross-check moved into `core/tests/hygiene.rs`, where it runs in
+  8 ms with no GPU.
+
+  **The blocker is the plan's own thesis, applied to the plan.** `cargo clippy --workspace
+  --all-targets -- -D warnings` — what pre-push and CI both run — failed on Phase 9's new
+  `system_names` helper, while the close block reported it clean. Nothing but re-running it would
+  have found that, which is the argument the whole plan is built on.
+
+  **Every done-when was verified by execution, not by reading.** Backlog 0104's own mutation —
+  `TABLE_ROW` and `BULLET` replaced with a never-matching regex — still exits 0 on a plain run and
+  now collapses `--self-test` to **1/10**. A closed-plan bullet seeded into the active-plans table
+  region is reported at its own line, with the majority rule naming it rather than the thirteen
+  correct rows around it. A present-but-gitignored probe path is named *"not tracked"* instead of
+  *"does not exist"*. A seeded `.venv/pkg/` is invisible to both enumeration gates. A thirteenth
+  `SystemKind` fails the cross-check. Full suite green on the merged branch: **1503 passed, 5
+  skipped**.
+
+  **What the log caught on itself, and is worth keeping.** The fixture bite is **13** findings, not
+  the 10 the plan and backlog 0170 both quoted — those were stale before the plan was written.
+  `warp_mesh` ships four presets, against backlog 0133's and the plan's claim of none, so Phase 10
+  was a real judgement between five candidates once `main`'s `warp_smoke` landed mid-phase;
+  `warp_wellhead` kept the slot because it is the better picture of the *family*. Four manifest
+  provenance lines said "the only X preset" and none was true. And 0173's first probe stays green
+  while the claim it stands for went false — green means the reduction still matches the tree, which
+  is all the gate ever promised.
+
+  **Two majors were the class returning by another door.** The close ceremony's own step 3c still
+  instructed the archived-anchor form ADR-0149 had just prohibited — invisible to the new rule
+  because it sits in a code span, not a link — and would have regenerated it at this very close.
+  And `docs/preset-guide.md`, the illustrated entrance, still carried three *"no picture yet"*
+  headings for systems that now have pictures, including one asserting `warp_mesh` has no shipped
+  preset. Both repaired here.
+
+  **What outlived the plan.** `check-backlog-claims.mjs --self-test` runs at no call site at all —
+  Phase 1 held it up as the model to follow and as the thing that must be wired *"or it is a
+  mechanism nobody runs, which is the defect being repaired"*. The plan's own argument applies to it
+  verbatim, and it fell outside every phase's file list.
+
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md)
   — closed 2026-09-01. Six `dev` phases in eight commits in the `lmv-plan-0137` lane on
   `plan-0137-metrics-light`, `efde516`..`32754b5`. Mode 4: **no blockers, one major, four minors,
@@ -2409,7 +2530,7 @@ were superseded orderings of the active roster.
   `prewarm = 0` (cover `0.0074`, 0 of 10 radial shells) and passes it at `prewarm = 1` (`0.1470`,
   10 of 10). Reactivity is the one still short — `0.0195` against `0.02` — on a draft nobody
   tuned for it. **No gate's capture length, floor or statistic moved**, which is what [backlog
-  0068](../design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+  0068](../design-backlog-archive.md)
   named as the wrong answer; the warm-up got attacked instead. Two deviations, both improvements
   and both declared in their commits: `spawn_fade` landed CPU-side at the draw site rather than
   in the shader (the emitter resolves brightness on the CPU, and the draw site is the seam where

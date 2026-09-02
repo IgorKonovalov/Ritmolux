@@ -9,14 +9,19 @@ use super::*;
 /// (Plan 0044).
 const FLOOR_CAP: usize = crate::render::TierConfig::FLOOR.max_segments;
 
+/// The half-width [`seg`] builds at, and so the extension a joined end carries
+/// in these tests.
+const W: f32 = 0.01;
+
 fn seg(a: [f32; 2], b: [f32; 2]) -> SegmentInstance {
     SegmentInstance {
         a,
         b,
         color: [0.4, 0.7, 1.0],
-        width: 0.01,
+        width: W,
         alpha: 1.0,
-        joined: 0,
+        ext_a: 0.0,
+        ext_b: 0.0,
     }
 }
 
@@ -197,10 +202,15 @@ fn the_overflow_message_names_the_cap_it_carries() {
 /// Plan 0039 Phase 1 done-when 4. Replication moves geometry; it does not
 /// change **topology**. A rotated or reflected copy of a joined chain is
 /// still a joined chain, so every copy must carry its source's per-endpoint
-/// flags through verbatim — dropping them would silently reopen the notch on
-/// every mirrored copy while the un-mirrored original looked correct.
+/// extensions through verbatim — dropping them would silently reopen the notch
+/// on every mirrored copy while the un-mirrored original looked correct.
+///
+/// Verbatim is right *here* because `replicate_mirror` does not restyle: it
+/// places a copy at scale `1.0` and leaves `width` alone, so a length measured
+/// against that width is still measured against it. The sibling test below is
+/// the case where width moves and the extension has to move with it.
 #[test]
-fn the_mirror_carries_the_join_flags_through() {
+fn the_mirror_carries_the_end_extensions_through() {
     let mut single = vec![
         seg([0.1, 0.05], [0.4, 0.2]),
         seg([0.4, 0.2], [0.3, 0.5]),
@@ -208,10 +218,11 @@ fn the_mirror_carries_the_join_flags_through() {
     ];
     // A three-segment chain: the interior vertices are joints, the two outer
     // ends are free — the pattern every chained producer emits.
-    single[0].joined = JOINED_B;
-    single[1].joined = JOINED_A | JOINED_B;
-    single[2].joined = JOINED_A;
-    let expected: Vec<u32> = single.iter().map(|s| s.joined).collect();
+    single[0].ext_b = W;
+    single[1].ext_a = W;
+    single[1].ext_b = W;
+    single[2].ext_a = W;
+    let expected: Vec<(f32, f32)> = single.iter().map(|s| (s.ext_a, s.ext_b)).collect();
 
     for spec in [
         MirrorSpec {
@@ -229,7 +240,7 @@ fn the_mirror_carries_the_join_flags_through() {
         assert_eq!(out.len(), single.len() * spec.copies());
         for (i, produced) in out.iter().enumerate() {
             assert_eq!(
-                produced.joined,
+                (produced.ext_a, produced.ext_b),
                 expected[i % expected.len()],
                 "{spec:?} copy of segment {} lost its connectivity",
                 i % expected.len()
@@ -238,21 +249,50 @@ fn the_mirror_carries_the_join_flags_through() {
     }
 }
 
-/// The same claim for the generator scenes' per-frame transform: rotation,
-/// scale, colour and width are this frame's styling, but connectivity
-/// belongs to the cached structure and survives untouched.
+/// The same claim for the generator scenes' per-frame transform — with the one
+/// difference a *length* makes that a flag did not.
+///
+/// Rotation, scale and colour are this frame's styling and connectivity belongs
+/// to the cached structure, so which ends are extended survives untouched. But
+/// `styled` also stamps this frame's half-width onto a figure cached at a
+/// placeholder one, and an extension is measured in those units (ADR-0158): it
+/// has to be **carried to the new width**, not passed through. A flag needed no
+/// such thing, which is exactly why this is worth pinning — the failure is
+/// invisible until `thickness` moves, and then every joint on the two cached
+/// scenes is extended by the wrong length.
 #[test]
-fn the_cached_transform_carries_the_join_flags_through() {
+fn the_cached_transform_rescales_the_end_extensions_to_this_frames_width() {
     let mut base = vec![seg([0.0, 0.0], [0.3, 0.1]), seg([0.3, 0.1], [0.5, 0.4])];
-    base[0].joined = JOINED_B;
-    base[1].joined = JOINED_A;
+    // `seg` is built at width `W`, and a joined end extends by its own
+    // half-width — the Phase 1 plumbing value.
+    base[0].ext_b = W;
+    base[1].ext_a = W;
 
+    let frame_width = 4.0 * W;
     let mut out = Vec::new();
-    transform_cached(&base, 0.7, 1.4, [0.2, 0.9, 0.3], 0.02, 1.0, &mut out);
+    transform_cached(&base, 0.7, 1.4, [0.2, 0.9, 0.3], frame_width, 1.0, &mut out);
     assert_eq!(out.len(), base.len());
     for (produced, source) in out.iter().zip(&base) {
-        assert_eq!(produced.joined, source.joined);
+        assert_eq!(produced.width, frame_width, "styling still applies");
         assert_ne!(produced.color, source.color, "styling still applies");
+        // Which ends are extended is unchanged; how far is this frame's.
+        assert_eq!(
+            (produced.ext_a > 0.0, produced.ext_b > 0.0),
+            (source.ext_a > 0.0, source.ext_b > 0.0),
+            "the transform must not change which ends are joints"
+        );
+        assert!(
+            (produced.ext_a - source.ext_a * 4.0).abs() < 1e-9,
+            "ext_a rode the width ratio: {} is not 4x {}",
+            produced.ext_a,
+            source.ext_a
+        );
+        assert!(
+            (produced.ext_b - source.ext_b * 4.0).abs() < 1e-9,
+            "ext_b rode the width ratio: {} is not 4x {}",
+            produced.ext_b,
+            source.ext_b
+        );
     }
 }
 

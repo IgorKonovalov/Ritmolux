@@ -324,6 +324,18 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0132 | The metrics module has no level statistic, and every statistic it has reads gamma-encoded code values | [ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md) + [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phases 1-3. **Closed 2026-09-01** |
 | 0151 | The driven floor's sharpest non-vacuity probe is printed and never asserted | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 5; both halves now asserted, mutation-checked. **Closed 2026-09-01** |
 | 0152 | A disjunctive gate made *the shipped library's minimum* ambiguous in both floors' derivations | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 6; re-measured over 81 presets, no constant moved. **Closed 2026-09-01** |
+| 0135 | `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty | [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4, reserved lazily rather than at load — 5,999,992 B not committed, and `nfr.md` 12 corrected. **Closed 2026-09-01** |
+| 0144 | The repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally | [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 5. All four repairs landed; the prose was qualified, the divisor kept. **Closed 2026-09-01** |
+| 0134 | A joined corner is blunt, and the stroke that hid it is gone | [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 2; past the limit a bevel, not a clamp. **Closed 2026-09-02** |
+| 0104 | `check-index-rows.mjs` has no assertion it can convict with, so a dead detector reads exactly like a clean tree | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phases 1-2: `--self-test` at both call sites, plus a red fixture. **Closed 2026-09-02** |
+| 0127 | The figure gate walks the working tree, so a gitignored local note can redden a push | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 6: an untracked hit is an advisory; a tracked one still fails. **Closed 2026-09-02** |
+| 0133 | `docs-shots.mjs` cannot run at all, so the operator-doc image sweep was dead since 2026-08-15 | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 9: three manifest entries, and the cross-check moved to a GPU-free test. **Closed 2026-09-02** |
+| 0143 | Backlog anchors point at bodies that now live in the archive | [ADR-0149](adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) + [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 4: 87 links across 29 files rewritten, the form now prohibited. **Closed 2026-09-02** |
+| 0162 | The claim gate resolves a probe path against the working tree, so an ignored path verifies locally and fails only on CI | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 5: git answers, and the message says *not tracked*. **Closed 2026-09-02** |
+| 0166 | The index-row gate measures a row's bytes and never its shape | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 3: a region's kind is its majority form, and the odd row is named. **Closed 2026-09-02** |
+| 0170 | The comment-hygiene gate walks the filesystem, so a gitignored vendored tree blocks every local push | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7: enumeration moved to `git ls-files`, by-name patches removed. **Closed 2026-09-02** |
+| 0171 | A backlog probe about a run of spaces is collapsed to one space before it is matched, so it can never fire | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 5: only the wrap is absorbed; a fixture probe on a run fires. **Closed 2026-09-02** |
+| 0173 | The literal gate is blind to the defect in its unrejoined form | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7: the continuation-indent arm runs ahead of the newline exclusion. **Closed 2026-09-02** |
 <!-- roster:end -->
 
 ## Open entries
@@ -363,7 +375,7 @@ measure 0.301 when measured to settlement. So "even" is a ~1.8x gap from what th
 produce, in either ordering, at any exponent.
 
 **The want is legitimate and has been asked for twice.** This is the half of
-[0006](design-backlog-archive.md#0006--smoothing-is-a-one-pole-low-pass-no-attackrelease-split-no-s-curve) that
+[0006](design-backlog-archive.md) that
 [ADR-0035](adrs/0035-asymmetric-attack-release-easing.md) deliberately did not take — 0006's origin
 ask was literally "use some qubic bezziere function or something", and the asymmetric one-pole
 answered the *symmetry* half of that defect while leaving the *shape* half untouched. A meter that
@@ -507,7 +519,7 @@ point this entry is the starting measurement rather than a fresh investigation.
 - **For:** `preset-author`. This is genuinely content-lane work; the engine behaved as designed.
 - **ROUTED 2026-08-01 → `preset-author`, as a content pass rather than a plan.** The user's
   call at the Plan 0051 close: this needs no engine change and no ADR, so it goes to the lane
-  directly. It pairs naturally with [0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
+  directly. It pairs naturally with [0040](design-backlog-archive.md) (**closed 2026-08-09**; its retune half is Plan 0071 Phase 5, which this should run with) — both are retunes of the same shipped set
   against a composite whose behaviour has changed under them.
 
 The user's report was "clifford is really dim". Rendering `attractor_clifford` at an identical
@@ -682,7 +694,7 @@ time here too.
 ## Entry 0069 — from Plan 0070's close (2026-08-05)
 
 Its sibling
-**[0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+**[0068](design-backlog-archive.md)
 closed 2026-08-15** at [Plan 0090](plans/done/0090-the-emitters-source-moves.md)'s close — both
 options delivered — and its body is in the archive.
 
@@ -768,7 +780,7 @@ ordering or sorting story the additive pipeline has never required — a filled 
 nothing in this engine has ever had to decide what is in front. That is why
 [ADR-0084](adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) rejected it as a
 bundled decision (Alternative B) rather than on its merits. It also sits adjacent to
-[0040](design-backlog-archive.md#0040--additive-light-occludes-by-geometry-so-a-dim-figure-over-a-lit-backdrop-reads-as-dark-speckle)
+[0040](design-backlog-archive.md)
 and its plan, which is the *other* place the additive model's occlusion behaviour is being
 questioned — anyone taking this should read that first.
 
@@ -982,7 +994,7 @@ The renaissance's first five cohorts (28 worlds, cohort 5 judged live 2026-08-11
 one assembled feedback note. Three of its items are **re-raises** and are recorded as dated
 updates inside [0009](#0009--the-animationrs-gate-penalizes-two-legitimate-designs-informational),
 [0055](#0055--the-attractors-shape-vocabulary-is-breathe-and-bend-and-the-reference-figures-ask-for-more)
-and [0068](design-backlog-archive.md#0068--a-swarm-mark-has-no-per-mark-variation-so-the-only-scene-that-can-hold-a-starfield-cannot-make-one-twinkle)
+and [0068](design-backlog-archive.md)
 rather than as new entries; the two doc drifts it carried went to
 [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 6's sweep list, not here. Each entry
 below carries a **handoff verdict** — promote or park — per that plan's Decision (promotion on
@@ -1101,7 +1113,7 @@ verdict is the trigger, and it is scheduled.
 
 **Raised by:** `architect`, at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md)
 Phase 5, from the three paired runs that closed
-[0083](design-backlog-archive.md#0083--rss-grew-385-to-663-mb-over-three-minutes-of-preset-switching-and-there-is-no-no-feedback-control-to-compare-it-against).
+[0083](design-backlog-archive.md).
 **Owner if taken:** `architect`, and only if the governor is revisited.
 
 - **Verified 2026-08-15** — the governor reads the raw series at a miss fraction, not `p99`:
@@ -1114,7 +1126,7 @@ Phase 5, from the three paired runs that closed
   telling a reader the tail is unremovable by an exclusion nobody is applying.
 
 **This is a new entry rather than an edit to
-[0082](design-backlog-archive.md#0082--the-quality-governor-reads-frame_ms_p99-and-a-preset-switch-spikes-p99-to-25-ms-while-nothing-is-dropped)**,
+[0082](design-backlog-archive.md)**,
 which is closed and archived. It cites it; it does not amend it. 0082 already carries two
 corrections — the governor was built, and it never reads p99. This is a **third**, and it is about
 the half of 0082 that survived both.
@@ -1590,64 +1602,6 @@ question, since sharing `wnd_proc` between both host kinds is deliberate in this
 **Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
 component from my layout" is a bad first impression.
 
-## 0104 — `check-index-rows.mjs` has no assertion that it can convict, so a dead detector reads exactly like a clean tree
-
-Found at Plan 0105's close (2026-08-16), reviewing the gate that plan built.
-
-Of the three checkers in `scripts/`, this is the only one whose fixture asserts **exit 0**.
-`scripts/fixtures/README.md` argues the inversion is correct — *"a byte cap is trivially red on any
-tree with a fat row in it, so the interesting assertion is the reverse"* — and that was true of the
-tree it was written against, which still held 136 over-cap rows. **Phases 2-4 of the same plan made
-it false.** Nothing in the repo now contains a row the gate would reject, so nothing anywhere
-exercises its ability to reject one.
-
-The consequence is that the checker's row detection is unasserted. Demonstrated at the close by
-copying the script and replacing `TABLE_ROW` and `BULLET` with regexes that match nothing: the
-fixture reports `3 regions, 0 rows, 0 over cap` and **exits 0**, and so does the repo run. Every one
-of the three call sites — pre-push, the CI `links` job, the architect close ceremony — goes green.
-The per-file region and row counts the script prints are the documented mitigation, and they are
-*printed*, not asserted; nothing compares them to an expected number.
-
-This is the same non-vacuity class the other two gates were repaired for.
-[Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md) found the link checker
-covering one of markdown's two link forms, and
-[Plan 0094](plans/done/0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name
-skip swallowing a real tree and a whole half of ADR-0108's rule invisible to a bullet-driven check.
-Both now ship fixtures that expect **exit 1 with an exact break count**, and
-`check-backlog-claims.mjs` additionally carries a `--self-test` whose non-vacuity assertion is
-pinned to the real repository rather than to the fixture.
-
-- **Verified 2026-08-16** — the script has no self-test:
-  `absent: self-test in: scripts/check-index-rows.mjs`
-- **Verified 2026-08-16** — its fixture is documented as the one that passes rather than fails:
-  `present: Expect \*\*exit 0\*\* in: scripts/fixtures/README.md`
-- **Verified 2026-08-16** — the sibling gate has the mechanism this one lacks:
-  `present: --self-test in: scripts/check-backlog-claims.mjs`
-
-### What a fix would be
-
-Two shapes, and they are not exclusive. A **second fixture root** — `scripts/fixtures/index-rows-red/`
-with one over-cap row inside a marked region, run as its own root and expected to exit 1 with
-exactly one break — keeps the existing green fixture's four negative assertions intact rather than
-flipping them. Or a **`--self-test`** on the model `check-backlog-claims.mjs` already carries,
-asserting the green fixture's own counts (3 regions, 4 rows) so a detector that finds nothing fails
-loudly. The `--self-test` is the cheaper of the two and covers the demonstrated mutation; the red
-fixture additionally covers the reporting path, which nothing currently runs either.
-
-[ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md) names the *marker*
-hole in its Negative section and pins it as deliberate behavior in the fixture. It does not name
-this one, and its dated `Outcome` now says so.
-
-### Priority
-
-**Medium.** Nothing is broken today — the gate was verified working by hand at Plan 0105's close,
-and the fix is small. What makes it worth an entry is the failure mode: a silent one, in a gate
-whose entire argument ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md))
-is that a rule nothing re-runs is a rule nobody follows. A check that re-runs and cannot fail is the
-same rule wearing a green tick.
-
----
-
 ## 0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank
 
 **Raised by:** `dev` (Plan 0100 Phase 6 log, "followup noticed, not acted on"), filed by
@@ -2095,7 +2049,7 @@ span without a capture.
 **Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
 presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
 
-### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md#0122--a-mode-6-or-7-wave-trace-is-normalized-to-the-frames-height-so-it-covers-1aspect-of-its-width); the amplitude constant **stays live and undecided**.
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md); the amplitude constant **stays live and undecided**.
 
 **The amplitude half stopped, on the branch the phase was given for it.** The reference's
 normalization is not derivable from any source available in this environment: there is no MilkDrop
@@ -2138,7 +2092,7 @@ screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
 **So we render 4.7 % SMALLER than the reference at unit scale, not larger.** The ratio is a single
 number — ours is linear to within 0.9 % across a 4x sweep of `wave_scale` (0.3037 / 0.3019 / 0.3009
 at 0.5 / 1.0 / 2.0) — so `draw.rs`'s mode-6/7 factor of `0.15` implies MilkDrop's is ~`0.157`.
-**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md#0123--the-waveform-is-the-one-un-normalized-analysis-output-so-the-os-volume-slider-changes-the-picture--and-the-two-frontends-disagree)**,
+**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md)**,
 the volume dependence, which is now closed — not a missing base amplitude. This entry's own reading
 of that interaction ("an un-normalized trace times an un-normalized `wave_scale` is hypersensitive")
 was right; the half it attributed to `wave_scale` was not there.
@@ -2287,38 +2241,6 @@ in increasing order of what they disturb:
 **Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
 one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
 
-## 0127 — the figure gate walks the working tree, so a gitignored local note can redden a push
-
-**Raised by:** `architect`, at Plan 0106's close (2026-08-25), when the gate the same plan shipped
-convicted a **gitignored** provenance file under `renders/` that had never been and could never be
-committed. **Owner if taken:** `dev` — it is a scan-set question in one script, not a design one.
-
-- **Verified 2026-08-25** — the walk is filesystem-based and consults no ignore rules:
-  `present: readdirSync in: scripts/check-filter-figures.mjs`
-
-### The finding
-
-`scripts/check-filter-figures.mjs` enumerates candidate markdown by walking directories, skipping a
-hardcoded set (`node_modules`, `target`, `.git`, and the seeded-fixture tree). It never asks git what
-is tracked, so **any local file naming `sd-filter` and carrying a figure fails the pre-push hook** —
-scratch notes, a pasted measurement, a downloaded README. The author's fix is to edit or delete a
-file the repository will never see.
-
-**CI is unaffected and that is why this is small.** The `links` job checks out the tracked tree, so
-gitignored files do not exist there; only the local hook can fire on this. That also means the gate's
-*enforcement* is sound — nothing wrong can reach `main` through this hole — and what is wrong is the
-**local ergonomics**, which is a weaker complaint than it first looks.
-
-**The counter-argument is real and should be costed before this is taken.** A gitignored copy of a
-cost figure still misleads whoever reads it, and this repository's whole reason for the gate is that
-*the copy that broke it was the one outside the list anyone was checking*
-([ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)). Restricting the scan to
-`git ls-files` buys ergonomics and gives up exactly that reach. A middle option — scan the working
-tree, but report an untracked hit as a **warning that does not set the exit code**, in the shape
-`check-backlog-claims.mjs`'s advisory block already uses — keeps both and is probably the answer.
-
-**Not urgent.** One close hit it, once, and editing the offending file took a minute.
-
 ## 0128 — `tonal_flatness` convicts a flat-graphic composition, and no reference tone and no structural statistic repairs it
 
 **Raised by:** `preset-author`, routed 2026-08-25, when a deliberately flat black-and-white preset
@@ -2345,6 +2267,59 @@ threshold to retune.
   the family's own distribution (0.13, half `On White`'s 0.2677) rather than resting on the
   `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
   instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
+
+### Re-opened 2026-09-02 by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) — the discharge above is falsified, and the fringe mechanism this entry named is why
+
+**Read this first. It reverses the section below it.** The repair that discharged this entry's title
+— `metrics::boundary_density` as the conjunction's second term — **does not separate a blot from a
+flat-graphic composition**, and the fringe mechanism *this entry already named* is the reason. The
+separation ADR-0130 shipped was an artifact of one fixture's rasterized rim.
+
+Plan 0149 Phase 2 gives joined corners their miter length, which closes the stepped notches around
+`blown_out`'s rim. Measured on that tree at this suite's own capture (96x96, `FRAMES = 30`, all bands
+at `LOUD = 1.0`, backdrop suppressed, hardware adapter):
+
+| lens | `coverage` | `tonal_flatness` | `boundary_density` | shells |
+|---|---|---|---|---|
+| `BLACK` (areal) | 0.9666 | 0.9983 | **0.0382** | 10/10 |
+| derived ground `[159, 254, 202]` | 0.0350 | 0.9628 | **0.5697** | 0/10 |
+
+One frame, one statistic, two references, **14.9x apart and straddling the `0.31` floor**. The frame
+is still visibly a blot — rendered side by side it is the same saturated single-tone disc, a smoother
+one. The areal reading is the mass measured as a mass (`0.0382` is the `2/r`
+`boundary_density`'s own doc predicts for a solid disc). The derived reading is the **fringe**, which
+is exactly what the *"what is still open"* paragraph below predicted. **A thinner fringe is
+proportionally more rim, so the term reads more structured the more perfectly a frame is a blot** —
+it is monotonically inverted on the class of frame it exists to convict.
+
+Three consequences:
+
+- **`0.2631` never measured a figure perimeter.** It was the thickness of one figure's rasterized
+  notch band, averaged with `Tiled Rosette Mono`'s genuine `0.3602` to make `boundary_floor`'s `0.31`
+  default arm. Two different kinds of quantity, so their midpoint was never a floor — ADR-0074's rule
+  one level up.
+- **No floor separates them now.** The blot reads **1.58x above** the composition the term exists to
+  admit.
+- **Pointing term two at `BLACK` is not the repair.** It convicts the blot at `0.0382` and would drag
+  `Tiled Rosette Mono`'s light paper toward a solid mass, under the floor, convicting the preset
+  ADR-0130 was written to admit. The ground that makes term two work for a two-ink print is the
+  ground that inverts it for a blot, which is the actual open question.
+
+**What Plan 0149 did about it, and what it deliberately did not.**
+[ADR-0161](adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+moves no threshold and retunes no fixture: the anchor's second-term assertions invert into a defect
+record in `KNOWN_FLAT`'s shape, and both tests gain the areal reading as a positive control. So the
+conjunction now has **no demonstrated true positive** and its `0.31` arm has no live derivation.
+`draws_a_real_shape` still fails such a frame, but on `coverage` — as **"blank"**, telling an author
+to add material to a saturated picture.
+
+**So the open question is sharper than the paragraph below leaves it**, and it is the same question:
+term two needs a ground that knows whether the frame's modal band is the *figure* or the
+*background*, because the two demand opposite treatment. Start here, with these numbers.
+**Owner if taken:** `architect`.
+
+- **Verified 2026-09-02** — the inverted term, still shipped and still the gate's second half:
+  `present: fn boundary_floor in: core/tests/sanity.rs`
 
 ### Half-discharged again 2026-08-26 by [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md) — the title is discharged, the residue is not
 
@@ -2542,188 +2517,6 @@ shell-occupancy rescue, reading the tonal statistic at the quiet excitation too,
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
 
-## 0133 — `docs-shots.mjs` cannot run at all, so the operator-doc image sweep has been dead since 2026-08-15
-
-**Raised by:** `architect`, at [Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s
-close, attempting the operator-doc image refresh that close ceremony owes.
-**Owner if taken:** `dev` — three manifest entries plus a re-run, unless someone first decides what
-`warp_mesh` should be a picture *of*, which is a content question.
-
-- **Verified 2026-08-26** — the guard that aborts the run, and its message:
-  `present: the gallery does not match SystemKind::from_name in: scripts/docs-shots.mjs`
-- **Verified 2026-08-26** — the three systems the manifest has no gallery entry for; each of these
-  reds the moment its entry is added, which is the intended re-read trigger:
-  `absent: gallery/shape_field\.png in: scripts/docs-shots.mjs`
-- **Verified 2026-08-26** — `absent: gallery/warp_mesh\.png in: scripts/docs-shots.mjs`
-- **Verified 2026-08-26** — `absent: gallery/shape_collage\.png in: scripts/docs-shots.mjs`
-- **Verified 2026-08-26** — all three are real systems the cross-check reads out of:
-  `present: "shape_collage" => SystemKind:: in: core/src/preset/schema.rs`
-
-### The finding
-
-`scripts/docs-shots.mjs` is the committed instrument
-[ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md) makes every committed
-documentation image depend on, and its own header states the contract in as many words: *"an image
-set nobody can re-shoot without remembering a command line is an image set that goes stale"*, and
-*"freshness is a human duty at a named cadence (the close-ceremony operator-doc sweep), not a
-check."*
-
-**It throws before rendering anything.** Its manifest holds nine gallery entries; `SystemKind`
-now has twelve. The script cross-checks the two and turns a mismatch into a hard error, so
-`shape_field`, `warp_mesh` and `shape_collage` having no gallery image takes down the *whole*
-run — including the eight images that are nothing to do with them.
-
-**The guard is not the bug; the cadence is.** The cross-check is doing exactly what its comment
-says it is for — *"a hardcoded list of nine names would let a tenth system ship with no gallery
-picture"* — and it caught precisely that. What failed is that the only thing which executes it is a
-human running it at a close, and ADR-0100 deliberately keeps it out of CI (renders are not
-byte-reproducible; a CI diff would be permanently red). So the guard fired into an empty room:
-`shape_field` entered `SystemKind` on **2026-08-15** (`78d1671`, Plan 0091 Phase 3), `warp_mesh` on
-2026-08-16 and `shape_collage` on 2026-08-25, and no close in the eleven days since could have
-re-shot an image even if it had tried.
-
-**What it is currently hiding.** Plan 0114 moved the line stroke's default `softness` and retuned
-six line presets, so `parametric_curve.png`, `lsystem.png`, `star_pattern.png` and `spectrum.png`
-all show a stroke the engine no longer draws. That is four of the nine gallery images stale, with
-no way to refresh them and nothing that reports it.
-
-### What a fix looks like
-
-Three manifest entries and one run. The only real decision is what each new picture should be of —
-`shape_field` and `shape_collage` have obvious shipped worlds (`shape_pulse`, `collage_suprematist`),
-while `warp_mesh` ships none, so it needs a fixture bundle or a converted `.milk` named in the
-manifest's provenance line like every other entry.
-
-**The separable question worth deciding once**, because this will recur on the thirteenth system:
-whether "every system has a gallery image" should be asserted somewhere that runs *without*
-rendering. The cross-check is pure text — it reads the manifest and `schema.rs` and needs no GPU —
-so it could live in `core/tests/` or in the `links` CI job and fail on the commit that ships a
-scene, instead of silently disabling the sweep until someone tries to use it. That is a different
-claim from "the images are current", which is the one ADR-0100 correctly refuses to gate.
-
-## 0134 — a joined corner is blunt, and the stroke that hid it is gone
-
-`renderer.rs` extends a joined end by exactly `width` along its own direction; a corner of interior
-angle `theta` needs `width / sin(theta / 2)`. A `diamond`'s 61.9-degree vertex needs 26.3 px of a
-13.5 px half-width and gets 15, so the point is truncated to a flat bevel, and the two quads sum on
-the inner side to 1.38x the stroke.
-[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) accepted this because
-the quadratic falloff blurred it;
-[Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
-`0.25` and there is no blur left.
-
-- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 7,
-  in the running app. Verdict: *"how straight lines are connected, its clearly visible and doesn't
-  look solid"*. It is the other half of the sitting that closed 0073 — that entry bought the curved
-  motifs, this is what is left on the straight ones.
-- **Verified by measurement 2026-08-27** — a single `diamond` filling a 1000x1000 frame at
-  `thickness = 9`: the profile through the acute vertex is 26 px of flat 185 and then zero, with no
-  taper at all, and the corner patch reads 1.38x the stroke's own value. Both halves are the same
-  constant.
-- **Verified 2026-08-27** — the extension is still one unmitred `width`:
-  `present: let ext_a = select\(0\.0, width, in: core/src/render/scenes/lines/renderer.rs`
-
-**This revises ADR-0041**, whose disc-join alternative closes with *"worth revisiting only if the
-blunt corners above turn out to matter"*. They matter. It reaches all four line families and moves
-every line golden, and the shader cannot compute `theta` on its own: a segment does not know its
-neighbour's direction, which is the whole point of *per-endpoint on the segment instance*. Three
-designs are open and they differ in instance-buffer cost — a per-endpoint miter length carried on
-the instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex.
-
-**One unrelated nit to sweep while in these files**, recorded here because it is too small for its
-own entry and the close write-up is not loaded per session: in
-`core/src/render/scenes/lines/renderer/tests.rs` the doc block deriving the arc comparison's two
-tolerances from `golden.rs` runs into `SOFT_PROFILE`'s own block with no blank line between them,
-so both attach to `SOFT_PROFILE` and `ARC_MEAN_TOL` / `ARC_OUTLIER_TOL` are left undocumented.
-The numbers are right — `0.02` and `48` match `golden.rs` exactly — but their derivation
-now documents the wrong constant, which is the ADR-0071 failure one level down.
-
-### Priority
-
-**Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
-(`diamond`, `chevron`) are exactly the two Plan 0087 did *not* convert to arcs — so the defect is now
-concentrated rather than diffuse.
-- **PROMOTED 2026-09-01 -> [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phases 1-2.** The ADR takes the first of the three
-  designs this entry lists - a per-endpoint miter length on the instance - and supersedes ADR-0041's
-  geometry half on the ground this entry names: Plan 0114 removed the blur that decision rested on.
-  The plan's Phase 5 also takes the `tests.rs` doc-block nit recorded at the end of this entry.
-
----
-
-## 0135 — `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty
-
-[Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 5 gave
-`ParametricCurveScene` five new buffers, all `Vec::with_capacity(max_segments)` at construction:
-`arcs` and `single_arcs` (36 B each), `points` (8 B), `pieces` (~24 B) and `walk` (4 B). At Rich's
-`max_segments = 60_000` that is about 6.5 MB of Rust heap, on top of the ~4.8 MB `segments` and
-`single_buf` already cost — so it more than doubles the scene's allocation. **Four of the five stay
-permanently empty for every preset in the library**, because every shipped `d` is a chord web and
-`maurer_rose_pieces` declines the fit before it ever fills them.
-
-- **Raised:** 2026-08-27, at Plan 0087's Mode 4 review. `dev` disclosed the GPU side (+720 KB at
-  Floor, +2.1 MB at Rich, and a layered line preset builds a second one) and routed the tighter bound
-  to `architect`; the CPU side was not in that accounting and is the larger number.
-- **The same plan already found the answer, one file over.** `star.rs` sizes its arc buffers at load
-  from the roster the preset actually declared and reserves nothing when there are no arcs
-  (`ring_arcs.len()`, capped by the mirror order). `parametric_curve` can do the same once
-  `corner_fraction` has answered — it is the identical shape of decision, taken one frame later.
-- **A second, smaller defect in the same buffers:** `points` is one short. Its capacity is
-  `max_segments`, and `maurer_rose_pieces` pushes `drawn + 1` where `drawn <= samples <=
-  max_segments`, so a preset binding `samples` at the cap reallocates once inside a path whose own
-  doc says *"Allocation-free into preallocated buffers, because this runs every frame"*. One-shot,
-  not per-frame, but it falsifies the sentence.
-- **Verified 2026-08-27** — the eager preallocation is still there:
-  `present: arcs: Vec::with_capacity\(max_segments\) in: core/src/render/scenes/lines/parametric.rs`
-- Worth re-reading [`docs/nfr.md`](nfr.md) section 12 against both numbers while this is open: it
-  claims *"our own Rust state stays <~1 MB"*, and the pre-0087 4.8 MB already exceeded that. The NFR
-  line may be the thing that is wrong rather than the code.
-
-### Priority
-
-**Low.** It is a fixed cost on a floor the driver dominates (~327 MB), and nothing measures it today.
-It becomes worth doing the moment a second parametric layer ships, or alongside any other
-`max_segments` re-sizing.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4**, which takes both halves - buffers sized at load from what
-  the preset declared, and the `points` off-by-one - and **re-reads `nfr.md` section 12 against the real
-  numbers**, since this entry's last bullet says the NFR line may be the thing that is wrong.
-
----
-
-## 0136 — a negative ring `scale` makes a `scallop` lobe bulge outward instead of dimpling inward
-
-`star.rs`'s `scallop_lobe` takes the ring `scale` as the lobe's **depth**. Past
-`depth ~ -R * (cos(s) + sin(s) - 1)` the arc's two ends move to the far side of its centre, and the
-counter-clockwise sweep then runs the long way round: the lobe bulges *outward* to roughly twice the
-ring radius instead of dimpling inward. The picture is wrong rather than degenerate — no panic, no
-cap violation, and nothing warns.
-
-- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md)'s Mode 4
-  review, by reading the construction rather than from a rendered frame.
-- **Its own comment names the wrong lever.** The code says the guard covers only the exactly-flat
-  case *"(`ring_scale` clamps at zero)"* — but `ring_scale` is the **bindable multiplier**, which is
-  clamped, while the **structural per-ring `scale`** is validated for finiteness alone
-  (`schema.rs`), and the two sibling arc branches carry explicit `.abs()` handling precisely because
-  a negative one is reachable and means a reflection. A second over-claim sits four lines below:
-  *"the sweep between them is under half a turn for any depth"* is false past the same threshold.
-- **The shipped preset cannot reach it.** `star_mandala_bordered` binds
-  `ring_scale = "1.00 + sin(time * 0.61) * 0.115 + clamp(mid * 0.20, 0, 0.17)"`, which is positive
-  everywhere, and its ring `scale` is `0.055`.
-- **What a fix is:** either an inward lobe drawn correctly (take the short way when the centre passes
-  the chord), or a load-time refusal saying `scallop` depth must be positive. The first is a few
-  lines; the second is honest and cheaper. It is a decision about whether an inward scallop is a look
-  anyone wants.
-- **Verified 2026-08-27** — the sweep is still taken unconditionally counter-clockwise:
-  `present: sweep: \(end - start\)\.rem_euclid\(TAU\) in: core/src/render/scenes/lines/star.rs`
-
-### Priority
-
-**Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
-author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 3**, which takes the **load-time refusal**, not the inward lobe.
-  That is a stated guess and the plan says so: no shipped preset is in range, the refusal is the honest
-  and cheaper of the two, and it is what makes an inward-scallop ask come back rather than ship a silent
-  bulge. Both over-claiming comments are corrected with it.
-
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
 [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) fixed *which* edges
@@ -2837,112 +2630,6 @@ is the transient — a scene that visibly quickens for the length of a crossfade
 reach — but it is now the shared failure mode of six rates rather than two, and every future
 `Scene::update` that grows state joins it silently. Revisit when a dissolve visibly misbehaves, or
 when someone needs the dual-live path testable for another reason.
-
----
-
-## 0143 — 20 of the 24 `design-backlog.md#NNNN` anchors in the repo point at bodies that now live in the archive
-
-**Raised by:** `architect`, at [Plan 0118](plans/done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)'s
-close, 2026-08-27, while repairing the two that plan's own implementation log had noticed.
-**Owner if taken:** `dev` — the repointing is mechanical; what is *not* mechanical is the scope
-call in the last paragraph, which is an `architect` decision to make first.
-
-- **Verified 2026-08-27** — the link gate says in its own header that it tests the file and not the
-  fragment: `present: fragments, not external URLs in: scripts/check-doc-links.mjs`
-- **Verified 2026-08-27** — an archived body still addressed by a live anchor:
-  `present: ^## 0072 in: docs/design-backlog-archive.md`
-
-### The finding
-
-The close ceremony archives a discharged backlog entry by moving its body verbatim to
-`design-backlog-archive.md` and leaving a ledger row behind. Anchors aimed at the moved body —
-`(../design-backlog.md#0072--sanityrss-coverage-floor-forces-...)` — keep resolving to a **file that
-exists**, so `scripts/check-doc-links.mjs` reports them clean: it validates paths and never
-fragments. The link lands at the top of the live backlog instead of at the entry, silently.
-
-Measured across every `.md` in the repo: **24 distinct entry numbers are addressed by anchor, and 20
-of them are archived** — `0009 0020 0022 0027 0033 0040 0055 0056 0057 0058 0059 0060 0061 0062
-0063 0067 0070 0084 0085 0088` — across roughly 20 files, mostly ADRs and closed plans. Two more
-(`0072`, twice in [Plan 0075](plans/done/0075-the-content-renaissance.md)) were repaired at Plan
-0118's close and are the reason this was measured at all.
-
-This is the same silent-rot family ADR-0127 retired one level down: a reference whose *form* cannot
-be checked, decaying on a routine ceremony step, visible only to a human who follows it. Step 3c of
-the architect skill already names it — *"the one class of break here that no gate will catch for
-you"* — which is why the accumulation is evidence that naming it was not enough.
-
-### The scope call, which is the actual question
-
-Most of the 20 sites are **append-only** documents: accepted ADRs and closed plans. Repointing them
-edits a historical record to keep a convenience link working, which cuts against the append-only
-rule. Three defensible answers, and one should be chosen before any editing:
-
-1. Repoint everything, treating a link target as mechanical rather than as content.
-2. Repoint only live documents and leave the historical ones, accepting that an old ADR's anchor
-   lands at the top of the backlog.
-3. Drop the anchor half repo-wide — `[backlog 0072](../design-backlog.md)` plus the bare number,
-   which is exactly ADR-0127's answer to the same problem in `.rs`, and would make the whole class
-   uncheckable-but-unbreakable.
-
-Option 3 also makes the gate question moot; options 1 and 2 leave a class that wants a fragment
-check in `check-doc-links.mjs` to stay repaired.
-
----
-
-## 0144 — the repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally
-
-[Plan 0098](plans/done/0098-the-figure-nests-properly.md) Phase 1 replaced the curved/jittered
-`star` arm's normalization reference and the interior contract came back with it — but only for a
-figure whose spikes are all the same length. Under `star_jitter` the divisor is the **unjittered**
-figure's while the measured distance is the fragment's own spike's, so the coordinate at the
-figure's centre is `0.076`-`0.085` rather than `0`, and a `max(0.0, ·)` guard sits in the shader for
-the case that asymmetry runs the other way. That is a large improvement on the `-0.23`..`-0.94` it
-replaced and it is not what the prose says.
-
-- **Raised:** 2026-08-27, at [Plan 0098](plans/done/0098-the-figure-nests-properly.md)'s close
-  review. **Owner if taken:** `dev`. Small, mechanical, and worth folding into whatever next opens
-  `marks.rs` rather than given a plan.
-- **Verified 2026-08-27** — the module header states the exactness for the whole branch:
-  `present: at the centre for every curved configuration in: core/src/render/scenes/marks.rs`
-- **Verified 2026-08-27** — and the guard that makes the `>= 0` sweep unfalsifiable on this arm is
-  right there: `present: return max\(0\.0, 1\.0 \+ sd / inradius\); in: core/src/render/scenes/marks.rs`
-- **Verified 2026-08-27** — the only assertion that pins the *reference* rather than the clamp is
-  gated to the unjittered case:
-  `present: if star\[2\] == 0\.0 && in: core/src/render/scenes/marks/tests.rs`
-
-### The finding, and the three other things it carries
-
-The review that raised this found five minors and two nits; four of them are one-line repairs and
-are collected here so none of them lives only in a review transcript.
-
-1. **The exactness claim**, above. The repair is either to qualify the header and the module
-   contract at `marks.rs`'s `mark_distance` doc block, or to make the jittered arm's divisor the
-   fragment's own spike's — which would make it exact and would also make the divisor depend on
-   which spike a fragment folded onto, the very thing Phase 1 walked the unjittered edge to avoid.
-   **Qualifying the prose is almost certainly right**; the entry says so rather than leaving it open,
-   because the alternative has a stated reason not to be taken.
-2. **`core/src/preset/schema.rs` hardcodes the `coord_mode` bounds** as `m.clamp(0.0, 1.0)` instead
-   of reading `shape_field`'s `COORD_MODES`. The predicate stays correct if a third mode is added,
-   so this is duplication rather than a latent bug.
-3. **The CPU mirror of `mark_boundary_radius` is not literally identical to the WGSL** it says it
-   mirrors "by inspection": the shader normalizes `abs(p.x) + 1e-20`, the mirror divides by
-   `max(len, 1e-20)`. They differ only at `p == (0,0)` and the resulting coordinate is `0` either
-   way, so nothing renders differently — but the comment promises identity and the next reader will
-   believe it.
-4. **A failure message names a pentagon on a test that renders a triangle**
-   (`the_radius_mode_bands_scaled_copies_where_the_distance_bands_offsets`). A message that names
-   the wrong figure sends the reader to the wrong place.
-
-### Priority
-
-**Low.** Nothing renders wrong and no gate is weakened in a way that hides a defect — the exactness
-claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
-reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
-has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5**, against this entry's own instruction to fold it into
-  whatever next opens `marks.rs`. Nothing else on the roster opens that file, and the plan is the nearest
-  work on figure-geometry contracts. All four repairs travel, and item 1 **qualifies the prose** rather
-  than changing the divisor, which is what this entry argues for.
 
 ---
 
@@ -3387,9 +3074,18 @@ has to be re-stated, since it is the part that is wrong independently of the pat
 > independently of any redirect and is exactly what a returning redirect would break. What changes
 > is the impact - from a live stray directory to a latent one. Read ADR-0141 above as history.
 
-- **Verified 2026-08-29** - the scratch path still starts at the repo root: `present: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
-- **Verified 2026-08-29** - and still joins its way to a dir inside it: `present: \.join\("shot-cli-tests"\) in: standalone/tests/shot_cli.rs`
-- **Verified 2026-08-29** - the sibling that is correct is still correct, so the file is genuinely split: `present: current_exe in: standalone/tests/shot_cli.rs`
+> **Updated 2026-09-01, by `dev` at [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 8.** The
+> **reduced claim above is delivered**: `scratch()` now roots at `env!("CARGO_TARGET_TMPDIR")`, which
+> cargo sets to a per-test-binary directory inside the target directory it is actually writing to,
+> and the doc comment is re-stated to describe that rather than to promise it. **The entry is not
+> closed and is not archived** - what remains live is the half this plan does not touch: whether the
+> *rule* it is an instance of (never derive a cargo output path from a source location) holds
+> anywhere else, which entry 0161 is the roster for. Its probes below are re-pointed at the repaired
+> code, so they assert the repair rather than the defect.
+
+- **Verified 2026-09-01** - the scratch path roots at the directory cargo writes to, not at the source location: `present: env!\("CARGO_TARGET_TMPDIR"\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-09-01** - and no longer builds that path off the repo root: `absent: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
+- **Verified 2026-08-29** - the sibling that was always correct still is: `present: current_exe in: standalone/tests/shot_cli.rs`
 
 ## 0161 - three committed scripts still resolve cargo output under `<repo>/target`, which the artifact-store docs assert nothing does
 
@@ -3437,51 +3133,29 @@ looking.
 > `plugin-foobar/build.ps1:32` still cites ADR-0141 as the live reason for asking `cargo metadata`;
 > its behaviour is correct and only the citation is stale. Read ADR-0141 above as history.
 
-- **Verified 2026-08-29** - the macOS bundler still builds its binary paths from the repo root: `present: repo_root\}/target/ in: packaging/macos/bundle.sh`
+> **Updated 2026-09-01, by `dev` at [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 8.**
+> **`bundle.sh` is repaired** and is off this roster: it reads `target_directory` from
+> `cargo metadata --format-version 1 --no-deps`, the question `plugin-foobar/build.ps1` already
+> asks, parsed with `sed` rather than `jq` because jq is not on a stock macOS and that script has to
+> run on a bare Mac. That was the one entry on the roster on a **release** path.
+>
+> **The two `renders/` scripts get no note in `renders/README.md`, and the proposed fix was wrong
+> for the reason this plan exists.** `renders/` is gitignored in full (`.gitignore:54`), so that
+> README is untracked: a line in it is absent from every checkout, reaches no reader, and cannot be
+> committed. It is the same shape Phase 5 taught the claim gate to reject one screen up - a claim
+> verified only on the machine that wrote it. **This entry is the record instead**, which is what
+> the `unprobeable:` bullet below has always said. Nothing about the two scripts changes: they are
+> archived one-offs from a closed plan, they resolve correctly under the current layout, and if the
+> redirect returns they are historical artifacts that were already broken.
+>
+> **What stays live** is the smallest and truest part: the documentation asserts *"never hardcode
+> `<repo>/target` in a script or a test"*, and that rule now has no committed violator this entry
+> knows of. The next sweep is the check, not a fix.
+
+- **Verified 2026-09-01** - the macOS bundler asks cargo where it writes instead of assuming: `present: read_target_dir in: packaging/macos/bundle.sh`
+- **Verified 2026-09-01** - and no longer builds a cargo output path off the repo root: `absent: repo_root\}/target/ in: packaging/macos/bundle.sh`
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
-
-## 0162 - the claim gate resolves a probe path against the working tree, so a path inside `.gitignore` verifies locally and can only ever fail on CI
-
-> **Filed 2026-08-29** from a red CI `links` job whose one broken probe was entry 0161's own,
-> written hours earlier by the close that filed it and green on the machine that wrote it.
-
-`runProbe` resolves `<path>` with `existsSync` against the working tree and asks nothing further. A
-path that exists but is **not in the repo** is indistinguishable from one that is, so a probe
-pointing into gitignored territory - `renders/`, `target/`, `spike/` - passes at every call site
-that runs on the authoring machine and fails only at the one that does not.
-
-Two of the three call sites are on that machine: the `pre-push` hook and the architect close
-ceremony both read a full working tree, ignored files included. The third is the CI `links` job,
-which [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) names the
-un-bypassable one, and it checks out a clone that by definition contains no ignored file. So the
-gate is green wherever the fix would still be cheap and red only once the push has happened.
-
-**The instance.** Entry 0161's second bullet probed `renders/plan-0106-p6/run.sh`. `renders/` is
-ignored in full, so that script exists on the authoring machine and in no checkout anywhere. It
-went green at the close that filed it and green at pre-push, then broke the `links` job on the
-first push that carried it - which was a push of 12 accumulated commits, so the breakage surfaced
-against an unrelated fix rather than against the close that caused it. Repaired in place by taking
-the `unprobeable:` opt-out, which is the honest reduction here: nothing in a checkout can see it.
-
-**Impact.** Low severity, and it recurs by construction rather than by accident. The cost is not
-the one broken entry - it is that the local gate whose entire purpose is to pre-empt a red CI
-reports OK, so the author learns from a runner, after pushing, that a claim they verified does not
-verify. The lag is unbounded: an unpushed close can sit for days before a push exposes it.
-
-**What a fix looks like:** one git question beside the `existsSync`. `git ls-files -- <path>`
-returns nothing for a path the repo does not track and handles directories, which probe paths often
-are, so a non-empty result is the whole test; `git check-ignore -q` answers it from the other side.
-Either lets the probe report *"probe path is not tracked"* rather than today's *"does not exist"*,
-which is the message a CI reader currently gets for a file sitting in front of them in their own
-tree. One invocation covering the whole probe set keeps it to a single process, the way the
-staleness advisory already batches its `git log`.
-
-- **Verified 2026-08-29** - the probe path is resolved against the filesystem and nothing else: `present: if \(!existsSync\(pathAbs\)\) in: scripts/check-backlog-claims.mjs`
-- **Verified 2026-08-29** - nothing asks git whether that path is ignored: `absent: check-ignore in: scripts/check-backlog-claims.mjs`
-- **Verified 2026-08-29** - nor whether it is tracked: `absent: ls-files in: scripts/check-backlog-claims.mjs`
-- **Verified 2026-08-29** - `renders/` is ignored in full, so nothing beneath it reaches a checkout: `present: ^renders/$ in: .gitignore`
-- **Verified 2026-08-29** - the local call site that goes green regardless: `present: check-backlog-claims in: .githooks/pre-push`
 
 ## 0163 - `level/bass` reads exactly 1.0 on every local peak by construction, so the lighting consumer that read it as a dimmer value saw pinned dynamics, and the recorded diagnosis blamed an input gain that cannot move it
 
@@ -3683,142 +3357,6 @@ the running adapter has already landed and is what makes any of this attributabl
   phase also records whether the console's dual-GPU degrade path became reachable; **if it stays
   unexercised this entry keeps that half and stays live.**
 
-## 0166 - the index-row gate measures a row's bytes and never its shape, so a closed-plan bullet dropped into the active-plans table passes
-
-> **Filed 2026-08-30** at Plan 0134's close, by the reviewer making the mistake and having the gate
-> wave it through. Not reported by a lane - found by inspection after the fact.
-
-`scripts/check-index-rows.mjs` enforces [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md):
-every row inside a `<!-- roster:begin cap=N -->` region is a pointer, held to N bytes. **Bytes is
-the only thing it measures.** Inside a region it accepts a line matching either `TABLE_ROW` or
-`BULLET`, records `{ line, bytes, cap }`, and asks nothing about which of the two the surrounding
-region is made of.
-
-`docs/plans/README.md` has two regions and they are different kinds: the **active-plans** region is
-a markdown table (`| Plan | Title | Status | Owner | Live constraint |`), the **recently-closed**
-region is a bullet list. A closed-plan bullet inserted into the table region is a `BULLET` inside a
-region, under cap, so the gate reports `0 over cap` and exits 0.
-
-**Observed 2026-08-30**, during this plan's own close: a `- [0134 ...] - closed 2026-08-30 ...`
-bullet landed immediately under the active roster's `roster:begin` and above its table header,
-because the insertion anchored on the first `Recently closed` string in the file rather than the
-section. `check-index-rows.mjs` passed it (`2 regions, 117 rows, 0 over cap`) and
-`check-doc-links.mjs` passed it too - the link resolves, it just points from the wrong list. It was
-caught by eye before the commit, and nothing in the toolchain would have caught it after.
-
-**Impact.** Low severity, high silence. The failure mode is a closed plan that reads as active, or
-an active plan that reads as closed, in the one file `docs/plans/README.md` that every session opens
-first - and both rosters keep passing. It is the same class as the rot ADR-0116 was written for: the
-convention is stated in prose above the markers and nothing holds anyone to it.
-
-**What a fix looks like:** infer each region's kind from its first measured row and reject rows of
-the other kind - roughly four lines, in the loop that already classifies every line as `TABLE_ROW`
-or `BULLET`. A region containing both is a real possibility elsewhere, so the honest form is
-per-region and inferred rather than a hardcoded expectation per file. `scripts/fixtures/` already
-holds seeded bite checks for these gates, so the fix comes with a fixture that is a bullet in a
-table region.
-
-- **Verified 2026-08-30** - the gate accepts either row shape anywhere inside a region: `present: !TABLE_ROW\.test\(line\) && !BULLET\.test\(line\) in: scripts/check-index-rows.mjs`
-- **Verified 2026-08-30** - and the only thing it records per row is the byte count: `present: bytes: Buffer\.byteLength\(line, "utf8"\) in: scripts/check-index-rows.mjs`
-- **Verified 2026-08-30** - the two regions in the plans index really are different kinds, which is what makes the confusion reachable: `present: \| Plan \| Title \| Status \| Owner \| Live constraint \| in: docs/plans/README.md`
-- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 3** (added at that plan's 2026-09-01 amendment). A shape check
-  lands **beside** the length check, not instead of it: a 200-byte bullet in a table region is under cap
-  and still wrong.
-
-## 0170 - the comment-hygiene gate walks the filesystem, so a gitignored vendored tree is invisible to CI and blocks every local push
-
-> **Filed 2026-08-30** while pushing the Plan 0134 close. Found because the gate went from green
-> to 490 findings between two pushes twenty minutes apart, with no commit in between touching it.
-
-`scripts/check-comment-hygiene.mjs` enumerates with `readdirSync` from the repo root and skips a
-hardcoded `SKIP_DIRS` set. **It never asks git what is tracked.** A gitignored directory is
-therefore absent from CI's fresh clone - so the CI job is green by construction - and present in
-every working tree, where it is scanned in full.
-
-Two such trees exist here, both third-party, both gitignored, neither ours to judge:
-
-- `.venv/` (`.gitignore:68`) - the Python virtualenv `tools/sd-filter` installs into. Its
-  `site-packages` ship torch, numpy and markupsafe C and C++ headers: **419 findings**, all
-  `plan-relative narration` on words like `used to` and `no longer` in vendor comments.
-- `plugin-foobar/sdk/` (`.gitignore:15`) - the foobar2000 SDK. **71 findings**, same class.
-
-**Impact.** It blocks `git push` outright, for everyone whose working tree has either directory,
-with a diagnostic pointing at files no one in this project wrote. The natural escape is
-`--no-verify`, which is what makes it worth recording: a gate that fires on vendor code teaches its
-users to skip the gate that fires on theirs. The immediate instances are patched by name at Plan
-0134's close (`SKIP_DIRS` gained `.venv`, a new `VENDORED_TREES` holds the SDK path), which fixes
-these two and not the class - the next `pip install` or unpacked SDK re-breaks it.
-
-**What a fix looks like:** enumerate from `git ls-files` rather than `readdirSync`, which makes
-"code we own" and "code the gate judges" the same set by construction and costs one call. The one
-thing to preserve is the seeded bite check - `node scripts/check-comment-hygiene.mjs scripts/fixtures`
-must still report its 10 findings, and those fixtures are tracked, so `ls-files` reaches them. Worth
-checking whether the sibling gates share the shape: `check-doc-links.mjs` walks markdown the same
-way and is green today only because neither vendored tree happens to carry a relative-linked `.md`.
-
-- **Verified 2026-08-30** - the walk is a filesystem walk with no git in it: `present: readdirSync\(dir, \{ withFileTypes: true \}\) in: scripts/check-comment-hygiene.mjs`
-- **Verified 2026-08-30** - nothing consults git's ignore rules: `absent: check-ignore in: scripts/check-comment-hygiene.mjs`
-- **Verified 2026-08-30** - the by-name patch this entry says is not the fix is present: `present: const VENDORED_TREES = new Set in: scripts/check-comment-hygiene.mjs`
-- **Verified 2026-08-30** - and both ignore rules that make the trees invisible to CI still stand: `present: plugin-foobar/sdk/ in: .gitignore`
-- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), taking the
-  `git ls-files` enumeration this entry names as the fix, and **removing the by-name patches** Plan 0134's
-  close added. The sibling question this entry raises about `check-doc-links.mjs` is in that phase's
-  done-when, and silence on it is not an answer.
-
-
-## 0171 - a backlog probe about a run of spaces is collapsed to one space before it is matched, so it can never fire
-
-> **Filed 2026-08-31** at Plan 0144's review, by moving 0168 into the probed section and watching
-> the gate hand its own probe back with the spaces gone.
-
-`scripts/check-backlog-claims.mjs:225` extracts each probe from its bullet with
-
-```js
-.map((m) => m[1].replace(/\s+/g, " ").trim())
-```
-
-which is right for the reason it was written - a markdown bullet may wrap across source lines, and
-the pattern has to survive that - and wrong for one class of claim. **A probe whose regex contains a
-run of two or more spaces is silently rewritten into a different regex**, one that matches
-single-spaced text the tree does not contain. It does not error, it does not warn; it reports `no
-match` and reads exactly like decay.
-
-**The instance, which is the reason this is filed rather than noticed.** Entry 0168 is *about* the
-broken-literal defect - a string carrying a run of spaces mid-sentence - and both of its probes
-quoted the run verbatim:
-
-```
-present: cannot be longer      than it in: core/src/dsp/mod.rs
-present: is not a flag, but the                  embedded set in: standalone/src/stream.rs
-```
-
-Neither has ever been capable of matching. That went unseen for a second reason - 0168 sat above
-`## Open entries`, where nothing probes at all - so the two defects hid each other, and the entry
-looked green by being unread. Both probes now use `\s{2,}`, which carries the same claim and holds
-no space character to collapse.
-
-**Impact.** Low frequency, and bounded: after 0168's repair no live probe contains a space run.
-It is filed because the failure is silent in the direction that matters - an author writes the
-claim they mean, the gate accepts the bullet, and the probe is dead on arrival. ADR-0108's whole
-argument is that a claim about the repo carries something re-runnable; a probe that cannot fire is
-the one shape that satisfies the letter of that and none of it.
-
-**What a fix looks like.** Two options, and the cheap one is probably right. **Refuse it:** after
-collapsing, if the extracted span differs from the source span, print the entry and the probe and
-exit non-zero - the author is told to use `\s{2,}` and nothing is silently rewritten. Roughly five
-lines, and it converts an unfalsifiable probe into a build error the moment it is written. **Or
-preserve it:** join wrapped bullet lines with a single space but leave interior runs alone, which
-is more faithful and more code, and needs care where a bullet wraps mid-pattern. The gate's own
-grammar note already says *"Regex source, so a literal dot needs escaping"*; whichever way this
-lands, it should say the same about a space.
-
-- **Verified 2026-08-31** - the collapse is still unconditional and still happens before the verb is read: `present: replace\(/\\s\+/g, " "\) in: scripts/check-backlog-claims.mjs`
-- **Verified 2026-08-31** - and nothing tells the author it happened: there is no diagnostic on the rewrite, which is the whole of why the probe reads as decay rather than as a mistake: `absent: collapse in: scripts/check-backlog-claims.mjs`
-- **Verified 2026-08-31** - the grammar note tells an author to escape a dot and says nothing about a space: `present: a literal dot needs escaping in: scripts/check-backlog-claims.mjs`
-- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 5** (added at that plan's 2026-09-01 amendment), as a done-when
-  on the phase that already opens `check-backlog-claims.mjs`. The wrap must still be absorbed; what stops
-  is a run of spaces inside a pattern being collapsed - proved by a fixture probe that **fires**.
-
 ## 0172 - the seeded preset directory is never pruned, so an operator's roster drifts from the shipped set and can hold two presets under one name
 
 > **Filed 2026-08-31** at Plan 0144's review. Surfaced because Phase 3 gave the window a
@@ -3857,53 +3395,6 @@ would serve the same end deliberately rather than as a side effect.
 - **Verified 2026-08-31** - seeding is write-if-absent and has no removal arm: `present: if !path.exists\(\) in: core/src/preset/mod.rs`
 - **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/mod.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
-
-## 0173 - the literal gate is blind to the defect in its unrejoined form, and the fixture README states that silence as a general truth
-
-> **Filed 2026-08-31** at Plan 0144's review, by seeding a two-line literal under
-> `scripts/fixtures/` and watching the gate stay silent.
-
-Plan 0144 Phase 4 gave `scripts/check-comment-hygiene.mjs` a string-literal pass, which is what
-closed 0168. `brokenLiteral` decodes each literal the way rustc does and then **returns `null` for
-any literal whose decoded text still contains a newline**, on the stated grounds that such a literal
-is a formatted block whose column spacing is layout the author typed - *"prose does not carry a
-newline in the middle of itself"*.
-
-**A lost `\` continuation is prose carrying a newline in the middle of itself.** That is the whole
-mechanism: the newline survives, the next line's indent survives, and the reader gets a run of
-spaces mid-sentence. So the gate catches the defect only *after* someone joins the lines, and is
-silent on it in the form an author actually types. The finding message it prints - `(a line break
-with no trailing \)` - names the shape it structurally cannot see.
-
-**Why this is low and not a re-opening of 0168.** Every instance this tree has held arrived already
-single-line: `core/src/dsp/mod.rs:57`, `standalone/src/stream.rs:393` and `milkconv/src/convert.rs:430`
-were all one source line with the run baked in, which is why the 12-space rule convicted 15 sites and
-`cargo fmt` never disturbed them. The authoring path that produces this defect here emits the joined
-form. The gap is real and the gate's own documentation overstates itself; the frequency is not known
-to be nonzero.
-
-**What a fix looks like.** One more arm, not a rewrite: alongside the single-line run, report a
-**newline immediately followed by 12 or more spaces and then a non-space** - which is precisely a
-continuation indent and is not what a column table looks like, since a table's rows start at a
-column and carry interior runs rather than a leading one. Seed both spellings. Failing that, the
-honest minimum is to correct `scripts/fixtures/README.md`'s silence row and the `LITERAL_RUN`
-comment so neither claims a generality the check does not have.
-
-**Also here, because it is one line of the same file.** The finding message's `\` is written `\)`
-inside a JS template literal, so it is consumed as an escape and the operator reads `(a line break
-with no trailing )`. It needs `\`.
-
-**Impact:** low. Nothing is mis-reported; a class is under-reported, and the documentation says
-otherwise, which is the property that gets the next reader to stop looking.
-
-- **Verified 2026-08-31** - the newline exclusion is still unconditional and still ahead of the run check, so the unrejoined form still returns before it is judged: `present: text\.includes.{0,40}return null in: scripts/check-comment-hygiene.mjs`
-- **Verified 2026-08-31** - the fixture roster still states the silence as a general property: `present: prose does not carry one mid-sentence in: scripts/fixtures/README.md`
-- **Verified 2026-08-31** - the swallowed backslash is still in the message the operator reads: `present: with no trailing \\\) in: scripts/check-comment-hygiene.mjs`
-- **PROMOTED 2026-09-01 -> [Plan 0136](plans/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), which takes
-  the unrejoined form **and** the fixture README sentence that states the gate's blindness as a general
-  truth.
-
----
 
 ## 0174 — two of the four colour tags the render path pins do not survive into the container, and the doc calls all four the half most likely to ship wrong
 

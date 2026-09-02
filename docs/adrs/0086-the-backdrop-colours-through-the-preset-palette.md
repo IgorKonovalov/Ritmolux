@@ -34,7 +34,7 @@ The consequences are not cosmetic:
 - **The documentation asserts the opposite.** `presets/README.md` reads "`bg_hue` offsets into the
   shared cosine palette". There is no sharing, and `docs/preset-palettes.md` — the document that
   owns the colour surface — does not contain the string `bg_hue` at all
-  ([backlog 0059](../design-backlog.md#0059--the-backdrop-is-the-one-surface-left-that-does-not-colour-through-the-shared-palette-and-nothing-says-so)).
+  ([backlog 0059](../design-backlog.md)).
 
 ADR-0021's Context named `bg_hue` once, to say it was a *background* colour and not a *scene*
 palette — true at the time, and a statement about which problem that ADR was solving rather than a
