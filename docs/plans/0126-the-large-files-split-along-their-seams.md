@@ -275,7 +275,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `warp_mesh/` takes the `particles/` shape | dev | done | committed with this row |
-| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | not started | |
+| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | committed with this row |
 | 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | not started | |
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | not started | |
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | not started | |
@@ -320,6 +320,34 @@ matched against the five files after the split; the 143 unmatched lines are the
 visibility widenings, the `self.` -> `scene.` rename in the free functions, the
 seven borrow fixes above, and rustfmt rewrapping three statements that fit at
 the shallower indent.
+
+**Phase 2.** `render/mod.rs` 2,567 -> **1,188** lines; `draw_frame` 436 -> **199**;
+`#[allow(clippy::too_many_arguments)]` in `render/mod.rs`: **3 -> 0** (the third was
+`draw_frame`'s own, retired by `(width, height)` becoming one `surface` pair).
+Three bundles do it: `Active` (preset + its routes, which are read at the same
+roster index), `FrameInputs` (vars, frame, time, dt) and `Scratch` (the two
+per-frame buffers). `evaluate_side` replaces the outgoing/incoming pair, and one
+`vertex_surface` replaces the four inline `VertexSurface` closures.
+
+**No shell edit**: `standalone/`, `core-cabi/` and `plugin-foobar/` are untouched
+and `cargo build --workspace` is green, which is the done-when's own proof that
+every `pub` path the shells import still resolves.
+
+One deviation. **`core/src/render/transition.rs` gains one method and is not in
+the phase's file list.** `draw_frame`'s tail -- the dual-live budget latch and
+the dissolve advance -- became `Renderer::advance_transition`, placed beside
+`cancel_transition`, which is the method it calls and which already lives in that
+file's `impl Renderer`. Leaving it in `mod.rs` as a sibling method would have met
+the `draw_frame` bar and missed the 1,200-line one.
+
+`capture_api.rs` (8 call sites), `render/tests.rs` (1) and `render/mod.rs` (1)
+follow `draw_frame`'s signature; two `capture::` calls in `capture_api.rs` take an
+unchanged `width, height` pair and are untouched.
+
+The same line-by-line audit as Phase 1: of `HEAD`'s `mod.rs`, 161 lines have no
+counterpart, and every one is a `pub(super)` widening, one of the three retired
+`#[allow]`s, an argument the bundles absorbed, or one of the two evaluation
+copies `evaluate_side` replaced.
 
 ### Close triggers
 
