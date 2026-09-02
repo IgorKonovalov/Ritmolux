@@ -30,7 +30,7 @@
 use std::f32::consts::TAU;
 
 use super::PLACEHOLDER_WIDTH;
-use super::renderer::SegmentInstance;
+use super::renderer::{SegmentInstance, miter_extension};
 
 /// Map a `tiling` name to its star order `n`. Accepts a few named/numeric
 /// regular tilings (the v1 set); returns `None` for anything else so the loader
@@ -77,7 +77,12 @@ pub fn star_rosette(n: u32, contact_angle: f32, out: &mut Vec<SegmentInstance>) 
         [v[0] * c - v[1] * s, v[0] * s + v[1] * c]
     };
 
-    for k in 0..n as i32 {
+    // Petal `k`'s tip, as a function of `k` rather than a loop local, so a
+    // vertex's two neighbours are both reachable when its miter is computed.
+    // Petals are congruent rotations, so this is `tip(0)` turned by
+    // `k * TAU / n`; it is derived rather than rotated so that a petal whose
+    // rays fail to meet reports `None` on its own terms.
+    let tip_at = |k: i32| -> Option<[f32; 2]> {
         let m0 = contact(k);
         let m1 = contact(k + 1);
         // Inward normals (toward the centre) — the contact points lie on the
@@ -89,7 +94,13 @@ pub fn star_rosette(n: u32, contact_angle: f32, out: &mut Vec<SegmentInstance>) 
         // m1 (clockwise off its inward normal); m1's tilts back toward m0.
         let d0 = rotate(in0, -contact_angle);
         let d1 = rotate(in1, contact_angle);
-        if let Some(tip) = line_intersect(m0, d0, m1, d1) {
+        line_intersect(m0, d0, m1, d1)
+    };
+
+    for k in 0..n as i32 {
+        let m0 = contact(k);
+        let m1 = contact(k + 1);
+        if let Some(tip) = tip_at(k) {
             // The rosette is a **closed chain**, so every one of its `2n`
             // vertices is a joint (ADR-0041's Outcome note; Plan 0040 Phase 3).
             // The `b` ends meet at this petal's tip — but the `a` ends are not
@@ -99,19 +110,32 @@ pub fn star_rosette(n: u32, contact_angle: f32, out: &mut Vec<SegmentInstance>) 
             // `contact(0) -> tip(0) -> contact(1) -> tip(1) -> …`.
             //
             // The contact points are the **sharper** half. The two rays leave
-            // one `2 * contact_angle` apart, so a stroke through turns by
-            // `pi - 2 * contact_angle` and the wedge is
-            // `half_width / tan(contact_angle)` — wider than the one at the tips
+            // one `2 * contact_angle` apart, so a stroke through a contact point
+            // turns by `pi - 2 * contact_angle` — its interior angle is
+            // `2 * contact_angle` and its miter is exactly
+            // `half_width / sin(contact_angle)`, which is the sharper of the two
             // for any star pointier than 45 degrees, against `star.rs`'s
-            // `CONTACT_MIN_DEG = 8`. Plan 0039 flagged only the tips.
-            out.push(seg(m0, tip, PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH));
-            out.push(seg(m1, tip, PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH));
+            // `CONTACT_MIN_DEG = 8`.
+            //
+            // Both segments meeting at a vertex reach the same corner point, so
+            // one length serves the pair at each of the three.
+            let ext_tip = miter_extension(PLACEHOLDER_WIDTH, m0, tip, m1);
+            let ext_m0 = tip_at(k - 1).map_or(PLACEHOLDER_WIDTH, |before| {
+                miter_extension(PLACEHOLDER_WIDTH, before, m0, tip)
+            });
+            let ext_m1 = tip_at(k + 1).map_or(PLACEHOLDER_WIDTH, |after| {
+                miter_extension(PLACEHOLDER_WIDTH, tip, m1, after)
+            });
+            out.push(seg(m0, tip, ext_m0, ext_tip));
+            out.push(seg(m1, tip, ext_m1, ext_tip));
         }
     }
 }
 
-/// One rosette segment. `ext_a`/`ext_b` are in units of [`PLACEHOLDER_WIDTH`],
-/// which is what the rosette is cached at; the star scene restyles it per frame.
+/// One rosette segment. `ext_a`/`ext_b` are miter lengths in units of
+/// [`PLACEHOLDER_WIDTH`], which is what the rosette is cached at; the star scene
+/// restyles it per frame, and the miter rescales with the width because it is
+/// homogeneous of degree 1 in it (see [`miter_extension`]).
 fn seg(a: [f32; 2], b: [f32; 2], ext_a: f32, ext_b: f32) -> SegmentInstance {
     SegmentInstance {
         a,
@@ -164,18 +188,56 @@ mod tests {
     /// one from `contact(k + 1)` again. All `2n` vertices are joints.
     #[test]
     fn the_star_is_a_closed_chain_extended_at_every_vertex() {
+        use crate::render::scenes::lines::MITER_SLACK;
+
         let n = 5usize;
         let mut out = Vec::new();
         star_rosette(n as u32, 30f32.to_radians(), &mut out);
         assert_eq!(out.len(), 2 * n, "two segments per petal on a 5-fold star");
 
         for (i, seg) in out.iter().enumerate() {
-            assert_eq!(
-                (seg.ext_a, seg.ext_b),
-                (PLACEHOLDER_WIDTH, PLACEHOLDER_WIDTH),
+            assert!(
+                seg.ext_a > 0.0 && seg.ext_b > 0.0,
                 "segment {i} lies in a closed chain, so both its ends are joints"
             );
         }
+
+        // **The contact vertex has a closed form**, and the module's own comment
+        // is where it comes from: the two rays leave one `2 * contact_angle`
+        // apart, so a stroke through a contact point turns by
+        // `pi - 2 * contact_angle`, its interior angle is `2 * contact_angle`,
+        // and its miter is exactly `half_width / sin(contact_angle)`. At 30
+        // degrees that is `2.0` half-widths — a property of the construction,
+        // not a reading off this render (ADR-0071).
+        //
+        // Every segment's `a` end is a contact point, by the chain the module
+        // documents: `contact(0) -> tip(0) -> contact(1) -> ...`.
+        let want = PLACEHOLDER_WIDTH / 30f32.to_radians().sin();
+        assert!(
+            (want - 2.0 * PLACEHOLDER_WIDTH).abs() < 1e-6,
+            "the closed form itself: 1 / sin(30 deg) is 2"
+        );
+        for (i, seg) in out.iter().enumerate() {
+            assert!(
+                (seg.ext_a - want).abs() <= want * MITER_SLACK,
+                "segment {i}'s `a` end is a contact point, whose interior angle \
+                 is twice the 30-degree contact angle: extension {} against \
+                 the {want} that angle asks for",
+                seg.ext_a
+            );
+        }
+
+        // The tips are the blunter half — the whole point of the module comment
+        // that calls the contacts the sharper one — so they must reach less far.
+        // Checked as an inequality rather than a second closed form, because
+        // the tip angle is what `line_intersect` produces and not what the
+        // construction states.
+        let tip = out.first().map_or(f32::NAN, |s| s.ext_b);
+        assert!(
+            tip > PLACEHOLDER_WIDTH && tip < want,
+            "a petal tip must reach past the flat {PLACEHOLDER_WIDTH} and less \
+             far than a contact point's {want}, got {tip}"
+        );
 
         // Within a petal: both rays end on the shared tip, and they start from
         // two distinct contact points.

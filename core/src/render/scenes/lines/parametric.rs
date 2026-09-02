@@ -217,17 +217,6 @@ impl ParametricCurveScene {
 }
 
 impl ParametricCurveScene {
-    /// Split the fitted chain into the two instance buffers the renderer draws,
-    /// colouring each piece by **where it sits along the walk**.
-    ///
-    /// The walk position is what the fit reports, not the piece's index: a
-    /// piece spans as many samples as the budget allowed, so the `k`th piece is
-    /// not the `k`th chord and an index would run the palette at the wrong rate
-    /// — visibly, wherever the fit's pieces are uneven, which is everywhere a
-    /// rose's curvature changes. `samples` stays the divisor for the reason
-    /// [`color_along_path`] gives: a chord's place on the curve belongs to the
-    /// curve, so a `draw_progress` reveal draws the gradient on rather than
-    /// re-tinting it.
     /// Give the four fit buffers their steady-state capacity, on the first frame
     /// that actually fits a curve.
     ///
@@ -265,11 +254,21 @@ impl ParametricCurveScene {
         }
     }
 
+    /// Split the fitted chain into the two instance buffers the renderer draws,
+    /// colouring each piece by **where it sits along the walk**.
+    ///
+    /// The walk position is what the fit reports, not the piece's index: a
+    /// piece spans as many samples as the budget allowed, so the `k`th piece is
+    /// not the `k`th chord and an index would run the palette at the wrong rate
+    /// — visibly, wherever the fit's pieces are uneven, which is everywhere a
+    /// rose's curvature changes. `samples` stays the divisor for the reason
+    /// [`color_along_path`] gives: a chord's place on the curve belongs to the
+    /// curve, so a `draw_progress` reveal draws the gradient on rather than
+    /// re-tinting it.
     fn split_pieces(&mut self, samples: usize, ramp: ColorRamp, color: [f32; 3], width: f32) {
         self.single_buf.clear();
         self.single_arcs.clear();
         let span = samples.saturating_sub(1).max(1) as f32;
-        let last = self.pieces.len().saturating_sub(1);
         for (k, piece) in self.pieces.iter().enumerate() {
             let color = self
                 .walk
@@ -294,8 +293,9 @@ impl ParametricCurveScene {
                     // two ends continues a neighbour, across a corner as much
                     // as along a curve — the extension is what covers the wedge
                     // between two strokes, and a corner is where there is one.
-                    let ext_a = if k > 0 { width } else { 0.0 };
-                    let ext_b = if k < last { width } else { 0.0 };
+                    //
+                    // The walk is open, so its two outer ends are free.
+                    let (ext_a, ext_b) = Piece::chain_extensions(&self.pieces, k, width, false);
                     self.single_buf.push(SegmentInstance {
                         a,
                         b,
@@ -431,23 +431,6 @@ impl Scene for ParametricCurveScene {
         self.palette = palette.clone();
     }
 
-    /// Give the four fit buffers their steady-state capacity, on the first frame
-    /// that actually fits a curve.
-    ///
-    /// **Why not at load, the way `star.rs` sizes its arc buffers.** A star's
-    /// roster is structural: the preset declares its circular motifs and the
-    /// count is known at `configure`. Whether a Maurer walk fits is not
-    /// declared — it is read off the walk, per frame, and `d` is an expression
-    /// that can cross `SMOOTH_CORNER_SHARE` mid-show. `curves::maurer_rose_pieces`
-    /// says so in its own doc block: *"the decision cannot be made at load - only
-    /// from the walk in hand"*.
-    ///
-    /// So the shape is lazy rather than eager. A chord-web preset — every one in
-    /// the shipped library — never reaches here and commits nothing. A preset
-    /// that fits pays **one** growth on its first fitted frame and is
-    /// allocation-free from the second, which is the property the per-frame path
-    /// documents. `reserve_exact`, because these settle at a known ceiling and
-    /// have no reason to carry a doubling's slack.
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
         // A curve preset records its family here (off the hot path). Later
         // phases' generator config variants are for the generator scenes; this
@@ -687,6 +670,115 @@ mod tests {
             SAMPLES + 1,
             "so a capacity of `samples` exactly would have reallocated on the \
              final push"
+        );
+    }
+
+    /// **A fitted chain's `Line` pieces reach their corners, and its two outer
+    /// ends stay free** (ADR-0158) — this scene's own joint rule, on
+    /// `curve_ionwake`'s rose, which is the figure the fitted path exists for.
+    ///
+    /// # Why the tangent and not a third point
+    ///
+    /// A `Line` piece's neighbour in a fitted chain is usually an **arc**, which
+    /// has no third vertex to take a direction from — its direction at the joint
+    /// is its tangent there. So the rule is stated on tangents, and this asserts
+    /// it against `acos` of the same two tangents, which is the other route to
+    /// the interior angle.
+    ///
+    /// # The G1 half is the load-bearing one
+    ///
+    /// Wherever the fit kept the chain tangent-continuous the two tangents are
+    /// equal and the miter is exactly the flat half-width — so a fitted rose
+    /// strokes its smooth runs at exactly the length it always did, and only the
+    /// breaks the fit made at real corners move. Both halves are asserted:
+    /// vacuity here would be a chain with no corner in it at all.
+    #[test]
+    fn a_fitted_chains_line_pieces_reach_their_corners_and_its_ends_stay_free() {
+        use crate::render::scenes::lines::MITER_SLACK;
+        use std::f32::consts::PI;
+
+        const W: f32 = 0.01;
+
+        let rose = curves::RoseParams {
+            n: 5.0,
+            // `curve_ionwake`'s rose: a curve, so `maurer_rose_pieces` takes it.
+            d: 2.0,
+            phase: 0.0,
+            radial_offset: 0.0,
+            samples: SAMPLES,
+            scale: 0.9,
+            rotation: 0.0,
+            draw_progress: 1.0,
+            color: [1.0, 1.0, 1.0],
+            width: W,
+        };
+        let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
+        assert!(
+            curves::maurer_rose_pieces(rose, &mut points, &mut pieces, &mut at),
+            "a d = 2 rose must be fitted, or this fixture tests nothing"
+        );
+
+        // The two outer ends of an open chain are free.
+        let last = pieces.len() - 1;
+        assert_eq!(
+            Piece::chain_extensions(&pieces, 0, W, false).0,
+            0.0,
+            "the walk's first end has no neighbour to join"
+        );
+        assert_eq!(
+            Piece::chain_extensions(&pieces, last, W, false).1,
+            0.0,
+            "nor its last"
+        );
+
+        let mut straight = 0usize;
+        let mut cornered = 0usize;
+        for k in 0..pieces.len() {
+            let (ext_a, ext_b) = Piece::chain_extensions(&pieces, k, W, false);
+            for (side, got, incoming, outgoing) in [
+                (
+                    "a",
+                    ext_a,
+                    k.checked_sub(1).map(|j| pieces[j].end_tangent()),
+                    Some(pieces[k].start_tangent()),
+                ),
+                (
+                    "b",
+                    ext_b,
+                    Some(pieces[k].end_tangent()),
+                    pieces.get(k + 1).map(|p| p.start_tangent()),
+                ),
+            ] {
+                let (Some(d1), Some(d2)) = (incoming, outgoing) else {
+                    continue; // a free end, asserted above
+                };
+                // The interior angle by `acos` of the turn, where the producer
+                // takes a square root of the half-angle identity.
+                let turn = (d1[0] * d2[0] + d1[1] * d2[1]).clamp(-1.0, 1.0).acos();
+                let want = W / ((PI - turn) * 0.5).sin();
+                assert!(
+                    (got - want).abs() <= want * MITER_SLACK,
+                    "piece {k}'s `{side}` joint carries {got} against the {want} \
+                     its {}-degree turn asks for",
+                    turn.to_degrees()
+                );
+                if turn < 1e-4 {
+                    straight += 1;
+                    assert!(
+                        (got - W).abs() <= W * MITER_SLACK,
+                        "piece {k}'s `{side}` joint is G1, so its miter must be \
+                         exactly the flat half-width {W}, got {got}"
+                    );
+                } else {
+                    cornered += 1;
+                }
+            }
+        }
+        assert!(
+            straight > 0 && cornered > 0,
+            "this chain holds {straight} tangent-continuous joints and \
+             {cornered} corners — it must hold some of each, or one of the two \
+             halves above was never exercised"
         );
     }
 

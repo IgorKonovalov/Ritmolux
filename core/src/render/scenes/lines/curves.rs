@@ -14,7 +14,7 @@
 )]
 
 use super::biarc::{self, Piece};
-use super::renderer::SegmentInstance;
+use super::renderer::{SegmentInstance, miter_extension};
 
 /// The largest share of a Maurer walk's vertices that may be **corners** before
 /// `maurer_rose_pieces` declines to fit it — *is this a curve at all?*
@@ -104,16 +104,28 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
     // different roses from one set of parameters.
     let point = |k: usize| rose_point(&p, k, rot_sin, rot_cos);
 
-    let mut prev = point(0);
+    // A three-point window over the walk, so each joint's interior angle is in
+    // hand when the segment carrying it is pushed and `point` is evaluated once
+    // per sample rather than three times.
+    let (mut back, mut prev) = (point(0), point(0));
     for k in 1..=drawn {
         let cur = point(k);
         // Chained (ADR-0158): consecutive chords share a sampled point, so every
-        // interior vertex is a joint. The two ends of the walk stay free — and
-        // that includes the head of a partially revealed curve, so
+        // interior vertex is a joint, and each end reaches its corner's point by
+        // the miter the two arms subtend. The two ends of the walk stay free —
+        // and that includes the head of a partially revealed curve, so
         // `draw_progress` never pushes the stroke past the point it actually
         // reached.
-        let ext_a = if k > 1 { p.width } else { 0.0 };
-        let ext_b = if k < drawn { p.width } else { 0.0 };
+        let ext_a = if k > 1 {
+            miter_extension(p.width, back, prev, cur)
+        } else {
+            0.0
+        };
+        let ext_b = if k < drawn {
+            miter_extension(p.width, prev, cur, point(k + 1))
+        } else {
+            0.0
+        };
         out.push(SegmentInstance {
             a: prev,
             b: cur,
@@ -123,6 +135,7 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
             ext_a,
             ext_b,
         });
+        back = prev;
         prev = cur;
     }
 }

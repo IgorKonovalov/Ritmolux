@@ -557,23 +557,45 @@ fn each_layout_draws_the_same_levels_as_its_own_figure() {
 /// grow inward through `radius` and fill the inner circle.
 #[test]
 fn only_the_polyline_extends_its_endpoints() {
+    use crate::render::scenes::lines::{MITER_SLACK, expected_miter};
+
     let levels = [0.1f32, 0.4, 0.9, 0.3, 0.6];
 
     // Chained: every interior vertex is a joint; the figure's two outer ends
     // stay free, or the stroke would run half a width past each edge.
     let chain = figure(SpectrumLayout::Polyline, &levels);
     assert_eq!(
-        chain.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
-        vec![(0.0, W), (W, W), (W, W), (W, 0.0)],
+        chain
+            .iter()
+            .map(|s| (s.ext_a > 0.0, s.ext_b > 0.0))
+            .collect::<Vec<_>>(),
+        vec![(false, true), (true, true), (true, true), (true, false)],
         "the interior endpoints of the chain are extended and only those"
     );
-    // ...and every extension matches a genuinely shared point, which is the
-    // invariant nothing else in the pipeline validates.
+    // ...and every extension matches a genuinely shared point AND the miter
+    // that point's own interior angle asks for — which is the invariant nothing
+    // else in the pipeline validates.
     for i in 1..chain.len() {
         assert_eq!(chain[i - 1].b, chain[i].a, "segment {i} shares a point");
-        assert_ne!(chain[i - 1].ext_b, 0.0, "seen from the segment before");
-        assert_ne!(chain[i].ext_a, 0.0, "and from the one after");
+        let want = expected_miter(W, chain[i - 1].a, chain[i].a, chain[i].b);
+        assert!(
+            (chain[i - 1].ext_b - want).abs() <= want * MITER_SLACK
+                && (chain[i].ext_a - want).abs() <= want * MITER_SLACK,
+            "vertex {i}: the two sides carry {} and {} against the miter {want} \
+             its interior angle asks for",
+            chain[i - 1].ext_b,
+            chain[i].ext_a
+        );
     }
+    // Non-vacuity: these five levels put real corners in the readout, so at
+    // least one joint reaches well past the flat half-width a bevel would.
+    assert!(
+        chain.iter().any(|s| s.ext_a > 1.2 * W),
+        "no joint in this fixture reaches past {}, so it cannot separate a \
+         mitred corner from a bevelled one: {:?}",
+        1.2 * W,
+        chain.iter().map(|s| s.ext_a).collect::<Vec<_>>()
+    );
     // Two elements make one segment, which is all end and no joint.
     let lone = figure(SpectrumLayout::Polyline, &[0.3, 0.7]);
     assert_eq!(lone.len(), 1);

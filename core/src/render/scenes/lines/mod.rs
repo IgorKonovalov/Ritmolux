@@ -34,7 +34,9 @@ pub mod turtle;
 
 pub use lsystem::LSystemScene;
 pub use parametric::ParametricCurveScene;
-pub use renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
+pub use renderer::{
+    ArcInstance, LineRenderer, MITER_LIMIT, SegmentInstance, StrokeMetric, miter_extension,
+};
 pub use spectrum::{SpectrumLayout, SpectrumScene};
 pub use star::StarPatternScene;
 
@@ -264,6 +266,48 @@ pub fn palette(t: f32) -> [f32; 3] {
 /// the ratio between the two. A producer that wrote a different placeholder into
 /// `width` than into the extensions would rescale them wrongly.
 pub(crate) const PLACEHOLDER_WIDTH: f32 = 0.01;
+
+/// The miter a joint needs, derived the **other way** from
+/// [`miter_extension`] — for the per-producer tests to check against.
+///
+/// The producer measures the turn as a dot product and takes a square root;
+/// this measures it with `atan2` and takes a sine of the interior angle
+/// directly. Two routes to one quantity, so a test using it is checking the
+/// producer rather than restating it — a helper that re-derived the miter the
+/// producer's way would assert only that the code is itself.
+///
+/// Shared here rather than copied into each producer's test module, because
+/// five copies of a reference expression is five chances for one of them to
+/// drift into agreeing with a bug.
+#[cfg(test)]
+pub(crate) fn expected_miter(width: f32, prev: [f32; 2], vertex: [f32; 2], next: [f32; 2]) -> f32 {
+    use std::f32::consts::{PI, TAU};
+    let incoming = (vertex[1] - prev[1]).atan2(vertex[0] - prev[0]);
+    let outgoing = (next[1] - vertex[1]).atan2(next[0] - vertex[0]);
+    let turn = (outgoing - incoming).rem_euclid(TAU);
+    let turn = if turn > PI { TAU - turn } else { turn };
+    let miter = width / ((PI - turn) * 0.5).sin();
+    if miter > MITER_LIMIT * width {
+        width
+    } else {
+        miter
+    }
+}
+
+/// Relative slack between [`expected_miter`] and the producers' own expression.
+///
+/// **Slack, not a tolerance**: the two are the same number in real arithmetic.
+/// Each route costs a handful of f32 roundings at `2^-24` (about `6e-8`) apiece,
+/// and neither end of the range amplifies them — as the joint straightens
+/// `sin(theta / 2)` approaches 1, where the miter is insensitive to the angle,
+/// and as it sharpens both routes take the same bevel fallback at the same
+/// [`MITER_LIMIT`]. The fallback is a **step**, so a joint within an f32 ulp of
+/// the boundary could land on opposite sides of it in the two routes — no
+/// fixture here sits there, and one that did would fail loudly rather than
+/// silently. `1e-4` is two orders above the worst accumulation either can carry
+/// away from that boundary.
+#[cfg(test)]
+pub(crate) const MITER_SLACK: f32 = 1e-4;
 
 pub(crate) trait LineInstance: Copy {
     /// Rotate about the origin and scale uniformly. `sin`/`cos` are the

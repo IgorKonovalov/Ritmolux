@@ -103,14 +103,23 @@ fn zero_phase_and_offset_reduce_to_the_plain_sine_rose() {
     }
 }
 
-/// Plan 0039 Phase 3 done-when 1 and 4 (ADR-0041). Asserted on the **flag
-/// pattern**, not on pixels: a producer that silently forgets to flag its
-/// joints keeps the notch and nothing else in the pipeline notices, so only
-/// a per-producer test catches it.
+/// **Every interior vertex is a joint, and each one reaches the point its own
+/// angle asks for** (ADR-0158). Asserted on the produced extensions, not on
+/// pixels: a producer that forgets a joint keeps the notch, and one that
+/// computes the wrong angle now draws a *wrong-length* stroke — neither is
+/// visible anywhere else in the pipeline, so only a per-producer test catches
+/// them.
+///
+/// The expected length comes from [`expected_miter`], which measures the turn
+/// with `atan2` where the producer uses a dot product, so this compares two
+/// derivations rather than restating one.
+///
+/// [`expected_miter`]: crate::render::scenes::lines::expected_miter
 #[test]
 fn the_rose_extends_every_interior_vertex_of_its_chain() {
-    /// The extension a joined end carries here. Phase 1 plumbing: the producer
-    /// passes its own half-width, which reproduces the flag's geometry exactly.
+    use crate::render::scenes::lines::{MITER_SLACK, expected_miter};
+
+    /// The half-width the walk is measured against.
     const W: f32 = 0.01;
 
     let mut arc = Vec::with_capacity(8);
@@ -122,15 +131,40 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
         &mut arc,
     );
     assert_eq!(arc.len(), 3, "three chords through four sampled points");
+    // Which ends are joints at all: the two interior vertices, and not the
+    // walk's own two ends.
     assert_eq!(
-        arc.iter().map(|s| (s.ext_a, s.ext_b)).collect::<Vec<_>>(),
-        vec![(0.0, W), (W, W), (W, 0.0)],
+        arc.iter()
+            .map(|s| (s.ext_a > 0.0, s.ext_b > 0.0))
+            .collect::<Vec<_>>(),
+        vec![(false, true), (true, true), (true, false)],
         "the two interior vertices are joints; the walk's own ends are free"
     );
-    // Each extension stands for a genuinely shared point.
+    // Each extension stands for a genuinely shared point, and is the miter that
+    // point's own interior angle asks for.
     for k in 1..arc.len() {
         assert_eq!(arc[k - 1].b, arc[k].a, "chord {k} continues the previous");
+        let want = expected_miter(W, arc[k - 1].a, arc[k].a, arc[k].b);
+        for (side, got) in [
+            ("b of the chord before", arc[k - 1].ext_b),
+            ("a", arc[k].ext_a),
+        ] {
+            assert!(
+                (got - want).abs() <= want * MITER_SLACK,
+                "vertex {k} ({side}): extension {got} against the miter {want} \
+                 its own interior angle asks for"
+            );
+        }
     }
+    // Non-vacuity: this walk's corners are sharp enough that the miter is a
+    // long way from the flat half-width a blunt joint would carry.
+    assert!(
+        arc[1].ext_a > 1.5 * W,
+        "a `d = 71` web turns hard at every sample, so its miters must be well \
+         past the flat {W} — got {}, and this fixture is not separating a \
+         mitred corner from a bevelled one",
+        arc[1].ext_a
+    );
 
     // A partially revealed curve ends where it actually stopped: the head of
     // the drawn prefix is a free end, not a joint into geometry that is not
@@ -145,9 +179,8 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
         &mut half,
     );
     assert_eq!(half.len(), 4, "half of eight chords");
-    assert_eq!(
-        (half[3].ext_a, half[3].ext_b),
-        (W, 0.0),
+    assert!(
+        half[3].ext_a > 0.0 && half[3].ext_b == 0.0,
         "the drawing head is a free end, so draw_progress cannot push the \
          stroke past the point it reached"
     );

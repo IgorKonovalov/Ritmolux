@@ -21,6 +21,95 @@
 
 use crate::render::gpu;
 
+/// The sharpest corner a miter is drawn for, as a multiple of the half-width
+/// the miter would reach (ADR-0158).
+///
+/// A corner of interior angle `theta` needs `width / sin(theta / 2)`, which
+/// grows without bound as the corner sharpens: a spike that doubles back on
+/// itself would reach to infinity and paint a spear across the frame. Past the
+/// limit the joint **reverts to the flat half-width** — a bevel, which is what
+/// `stroke-miterlimit` selects in SVG and what an unmitred joint always drew.
+/// It is a fallback and not a truncation: clamping to `MITER_LIMIT * width`
+/// instead leaves the stroke reaching four half-widths past the vertex along its
+/// own direction, which reads as a burr rather than as a corner.
+///
+/// **`4.0` is adopted, not measured.** It is SVG's `stroke-miterlimit` default,
+/// and it draws exactly every corner at or above
+/// `2 * asin(1 / 4) = 28.96 degrees` — that is the angle at which
+/// `1 / sin(theta / 2)` reaches 4, so the limit is a statement about which
+/// corners are mitred and which are bevelled, not a tuned number (ADR-0071).
+/// `diamond`'s 61.9-degree vertex needs 1.9437 and is well inside it; a Maurer
+/// chord web's near-reversals are the population outside it.
+pub const MITER_LIMIT: f32 = 4.0;
+
+/// The extension a joined end needs to reach its corner's point: the miter
+/// length at `vertex`, where the chain arrives from `prev` and leaves for
+/// `next`, clamped to [`MITER_LIMIT`] half-widths (ADR-0158).
+///
+/// # The expression, and why it carries no trigonometry
+///
+/// For an interior angle `theta` the miter is `width / sin(theta / 2)`. Writing
+/// `d1`, `d2` for the two unit directions, the turn between them is
+/// `theta_turn = pi - theta`, so
+///
+/// ```text
+/// sin(theta / 2) = cos(theta_turn / 2) = sqrt((1 + d1 · d2) / 2)
+/// ```
+///
+/// — a dot product and a square root, with no `acos` to lose precision near the
+/// straight case and no branch on the turn's sign. A straight joint has
+/// `d1 · d2 = 1` and yields exactly `width`, which is the flat half-width, so a
+/// collinear chain is byte-identical to one that extends by `width`.
+///
+/// # Homogeneous of degree 1 in `width`
+///
+/// Both `width / sin(theta / 2)` and the clamp `MITER_LIMIT * width` scale
+/// linearly, so `miter(c * w) == c * miter(w)` and the clamp cannot be engaged
+/// at one width and not another. That is what lets the cached producers compute
+/// this against [`PLACEHOLDER_WIDTH`](super::PLACEHOLDER_WIDTH) at `configure`
+/// and have [`LineInstance::styled`](super::LineInstance::styled) carry it to
+/// this frame's width by the ratio. `theta` survives that too: every transform
+/// between a producer and the shader — uniform scale, rotation, reflection, the
+/// mirror replication, `normalize_fit` — is a similarity, and a similarity
+/// preserves angles.
+///
+/// # Degenerate input
+///
+/// A zero-length arm has no direction, and a chain that doubles back exactly
+/// (`d1 · d2 = -1`) has no reachable point. Both fall back to `width`, the flat
+/// half-width — which is the same value a corner past [`MITER_LIMIT`] takes, so
+/// the degenerate case is the limit case rather than a separate rule.
+pub fn miter_extension(width: f32, prev: [f32; 2], vertex: [f32; 2], next: [f32; 2]) -> f32 {
+    let unit = |from: [f32; 2], to: [f32; 2]| -> Option<[f32; 2]> {
+        let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+        let len = dx.hypot(dy);
+        (len > 1e-9).then(|| [dx / len, dy / len])
+    };
+    let (Some(d1), Some(d2)) = (unit(prev, vertex), unit(vertex, next)) else {
+        return width;
+    };
+    miter_extension_between(width, d1, d2)
+}
+
+/// [`miter_extension`] for a chain that carries its own tangents rather than a
+/// third point — a fitted arc/line chain, where the direction a neighbour
+/// arrives or leaves at is a property of the piece and not of any vertex.
+///
+/// `incoming` and `outgoing` are **unit** directions of travel through the
+/// joint. A G1 joint has them equal, so this returns exactly `width` there and a
+/// tangent-continuous run is byte-identical to one extended by the flat
+/// half-width; only the chain's genuine corners move.
+pub fn miter_extension_between(width: f32, incoming: [f32; 2], outgoing: [f32; 2]) -> f32 {
+    let half = ((1.0 + incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) * 0.5)
+        .max(0.0)
+        .sqrt();
+    if half <= 1.0 / MITER_LIMIT {
+        // Bevel, not a truncated miter — see `MITER_LIMIT`.
+        return width;
+    }
+    width / half
+}
+
 /// One line segment: endpoints `a`/`b` in world space (x is divided by aspect
 /// in the shader, matching the swarm's convention), an RGB colour, a
 /// half-width in world units, and the per-endpoint extension length the join

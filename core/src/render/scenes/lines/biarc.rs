@@ -202,6 +202,59 @@ impl Piece {
         }
     }
 
+    /// The miter extensions the piece at `k` carries at its two ends, in
+    /// `width` units (ADR-0158) — the one rule both fitted-chain producers
+    /// stroke by.
+    ///
+    /// A neighbour's direction is its own **tangent**, because a neighbour may
+    /// be an arc and an arc has no third point to take a direction from. Where
+    /// the fit kept the chain G1 the two tangents are equal and the miter is
+    /// exactly the flat half-width, so only the breaks the fit made at real
+    /// corners reach past it.
+    ///
+    /// `closed` wraps the chain's two ends onto each other. An open chain's
+    /// outer ends are genuinely free and read `0.0`, which is what keeps a
+    /// stroke from running past the figure's own endpoints.
+    ///
+    /// Angles are taken on the chain **as the fit produced it**. A producer that
+    /// places its copies through a rotation, a uniform scale or a reflection may
+    /// use these lengths unchanged: a similarity preserves angles.
+    pub(crate) fn chain_extensions(
+        chain: &[Piece],
+        k: usize,
+        width: f32,
+        closed: bool,
+    ) -> (f32, f32) {
+        use super::renderer::miter_extension_between;
+
+        let last = chain.len().saturating_sub(1);
+        let Some(here) = chain.get(k) else {
+            return (0.0, 0.0);
+        };
+        let before = if k > 0 {
+            chain.get(k - 1)
+        } else if closed {
+            chain.get(last)
+        } else {
+            None
+        };
+        let after = if k < last {
+            chain.get(k + 1)
+        } else if closed {
+            chain.first()
+        } else {
+            None
+        };
+        (
+            before.map_or(0.0, |p| {
+                miter_extension_between(width, p.end_tangent(), here.start_tangent())
+            }),
+            after.map_or(0.0, |p| {
+                miter_extension_between(width, here.end_tangent(), p.start_tangent())
+            }),
+        )
+    }
+
     /// How far `p` is from this piece, and the piece's unit tangent at the
     /// nearest point on it — the two quantities the two budgets are read
     /// against.
