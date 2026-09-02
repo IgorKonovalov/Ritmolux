@@ -635,8 +635,8 @@ pub struct SegmentInstance {
 
 **Lane:** `plan-0149-the-line-corners-stop-being-blunt`, worktree `WORK/lmv-plan-0149`.
 
-**This plan is NOT ready to close.** Every `dev` phase has landed. **Phase 6 is a `human` phase**
-that has not run, and Phase 7 sits behind it. What follows is a phase record, not a close brief.
+Every phase has landed. Phase 6 ran and returned **no change**, so Phase 7 had nothing to apply
+and neither carries a commit.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -646,8 +646,8 @@ that has not run, and Phase 7 sits behind it. What follows is a phase record, no
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
 | 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
 | 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
-| 6 — Judge what the corrected stroke weighs | human | not started | |
-| 7 — Apply the calibration verdict | dev | not started | |
+| 6 — Judge what the corrected stroke weighs | human | done — verdict: no change | no commit |
+| 7 — Apply the calibration verdict | dev | done — nothing to apply | no commit |
 
 ### Notes
 
@@ -988,6 +988,14 @@ the arm Phase 6 asks for.
 The pre-existing `target/plan0149/sheet_{nomiter,clamp,bevel}_*` and `panel_*`
 renders answer the **miter-limit** question and are a different comparison.
 
+**Phase 6's verdict is `WIDTH_SCALE` does not move**, given by the user from the
+four sheets above on 2026-09-02: *"post looks fine"*. So Phase 7 has nothing to
+apply and lands no commit — `WIDTH_SCALE` stays at `0.003`, and `MIN_HALF_WIDTH`
+and the `0.167` floor ADR-0124 derived from it are undisturbed and need no
+re-derivation. The whole line library therefore ships about a third lighter than
+it rendered before Phase 2a, at the *horizontal* thickness it always had, and
+that is the accepted look rather than an unexamined consequence.
+
 ### Close triggers
 
 - **`presets/` touched:** none. `git diff --name-only main...HEAD -- presets/` is empty.
@@ -1013,15 +1021,15 @@ renders answer the **miter-limit** question and are a different comparison.
   `renderer.rs:32`, which is that phase's own evidence. The 0135 and 0144 breaks are gone with
   those entries' move to the archive at `5ba4f72`. Left untouched: archiving is the close
   ceremony's judgement, not `dev`'s.
-- **Full suite:** at **Phase 2's tip**, `cargo nextest run --workspace` — **1505 run, 1505 passed,
+- **Full suite:** at **Phase 2's tip** (`d0d596e`, which is the last commit that changes code —
+  everything after it is this log), `cargo nextest run --workspace` — **1505 run, 1505 passed,
   5 skipped, exit 0**, 411.967 s, `LMV_BLESS` unset, every golden suite included and no baseline
   file modified by the run. `cargo fmt --all --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`,
   `node scripts/check-comment-hygiene.mjs`, `node scripts/check-doc-links.mjs` and
   `node scripts/check-index-rows.mjs` all clean.
-- **Outstanding `human` phases:** **Phase 6**, which judges `WIDTH_SCALE` from renders, and
-  Phase 7 behind it. Phase 6 is now reachable — its sheet is rendered against Phase 2's commit,
-  and the inventory lands in the Notes with that render.
+- **Outstanding `human` phases:** none. Phase 6 ran on 2026-09-02 against the four sheets the
+  Notes inventory and returned **no change**; Phase 7 lands no commit behind it.
 
 ## Followups (after this lands)
 
