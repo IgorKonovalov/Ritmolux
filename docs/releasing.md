@@ -52,9 +52,9 @@ parallel and, only if **all three** are green, publishes a GitHub **prerelease**
 zips:
 
 ```text
-light-music-visualizer-v<version>-macos-universal.zip        # universal .app, ad-hoc signed
-light-music-visualizer-v<version>-windows-x64.zip            # lmv.exe
-light-music-visualizer-v<version>-foobar2000-component.zip   # foo_lmv.fb2k-component, x64
+ritmolux-v<version>-macos-universal.zip        # universal .app, ad-hoc signed
+ritmolux-v<version>-windows-x64.zip            # ritmolux.exe
+ritmolux-v<version>-foobar2000-component.zip   # foo_ritmolux.fb2k-component, x64
 ```
 
 Each carries a `READ-ME-FIRST.txt`; the two standalone zips also carry a reference copy of
@@ -93,13 +93,13 @@ box this project is developed on:
 
 ### While you are here: read the component's size
 
-`foo_lmv.dll` carries a soft cap of its own — **12,582,912 B (12 MiB)**
+`foo_ritmolux.dll` carries a soft cap of its own — **12,582,912 B (12 MiB)**
 ([`docs/nfr.md`](nfr.md) §4, ADR-0159) — and it grew +910,848 B between Plan 0097 and Plan 0141
 without anyone watching, none of it attributed as it landed. **You no longer have to measure it.**
 The recipe above reads its own output's length and prints it beside the cap:
 
 ```
-    foo_lmv.dll is 9789952 B (77.8 % of the 12582912 B cap)
+    foo_ritmolux.dll is 9789952 B (77.8 % of the 12582912 B cap)
 ```
 
 Past **11,324,620 B** — 90 % of the cap — that step emits a warning instead of a check mark. It
@@ -122,7 +122,7 @@ was conditioned on an event that never happened, and the growth arrived anyway.
 - **The foobar plugin's build.** `cargo-release` does not run it — but since
   [ADR-0025](adrs/0025-foobar-component-version-single-sourced.md) the component version is
   no longer independent: `plugin-foobar/build.ps1` reads `[workspace.package].version` out of
-  root `Cargo.toml` and generates `build/foo_lmv_version.h`, which `DECLARE_COMPONENT_VERSION`
+  root `Cargo.toml` and generates `build/foo_ritmolux_version.h`, which `DECLARE_COMPONENT_VERSION`
   consumes. So a bump here reaches foobar's Components list **on the plugin's next build**,
   with no second string to edit. (This revises ADR-0005's original "independent plugin
   version" note.) Since Plan 0102 that next build is the **tag push**, not a developer running
@@ -141,7 +141,7 @@ was conditioned on an event that never happened, and the growth arrived anyway.
   `packaging/macos/Info.plist.in` at package time. `bundle.sh` asserts the plist and
   `[workspace.package]` agree, so a drift fails the build rather than shipping.
 - The foobar component's `DECLARE_COMPONENT_VERSION`, via the generated
-  `build/foo_lmv_version.h` (ADR-0025). `build-component.ps1` reads the version back out of the
+  `build/foo_ritmolux_version.h` (ADR-0025). `build-component.ps1` reads the version back out of the
   linked DLL and asserts it matches `[workspace.package]`, so — as with the macOS plist — a
   drift fails the build rather than shipping.
 

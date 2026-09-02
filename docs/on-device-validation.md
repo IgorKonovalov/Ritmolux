@@ -25,7 +25,7 @@ hardware, and the user won't have access to it until later:
 1. Does the **NFR §1 perf floor** (≥ 60 fps @ 1080p at the `Floor` tier) hold on the weakest box?
    Since Plan 0044 the engine ships two tiers ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)),
    and `Floor` is byte-for-byte the constants that were measured here before — so every item below
-   is a **`Floor`-tier** measurement unless it says otherwise. **Pin it: `lmv.exe --tier floor`.**
+   is a **`Floor`-tier** measurement unless it says otherwise. **Pin it: `ritmolux.exe --tier floor`.**
    Unpinned, the app starts on `Rich` and the frame-time governor may demote mid-run, which would
    put a tier change inside the very measurement being taken.
 2. Is the **~350 MB working-set soft ceiling** (NFR §12) AMD-specific, or does a second GPU vendor
@@ -311,7 +311,7 @@ the code says so in its own doc comment. Phase 4 was to replace them with measur
 not run at the plan's close, so the rich tier currently ships numbers nobody has timed.
 
 - [ ] **Calibrate `Rich` on the midrange discrete GPU, native fullscreen.** Run
-      `lmv.exe --tier rich` (the pin, so the governor cannot demote mid-measurement) with the
+      `ritmolux.exe --tier rich` (the pin, so the governor cannot demote mid-measurement) with the
       overlay on (`F3`), across the heaviest preset of each family: an `attractor_*`, a dense line
       preset with mirror + fold (`fragment_kaleido`), `swarm_dense`, a `reaction_*`, and a
       `spectrum_*`. Report per preset **(a)** whether frame time holds the display's refresh rate
@@ -356,7 +356,7 @@ Two things make this a real check rather than a formality. It must run against t
 zip, not `plugin-foobar/build.ps1 -Install` — an artifact that has only ever been installed over its
 own build directory has never exercised the path a user takes, and the release route additionally
 exercises the SDK fetch, the runner's MSVC and the three-zip count. And the dev box already carries
-`%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\` from that inner loop, so **remove it first**,
+`%APPDATA%\foobar2000-v2\user-components-x64\foo_ritmolux\` from that inner loop, so **remove it first**,
 or an older copy shadows the one under test and the version check means nothing.
 
 - [x] **RUN 2026-08-16 — `v0.70.0`, foobar2000 v2.25.10, AMD iGPU dev box. Installs and renders;
@@ -389,8 +389,21 @@ or an older copy shadows the one under test and the version check means nothing.
       it, including pre-rename `rose_*` files. Anyone judging the shipped set from a long-lived
       profile is judging the wrong set.
 
+- [ ] **The renamed component loads, and the old one is gone.** Nothing in CI can check this: the
+      component's filename is validated by foobar2000 itself, so a rename is only proven by a host
+      that accepts it. Install `foo_ritmolux.fb2k-component`, then confirm
+      **(a)** the Components list reads **Ritmolux**, not Light Music Visualizer;
+      **(b)** the pop-out opens from View → Ritmolux and renders;
+      **(c)** nothing named `foo_lmv` remains under
+      `%APPDATA%\foobar2000-v2\user-components-x64\` — `VALIDATE_COMPONENT_FILENAME` means the
+      old and new components have different filenames and **both load**, so the old one must be
+      removed through Preferences rather than left to be shadowed;
+      **(d)** an existing Default UI layout still holds the panel — the component's GUIDs were
+      deliberately not changed, and this is the only thing that proves it.
+      _(Plan 0150 Phase 9. A failure here is a defect in the rename, not a new backlog entry.)_
+
 - [ ] **Install the released component into a clean profile and play something.** Download
-      `light-music-visualizer-v<version>-foobar2000-component.zip` from the Releases page, unzip,
+      `ritmolux-v<version>-foobar2000-component.zip` from the Releases page, unzip,
       and install via File → Preferences → Components. Then, in this order:
       **(a)** the Components list shows the released version, not the dev build's;
       **(b)** dock it as a Default UI panel **before playing anything** and record whether it comes
@@ -468,7 +481,7 @@ From the repo root on the target box:
 
 ```
 cargo build -p standalone --release --bin lmv
-./target/release/lmv.exe --tier floor
+./target/release/ritmolux.exe --tier floor
 ```
 
 **Pin the tier.** Every iGPU item above is a `Floor` measurement, and unpinned the app starts on

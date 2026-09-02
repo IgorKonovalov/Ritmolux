@@ -17,12 +17,12 @@ You need macOS 13 (Ventura) or newer.
 macOS blocks apps downloaded from the internet that Apple has not signed. Ours
 is not signed, so you have to say so once.
 
-The easy way: right-click (or Control-click) LightMusicVisualizer.app, choose
+The easy way: right-click (or Control-click) Ritmolux.app, choose
 Open, then click Open again in the dialog. Only needed the first time.
 
 The Terminal way, if the dialog will not go away - cd into this folder and run:
 
-    xattr -dr com.apple.quarantine LightMusicVisualizer.app
+    xattr -dr com.apple.quarantine Ritmolux.app
 
 Then open it normally.
 
@@ -69,7 +69,7 @@ Send back whichever you get - that line is the whole answer.
 If neither is available for some reason, the fallback is to run the app from
 Terminal, which prints the same reason on startup - cd into this folder and run:
 
-    ./LightMusicVisualizer.app/Contents/MacOS/lmv
+    ./Ritmolux.app/Contents/MacOS/lmv
 
 
 4. Controls

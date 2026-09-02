@@ -359,8 +359,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — the name is cleared and the tree is frozen | human | done | no files touched |
 | 2 — the crates take the prefix | dev | done | c093dc7 |
-| 3 — the C ABI takes the prefix | dev | done | committed with this row |
-| 4 — the shipped artifacts take the name | dev | not started | |
+| 3 — the C ABI takes the prefix | dev | done | 55fa009 |
+| 4 — the shipped artifacts take the name | dev | done | committed with this row |
 | 5 — the environment takes the prefix | dev | not started | |
 | 6 — the user's machine is migrated | dev | not started | |
 | 7 — the strings a user reads | dev | not started | |
@@ -429,6 +429,44 @@ renamed symbol can never reach.
 **Left alone deliberately:** the `$LmvSdkVersion`, `$LmvSpout*` and `$LmvWorkspaceVersion`
 PowerShell variables under `packaging/foobar/`. They are packaging, not the ABI, and they are out
 of Phase 3's grep scope; they move with the packaging phases.
+
+**The sweep falsified four dated observations before they were caught, and the plan's rule for
+what is "the record" does not cover them.** `docs/on-device-validation.md` is a live doc, so it is
+swept — but it contains checked `- [x] RUN <date>` entries that are *observations*, not
+instructions. The sweep rewrote *"Components list reads `Light Music Visualizer 0.70.0 / foo_lmv`"*
+into `foo_ritmolux`, which asserts that someone saw, on 2026-08-16, a component name that did not
+exist until today. Four such records were restored to the old name (the 2026-08-16 and 2026-08-24
+runs); every forward-looking instruction in the same file keeps the new one. **This is ADR-0162's
+own argument — that rewriting history to agree with a name chosen afterwards is a falsification —
+applied to a file that is not on its "kept" list.** The ADR draws that list by directory
+(`docs/adrs/`, `docs/plans/done/`, the two archives); the operative property is not where a
+sentence lives but whether it is a dated claim about what was observed. Worth a second look at the
+close: `docs/design-backlog.md` carries dated entries too, and Phase 8 sweeps it.
+
+**`standalone/tests/help_cli.rs` had to move, and it is in no phase's file list.** It spawns the
+binary through `env!("CARGO_BIN_EXE_lmv")`, a compile-time macro named after the `[[bin]]`. The
+moment Phase 4 renames the bin the macro stops existing, so leaving the file alone is a build
+break, not an untidiness.
+
+**`packaging/foobar/build-component.ps1` asserts the component's declared name against the built
+image**, at `$pe.Text.Contains("Light Music Visualizer")`. Phase 4's file list names only
+`$DllName` in that file, but changing `DECLARE_COMPONENT_VERSION` without this literal makes the
+recipe `Die` on every subsequent build. Moved to `"Ritmolux"` in the same commit.
+
+**Two more names no phase's file list reaches:** `packaging/foobar/lmv-version.ps1` is a file whose
+*name* carries the prefix (now `rlx-version.ps1`), and there are **three** `READ-ME-FIRST.md` under
+`packaging/`, not the two Phase 4 names — `foobar/`, `macos/` and `windows/`.
+
+**The recipe was run end to end rather than reasoned about.** `packaging/foobar/build-component.ps1`
+produced `target/dist/ritmolux-v0.102.0-foobar2000-component.zip`, holding
+`foo_ritmolux.fb2k-component` -> `x64/foo_ritmolux.dll` and nothing else, with all seven of its
+verification checks green including the renamed name-string and the version read back out of the
+image. The DLL is 9,804,288 B, 77.9 % of NFR section 4's 12,582,912 B cap.
+
+**Deliberately still spelled with the old product name after this phase:** the `Light Music
+Visualizer` prose in the three `READ-ME-FIRST.md`, the window and `ui_element` titles in
+`foo_ritmolux.cpp` (Phase 7), and the `%APPDATA%\light-music-visualizer` paths in the same file
+(Phase 6). Phase 8's grep matches `light.music.visualizer` and is what closes the remainder.
 
 ### Close triggers
 

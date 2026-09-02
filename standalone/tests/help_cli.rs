@@ -8,7 +8,7 @@
 //! capture client on this path is the failure, and none of them is observable
 //! from inside the process that would be creating them.
 //!
-//! So this spawns the built binary. `lmv` is a `[[bin]]`, so `CARGO_BIN_EXE_lmv`
+//! So this spawns the built binary. `ritmolux` is a `[[bin]]`, so `CARGO_BIN_EXE_ritmolux`
 //! resolves it and cargo rebuilds it before the test runs — unlike the `shot`
 //! CLI beside it, which is an example and has to be located by path.
 //!
@@ -42,7 +42,7 @@ fn run(args: &[&str]) -> (Option<i32>, String, Duration) {
 /// these cases is what the operator is told before the process ends.
 fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
     let started = Instant::now();
-    let output = Command::new(env!("CARGO_BIN_EXE_lmv"))
+    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .args(args)
         .output()
         .expect("failed to spawn the lmv binary");
@@ -92,7 +92,7 @@ fn help_is_answered_even_beside_an_unrecognized_argument() {
 /// starting the app and drawing.
 #[test]
 fn an_unrecognized_argument_exits_non_zero_and_names_it() {
-    let output = Command::new(env!("CARGO_BIN_EXE_lmv"))
+    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .arg("--ocs")
         .arg("127.0.0.1:9000")
         .output()
@@ -108,7 +108,7 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
         "the refusal did not name the nearest flag: {stderr}"
     );
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lmv"))
+    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .arg("--definitely-not-a-flag")
         .output()
         .expect("failed to spawn the lmv binary");

@@ -27,7 +27,7 @@ Built against the foobar2000 SDK release @SDK_VERSION@.
 -------------
 
   1. In foobar2000: File -> Preferences -> Components.
-  2. Click "Install..." and pick foo_lmv.fb2k-component (the other file in
+  2. Click "Install..." and pick foo_ritmolux.fb2k-component (the other file in
      this folder). You can also drag that file onto the Components list.
   3. Click Apply. foobar2000 will ask to restart - let it.
 
@@ -98,7 +98,7 @@ Deleting the folder resets it; it is recreated on the next launch.
 
   - The POP-OUT window is black and never moves: that one really is the
     engine failing to start. Open View -> Console (foobar2000's own log) and
-    look for lines starting with "foo_lmv:".
+    look for lines starting with "foo_ritmolux:".
 
   - It draws, but never reacts to the music: playback has to be running -
     the visuals idle when nothing is playing.
@@ -118,6 +118,6 @@ Five things, however roughly:
   - Does it react to playback, in the pop-out window and as a docked panel?
   - Was the docked panel black at first, and did a track change fix it?
   - Does it survive a track change and pressing Space a few times?
-  - What graphics card do you have, and any "foo_lmv:" lines from the Console.
+  - What graphics card do you have, and any "foo_ritmolux:" lines from the Console.
 
 Thank you - this build exists to find out what breaks.
