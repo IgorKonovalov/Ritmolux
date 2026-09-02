@@ -134,7 +134,7 @@ use std::sync::OnceLock;
 use super::super::Scene;
 use super::super::common;
 use super::biarc::{self, Piece};
-use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric};
+use super::renderer::{ArcInstance, LineRenderer, SegmentInstance, StrokeMetric, miter_extension};
 use super::{
     CapOverflow, ColorRamp, GeneratorConfig, MirrorSpec, OverflowContext, PLACEHOLDER_WIDTH,
     ViewTransform, hankin, replicate_mirror, transform_cached, turtle,
@@ -1441,7 +1441,6 @@ pub(crate) fn build_rings(
         // the two buffers they belong to.
         if let Some(chain) = ring.motif.chain() {
             let closed = ring.motif.is_closed();
-            let last = chain.len().saturating_sub(1);
             for i in 0..count {
                 let theta = TAU * i as f32 / count as f32 + base_phase;
                 let (sin, cos) = theta.sin_cos();
@@ -1478,17 +1477,11 @@ pub(crate) fn build_rings(
                             // continues it at both ends. That is true across a
                             // corner too — the extension is what covers the
                             // wedge between two strokes, and a corner is exactly
-                            // where there is one.
-                            let ext_a = if closed || k > 0 {
-                                PLACEHOLDER_WIDTH
-                            } else {
-                                0.0
-                            };
-                            let ext_b = if closed || k < last {
-                                PLACEHOLDER_WIDTH
-                            } else {
-                                0.0
-                            };
+                            // where there is one, so the length is the miter the
+                            // two arms subtend.
+                            //
+                            let (ext_a, ext_b) =
+                                Piece::chain_extensions(chain, k, PLACEHOLDER_WIDTH, closed);
                             out.push(SegmentInstance {
                                 a: place(a),
                                 b: place(b),
@@ -1527,18 +1520,23 @@ pub(crate) fn build_rings(
                     continue;
                 };
                 // A closed outline is a closed chain, so every vertex is a joint
-                // (ADR-0158); an open one is free at its two ends only.
+                // (ADR-0158); an open one is free at its two ends only. A joint
+                // reaches its corner's point by the miter its two edges subtend,
+                // measured on the UNPLACED outline — `place` is a similarity and
+                // a similarity preserves angles.
                 let closed = ring.motif.is_closed();
-                let ext_a = if closed || e > 0 {
-                    PLACEHOLDER_WIDTH
-                } else {
-                    0.0
-                };
-                let ext_b = if closed || e + 1 < edges {
-                    PLACEHOLDER_WIDTH
-                } else {
-                    0.0
-                };
+                let ext_a = (closed || e > 0)
+                    .then(|| pts.get((e + n - 1) % n))
+                    .flatten()
+                    .map_or(0.0, |&before| {
+                        miter_extension(PLACEHOLDER_WIDTH, before, a, b)
+                    });
+                let ext_b = (closed || e + 1 < edges)
+                    .then(|| pts.get((e + 2) % n))
+                    .flatten()
+                    .map_or(0.0, |&after| {
+                        miter_extension(PLACEHOLDER_WIDTH, a, b, after)
+                    });
                 out.push(SegmentInstance {
                     a: place(a),
                     b: place(b),

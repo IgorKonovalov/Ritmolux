@@ -635,15 +635,14 @@ pub struct SegmentInstance {
 
 **Lane:** `plan-0149-the-line-corners-stop-being-blunt`, worktree `WORK/lmv-plan-0149`.
 
-**This plan is NOT ready to close.** Phase 2a has landed and unblocked Phase 2. Phase 2 is
-**written and uncommitted**, stopped on a finding that invalidates a gate outside this plan — see
-*Phase 2 is written, and stopped* below. What follows is a phase record, not a close brief.
+**This plan is NOT ready to close.** Every `dev` phase has landed. **Phase 6 is a `human` phase**
+that has not run, and Phase 7 sits behind it. What follows is a phase record, not a close brief.
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
 | 2a — The stroke is measured where the screen is isotropic | dev | done | c801f43 |
-| 2 — The corner reaches its point | dev | **STOPPED** — written, uncommitted; see Notes | |
+| 2 — The corner reaches its point | dev | done | committed with this row |
 | 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
 | 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
 | 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
@@ -857,65 +856,29 @@ mtimes.
 
 **`WIDTH_SCALE` did not move**, per the phase.
 
-**Phase 2 is written, and stopped.**
-
-> **RESUME NOTE — scaffolding, to be removed when Phase 2 lands.** The work is
-> **uncommitted in the worktree**, twelve files under
-> `core/src/render/scenes/lines/`, and a patch of it is saved at
-> `target/plan0149/phase2-uncommitted.patch` (gitignored, and `cargo clean`
-> removes it). Nothing else in the tree is dirty. A `git checkout` in this
-> worktree loses it; a WIP commit on the lane branch is the cheap insurance.
-
-What is written and green: `MITER_LIMIT` plus `miter_extension` (three points)
-and `miter_extension_between` (two unit tangents) in `renderer.rs`; the miter in
-all six producers — `curves`, `parametric`, `turtle`, `hankin`, `spectrum` and
+**Phase 2 landed.** `MITER_LIMIT` plus `miter_extension` (three points) and
+`miter_extension_between` (two unit tangents) in `renderer.rs`; the miter in all
+six producers — `curves`, `parametric`, `turtle`, `hankin`, `spectrum` and
 `star`'s two paths; the two fitted-chain producers sharing one extracted rule,
 `Piece::chain_extensions` in `biarc.rs`; six per-producer tests plus the diamond
-fixture; `parametric.rs`'s doc riders. **640 lib tests pass** (638 before),
-`cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all
---check` and `node scripts/check-comment-hygiene.mjs` all clean.
+fixture; `parametric.rs`'s doc riders; and the `sanity.rs` disposition below.
 
-`spectrum` and `warp_mesh` are **unmoved and unblessed**, which is the scope
-rule's own oracle. `golden`, `line_joints` and `composite` await a bless that was
-deliberately not taken. `line_joints` reports the change it names as expected:
-*"the stroke still passes the local-minimum claim, so this is a change in how the
-joint renders rather than the notch reopening"*, and the free ends still read
-`0.0000` beyond.
+**The `Blown Out` anchor, and the numbers ADR-0161 was written from.** Both
+assertions reproduce exactly at that ADR's figures, on this box's hardware
+adapter at the suite's own 96x96 capture:
 
-**Why it stopped: `core/tests/sanity.rs` loses its only true-positive anchor.**
-`a_frame_with_no_tonal_structure_is_reported_flat` and
-`each_term_of_the_flatness_conjunction_is_load_bearing` both fail on the
-`Blown Out` fixture — `parametric_curve` at `thickness = 44`, `glow = 20`,
-`trails = 0.97`:
+| lens | coverage | tonal_flatness | boundary_density | shells |
+|---|---|---|---|---|
+| `BLACK` (areal) | 0.9666 | 0.9983 | **0.0382** | 10/10 |
+| derived ground `[159, 254, 202]` | 0.0350 | 0.9628 | **0.5697** | 0/10 |
 
-| tree | coverage | boundary (floor 0.31) | convicted |
-|---|---|---|---|
-| no miter | 0.1849 | **0.2700** | yes |
-| miter, limit 2.0 | 0.0777 | 0.4302 | no |
-| miter, limit 4.0 | 0.0350 | **0.5697** | no |
-
-**The blot is still a blot** — rendered side by side at 960x540 it is the same
-figure. What the miter did is **smooth its perimeter**, closing the stepped
-notches around the rim, which is what the miter is for. Measured against its own
-derived ground — a blot is its own modal band, so "lit" is the fringe — the
-fringe fell from 18.5 % of the frame to 3.5 %, and `boundary_density` is
-`edge / lit` with the **lit area** as denominator, so a thinner fringe is
-proportionally more rim and the ratio rose. `boundary_density`'s own doc names
-raggedness as its decay mode; this is that, inverted. The **tonal** term still
-fires (0.9628 against the 0.90 max) — only the conjunction's structural term
-stopped, and ADR-0128 makes the gate a conjunction.
-
-No miter limit that mitres at all keeps the fixture convicted: at `MITER_LIMIT`
-`1.0` the expression degenerates to the flat half-width and the reading returns
-to `0.2700`. The bevel-versus-clamp choice below does not touch it either — both
-read `0.5697` to four decimals, because at `thickness = 44` the smoothing happens
-well inside the limit.
-
-`sanity.rs` states why this is not `dev`'s to bless: *"this fixture is the whole
-of that evidence — it is the sole anchor on the defect side of
-`MAX_TONAL_FLATNESS`, of ADR-0128's conjunction, and of `boundary_floor`'s
-default arm. Re-blessing it moves three thresholds."* **Routed to `architect`
-on the user's call at the gate.**
+The six parts of that done-when are in `sanity.rs` and its doc blocks only;
+`metrics.rs` is untouched. `MAX_TONAL_FLATNESS`, both `boundary_floor` arms and
+`blown_out`'s parameters are byte-unchanged — `git diff` on those four lines is
+empty. The areal positive control reads `0.0382` in both tests. `Sumi`'s areal
+boundary is `0.0412`, also under the floor, so the control is asserted **only**
+on the blot and the other two rows print theirs; a claim that the areal lens
+convicts the blot alone would have been false.
 
 **A premise in this plan's Risks section is falsified.** It reads *"the miter
 limit at very sharp corners is untested by any shipped figure … if none does, the
@@ -965,50 +928,78 @@ phase names only `configure`'s duplicated block. The same edit had left
 `split_pieces` with **no** doc at all — its block was stacked above
 `reserve_fit_buffers`'s — and both are repaired.
 
-**The judging sheets Phase 6 consumes are rendered but are NOT the sheet the
-phase asks for.** They are under `target/plan0149/`:
-`sheet_{nomiter,clamp,bevel}_{1080,1280}.png` (the twenty-preset line roster at
-1920x1080 and 1280x800) and `panel_{arm}_{preset}.png` at full size for
-`curve_nightbloom`, `curve_broadside`, `star_zellij` and `lsystem_vellum`. They
-answer the **miter-limit** question, on three arms of the *corner*. Phase 6 asks
-the **`WIDTH_SCALE`** question, whose arms are *before Phase 2a* and *after Phase
-2* — and its own done-when says the sheet is rendered on the finished tree,
-because judging stroke weight against blunt corners judges the wrong picture.
-That sheet is still owed and cannot be taken until Phase 2 lands.
+**The bless, both halves.** Eleven baselines moved and every one of them is a
+line render: `line_joint_zigzag`, `parametric_curve`, `star_pattern`, and the
+eight `parametric_curve` composite fixtures. `composite_symmetry` and
+`composite_kaleido_squash` — the two `fragment_field` ones — are untouched, as
+are `spectrum`, the four `warp_mesh_*` and `milkconv/tests/draw_layer.rs`
+(8 tests, all pass unblessed). `core/src/render/scenes/warp_mesh/**` is absent
+from the diff, which is the scope rule's own oracle.
+
+Two things the bless turned up that are worth naming.
+
+- **`shape_collage.png` is rewritten on every bless and was restored twice.**
+  `LMV_BLESS` writes each fixture unconditionally, and this one is not stable to
+  the byte: unblessed it reads `mean 0.0000 max_outlier 1` against its committed
+  baseline. One byte on one channel, unrelated to this phase — `shape_collage`
+  reaches no line producer. The committed baseline is the one in the commit.
+- **`lsystem.png` did not move, and that is arithmetic rather than a wiring
+  failure.** The fixture's `angle_deg = 25` makes a `1/sin(77.5 deg) = 1.0243`
+  miter, its `thickness = 2.5` is a half-width of `0.0075` world units, and
+  128x128 at a unit half-extent is 64 px per world unit — so the joint tips move
+  `0.012 px` and no pixel changes by a byte. `turtle.rs`'s own test asserts the
+  extensions it writes.
+
+**The adapter comparison, which is what a bless is trusted on.** The baselines
+are WARP-blessed by construction (`golden.rs`'s module doc requires it). A
+scratch probe rendered `parametric_curve`, `star_pattern`, `lsystem` and
+`spectrum` on this box's **hardware** adapter against the freshly blessed
+baselines: `mean 0.0001 / max_outlier 1` on `parametric_curve` and
+`mean 0.0000 / max_outlier 1` on the other three. The probe was removed rather
+than committed; it is `common::headless_hardware_for` plus `golden.rs`'s own
+fixture table and `frame_diff`.
+
+**The judging sheet Phase 6 consumes is rendered against this commit**, and its
+inventory lands as its own `docs(plans)` commit rather than inside this one: the
+sheet's "before" arm is a rebuild from the pre-2a commit, which needs a clean
+tree to check out over. The pre-existing `target/plan0149/sheet_*` and `panel_*`
+renders answer the **miter-limit** question and are a different comparison;
+Phase 6 asks the `WIDTH_SCALE` one.
 
 ### Close triggers
 
 - **`presets/` touched:** none. `git diff --name-only main...HEAD -- presets/` is empty.
-- **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144. **0136 and 0144 are
-  discharged** (Phases 3 and 5). **0135 is discharged** (Phase 4), by a different mechanism than
-  the phase named — see the Notes. **0134 is NOT discharged**: it is the blunt corner itself, and
-  Phase 2 is blocked. Its probe was re-pointed at `absent: MITER_LIMIT` on 2026-09-01 and the
-  entry is still live. Phase 2's uncommitted work would discharge it; `star_zellij`'s outer
-  vertices reach their points under it.
+- **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144. **0135, 0136 and 0144 are
+  discharged** (Phases 4, 3 and 5) and were moved to the archive at `5ba4f72`; 0135 by a different
+  mechanism than the phase named — see the Notes. **0134 is discharged by Phase 2** and is still
+  live in `docs/design-backlog.md`: archiving it is the close ceremony's judgement, not `dev`'s.
 - **What shipped:** a **fix**. Phase 3 is a load-time refusal, Phase 4 an allocation reduction with
   no rendered change, Phase 5 prose. Phase 1 is a representation change that moves no pixel.
   **Phase 2a moves every non-square line render**: every stroke converges on today's horizontal
   thickness, a mean `1.52x` lighter at 16:9, and eight `parametric_curve` composite baselines
-  re-blessed with it. No new capability reached a preset author, and the feature this plan exists
-  for — the miter — has not shipped.
+  re-blessed with it. **Phase 2 moves every joined corner in the four line families**: eleven
+  baselines re-blessed, `star_zellij`'s outer vertices reach their points, and joints past
+  `28.96` degrees take a bevel. No new capability reached a preset author — a preset's `thickness`
+  means what it meant.
 - **Operator docs touched:** `docs/nfr.md` §12 (the Rust-state bound, corrected — Phase 4). No
   scene param was added, renamed or re-defaulted, so `presets/README.md`, `docs/presets.md` and
   `docs/preset-palettes.md` are untouched by construction. `docs/capturing.md` and
   `docs/on-device-validation.md` unaffected: no CLI flag or checklist assertion moved.
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **1**, two entries broken,
-  and **both are red-on-delivery rather than decayed** — 0135's probe greps for the
-  `arcs: Vec::with_capacity(max_segments)` Phase 4 removed, and 0144's for the unconditional
-  exactness sentence Phase 5 qualified. Each break is that phase's own evidence. Left untouched:
-  archiving is the close ceremony's judgement, not `dev`'s.
-- **Full suite:** at **Phase 2a's tip** (`c801f43`), `cargo nextest run --workspace` —
-  **1503 run, 1503 passed, 5 skipped, exit 0**, 419.536 s, `LMV_BLESS` unset. With Phase 2's
-  uncommitted work in the tree it is **1505 run, 5 failed**: `golden`, `line_joints` and
-  `composite` await a bless that was deliberately not taken, and the two `sanity` failures are
-  the finding above. `spectrum` and `warp_mesh` are unmoved and unblessed under both.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **1**, **one** entry broken,
+  and it is red-on-delivery rather than decayed — 0134's probe is
+  `absent: MITER_LIMIT in: core/src/render/scenes/lines/renderer.rs` and the constant is now at
+  `renderer.rs:32`, which is that phase's own evidence. The 0135 and 0144 breaks are gone with
+  those entries' move to the archive at `5ba4f72`. Left untouched: archiving is the close
+  ceremony's judgement, not `dev`'s.
+- **Full suite:** at **Phase 2's tip**, `cargo nextest run --workspace` — **1505 run, 1505 passed,
+  5 skipped, exit 0**, 411.967 s, `LMV_BLESS` unset, every golden suite included and no baseline
+  file modified by the run. `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings`,
+  `node scripts/check-comment-hygiene.mjs`, `node scripts/check-doc-links.mjs` and
+  `node scripts/check-index-rows.mjs` all clean.
 - **Outstanding `human` phases:** **Phase 6**, which judges `WIDTH_SCALE` from renders, and
-  Phase 7 behind it. Neither is reachable: Phase 6's sheet is Phase 2's last done-when and Phase 2
-  has not landed. **And Phase 2 is stopped on an architect decision** about `core/tests/sanity.rs`,
-  which is not a `human` phase and is not covered by this field.
+  Phase 7 behind it. Phase 6 is now reachable — its sheet is rendered against Phase 2's commit,
+  and the inventory lands in the Notes with that render.
 
 ## Followups (after this lands)
 
