@@ -26,21 +26,21 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0150](0150-the-application-becomes-ritmolux.md) | The application becomes Ritmolux | approved | dev, human | ADR-0162 (proposed): 1,318 live sites take `rlx`/Ritmolux; the 990-site record keeps `ritmolux`. **Phase 1 trademark half discharged 2026-09-02**; the freeze half stands. **Blocks 0143 and 0103.** |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts, and that fix only reaches users on the next tag. **Phases 4-6 wait on 0150.** |
+| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_ritmolux.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved, PARKED | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Parked until 0150 lands.** |
+| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 <!-- roster:end -->
 
-**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**
+~~**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**~~ — **closed 2026-09-02**, all nine phases, and the freeze held for every one of them. **[0143] and [0103] Phases 4-6 are unparked**: the repository is `IgorKonovalov/Ritmolux`, so 0143 may now choose its Pages subpath and 0103 may submit the component. The original note follows, since its reasoning is what made the freeze non-negotiable.
+
 ADR-0162 chose Ritmolux; the plan sweeps 1,318 live sites across every crate and so cannot be merged
 against a parallel branch. Its Phase 1 is a `human` stop gate that does not release `dev` until
 `git worktree list` prints one line — and **no lane opens between that gate and Phase 9.** That
@@ -67,7 +67,7 @@ shape, because most of what it decided was sequencing rather than design:
   satisfiable only in the window after [0136] and [0149] closed, and it was taken in that window.
   Its finding is that 66.7 % of the component's growth is embedded preset text, which is now in
   `docs/specs/0001-c-abi.md` and in ADR-0159's Outcome. **The lane is removed, so [0150]'s freeze
-  gate is clear**, and [0150] still holds [0143] and [0103].
+  gate was clear**, and [0150] has since closed and released [0143] and [0103].
 - **The gate entries folded into [0136] rather than becoming a fourth plan**, which was the user's
   call at the interview: a second lane over `scripts/check-*.mjs` would contend with 0136 on the
   same six files for no benefit. That amendment took it from 8 phases to 10 and **falsified its own
@@ -96,7 +96,7 @@ shape, because most of what it decided was sequencing rather than design:
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
-[0150]: 0150-the-application-becomes-ritmolux.md
+[0150]: done/0150-the-application-becomes-ritmolux.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
 [ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
 
@@ -211,7 +211,7 @@ because it is large.
 **Added 2026-08-29, on show day: [0131] and [0133] are approved, and the order below is the
 user's call.** Both were `draft` carrying proposed ADRs, and neither could serve the show that
 evening — 0133 Phase 1 needs an evening with the rig patched and 0115 Phase 1 needs the Spout SDK
-staged. **The set runs on the external Python bridge** (`WORK/ritmolux-lighting-probes/`, outside version
+staged. **The set runs on the external Python bridge** (`WORK/lmv-lighting-probes/`, outside version
 control), unmodified. Approving the plans starts the work; it changes nothing about the show.
 
 **Added 2026-08-31, updated at [0145]'s close the same day: [0145] landed and [0146] is next.**
@@ -371,7 +371,7 @@ build is no longer a reason to keep a finished worktree around.
 > phases and merged; because its lane was branched off `plan-0087-arc-primitive`, **0087's phases
 > 1-4 reached `main` on the same merge**. So 0087's remaining work resumes from `main` rather than
 > from its own branch, and its Phase 5 is now judged on the shipped stroke, which is what the park
-> was for. The `WORK/ritmolux-plan-0087` worktree is stale from here on — take a fresh lane.
+> was for. The `WORK/lmv-plan-0087` worktree is stale from here on — take a fresh lane.
 
 **The one rule these two lanes need, and it is not obvious.** Both end at the golden corpus — Lane A
 adds a baseline, Lane B re-blesses 28 — and `RLX_BLESS` rewrites every baseline the run renders, not
@@ -1043,6 +1043,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md) — closed 2026-09-02. Review: **no blockers, four majors, two minors.** Version: **0.103.0** (minor). Filed backlog 0180 + 0181. [Write-up](README-archive.md).
 - [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) — closed 2026-09-02. Review: **Phases 1-4 only, no blockers.** Version: **0.102.0** (minor). Archived [backlog 0174-0178](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md) — closed 2026-09-02. Review: **no blockers, two majors, three minors.** Version: **0.101.0** (minor). Archived [backlog 0134](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0136 - The gates can convict](done/0136-the-gates-can-convict.md) - closed 2026-09-02. Review: **one blocker, two majors, two minors, one nit.** Version: **0.100.1** (patch). Archived [nine backlog entries](../design-backlog-archive.md). [Write-up](README-archive.md).
@@ -1155,7 +1156,7 @@ archive first.
 - [0012 — Measure the driver-memory floor + cull dead scenes](done/0012-memory-floor-measure-and-scene-cull.md) — closed 2026-07-22. Review: no blockers, no majors
 - [0011 — Diagnostics harness + quick-win memory/perf trim](done/0011-diagnostics-and-memory-trim.md) — closed 2026-07-22. Review: no blockers, no majors; two nits
 - [0007 — Curated preset library: robust loading + seed-on-first-run + C ABI v2](done/0007-curated-preset-library.md) — closed 2026-07-22. Review: no blockers, no majors
-- [0004 — foo_ritmolux as an embeddable Default UI panel](done/0004-foobar-ui-element-panel.md) — closed 2026-07-21. Review: no blockers, no majors
+- [0004 — foo_lmv as an embeddable Default UI panel](done/0004-foobar-ui-element-panel.md) — closed 2026-07-21. Review: no blockers, no majors
 - [0005 — Extract the lock-free ring into a wgpu-free crate for Miri](done/0005-miri-ring-extraction.md) — closed 2026-07-21. Review: no blockers, no majors
 - [0003 — Generative scenes + data-driven presets](done/0003-generative-scenes-and-presets.md) — closed 2026-07-21. Review: no blockers
 - [0006 — Versioning: single source of truth + cargo-release + surfacing](done/0006-versioning-wiring.md) — closed 2026-07-21. Review: no blockers, no majors

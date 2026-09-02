@@ -318,7 +318,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0168 | The broken-literal defect is a class, and the guard Plan 0124 shipped is a six-item list | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 4, as a repo-wide scan in `check-comment-hygiene.mjs`; the unrejoined form is still unseen, see 0173. **Closed 2026-08-31** |
 | 0169 | `cargo doc` emits intra-doc-link warnings and nothing in the project runs `cargo doc` | [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) Phase 6: 71 cleared, then `RUSTDOCFLAGS=-D warnings` added to CI. **Closed 2026-08-31** |
 | 0117 | The preset menu dispatches a snapshot index across a modal wait, and "nothing can reload" is not sound | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 1, via `select_preset_named`. **Closed 2026-09-01** |
-| 0118 | `foo_ritmolux.dll` grew ~400 KB and the spec still advertised the old headroom | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phases 2-3: a dated series, 98.4 % of it Plan 0100; the later window is open, see 0178. **Closed 2026-09-01** |
+| 0118 | `foo_lmv.dll` grew ~400 KB and the spec still advertised the old headroom | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phases 2-3: a dated series, 98.4 % of it Plan 0100; the later window is open, see 0178. **Closed 2026-09-01** |
 | 0105 | READ-ME-FIRST states an SDK version that nothing checks on the pre-staged route | [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md) Phase 4: the recipe reads the staged tree's own marker and dies on disagreement. **Closed 2026-09-01** |
 | 0130 | `boundary_density` scales with the capture resolution, and neither it nor its floors named the 96x96 | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 4, as documentation — the statistic is ~`1/L` and stays so. **Closed 2026-09-01** |
 | 0132 | The metrics module has no level statistic, and every statistic it has reads gamma-encoded code values | [ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md) + [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phases 1-3. **Closed 2026-09-01** |
@@ -2087,7 +2087,7 @@ to be amplitude-revealing.
 (`nWaveMode = 6`, `fWaveScale = 1.0`, `fWaveSmoothing = 0`, `fWaveParam = 0`, warp/zoom/rot/echo
 neutral, a thin opaque white line on black) and drove both `foo_vis_milk2` 0.2.0.0 and this engine
 from one 60 s 48 kHz full-scale 200 Hz sine, verified 0.0 dBFS peak. Two readings, each with the
-screenshot it came from, in `WORK/ritmolux-0127-gate/` outside the repo:
+screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
 
 | | reference (`foo_vis_milk2`) | ours |
 |---|---|---|
@@ -3376,7 +3376,7 @@ while the new file arrives beside it on the next launch.
 
 **What that adds up to on a machine that has tracked this project for a while.** The shipped set is
 81 presets with no duplicate display name. The development box's own
-`%APPDATA%\ritmolux\presets` holds **118**, and two of them are named `Coral`.
+`%APPDATA%\light-music-visualizer\presets` holds **118**, and two of them are named `Coral`.
 `Renderer::select_preset_by_name` takes the first exact match, so the second is unreachable by name
 from the window, from `--stream`, and from anything else that selects by name - while both still
 appear in the browse overlay and both still take a turn in the rotation.
@@ -3454,3 +3454,75 @@ A third option worth naming only to reject: adding `#[allow(rustdoc::private_int
 the module level. It would have made this specific failure impossible and would also have made the
 next real broken link invisible.
 
+
+## 0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist
+
+**Raised by:** `architect`, at [Plan 0150](plans/done/0150-the-application-becomes-ritmolux.md)'s
+close review (2026-09-02). **Owner if taken:** `dev`.
+
+- **Verified 2026-09-02** — the comment makes both claims:
+  `present: is still 4 in: core/src/diag/mod.rs`
+- **Verified 2026-09-02** — the header says otherwise:
+  `present: #define RLX_ABI_VERSION 6u in: core-cabi/include/rlx_core.h`
+- **Verified 2026-09-02** — the file the comment names does not exist, and the real one does:
+  `present: fn abi_version_is_six in: core-cabi/tests/ffi.rs`
+
+### The finding
+
+`core/src/diag/mod.rs:508-509` reads *"`core/tests/ffi.rs` holds the other half — `RlxMetrics` is
+still 56 bytes and `RLX_ABI_VERSION` is still 4."* Both halves are wrong. The counter has been 6
+since before Plan 0150, and the test lives at `core-cabi/tests/ffi.rs` — it moved when ADR-0072
+split the C ABI into its own crate.
+
+The drift predates the rename and Plan 0150 deliberately did not fix it, which was the right call
+for that plan's scope. What the rename **did** do is rewrite `LMV_ABI_VERSION` to `RLX_ABI_VERSION`
+on that exact line, so a sentence that used to read as an obviously stale artifact now asserts a
+false fact in the vocabulary a reader trusts today. That is a small but real change in how
+misleading it is.
+
+**Why nothing catches it.** `check-comment-hygiene.mjs` gates relative links and plan-relative
+narration, not factual claims; `cargo doc` resolves intra-doc links but does not read prose. A
+comment naming a constant's value is exactly the class `CLAUDE.md` already warns about for the ABI
+roster count — *"a count is falsified by every ABI change and nothing gates one written in prose."*
+
+**What a fix looks like.** Correct the path, and either state the value by referring to the constant
+rather than restating it, or drop the number entirely — the comment's job is to say where the other
+half of the check lives, which does not require quoting either figure.
+
+## 0181 — Running the test suite migrates the developer's real `%APPDATA%` directory
+
+**Raised by:** `architect`, at [Plan 0150](plans/done/0150-the-application-becomes-ritmolux.md)'s
+close review (2026-09-02), from a property `dev` disclosed in that plan's implementation log after
+it happened on this machine. **Owner if taken:** `dev`.
+
+- **Verified 2026-09-02** — the app migrates at startup, by design:
+  `present: match migrate_app_dir() in: standalone/src/main.rs`
+- **Verified 2026-09-02** — and the subprocess test spawns that startup path with no environment
+  isolation: `absent: APPDATA in: standalone/tests/help_cli.rs`
+
+### The finding
+
+Plan 0150 Phase 6 kept `fs::rename` out of `resolve_preset_dir()` precisely so that no in-process
+test could move a real directory, and that protection holds. It does not reach
+`standalone/tests/help_cli.rs`, which **spawns the built binary as a subprocess**. Two of its cases
+(`an_unknown_preset_exits_without_opening_a_window`,
+`the_windowed_preset_flag_is_not_refused_for_a_missing_stream`) get past the argument gate into
+`main()` proper, which is where `migrate_app_dir()` is called. The subprocess inherits the real
+`APPDATA`, so `cargo nextest run` moves the operator's directory.
+
+It did exactly that during Phase 6's own verification run, before any human had launched the renamed
+app. The outcome was correct — 123 files carried across, timestamps intact — so this is not a data
+defect. It is a **scope** defect: a test suite mutating `%APPDATA%` is a side effect nobody reading
+`help_cli.rs` would predict, and the next startup-time side effect added to `main()` inherits the
+same reach with no warning.
+
+**What is and is not at risk.** CI is unaffected: a runner has no legacy directory, so the
+`NotNeeded` arm runs. Every stderr assertion in the file is `contains` rather than an exact match,
+so the extra migration line printed on the `BothPresent` arm does not make any test fragile today —
+but nothing states that as a requirement, and an exact-match assertion added later would fail only
+on machines that happen to have both directories.
+
+**What a fix looks like.** Point the subprocess at a scratch root — one `.env("APPDATA", tmp)` in
+the file's `run`/`run_both` helper — which isolates the migration and every future startup side
+effect at once. Migration-specific behaviour is already covered by the four unit tests against
+`migrate_app_dir_in`, so nothing is lost by keeping it out of the subprocess cases.

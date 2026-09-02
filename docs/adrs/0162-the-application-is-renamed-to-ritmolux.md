@@ -1,8 +1,8 @@
 # ADR-0162 — The application is renamed to Ritmolux, and the record keeps the old name
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0150) — with an Outcome
 > **Date:** 2026-09-02
-> **Related plan(s):** [0150](../plans/0150-the-application-becomes-ritmolux.md)
+> **Related plan(s):** [0150](../plans/done/0150-the-application-becomes-ritmolux.md)
 
 ## Context
 
@@ -174,3 +174,43 @@ Russian-language web searches — was gathered 2026-08-29 and re-verified 2026-0
 `Lumenfall` were eliminated earlier in the same process: Afterglow collides twice inside this
 project's own domain (Deep Symmetry's DMX light-show engine, Nextec's DMX interfaces) and Lumenfall
 is a live company.
+
+## Outcome — 2026-09-02, at Plan 0150's close
+
+The rename landed as decided and the central safety property held: the full suite is green
+(1518 passed, 5 skipped) and every golden is byte-identical to the pre-rename baseline `47432ca`.
+Three claims in the body above were falsified by the implementation and are corrected here rather
+than edited there.
+
+**The C ABI has fifteen `extern "C"` functions, not sixteen.** The Context and both the Decision and
+the rejected-alternative sections say sixteen. `docs/specs/0001-c-abi.md` — which `CLAUDE.md` names
+as the authority on the ABI's shape — says **fifteen** normatively, the header declares fifteen, and
+after the sweep the two rosters are identical at fifteen. The sixteen appears to be a count of
+distinct `lmv_*` tokens in the header, which includes `lmv_core` from the header's own filename.
+No code consequence — the sweep renamed every symbol regardless of how many there were.
+
+**`DEFAULT_SENDER` is not the only identifier that lives outside this repository.** The Consequences
+section calls it *"the one identifier here that lives outside this repository entirely"*. The
+`/lmv/v1` OSC address prefix is a second, and the more expensive of the two: every address bound in
+a console, a show file or TouchDesigner begins with it, and the 2026-08-29 live set ran eight hours
+on that path. It was left alone deliberately — Plan 0150's greps do not match it, because the
+character after `lmv` is `/` — and moving it is the natural thing to do at 1.0 behind the `/v1` the
+address already carries. **It needs a decision, not a sweep.**
+
+**"Three characters replace three, so … no formatted line re-wraps" is true of the prefix and false
+of the product name.** `ritmolux` is longer than `lmv`, so `rustfmt` re-wrapped the `--help` banner;
+and `rlx_core` sorts where `lmv_core` did not, so `use` statements had to be re-ordered even though
+the substitution was textually mechanical. Both were caught by `cargo fmt --check` rather than by
+review, which is the reason neither cost anything.
+
+**One consequence the ADR did not anticipate, and it is the one that matters most in practice.**
+Drawing the "kept" set by **directory** — `docs/adrs/`, `docs/plans/done/`, the two archives — is
+not the operative property. What must keep the old name is any **dated claim about what was
+observed**, wherever it lives. The sweep rewrote seven such records inside live documents, each
+asserting that someone saw, on a date before this ADR existed, a name that did not yet exist: four
+`foo_lmv` component-list observations in `docs/on-device-validation.md` (caught by `dev` during
+Phase 4), and three more found at the close — an `%APPDATA%` Pass record in the same file, the
+development box's 118-preset reading in `docs/design-backlog.md`, and that file's ledger row for
+backlog 0118. This is the ADR's own argument against rewriting the record, applied one level down.
+The rule that works is: **a quoted observation keeps the old name; a named thing that still exists
+takes the new one.**

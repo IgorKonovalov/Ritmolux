@@ -36,7 +36,7 @@ this document does not duplicate them.
 ## Quickstart: your first preset
 
 1. **Find your preset directory** (see [Where preset files live](#where-preset-files-live)).
-   On Windows that is `%APPDATA%\ritmolux\presets`. Both the
+   On Windows that is `%APPDATA%\Ritmolux\presets`. Both the
    standalone app and the foobar2000 plugin read this same folder — it is seeded
    with the curated set on first run.
 
@@ -1279,7 +1279,7 @@ why "edit once, both frontends see it" works.
 
    | OS | Preset directory |
    |----|------------------|
-   | Windows | `%APPDATA%\ritmolux\presets` |
+   | Windows | `%APPDATA%\Ritmolux\presets` |
    | macOS | `~/Library/Application Support/ritmolux/presets` |
    | Linux/other | `$XDG_DATA_HOME/ritmolux/presets` (or `~/.local/share/ritmolux/presets`) |
 
