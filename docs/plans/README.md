@@ -38,16 +38,16 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved, PARKED | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Parked until 0150 lands.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
-| [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved, IN FLIGHT | dev | 4 of 6 phases landed. **Phase 6, then Phase 5.** Backlog 0174-0177 done, 0178 open. **Holds 0150's gate.** |
 <!-- roster:end -->
 
 **Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**
 ADR-0162 chose Ritmolux; the plan sweeps 1,318 live sites across every crate and so cannot be merged
 against a parallel branch. Its Phase 1 is a `human` stop gate that does not release `dev` until
-`git worktree list` prints one line — [0149] closed 2026-09-02, so today that means [0148] — and **no lane
-opens between that gate and Phase 9.** That gate's other half, the trademark check, was discharged
-2026-09-02: a knockout search found no `Ritmolux` on any register, and the risk of stopping there was
-accepted for a non-commercial project. So the freeze is the only thing left holding this plan.
+`git worktree list` prints one line — and **no lane opens between that gate and Phase 9.** That
+gate's other half, the trademark check, was discharged 2026-09-02: a knockout search found no
+`Ritmolux` on any register, and the risk of stopping there was accepted for a non-commercial
+project. **Both halves are clear as of 2026-09-02**: [0149] and [0148] closed and their lanes were
+removed, so this plan is next and runs on `main` directly.
 
 **Added 2026-09-01, from a backlog round after the closes of 0124, 0125, 0139, 0141 and 0144-0146**
 — three new plans and one amendment, taking 21 of the ~30 live entries no plan claimed. The round's
@@ -62,14 +62,12 @@ shape, because most of what it decided was sequencing rather than design:
 - **[0147]'s Phase 1 wants to land before [0133] is built.** Backlog 0163 is one sentence of prose,
   and 0133 brings in-house the exact consumer that was misled by its absence — a lighting look
   multiplying a band term into a physical output. The rest of 0147 does not gate 0133.
-- **[0148] was the free one, and it is now the only lane open.** No `human` phase, no GPU, no preset,
-  no golden. Phases 1-4 landed and passed their close review on 2026-09-01 with no blockers; the plan
-  is **unparked and mid-flight**, not finished. Two phases are owed: **Phase 6**, the four repairs
-  that review found, which runs first because it makes the tree correct before the bisect reads it,
-  and then **Phase 5**, the component-size bisect, whose own method constraint forbids running while
-  any other lane builds — satisfied for the first time now that [0136] and [0149] are gone, and only
-  until the next lane opens. Until both land and the plan closes, this lane is what holds [0150]'s
-  freeze gate, and [0150] holds [0143] and [0103].
+- ~~**[0148] was the free one, and it is now the only lane open.**~~ — **closed 2026-09-02**, all six
+  phases. Phase 5's method constraint — no other lane building while the size series is taken — was
+  satisfiable only in the window after [0136] and [0149] closed, and it was taken in that window.
+  Its finding is that 66.7 % of the component's growth is embedded preset text, which is now in
+  `docs/specs/0001-c-abi.md` and in ADR-0159's Outcome. **The lane is removed, so [0150]'s freeze
+  gate is clear**, and [0150] still holds [0143] and [0103].
 - **The gate entries folded into [0136] rather than becoming a fourth plan**, which was the user's
   call at the interview: a second lane over `scripts/check-*.mjs` would contend with 0136 on the
   same six files for no benefit. That amendment took it from 8 phases to 10 and **falsified its own
@@ -96,7 +94,7 @@ shape, because most of what it decided was sequencing rather than design:
 
 [0143]: 0143-the-documentation-gets-a-front-end.md
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
-[0148]: 0148-the-shipped-artifacts-carry-their-own-guarantees.md
+[0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
 [0150]: 0150-the-application-becomes-ritmolux.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
@@ -1045,6 +1043,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) — closed 2026-09-02. Review: **Phases 1-4 only, no blockers.** Version: **0.102.0** (minor). Archived [backlog 0174-0178](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md) — closed 2026-09-02. Review: **no blockers, two majors, three minors.** Version: **0.101.0** (minor). Archived [backlog 0134](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0136 - The gates can convict](done/0136-the-gates-can-convict.md) - closed 2026-09-02. Review: **one blocker, two majors, two minors, one nit.** Version: **0.100.1** (patch). Archived [nine backlog entries](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md) — closed 2026-09-01. Review: **no blockers, one major, four minors, one nit.** Version: **0.100.0** (minor). Archived [backlog 0130 + 0132 + 0151 + 0152](../design-backlog-archive.md). [Write-up](README-archive.md).

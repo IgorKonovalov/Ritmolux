@@ -8226,3 +8226,222 @@ concentrated rather than diffuse.
   Phase 5.
 
 ---
+
+## 0174 — two of the four colour tags the render path pins do not survive into the container, and the doc calls all four the half most likely to ship wrong
+
+- **Raised:** 2026-09-01, by `dev` during [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)
+  Phase 2, reported and deliberately not acted on.
+- **Verified 2026-09-01** — the tags are still emitted unconditionally:
+  `present: color_primaries in: standalone/src/shot/render.rs`
+- **Verified 2026-09-01** — and nothing reads back what the produced file actually carries:
+  `absent: color_primaries in: standalone/tests/shot_cli.rs`
+
+**Observed.** `ffprobe` reads a file produced by the generated command line as
+**`bt709/unknown/unknown`**. `-color_trc bt709` and `-color_primaries bt709` are both on that
+command line. It was identical on both arms of Phase 2's `--crf` comparison, so it is a property of
+the shipped invocation and not of the new flag.
+
+**Why it matters.** `docs/capturing.md` states that *“the four colour tags are the half most likely
+to ship wrong — an untagged file is one the player expands from studio swing and shows washed
+out”*, and the same paragraph argues `-color_trc bt709` over `iec61966-2-1` on the ground that
+*“every player assumes the former”*. If two of the four do not reach the container, that reasoning
+is being applied to arguments that have no effect, and the doc is asserting a guarantee the artifact
+does not carry. Nothing here is known to be *wrong* on screen — the range tag is the one that
+produces the washed-out failure and it does survive — but the claim is stated as a property and is
+not verified as one.
+
+**What a fix looks like, in order.** (a) Establish what is actually true: `ffprobe -show_streams` on
+a produced file, against what the same `ffmpeg` writes when the tags are passed as output-side
+`-bsf:v h264_metadata` or via `-color_primaries` placed after `-c:v`. Argument *position* is the
+first suspect — colour options ahead of the output codec can bind to the input. (b) If they are
+being dropped, move them and assert the readback in `standalone/tests/shot_cli.rs`, which already
+gates on `ffmpeg_on_path()`. (c) If they cannot survive H.264-in-MP4 the way this command writes
+them, correct the paragraph rather than the command.
+
+**Impact:** low-medium. No reported visual defect; a documented guarantee that is not checked, on
+the path [Plan 0103](plans/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 3**, whose done-when is written around *establishing what is
+  true* and admits both repairs this entry names - move the arguments, or correct the paragraph.
+
+---
+
+## 0175 — the render path's spend-nothing ordering is a structural property with no end-to-end guard
+
+- **Raised:** 2026-09-01, by `architect` at [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)'s
+  close review.
+- **Verified 2026-09-01** — no test in the CLI suite drives `--render` with a name the roster does
+  not hold: `absent: unknown preset in: standalone/tests/shot_cli.rs`
+
+**The claim nothing checks.** Plan 0139 Phase 1's done-when is that a misspelt `--preset` *“exits 1
+naming the roster's keys, spawns no child process, builds no GPU device, and leaves **nothing** at
+`<path>`”*. The first clause is asserted; the last three are not. `resolve_preset` is tested as a
+pure function, and it returns the same answer whether its call site sits before or after
+`Encoder::spawn` — so the ordering that is the entire defect (a valid, playable, 262-byte audio-only
+MP4 left at the destination) is held up by nothing but the current line order in `render::run()`.
+Plan 0139's own risks section warns against *“merging it into a larger refactor of
+`render::run()`”*; that refactor reintroduces the artifact with a green suite.
+
+**What a fix looks like.** About ten lines in `standalone/tests/shot_cli.rs`'s existing `--render`
+section, using helpers already in that file — `render_clip()`, `run()`, `scratch()`,
+`assert_failed_naming()`. Drive `--preset attractor_leviathan` (the reproduction: a filename against
+a roster keyed on `name`) with `--ffmpeg no_such_encoder_binary --out <scratch>/nothing.mp4`, then
+assert stderr names `Leviathan`, does **not** name `--ffmpeg`, and that the output path does not
+exist. It needs no real encoder: if the ordering regresses, the spawn failure arrives first and the
+assertion on the roster keys fails. `a_missing_encoder_names_the_flag_rather_than_falling_back`
+asserts the mirror property of the same ordering and is the template.
+
+**Also here, because it is the same file and the same shape.** Plan 0139 Phase 2 added two
+cross-flag rejections — `--crf` without `--ffmpeg`, and `--crf` outside `--render` — and neither is
+covered. They live in `parse_args`, which reads `std::env::args` and is reachable only through the
+binary. Their `--ffmpeg` siblings are asserted three lines apart in that same test.
+
+**Impact:** medium. The shipped behaviour is correct; what is missing is the guard on the one
+property the plan exists to hold. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 1**, using this entry's own reproduction and helper list.
+
+---
+
+## 0176 — `shot`'s usage text and its parser can drift with nothing checking, and the other CLI in this repo has exactly that guard
+
+- **Raised:** 2026-09-01, by `architect` at [Plan 0139](plans/done/0139-the-render-path-validates-before-it-spends.md)'s
+  close review, from noticing `--crf` reached `print_usage()` by hand.
+- **Verified 2026-09-01** — nothing in the CLI suite reaches the usage text:
+  `absent: print_usage in: standalone/tests/shot_cli.rs`
+- **Verified 2026-09-01** — while the `lmv` binary holds precisely this property:
+  `present: fn the_help_text_prints_every_rostered_flag in: standalone/src/main.rs`
+
+**The asymmetry.** [Plan 0144](plans/done/0144-the-flags-mean-what-they-say.md) built a flag roster
+for the `lmv` binary and two tests over it — `every_scanner_flag_literal_is_rostered` and
+`the_help_text_prints_every_rostered_flag` — so that binary's help cannot fall behind its scanner.
+`shot` has the same failure mode, no roster and no test. Its flags are matched in one `match` arm
+each and re-typed by hand into `print_usage()` and again into `docs/capturing.md`'s flag table.
+Plan 0139 added `--crf` to all three correctly; nothing would have reported it if it had not.
+
+**Why it matters here specifically.** `shot` is the CLI the `preset-author` lane drives, and that
+lane has no other way to discover a flag — `CLAUDE.md` routes it to `docs/capturing.md`, and the
+guide's flag table is transcribed from the usage text nobody checks. A flag that exists and is
+undocumented is invisible to the only consumer that needs it.
+
+**What a fix looks like.** The cheap half is one test asserting `--help`'s output contains every
+literal the parser's `match` arms accept, extracted the way `every_scanner_flag_literal_is_rostered`
+extracts them. The expensive half — a shared roster type both binaries build from — is not obviously
+worth it for two CLIs and is not proposed.
+
+**Impact:** low. No known drift today; the property Plan 0144 decided was worth holding for one
+binary is unheld for the other. **No ADR needed.**
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 2**, taking the cheap half only - one test that `--help` prints
+  every literal the parser accepts. **The shared roster type this entry declines is declined there too.**
+
+---
+
+## 0177 — the component's size cap has a trigger and no carrier: the recipe builds the DLL and never reads its own output's length
+
+**Raised by:** `architect`, from [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md)'s
+close review (2026-09-01). **Owner if taken:** `dev`.
+
+- **Verified 2026-09-01** — the recipe that produces the shipped DLL knows nothing about the cap it
+  is measured against: `absent: soft cap in: packaging/foobar/build-component.ps1`
+
+### The finding
+
+Plan 0141 Phase 2 replaced a re-measure trigger that could not fire (*"when a dependency is added to
+this crate"* — the growth arrived as code behind the ABI, with no new crate) with one that always
+fires: **at every release**. That is a real improvement, and it is still a duty a person performs
+from memory.
+
+`packaging/foobar/build-component.ps1` produces `foo_lmv.dll`, then runs seven fatal checks over it
+— it is an x64 PE, it exports `foobar2000_get_interface`, it carries the workspace version, the
+archive holds exactly one file. It parses the PE headers by hand to do this. **It never reads the
+file's length**, which is the cheapest fact about the artifact and the only one NFR §4 constrains.
+
+So the series in [`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) is only as current as the last
+person who remembered to look, and the history says that is not often: the component grew
+**+910,848 B across Plan 0097 to Plan 0141** and every byte of it was noticed retroactively, twice,
+by a reviewer rather than by the build.
+
+### What a fix would be
+
+One `Check` line in the recipe printing the DLL's size, and a **warning** — not a `Die` — when it is
+within some margin of NFR §4's cap. The cap is soft and the recipe must not start failing releases
+over a number the NFR writes with a tilde; the point is that the figure appears in the release log
+where a human already reads output, rather than in a spec nobody opens to cut a tag.
+
+The open question, and the reason this is filed rather than done: **the recipe has no cap constant
+today, and giving it one imports NFR §4's ambiguity** — "~10 MB" names no unit, its subject is the
+standalone exe, and the plugin is covered only by *"in the same ballpark"*. Deciding what the
+plugin's own cap is, and whether it is 10,000,000 or 10,485,760, is an NFR question that should be
+settled before a script starts asserting on it.
+
+### Priority
+
+**Low.** Nothing is over cap and the trigger now at least fires on an event that happens. This is
+the difference between a duty and a guard.
+- **PROMOTED 2026-09-01 -> [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) + [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 4.** The open question this entry filed
+  rather than answered - what the plugin's own cap is - is settled by the ADR at **12,582,912 B (12 MiB)**,
+  derived as today's size plus one more step the size of the `text` step. The recipe prints the length
+  always and warns above 90 %; it never fails a release.
+
+---
+
+## 0178 — the +510,464 B the component gained after 2026-08-18 is unattributed, and it is the larger half of the growth
+
+**Raised by:** `architect`, from [Plan 0141](plans/done/0141-the-plugin-seams-stop-drifting.md)'s
+close review (2026-09-01), on `dev`'s own note that the window was outside Phase 3's scope.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-09-01** — the spec records the movement and says it is unattributed:
+  `present: is not attributed at all in: docs/specs/0001-c-abi.md`
+
+### The finding
+
+Plan 0141 Phase 3 bisected the window [backlog 0118](design-backlog-archive.md) named — Plan 0097's
+close to Plan 0107's close — and attributed **98.4 %** of it to Plan 0100's MilkDrop conversion work.
+That is a clean result and it closed the entry it was filed against.
+
+It is also the **smaller** half. Phase 2's re-measure found `foo_lmv.dll` had reached 9,789,952 B on
+2026-09-01, which is **+510,464 B beyond** the 2026-08-18 figure the bisect ended at — larger than
+the +400,384 B that was worth filing a backlog entry over. Phase 3's scope was the window the plan
+named, correctly, so this one has never been looked at.
+
+**What makes it worth a second bisect rather than a shrug** is that the first one paid off: the
+suspicion in the entry was confirmed rather than assumed, and the answer turned out to be one plan
+rather than "the sum of many small things". Roughly twenty plans closed between 2026-08-18 and
+2026-09-01.
+
+### What a fix would be
+
+The same method, and it is written down now: build only `core-cabi` at each `chore: Release` commit
+in the window and read `lmv_core_c.dll`. Two things Plan 0141's bisect learned that this one should
+carry:
+
+- **Record the `rustc` version at every point.** Rebuilding `22bb460` in 2026-09 gave a number
+  **13,312 B** from the one measured at that commit in 2026-08, under the same build command, and
+  nothing recorded at either date can now explain the gap. That is the working noise floor for this
+  column, and it makes any single step under ~13 KB uninterpretable.
+- **Read the cdylib, ship the number for `foo_lmv.dll`.** The shim links the staticlib, so the
+  cdylib is a proxy — fine for locating a step, not the artifact the cap is about.
+
+If the growth is attributable and unwanted, *that* is a third entry; this one asks only what moved.
+
+### Priority
+
+**Low-medium.** Nothing is over cap, and the component is at 97.9 % of the decimal reading of a soft
+cap written with a tilde — which is a reason to know what is in it, not a reason to panic. Cheaper
+now than after another twenty plans.
+- **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5**, carrying both method constraints this entry names: the
+  `rustc` version recorded at every point against the ~13,312 B noise floor, and the cdylib read as a
+  proxy while the number shipped is `foo_lmv.dll`'s.
+- **ANSWERED 2026-09-02 by that phase, in neither of the two shapes it allowed for.** All 34 points
+  built, 33 steps, one `rustc` throughout, no other lane running. There is **no dominant step** (the
+  largest window is 24.0 % of the growth) and the growth is **not distributed** (two steps clear the
+  66,560 B bar; twelve steps are exactly 0 B). The dominant thing is a **cause**, not a step:
+  `presets/*.toml` grew 185,563 B -> 525,603 B, 40 presets to 81, and `build.rs` embeds each verbatim
+  (ADR-0022) — **340,040 B of the 509,952 B, 66.7 %, is preset text**, and the two largest steps are
+  both preset-adding closes. Full series and the ten interpretable steps are in
+  [`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md). Attribution is the deliverable and it is
+  discharged. Whether a library that doubles is *unwanted* growth is the separate question this entry
+  was told not to answer: the presets are shipped capability, nothing is over cap, and the honest
+  reading is that the cap will be met by curation rather than by a feature. Filing that as its own
+  entry is `architect`'s call at the close, not this phase's.
+
+---

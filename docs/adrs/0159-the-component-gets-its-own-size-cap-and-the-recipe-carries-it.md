@@ -1,14 +1,14 @@
 # ADR-0159 — The component gets its own size cap, and the recipe that builds it is what carries it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0148 Phase 4), Outcome
 > **Date:** 2026-09-01
-> **Related plan(s):** [0148](../plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md)
+> **Related plan(s):** [0148](../plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md)
 > **Supplements:** [ADR-0038](0038-tag-driven-release-unsigned-universal-mac-app.md) (the recipe this extends),
 > [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (why a
 > measurement is printed and a property is asserted)
 > **Amends:** `docs/nfr.md` §4 — the one place in this project where an ADR edits an NFR line
 > rather than only citing it
-> **Backlog entry closed:** [0177](../design-backlog.md)
+> **Backlog entry closed:** [0177](../design-backlog-archive.md)
 
 ## Context
 
@@ -137,3 +137,22 @@ pressure at a tag — which is worse than no gate, because it also destroys the 
 **Have CI enforce it instead of the recipe.** Rejected because the recipe is where the artifact is
 produced and where the number is free; CI would have to rebuild the component to learn it, and the
 macOS and Linux arms have no component to measure at all.
+
+## Outcome — 2026-09-02, at Plan 0148's close
+
+**Adopted as decided, and the threshold arm was exercised rather than only written.** The recipe
+prints the produced DLL's length against the cap on every build and warns above 11,324,620 B without
+ever calling `Die`; the seven fatal checks are untouched. `-WarnBytes` exists so the warning arm
+stays reachable at today's 9,789,952 B, and it was driven against a staged 9,564,672 B DLL with the
+run continuing past it. `core/tests/hygiene.rs` guard (e) holds the recipe's two constants to
+`docs/nfr.md` §4 and derives the threshold from the cap rather than transcribing it.
+
+**One thing this ADR argued from has since been measured, and it changes what the cap is about.**
+The rejected alternatives reason about growth arriving as *features* — "the first legitimate feature
+to cross it". Plan 0148 Phase 5 bisected the 2026-08-18 to 2026-09-01 window and found the driver is
+**embedded preset text**: 340,040 B of 509,952 B, 66.7 %, as the library went from 40 presets to 81
+and `build.rs` embeds each verbatim (ADR-0022). The soft/hard distinction this ADR turns on holds
+either way and is if anything strengthened — a hard gate would make the *curation* lane the thing
+that breaks a release, which is further still from where the judgement belongs. But the sentence a
+future reader should carry is that **this cap will be reached by the preset library, not by a
+feature**, and `docs/specs/0001-c-abi.md` now records that.

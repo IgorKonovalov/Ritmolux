@@ -13,6 +13,39 @@ were superseded orderings of the active roster.
 
 ## Recently closed (full entries)
 
+- [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md)
+  — closed 2026-09-02. Six `dev` phases, no `human` phase, in the `lmv-plan-0148` lane on
+  `plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, `d527820`..`65ac7c1`. Version:
+  **0.102.0** (minor) — the recipe's size guard is new capability, and nothing else in the plan
+  moves a pixel or a byte of encoded output.
+
+  **Five claims about what this project ships, none of which anything checked.** Phase 1 put an
+  end-to-end guard under Plan 0139's spend-nothing ordering, which until then was held only by the
+  line order inside `render::run()` — `resolve_preset` was tested as a pure function, and a pure
+  function answers the same either side of `Encoder::spawn`. Phase 2 gave `shot` the property Plan
+  0144 built for `lmv` and it convicted on its first run (`--help` and `-h` were accepted by the
+  parser and named nowhere). Phase 3 established by `ffprobe` readback that the libx264 path drops
+  `-color_primaries` and `-color_trc` while honouring `-colorspace`, and set the two directly with
+  `-x264-params`. Phase 4 implemented ADR-0159. Phase 6 repaired what Phases 1-4 had made false in
+  three documents.
+
+  **Two phases reached a third outcome their done-when did not allow for, and both are results.**
+  Phase 3's done-when offered "they were being dropped, move them" or "they cannot survive
+  H.264-in-MP4"; the truth was neither — the loss is in the encoder wrapper, not the container, and
+  the repair is a mechanism the plan never named. Phase 5's done-when offered "a dominant step" or
+  "distributed growth"; the growth is neither. No single window is a majority (the largest is
+  24.0 %) and two steps clear the distributed bar, but **66.7 % of the +509,952 B is embedded
+  preset text** — the library went from 40 presets to 81 and `build.rs` embeds each verbatim. The
+  useful consequence is recorded in ADR-0159's Outcome: **this cap will be reached by curation, not
+  by a feature.**
+
+  **Mode 4 covered Phases 1-4 only** (2026-09-01, fresh session: no blockers, one major, six
+  minors). **Phases 5 and 6 were closed in the session that wrote them**, at the user's explicit
+  direction under time pressure. The mechanical close ran in full — merged `main`, resolved the one
+  conflict, full workspace suite, gates, archives, bump, tag — but the fresh-context read did not
+  happen, and those two phases have been seen by no one but their author. That is the one thing this
+  project's `dev → architect` seam exists to provide, and it is the known gap in this close.
+
 - [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md)
   — closed 2026-09-02. Six `dev` phases and one `human` phase in the `lmv-plan-0149` lane on
   `plan-0149-the-line-corners-stop-being-blunt`, `7128ba6`..`d0d596e`. Mode 4: **no blockers, two
