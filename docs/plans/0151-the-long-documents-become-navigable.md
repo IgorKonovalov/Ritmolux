@@ -138,17 +138,28 @@ flowchart TB
 - **What:** The self-declared-superseded sequencing notes move verbatim from `docs/plans/README.md`
   into `docs/plans/README-archive.md`'s existing `## Prior sequencing notes (superseded)` section.
 - **Files touched:** `docs/plans/README.md`, `docs/plans/README-archive.md`.
-- **Scope, precisely:** the block currently at `docs/plans/README.md:446`–`780`. It opens at
-  *"Superseded 2026-08-18, kept as the record. The 2026-08-16 sequence follows."* and ends at the
-  line before `### The baseline-drift control any pixel-touching plan inherits`.
+- **Scope, precisely:** `docs/plans/README.md` lines **455–789** as of commit `0964385` — 335 lines.
+  The block opens at the line `**Superseded 2026-08-18, kept as the record.** The 2026-08-16
+  sequence follows.` and ends at the line before
+  `### The baseline-drift control any pixel-touching plan inherits`.
   **`### What this sequence assumes` is not deleted — it is truncated.** Its first two bullets
-  (`[0087] failing at its stop condition…` and `Two lanes is the ceiling here…`, lines 437–444) are
-  live and stay; only what follows the *"Superseded 2026-08-18"* line goes. The other three
-  subsections — `### The two lanes, now`, `### Then, in this order`, and
-  `### The six plans added 2026-08-04, and why they exist` — are untouched.
+  (`[0087] failing at its stop condition…` and `Two lanes is the ceiling here…`, lines 440–447) are
+  live and stay. The other three subsections — `### The two lanes, now`, `### Then, in this order`,
+  and `### The six plans added 2026-08-04, and why they exist` — are untouched.
+- **One live sentence points at what leaves, and must be rewritten:** line 208's *"Rewritten
+  2026-08-18, and this is the live sequence — everything from 'Prior sequence notes' down is
+  history"* is the index describing the block being moved. After the move it points at nothing;
+  it becomes a pointer to `README-archive.md`.
 - **Done when:**
-  - `docs/plans/README.md` is 335 ± 15 lines shorter — 1,267 → about 932 — and contains no line
-    matching `Superseded 2026-08-1` or `Prior sequence notes`.
+  - `docs/plans/README.md` is 335 ± 15 lines shorter — 1,274 → about 939.
+  - **The structural check, and it is deliberately not a grep.**
+    `sed -n '/^### What this sequence assumes/,/^### The baseline-drift control/p' docs/plans/README.md`
+    returns the two headings with exactly the two live bullets between them and nothing else.
+    **A grep for `Superseded 2026-08-1` or `Prior sequence notes` is the wrong check and must not be
+    used:** three *live* lines quote those strings — the roster note at line 452, the live-sequence
+    pointer at line 208, and this plan — so such a grep is unsatisfiable precisely when the edit is
+    correct. This is the Plan 0150 trap in its other direction, and it is why the criterion above
+    names a structure instead of a string.
   - **`node scripts/check-doc-links.mjs` exits 0**, which is what proves the move was completed
     rather than merely performed. The moved block uses **37 shortcut reference labels** (`[0046]`,
     `[0064]`, …) and **27 of them have no `[label]: target` definition in `README-archive.md`
@@ -287,6 +298,20 @@ const anchor = (heading) =>
 - **Both archives are past 512 KB**, where GitHub's markdown rendering may not reach the targets a
   contents block points at. The block still works in an editor and locally. Not mitigated, and
   recorded in ADR-0163's Negative section as the price of not splitting.
+- **[0126](0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126` and the
+  file sets are disjoint — take this plan on `main`, not in a worktree.** 0126 touches `core/`,
+  `core-cabi/`, `standalone/`, `plugin-foobar/` and its own plan file; this plan touches `docs/`,
+  `presets/README.md`, `scripts/`, `.githooks/pre-push`, `.github/workflows/ci.yml` and `CLAUDE.md`.
+  Checked: `CLAUDE.md` names none of the six files 0126 splits, so 0126's close has no edit to make
+  there. This plan compiles nothing, so a second worktree would buy isolation nothing needs and cost
+  a second `target/` under ADR-0147. The **one** shared file is `docs/plans/README.md` at the two
+  closes — both remove a roster row and add a recently-closed bullet — so whoever closes second
+  re-merges `main` and resolves. Phase 2 pins its deletion by content rather than by line number for
+  exactly this reason.
+- **Phase 6 arms `toc.mjs --check` in `pre-push` while 0126's lane is live.** Once 0126 merges
+  `main` its pushes run the new check. It edits no markdown carrying markers, so it passes; the case
+  that would bite is a close that adds or removes a heading in a file with a block without
+  regenerating, which is what the ceremony step in the same phase exists to prevent.
 - **A contents block relieves the pressure that would force a split.** These files keep growing at
   +19 % and +23 % per five days and nothing measures that. The user declined a size gate; if the
   next reader finds a 12,000-line archive, the answer is ADR-0163's Alternative A, which is written
