@@ -1348,7 +1348,7 @@ so that is the name in the OP Create Dialog. Set its **Sender Name** to whatever
 the mode prints, which is not always what you asked for:
 
 ```
-publishing 1280x720 at 60 fps as Spout sender 'lmv'
+publishing 1280x720 at 60 fps as Spout sender 'Ritmolux'
 ```
 
 `SetSenderName` **increments on collision** — a run that was force-killed leaves

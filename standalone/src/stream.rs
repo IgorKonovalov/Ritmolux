@@ -34,7 +34,7 @@ use std::time::Duration;
 /// necessarily the name that gets registered: a stale registration from a
 /// crashed run makes `SetSenderName` increment, which is why the mode prints
 /// what it actually got.
-pub const DEFAULT_SENDER: &str = "lmv";
+pub const DEFAULT_SENDER: &str = "Ritmolux";
 
 const DEFAULT_WIDTH: u32 = 1280;
 const DEFAULT_HEIGHT: u32 = 720;
@@ -553,7 +553,7 @@ mod tests {
         assert_eq!(request.width, 1280);
         assert_eq!(request.height, 720);
         assert_eq!(request.fps, 60);
-        assert_eq!(request.sender, "lmv");
+        assert_eq!(request.sender, "Ritmolux");
         assert_eq!(request.gpu, None);
         assert_eq!(request.frames, None);
     }
