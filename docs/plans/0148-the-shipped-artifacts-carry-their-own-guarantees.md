@@ -327,8 +327,8 @@ $ComponentWarnBytes = 11324620
 | 2 — `shot`'s help cannot fall behind its parser | dev | done | 277e372 |
 | 3 — What the container actually carries | dev | done | 393a332 |
 | 4 — The recipe reads its own output's length | dev | done | 690fb29 |
-| 5 — The second bisect | dev | **not run — held** | |
-| 6 — The repairs the close review found | dev | done | committed with this row |
+| 5 — The second bisect | dev | done | committed with this row |
+| 6 — The repairs the close review found | dev | done | e3af0c3 |
 
 ### Notes
 
@@ -366,10 +366,26 @@ The percentage is formatted invariant-culture after this box printed `76,0`.
 shot_cli` does **not** rebuild the `shot` example the suite spawns as a subprocess, so a mutation
 appears to have no effect. `cargo build -p standalone --example shot` first.
 
-**Phase 5 was not run, and the reason is its own method constraint.** It requires that no other
-lane be building while the series is taken; `lmv-plan-0136` and `lmv-plan-0149` were both live
-throughout this session. Nothing about it is blocked otherwise — backlog 0178 is untouched and its
-probe still holds.
+**Phase 5 reached neither of the two outcomes its done-when names, and took a third** — the same
+shape Phase 3 did. All 34 points built, 33 steps, `rustc 1.97.1 (8bab26f4f 2026-07-14)` at every
+one, sole lane on the box before and after.
+
+- **Not a dominant step:** the largest single window is `7524b3f` at +122,368 B, which is 24.0 %
+  of the +509,952 B — not the majority the done-when asks for.
+- **Not distributed either:** two steps clear the 66,560 B bar and twelve steps moved exactly 0 B,
+  so the done-when's second finding is false as stated.
+- **The dominant thing is a cause, not a step.** `presets/*.toml` grew 185,563 B -> 525,603 B over
+  the window, 40 presets to 81, and `build.rs` embeds each verbatim, so **340,040 B of the
+  509,952 B — 66.7 % — is preset text**. Both large steps are preset-adding closes, and `6969043`
+  *shrinks* by 27,648 B where Plan 0125 shared the scenes' GPU boilerplate.
+
+Two cross-checks worth having: the baseline rebuild of `22bb460` gave 9,204,736 B, bit-identical to
+Plan 0141's 2026-09 rebuild of the same commit, so the two bisects share a measurement chain; and
+the cdylib's +509,952 B tracks the shipped component's +510,464 B, which is the first direct
+evidence that the proxy the method rests on is a good one.
+
+The done-when's `foo_lmv.dll` figure is unchanged — the series' shipped column is not re-measured
+by this phase, only attributed.
 
 ### Close triggers
 

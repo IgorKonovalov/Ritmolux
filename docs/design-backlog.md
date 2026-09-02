@@ -4109,6 +4109,18 @@ now than after another twenty plans.
 - **PROMOTED 2026-09-01 -> [Plan 0148](plans/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5**, carrying both method constraints this entry names: the
   `rustc` version recorded at every point against the ~13,312 B noise floor, and the cdylib read as a
   proxy while the number shipped is `foo_lmv.dll`'s.
+- **ANSWERED 2026-09-02 by that phase, in neither of the two shapes it allowed for.** All 34 points
+  built, 33 steps, one `rustc` throughout, no other lane running. There is **no dominant step** (the
+  largest window is 24.0 % of the growth) and the growth is **not distributed** (two steps clear the
+  66,560 B bar; twelve steps are exactly 0 B). The dominant thing is a **cause**, not a step:
+  `presets/*.toml` grew 185,563 B -> 525,603 B, 40 presets to 81, and `build.rs` embeds each verbatim
+  (ADR-0022) — **340,040 B of the 509,952 B, 66.7 %, is preset text**, and the two largest steps are
+  both preset-adding closes. Full series and the ten interpretable steps are in
+  [`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md). Attribution is the deliverable and it is
+  discharged. Whether a library that doubles is *unwanted* growth is the separate question this entry
+  was told not to answer: the presets are shipped capability, nothing is over cap, and the honest
+  reading is that the cap will be met by curation rather than by a feature. Filing that as its own
+  entry is `architect`'s call at the close, not this phase's.
 
 ## 0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push
 
