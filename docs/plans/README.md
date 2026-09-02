@@ -39,13 +39,12 @@ place. The plan file carries the real link.
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved, PARKED | dev, human | ADR-0154 (proposed): reader-facing docs publish as a Starlight site, `docs/` stays the single source, 926 of 1,059 links rewrite at build time. **Parked until 0150 lands.** |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0148](0148-the-shipped-artifacts-carry-their-own-guarantees.md) | The shipped artifacts carry their own guarantees | approved | dev | Backlog 0175 + 0176 + 0174 + 0177 + 0178. ADR-0159 (proposed): a 12,582,912 B component cap the recipe reads. Phases 1-2 are pure test additions. No GPU, no `human`. |
-| [0149](0149-the-line-corners-stop-being-blunt.md) | The line corners stop being blunt | in-progress, **Phase 2a next** | dev, human | 0135/0136/0144 closed; **0134 open**. Gained Phase 2a on ADR-0160: the stroke moves to world space. 7 phases. |
 <!-- roster:end -->
 
 **Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**
 ADR-0162 chose Ritmolux; the plan sweeps 1,318 live sites across every crate and so cannot be merged
 against a parallel branch. Its Phase 1 is a `human` stop gate that does not release `dev` until
-`git worktree list` prints one line — today that means [0148] and [0149] close first — and **no lane
+`git worktree list` prints one line — [0149] closed 2026-09-02, so today that means [0148] — and **no lane
 opens between that gate and Phase 9.** That gate's other half, the trademark check, was discharged
 2026-09-02: a knockout search found no `Ritmolux` on any register, and the risk of stopping there was
 accepted for a non-commercial project. So the freeze is the only thing left holding this plan.
@@ -54,7 +53,7 @@ accepted for a non-commercial project. So the freeze is the only thing left hold
 — three new plans and one amendment, taking 21 of the ~30 live entries no plan claimed. The round's
 shape, because most of what it decided was sequencing rather than design:
 
-- **[0149] must run before [0126].** They contend on two files: 0149's Phase 3 edits `star.rs` and
+- **[0149] must run before [0126]** — **discharged: [0149] closed 2026-09-02.** They contended on two files: 0149's Phase 3 edits `star.rs` and
   its Phase 5 edits `schema.rs`, and 0126 **splits both**. A pure move of code that is about to
   change is the move done twice, and 0126's phases are gated on golden while 0149's Phases 2a and 2
   each deliberately re-bless the non-square line baselines. They must not run in parallel in any
@@ -91,7 +90,7 @@ shape, because most of what it decided was sequencing rather than design:
 
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: 0148-the-shipped-artifacts-carry-their-own-guarantees.md
-[0149]: 0149-the-line-corners-stop-being-blunt.md
+[0149]: done/0149-the-line-corners-stop-being-blunt.md
 [0150]: 0150-the-application-becomes-ritmolux.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
 [ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
@@ -1039,6 +1038,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md) — closed 2026-09-02. Review: **no blockers, two majors, three minors.** Version: **0.101.0** (minor). Archived [backlog 0134](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0136 - The gates can convict](done/0136-the-gates-can-convict.md) - closed 2026-09-02. Review: **one blocker, two majors, two minors, one nit.** Version: **0.100.1** (patch). Archived [nine backlog entries](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md) — closed 2026-09-01. Review: **no blockers, one major, four minors, one nit.** Version: **0.100.0** (minor). Archived [backlog 0130 + 0132 + 0151 + 0152](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0141 — The plugin's seams stop drifting](done/0141-the-plugin-seams-stop-drifting.md) — closed 2026-09-01. Review: **no blockers, two majors, three minors, two nits.** Version: **0.99.1** (patch). Archived [0105 + 0117 + 0118](../design-backlog-archive.md), filed 0177-0178. [Write-up](README-archive.md).

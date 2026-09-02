@@ -1,8 +1,8 @@
 # ADR-0161 — The blot anchor becomes a defect record, because term two reads the fringe
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0149)
 > **Date:** 2026-09-02
-> **Related plan(s):** [0149](../plans/0149-the-line-corners-stop-being-blunt.md) Phase 2
+> **Related plan(s):** [0149](../plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 2
 > **Supplements:** [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md)
 > (whose default `boundary_floor` arm this falsifies), [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md)
 > (the conjunction), [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)

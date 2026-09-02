@@ -7571,11 +7571,11 @@ permanently empty for every preset in the library**, because every shipped `d` i
 **Low.** It is a fixed cost on a floor the driver dominates (~327 MB), and nothing measures it today.
 It becomes worth doing the moment a second parametric layer ships, or alongside any other
 `max_segments` re-sizing.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4**, which takes both halves - buffers sized at load from what
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4**, which takes both halves - buffers sized at load from what
   the preset declared, and the `points` off-by-one - and **re-reads `nfr.md` section 12 against the real
   numbers**, since this entry's last bullet says the NFR line may be the thing that is wrong.
 
-- **CLOSED 2026-09-01** by [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4
+- **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4
   (commit `8ed7f1d`), by a different mechanism than the plan named: load-time sizing is impossible
   here because `curves::maurer_rose_pieces` decides the fit from the walk in hand, not from anything
   the preset declares. The four buffers start at capacity zero and are `reserve_exact`-ed on the
@@ -7619,12 +7619,12 @@ cap violation, and nothing warns.
 
 **Low.** One roster member, one sign, no shipped preset in range. It is here so the next person to
 author an inward boundary does not spend the session the way `fragment_vitrail`'s author spent theirs.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 3**, which takes the **load-time refusal**, not the inward lobe.
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 3**, which takes the **load-time refusal**, not the inward lobe.
   That is a stated guess and the plan says so: no shipped preset is in range, the refusal is the honest
   and cheaper of the two, and it is what makes an inward-scallop ask come back rather than ship a silent
   bulge. Both over-claiming comments are corrected with it.
 
-- **CLOSED 2026-09-01** by [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 3
+- **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 3
   (commit `324d34c`), taking the **load-time refusal** rather than the inward lobe. `schema.rs`
   refuses a `scallop` ring whose `scale` is negative, naming the ring and the constraint. Both
   over-claiming comments were corrected with it: the one citing `ring_scale` where the structural
@@ -7685,12 +7685,12 @@ are collected here so none of them lives only in a review transcript.
 claim is prose, the duplication is two constants, and the mirror divergence is unreachable. The
 reason it is filed rather than dropped is that item 1 is a **contract** statement, and this project
 has already spent a plan on an arm whose stated contract and actual behaviour disagreed.
-- **PROMOTED 2026-09-01 -> [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5**, against this entry's own instruction to fold it into
+- **PROMOTED 2026-09-01 -> [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 5**, against this entry's own instruction to fold it into
   whatever next opens `marks.rs`. Nothing else on the roster opens that file, and the plan is the nearest
   work on figure-geometry contracts. All four repairs travel, and item 1 **qualifies the prose** rather
   than changing the divisor, which is what this entry argues for.
 
-- **CLOSED 2026-09-01** by [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5
+- **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 5
   (commit `c0fd6bf`). All four repairs landed. Item 1 **qualified the prose, not the divisor**, as
   this entry argued: `marks.rs`s header and the repaired-reference section now say the interior
   contract is exact for equal spikes and name the `0.076`-`0.085` the jittered arm reads at the
@@ -8154,5 +8154,75 @@ otherwise, which is the property that gets the next reader to stop looking.
 - **PROMOTED 2026-09-01 -> [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 7** (added at that plan's 2026-09-01 amendment), which takes
   the unrejoined form **and** the fixture README sentence that states the gate's blindness as a general
   truth.
+
+---
+
+## 0134 — a joined corner is blunt, and the stroke that hid it is gone
+
+`renderer.rs` extends a joined end by exactly `width` along its own direction; a corner of interior
+angle `theta` needs `width / sin(theta / 2)`. A `diamond`'s 61.9-degree vertex needs 26.3 px of a
+13.5 px half-width and gets 15, so the point is truncated to a flat bevel, and the two quads sum on
+the inner side to 1.38x the stroke.
+[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) accepted this because
+the quadratic falloff blurred it;
+[Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
+`0.25` and there is no blur left.
+
+- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 7,
+  in the running app. Verdict: *"how straight lines are connected, its clearly visible and doesn't
+  look solid"*. It is the other half of the sitting that closed 0073 — that entry bought the curved
+  motifs, this is what is left on the straight ones.
+- **Verified by measurement 2026-08-27** — a single `diamond` filling a 1000x1000 frame at
+  `thickness = 9`: the profile through the acute vertex is 26 px of flat 185 and then zero, with no
+  taper at all, and the corner patch reads 1.38x the stroke's own value. Both halves are the same
+  constant.
+- **Verified 2026-09-01** — the extension is still one unmitred `width`, and this entry stays
+  live. Reduced on 2026-08-27 to the presence of the vertex shader's `select(0.0, width, ...)`
+  expression;
+  [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 1 then replaced the join
+  bitfield with a per-endpoint `f32` length, deleting that expression. **What it verified is
+  still true**: every producer passes a flat `width` at a joined end, the geometry is
+  byte-identical, and the corner is exactly as blunt as it was measured. The mechanism moved and
+  the defect did not, so the reduction is re-pointed rather than the entry closed. What
+  discharges this is Phase 2, and the constant it introduces is what the reduction now watches
+  for:
+  `absent: MITER_LIMIT in: core/src/render/scenes/lines/renderer.rs`
+
+**This revises ADR-0041**, whose disc-join alternative closes with *"worth revisiting only if the
+blunt corners above turn out to matter"*. They matter. It reaches all four line families and moves
+every line golden, and the shader cannot compute `theta` on its own: a segment does not know its
+neighbour's direction, which is the whole point of *per-endpoint on the segment instance*. Three
+designs are open and they differ in instance-buffer cost — a per-endpoint miter length carried on
+the instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex.
+
+**One unrelated nit to sweep while in these files**, recorded here because it is too small for its
+own entry and the close write-up is not loaded per session: in
+`core/src/render/scenes/lines/renderer/tests.rs` the doc block deriving the arc comparison's two
+tolerances from `golden.rs` runs into `SOFT_PROFILE`'s own block with no blank line between them,
+so both attach to `SOFT_PROFILE` and `ARC_MEAN_TOL` / `ARC_OUTLIER_TOL` are left undocumented.
+The numbers are right — `0.02` and `48` match `golden.rs` exactly — but their derivation
+now documents the wrong constant, which is the ADR-0071 failure one level down.
+
+### Priority
+
+**Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
+(`diamond`, `chevron`) are exactly the two Plan 0087 did *not* convert to arcs — so the defect is now
+concentrated rather than diffuse.
+- **PROMOTED 2026-09-01 -> [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phases 1-2.** The ADR takes the first of the three
+  designs this entry lists - a per-endpoint miter length on the instance - and supersedes ADR-0041's
+  geometry half on the ground this entry names: Plan 0114 removed the blur that decision rested on.
+  The plan's Phase 5 also takes the `tests.rs` doc-block nit recorded at the end of this entry.
+
+- **CLOSED 2026-09-02** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md)
+  Phase 2. `MITER_LIMIT` and `miter_extension` land in `renderer.rs` and all six producers in
+  the four line families compute the miter their joint subtends; eleven line baselines
+  re-blessed. Two things this entry did not predict, both measured at the close: past the
+  limit the joint takes a **bevel** rather than the truncated miter ADR-0158 specified,
+  because a Maurer chord web puts 26-86 % of its joints there and the truncation reads as a
+  burr; and the miter could not be computed at all until
+  [ADR-0160](adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) moved the
+  stroke into world space, a defect older than this entry that the square golden corpus was
+  structurally blind to. The `tests.rs` doc-block nit at the end of this entry landed in
+  Phase 5.
 
 ---

@@ -324,8 +324,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0132 | The metrics module has no level statistic, and every statistic it has reads gamma-encoded code values | [ADR-0150](adrs/0150-the-level-question-is-asked-in-linear-light.md) + [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phases 1-3. **Closed 2026-09-01** |
 | 0151 | The driven floor's sharpest non-vacuity probe is printed and never asserted | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 5; both halves now asserted, mutation-checked. **Closed 2026-09-01** |
 | 0152 | A disjunctive gate made *the shipped library's minimum* ambiguous in both floors' derivations | [Plan 0137](plans/done/0137-the-metrics-measure-light.md) Phase 6; re-measured over 81 presets, no constant moved. **Closed 2026-09-01** |
-| 0135 | `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty | [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 4, reserved lazily rather than at load — 5,999,992 B not committed, and `nfr.md` 12 corrected. **Closed 2026-09-01** |
-| 0144 | The repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally | [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 5. All four repairs landed; the prose was qualified, the divisor kept. **Closed 2026-09-01** |
+| 0135 | `parametric_curve` commits ~6.5 MB at Rich for buffers every shipped preset leaves empty | [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4, reserved lazily rather than at load — 5,999,992 B not committed, and `nfr.md` 12 corrected. **Closed 2026-09-01** |
+| 0144 | The repaired `star` interior is exact only when the spikes are equal, and three places state it unconditionally | [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 5. All four repairs landed; the prose was qualified, the divisor kept. **Closed 2026-09-01** |
+| 0134 | A joined corner is blunt, and the stroke that hid it is gone | [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 2; past the limit a bevel, not a clamp. **Closed 2026-09-02** |
 | 0104 | `check-index-rows.mjs` has no assertion it can convict with, so a dead detector reads exactly like a clean tree | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phases 1-2: `--self-test` at both call sites, plus a red fixture. **Closed 2026-09-02** |
 | 0127 | The figure gate walks the working tree, so a gitignored local note can redden a push | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 6: an untracked hit is an advisory; a tracked one still fails. **Closed 2026-09-02** |
 | 0133 | `docs-shots.mjs` cannot run at all, so the operator-doc image sweep was dead since 2026-08-15 | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 9: three manifest entries, and the cross-check moved to a GPU-free test. **Closed 2026-09-02** |
@@ -2267,7 +2268,7 @@ threshold to retune.
   `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
   instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
 
-### Re-opened 2026-09-02 by [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) — the discharge above is falsified, and the fringe mechanism this entry named is why
+### Re-opened 2026-09-02 by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) — the discharge above is falsified, and the fringe mechanism this entry named is why
 
 **Read this first. It reverses the section below it.** The repair that discharged this entry's title
 — `metrics::boundary_density` as the conjunction's second term — **does not separate a blot from a
@@ -2515,64 +2516,6 @@ Whether the answer is a ground-relative `is_lit`, a structural statistic in the 
 shell-occupancy rescue, reading the tonal statistic at the quiet excitation too, or a per-system
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
-
-## 0134 — a joined corner is blunt, and the stroke that hid it is gone
-
-`renderer.rs` extends a joined end by exactly `width` along its own direction; a corner of interior
-angle `theta` needs `width / sin(theta / 2)`. A `diamond`'s 61.9-degree vertex needs 26.3 px of a
-13.5 px half-width and gets 15, so the point is truncated to a flat bevel, and the two quads sum on
-the inner side to 1.38x the stroke.
-[ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) accepted this because
-the quadratic falloff blurred it;
-[Plan 0114](plans/done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
-`0.25` and there is no blur left.
-
-- **Raised:** 2026-08-27, at [Plan 0087](plans/done/0087-the-line-renderer-draws-a-curve.md) Phase 7,
-  in the running app. Verdict: *"how straight lines are connected, its clearly visible and doesn't
-  look solid"*. It is the other half of the sitting that closed 0073 — that entry bought the curved
-  motifs, this is what is left on the straight ones.
-- **Verified by measurement 2026-08-27** — a single `diamond` filling a 1000x1000 frame at
-  `thickness = 9`: the profile through the acute vertex is 26 px of flat 185 and then zero, with no
-  taper at all, and the corner patch reads 1.38x the stroke's own value. Both halves are the same
-  constant.
-- **Verified 2026-09-01** — the extension is still one unmitred `width`, and this entry stays
-  live. Reduced on 2026-08-27 to the presence of the vertex shader's `select(0.0, width, ...)`
-  expression;
-  [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phase 1 then replaced the join
-  bitfield with a per-endpoint `f32` length, deleting that expression. **What it verified is
-  still true**: every producer passes a flat `width` at a joined end, the geometry is
-  byte-identical, and the corner is exactly as blunt as it was measured. The mechanism moved and
-  the defect did not, so the reduction is re-pointed rather than the entry closed. What
-  discharges this is Phase 2, and the constant it introduces is what the reduction now watches
-  for:
-  `absent: MITER_LIMIT in: core/src/render/scenes/lines/renderer.rs`
-
-**This revises ADR-0041**, whose disc-join alternative closes with *"worth revisiting only if the
-blunt corners above turn out to matter"*. They matter. It reaches all four line families and moves
-every line golden, and the shader cannot compute `theta` on its own: a segment does not know its
-neighbour's direction, which is the whole point of *per-endpoint on the segment instance*. Three
-designs are open and they differ in instance-buffer cost — a per-endpoint miter length carried on
-the instance, a round join drawn in the fragment, or ADR-0041's own disc-per-vertex.
-
-**One unrelated nit to sweep while in these files**, recorded here because it is too small for its
-own entry and the close write-up is not loaded per session: in
-`core/src/render/scenes/lines/renderer/tests.rs` the doc block deriving the arc comparison's two
-tolerances from `golden.rs` runs into `SOFT_PROFILE`'s own block with no blank line between them,
-so both attach to `SOFT_PROFILE` and `ARC_MEAN_TOL` / `ARC_OUTLIER_TOL` are left undocumented.
-The numbers are right — `0.02` and `48` match `golden.rs` exactly — but their derivation
-now documents the wrong constant, which is the ADR-0071 failure one level down.
-
-### Priority
-
-**Medium.** It is a named user complaint on shipped presets, and the two roster members it disfigures
-(`diamond`, `chevron`) are exactly the two Plan 0087 did *not* convert to arcs — so the defect is now
-concentrated rather than diffuse.
-- **PROMOTED 2026-09-01 -> [ADR-0158](adrs/0158-a-joined-end-carries-its-own-miter-length.md) + [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) Phases 1-2.** The ADR takes the first of the three
-  designs this entry lists - a per-endpoint miter length on the instance - and supersedes ADR-0041's
-  geometry half on the ground this entry names: Plan 0114 removed the blur that decision rested on.
-  The plan's Phase 5 also takes the `tests.rs` doc-block nit recorded at the end of this entry.
-
----
 
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
