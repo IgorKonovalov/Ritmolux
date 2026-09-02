@@ -69,7 +69,7 @@ use std::rc::Rc;
 
 use super::super::Scene;
 use super::super::common;
-use super::renderer::{LineRenderer, SegmentInstance};
+use super::renderer::{LineRenderer, SegmentInstance, StrokeMetric};
 use super::{
     CapOverflow, GeneratorConfig, MirrorSpec, OverflowContext, ViewTransform, replicate_mirror,
 };
@@ -835,6 +835,7 @@ impl Scene for SpectrumScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
                 &[],
@@ -847,6 +848,7 @@ impl Scene for SpectrumScene {
                 aspect,
                 self.glow,
                 self.softness,
+                StrokeMetric::World,
                 xform,
                 &self.segments,
             );
