@@ -1,9 +1,13 @@
 # 0148 — The shipped artifacts carry their own guarantees
 
-> **Status:** in-progress — **parked after Phase 4.** Phases 1-4 are landed, reviewed and
-> green; Phase 5 cannot run while another lane is building (its own method constraint) and
-> Phase 6 carries the close review's repairs. Resume when `lmv-plan-0136` and
-> `lmv-plan-0149` are gone.
+> **Status:** in-progress — **unparked 2026-09-02, two phases owed.** Phases 1-4 are landed,
+> reviewed and green (2026-09-01: no blockers, one major, six minors). The park's condition is
+> **met**: `lmv-plan-0136` and `lmv-plan-0149` both closed on 2026-09-02 and this is now the only
+> open lane, so Phase 5's method constraint — no other lane building while the size series is
+> taken — holds for the first time since the plan opened. **It holds only until the next lane
+> opens.** Run **Phase 6 first** (the review's repairs, no special conditions, and it makes the
+> tree correct before the bisect reads it), then **Phase 5**. Until this plan closes, its lane is
+> what holds Plan 0150's freeze gate.
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
 > **Related ADRs:** [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
