@@ -972,7 +972,7 @@ the rows above.
   [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) carried into C++ link time — the
   linked artifact renamed to `rlx_core_c.lib`, and CI has no plugin job that would have caught a
   stale path. **Phase 9 needed a CI run rather than this machine, and got one:** run
-  [`32272926929`](https://github.com/IgorKonovalov/ritmolux/actions/runs/32272926929)
+  [`32272926929`](https://github.com/IgorKonovalov/Ritmolux/actions/runs/32272926929)
   (`main` at `7b9781d`, `rust-cache` restore-key hit, all six jobs green), read at Plan
   [0110](done/0110-the-shader-surface-stops-being-invisible.md)'s Phase 6 — that plan's own success
   criterion is the same job. Both halves answered:

@@ -116,7 +116,7 @@ preset files they document.
 ## Download
 
 Prebuilt binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/ritmolux/releases). Three zips per
+[Releases page](https://github.com/IgorKonovalov/Ritmolux/releases). Three zips per
 release, each carrying a `READ-ME-FIRST.txt`:
 
 | Zip | What's in it |

@@ -23,7 +23,7 @@ default-members = ["core", "rlx-ring", "standalone"]
 version = "0.102.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/IgorKonovalov/ritmolux"
+repository = "https://github.com/IgorKonovalov/Ritmolux"
 
 # Baseline lints shared by every workspace member (opted in with
 # `lints.workspace = true`). Kept to the universally-safe set here; hot-path
