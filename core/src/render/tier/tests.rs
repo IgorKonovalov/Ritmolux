@@ -25,7 +25,7 @@ fn a_tier_change_is_permitted_only_where_there_is_a_surface() {
 }
 
 /// A name round-trips, and an unknown name is rejected rather than defaulted
-/// — a typo in `LMV_TIER` must be a usage error, not a silent floor.
+/// — a typo in `RLX_TIER` must be a usage error, not a silent floor.
 #[test]
 fn tier_names_round_trip_and_reject_junk() {
     for tier in [Tier::Floor, Tier::Rich] {

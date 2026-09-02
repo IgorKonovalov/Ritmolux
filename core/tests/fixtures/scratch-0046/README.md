@@ -6,7 +6,7 @@ read as depth and flow, with music, fullscreen, on the target display — and do
 frame time hold while it does.
 
 They are **not shipped content and not test fixtures.** Nothing includes them,
-`LMV_BLESS` never touches them, and `core/build.rs` does not see them (it globs
+`RLX_BLESS` never touches them, and `core/build.rs` does not see them (it globs
 `presets/*.toml` only). Plan 0046's "What this plan does NOT do" is explicit that
 the content pass belongs to a later roadmap item; these exist to be looked at and
 then either superseded by real presets or deleted.
@@ -18,18 +18,18 @@ then either superseded by real presets or deleted.
 
 ## Running them
 
-The standalone loads a **directory**, so point `LMV_PRESET_DIR` at this one — the
+The standalone loads a **directory**, so point `RLX_PRESET_DIR` at this one — the
 per-user preset cache is seeded write-if-absent and will not pick up an edit here
 otherwise. From the repo root, with audio playing through the default output
 device:
 
 ```powershell
-$env:LMV_PRESET_DIR = "$PWD\core\tests\fixtures\scratch-0046"
+$env:RLX_PRESET_DIR = "$PWD\core\tests\fixtures\scratch-0046"
 cargo run --release -p standalone -- --tier rich
 ```
 
 ```bash
-LMV_PRESET_DIR="$PWD/core/tests/fixtures/scratch-0046" \
+RLX_PRESET_DIR="$PWD/core/tests/fixtures/scratch-0046" \
   cargo run --release -p standalone -- --tier rich
 ```
 

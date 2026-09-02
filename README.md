@@ -342,7 +342,7 @@ says what each flag is *for*, which is the part a roster line has no room for.
   is never demoted, so this is also how you keep `rich` on a machine a transient stall demoted.
   **The tier also moves while the app is running** — `[` / `]`, or the settings menu's Quality
   row. An in-app change **pins** the tier for the session (so the governor stops touching it) and
-  writes it to `config.toml`'s `[quality] tier`. `--tier` and `LMV_TIER` still win at the next
+  writes it to `config.toml`'s `[quality] tier`. `--tier` and `RLX_TIER` still win at the next
   launch, so the precedence below is unchanged. Expect a brief re-accumulation of trails and
   feedback when it switches: the tier sizes GPU resources, so changing it rebuilds them.
 - `--osc <host:port>` — publish the analyzer's telemetry as OSC over UDP, so a lighting console or a
@@ -383,10 +383,10 @@ says what each flag is *for*, which is the part a roster line has no room for.
   Telemetry rides the rendered frame, so it stops when the window is hidden and the preset name
   lags a switch by one frame. Nothing here is a musical timebase you can drive a sequencer from —
   it is a level feed for lights.
-- `LMV_PRESET_DIR=<dir>` — point the app at a custom preset folder instead of the seeded per-user
+- `RLX_PRESET_DIR=<dir>` — point the app at a custom preset folder instead of the seeded per-user
   directory; edits to `*.toml` there hot-reload live.
-- `LMV_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
-  `--tier` > `LMV_TIER` > `config.toml`'s `[quality] tier` > auto.
+- `RLX_TIER=floor|rich` — the same pin as `--tier`, for a one-off run. Precedence is
+  `--tier` > `RLX_TIER` > `config.toml`'s `[quality] tier` > auto.
 
 > **macOS:** loopback capture **is** implemented — `standalone/src/capture_mac.rs` taps system
 > audio through **ScreenCaptureKit**, so it needs **macOS 13+** and the **Screen Recording**
@@ -438,8 +438,8 @@ The three references the guide links into, each owning one surface:
 | [`docs/presets.md`](docs/presets.md) | the expression grammar — variables, functions, `select()`, and how a bad preset is reported |
 | [`docs/preset-palettes.md`](docs/preset-palettes.md) | the colour surface — palettes, custom stops, the A/B crossfade |
 
-Set **`LMV_PRESET_DIR`** to run against a custom preset folder instead of the
-per-user one — `LMV_PRESET_DIR=./presets cargo run -p standalone` points the app
+Set **`RLX_PRESET_DIR`** to run against a custom preset folder instead of the
+per-user one — `RLX_PRESET_DIR=./presets cargo run -p standalone` points the app
 at the repo's own presets and hot-reloads an edit within ~150 ms.
 
 ## Rendering a music video
@@ -513,7 +513,7 @@ For the `--audio` path, drop a **16-bit PCM WAV** into `assets/test/` — that
 folder is gitignored, so test audio is added manually and never committed (use
 your own or a royalty-free / CC0 clip).
 
-`shot` reads the same library the app does — including `LMV_PRESET_DIR` — and
+`shot` reads the same library the app does — including `RLX_PRESET_DIR` — and
 takes `--presets <dir>` / `--preset-file <path>` to capture a specific folder or
 file, so an edit can be shot without touching the seeded copy.
 

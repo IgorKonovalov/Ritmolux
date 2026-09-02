@@ -67,7 +67,9 @@ use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
-/// (NFR §6). "LMV_EMIT".
+/// (NFR §6). The bytes are ASCII used as a number: re-spelling them to match
+/// a renamed prefix changes every spawn and moves this scene's goldens, so
+/// the value is opaque.
 const SEED: u64 = 0x4C4D_565F_454D_4954;
 
 /// Domain aspect before the first [`Scene::render`] hands one over. Only reached

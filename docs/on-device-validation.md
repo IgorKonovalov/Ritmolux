@@ -123,7 +123,7 @@ footprint so the vendor spread is on record.
       the stage entirely — no offscreens, no pyramid, no pipelines), so an ordinary run on most of
       the library measures none of it. **Load `star_lantern`** — it is the shipped preset built
       *for* this stage and binds all three params (`bloom_amount` around 0.95 rising on onset,
-      `bloom_threshold = 1.0`, `bloom_radius` around 2.15), so no scratch `LMV_PRESET_DIR` is
+      `bloom_threshold = 1.0`, `bloom_radius` around 2.15), so no scratch `RLX_PRESET_DIR` is
       needed any more. When active the stage costs **4N passes** at `TierConfig::bloom_levels`
       (`Floor` = 4, `Rich` = 6) plus its own grid-sized `bloom-src` offscreen and the pyramid —
       **16.6 + ~11 ≈ 28 MB** at the floor cap (NFR §12). Report **(a)** whether fps holds ≥ 60 @
@@ -181,7 +181,7 @@ footprint so the vendor spread is on record.
       long-held still frame can resolve as texture. The 2026-08-12 verdict was "looks fine" on
       the dev box's own display; a **6-bit + FRC panel**, which runs its own temporal dither over
       ours, is the case that verdict cannot speak to. Load the reference frame
-      (`LMV_PRESET_DIR=core/tests/fixtures/scratch-0082 …`, the run line is in that directory's
+      (`RLX_PRESET_DIR=core/tests/fixtures/scratch-0082 …`, the run line is in that directory's
       README), go fullscreen, and hold it. If the grain reads as texture the answer is ADR-0096
       **Alternative F** — an animated dither, one term — and it is an `architect` call, not a
       constant to lower. **(b) Does it cost anything?** The pass gained three `pow` calls per

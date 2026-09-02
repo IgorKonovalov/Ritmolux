@@ -115,7 +115,7 @@ was conditioned on an event that never happened, and the growth arrived anyway.
 
 ## What this does NOT touch
 
-- **The C ABI version** (`LMV_ABI_VERSION`, `core-cabi/src/lib.rs`) is a **separate axis**
+- **The C ABI version** (`RLX_ABI_VERSION`, `core-cabi/src/lib.rs`) is a **separate axis**
   (ADR-0003). It moves only when the `extern "C"` surface changes shape — never on an app
   bump, and an ABI bump never implies an app bump.
 - **Dependency versions** (exact `=` pins, cargo-deny) are unrelated.

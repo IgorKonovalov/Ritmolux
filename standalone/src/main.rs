@@ -180,7 +180,7 @@ struct AppState {
     /// [`AppState::frame_text`]. Retained for its capacity.
     modal_scratch: Vec<console::Line>,
     /// Whether the tier is pinned rather than engine-resolved — seeded from the
-    /// launch pin (`--tier` / `LMV_TIER` / `[quality] tier`) and set by any
+    /// launch pin (`--tier` / `RLX_TIER` / `[quality] tier`) and set by any
     /// explicit change. Tracked here rather than read off the renderer because
     /// the core exposes the *demotion* latch but not the pin, and widening the
     /// core's surface to render one menu suffix is the wrong trade.
@@ -353,7 +353,7 @@ impl AppState {
         }
 
         // Resolve the preset directory, seed the curated set into it on first
-        // run (write-if-absent — but never into an LMV_PRESET_DIR override,
+        // run (write-if-absent — but never into an RLX_PRESET_DIR override,
         // which is the user's own folder), then load it over the renderer's
         // embedded defaults and record the signature so later edits hot-reload.
         // Any failure degrades to the embedded defaults (NFR 10).
@@ -966,7 +966,7 @@ impl AppState {
     /// the shell's "already announced" latch alongside — otherwise a later real
     /// demotion would be silent, which ADR-0045 rules out.
     ///
-    /// `--tier` and `LMV_TIER` still win at the next launch; this writes the
+    /// `--tier` and `RLX_TIER` still win at the next launch; this writes the
     /// `[quality] tier` they override, so the documented precedence is unchanged.
     fn swap_tier(&mut self, tier: Tier) {
         self.tier_pinned = true;
@@ -2226,7 +2226,7 @@ struct App {
     /// Per-beat downbeat-log path from `--downbeat-log`, or `None` when the mode
     /// is off (Plan 0086 Phase 1).
     downbeat_log_path: Option<PathBuf>,
-    /// The quality-tier pin, already resolved across `--tier` / `LMV_TIER` /
+    /// The quality-tier pin, already resolved across `--tier` / `RLX_TIER` /
     /// config (Plan 0044). `None` is auto — rich, governed.
     tier: Option<Tier>,
     /// Which adapter `--gpu` named, already resolved.
@@ -2453,7 +2453,7 @@ impl ApplicationHandler for App {
 }
 
 /// The preset directory to load and poll, seeding the curated set only when it
-/// is the per-user default — an `LMV_PRESET_DIR` override names a directory the
+/// is the per-user default — an `RLX_PRESET_DIR` override names a directory the
 /// user owns (typically the repo's version-controlled `presets/`), so writing
 /// our copies into it would be a surprise (ADR-0014). Returns an empty path if
 /// nothing resolves, so the caller keeps the renderer's embedded defaults
@@ -2924,7 +2924,7 @@ fn parse_console_flag() -> bool {
 /// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
 /// absent (Plan 0044).
 ///
-/// `Err` on a missing or unparseable value. Unlike `LMV_TIER`, a bad `--tier` is
+/// `Err` on a missing or unparseable value. Unlike `RLX_TIER`, a bad `--tier` is
 /// a **usage error** rather than something to degrade past: it was typed for this
 /// run, so silently starting on another tier would answer the wrong question.
 fn parse_tier_arg() -> Result<Option<Tier>, String> {
@@ -2995,7 +2995,7 @@ fn flag_value(
 /// the `=` spelling `--soak` and `--tier` already accept.
 ///
 /// `Err` on an `--input` value that names no mode. Like `--tier` and unlike
-/// `LMV_TIER`, a bad flag is a **usage error** rather than something to degrade
+/// `RLX_TIER`, a bad flag is a **usage error** rather than something to degrade
 /// past: it was typed for this run, so starting on another input would answer
 /// the wrong question. A `--device` naming an absent endpoint is *not* an error
 /// — the capture layer degrades to the mode's default endpoint and says so, and
@@ -3035,7 +3035,7 @@ fn parse_input_args_from(
 
 /// Which source decided the capture selection, so a surprising input is
 /// traceable to what set it — the tier-source shape ADR-0045 established, minus
-/// the environment level (Plan 0130 says why there is no `LMV_INPUT`).
+/// the environment level (Plan 0130 says why there is no `RLX_INPUT`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InputSource {
     /// `--input` / `--device` on the command line.
@@ -3434,7 +3434,7 @@ fn main() {
     let soak_path = parse_soak_arg();
     let downbeat_log_path = parse_downbeat_log_arg();
 
-    // Quality tier, highest precedence first: `--tier`, `LMV_TIER`, config
+    // Quality tier, highest precedence first: `--tier`, `RLX_TIER`, config
     // (Plan 0044 / ADR-0045). A bad flag is a usage error; a bad env var is
     // reported and stepped past, so a stale export cannot stop the show (NFR 10).
     let tier_flag = match parse_tier_arg() {

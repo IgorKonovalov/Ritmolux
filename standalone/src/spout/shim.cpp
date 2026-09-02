@@ -82,7 +82,7 @@ int lmv_spout_adapter_name(int index, char *buffer, int length) {
 // `lmv_spout_name` returns and not necessarily what was asked for.
 // Registration applies no further increment on top of that.
 //
-// `LMV_SPOUT_LOG` in the environment turns on the SDK's own verbose log. It is
+// `RLX_SPOUT_LOG` in the environment turns on the SDK's own verbose log. It is
 // read here rather than passed in because it configures the SDK's global
 // logger rather than this sender, and it is the only thing that reports what
 // the D3D11 layer actually did.
@@ -95,7 +95,7 @@ LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned
     if (spout == nullptr) {
         return nullptr;
     }
-    if (std::getenv("LMV_SPOUT_LOG") != nullptr) {
+    if (std::getenv("RLX_SPOUT_LOG") != nullptr) {
         spoututils::EnableSpoutLog();
         spoututils::SetSpoutLogLevel(spoututils::SPOUT_LOG_VERBOSE);
     }

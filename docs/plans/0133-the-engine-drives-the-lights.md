@@ -312,7 +312,7 @@ flowchart LR
 - **No second machine, no NDI, no Spout, no video transport of any kind.** ADR-0145 records why.
 - **This plan does not build Plan 0115's frame tap.** Phase 8 resolves onto it.
 - **It does not delete the external bridge or the OSC sink.** Both stay supported, per ADR-0145.
-- **No foobar plugin support.** Standalone only, so `LMV_ABI_VERSION` does not move.
+- **No foobar plugin support.** Standalone only, so `RLX_ABI_VERSION` does not move.
 - **No sACN.** The rig speaks Art-Net; a second transport waits for a rig that needs it.
 - **No lighting-specific render path.** If Phase 8 says the picture is too dim, the remedy is routed.
 

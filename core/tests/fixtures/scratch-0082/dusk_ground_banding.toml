@@ -1,5 +1,5 @@
 # SCRATCH REFERENCE - not a fixture, not shipped content, not tuned for looks.
-# Nothing includes this file, no test names it, LMV_BLESS does not touch it, and
+# Nothing includes this file, no test names it, RLX_BLESS does not touch it, and
 # core/build.rs cannot see it (it globs presets/*.toml only). See the README
 # beside it. Same arrangement as scratch-0046/.
 #

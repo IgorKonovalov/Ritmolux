@@ -186,7 +186,7 @@ flowchart LR
 - **Done when:** `grep -rn "cfg(windows)\|cfg(target_os" core/src` returns nothing outside
   `Cargo.toml` feature gating; `grep -rn "thread_local" core/src/render/scenes` returns nothing;
   `standalone/tests/shot_cli.rs`'s report tests pass; the C ABI conformance suite in `core-cabi`
-  passes and `LMV_ABI_VERSION` is unchanged (no `extern "C"` signature moved — the constructor
+  passes and `RLX_ABI_VERSION` is unchanged (no `extern "C"` signature moved — the constructor
   was never exported).
 
 ### Phase 7 — `standalone/main.rs` becomes shell glue

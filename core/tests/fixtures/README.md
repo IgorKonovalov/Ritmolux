@@ -34,11 +34,11 @@ wildcard arm. To add one:
    `EXTRA_FIXTURES` — see below — is a different thing and is not part of adding
    a scene.)
 3. Bless the baseline on Windows WARP:
-   `LMV_BLESS=1 cargo test -p rlx-core --test golden`, then eyeball the new PNG
+   `RLX_BLESS=1 cargo test -p rlx-core --test golden`, then eyeball the new PNG
    under `core/tests/golden/` to confirm the scene actually drew.
 
 Baselines are WARP-only (macOS skips per ADR-0016) and must be blessed on WARP or
-they will drift. **`LMV_BLESS=1` rewrites every baseline, not just the one you
+they will drift. **`RLX_BLESS=1` rewrites every baseline, not just the one you
 are adding** — check `git status` afterwards and restore any file you did not
 mean to move, or you will silently re-baseline an unrelated scene's drift.
 
@@ -99,7 +99,7 @@ was an even confetti mush with no figure in it at all, and the zoom is what puts
 a few hundred separated marks in frame instead).
 
 Appended at the **end** of `EXTRA_FIXTURES`, for the reason that list gives.
-Blessing it moved no other baseline: `LMV_BLESS` rewrites all of them, and the
+Blessing it moved no other baseline: `RLX_BLESS` rewrites all of them, and the
 three line-scene PNGs it rewrote (`lsystem`, `parametric_curve`,
 `star_pattern` — the three that read `max_outlier 1` against their committed
 baselines, i.e. WARP's own rasterization noise) were restored before committing.
@@ -109,8 +109,8 @@ Check `git status` after any bless here and do the same.
 
 Plan 0053 Phase 1, [ADR-0058](../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md).
 It belongs to `core/tests/attractor_trails.rs` and to nothing else, so
-`LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites **one**
-file. That is deliberate: `LMV_BLESS` is not scoped to a fixture, so adding this
+`RLX_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites **one**
+file. That is deliberate: `RLX_BLESS` is not scoped to a fixture, so adding this
 to `golden.rs`'s `EXTRA_FIXTURES` would have meant rewriting all 12 of that
 binary's baselines to add one — and three of them (`lsystem`, `parametric_curve`,
 `star_pattern`) re-encode differently on this repository's dev box from a clean
@@ -194,7 +194,7 @@ and their `[smoothing]` table — one scalar, one an `{ attack, release }` pair.
 test asserts that twinship, because the probe's whole claim is that the table is
 the only thing that differs.
 
-They have **no committed baseline**. Nothing here is blessed and `LMV_BLESS` does
+They have **no committed baseline**. Nothing here is blessed and `RLX_BLESS` does
 not touch them: the probe measures a *relative* property (how many frames the
 frame takes to settle after a step, up against down), so there is no PNG to drift.
 
@@ -215,7 +215,7 @@ either side of it.
 
 **Since Plan 0040 Phase 1 it also carries a committed baseline**,
 `golden/line_joint_zigzag.png`, blessed with
-`LMV_BLESS=1 cargo test -p rlx-core --test line_joints`. It exists because the
+`RLX_BLESS=1 cargo test -p rlx-core --test line_joints`. It exists because the
 defect that motivated ADR-0041 — the polyline's notch — was pinned by no pixels
 anywhere: `spectrum.toml` below takes the default `bars` layout, and
 `spectrum_ridge` is a shipped preset guarded behaviorally. A shader edit could
@@ -223,7 +223,7 @@ have reopened the notch on a gentler figure than this deliberately hostile zigza
 and moved no file.
 
 The two claims are not redundant and the order matters: the relative assertion
-runs **first, including under `LMV_BLESS`**, so the notch cannot be blessed back
+runs **first, including under `RLX_BLESS`**, so the notch cannot be blessed back
 in by someone reading the diff as drift — the bless never runs. A baseline alone
 only says "something moved"; the relative claim fails loudly and says why.
 
@@ -265,7 +265,7 @@ directions against a deliberately reverted constant-alpha shader; the emitter's
 test records its two numbers (0.3345 against 0.0002 on the same capture) in its
 doc comment.
 
-They pin **no pixels** and have no committed baselines; `LMV_BLESS` does not
+They pin **no pixels** and have no committed baselines; `RLX_BLESS` does not
 touch them. Each test captures its own fixture three ways — lit backdrop, black
 backdrop, and backdrop with the scene contributing nothing — and asserts that
 wherever the scene wrote no light, the backdrop arrives intact in the **linear**
@@ -329,7 +329,7 @@ is 33 frames, comfortably inside the silent tail.
 `spectrum_comb_over_scaled.toml` and `spectrum_corona_over_scaled.toml` belong to
 `core/tests/geometry_extent.rs` (Plan 0069 Phase 3,
 [ADR-0083](../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
-They pin no pixels, have no baselines, and `LMV_BLESS` does not touch them.
+They pin no pixels, have no baselines, and `RLX_BLESS` does not touch them.
 
 They are **frozen defects** rather than fixtures authored for a look: each is a
 shipped preset exactly as it shipped over-scaled, recovered from
@@ -394,7 +394,7 @@ measures nothing.
 ## `scratch-NNNN/` directories are not fixture directories at all
 
 A `scratch-NNNN/` holds presets a **human** phase of Plan NNNN needs to look at,
-plus a README. Nothing includes them, no test names them, `LMV_BLESS` does not
+plus a README. Nothing includes them, no test names them, `RLX_BLESS` does not
 touch them, and `core/build.rs` cannot see them (it globs `presets/*.toml` only).
 They live here because a phase that needs a preset needs somewhere to keep one,
 and a session's temporary directory does not survive the session.

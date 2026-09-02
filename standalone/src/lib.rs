@@ -11,7 +11,7 @@
 //!
 //! Hand-copying the per-OS preset directory into `src/main.rs` and
 //! `examples/shot.rs` lets the two copies drift, which silently breaks the one
-//! invariant the `LMV_PRESET_DIR` override rests on — the app and `shot` must
+//! invariant the `RLX_PRESET_DIR` override rests on — the app and `shot` must
 //! resolve the *same* directory (ADR-0014). This module is that single source.
 //! It is host-only by design: `%APPDATA%` / `HOME` / `XDG` conventions are a
 //! shell concern and never leak into the source-agnostic core.
@@ -49,12 +49,12 @@ pub const APP_DIR_NAME: &str = "light-music-visualizer";
 /// Environment variable naming a preset directory that overrides the per-user
 /// default (ADR-0014). Set it to the repo's `presets/` for the edit-live loop,
 /// or to any folder to run a custom preset library.
-pub const PRESET_DIR_ENV: &str = "LMV_PRESET_DIR";
+pub const PRESET_DIR_ENV: &str = "RLX_PRESET_DIR";
 
 /// Environment variable pinning the quality tier — `floor` or `rich`
 /// (Plan 0044 / ADR-0045). Between the `--tier` flag and `config.toml` in
 /// precedence: handy for a one-off run without editing either.
-pub const TIER_ENV: &str = "LMV_TIER";
+pub const TIER_ENV: &str = "RLX_TIER";
 
 /// Which of the three pin sources decided the tier, so a surprising tier is
 /// traceable to what set it rather than being a mystery on stderr.
@@ -84,11 +84,11 @@ impl TierSource {
 }
 
 /// The tier [`TIER_ENV`] pins, or `None` when it is unset or empty — empty is
-/// treated as unset, the same rule `LMV_PRESET_DIR` follows, because an
+/// treated as unset, the same rule `RLX_PRESET_DIR` follows, because an
 /// exported-but-blank variable is a shell artifact rather than a choice.
 ///
 /// `Err` on an unparseable value. It has to be *reported* rather than silently
-/// defaulted — an operator who typed `LMV_TIER=rch` is otherwise convinced they
+/// defaulted — an operator who typed `RLX_TIER=rch` is otherwise convinced they
 /// pinned a tier they did not — but the app degrades to the next source down
 /// rather than refusing to start (NFR 10).
 pub fn tier_env() -> Result<Option<rlx_core::render::Tier>, String> {
@@ -129,7 +129,7 @@ pub fn resolve_tier(
 /// Where the preset directory came from, so the app knows whether to seed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PresetDir {
-    /// `LMV_PRESET_DIR` pointed here — user-owned, so we never seed into it.
+    /// `RLX_PRESET_DIR` pointed here — user-owned, so we never seed into it.
     Override(PathBuf),
     /// The per-OS `%APPDATA%` / `HOME` / `XDG` default — seeded write-if-absent
     /// on first run.
@@ -148,13 +148,13 @@ impl PresetDir {
         }
     }
 
-    /// True when `LMV_PRESET_DIR` supplied the directory.
+    /// True when `RLX_PRESET_DIR` supplied the directory.
     pub fn is_override(&self) -> bool {
         matches!(self, PresetDir::Override(_))
     }
 }
 
-/// Resolve the preset directory: `LMV_PRESET_DIR` wins when set to a non-empty
+/// Resolve the preset directory: `RLX_PRESET_DIR` wins when set to a non-empty
 /// path, otherwise the per-OS default under [`preset_data_root`], otherwise
 /// [`PresetDir::Unresolved`].
 pub fn resolve_preset_dir() -> PresetDir {
@@ -290,7 +290,7 @@ mod tests {
     }
 
     /// The env var parses both tiers, treats empty as unset, and **reports** a
-    /// junk value rather than defaulting it — silently ignoring `LMV_TIER=rch`
+    /// junk value rather than defaulting it — silently ignoring `RLX_TIER=rch`
     /// would leave the operator convinced they had pinned a tier they had not.
     #[test]
     fn the_tier_env_var_parses_or_reports() {

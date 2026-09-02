@@ -140,7 +140,7 @@ honesty, not commitments.
 > **Delivered by [Plan 0044](plans/done/0044-quality-tiers.md) /
 > [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)** (accepted). `TierConfig` resolves once at
 > renderer construction; unpinned starts `Rich` and a one-way frame-time governor demotes to
-> `Floor` on a sustained miss, announced not silent; `--tier` / `LMV_TIER` / `[quality] tier` pin
+> `Floor` on a sustained miss, announced not silent; `--tier` / `RLX_TIER` / `[quality] tier` pin
 > it; captures and goldens pin `Floor` **by construction**, so every baseline stayed
 > byte-identical through the change. `Floor` is the pre-tier engine field for field.
 >
@@ -339,7 +339,7 @@ visually).
 ## Risks
 
 - **R1 touches every golden baseline** — the linear-light switch changes every rendered
-  pixel. Budget a deliberate re-bless with eyes on every scene, and remember `LMV_BLESS`
+  pixel. Budget a deliberate re-bless with eyes on every scene, and remember `RLX_BLESS`
   rewrites all baselines, not just the targeted one.
 - **The WARP software adapter's pipeline-count sensitivity** (the documented mis-render
   pressure against adding pipelines) is a live constraint on R1/R2/R3's test strategy —

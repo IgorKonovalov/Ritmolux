@@ -33,7 +33,7 @@ otherwise by accident.** `Renderer::new_headless` takes no tier argument and
 resolves `Floor` by construction (Plan 0044 / [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)),
 so there is no field a test can forget and no environment variable that can change
 what a baseline looks like. `shot` defaults to `floor` for the same reason and
-deliberately does **not** read `LMV_TIER`.
+deliberately does **not** read `RLX_TIER`.
 
 Two reasons, and both are load-bearing:
 
@@ -1056,7 +1056,7 @@ Highest precedence first:
 
 1. `--preset-file <path>` — one preset, parsed from that file.
 2. `--presets <dir>` — every `*.toml` in that directory.
-3. **`LMV_PRESET_DIR`** — the environment override
+3. **`RLX_PRESET_DIR`** — the environment override
    ([ADR-0014](adrs/0014-preset-dir-override-for-dev-iteration.md)).
 4. The per-user preset directory (`%APPDATA%\light-music-visualizer\presets` on
    Windows; see [`presets.md`](presets.md#where-preset-files-live)).
@@ -1079,7 +1079,7 @@ Point both surfaces at the repo's version-controlled `presets/` and edit a
 
 ```bash
 # Windows (PowerShell): the app reloads the edited file within ~150 ms
-$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release
+$env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release
 
 # ...and every shot in that shell reads the same folder
 cargo run -p standalone --example shot -- --preset "Whorl" --out shot.png
@@ -1095,12 +1095,12 @@ cargo run -p standalone --example shot -- --presets presets --preset "Whorl" --o
 cargo run -p standalone --example shot -- --preset-file presets/fragment_whorl.toml --out a.png
 
 # Metrics for the repo library rather than the seeded per-user copy
-LMV_PRESET_DIR=./presets cargo run -p standalone --example shot -- --report
+RLX_PRESET_DIR=./presets cargo run -p standalone --example shot -- --report
 ```
 
 The app hot-reloads an override folder but **never seeds** into it (it is yours,
 not ours), and `diagnostics.log` / `config.toml` stay under the per-user app
-directory. The foobar2000 plugin does not read `LMV_PRESET_DIR`.
+directory. The foobar2000 plugin does not read `RLX_PRESET_DIR`.
 
 ### Examples
 
@@ -1865,14 +1865,14 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
-| `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `LMV_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
-| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on WARP — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-WARP comparison is the check and this is the drift guard. Its own binary so `LMV_BLESS=1 … --test attractor_trails` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
+| `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `RLX_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
+| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on WARP — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-WARP comparison is the check and this is the drift guard. Its own binary so `RLX_BLESS=1 … --test attractor_trails` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
 | lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below. The swarm's and the lines' take a **fourth** capture at zero emitted light (Plan 0053 Phase 4), which turns the frame into a direct readout of alpha and widens the line guard's reach from 15 channels to the whole stroke footprint |
 | emitter burst (**in-crate**, `--lib`) | HARD (relative) | the emitter is the first scene whose **population** varies, so `emitter.rs`'s `a_spawn_rate_on_onset_bursts_and_then_idles` drives `emitter_onset.toml` through `capture_preset_over` with a silent lead, a six-frame transient and a second of silence, and asserts the frame is dark before, lit after, and dark again by the end. `capture_preset` cannot ask this: it holds one analysis frame for every step, so it can show that a binding is live but never that the shower **empties** when the transient passes ([ADR-0057](adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md)) |
 | `background_composite` | HARD (**hardware only**) | RD / attractor presents alpha-blend over the `bg_*` backdrop; **skipped** on a software adapter, which mis-renders that pipeline set. **The stated cause of that mis-render was identified and fixed by Plan 0053 Phase 3** — it was `background-bind-layout` colliding with `rd-init-layout` / `fragment-field-uniform-layout` ([ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)), and an explicit `min_binding_size` moved WARP onto the hardware numbers for the RD half (`087.612 165.165 156.168` hardware, against a bare layout's `087.543 064.538 …`). **Whether the skip can now be lifted is open and unmeasured**: the attractor half of this test is a different layout group and nothing probed it. The module docs here and in `background_composite.rs` still assert the quirk as live — do not read that as evidence it is, and do not lift the gate without rendering both halves on both adapters |
-| `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `LMV_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
+| `transition` | HARD | every switch path (cycle **and** select) renders intermediate blended frames as a ramp, reproducibly from the injected `dt`; each blend kind shows its own signature; a switch arriving mid-dissolve lands on the last index requested; a hot-reload mid-dissolve cancels cleanly; the heavy attractor ↔ reaction-diffusion pair dissolves on the freeze fallback (set `RLX_TRANSITION_STRIP=<dir>` to also dump filmstrips) |
 | `easing` | HARD | `[smoothing]` is observable: a scalar entry measures symmetric and an `{ attack, release }` pair does not, against purpose-built near-linear fixtures ([ADR-0039](adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md)). Also measures the `spectrum` `curve`↔easing **ordering** both ways round through one renderer — **every** frame count in the suite is gated on `segment_settled` first — the shared probe's window is 180 frames (3 s, 6 τ) because at 96 its own asymmetric arm was truncated, reading 61 where the settled answer is 69 |
 | `preset` | HARD | the expression evaluator and TOML schema: exact values, rejection without panic, **zero allocation** per eval, and the `PARAMS` ↔ `set_param` drift guard |
 | `dsp` / `ffi` / `hygiene` | HARD | known-signal analysis fixtures; the C ABI across the boundary; the hot-path panic pragma + exact dependency pinning |
@@ -2026,9 +2026,9 @@ Golden baselines live in `core/tests/golden/*.png` and are ordinary PNGs
 change:
 
 ```bash
-LMV_BLESS=1 cargo test -p lmv-core --test golden
-LMV_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselines
-LMV_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
+RLX_BLESS=1 cargo test -p lmv-core --test golden
+RLX_BLESS=1 cargo test -p lmv-core --test composite     # the post-stage baselines
+RLX_BLESS=1 cargo test -p lmv-core --test line_joints   # the joined-polyline baseline
 ```
 
 Only the first of those owns the per-`SystemKind` roster. Every
@@ -2277,7 +2277,7 @@ the `bg_bright = 0` rule above — and it moved when Plan 0051 landed, at mean
 gate cannot see a hairline. That is the argument for asserting the property
 directly rather than trusting a baseline to notice.
 
-> **`LMV_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
+> **`RLX_BLESS=1` is not scoped to the scene you changed** — it rewrites **every**
 > baseline the run touches. `git status` after blessing and `git checkout` the
 > baselines your change had no business moving; committing an incidental re-bless
 > silently retires the drift guard for that scene. (Learned the hard way in Plan

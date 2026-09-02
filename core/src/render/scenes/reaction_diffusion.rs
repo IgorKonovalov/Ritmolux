@@ -63,7 +63,10 @@ const MAX_SUBSTEPS: u32 = 40;
 /// Seeded initial-scatter blobs, and the uniform array's capacity.
 const SEED_BLOBS: usize = 30;
 const MAX_BLOBS: usize = 32;
-const SEED: u64 = 0x4C4D_565F_5244_5F31; // "LMV_RD_1"
+// ASCII bytes used as a number. Re-spelling them to match a renamed
+// prefix changes the seeded scatter and moves this scene's goldens, so
+// the value is opaque and stays as it is.
+const SEED: u64 = 0x4C4D_565F_5244_5F31;
 
 /// Parameter defaults — the "mitosis" Gray-Scott regime (Pearson's
 /// classification): spots that perpetually divide, so the field keeps

@@ -24,14 +24,14 @@
 //!
 //! # A separate test binary, for two reasons
 //!
-//! **Blessing.** `LMV_BLESS` is not scoped to a fixture. Adding this to
-//! `golden.rs`'s `EXTRA_FIXTURES` would mean `LMV_BLESS=1 … --test golden`
+//! **Blessing.** `RLX_BLESS` is not scoped to a fixture. Adding this to
+//! `golden.rs`'s `EXTRA_FIXTURES` would mean `RLX_BLESS=1 … --test golden`
 //! rewrites all 12 of that binary's baselines to add one, and three of those
 //! twelve (`lsystem`, `parametric_curve`, `star_pattern`) re-encode differently
 //! on this repository's dev box from a *clean* tree — so the diff would name
 //! files the change never touched, which is how an unrelated drift gets blessed
 //! in while someone reads it as noise. Its
-//! own binary means `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails`
+//! own binary means `RLX_BLESS=1 cargo test -p rlx-core --test attractor_trails`
 //! can reach nothing else. Same posture `line_joints.rs` documents.
 //!
 //! **Device state.** `composite.rs` keeps one stage per fixture and its own
@@ -101,7 +101,7 @@ fn capture() -> Option<CaptureImage> {
 
 /// The scene's own accumulation and the engine stage's, composited and pinned.
 ///
-/// `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites this
+/// `RLX_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites this
 /// baseline and — because this is its own binary — can reach no other.
 #[test]
 fn the_attractor_over_the_trails_stage_matches_its_baseline() {
@@ -128,7 +128,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
          nothing, so this capture pins neither the scene nor the stage over it"
     );
 
-    if std::env::var_os("LMV_BLESS").is_some() {
+    if std::env::var_os("RLX_BLESS").is_some() {
         common::encode(&fresh, &path);
         println!("blessed {}", path.display());
         return;
@@ -136,7 +136,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
 
     assert!(
         path.exists(),
-        "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails`",
+        "missing baseline {} — run `RLX_BLESS=1 cargo test -p rlx-core --test attractor_trails`",
         path.display()
     );
     let baseline = common::decode(&path);
@@ -149,7 +149,7 @@ fn the_attractor_over_the_trails_stage_matches_its_baseline() {
         mean <= MEAN_TOL && outlier <= MAX_OUTLIER,
         "{STEM}: mean {mean:.4} / outlier {outlier} exceeds tolerance — the \
          attractor, the trails stage, or the seam between them has moved. Bless \
-         with LMV_BLESS=1 only if intended"
+         with RLX_BLESS=1 only if intended"
     );
 }
 

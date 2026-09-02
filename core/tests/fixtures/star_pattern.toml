@@ -14,7 +14,7 @@
 # analytic cosine to ADR-0021's 256-entry bake of that same cosine, worth at
 # most one 8-bit level per channel.
 #
-# The golden was therefore re-run WITHOUT `LMV_BLESS` and passed. Nothing was
+# The golden was therefore re-run WITHOUT `RLX_BLESS` and passed. Nothing was
 # blessed and no PNG under tests/golden/ was rewritten during Plan 0054.
 system = "star_pattern"
 name   = "fixture_star_pattern"

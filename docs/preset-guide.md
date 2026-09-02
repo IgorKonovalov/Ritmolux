@@ -297,15 +297,15 @@ that flickers. It is documented in [`presets/README.md`](../presets/README.md), 
 
 The loop is: point both the app and the capture tool at the same folder, edit, look.
 
-**Live, in the window.** `LMV_PRESET_DIR` overrides the seeded per-user preset directory, and the
+**Live, in the window.** `RLX_PRESET_DIR` overrides the seeded per-user preset directory, and the
 app polls it every ~150 ms:
 
 ```sh
-LMV_PRESET_DIR=./presets cargo run -p standalone --release
+RLX_PRESET_DIR=./presets cargo run -p standalone --release
 ```
 
 ```powershell
-$env:LMV_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerShell
+$env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # PowerShell
 ```
 
 Save a file and the change is on screen without a restart. **Editing a file in `presets/` without

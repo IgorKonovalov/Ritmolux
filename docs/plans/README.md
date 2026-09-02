@@ -374,7 +374,7 @@ build is no longer a reason to keep a finished worktree around.
 > was for. The `WORK/lmv-plan-0087` worktree is stale from here on — take a fresh lane.
 
 **The one rule these two lanes need, and it is not obvious.** Both end at the golden corpus — Lane A
-adds a baseline, Lane B re-blesses 28 — and `LMV_BLESS` rewrites every baseline the run renders, not
+adds a baseline, Lane B re-blesses 28 — and `RLX_BLESS` rewrites every baseline the run renders, not
 only the intended ones. Worktrees keep that isolated while the lanes are live, so the collision is at
 **merge**, not at bless: **[0087] merges `main` and re-blesses only after [0110]'s baseline is on
 `main`** — which it now is, as of 2026-08-19 — then checks its diff carries only its own 28. Taken
@@ -782,7 +782,7 @@ session), then 0079** (largest, two `human` curation gates).
 
 Kept here after [0053]'s close because it is not that plan's property — it applies to every plan
 that could move a render. **Do not `git diff` the committed baselines.** On this box **eight
-baselines drift from their committed bytes under `LMV_BLESS`** (`composite_bloom`, `composite_kaleido`,
+baselines drift from their committed bytes under `RLX_BLESS`** (`composite_bloom`, `composite_kaleido`,
 `composite_overlap`, `composite_trails`, `line_joint_zigzag`, `lsystem`, `parametric_curve`,
 `star_pattern`), so a naive diff convicts eight files the change never touched. Bless every binary
 in scope (`--test golden --test composite --test line_joints --test attractor_trails`) and compare
@@ -879,10 +879,10 @@ the rows above.
   (`composite_bloom_exposed.toml` is now the suite's only `exposure`-binding fixture), so the same
   reasoning cannot be reused unchecked. **[0071] has now closed and its claim held too, but it was
   the check rather than the arithmetic that established it**: the default at literal `1.0` was the
-  argument, and what was run was an `LMV_BLESS` on the change re-encoding all 19 baselines
-  hash-identical to an `LMV_BLESS` on clean `main`. That is the form to reuse — a bless-against-a-
+  argument, and what was run was an `RLX_BLESS` on the change re-encoding all 19 baselines
+  hash-identical to an `RLX_BLESS` on clean `main`. That is the form to reuse — a bless-against-a-
   control, not a diff against the committed files, because three baselines on this machine
-  (`lsystem`, `parametric_curve`, `star_pattern`) drift from their committed bytes under `LMV_BLESS`
+  (`lsystem`, `parametric_curve`, `star_pattern`) drift from their committed bytes under `RLX_BLESS`
   on clean `main` too, and a naive diff would have convicted the change of moving them.
 
 
@@ -1008,7 +1008,7 @@ the rows above.
   live, and exactly one shipped preset binds `exposure` today (`lsystem_vellum.toml:60`).
 - **The banding reference frame is kept in the repo, and its second check is now due**
   (2026-08-12). `core/tests/fixtures/scratch-0082/dusk_ground_banding.toml` — a `scratch-NNNN/` in
-  the [0046] arrangement, so nothing includes it, no test names it and `LMV_BLESS` does not touch
+  the [0046] arrangement, so nothing includes it, no test names it and `RLX_BLESS` does not touch
   it. It is the dusk ground at `bg_ramp_gamma = 0.4`: the darkest of the Plan 0080 probes **and**
   the worst banding case, both for the same reason — a fast-dropping ramp leaves a long dim tail,
   and a flat tail is where one 8-bit level lasts longest. It is committed rather than left in a
