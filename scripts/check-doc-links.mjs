@@ -15,10 +15,10 @@
 // `root` scans some other directory — used to run this against the committed
 // fixture tree (Plan 0084 Phase 1 built the argument, Plan 0093 Phase 1 finally
 // committed the tree): `node scripts/check-doc-links.mjs scripts/fixtures`
-// expects exit 1 and exactly three breaks, one per class below. CI and the
-// pre-push hook pass nothing and get the repo.
+// expects exit 1 and exactly five breaks, across the four classes below. CI and
+// the pre-push hook pass nothing and get the repo.
 //
-// Three break classes, and the first is the only one this script had until
+// Four break classes, and the first is the only one this script had until
 // Plan 0084. Markdown has two link forms and checking one of them was a green
 // light over 85 broken links of the other:
 //
@@ -26,6 +26,7 @@
 //   2. definition   [label]: target         — target must exist
 //   3. use          [label] / [text][label] — the file must define `label`,
 //                                             or it renders as literal brackets
+//   4. backlog      ](design-backlog.md#…)  — the fragment form is prohibited
 //
 // Class 3 is what a close ceremony breaks when it moves link-dense prose between
 // files: the *uses* travel with the paragraph and the *definitions* stay behind
@@ -37,6 +38,23 @@
 // fragments, not external URLs (which would make this a network call and a
 // flake).
 //
+// ONE FRAGMENT IS REJECTED OUTRIGHT, as a fourth break class (ADR-0149). A link
+// into docs/design-backlog.md or its archive keeps resolving to a file that
+// exists after the close ceremony moves an entry's body from the one to the
+// other, so this script reported 87 such references clean — every one of them
+// landing at the top of a 280 KB document instead of at the entry. The anchor is
+// the part that rots and the number is not: an entry's heading text IS its
+// anchor, headings get reworded, and the ledger row that replaces an archived
+// body carries the number but not the old heading, so even a fragment checker
+// would only convert silent rot into loud rot at every close. The form is
+// therefore prohibited rather than validated — `[backlog 0072](../design-backlog.md)`,
+// or in prose that already links the file, the bare number. Same answer ADR-0127
+// reached one level down for `.rs` comments: a reference whose form cannot be
+// checked is replaced by one that cannot break.
+//
+// This is NOT a general fragment checker, and ADR-0149 records that it made one
+// less likely. Every other `#anchor` in the repository stays unchecked.
+//
 // Code is skipped — fenced blocks and inline spans alike — because a document
 // that *describes* link syntax is not making a link. This file's own prose in
 // the architect skill was the first false positive.
@@ -44,6 +62,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
@@ -64,14 +83,62 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // tree has to name itself on this list.
 const SEEDED_TREES = new Set([resolve(REPO_ROOT, "scripts", "fixtures")]);
 
-/** Every `.md` file in the repo, as paths relative to the repo root. */
-function markdownFiles(dir = REPO, found = []) {
+/** Whether an absolute path sits inside a seeded tree that is not the scan root. */
+function inSeededTree(abs) {
+  for (const tree of SEEDED_TREES) {
+    if (REPO === tree || REPO.startsWith(tree + sep)) continue; // the root is that tree
+    if (abs === tree || abs.startsWith(tree + sep)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every `.md` file the REPOSITORY holds under the root, as relative paths.
+ *
+ * ENUMERATED FROM GIT for the same reason check-comment-hygiene.mjs is: a
+ * filesystem walk cannot tell code we own from code sitting in the working tree
+ * that git ignores, so a gitignored vendored README is absent from CI's fresh
+ * clone and present in every working tree — CI green by construction, the local
+ * push blocked, with a diagnostic pointing at files nobody here wrote. This gate
+ * was green only because neither vendored tree happened to carry a
+ * relative-linked `.md`, which is luck rather than a property: seeding one
+ * `.venv/pkg/README.md` with two relative links reports both and exits 1.
+ *
+ * The consequence is the same one: a markdown file git has never seen is not
+ * checked, and at push time — the only time this runs — that window is a file
+ * created and not yet added.
+ *
+ * Falls back to the filesystem walk when git cannot answer, and says so, rather
+ * than reporting a set it did not measure (ADR-0016).
+ */
+function markdownFiles() {
+  try {
+    const out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: REPO,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const found = [];
+    for (const path of out.split("\0")) {
+      if (!path || !path.endsWith(".md")) continue;
+      if (inSeededTree(resolve(REPO, path))) continue;
+      found.push(path);
+    }
+    return { files: found, source: "git" };
+  } catch {
+    return { files: walk(), source: "filesystem" };
+  }
+}
+
+/** The pre-git enumeration, kept as the fallback for a tree git cannot answer for. */
+function walk(dir = REPO, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      markdownFiles(full, found);
+      walk(full, found);
     } else if (entry.name.endsWith(".md")) {
       found.push(relative(REPO, full));
     }
@@ -82,6 +149,13 @@ function markdownFiles(dir = REPO, found = []) {
 // `](target)` where target is not a URL, a mailto:, or a bare `#anchor`.
 // The target runs to the first `)`, `#`, or whitespace.
 const LINK = /\]\((?!https?:|mailto:|#)([^)#\s]+)/g;
+
+// The one prohibited fragment, in both link forms. Matched on the filename
+// rather than on a resolved path, because the offending link is offending
+// wherever it points from and the target need not exist for the form to be
+// wrong. The `#` is required: dropping it is the whole repair.
+const BACKLOG_FRAGMENT = /\]\(([^)\s]*design-backlog(?:-archive)?\.md)#([^)\s]*)\)/g;
+const BACKLOG_FRAGMENT_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*([^\s]*design-backlog(?:-archive)?\.md)#(\S*)/;
 
 // A link reference definition: up to three spaces, `[label]:`, then the target.
 // An optional `"title"` may follow, which is why the target is one token.
@@ -108,7 +182,7 @@ const isRelativeTarget = (t) => !/^(https?:|mailto:|#)/.test(t);
  * to hold brackets. A label nothing anywhere defines was never a link.
  */
 function collect() {
-  const files = markdownFiles();
+  const { files, source: enumeration } = markdownFiles();
   const parsed = new Map(); // file -> { definitions: Map, uses: [], inline: [] }
   const known = new Set(); // every label defined anywhere in the tree
 
@@ -118,6 +192,7 @@ function collect() {
     const definitions = new Map(); // label -> { line, target }
     const uses = [];
     const inline = [];
+    const fragments = [];
     let inFence = false;
 
     lines.forEach((raw, i) => {
@@ -138,6 +213,15 @@ function collect() {
           /* leave it as written */
         }
         inline.push({ line: i + 1, target, written: m[1], base });
+      }
+
+      BACKLOG_FRAGMENT.lastIndex = 0;
+      for (const m of line.matchAll(BACKLOG_FRAGMENT)) {
+        fragments.push({ line: i + 1, target: m[1], fragment: m[2] });
+      }
+      const fragDef = line.match(BACKLOG_FRAGMENT_DEFINITION);
+      if (fragDef) {
+        fragments.push({ line: i + 1, target: fragDef[2], fragment: fragDef[3] });
       }
 
       const def = line.match(DEFINITION);
@@ -161,16 +245,16 @@ function collect() {
       }
     });
 
-    parsed.set(file, { definitions, uses, inline });
+    parsed.set(file, { definitions, uses, inline, fragments });
   }
 
-  return { parsed, known };
+  return { parsed, known, enumeration };
 }
 
-const { parsed, known } = collect();
+const { parsed, known, enumeration } = collect();
 const broken = [];
 
-for (const [file, { definitions, uses, inline }] of parsed) {
+for (const [file, { definitions, uses, inline, fragments }] of parsed) {
   const show = file.split(sep).join("/");
 
   for (const { line, target, written, base } of inline) {
@@ -181,15 +265,24 @@ for (const [file, { definitions, uses, inline }] of parsed) {
 
   for (const [label, { line, target, base }] of definitions) {
     if (!isRelativeTarget(target)) continue;
-    let decoded = target;
+    // A definition's target runs to whitespace, so it carries any `#fragment`
+    // with it; the inline form's regex stops at the `#`. Strip it here so the
+    // two forms answer the same question — this class is "does the FILE exist",
+    // and without the strip an anchored definition is reported as a missing
+    // path, which names the wrong defect and reports one line twice.
+    let decoded = target.split("#")[0];
     try {
-      decoded = decodeURIComponent(target);
+      decoded = decodeURIComponent(decoded);
     } catch {
       /* leave it as written */
     }
-    if (!existsSync(resolve(base, decoded))) {
+    if (decoded !== "" && !existsSync(resolve(base, decoded))) {
       broken.push(`${show}:${line} -> [${label}]: ${target}`);
     }
+  }
+
+  for (const { line, target, fragment } of fragments) {
+    broken.push(`${show}:${line} -> ${target}#${fragment} (a backlog reference carries no fragment)`);
   }
 
   const reported = new Set();
@@ -203,8 +296,17 @@ for (const [file, { definitions, uses, inline }] of parsed) {
   }
 }
 
+if (enumeration !== "git") {
+  console.log(
+    "note: git could not list this tree, so the file set came from a filesystem\n" +
+      "      walk. That set includes anything gitignored sitting in the working\n" +
+      "      tree — a vendored README, a virtualenv — whose links are not ours to\n" +
+      "      judge and which no checkout contains.",
+  );
+}
+
 if (broken.length === 0) {
-  console.log("doc links: OK (every relative markdown link resolves)");
+  console.log(`doc links: OK (every relative markdown link in ${parsed.size} tracked files resolves)`);
   process.exit(0);
 }
 
@@ -221,6 +323,17 @@ console.error(
     "\n" +
     "`[label] (no definition in this file)` is the third class: the use travelled\n" +
     "to another file and its `[label]: target` definition stayed behind. Copy the\n" +
-    "definition into this file — markdown scopes them per document.",
+    "definition into this file — markdown scopes them per document.\n" +
+    "\n" +
+    "`(a backlog reference carries no fragment)` is the fourth class, and it is a\n" +
+    "form rule rather than a resolution failure (ADR-0149): the target exists,\n" +
+    "which is why 87 of these read clean. Drop the `#...` and keep the number:\n" +
+    "  [backlog 0072](../design-backlog.md)\n" +
+    "or, where the file is already linked in the same breath, just `backlog 0072`.\n" +
+    "An entry's heading IS its anchor, and the close ceremony moves the body to\n" +
+    "design-backlog-archive.md leaving a ledger row that carries the number and\n" +
+    "not the heading — so the anchor is the half that cannot survive. Every other\n" +
+    "`#anchor` in this repository stays unchecked; this is one prohibited form,\n" +
+    "not a fragment checker.",
 );
 process.exit(1);

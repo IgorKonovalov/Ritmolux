@@ -1,9 +1,18 @@
 # 0136 — The gates can convict
 
-> **Status:** approved
+> **Status:** done — closed 2026-09-02. Ten phases in thirteen commits (`df9b7a1`..`93e40bb`), plus
+> `53e5aa1` for the one review blocker. Review: **one blocker, two majors, two minors, one nit.**
+> The blocker was `clippy -D warnings` failing on Phase 9's new test helper while the close block
+> reported it clean — the plan's own subject, caught by re-running the gate rather than reading it.
+> Every done-when was verified by execution: the backlog 0104 mutation now collapses `--self-test`
+> to 1/10, a bullet seeded into the active-plans table region is reported at its own line, a
+> present-but-untracked probe path is named as such, a gitignored `.venv/` is invisible to two
+> gates, and a thirteenth `SystemKind` fails a check that runs in 8 ms with no GPU. Full suite green
+> on the merged branch. Version: **0.100.1** (patch — five gates, one test helper, one packaging
+> script and twelve images; no engine, app or C ABI change).
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (proposed)
+> **Related ADRs:** [0149](../../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (accepted)
 > **Closes:** design-backlog 0104, 0143, 0162, 0127, 0133, **0166, 0170, 0171, 0173**.
 > **0160 and 0161 are corrected in place, not closed** — see Phase 8.
 >
@@ -28,14 +37,14 @@ fixture that makes `check-index-rows.mjs` exit 1 on demand.
 
 ## Context & problem
 
-[ADR-0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)'s whole argument is
+[ADR-0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)'s whole argument is
 that **a rule nothing re-runs is a rule nobody follows**. The corollary this plan addresses is
 sharper: *a check that re-runs and cannot fail is the same rule wearing a green tick.*
 
 That failure has now been found and repaired twice —
-[Plan 0084](done/0084-two-gates-stop-lying-about-what-they-check.md) found the link checker covering
+[Plan 0084](0084-two-gates-stop-lying-about-what-they-check.md) found the link checker covering
 one of markdown's two link forms, and
-[Plan 0094](done/0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name skip
+[Plan 0094](0094-the-two-doc-gates-check-what-they-claim-to.md) found a directory-name skip
 swallowing a real tree plus a whole half of ADR-0108's rule invisible to a bullet-driven check. Both
 gates now ship fixtures expecting **exit 1 with an exact break count**. `check-index-rows.mjs` is the
 one of the three that was never given that treatment, and its fixture asserts exit 0 — a choice
@@ -60,7 +69,7 @@ increasing order of how much judgement they need. Phases 1-2 give `check-index-r
 backlog 0104 names — they are explicitly not exclusive, the `--self-test` covers the demonstrated
 mutation and the red fixture covers the reporting path that nothing currently runs. Phase 3 gives the
 same gate the *shape* check it has never had. Phase 4
-implements [ADR-0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md). Phase 5
+implements [ADR-0149](../../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md). Phase 5
 teaches the claim gate to ask git whether a probe path is tracked, and to stop destroying a probe's
 own spacing on the way in. Phase 6 takes the figure gate's
 untracked-file complaint as an advisory rather than an exit code, and Phase 7 makes two gates judge
@@ -157,7 +166,7 @@ flowchart TB
 ### Phase 4 — Backlog references stop using fragments
 - **Owner skill:** dev
 - **What:** Close backlog 0143. Implement
-  [ADR-0149](../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md): rewrite all 24
+  [ADR-0149](../../adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md): rewrite all 24
   anchored references to the bare-number-plus-file-link form, and teach `check-doc-links.mjs` to
   reject a `design-backlog.md#…` or `design-backlog-archive.md#…` fragment.
 - **Files touched:** `scripts/check-doc-links.mjs`, plus roughly 20 files under `docs/adrs/` and
@@ -264,8 +273,8 @@ flowchart TB
   `packaging/macos/bundle.sh`, `renders/README.md`.
 - **Notes for the implementer:**
   - **Read this before editing.** Both entries were filed 2026-08-29 against
-    [ADR-0141](../adrs/0141-one-artifact-store-serves-every-lane.md)'s shared store, and
-    [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked
+    [ADR-0141](../../adrs/0141-one-artifact-store-serves-every-lane.md)'s shared store, and
+    [ADR-0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) revoked
     that store the same day. Entry 0160's stated defect — *"a `target/` inside the worktree that no
     redirect reaches"* — **no longer holds**: with each lane writing to its own `target/`,
     `repo_root().join("target")` is the build tree again and the doc comment it convicts is correct.
@@ -297,7 +306,7 @@ flowchart TB
 - **Notes for the implementer:**
   - The guard is **not** the bug — it is doing exactly what its comment says and it caught exactly
     what it was built for. What failed is the cadence: the only thing that executes it is a human at
-    a close, and [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)
+    a close, and [ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md)
     deliberately keeps the *rendering* out of CI because renders are not byte-reproducible.
   - **The cross-check is pure text.** It reads the manifest and `schema.rs` and needs no GPU, so it
     can fail on the commit that ships a scene instead of silently disabling the sweep for eleven
@@ -365,34 +374,165 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0136-the-gates-can-convict` in `WORK/lmv-plan-0136`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The row gate asserts its own counts | dev | not started | |
-| 2 — A seeded tree the row gate rejects | dev | not started | |
-| 3 — The row gate reads a row's shape | dev | not started | |
-| 4 — Backlog references stop using fragments | dev | not started | |
-| 5 — A probe path is checked against the repository | dev | not started | |
-| 6 — The figure gate stops convicting untracked files | dev | not started | |
-| 7 — The gates judge the code this project wrote | dev | not started | |
-| 8 — Two entries whose premise the store revocation falsified | dev | not started | |
-| 9 — The image sweep runs again | dev | not started | |
-| 10 — What the pictures are of | human | not started | |
+| 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
+| 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
+| 3 — The row gate reads a row's shape | dev | done | `8986147` |
+| 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
+| 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
+| 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
+| 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
+| 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
+| 9 — The image sweep runs again | dev | done | `a87983a`, `7b9a1ae` |
+| 10 — What the pictures are of | human | done | `93e40bb` |
 
 ### Notes
 
+- **Phase 1's `--self-test` is wired into the call sites in Phase 2, not Phase 1.** Phase 1's file
+  list is the script and the fixtures README; `.githooks/pre-push` and the CI `links` job are named
+  in Phase 2's. Both invocations land together there.
+- **Phase 3 takes the region's kind from the MAJORITY of its rows, not from its first measured
+  row.** Backlog 0166's "What a fix looks like" and this plan's Phase 3 both name first-row
+  inference. Measured against the instance the entry itself records - a closed-plan bullet seeded
+  immediately under `roster:begin` and above the table header in `docs/plans/README.md`, which is
+  where the real one landed - first-row inference reports **14 breaks, none of them the stray row**,
+  because the stray row is the one it adopts as the region's form. The majority rule reports one:
+  `docs/plans/README.md:27  a bullet row in a table region (expected a table row; 14 of the 15 rows
+  in this region have that form)`. A region split evenly has no majority, so it is reported once at
+  its own opening line rather than at a guessed row; `index-rows-red/` seeds that case too.
+- **Phase 4 re-derived the set as 87 links across 29 files**, against the plan's *"roughly 20 files
+  under `docs/adrs/` and `docs/plans/done/`"* and ADR-0149's 24, which is a count of distinct entry
+  NUMBERS rather than of sites. Ten occurrences survive and are all inline code spans in prose that
+  describes the retired form - `.claude/skills/architect/SKILL.md:550`, ADR-0149's own Context and
+  Decision, backlog 0143's body, this plan, and two closed plans.
+- **Phase 4 also repaired an asymmetry the new fixture exposed.** `check-doc-links.mjs`'s inline
+  regex stops at the `#` and its DEFINITION regex ran the target to whitespace, so a `[label]:
+  target#anchor` definition was resolved as a path CONTAINING the fragment and reported as a
+  missing file. No such definition existed in the tree, which is why it was green. Seeding class 4
+  in both link forms produced two findings on one line; the definition target now drops its
+  fragment before the existence check, so both forms answer the same question.
+- **`scripts/check-backlog-claims.mjs` held a NUL byte on `main`**, in the advisory's dedup key
+  (`${probe.entry}` NUL `${probe.path}`, where a space was meant). git classified the file as
+  binary, so `git diff` printed nothing for it and `grep` skipped it. Replaced with a space in this
+  phase's commit, since the file is Phase 5's own and the defect makes the gate undiffable. Not
+  found by a gate - found by `grep` refusing to search it.
+- **The plan's *"must still report its 10 findings"* was 12 before this phase and is 13 after.**
+  Plan 0144 added `seeded-literal.rs` with two, and 0173's unrejoined seed adds the third. The
+  fixture README carried 12 and was the accurate number; the plan and backlog 0170 both quote 10.
+- **`check-doc-links.mjs` got the enumeration rather than a note**, which is the half of Phase 7's
+  done-when that permitted either. Not on principle: seeding `.venv/pkg/README.md` with two
+  relative links made it report both and exit 1, so the sibling shares the defect outright and was
+  green only because neither vendored tree happened to carry a relative-linked `.md`.
+- **0173's first probe still holds while its claim no longer does.**
+  `present: text\.includes.{0,40}return null` asserts the newline exclusion is *"still
+  unconditional and still ahead of the run check"*. The early return is still in the source, so the
+  probe matches; the new continuation-indent arm now runs **before** it, so the claim is false.
+  Green here means the reduction still matches the tree, which is what the gate's own header says.
+- **Phase 8's `renders/README.md` resolution was not taken, and the reason is this plan's own
+  subject.** `renders/` is gitignored in full (`.gitignore:54`), so that README is untracked: a line
+  in it is absent from every checkout, reaches no reader, and cannot be committed - the same shape
+  Phase 5 taught the claim gate to reject one entry earlier. Recorded in backlog 0161 itself
+  instead, which is tracked and is where the roster lives. Raised with the user, who chose that.
+- **Phase 8's *"the claim gate exits 0"* is met for 0160 and 0161 and not for the gate overall.**
+  Both entries' probes are re-pointed at the repaired code and hold. Seven probes remain red across
+  the five entries this plan CLOSES - they were written to go red on delivery, and archiving them is
+  the close ceremony's act. Raised with the user, who chose that reading.
+- **Phase 9: `warp_mesh` ships four presets, so no placeholder was left.** Backlog 0133 and the plan
+  both state the family ships none; `warp_cauldron`, `warp_millrace`, `warp_sirocco` and
+  `warp_wellhead` all carry `system = "warp_mesh"`. All four were shot at hop 300 and compared;
+  the slot took **wellhead**, marked UNJUDGED in the manifest, and Phase 10 is where that is
+  confirmed or swapped. **Observation for that phase:** the family is soft throughout - a warp field
+  has no edges of its own - so the four differ in whether a subject survives at gallery size.
+  Wellhead keeps one (a dark star aperture against teal, its feeding ring reading as depth);
+  cauldron held the slot first and is a symmetric bloom with no hard edge anywhere in it; millrace
+  is a single crescent on black; sirocco reads as an abstract horizontal gradient. The three
+  alternates are rendered at `scratchpad/warp-candidates/` for a side-by-side.
+- **Phase 9: four manifest provenance comments said "the only X preset" and none was true.**
+  lsystem ships 5, star_pattern 4, spectrum 5, emitter 5 - every family now ships several, so the
+  manifest's *"Four families have exactly one preset and choose themselves"* was false before this
+  phase and is falsified further by the three additions. Marked UNJUDGED with their counts rather
+  than re-picked, which is a content call.
+- **Phase 9: `docs/preset-guide.md` still carries three `— no picture yet` headings**, one per
+  new system, and each body says *"the gallery predates them, so there is no image here"*. That is
+  now false. The file is in no phase's `Files touched` list - not Phase 9's and not Phase 10's - so
+  it was left alone. It is the one place a reader meets these pictures.
+- **Phase 9: six committed images moved and four did not.** `lsystem`, `parametric_curve`,
+  `spectrum`, `star_pattern` are the four backlog 0133 predicted - Plan 0114 moved the line stroke's
+  default `softness` - plus `swarm` and `preset-minimal`. `hero`, `fragment_field`,
+  `reaction_diffusion`, `attractor`, `emitter` and the five walkthrough steps re-rendered
+  byte-identically on this machine.
+- **`check-backlog-claims.mjs --self-test` is wired into no call site at all.** Phase 1's note holds
+  it up as the model to follow and as the thing that must be wired *"or it is a mechanism nobody
+  runs, which is the defect being repaired"*. Grepped 2026-09-01 across `.githooks/`, `.github/` and
+  `.claude/`: the string `self-test` appears in none of them. Not acted on - it is outside every
+  phase's file list.
+
+- **Phase 10's decision, and the thing that made it a real choice.** A fifth
+  `warp_mesh` world - `presets/warp_smoke.toml`, a rising plume - was authored and
+  shipped **on `main`** during this phase, so the slot was judged against five
+  candidates rather than four. It was NOT taken: the smoke plume is a better picture
+  of *smoke* than `warp_wellhead` is, but wellhead is the better picture of the
+  *family*, which is what a gallery slot is for. The preset is independent of this
+  plan and is not on this branch; `presets/` is still untouched here.
+
+- **The close block's clippy claim below was false when it was written, and is repaired here.**
+  `cargo clippy --workspace --all-targets -- -D warnings` exits 1 on `collapsible_if` at
+  `core/tests/hygiene.rs:608`, the nested `if let` / `if` inside `system_names`. That function is
+  Phase 9's own (`a87983a`) and the shape is already present at `deca944`, the commit that recorded
+  the claim - so the claim did not go stale, it was never true. `main` has never carried the
+  function, so the merge at `332a99e` is not implicated and `main` is not red. Collapsed into an
+  edition-2024 let-chain, which is the lint's own suggestion and changes no behaviour; the four
+  Node gates, `cargo fmt --all --check` and the full suite are green at the tip.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no. `git diff --name-only main..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** design-backlog 0104, 0143, 0162, 0127, 0133, 0166, 0170, 0171, 0173
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only, plus one feature. The feature is `check-index-rows.mjs`'s shape check
+  (Phase 3), a class of break the gate could not report before. Everything else repairs an existing
+  instrument or a path: five gates, one test helper, one packaging script, twelve gallery images.
+  No engine code, no C ABI, no preset content.
+- **Operator docs touched:** `docs/images/gallery/` — three images added (`shape_field`,
+  `warp_mesh`, `shape_collage`), six re-shot (`lsystem`, `parametric_curve`, `spectrum`,
+  `star_pattern`, `swarm`, `preset-minimal`). `docs/preset-guide.md` is **not** touched and still
+  carries three `— no picture yet` headings that are now false; see the Notes.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, 11 broken**, across the
+  six entries this plan closes — 0104, 0133, 0162, 0170, 0171, 0173. Every one was written to go red
+  on delivery. 0160's and 0161's probes were re-pointed by Phase 8 and hold; no other entry moved.
+  The gate's `--self-test` is 13 of 13.
+- **Full suite:** `cargo nextest run --workspace` — **exit 0**, 1503 passed, 5 skipped, 12 slow.
+  Run 2026-09-02 on the development machine at the current tip, which is `main` merged in plus the
+  clippy repair. `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D
+  warnings` are clean at that tip. The earlier reading recorded here — exit 0, 1500 passed, 5
+  skipped, 15 slow, 2026-09-01 after the last phase's commit — was accurate for nextest and **wrong
+  about clippy**; see the last bullet in the Notes. No wall-time figure is given for either run:
+  two sibling lanes exist and neither run was proved to have the machine to itself.
+- **Outstanding `human` phases:** none. Phase 10 was taken 2026-09-01: the twelve
+  gallery images were opened and looked at, and `warp_mesh`'s slot was confirmed on
+  `warp_wellhead` rather than swapped. Its provenance line in the manifest now records
+  that verdict instead of the UNJUDGED marker `dev` left.
 
 ## Followups (after this lands)
 
 - Whether the remaining three Node gates need the `git ls-files` enumeration Phase 7 gives one of
-  them.
+  them. Phase 7 answered it for `check-doc-links.mjs` by giving it the enumeration - the defect was
+  real there, demonstrated - and `check-filter-figures.mjs` reaches the same end by the advisory
+  route. What is left is `check-index-rows.mjs` and `check-backlog-claims.mjs`.
+- **`docs/preset-guide.md` owes three sections a picture.** Its `shape_field`, `warp_mesh` and
+  `shape_collage` headings still read `- no picture yet` and each body says the gallery predates the
+  system, which stopped being true at Phase 9. Alt text has to be written against the rendered
+  images, so it is content work, and the file is in no phase's `Files touched` list.
+  **Taken at the close** (2026-09-02, review finding): all three now carry their gallery image, its
+  preset name and alt text written against the render, and the section-2 preamble no longer says
+  three of twelve have no picture. `warp_mesh`'s body additionally claimed it was *"the only system
+  with no shipped preset, so there is nothing to photograph"* — false twice over.
+- **`check-backlog-claims.mjs --self-test` still runs at no call site**, which is the one thing this
+  plan argued about and did not do to itself. Phase 1's notes hold that self-test up as the model to
+  follow *and* as the thing that must be wired *"or it is a mechanism nobody runs, which is the
+  defect being repaired"*; the sibling gate got both invocations in Phase 2 and this one got none.
+  Grepped at the close across `.githooks/`, `.github/` and `.claude/`: the string `self-test`
+  appears in none of them for this gate. It is one line in each of two files, and it is the exact
+  shape of backlog 0104 — a bite check that exists and is never executed.

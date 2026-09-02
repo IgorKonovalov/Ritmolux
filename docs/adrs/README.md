@@ -7,11 +7,11 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0162.** *(0120 was reserved for
+**Next free number: 0163.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
-sidecar ADR renumbered to 0122 at its close. The sequence is dense again and nothing is held.)*
+sidecar ADR renumbered to 0122 at its close. **0160 was then claimed twice as well**, on 2026-09-01 by Plan 0149's lane and on 2026-09-02 by Plan 0150 in the main checkout; 0160 stayed with Plan 0149, whose number is cited from Rust doc comments, and the rename ADR took 0162 at Plan 0149's close. The sequence is dense again and nothing is held.)*
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -170,7 +170,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115), Outcome, refines 0125 |
 | [0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) | The shared artifact store is revoked, and the linker stays | accepted 2026-08-30 (Plan 0134), Outcome, supersedes 0141 in part |
 | [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | accepted 2026-08-30 (Plan 0135) |
-| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | proposed 2026-08-29 (Plan 0136), extends 0127 |
+| [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | accepted 2026-09-02 (Plan 0136), extends 0127, Outcome |
 | [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | accepted 2026-09-01 (Plan 0137), Outcome |
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
@@ -183,4 +183,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | proposed 2026-09-01 (Plan 0148), amends nfr.md 4 |
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | proposed 2026-09-01 (Plan 0149 Phase 2a), supersedes the metric half of 0041, unblocks 0158 |
 | [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | proposed 2026-09-02 (Plan 0149 Phase 2), falsifies 0130's default floor arm |
+| [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | proposed 2026-09-02 (Plan 0150) |
 <!-- roster:end -->

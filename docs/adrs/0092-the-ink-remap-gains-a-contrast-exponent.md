@@ -5,7 +5,7 @@
 > was falsified; two implementation decisions the decision did not specify are recorded there.
 > **Date:** 2026-08-11
 > **Related plan(s):** [0078](../plans/done/0078-the-ink-learns-to-bite.md)
-> **Resolves:** [design-backlog 0084](../design-backlog.md#0084--the-ink-stage-has-no-contrast-lever-and-three-worlds-in-two-cohorts-paid-for-it)
+> **Resolves:** [design-backlog 0084](../design-backlog.md)
 > **Supplements:** [ADR-0028](0028-final-stage-ink-tone-remap.md) (the ink stage)
 
 ## Context
