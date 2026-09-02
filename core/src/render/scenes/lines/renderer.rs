@@ -66,12 +66,12 @@ pub const MITER_LIMIT: f32 = 4.0;
 /// Both `width / sin(theta / 2)` and the clamp `MITER_LIMIT * width` scale
 /// linearly, so `miter(c * w) == c * miter(w)` and the clamp cannot be engaged
 /// at one width and not another. That is what lets the cached producers compute
-/// this against [`PLACEHOLDER_WIDTH`](super::PLACEHOLDER_WIDTH) at `configure`
-/// and have [`LineInstance::styled`](super::LineInstance::styled) carry it to
-/// this frame's width by the ratio. `theta` survives that too: every transform
-/// between a producer and the shader — uniform scale, rotation, reflection, the
-/// mirror replication, `normalize_fit` — is a similarity, and a similarity
-/// preserves angles.
+/// this against `PLACEHOLDER_WIDTH` at `configure` and have
+/// `LineInstance::styled` carry it to this frame's width by the ratio. Both are
+/// crate-private, so this names them rather than linking them. `theta` survives
+/// that too: every transform between a producer and the shader — uniform scale,
+/// rotation, reflection, the mirror replication, `normalize_fit` — is a
+/// similarity, and a similarity preserves angles.
 ///
 /// # Degenerate input
 ///
