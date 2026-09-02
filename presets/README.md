@@ -1654,9 +1654,11 @@ wants `thickness`; *too bright* wants `brightness` or `glow`. Reaching for the
 wrong one is the trap the `glow` entry below records.
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
   Pick it for the weight you want: it no longer trades against a joint artifact.
+  The weight is the **same at every orientation** — a vertical stroke and a
+  horizontal one measure the same across on screen, on any aspect (ADR-0160).
 
   > **Below `0.167` is a DEAD ZONE — every value there renders identically.** The
-  > param maps to an NDC half-width as `thickness * 0.003`, floored at `0.0005`
+  > param maps to a **world** half-width as `thickness * 0.003`, floored at `0.0005`
   > so a zero cannot degenerate the quad; below that threshold the floor wins and
   > the stroke is ~0.27 px at 1080p, which rasterizes as a **broken dotted line**
   > rather than a stroke. `fragment_vitrail` shipped at `0.016` — two orders low —

@@ -1,8 +1,8 @@
 # ADR-0158 — A joined end carries its own miter length, not a flag the shader expands by a half-width
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0149)
 > **Date:** 2026-09-01
-> **Related plan(s):** [0149](../plans/0149-the-line-corners-stop-being-blunt.md)
+> **Related plan(s):** [0149](../plans/done/0149-the-line-corners-stop-being-blunt.md)
 > **Supersedes the geometry half of:** [ADR-0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (its per-endpoint *granularity* stands and is what makes this cheap; what changes is what the
 > endpoint carries)
@@ -65,10 +65,24 @@ The producer computes
 
 ```rust
 // illustrative
-ext = (width / (theta * 0.5).sin()).min(MITER_LIMIT * width)
+let miter = width / (theta * 0.5).sin();
+ext = if miter > MITER_LIMIT * width { width } else { miter };
 ```
 
 with `MITER_LIMIT = 4.0`, and passes `0.0` for a free end.
+
+**Corrected 2026-09-02, from Plan 0149 Phase 2's renders.** This block read
+`(width / (theta * 0.5).sin()).min(MITER_LIMIT * width)` — a *truncated miter*, which leaves the
+stroke reaching four half-widths past the vertex along its own direction. The far side of the limit
+turned out not to be the untested edge this ADR assumed: measured on the shipped walks, **86.2 %**
+of `curve_nightbloom`'s joints at `d = 29` are past `28.96` degrees, and **26.4 %** of the
+`parametric_curve` default's, because a Maurer chord web is made of near-reversals. At those shares
+the truncation is visible — the star arms' outer edges grow a burr at 1920x1080. Past the limit the
+joint therefore takes `width`, the flat half-width: a **bevel**, which is what `stroke-miterlimit`
+selects in SVG and what an unmitred joint always drew. The two arms are byte-identical on the
+figures the miter exists for and differ only on the chord webs; the user chose the bevel from the
+rendered comparison. The clamp is recorded here rather than deleted because it is what this ADR
+argued for and what the measurement overturned.
 
 Three properties carry the decision:
 
@@ -85,10 +99,13 @@ Three properties carry the decision:
   non-square target — a bar is vertical by construction and takes the full aspect factor — for an
   unrelated reason, and this bullet is not a promise about that.
 - **The miter limit is the near-180-degree rule ADR-0041 had to hand-wave.** `4.0` serves every
-  corner down to `2 * asin(1 / 4) = 28.96 degrees` exactly; below that the extension clamps and the
-  corner bevels as it does today, which is the standard behaviour and a strictly smaller bevel than
-  the current constant produces. The diamond's 61.9-degree vertex needs a factor of **1.945** and
-  is therefore served exactly, with the limit not engaged.
+  corner down to `2 * asin(1 / 4) = 28.96 degrees` exactly; below that the joint takes the flat
+  half-width and bevels exactly as it does today, which is the standard behaviour. The diamond's
+  61.9-degree vertex needs a factor of **1.945** and is therefore served exactly, with the limit not
+  engaged. **This bullet said the extension *clamps* to `MITER_LIMIT * width` and that the far side
+  is a strictly smaller bevel than today's; both are corrected above** — a clamp is larger than
+  today's extension, not smaller, and the far side is the dominant population on a chord web rather
+  than an edge.
 
 **Scope: the four line families, and not `warp_mesh`.** `SegmentInstance` has a seventh producer
 this decision does not reach — `warp_mesh::draw`, the MilkDrop compatibility surface — and it keeps

@@ -1,21 +1,31 @@
 # 0149 — The line corners stop being blunt
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-02. Phases 1, 2a, 2, 3, 4 and 5 landed as
+> `7128ba6`, `c801f43`, `d0d596e`, `324d34c`, `8ed7f1d` and `c0fd6bf`; Phase 6 returned
+> **no change** to `WIDTH_SCALE` and Phase 7 lands no commit behind it. Mode 4 review:
+> **no blockers, two majors** — [ADR-0158]'s Decision still stated the truncated-miter
+> clamp the implementation replaced with a bevel (corrected in that ADR before
+> acceptance), and five committed documentation images were rendered on the pre-miter
+> engine at 1280x720 (re-shot at this close). Verified against the merged tree:
+> `cargo nextest run --workspace` 1509 passed / 5 skipped, `fmt`, `clippy
+> --workspace --all-targets` and all five Node gates clean; the eleven re-blessed
+> baselines are all line renders and `warp_mesh`, `spectrum` and
+> `milkconv/tests/draw_layer.rs` are unmoved.
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
-> **Related ADRs:** [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (proposed — a
-> joined end carries its own miter length), [0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md)
-> (proposed — the stroke is measured where the screen is isotropic; added 2026-09-01 after Phase 2's
+> **Related ADRs:** [0158](../../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (accepted — a
+> joined end carries its own miter length), [0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md)
+> (accepted — the stroke is measured where the screen is isotropic; added 2026-09-01 after Phase 2's
 > stop gate failed),
-> [0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
-> (proposed — the blot anchor becomes a defect record; added 2026-09-02, the decision that unblocked
-> Phase 2), [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> [0161](../../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+> (accepted — the blot anchor becomes a defect record; added 2026-09-02, the decision that unblocked
+> Phase 2), [0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (whose geometry half 0158 supersedes and whose metric half 0160 does),
-> [0007](../adrs/0007-line-geometry-generators.md) (the fixed-capacity instance buffer),
-> [0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) (whose pixel
+> [0007](../../adrs/0007-line-geometry-generators.md) (the fixed-capacity instance buffer),
+> [0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) (whose pixel
 > calibration assumed the property 0160 delivers),
-> [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0134, 0135, 0136, 0144.
 
 ## TL;DR
@@ -35,13 +45,13 @@ offset in clip space, not in the isotropic space, so a vertical stroke is `aspec
 screen than a horizontal one — measured `1.7843` at 1920x1080 — and the producer's world-space angle
 is not the angle the shader extends along. That is a defect older than this plan, it blocks the
 miter, and the whole square golden corpus is blind to it. **Phase 2a moves the stroke into world
-space** per [ADR-0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md), which
+space** per [ADR-0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md), which
 makes [ADR-0158]'s Decision correct as written and costs the instance nothing. Phase 2 then lands on
 a corrected tree, unamended.
 
 ## Context & problem
 
-[ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) gave
+[ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) gave
 `SegmentInstance` a per-endpoint `joined` bitfield and had the vertex shader do
 
 ```wgsl
@@ -57,9 +67,9 @@ value**. Both halves are the same missing factor, `1 / sin(30.95 deg) = 1.945`.
 **ADR-0041 saw this and accepted it, on a premise Plan 0114 removed.** Its rejection of a true miter
 reads *"a mitred corner and a rounded one differ by less than the blur that is already there"*, and
 its disc-join alternative closes with *"worth revisiting only if the blunt corners above turn out to
-matter"*. [Plan 0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
+matter"*. [Plan 0114](0114-the-line-stroke-reads-as-a-drawn-line.md) took `DEFAULT_SOFTNESS` to
 `0.25`; there is no blur left. And they turned out to matter — at
-[Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) Phase 7, in the running app: *"how straight
+[Plan 0087](0087-the-line-renderer-draws-a-curve.md) Phase 7, in the running app: *"how straight
 lines are connected, its clearly visible and doesn't look solid"*.
 
 **And the miter cannot be computed until the stroke is measured in the right space** (added
@@ -81,7 +91,7 @@ does `SegmentInstance::width`'s doc, and `ARC_SHADER` replicates the clip metric
 two primitives agree. **Nothing chose this**: ADR-0124's `1.35 px at 1080p` is `0.0025 · 1080 / 2`,
 the horizontal case quoted as the general one. It survived because every line golden renders square
 — 128x128, 512x512, 96x96 — where the two spaces are identical in `f32`. That is
-[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s failure one level down, on a
+[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)'s failure one level down, on a
 space rather than a size, and this family has now shipped it four times.
 
 Three smaller entries sit in the same two files, and each is cheaper to take now than to schedule
@@ -123,20 +133,20 @@ it is **not what the module header says**. Three one-line repairs travel with it
 ## Decision
 
 **The producer computes the miter length and the instance carries it as an `f32`**, per
-[ADR-0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) — a segment cannot see its
+[ADR-0158](../../adrs/0158-a-joined-end-carries-its-own-miter-length.md) — a segment cannot see its
 neighbour's direction, which is exactly why ADR-0041 put connectivity on the producer side, and the
 angle is one step further along the same argument. `SegmentInstance.joined: u32` becomes `ext_a: f32`
 in place at location 4, `ext_b: f32` is appended **last** at location 6, and `0.0` is exactly "free
 end" so a producer that passes nothing stays byte-identical.
 
 **The stroke moves into world space first** (added 2026-09-01), per
-[ADR-0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md). `dir`, `nrm`, the
+[ADR-0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md). `dir`, `nrm`, the
 endpoint extensions and the perpendicular offset all move ahead of the aspect divide; only `out.pos`
 carries the `/ aspect`. `width` and `ext_*` become world half-widths — a change of unit, not of
 layout, so the instance stays 44 bytes. The producer's world-space `theta` is then the angle the
 shader extends along and [ADR-0158] needs no amendment. `warp_mesh` keeps the clip metric, selected
 per draw call through the segment uniform's documented-unused `v.w` lane, because
-[Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) is about to take `foo_vis_milk2` readings
+[Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) is about to take `foo_vis_milk2` readings
 on it and its stroke weight must not move between the question and the answer.
 
 We rejected **handing the miter the aspect instead** (a bisector or neighbour direction on the
@@ -220,7 +230,7 @@ flowchart LR
 
 > **Added 2026-09-01**, after Phase 2's stop gate ran and failed. This phase is what unblocks
 > Phase 2, and it is a defect older than this plan.
-> [ADR-0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) carries the
+> [ADR-0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) carries the
 > decision and its rejected alternatives.
 
 - **Owner skill:** dev
@@ -271,7 +281,7 @@ flowchart LR
 - **`warp_mesh` renders exactly what it renders today.** Its four baselines are unmoved and
   unblessed, and `milkconv/tests/draw_layer.rs` still passes unchanged. Its two call sites pass the
   clip metric with a comment naming
-  [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) as the revisit trigger and ADR-0160 as
+  [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) as the revisit trigger and ADR-0160 as
   the reason — and stating the open possibility that the clip metric is *correct* there rather than
   merely deferred, which nobody has measured.
 - **`WIDTH_SCALE` does not move in this phase.** Every stroke gets thinner — the factor is `1.00`
@@ -295,7 +305,7 @@ flowchart LR
 > **Amended a third time 2026-09-02, on the `core/tests/sanity.rs` decision.** The phase is
 > **unblocked and lands as written** — no arithmetic in it changes and `MITER_LIMIT` is untouched.
 > What is added is the sixth done-when below, which disposes of the `Blown Out` anchor.
-> [ADR-0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+> [ADR-0161](../../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
 > carries the decision, the measurement and the four rejected alternatives.
 
 - **Owner skill:** dev
@@ -372,7 +382,7 @@ Phase 2a lives.
 **The repair is Phase 2a, not an amendment here.** Every option that keeps the clip-space metric —
 the neighbour direction, the bisector, the aspect handed to the cached producers — changes what
 `SegmentInstance` carries and pays for a correction rather than removing the disagreement.
-[ADR-0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) moves the stroke
+[ADR-0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) moves the stroke
 into world space instead, at which point `dir` is a world direction, the producer's world-space
 `theta` is the angle the shader extends along, and **the arithmetic in this phase is correct exactly
 as it was written**. [ADR-0158]'s Decision stands unchanged and the instance grows by nothing.
@@ -533,7 +543,7 @@ wrong by a factor that varies with every corner's orientation.
 - **Done when:** if `WIDTH_SCALE` moves, the one constant in `core/src/render/scenes/lines/mod.rs`
   moves and its doc names Phase 6 as where the number came from; the non-square line baselines
   re-bless a third time; and **`MIN_HALF_WIDTH` and the `0.167` floor are re-derived against the new
-  scale**, because [ADR-0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
+  scale**, because [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md)
   computed them from it and the dead zone the closed backlog 0098 warns about moves with it.
   If the verdict is "no change", this phase lands no commit and the log records that as its outcome.
 
@@ -565,7 +575,7 @@ pub struct SegmentInstance {
 - **RESOLVED 2026-09-01: `theta` was not measured in the space the extension is applied in.** The
   stop gate ran and failed — the vertical/horizontal stroke ratio tracks the aspect, `1.7843` at
   1920x1080. Phase 2a moves the stroke into world space
-  ([ADR-0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md)), which makes
+  ([ADR-0160](../../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md)), which makes
   the producer's world-space angle correct and leaves [ADR-0158]'s Decision untouched. Found while
   amending the plan after Phase 1, not by the plan as first written.
 - **Phase 2a's own correctness is invisible to the golden corpus, and that is the risk.** Every line
@@ -619,7 +629,7 @@ pub struct SegmentInstance {
   extension as a cap on a zero-length segment rather than as a join.
 - **It does not draw an inward scallop.** Phase 3 refuses one.
 - **It does not change `warp_mesh`'s stroke metric.** Phase 2a scopes it out and gates the question
-  on [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md), which is about to take
+  on [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md), which is about to take
   `foo_vis_milk2` readings on that surface. Whether the clip metric is *correct* there — MilkDrop
   authors in a square space and may be anisotropic on screen itself — is unverified and is that
   plan's to answer, not this one's.
@@ -1038,7 +1048,7 @@ that is the accepted look rather than an unexamined consequence.
 - Whether any roster figure reaches below the 28.96-degree miter limit; if none does, the clamp arm
   needs a synthetic fixture.
 - The ~4.8 MB `segments` / `single_buf` allocation that predates Plan 0087, still unexamined.
-- **`warp_mesh`'s stroke metric, at [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md)'s
+- **`warp_mesh`'s stroke metric, at [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md)'s
   close.** Phase 2a leaves it on the clip metric so its `foo_vis_milk2` readings are taken on an
   unmoved instrument. Once they exist, the question is whether the clip metric is what matches the
   reference — MilkDrop authors in a square space and may be anisotropic on screen itself — or
@@ -1047,4 +1057,4 @@ that is the accepted look rather than an unexamined consequence.
   families' two primitives. Nobody has swept `marks`, `swarm`, `emitter` or the post stages for the
   same substitution, and the same square-corpus blindness would hide it there too.
 
-[ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
+[ADR-0158]: ../../adrs/0158-a-joined-end-carries-its-own-miter-length.md

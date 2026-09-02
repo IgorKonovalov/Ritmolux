@@ -1,8 +1,8 @@
 # ADR-0160 — The stroke is measured where the screen is isotropic, not in NDC
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-02 (Plan 0149)
 > **Date:** 2026-09-01
-> **Related plan(s):** [0149](../plans/0149-the-line-corners-stop-being-blunt.md) Phase 2a
+> **Related plan(s):** [0149](../plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 2a
 > **Supersedes the metric half of:** [ADR-0041](0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (nothing of its join design; what changes is the space the half-width is applied in)
 > **Unblocks:** [ADR-0158](0158-a-joined-end-carries-its-own-miter-length.md) — whose Decision this
