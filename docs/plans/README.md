@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0151** (ADRs are a separate sequence — next free there is **0163**.)
+**Next free number: 0152** (ADRs are a separate sequence — next free there is **0164**.)
 
 ## Active roster
 
@@ -37,6 +37,7 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
+| [0151](0151-the-long-documents-become-navigable.md) | The long documents become navigable | draft | dev | ADR-0163 (proposed): generated contents blocks, no splits. Sheds 335 lines of self-declared-superseded sequencing prose from this file. **Take before 0143**, whose route map wants the final layout. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**~~ — **closed 2026-09-02**, all nine phases, and the freeze held for every one of them. **[0143] and [0103] Phases 4-6 are unparked**: the repository is `IgorKonovalov/Ritmolux`, so 0143 may now choose its Pages subpath and 0103 may submit the component. The original note follows, since its reasoning is what made the freeze non-negotiable.
@@ -97,6 +98,7 @@ shape, because most of what it decided was sequencing rather than design:
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
 [0150]: done/0150-the-application-becomes-ritmolux.md
+[0151]: 0151-the-long-documents-become-navigable.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
 [ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
 
@@ -442,6 +444,13 @@ file is the one that meets it.
 - **Two lanes is the ceiling here, not a target.** Only three groups are genuinely disjoint
   (`lines/`, `shape_field.rs`, and `dsp/` + `tools/`); a third lane starts forcing plans that share
   files into one window.
+
+**Added 2026-09-02 — [0151] is docs-only and precedes [0143].** It touches no Rust and contends with
+nothing on the roster, so it slots into any window. It goes **before** 0143 because 0143 writes a
+route map and a 926-link rewrite against the layout of `capturing.md` and `presets/README.md`, and
+0151 is what settles that layout. It also takes 335 lines out of this file: everything below the
+*"Superseded 2026-08-18"* line in this subsection is spent sequencing prose that
+[README-archive.md](README-archive.md) has had a section waiting for since Plan 0061.
 
 **Superseded 2026-08-18, kept as the record.** The 2026-08-16 sequence follows.
 
