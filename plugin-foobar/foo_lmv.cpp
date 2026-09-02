@@ -3,11 +3,11 @@
 // A thin shim per ADR-0001: pulls PCM from foobar's visualisation_stream,
 // forwards it across rlx-core's C ABI, and hosts the core's wgpu output in a
 // plain Win32 window. All logic lives in the Rust core; this file only
-// bridges foobar2000 conventions to the ABI in core-cabi/include/lmv_core.h.
+// bridges foobar2000 conventions to the ABI in core-cabi/include/rlx_core.h.
 //
 // Two entry points share ONE core instance: a View-menu pop-out window and a
 // Default UI panel (ui_element). Both are "host windows" that claim a single
-// global VizSession; the session holds the sole LmvHandle + visualisation
+// global VizSession; the session holds the sole RlxHandle + visualisation
 // stream + render timer, and only its current owner drives the core. A second
 // host cannot create a second wgpu surface (the "lightweight / one surface"
 // value). Placeholder painting for non-owners lands in a later phase.
@@ -28,7 +28,7 @@
 #include <windowsx.h> // GET_X_LPARAM / GET_Y_LPARAM
 #include <shellapi.h> // ShellExecuteW (Open presets folder)
 
-#include "lmv_core.h"
+#include "rlx_core.h"
 
 // Component version, single-sourced from the workspace Cargo version (ADR-0025).
 // build.ps1 generates foo_lmv_version.h into build/ (on the include path) from
@@ -106,14 +106,14 @@ constexpr size_t kMenuPresetMax = 900;
 // Read this far behind "now": visualisation data close to the playback head
 // may not be decoded yet.
 constexpr double kReadBehindSec = 0.05;
-constexpr wchar_t kWindowClass[] = L"lmv_foobar_window";
+constexpr wchar_t kWindowClass[] = L"rlx_foobar_window";
 
 // The single shared visualizer session (main thread only). Exactly one host
 // window (pop-out or a panel) owns it at a time; only the owner holds the
-// LmvHandle, stream and render timer, so there is only ever one wgpu surface.
+// RlxHandle, stream and render timer, so there is only ever one wgpu surface.
 struct VizSession {
     HWND owner = nullptr; // host window currently driving the core
-    LmvHandle *handle = nullptr;
+    RlxHandle *handle = nullptr;
     visualisation_stream::ptr stream;
     double cursor = 0.0;
     uint32_t rate = 0;
@@ -138,12 +138,12 @@ struct VizSession {
     void push_converted(const audio_sample *data, size_t total, unsigned channels);
     void pump();
     // Real seconds since the previous render, for the frame-rate-independent
-    // simulation (C ABI v4 lmv_render_dt). Measured with QueryPerformanceCounter
+    // simulation (C ABI v4 rlx_render_dt). Measured with QueryPerformanceCounter
     // on the render thread (main-thread only); the core never reads a clock. The
     // first frame and any long stall clamp to a small step so a hitch can't jump
     // the simulation.
     float measure_dt();
-    // Append a diagnostics sample (lmv_get_metrics) to the plugin log at ~1 Hz.
+    // Append a diagnostics sample (rlx_get_metrics) to the plugin log at ~1 Hz.
     // Main-thread only (render timer), never the audio path. No-op pre-v3 core.
     void maybe_log_metrics();
     // Re-arm (or stop) the render timer to match visibility and playback: full
@@ -166,16 +166,16 @@ VizSession g_session;
 // command can bump an existing pop-out and on_quit can tear it down.
 HWND g_popup_hwnd = nullptr;
 
-// Set once at component init from the runtime ABI handshake (lmv_abi_version).
+// Set once at component init from the runtime ABI handshake (rlx_abi_version).
 // Preset loading (v2, ADR-0006) and diagnostics (v3, ADR-0008) are skipped when
 // the linked core is older than the version this shim was built against.
 bool g_abi_ok = false;
 
-// Current debug flags (ADR-0008), seeded from LMV_DEBUG_OVERLAY at init and
+// Current debug flags (ADR-0008), seeded from RLX_DEBUG_OVERLAY at init and
 // flipped by the context-menu toggle. Applied to each handle on creation and
-// live via lmv_set_debug, so the plugin - not the core's env read - is the
+// live via rlx_set_debug, so the plugin - not the core's env read - is the
 // authority once running.
-uint32_t g_debug_flags = LMV_DEBUG_OFF;
+uint32_t g_debug_flags = RLX_DEBUG_OFF;
 
 // %APPDATA%\light-music-visualizer - the app dir the standalone shares. Empty on
 // failure. The diagnostics log lives here, next to the shared presets dir.
@@ -196,7 +196,7 @@ std::wstring plugin_app_dir_w() {
 //
 // This is the last independent copy of that path. The two Rust frontends (the
 // app and the shot CLI) now share one resolver in standalone/src/lib.rs, which
-// also honors the LMV_PRESET_DIR override (ADR-0014); this shim deliberately
+// also honors the RLX_PRESET_DIR override (ADR-0014); this shim deliberately
 // does not - it resolves the same %APPDATA% directory on its own, and honoring
 // the override here is a documented followup. Keep the literals above in step
 // with APP_DIR_NAME in that module.
@@ -250,11 +250,11 @@ std::string resolve_preset_dir_utf8() { return narrow(preset_dir_w()); }
 // Seed + load the shared preset library into `h` over the C ABI. No-op if the
 // ABI handshake failed or the directory can't be resolved. Runs on the main
 // thread (menu/timer), never the audio callback, so its disk I/O is fine.
-void load_presets_into(LmvHandle *h) {
+void load_presets_into(RlxHandle *h) {
     if (!g_abi_ok || h == nullptr) return;
     const std::string dir = resolve_preset_dir_utf8();
     if (dir.empty()) return;
-    lmv_load_presets(h, reinterpret_cast<const uint8_t *>(dir.data()),
+    rlx_load_presets(h, reinterpret_cast<const uint8_t *>(dir.data()),
                      dir.size());
 }
 
@@ -273,17 +273,17 @@ struct PresetSnapshot {
 // Fill `out` from `h`. False (and an empty snapshot) when the ABI is too old,
 // no window is attached yet, or the roster is empty - all cases where the menu
 // simply omits the Preset submenu rather than showing an empty one.
-bool read_preset_snapshot(LmvHandle *h, PresetSnapshot &out) {
+bool read_preset_snapshot(RlxHandle *h, PresetSnapshot &out) {
     out.names.clear();
     out.current = -1;
     if (!g_abi_ok || h == nullptr) return false;
     // Call twice: size, then fill. Nothing is written when the buffer is short,
     // so a roster that grew between the two calls yields no names rather than a
     // truncated list - and it cannot, since both run on this thread.
-    const int32_t needed = lmv_get_presets(h, nullptr, 0, &out.current);
+    const int32_t needed = rlx_get_presets(h, nullptr, 0, &out.current);
     if (needed <= 0) return false;
     std::vector<uint8_t> buf(static_cast<size_t>(needed));
-    if (lmv_get_presets(h, buf.data(), buf.size(), &out.current) != needed) {
+    if (rlx_get_presets(h, buf.data(), buf.size(), &out.current) != needed) {
         return false;
     }
     size_t start = 0;
@@ -300,12 +300,12 @@ bool read_preset_snapshot(LmvHandle *h, PresetSnapshot &out) {
 // was found. Indices are snapshot-scoped (ADR-0117), so the lookup and the
 // select must have nothing between them - which is exactly why this reads the
 // roster itself instead of taking an index from a caller who read it earlier.
-bool select_preset_named(LmvHandle *h, const std::string &name) {
+bool select_preset_named(RlxHandle *h, const std::string &name) {
     PresetSnapshot snap;
     if (name.empty() || !read_preset_snapshot(h, snap)) return false;
     for (size_t i = 0; i < snap.names.size(); ++i) {
         if (snap.names[i] != name) continue;
-        return lmv_select_preset(h, static_cast<int32_t>(i)) == LMV_OK;
+        return rlx_select_preset(h, static_cast<int32_t>(i)) == RLX_OK;
     }
     return false; // a name that is gone leaves the roster where it is
 }
@@ -313,7 +313,7 @@ bool select_preset_named(LmvHandle *h, const std::string &name) {
 // Store what is showing now, so the next foobar start comes up on it. Reads the
 // name back from the core rather than trusting the caller's index: the snapshot
 // reports the dissolve's target, which is the preset the user just asked for.
-void remember_current_preset(LmvHandle *h) {
+void remember_current_preset(RlxHandle *h) {
     PresetSnapshot snap;
     if (!read_preset_snapshot(h, snap)) return;
     if (snap.current < 0 ||
@@ -327,7 +327,7 @@ void remember_current_preset(LmvHandle *h) {
 // window is attached and the library is loaded - the roster does not exist
 // before either. A name that fails to resolve leaves the roster's own default
 // showing, which is the documented degrade.
-void restore_remembered_preset(LmvHandle *h) {
+void restore_remembered_preset(RlxHandle *h) {
     const pfc::string8 name = g_cfg_preset.get();
     if (name.is_empty()) return;
     select_preset_named(h, std::string(name.get_ptr(), name.get_length()));
@@ -342,7 +342,7 @@ void restore_remembered_preset(LmvHandle *h) {
 // silently move the show to a different look. Reloading also re-seeds the
 // running scene's simulation state (set_presets reconfigures the active scene),
 // which is accepted here because reload is something the user asked for.
-void reload_presets_keeping_selection(LmvHandle *h) {
+void reload_presets_keeping_selection(RlxHandle *h) {
     if (!g_abi_ok || h == nullptr) return;
     PresetSnapshot before;
     std::string keep;
@@ -370,12 +370,12 @@ void open_preset_folder() {
     ShellExecuteW(nullptr, L"open", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
-// True when LMV_DEBUG_OVERLAY is set to a truthy value (1/true/on/yes). Seeds
-// the overlay default; the core reads the same var at lmv_create, but the plugin
+// True when RLX_DEBUG_OVERLAY is set to a truthy value (1/true/on/yes). Seeds
+// the overlay default; the core reads the same var at rlx_create, but the plugin
 // tracks it too so the menu toggle and handle re-creation stay consistent.
 bool env_overlay_on() {
     wchar_t buf[16] = {};
-    const DWORD got = GetEnvironmentVariableW(L"LMV_DEBUG_OVERLAY", buf, 16);
+    const DWORD got = GetEnvironmentVariableW(L"RLX_DEBUG_OVERLAY", buf, 16);
     if (got == 0 || got >= 16) return false;
     return _wcsicmp(buf, L"1") == 0 || _wcsicmp(buf, L"true") == 0 ||
            _wcsicmp(buf, L"on") == 0 || _wcsicmp(buf, L"yes") == 0;
@@ -383,7 +383,7 @@ bool env_overlay_on() {
 
 void VizSession::destroy_handle() {
     if (handle) {
-        lmv_free(handle);
+        rlx_free(handle);
         handle = nullptr;
     }
     rate = 0;
@@ -397,14 +397,14 @@ void VizSession::destroy_handle() {
 void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
     if (handle != nullptr && new_rate == rate && new_channels == channels) return;
     destroy_handle();
-    LmvHandle *h = lmv_create(new_rate, new_channels);
+    RlxHandle *h = rlx_create(new_rate, new_channels);
     if (h == nullptr) return; // format outside core bounds - skip
     RECT rc = {};
     GetClientRect(owner, &rc);
     const uint32_t w = static_cast<uint32_t>(rc.right - rc.left);
     const uint32_t ht = static_cast<uint32_t>(rc.bottom - rc.top);
-    if (lmv_attach_window(h, owner, w ? w : 1, ht ? ht : 1) != LMV_OK) {
-        lmv_free(h);
+    if (rlx_attach_window(h, owner, w ? w : 1, ht ? ht : 1) != RLX_OK) {
+        rlx_free(h);
         return;
     }
     handle = h;
@@ -427,7 +427,7 @@ void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
     // Re-apply the current debug flags so a menu-toggled overlay survives a
     // handle re-creation (mid-playback format change); the core otherwise
     // re-seeds from the env at create.
-    if (g_abi_ok) lmv_set_debug(h, g_debug_flags);
+    if (g_abi_ok) rlx_set_debug(h, g_debug_flags);
 }
 
 void VizSession::reattach_at_current_size() {
@@ -435,7 +435,7 @@ void VizSession::reattach_at_current_size() {
     const uint32_t r = rate;
     const uint16_t c = channels;
     destroy_handle();    // clears rate/channels so ensure_handle re-attaches
-    ensure_handle(r, c); // fresh lmv_create + lmv_attach_window at the real size
+    ensure_handle(r, c); // fresh rlx_create + rlx_attach_window at the real size
 }
 
 // Append a diagnostics sample to %APPDATA%\light-music-visualizer\
@@ -447,9 +447,9 @@ void VizSession::maybe_log_metrics() {
     if (last_log_ms != 0 && now - last_log_ms < 1000) return;
     last_log_ms = now;
 
-    LmvMetrics m = {};
-    m.struct_size = sizeof(LmvMetrics);
-    if (lmv_get_metrics(handle, &m) != LMV_OK) return;
+    RlxMetrics m = {};
+    m.struct_size = sizeof(RlxMetrics);
+    if (rlx_get_metrics(handle, &m) != RLX_OK) return;
 
     const std::wstring dir = plugin_app_dir_w();
     if (dir.empty()) return;
@@ -490,7 +490,7 @@ void VizSession::push_converted(const audio_sample *data, size_t total,
         for (size_t i = 0; i < n; ++i) {
             conv[i] = static_cast<float>(data[off + i]);
         }
-        lmv_push_samples(handle, conv, static_cast<uint32_t>(n));
+        rlx_push_samples(handle, conv, static_cast<uint32_t>(n));
         off += n;
     }
 }
@@ -583,18 +583,18 @@ const titleformat_object::ptr &now_playing_script() {
 // Push `track` into the core's banner.
 //
 // MAIN THREAD ONLY, and that is the real-time rule here rather than a style
-// note: lmv_set_now_playing COPIES the string, and an allocation on the
+// note: rlx_set_now_playing COPIES the string, and an allocation on the
 // visualisation_stream thread is exactly what the ABI's threading contract
 // forbids. Every caller below is a play_callback or a window message - foobar
 // delivers both on the main thread, the same one the render timer runs on.
 void announce(const metadb_handle_ptr &track) {
-    // Gated on the ABI handshake: lmv_set_now_playing is v5, so a core older
+    // Gated on the ABI handshake: rlx_set_now_playing is v5, so a core older
     // than this shim does not have it.
     if (!g_abi_ok || g_session.handle == nullptr || track.is_empty()) return;
     pfc::string8 text;
     track->format_title(nullptr, text, now_playing_script(), nullptr);
     if (text.is_empty()) return; // nothing to announce is not an error
-    lmv_set_now_playing(g_session.handle,
+    rlx_set_now_playing(g_session.handle,
                         reinterpret_cast<const uint8_t *>(text.get_ptr()),
                         text.get_length());
 }
@@ -748,7 +748,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (g_session.owner == wnd) {
                     g_session.pump();
                     if (g_session.handle != nullptr)
-                        lmv_render_dt(g_session.handle, g_session.measure_dt());
+                        rlx_render_dt(g_session.handle, g_session.measure_dt());
                     g_session.maybe_log_metrics(); // ~1 Hz, gated internally
                     // Follow play/pause transitions between full and idle rate.
                     g_session.sync_render_timer();
@@ -791,7 +791,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                         // (a plain resize can't revive the dead 1x1 surface).
                         g_session.reattach_at_current_size();
                     } else {
-                        lmv_resize(g_session.handle, LOWORD(lp), HIWORD(lp));
+                        rlx_resize(g_session.handle, LOWORD(lp), HIWORD(lp));
                     }
                 }
             } else {
@@ -805,7 +805,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_KEYDOWN:
             if (wp == VK_SPACE && g_session.owner == wnd &&
                 g_session.handle != nullptr) {
-                lmv_cycle_scene(g_session.handle);
+                rlx_cycle_scene(g_session.handle);
                 remember_current_preset(g_session.handle);
                 return 0;
             }
@@ -873,7 +873,7 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                             L"Open presets folder");
                 AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
                 const UINT check =
-                    (g_debug_flags & LMV_DEBUG_OVERLAY) ? MF_CHECKED : MF_UNCHECKED;
+                    (g_debug_flags & RLX_DEBUG_OVERLAY) ? MF_CHECKED : MF_UNCHECKED;
                 AppendMenuW(menu, MF_STRING | check, kMenuToggleOverlay,
                             L"Diagnostics overlay");
             }
@@ -890,12 +890,12 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_session.owner != wnd || g_session.handle == nullptr) return 0;
             const UINT ucmd = static_cast<UINT>(cmd);
             if (cmd == kMenuNextScene) {
-                lmv_cycle_scene(g_session.handle);
+                rlx_cycle_scene(g_session.handle);
                 remember_current_preset(g_session.handle);
             } else if (cmd == kMenuToggleOverlay && g_abi_ok) {
                 // Flip the overlay bit and push it live over the ABI.
-                g_debug_flags ^= LMV_DEBUG_OVERLAY;
-                lmv_set_debug(g_session.handle, g_debug_flags);
+                g_debug_flags ^= RLX_DEBUG_OVERLAY;
+                rlx_set_debug(g_session.handle, g_debug_flags);
             } else if (cmd == kMenuReloadPresets && g_abi_ok) {
                 reload_presets_keeping_selection(g_session.handle);
             } else if (cmd == kMenuOpenPresetDir) {
@@ -988,19 +988,19 @@ public:
     // separately, so a version mismatch is caught here rather than by calling a
     // function whose contract has shifted. Preset loading (v2) is gated on it.
     void on_init() override {
-        const uint32_t core_abi = lmv_abi_version();
+        const uint32_t core_abi = rlx_abi_version();
         // v3 is forward-compatible: get_metrics is size-guarded and the older
         // functions are stable, so a newer core is fine - require >= built ABI.
-        g_abi_ok = (core_abi >= LMV_ABI_VERSION);
+        g_abi_ok = (core_abi >= RLX_ABI_VERSION);
         if (!g_abi_ok) {
             console::printf("foo_lmv: rlx-core ABI too old (core reports %u, "
                             "shim needs >= %u); preset loading and diagnostics "
                             "disabled",
                             static_cast<unsigned>(core_abi),
-                            static_cast<unsigned>(LMV_ABI_VERSION));
+                            static_cast<unsigned>(RLX_ABI_VERSION));
         }
         // Seed the overlay default from the environment (a boundary read).
-        g_debug_flags = env_overlay_on() ? LMV_DEBUG_OVERLAY : LMV_DEBUG_OFF;
+        g_debug_flags = env_overlay_on() ? RLX_DEBUG_OVERLAY : RLX_DEBUG_OFF;
     }
     void on_quit() override {
         if (g_popup_hwnd != nullptr) DestroyWindow(g_popup_hwnd);
@@ -1014,16 +1014,16 @@ initquit_factory_t<initquit_lmv> g_initquit_factory;
 // One embedded panel instance: owns a WS_CHILD window parented into the
 // layout. The window claims the shared session on WM_CREATE and releases it on
 // WM_DESTROY, exactly like the pop-out, so no panel-specific core logic exists.
-class lmv_ui_element_instance : public ui_element_instance {
+class rlx_ui_element_instance : public ui_element_instance {
 public:
-    lmv_ui_element_instance(HWND parent, ui_element_instance_callback_ptr callback)
+    rlx_ui_element_instance(HWND parent, ui_element_instance_callback_ptr callback)
         : m_callback(callback) {
         ensure_window_class();
         m_wnd = CreateWindowExW(0, kWindowClass, L"", WS_CHILD | WS_VISIBLE, 0, 0,
                                 0, 0, parent, nullptr,
                                 core_api::get_my_instance(), nullptr);
     }
-    ~lmv_ui_element_instance() {
+    ~rlx_ui_element_instance() {
         if (m_wnd != nullptr) DestroyWindow(m_wnd);
     }
 
@@ -1051,7 +1051,7 @@ private:
     ui_element_instance_callback_ptr m_callback;
 };
 
-class lmv_ui_element : public ui_element {
+class rlx_ui_element : public ui_element {
 public:
     GUID get_guid() override { return kGuidLmvElement; }
     GUID get_subclass() override {
@@ -1063,7 +1063,7 @@ public:
     ui_element_instance_ptr instantiate(
         fb2k::hwnd_t parent, ui_element_config::ptr,
         ui_element_instance_callback_ptr callback) override {
-        return new service_impl_t<lmv_ui_element_instance>(
+        return new service_impl_t<rlx_ui_element_instance>(
             static_cast<HWND>(parent), callback);
     }
     ui_element_config::ptr get_default_configuration() override {
@@ -1081,6 +1081,6 @@ public:
     }
 };
 
-service_factory_single_t<lmv_ui_element> g_lmv_ui_element_factory;
+service_factory_single_t<rlx_ui_element> g_lmv_ui_element_factory;
 
 } // namespace
