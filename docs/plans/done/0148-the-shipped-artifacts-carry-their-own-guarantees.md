@@ -1,27 +1,25 @@
 # 0148 — The shipped artifacts carry their own guarantees
 
-> **Status:** in-progress — **unparked 2026-09-02, two phases owed.** Phases 1-4 are landed,
-> reviewed and green (2026-09-01: no blockers, one major, six minors). The park's condition is
-> **met**: `lmv-plan-0136` and `lmv-plan-0149` both closed on 2026-09-02 and this is now the only
-> open lane, so Phase 5's method constraint — no other lane building while the size series is
-> taken — holds for the first time since the plan opened. **It holds only until the next lane
-> opens.** Run **Phase 6 first** (the review's repairs, no special conditions, and it makes the
-> tree correct before the bisect reads it), then **Phase 5**. Until this plan closes, its lane is
-> what holds Plan 0150's freeze gate.
+> **Status:** done — closed 2026-09-02. All six phases landed. Phases 1-4 were reviewed in a fresh
+> session on 2026-09-01 (no blockers, one major, six minors) and Phase 6 is that review's repairs.
+> **Phases 5 and 6 were closed in the session that wrote them**, at the user's explicit direction
+> under time pressure, so they carry the mechanical close but **not** a fresh-context review — the
+> one thing this project's seam exists to provide. If any part of this plan is re-read later, those
+> two phases are the ones that were never read by anyone but their author.
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev
-> **Related ADRs:** [0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
-> (proposed — the plugin's own cap and the recipe that carries it),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (why a size
+> **Related ADRs:** [0159](../../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md)
+> (accepted 2026-09-02 with an Outcome — the plugin's own cap and the recipe that carries it),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (why a size
 > is printed and a parser property is asserted),
-> [0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (the roster discipline
+> [0148](../../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md) (the roster discipline
 > Phase 2 extends to the second CLI)
 > **Closes:** design-backlog 0175, 0176, 0174, 0177, 0178.
 
 ## TL;DR
 
 Five claims this project makes about what it ships, none of which anything checks.
-[Plan 0139](done/0139-the-render-path-validates-before-it-spends.md)'s spend-nothing ordering — the
+[Plan 0139](0139-the-render-path-validates-before-it-spends.md)'s spend-nothing ordering — the
 entire reason that plan exists — is held up by nothing but the current line order in `render::run()`.
 `shot`'s usage text and its parser can drift, on the CLI the `preset-author` lane has no other way to
 discover a flag from. Two of the four colour tags `docs/capturing.md` calls *"the half most likely to
@@ -46,7 +44,7 @@ reintroduces the artifact **with a green suite**. Two cross-flag rejections the 
 `--crf` without `--ffmpeg`, and `--crf` outside `--render` — are also uncovered, and their `--ffmpeg`
 siblings are asserted three lines apart in the same test file.
 
-**The two CLIs are not held to the same standard.** [Plan 0144](done/0144-the-flags-mean-what-they-say.md)
+**The two CLIs are not held to the same standard.** [Plan 0144](0144-the-flags-mean-what-they-say.md)
 built a flag roster for `lmv` and two tests over it, so that binary's help cannot fall behind its
 scanner. `shot` has the same failure mode, no roster and no test: its flags are matched in one
 `match` arm each and re-typed by hand into `print_usage()` and again into `docs/capturing.md`'s flag
@@ -64,7 +62,7 @@ colour tags are the half most likely to ship wrong"* and argues `-color_trc bt70
 `iec61966-2-1` on the ground that *"every player assumes the former"* — reasoning applied to arguments
 that may have no effect. Nothing is known to be wrong on screen: the **range** tag produces the
 washed-out failure and it does survive. What is wrong is that a guarantee is stated as a property and
-is not verified as one, on the path [Plan 0103](0103-the-project-gets-an-audience.md) publishes from.
+is not verified as one, on the path [Plan 0103](../0103-the-project-gets-an-audience.md) publishes from.
 
 **The size cap is a duty, not a guard.** `packaging/foobar/build-component.ps1` runs seven fatal
 checks over `foo_lmv.dll` and parses PE headers by hand to do it, but **never reads the file's
@@ -87,7 +85,7 @@ outcomes it is allowed to reach.** Phases 1 and 2 are pure test additions agains
 already correct, and they are the cheapest items here by a wide margin. Phase 3 establishes what is
 actually true about the colour tags before changing either the command or the paragraph — backlog
 0174 names argument *position* as the first suspect and the plan does not assume it. Phase 4
-implements [ADR-0159](../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md).
+implements [ADR-0159](../../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md).
 Phase 5 is the second bisect, last because it is the longest-running and the only one whose value is
 a fact rather than a mechanism.
 
@@ -356,7 +354,9 @@ file through `include_str!`. No shared roster type was built, per backlog 0176.
 `--help` and `-h` are accepted by the parser and were absent from the usage text, from the
 example's module header, and from the doc's flag table. All three now carry them.
 
-**Phase 4 put its agreement test in `core/tests/hygiene.rs`** (a new guard (d)) rather than in a
+**Phase 4 put its agreement test in `core/tests/hygiene.rs`** (a new guard, **(e)** after the
+close's merge with `main` renumbered it — it was authored as (d) and `main` had taken that
+letter for its own gallery guard) rather than in a
 new packaging test target — that file is already the workspace-wide convention guard, is std-only,
 and runs in the everyday loop. `-WarnBytes` was added to the recipe so the warning arm stays
 reachable; the arm was exercised against a staged 9,564,672 B DLL and the run continued past it.
@@ -389,24 +389,29 @@ by this phase, only attributed.
 
 ### Close triggers
 
-- **`presets/` touched:** no.
-- **Plan header `Closes:`** design-backlog 0175, 0176, 0174, 0177, 0178. **0178 is not closed** —
-  it is Phase 5's entry and Phase 5 did not run. The other four are discharged.
+- **`presets/` touched:** no. Phase 5 *measured* `presets/` and changed nothing in it.
+- **Plan header `Closes:`** design-backlog 0175, 0176, 0174, 0177, 0178 — **all five discharged and
+  archived at this close.**
 - **What shipped:** a fix (two colour tags now reach the container — metadata only, no encoded
   sample moves), a feature (the component recipe prints its output's length and warns above a
-  threshold), three new tests and one extended, and doc corrections.
+  threshold), four new tests and one extended, an attribution for a size series, and doc
+  corrections.
 - **Operator docs touched:** `docs/capturing.md` (the flag table gains `--help`; the colour
-  paragraph now states what the artifact carries and cites the test that checks it), `docs/nfr.md`
-  §4 (two capped figures with units; the component gains its own cap), `docs/specs/0001-c-abi.md`
-  (the size series reads the new cap; headroom restated as 2,792,960 B and 77.8 % of cap).
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1, four broken** — 0174,
-  0175, 0176 and 0177. Each is an `absent:` probe asserting its defect is still present, and each
-  now matches the test or the constant that fixes it, so all four are ready to archive. 0178 is
-  unaffected. No probe was edited.
-- **Full suite:** `cargo nextest run --workspace`, **exit 0**, `1503 tests run: 1503 passed
-  (52 slow), 5 skipped` in 812.385 s. Run in the lane on the hardware adapter. The wall time is not
-  a comparable figure — another lane built during part of the session.
-- **Outstanding `human` phases:** none; the plan has no `human` phase. Phase 5 is `dev` and held.
+  paragraph states what the artifact carries, cites the test that checks it, and names the ffmpeg
+  build the finding was measured on), `docs/nfr.md` §4 (two capped figures with units; the component
+  gains its own cap), `docs/specs/0001-c-abi.md` (the size series reads the new cap, describes the
+  guard rather than the duty, and gains the second bisect's attribution), `docs/releasing.md` (the
+  size section is rewritten — all three of its claims had become false).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 0** after the five entries
+  were archived. Before archiving it was exit 1 with 0174-0177 broken, each an `absent:` probe
+  asserting a defect that this plan removed — which is the expected reading, not a failure. **No
+  probe was edited.**
+- **Full suite:** `cargo nextest run --workspace` in the lane, on the hardware adapter, **after**
+  the merge with `main` — `1513 tests run: 1513 passed (23 slow), 5 skipped` in 569.884 s. The
+  run was piped through `tail`, so its shell exit status is `tail`'s and means nothing; the
+  summary line is what the pass is read from. Sole lane on the box, no other build running.
+- **Outstanding `human` phases:** none; the plan has no `human` phase.
+- **Not done, and deliberately:** no fresh-context review of Phases 5 and 6. See the `Status:` line.
 
 ## Followups (after this lands)
 
