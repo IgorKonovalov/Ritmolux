@@ -6,7 +6,10 @@
 > **Related ADRs:** [0158](../adrs/0158-a-joined-end-carries-its-own-miter-length.md) (proposed — a
 > joined end carries its own miter length), [0160](../adrs/0160-the-stroke-is-measured-where-the-screen-is-isotropic.md)
 > (proposed — the stroke is measured where the screen is isotropic; added 2026-09-01 after Phase 2's
-> stop gate failed), [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
+> stop gate failed),
+> [0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+> (proposed — the blot anchor becomes a defect record; added 2026-09-02, the decision that unblocked
+> Phase 2), [0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)
 > (whose geometry half 0158 supersedes and whose metric half 0160 does),
 > [0007](../adrs/0007-line-geometry-generators.md) (the fixed-capacity instance buffer),
 > [0124](../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) (whose pixel
@@ -288,6 +291,12 @@ flowchart LR
 > outcome below; **Phase 2a is now a prerequisite** and the arithmetic in this phase is correct as
 > written once it lands. Two done-whens were also wrong on their own terms and are corrected — the
 > composite oracle and the `spectrum` one — for reasons that have nothing to do with the gate.
+>
+> **Amended a third time 2026-09-02, on the `core/tests/sanity.rs` decision.** The phase is
+> **unblocked and lands as written** — no arithmetic in it changes and `MITER_LIMIT` is untouched.
+> What is added is the sixth done-when below, which disposes of the `Blown Out` anchor.
+> [ADR-0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+> carries the decision, the measurement and the four rejected alternatives.
 
 - **Owner skill:** dev
 - **What:** each producer **in the four line families** computes
@@ -401,6 +410,37 @@ wrong by a factor that varies with every corner's orientation.
   `reserve_fit_buffers`'s entire doc block duplicated onto `configure`, which reserves nothing and
   now advertises in rustdoc that it *"give[s] the four fit buffers their steady-state capacity"*.
   A rider, taken because this phase opens the file; it is the same class Phase 5 exists for.
+- **`core/tests/sanity.rs`'s `Blown Out` anchor becomes a defect record, and no threshold moves.**
+  The miter closes the blot's stepped rim, which is what a miter is for; because a blot is its own
+  modal band, `boundary_density`'s lit set is the mass's **fringe**, and a thinner fringe is
+  proportionally more rim, so the reading rises from `0.2700` to `0.5697` and ADR-0128's conjunction
+  acquits a frame that is still visibly a blot. ADR-0161 carries the mechanism and the arithmetic.
+  Six parts, all in `sanity.rs` and its doc blocks — **`metrics.rs` is untouched and nothing
+  renders differently**:
+  - `MAX_TONAL_FLATNESS`, **both** `boundary_floor` arms and `blown_out`'s parameters are
+    **unchanged**. A diff touching any of those four is this done-when failing.
+  - In both `a_frame_with_no_tonal_structure_is_reported_flat` and
+    `each_term_of_the_flatness_conjunction_is_load_bearing`, the assertion that the blot reads
+    **under** its boundary floor becomes an assertion that it reads **over** it, in the shape
+    `KNOWN_FLAT` already uses in this file: the message cites ADR-0161 and says that a failure here
+    means term two was repaired, so the conviction is to be restored and the record deleted — never
+    left as a stale exemption.
+  - **Each of the two tests gains `boundary_density(&img, BLACK, EPS)` as a positive control**,
+    asserted **under** the same floor. It reads `0.0382` — the `2/r` that `boundary_density`'s own
+    doc predicts for a solid disc — so the statistic convicts this blot when it is pointed at the
+    figure. This is what separates "the statistic is broken" from "its conditioning is", and it is
+    the new true positive the inverted assertion costs.
+  - Everything else in both tests **keeps asserting**: the areal lens's coverage / quadrants /
+    shells / flatness, term one against the derived ground (`0.9628` against `0.90`), the
+    self-modal check, and parts (1) and (2) of the conjunction test — the held composition and
+    `Sumi` are both undisturbed.
+  - **`each_term_..._load_bearing`'s doc block is rewritten, not just its assertion.** Its stated
+    premise is that the conjunction is non-vacuous; that is now false, and the block says so and
+    says what replaced it.
+  - **`boundary_floor`'s doc block stops claiming `0.2631` as a derivation.** The default arm's
+    value does not move, but the prose names what that number actually measured — the thickness of
+    one figure's rasterized notch band, not a figure perimeter — and therefore that it is not the
+    same kind of quantity as the `0.3602` it was averaged with. Same class as Phase 5's work.
 - The line goldens are re-blessed. **`LMV_BLESS` rewrites every baseline, not the failing scene's**
   — restore the unrelated ones before committing, and compare adapters before trusting a bless.
   **Two phases in a row re-bless the same non-square set**, so bless from a known-good Phase 2a
