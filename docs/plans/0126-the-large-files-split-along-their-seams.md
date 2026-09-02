@@ -281,7 +281,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | committed with this row |
 | 6 — The two seams go home | dev | done | committed with this row |
 | 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
-| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | not started | |
+| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | committed with this row |
 
 ### Notes
 
@@ -487,6 +487,53 @@ reaching `rlx_core::render::scenes::lines::renderer::` to read a diagnostic.
 import from `rlx_core::render::metrics` now. The relocated comment states the
 reachability argument rather than the old "rather than a field on
 `LineRenderer`" one.
+
+**Phase 8.** `foo_ritmolux.cpp` 1,086 lines becomes four translation units
+(235 / 350 / 209 / 312) behind one 182-line `viz_session.h`. Longest function in
+`plugin-foobar/`: **`wnd_proc`, 100 lines**, from 199 -- `build_context_menu`,
+`dispatch_menu_command` and `handle_timer` came out of it. `build.ps1` compiles
+a `$sources` list.
+
+**The anonymous namespace had to go.** Everything was in `namespace { }`, which
+is internal linkage and impossible across four files. It is now `namespace rlx`,
+so the scoping stays and the linkage does not; each file keeps its own anonymous
+namespace for what is genuinely private to it.
+
+**Globals: `g_session` and `g_popup_hwnd`, as the done-when asks.** `g_abi_ok`
+and `g_debug_flags` are now `VizSession` members. `g_cfg_preset` is the fifth the
+plan counted, and it is **not** eliminated -- it is now file-static inside
+`presets.cpp`'s anonymous namespace, reachable only through
+`remember_current_preset` and `restore_remembered_preset`, so it is no longer a
+*shared* global. Making it a function-local static was rejected on purpose:
+foobar enumerates `cfg_var`s at startup, and a lazily-constructed one is a change
+to config persistence rather than a refactor.
+
+**On-device check: RUN, and it passes.** Built with MSVC, installed into the
+foobar2000 v2 profile's `user-components-x64`, foobar2000 launched:
+`foo_ritmolux.dll` is in the loaded-module list (12 `foo_*` components), and the
+plugin diagnostics log **advanced 12.3 s over a 12 s wait**, last sample 0.6 s
+old, `frames_total` climbing 246 -> 253 -> 260 at the idle cadence
+(`kIdleTimerMs` = 150 ms, ~6.7 fps, which is what a stopped transport should
+show). `gpu_bytes` 2,791,536 and `draw_calls` 22: a live renderer.
+
+**A note for whoever runs this next.** Force-killing foobar2000 puts it into an
+unclean-shutdown recovery on the following launch that loads **no components at
+all** -- not ours, not its own. Two launches were read as "the component is
+broken" before that was recognised. Close it through its window, not with
+`Stop-Process -Force`.
+
+**Keeping the log handle open introduced a defect, which the on-device run caught
+and which is fixed.** The CRT's `fopen` in append mode opens **exclusive** on
+Windows. Held for a whole session rather than for the microseconds of one write,
+that locked every other reader out of `plugin-diagnostics.log` for as long as the
+visualisation ran -- exactly when someone tails it, and exactly what
+`on-device-validation.md`'s diagnostics steps assume they can do. It uses
+`_wfsopen` with `_SH_DENYWR` now, and the second on-device run confirms the file
+is readable while the session holds it. **A reviewer should look here first**:
+the plan asked for the handle to be kept and did not price this.
+
+The per-write `fclose` became `fflush`, so a crash mid-show still leaves the
+samples that led up to it on disk.
 
 ### Close triggers
 
