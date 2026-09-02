@@ -13,7 +13,8 @@
 # every attempt (ADR-0115, Positive), so a green local run is worth something.
 #
 # The verification lives HERE rather than in the workflow, so a local run is
-# held to the same bar as CI. Every check below is fatal.
+# held to the same bar as CI. Every check below is fatal except the size
+# measurement, which prints and at most warns (ADR-0159).
 #
 #   Usage:  packaging\foobar\build-component.ps1 [-SkipBuild] [-WarnBytes <n>]
 #

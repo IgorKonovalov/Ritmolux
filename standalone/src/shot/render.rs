@@ -448,7 +448,8 @@ pub fn render_frames(
 ///   ignore the latter outright.
 /// - `-x264-params colorprim=bt709:transfer=bt709` — **the two tags that do not
 ///   otherwise reach the file.** `-colorspace` is honoured by the libx264 path
-///   and `-color_primaries` / `-color_trc` are dropped by it: a file written with
+///   and `-color_primaries` / `-color_trc` are dropped by it — measured on ffmpeg
+///   8.1 (gyan.dev full build), and on no second build: a file written with
 ///   all three reads back `bt709/unknown/unknown` from `ffprobe -show_streams`,
 ///   and asking for `bt2020`/`smpte2084` moves the matrix while leaving the other
 ///   two unknown — so the loss is in the encoder wrapper, not in the container or

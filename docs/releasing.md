@@ -93,20 +93,25 @@ box this project is developed on:
 
 ### While you are here: read the component's size
 
-`foo_lmv.dll` carries a **~10 MB soft cap** ([`docs/nfr.md`](nfr.md) §4) and it has been growing
-without anyone watching — +910,848 B between Plan 0097 and Plan 0141, none of it attributed as it
-landed. The release is the one moment the number exists for free, so take it:
+`foo_lmv.dll` carries a soft cap of its own — **12,582,912 B (12 MiB)**
+([`docs/nfr.md`](nfr.md) §4, ADR-0159) — and it grew +910,848 B between Plan 0097 and Plan 0141
+without anyone watching, none of it attributed as it landed. **You no longer have to measure it.**
+The recipe above reads its own output's length and prints it beside the cap:
 
-```powershell
-(Get-Item .\plugin-foobar\build\foo_lmv.dll).Length
+```
+    foo_lmv.dll is 9789952 B (77.8 % of the 12582912 B cap)
 ```
 
-If it has moved more than **~100 KB** since the last row, add a dated row to the size series in
-[`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) — that table is the only record of the trend, and
-a trend is what the cap is actually about. Nothing enforces this yet
-([design-backlog 0177](design-backlog.md)); it is here because the trigger it replaces — "re-measure
-when a dependency is added" — was conditioned on an event that never happened, and the growth
-arrived anyway.
+Past **11,324,620 B** — 90 % of the cap — that step emits a warning instead of a check mark. It
+warns and never dies: a release blocked on a byte count is one where someone edits the constant
+under time pressure at a tag, which is worse than no gate because it also destroys the record.
+
+**What is still yours is the row.** If the printed figure has moved more than **~100 KB** since the
+last one, add a dated row to the size series in
+[`docs/specs/0001-c-abi.md`](specs/0001-c-abi.md) and say what moved it — that table is the only
+record of the trend, and a trend is what the cap is actually about. The reminder sits here rather
+than only in that spec because the trigger it replaces — "re-measure when a dependency is added" —
+was conditioned on an event that never happened, and the growth arrived anyway.
 
 ## What this does NOT touch
 
