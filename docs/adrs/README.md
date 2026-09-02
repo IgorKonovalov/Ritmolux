@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0161.** *(0120 was reserved for
+**Next free number: 0162.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -182,4 +182,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | proposed 2026-09-01 (Plan 0149), supersedes the geometry half of 0041 |
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | proposed 2026-09-01 (Plan 0148), amends nfr.md 4 |
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | proposed 2026-09-01 (Plan 0149 Phase 2a), supersedes the metric half of 0041, unblocks 0158 |
+| [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | proposed 2026-09-02 (Plan 0149 Phase 2), falsifies 0130's default floor arm |
 <!-- roster:end -->

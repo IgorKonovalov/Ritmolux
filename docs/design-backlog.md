@@ -2348,6 +2348,59 @@ threshold to retune.
   `1.0000` this entry named degenerate, and the emptying canvas is convicted on the real family
   instead of the synthetic stand-in: `present: SystemKind::ShapeCollage in: core/src/preset/schema.rs`
 
+### Re-opened 2026-09-02 by [Plan 0149](plans/0149-the-line-corners-stop-being-blunt.md) — the discharge above is falsified, and the fringe mechanism this entry named is why
+
+**Read this first. It reverses the section below it.** The repair that discharged this entry's title
+— `metrics::boundary_density` as the conjunction's second term — **does not separate a blot from a
+flat-graphic composition**, and the fringe mechanism *this entry already named* is the reason. The
+separation ADR-0130 shipped was an artifact of one fixture's rasterized rim.
+
+Plan 0149 Phase 2 gives joined corners their miter length, which closes the stepped notches around
+`blown_out`'s rim. Measured on that tree at this suite's own capture (96x96, `FRAMES = 30`, all bands
+at `LOUD = 1.0`, backdrop suppressed, hardware adapter):
+
+| lens | `coverage` | `tonal_flatness` | `boundary_density` | shells |
+|---|---|---|---|---|
+| `BLACK` (areal) | 0.9666 | 0.9983 | **0.0382** | 10/10 |
+| derived ground `[159, 254, 202]` | 0.0350 | 0.9628 | **0.5697** | 0/10 |
+
+One frame, one statistic, two references, **14.9x apart and straddling the `0.31` floor**. The frame
+is still visibly a blot — rendered side by side it is the same saturated single-tone disc, a smoother
+one. The areal reading is the mass measured as a mass (`0.0382` is the `2/r`
+`boundary_density`'s own doc predicts for a solid disc). The derived reading is the **fringe**, which
+is exactly what the *"what is still open"* paragraph below predicted. **A thinner fringe is
+proportionally more rim, so the term reads more structured the more perfectly a frame is a blot** —
+it is monotonically inverted on the class of frame it exists to convict.
+
+Three consequences:
+
+- **`0.2631` never measured a figure perimeter.** It was the thickness of one figure's rasterized
+  notch band, averaged with `Tiled Rosette Mono`'s genuine `0.3602` to make `boundary_floor`'s `0.31`
+  default arm. Two different kinds of quantity, so their midpoint was never a floor — ADR-0074's rule
+  one level up.
+- **No floor separates them now.** The blot reads **1.58x above** the composition the term exists to
+  admit.
+- **Pointing term two at `BLACK` is not the repair.** It convicts the blot at `0.0382` and would drag
+  `Tiled Rosette Mono`'s light paper toward a solid mass, under the floor, convicting the preset
+  ADR-0130 was written to admit. The ground that makes term two work for a two-ink print is the
+  ground that inverts it for a blot, which is the actual open question.
+
+**What Plan 0149 did about it, and what it deliberately did not.**
+[ADR-0161](adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+moves no threshold and retunes no fixture: the anchor's second-term assertions invert into a defect
+record in `KNOWN_FLAT`'s shape, and both tests gain the areal reading as a positive control. So the
+conjunction now has **no demonstrated true positive** and its `0.31` arm has no live derivation.
+`draws_a_real_shape` still fails such a frame, but on `coverage` — as **"blank"**, telling an author
+to add material to a saturated picture.
+
+**So the open question is sharper than the paragraph below leaves it**, and it is the same question:
+term two needs a ground that knows whether the frame's modal band is the *figure* or the
+*background*, because the two demand opposite treatment. Start here, with these numbers.
+**Owner if taken:** `architect`.
+
+- **Verified 2026-09-02** — the inverted term, still shipped and still the gate's second half:
+  `present: fn boundary_floor in: core/tests/sanity.rs`
+
 ### Half-discharged again 2026-08-26 by [Plan 0119](plans/done/0119-the-flatness-gate-gets-its-second-term.md) — the title is discharged, the residue is not
 
 **Read this before the section below it, which this one narrows.** The heading of this entry —
