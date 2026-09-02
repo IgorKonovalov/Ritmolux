@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 /// to the top of any new file under `core/src/dsp/`, `core/src/render/`,
 /// `core/src/diag/`, `core/src/audio.rs`, `core/src/preset/expr.rs`, the
 /// `core-cabi` crate's `src/` (the C ABI, moved out of `core/src/ffi.rs` by
-/// ADR-0072), or the `lmv-ring` crate's `src/` (the extracted SPSC ring,
+/// ADR-0072), or the `rlx-ring` crate's `src/` (the extracted SPSC ring,
 /// Plan 0005):
 ///
 /// ```ignore
@@ -40,7 +40,7 @@ fn core_src() -> PathBuf {
 }
 
 /// The workspace root — the parent of the `core` crate this test lives
-/// in. It reaches the sibling crates (`lmv-ring`, `standalone`) whose
+/// in. It reaches the sibling crates (`rlx-ring`, `standalone`) whose
 /// manifests and hot-path source the guards below also cover.
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -228,9 +228,9 @@ fn hot_path_modules_carry_the_panic_pragma() {
         // an otherwise load-time module, so it is listed directly rather than
         // scanning all of `src/preset/`.
         src.join("preset").join("expr.rs"),
-        // The SPSC ring's `unsafe` now lives in the sibling lmv-ring crate
+        // The SPSC ring's `unsafe` now lives in the sibling rlx-ring crate
         // (Plan 0005); its whole `src/` is hot-path code.
-        workspace_root().join("lmv-ring").join("src"),
+        workspace_root().join("rlx-ring").join("src"),
         // The EEL2 machine (Plan 0100 Phase 2, ADR-0113). Its whole directory,
         // not just `vm.rs`: this is the only code in the engine that executes
         // **untrusted program text** — a converted MilkDrop preset's — and it does
@@ -270,7 +270,7 @@ fn direct_dependencies_are_exact_pinned() {
     let manifests = [
         root.join("core").join("Cargo.toml"),
         root.join("core-cabi").join("Cargo.toml"),
-        root.join("lmv-ring").join("Cargo.toml"),
+        root.join("rlx-ring").join("Cargo.toml"),
         root.join("standalone").join("Cargo.toml"),
     ];
     for manifest in &manifests {

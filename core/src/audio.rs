@@ -3,7 +3,7 @@
 //!
 //! Format (sample rate, channel count) is validated once when the intake is
 //! created — the boundary — and the hot path trusts it from then on. The ring
-//! itself lives in the dependency-free [`lmv_ring`] crate (so Miri can check
+//! itself lives in the dependency-free [`rlx_ring`] crate (so Miri can check
 //! its `unsafe` without compiling the wgpu graph, Plan 0005); its
 //! [`SampleProducer`]/[`SampleConsumer`] handles are re-exported here so this
 //! module stays the single audio-intake surface for the standalone and FFI.
@@ -24,9 +24,9 @@
     clippy::unreachable
 )]
 
-// The SPSC ring internals moved to `lmv-ring` (Plan 0005); re-export the
+// The SPSC ring internals moved to `rlx-ring` (Plan 0005); re-export the
 // handles so the public `audio` API and every call site stay unchanged.
-pub use lmv_ring::{SampleConsumer, SampleProducer};
+pub use rlx_ring::{SampleConsumer, SampleProducer};
 
 /// Lowest sample rate the intake accepts (Hz).
 pub const MIN_SAMPLE_RATE: u32 = 8_000;
@@ -92,7 +92,7 @@ pub fn intake(
 ) -> Result<(SampleProducer, SampleConsumer), FormatError> {
     let format = format.validate()?;
     let capacity_samples = capacity_frames.max(1) * format.channels as usize;
-    Ok(lmv_ring::spsc(capacity_samples, format.channels))
+    Ok(rlx_ring::spsc(capacity_samples, format.channels))
 }
 
 #[cfg(test)]

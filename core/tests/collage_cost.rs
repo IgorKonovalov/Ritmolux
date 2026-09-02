@@ -140,9 +140,9 @@ mod common;
 
 use std::time::Instant;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, TierConfig};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, TierConfig};
 
 /// **1080p, because that is the size `docs/nfr.md` §1 states its budget at.**
 /// This scene's cost is per pixel per element, so the render size is half the

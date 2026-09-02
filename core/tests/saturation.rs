@@ -22,9 +22,9 @@
 //! test prints the whole library's distribution on every run, which is where the
 //! next re-measurement comes from.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, WARMUP_HOPS};
-use lmv_core::preset::{
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, WARMUP_HOPS};
+use rlx_core::preset::{
     Expr, GateKind, Observations, Preset, SATURATED_OCCUPANCY, Variables, default_presets,
 };
 
@@ -49,7 +49,7 @@ const INDEX_SAMPLES: usize = 5;
 /// The probe: the real analyzer over the real generator, so bands move together
 /// the way music's do rather than the way a hand-built frame does.
 fn probe_frames() -> Vec<AnalysisFrame> {
-    let pcm = lmv_core::signal::dynamic_groove(BPM, SECS, FORMAT);
+    let pcm = rlx_core::signal::dynamic_groove(BPM, SECS, FORMAT);
     let mut analyzer = Analyzer::new(FORMAT).expect("probe analyzer");
     let hop_samples = HOP_SIZE * FORMAT.channels as usize;
     let mut frames = Vec::new();
@@ -94,7 +94,7 @@ fn drive(expr: &Expr, frames: &[AnalysisFrame], salt: u32, obs: &mut Observation
 fn peak_occupancy(obs: &Observations) -> Option<f32> {
     obs.nodes()
         .iter()
-        .filter(|n| matches!(n, lmv_core::preset::NodeObservation::Clamp { .. }))
+        .filter(|n| matches!(n, rlx_core::preset::NodeObservation::Clamp { .. }))
         .map(|n| n.occupancy())
         .fold(None, |acc, occ| Some(acc.map_or(occ, |a: f32| a.max(occ))))
 }

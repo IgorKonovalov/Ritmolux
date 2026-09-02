@@ -49,9 +49,9 @@
 //! **measurement, not a gate** — it is `#[ignore]`d, records why [`SIZE`] did
 //! not move, and stays pinned to the whole-frame statistic it measured.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::{Preset, SystemKind, default_presets};
-use lmv_core::render::{
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::{Preset, SystemKind, default_presets};
+use rlx_core::render::{
     Renderer,
     metrics::{footprint_diff, frame_diff},
 };
@@ -742,7 +742,7 @@ fn probes() -> Vec<(&'static str, &'static str, String)> {
 /// of the sweep above. Run it with:
 ///
 /// ```bash
-/// cargo nextest run -p lmv-core --test animation --run-ignored all --no-capture
+/// cargo nextest run -p rlx-core --test animation --run-ignored all --no-capture
 /// ```
 ///
 /// Measured 2026-08-09, DX12 software adapter (`frame_diff`, frames 24 vs 48,

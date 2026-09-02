@@ -8,9 +8,9 @@
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
-use lmv_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
-use lmv_core::preset::Preset;
-use lmv_core::render::metrics::frame_diff;
+use rlx_core::dsp::{AnalysisFrame, SPECTRUM_BINS};
+use rlx_core::preset::Preset;
+use rlx_core::render::metrics::frame_diff;
 
 mod common;
 

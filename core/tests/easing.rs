@@ -23,9 +23,9 @@
 //!
 //! Skips with no adapter per ADR-0016.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::{Easing, Preset};
-use lmv_core::render::metrics::{
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::{Easing, Preset};
+use rlx_core::render::metrics::{
     StepResponse, frame_diff, frames_to_settle, segment_settled, step_response,
 };
 
@@ -35,7 +35,7 @@ mod common;
 /// measures whichever side of it a `curve` sits on: `ln 2 / ln 10`, which is
 /// `log10(2)` and so already in `std` rather than spelled out as a literal.
 const LN2_OVER_LN10: f32 = std::f32::consts::LOG10_2;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::render::{CaptureImage, Renderer};
 
 const SIZE: u32 = 96;
 
@@ -330,7 +330,7 @@ const CURVE_LINE: &str = "curve      = \"0.5\"";
 /// the same direction under this stimulus, so all of them select the same
 /// constant. Mean-then-ease and ease-then-mean therefore coincide.
 fn pre_eased(stimulus: &[AnalysisFrame]) -> Vec<AnalysisFrame> {
-    let mut bands = [0.0f32; lmv_core::dsp::SPECTRUM_BINS];
+    let mut bands = [0.0f32; rlx_core::dsp::SPECTRUM_BINS];
     let mut bass = 0.0f32;
     stimulus
         .iter()

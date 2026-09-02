@@ -31,8 +31,8 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use lmv_core::render::CaptureImage;
-use lmv_core::render::metrics::frame_diff;
+use rlx_core::render::CaptureImage;
+use rlx_core::render::metrics::frame_diff;
 
 /// Substring of the error `shot` prints when no GPU adapter can be acquired
 /// (`RenderError::RequestAdapter` -> "no suitable GPU adapter: ..."). Matching the
@@ -531,7 +531,7 @@ fn frame_at_rejects_a_second_hop_source_and_a_missing_clip() {
     );
 }
 
-/// Decode a PNG `shot` wrote back into the shape `lmv_core`'s metrics take, so a
+/// Decode a PNG `shot` wrote back into the shape `rlx_core`'s metrics take, so a
 /// CLI-level difference is measured with the same function the in-core harness
 /// uses rather than a second, subtly different one.
 fn load_capture(path: &Path) -> CaptureImage {
@@ -997,11 +997,11 @@ fn wav_bytes(channels: u16, sample_rate: u32, samples: &[i16]) -> Vec<u8> {
 /// moves would pass a determinism check while proving nothing about the two
 /// clocks, since every frame would carry the same stimulus either way.
 fn render_clip(name: &str, sample_rate: u32, secs: f32) -> PathBuf {
-    let format = lmv_core::audio::AudioFormat {
+    let format = rlx_core::audio::AudioFormat {
         sample_rate,
         channels: 2,
     };
-    let pcm = lmv_core::signal::dynamic_groove(110.0, secs, format);
+    let pcm = rlx_core::signal::dynamic_groove(110.0, secs, format);
     let samples: Vec<i16> = pcm
         .iter()
         .map(|s| (s.clamp(-1.0, 1.0) * 32_767.0) as i16)
@@ -1175,9 +1175,9 @@ fn a_render_rejects_a_second_clip_a_decimal_rate_and_a_pointless_out() {
 /// assumed anywhere in the code.
 #[test]
 fn a_rendered_frame_is_byte_identical_to_the_png_the_app_writes() {
-    use lmv_core::dsp::HOP_SIZE;
-    use lmv_core::preset::Preset;
-    use lmv_core::render::Tier;
+    use rlx_core::dsp::HOP_SIZE;
+    use rlx_core::preset::Preset;
+    use rlx_core::render::Tier;
     use standalone::shot::render::{DEFAULT_FPS, render_frames};
 
     /// One analysis hop per output frame at 60 fps.

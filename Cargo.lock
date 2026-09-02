@@ -835,32 +835,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
-name = "lmv-core"
-version = "0.102.0"
-dependencies = [
- "bytemuck",
- "glyphon",
- "image",
- "lmv-ring",
- "pollster",
- "rustfft",
- "serde",
- "toml",
- "wgpu",
-]
-
-[[package]]
-name = "lmv-core-cabi"
-version = "0.102.0"
-dependencies = [
- "lmv-core",
-]
-
-[[package]]
-name = "lmv-ring"
-version = "0.102.0"
-
-[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -900,7 +874,7 @@ dependencies = [
 name = "milkconv"
 version = "0.102.0"
 dependencies = [
- "lmv-core",
+ "rlx-core",
 ]
 
 [[package]]
@@ -1728,6 +1702,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
+name = "rlx-core"
+version = "0.102.0"
+dependencies = [
+ "bytemuck",
+ "glyphon",
+ "image",
+ "pollster",
+ "rlx-ring",
+ "rustfft",
+ "serde",
+ "toml",
+ "wgpu",
+]
+
+[[package]]
+name = "rlx-core-cabi"
+version = "0.102.0"
+dependencies = [
+ "rlx-core",
+]
+
+[[package]]
+name = "rlx-ring"
+version = "0.102.0"
+
+[[package]]
 name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2002,13 +2002,13 @@ dependencies = [
  "cc",
  "dispatch2",
  "image",
- "lmv-core",
  "objc2 0.6.4",
  "objc2-core-audio-types",
  "objc2-core-foundation",
  "objc2-core-media",
  "objc2-foundation 0.3.2",
  "objc2-screen-capture-kit",
+ "rlx-core",
  "serde",
  "toml",
  "windows",

@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use lmv_core::diag::{AnalysisMetrics, Metrics};
+use rlx_core::diag::{AnalysisMetrics, Metrics};
 
 /// One sample per second.
 const LOG_INTERVAL: Duration = Duration::from_secs(1);
@@ -240,8 +240,8 @@ mod tests {
 
     use std::io::Read as _;
 
-    use lmv_core::audio::AudioFormat;
-    use lmv_core::dsp::{Analyzer, HOP_SIZE, WARMUP_HOPS};
+    use rlx_core::audio::AudioFormat;
+    use rlx_core::dsp::{Analyzer, HOP_SIZE, WARMUP_HOPS};
 
     use super::*;
     use crate::capture_verdict::CaptureVerdict;

@@ -39,7 +39,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use lmv_core::diag::Metrics;
+use rlx_core::diag::Metrics;
 
 /// One soak sample every few seconds — coarse enough to stay off the per-frame
 /// path, fine enough that a multi-hour run has thousands of points.
@@ -57,10 +57,10 @@ const HEADER: &str = "elapsed_secs\tfps\trss_bytes\tframes_total\theartbeat\t\
 /// times, so a rebuild spike keeps influencing it until the ring has turned
 /// over — a property of *frames*, not of seconds, and one that would need a
 /// different constant at every refresh rate if expressed in time. The ring's
-/// length is `pub(crate)` in `lmv_core::diag` and deliberately not exported (it
+/// length is `pub(crate)` in `rlx_core::diag` and deliberately not exported (it
 /// is coupled to the quality governor's minimum series), so this constant cannot
 /// simply reference it. It is instead **measured** from the public
-/// [`FrameStats`](lmv_core::diag::FrameStats) in this module's tests, which fail
+/// [`FrameStats`](rlx_core::diag::FrameStats) in this module's tests, which fail
 /// if the ring ever outgrows this window.
 ///
 /// 300 is the measured 240-frame ring with 25 % margin. The cost of the margin
@@ -214,7 +214,7 @@ impl SoakLog {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-    use lmv_core::diag::FrameStats;
+    use rlx_core::diag::FrameStats;
 
     use super::*;
 
@@ -352,7 +352,7 @@ mod tests {
     /// **The coupling this file cannot express in code.**
     ///
     /// [`SWITCH_EXCLUSION_FRAMES`] has to outlast the ring `frame_ms_p99` is
-    /// computed over, and that ring's length is `pub(crate)` in `lmv_core::diag`
+    /// computed over, and that ring's length is `pub(crate)` in `rlx_core::diag`
     /// — deliberately, because it is coupled to the quality governor's minimum
     /// series. So it is measured here through the public API instead: feed one
     /// enormous frame, then ordinary ones, and count how many it takes before

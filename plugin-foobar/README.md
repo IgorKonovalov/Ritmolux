@@ -1,6 +1,6 @@
 # plugin-foobar
 
-The foobar2000 visualization component: a thin C++ shim over lmv-core's C ABI
+The foobar2000 visualization component: a thin C++ shim over rlx-core's C ABI
 (`core-cabi/include/lmv_core.h`). Windows-only per ADR-0001, x64 only.
 
 ## SDK location (Plan 0001 Phase 7)

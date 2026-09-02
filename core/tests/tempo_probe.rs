@@ -13,8 +13,8 @@
 //! and in what way. To read it:
 //!
 //! ```text
-//! cargo nextest run -p lmv-core --test tempo_probe --no-capture
-//! cargo test -p lmv-core --test tempo_probe -- --nocapture
+//! cargo nextest run -p rlx-core --test tempo_probe --no-capture
+//! cargo test -p rlx-core --test tempo_probe -- --nocapture
 //! ```
 //!
 //! (Unlike `downbeat_probe.rs` this file carries no `.config/nextest.toml`
@@ -28,9 +28,9 @@
 //! half the true tempo is making a different mistake from one that reports
 //! 0.94x of it, and a single error column cannot say which.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{Analyzer, HOP_SIZE};
-use lmv_core::signal;
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{Analyzer, HOP_SIZE};
+use rlx_core::signal;
 
 const SR: u32 = 48_000;
 

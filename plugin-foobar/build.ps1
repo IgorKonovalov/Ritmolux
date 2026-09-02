@@ -1,5 +1,5 @@
 # Builds foo_lmv.dll (x64 Release): the foobar2000 component that wraps
-# lmv-core's C ABI. Requires VS Build Tools 2022 (C++ workload), rustup, and
+# rlx-core's C ABI. Requires VS Build Tools 2022 (C++ workload), rustup, and
 # the foobar2000 SDK unpacked at plugin-foobar/sdk (see README.md).
 #
 #   .\build.ps1            # build plugin-foobar/build/foo_lmv.dll
@@ -23,10 +23,10 @@ if (-not (Test-Path (Join-Path $sdk "foobar2000\SDK\foobar2000.h"))) {
 # The C ABI ships from its own crate (ADR-0072), which is the only one declaring
 # cdylib/staticlib and is deliberately OUTSIDE the workspace default-members -
 # so it is built by naming it here, and a bare `cargo build` never emits it.
-# The emitted stem is lmv_core_c, not lmv_core: see core-cabi/Cargo.toml for why
+# The emitted stem is rlx_core_c, not rlx_core: see core-cabi/Cargo.toml for why
 # the preferred name could not be kept.
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-cargo build --release -p lmv-core-cabi 2>&1 | ForEach-Object { "$_" }
+cargo build --release -p rlx-core-cabi 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 # The artifact store is not always $repo\target: a machine-local .cargo/config.toml
 # above the worktree can point build.target-dir elsewhere, and cargo finds it by
@@ -36,7 +36,7 @@ if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 # --no-deps keeps it to the workspace manifest, which is all target_directory needs.
 $meta = cargo metadata --format-version 1 --no-deps --manifest-path (Join-Path $repo "Cargo.toml") | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
-$coreLib = Join-Path $meta.target_directory "release\lmv_core_c.lib"
+$coreLib = Join-Path $meta.target_directory "release\rlx_core_c.lib"
 
 # --- 2. Locate MSVC ---
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -82,7 +82,7 @@ $libs = @(
     (Join-Path $sdk "pfc\x64\Release\pfc.lib"),
     (Join-Path $sdk "foobar2000\shared\shared-x64.lib"),
     $coreLib,
-    # lmv_core_c.lib's system deps (from rustc --print native-static-libs)
+    # rlx_core_c.lib's system deps (from rustc --print native-static-libs)
     # plus user32/gdi32 for the component's own window.
     "opengl32.lib", "kernel32.lib", "ntdll.lib", "userenv.lib",
     "ws2_32.lib", "dbghelp.lib", "user32.lib", "gdi32.lib", "advapi32.lib",

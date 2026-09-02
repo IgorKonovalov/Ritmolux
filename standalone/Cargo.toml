@@ -1,4 +1,4 @@
-# Standalone desktop shell: winit window + OS loopback capture feeding lmv-core.
+# Standalone desktop shell: winit window + OS loopback capture feeding rlx-core.
 [package]
 name = "standalone"
 version.workspace = true
@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 # The app binary, never published to crates.io; publish=false also lets
-# cargo-deny accept its path dependency on lmv-core under wildcards=deny.
+# cargo-deny accept its path dependency on rlx-core under wildcards=deny.
 publish = false
 
 # Host-utility path resolution shared by the binary and the `shot` example, so
@@ -43,7 +43,7 @@ cc = "=1.3.0"
 [dependencies]
 # `text` enables the glyphon on-canvas text seam (ADR-0009) — the standalone is
 # the only frontend that opts in; the plugin build leaves it off.
-lmv-core = { path = "../core", features = ["text"] }
+rlx-core = { path = "../core", features = ["text"] }
 # Windowing (ADR-0001 fixes winit for the standalone shell).
 winit = "=0.30.13"
 # Per-user operator config (Plan 0009): derive-(de)serialize the small

@@ -31,8 +31,8 @@ pub mod render;
 pub mod report;
 pub mod wav;
 
-use lmv_core::preset::Preset;
-use lmv_core::render::{HeadlessOptions, Renderer, Tier};
+use rlx_core::preset::Preset;
+use rlx_core::render::{HeadlessOptions, Renderer, Tier};
 
 /// A headless renderer over `presets`, using the real GPU at full quality (the
 /// CLI wants speed and true output, not the tests' software reproducibility).

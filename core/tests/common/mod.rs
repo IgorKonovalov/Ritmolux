@@ -3,7 +3,7 @@
 //! `core/tests/common/` is a directory, not a top-level `.rs`, so cargo does not
 //! compile it as its own test binary; each test file pulls it in with
 //! `mod common;` and it is rebuilt into that binary. Nothing here is public API
-//! — `lmv-core` must not grow a test-support surface to serve its own tests.
+//! — `rlx-core` must not grow a test-support surface to serve its own tests.
 //!
 //! **The skip is the point.** A runner with no GPU adapter at all — macOS has no
 //! software Metal fallback — must skip with a printed notice rather than fail,
@@ -19,8 +19,8 @@
 
 use std::path::{Path, PathBuf};
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, Tier};
 
 /// The one place the ADR-0016 skip lives: build a renderer, or return `None`
 /// after printing the notice when the runner has no GPU adapter at all. Any

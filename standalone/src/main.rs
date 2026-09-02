@@ -27,10 +27,10 @@ use config::Config;
 use diaglog::DiagLog;
 use director::Director;
 use downbeatlog::DownbeatLog;
-use lmv_core::audio::{AudioFormat, SampleConsumer};
-use lmv_core::dsp::Analyzer;
-use lmv_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
 use overlay::{LIST_INSET, LIST_TOP, OverlayAction, OverlayKey, OverlayState, ROW_H, ROW_SIZE};
+use rlx_core::audio::{AudioFormat, SampleConsumer};
+use rlx_core::dsp::Analyzer;
+use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
 use settings::{SettingsAction, SettingsKey, SettingsState, SettingsView, TierState};
 use soak::SoakLog;
 use standalone::osc::{OscSink, Telemetry, rms_of};
@@ -2495,9 +2495,9 @@ fn startup_preset_names() -> Vec<String> {
         PresetDir::Override(dir) | PresetDir::Default(dir) => dir,
         PresetDir::Unresolved => PathBuf::new(),
     };
-    let from_dir = lmv_core::preset::load_dir(&dir).presets;
+    let from_dir = rlx_core::preset::load_dir(&dir).presets;
     let set = if from_dir.is_empty() {
-        lmv_core::preset::default_presets()
+        rlx_core::preset::default_presets()
     } else {
         from_dir
     };
@@ -3198,7 +3198,7 @@ fn seed_preset_dir(dir: &Path) {
     if dir.as_os_str().is_empty() {
         return;
     }
-    match lmv_core::preset::seed_dir(dir) {
+    match rlx_core::preset::seed_dir(dir) {
         Ok(0) => {}
         Ok(n) => eprintln!("seeded {n} curated preset(s) into {}", dir.display()),
         Err(err) => eprintln!("could not seed presets into {}: {err}", dir.display()),
@@ -3232,7 +3232,7 @@ fn dir_signature(dir: &Path) -> Option<(u128, usize)> {
 /// too: the preset still loads and renders, and the mistake is not silent
 /// (ADR-0020).
 fn reload_presets(renderer: &mut Renderer, dir: &Path) {
-    let report = lmv_core::preset::load_dir(dir);
+    let report = rlx_core::preset::load_dir(dir);
     for (path, err) in &report.errors {
         eprintln!("preset {}: {err}", path.display());
     }
@@ -3296,7 +3296,7 @@ fn warn_cap_overflow(renderer: &Renderer) {
 /// side by side is also the only way to see whether the two describe the same
 /// GPU with the same string, which is what the no-flag default rests on.
 fn list_adapters_and_exit() {
-    let renderer_roster = lmv_core::render::list_adapters();
+    let renderer_roster = rlx_core::render::list_adapters();
     if renderer_roster.is_empty() {
         eprintln!("renderer (wgpu): no adapters enumerated");
     } else {

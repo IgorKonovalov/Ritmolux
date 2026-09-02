@@ -34,9 +34,9 @@
 /// The shared ADR-0016 skip and headless constructors.
 mod common;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer};
 
 /// Capture size. Small on purpose: every assertion counts pixels over the whole
 /// frame, and none of the properties vary with resolution.

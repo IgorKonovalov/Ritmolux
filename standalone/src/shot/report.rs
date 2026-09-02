@@ -14,17 +14,17 @@
 
 use std::fmt::Write as _;
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
-use lmv_core::preset::{
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
+use rlx_core::preset::{
     GateFlag, GateKind, Observations, Preset, SATURATED_OCCUPANCY, SystemKind, Variables,
 };
-use lmv_core::render::metrics::{
+use rlx_core::render::metrics::{
     StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, quadrant_spread,
     segment_settled, step_response, struct_diff,
 };
-use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
-use lmv_core::render::{CaptureImage, Renderer, Tier};
+use rlx_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
+use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 use crate::shot::film::FILMSTRIP_WARMUP;
 use crate::shot::json::{json_matrix, json_string, json_transient, num};
@@ -596,7 +596,7 @@ const REACH_INDEX_SAMPLES: usize = 5;
 /// ADR-0042 adds beside the frame differentials.
 fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
     let format = REACH_FORMAT;
-    let pcm = lmv_core::signal::dynamic_groove(REACH_BPM, REACH_SECS, format);
+    let pcm = rlx_core::signal::dynamic_groove(REACH_BPM, REACH_SECS, format);
     let mut analyzer = Analyzer::new(format).map_err(|e| format!("reachability analyzer: {e}"))?;
     let hop_samples = HOP_SIZE * format.channels as usize;
     let mut frames = Vec::new();

@@ -9,7 +9,7 @@
 //! **This crate exists so the rest of the workspace stops paying for it**
 //! (ADR-0072). It is the only crate declaring `cdylib`/`staticlib`, and its
 //! whole contents are this file — so an ABI change is a diff in a crate whose
-//! entire purpose is the ABI. It reaches `lmv-core` through that crate's public
+//! entire purpose is the ABI. It reaches `rlx-core` through that crate's public
 //! surface only; nothing widened in visibility to make the split compile.
 //!
 //! # Threading contract (mirrored in the header)
@@ -35,16 +35,16 @@
     clippy::unreachable
 )]
 // The ABI is the crate's whole public surface; it stays documented for the same
-// reason `lmv-core` does (Plan 0002 Phase 0).
+// reason `rlx-core` does (Plan 0002 Phase 0).
 #![warn(missing_docs)]
 
 use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
-use lmv_core::dsp::Analyzer;
-use lmv_core::preset::{self, Preset};
-use lmv_core::render::Renderer;
+use rlx_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
+use rlx_core::dsp::Analyzer;
+use rlx_core::preset::{self, Preset};
+use rlx_core::render::Renderer;
 
 /// Bump on any ABI shape change (with the accompanying ADR). v2 added
 /// `lmv_load_presets` (ADR-0006); v3 added `lmv_set_debug` + `lmv_get_metrics`

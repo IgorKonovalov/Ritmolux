@@ -1,7 +1,7 @@
 # The shared brain: DSP + render engine + scenes (ADR-0001).
-# Package is named lmv-core because plain "core" collides with the std `core` crate.
+# Package is named rlx-core because plain "core" collides with the std `core` crate.
 [package]
-name = "lmv-core"
+name = "rlx-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,10 +12,10 @@ repository.workspace = true
 publish = false
 
 [lib]
-name = "lmv_core"
+name = "rlx_core"
 # rlib only (ADR-0072). Every consumer in this workspace links the rlib: the
 # standalone, all integration test targets and both examples. The cdylib and
-# staticlib the foobar C++ shim links now come from the `lmv-core-cabi` crate,
+# staticlib the foobar C++ shim links now come from the `rlx-core-cabi` crate,
 # so a core edit stops re-emitting ~550 MB of artifacts nobody in the command's
 # dependency graph reads.
 crate-type = ["rlib"]
@@ -26,7 +26,7 @@ workspace = true
 [dependencies]
 # The lock-free SPSC ring, extracted so Miri can check its `unsafe` without our
 # wgpu graph (Plan 0005). Intra-workspace path dep, re-exported by `audio`.
-lmv-ring = { path = "../lmv-ring" }
+rlx-ring = { path = "../rlx-ring" }
 # FFT for the spectrum path. Pure Rust, ~5 transitive deps (num-* family),
 # no unsafe SIMD requirements — well under the NFR 4 dependency gate.
 rustfft = "=6.4.1"

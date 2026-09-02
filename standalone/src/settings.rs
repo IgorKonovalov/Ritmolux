@@ -13,7 +13,7 @@
 //! [`InputMode`] — because the rows carrying them are
 //! switches over a closed set, and a row that re-spelled the value could
 //! disagree with what `config.toml` holds. Only one of the two is a config type:
-//! `Tier` is `lmv_core::render::Tier`, a core type a config key happens to name.
+//! `Tier` is `rlx_core::render::Tier`, a core type a config key happens to name.
 //! Both are `Copy` value types, not the `Config` struct, so nothing here reads
 //! or writes a file.
 //!
@@ -25,7 +25,7 @@
 //! up/down/wrap of about ten lines. They agree where it matters — both wrap
 //! vertically — and that agreement is asserted here rather than inherited.
 
-use lmv_core::render::Tier;
+use rlx_core::render::Tier;
 
 use crate::config::InputMode;
 

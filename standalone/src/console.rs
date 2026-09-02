@@ -16,7 +16,7 @@
 //! The console owns no state of its own yet — it is a second destination, not a
 //! second model.
 
-use lmv_core::render::TextRun;
+use rlx_core::render::TextRun;
 
 /// One positioned line of text, owned so the routing can move it between
 /// destinations without borrowing the roster it was built from.

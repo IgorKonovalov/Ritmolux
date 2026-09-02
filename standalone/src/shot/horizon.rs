@@ -40,10 +40,10 @@
 use std::fmt::Write as _;
 use std::time::Instant;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::metrics::{coverage, footprint_diff, peak_to_mean};
-use lmv_core::render::{CaptureImage, Tier};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::metrics::{coverage, footprint_diff, peak_to_mean};
+use rlx_core::render::{CaptureImage, Tier};
 
 use crate::shot::json::{json_string, num};
 

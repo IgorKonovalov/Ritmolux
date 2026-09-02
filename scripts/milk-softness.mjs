@@ -32,7 +32,7 @@
 // restore is also wired to SIGINT/SIGTERM/SIGHUP and to `process.on("exit")`,
 // all of which are synchronous writes of one small file.
 //
-// The whole sweep is four release builds of `lmv-core` plus its dependents, and
+// The whole sweep is four release builds of `rlx-core` plus its dependents, and
 // it takes upward of ten minutes. Run it detached rather than under anything
 // that will cut it off. If it is ever killed anyway, check that file first:
 //   git diff core/src/render/scenes/warp_mesh/mod.rs

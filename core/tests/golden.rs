@@ -20,9 +20,9 @@
 //! the test skips there per ADR-0016) and must be blessed on WARP. Eyeball each
 //! before blessing (Plan 0013 Phase 8 habit).
 
-use lmv_core::preset::{Preset, SystemKind};
-use lmv_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
-use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::preset::{Preset, SystemKind};
+use rlx_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 
 mod common;
 
@@ -188,7 +188,7 @@ fn scenes_match_golden_baselines() {
 
         assert!(
             path.exists(),
-            "missing baseline {} — run `LMV_BLESS=1 cargo test -p lmv-core --test golden`",
+            "missing baseline {} — run `LMV_BLESS=1 cargo test -p rlx-core --test golden`",
             path.display()
         );
         let baseline = common::decode(&path);

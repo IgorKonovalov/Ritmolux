@@ -93,9 +93,9 @@ mod common;
 
 use std::time::Instant;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer};
 
 /// A realistic frame for this scene, not a stress test: the size the standalone
 /// opens at. `shape_field` covers every pixel, so this is its whole cost.

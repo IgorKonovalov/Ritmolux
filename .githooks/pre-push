@@ -151,7 +151,7 @@ fi
 
 run_step "cargo fmt --all --check" cargo fmt --all --check
 # `--workspace` matches what CI now runs, and is load-bearing since ADR-0072:
-# `lmv-core-cabi` sits outside the workspace default-members, so a bare `cargo
+# `rlx-core-cabi` sits outside the workspace default-members, so a bare `cargo
 # clippy` / `cargo nextest run` silently stops covering the C ABI entirely.
 run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 

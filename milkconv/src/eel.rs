@@ -1,7 +1,7 @@
 //! EEL2 → bytecode: the compiler half of Plan 0100's seam.
 //!
 //! **This never ships.** It parses the imperative program text a `.milk` file
-//! carries and emits the [`EelProgram`] `lmv-core`'s VM executes, ahead of time
+//! carries and emits the [`EelProgram`] `rlx-core`'s VM executes, ahead of time
 //! (ADR-0113).
 //!
 //! # The language, as MilkDrop uses it
@@ -34,15 +34,15 @@
 //! Every construct it emits is **stack-balanced**: each branch of a conditional
 //! pushes exactly one value, every statement leaves one, and a `;` pops the one
 //! before it. That is what makes the linear stack walk in
-//! [`EelProgram::new`](lmv_core::milk::bytecode::EelProgram) exact rather than
+//! [`EelProgram::new`](rlx_core::milk::bytecode::EelProgram) exact rather than
 //! approximate, and it is why the compiler runs its own output through that
 //! constructor before returning: a codegen bug is a converter failure, not a
 //! preset that renders wrong.
 
 use std::collections::HashMap;
 
-use lmv_core::milk::MilkBundle;
-use lmv_core::milk::bytecode::{Binary, EelProgram, Mem, Op, Unary};
+use rlx_core::milk::MilkBundle;
+use rlx_core::milk::bytecode::{Binary, EelProgram, Mem, Op, Unary};
 
 /// Where a compile failed, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -972,7 +972,7 @@ pub fn compile_bundle(
         // (ADR-0118). Emitted as the default rather than as a key, so a
         // converted bundle carries no `quantize_steps` line at all and the
         // engine's own default is the single place the number lives.
-        quantize_steps: lmv_core::milk::DEFAULT_QUANTIZE_STEPS,
+        quantize_steps: rlx_core::milk::DEFAULT_QUANTIZE_STEPS,
     };
     Ok((bundle, symbols))
 }

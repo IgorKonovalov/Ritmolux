@@ -28,9 +28,9 @@
 /// The shared ADR-0016 skip and headless constructors.
 mod common;
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer};
 
 /// Capture size for the ramp probes. Square, because the ramp's own properties
 /// (continuity, direction, easing) do not vary with aspect — the one test that

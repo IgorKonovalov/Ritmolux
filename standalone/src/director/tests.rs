@@ -274,7 +274,7 @@ fn inverted_dwell_config_is_clamped() {
 /// alone.
 #[test]
 fn a_rotation_the_director_asks_for_changes_the_preset() {
-    use lmv_core::render::{HeadlessOptions, Renderer};
+    use rlx_core::render::{HeadlessOptions, Renderer};
 
     let Ok(mut renderer) = Renderer::new_headless(HeadlessOptions {
         width: 64,

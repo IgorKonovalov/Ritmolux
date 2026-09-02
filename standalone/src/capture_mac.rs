@@ -20,7 +20,6 @@ use std::time::Duration;
 
 use block2::RcBlock;
 use dispatch2::{DispatchQueue, DispatchRetained};
-use lmv_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2::{AllocAnyThread, DefinedClass, define_class, msg_send};
@@ -35,6 +34,7 @@ use objc2_screen_capture_kit::{
     SCContentFilter, SCShareableContent, SCStream, SCStreamConfiguration, SCStreamOutput,
     SCStreamOutputType,
 };
+use rlx_core::audio::{AudioFormat, SampleConsumer, SampleProducer, intake};
 
 /// Same headroom as the Windows path (~340 ms @ 48 kHz stereo).
 const RING_CAPACITY_FRAMES: usize = 16_384;
@@ -55,7 +55,7 @@ pub enum CaptureError {
     ShareableContent(String),
     NoDisplay,
     Stream(String),
-    Format(lmv_core::audio::FormatError),
+    Format(rlx_core::audio::FormatError),
     Timeout,
 }
 

@@ -21,7 +21,7 @@
 
 use std::fmt;
 
-use lmv_core::audio::AudioFormat;
+use rlx_core::audio::AudioFormat;
 
 /// What `start_capture` concluded.
 ///

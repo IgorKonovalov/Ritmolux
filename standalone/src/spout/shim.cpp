@@ -113,7 +113,7 @@ LmvSpout *lmv_spout_create(const char *sender_name, unsigned int width, unsigned
 }
 
 // Publish one frame. `rgba` is `width * height * 4` bytes of tight, row-major,
-// top-to-bottom RGBA8 - the layout `lmv_core`'s CaptureImage already returns.
+// top-to-bottom RGBA8 - the layout `rlx_core`'s CaptureImage already returns.
 // Returns 1 on success, 0 on failure.
 //
 // No conversion and no copy of our own: the sender's format matches these

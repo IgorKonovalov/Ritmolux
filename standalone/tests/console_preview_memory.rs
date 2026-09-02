@@ -22,8 +22,8 @@
 //! Software adapter (`prefer_software`) so it runs wherever the hardware-gated
 //! cases skip.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::render::{HeadlessOptions, RenderError, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
 use standalone::shot::render::ResidentSet;
 
 /// Frames driven through one open preview — 5 s at 60 fps.

@@ -2,7 +2,7 @@
 # baseline (Plan 0053 Phase 1, ADR-0058).
 #
 # BLESS IT BY ITS OWN FILTER:
-#   LMV_BLESS=1 cargo test -p lmv-core --test attractor_trails
+#   LMV_BLESS=1 cargo test -p rlx-core --test attractor_trails
 # It has its own test binary for exactly that reason - `LMV_BLESS` is not scoped
 # to a fixture, so blessing this one from `--test golden` or the whole suite
 # would rewrite every other baseline in `core/tests/golden/` at the same time.

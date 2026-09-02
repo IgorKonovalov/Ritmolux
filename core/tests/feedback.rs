@@ -40,8 +40,8 @@
 
 use std::f32::consts::{PI, TAU};
 
-use lmv_core::preset::Preset;
-use lmv_core::render::{CaptureImage, Renderer, metrics::frame_diff};
+use rlx_core::preset::Preset;
+use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 
 mod common;
 

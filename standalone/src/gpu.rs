@@ -14,7 +14,7 @@
 //! Everything here is a pure function over rosters passed in, so it is testable
 //! with no GPU, no audio device and no Spout SDK.
 
-use lmv_core::render::AdapterChoice;
+use rlx_core::render::AdapterChoice;
 
 /// What the sender should do about its adapter, and what to tell the operator.
 #[derive(Debug, Clone, PartialEq, Eq)]

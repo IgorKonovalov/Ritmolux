@@ -6,8 +6,8 @@
 //! ADR-0033 Alt E). Dimensions and offsets are the part that can be wrong in a
 //! way a human would not notice, so they are the part worth testing.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{HOP_SIZE, WARMUP_HOPS};
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{HOP_SIZE, WARMUP_HOPS};
 
 /// Hops skipped at the start so the strip samples past the analyzer's warm-up.
 ///

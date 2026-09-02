@@ -20,12 +20,12 @@
 //! which is the stage that was missing entirely until this test's sibling
 //! assertions went looking for it.
 
-use lmv_core::dsp::WAVE_SAMPLES;
-use lmv_core::milk::outputs::FrameOutputs;
-use lmv_core::milk::{MilkBundle, MilkRuntime};
-use lmv_core::preset::Preset;
-use lmv_core::render::scenes::GeneratorConfig;
-use lmv_core::render::scenes::warp_mesh::draw;
+use rlx_core::dsp::WAVE_SAMPLES;
+use rlx_core::milk::outputs::FrameOutputs;
+use rlx_core::milk::{MilkBundle, MilkRuntime};
+use rlx_core::preset::Preset;
+use rlx_core::render::scenes::GeneratorConfig;
+use rlx_core::render::scenes::warp_mesh::draw;
 
 /// A minimal `.milk` file with one enabled custom shape whose per-frame program
 /// computes every number the draw layer reads.
@@ -310,7 +310,7 @@ fn a_waves_per_point_state_carries_to_the_next_point() {
 
     let mut runtime = MilkRuntime::new(bundle, 0);
     runtime.run_frame(
-        &lmv_core::dsp::AnalysisFrame::default(),
+        &rlx_core::dsp::AnalysisFrame::default(),
         0.0,
         1.0 / 30.0,
         (32, 24),
@@ -366,7 +366,7 @@ fn flip_runtime(text: &str) -> MilkRuntime {
 /// One frame of `count` points: the per-frame program, then the walk.
 fn flip_frame(runtime: &mut MilkRuntime, count: usize) -> Vec<f32> {
     runtime.run_frame(
-        &lmv_core::dsp::AnalysisFrame::default(),
+        &rlx_core::dsp::AnalysisFrame::default(),
         0.0,
         1.0 / 30.0,
         (32, 24),
@@ -451,7 +451,7 @@ fn a_waves_per_point_state_also_carries_across_the_frame_boundary() {
 /// Every `wave_mode` the reference has.
 const WAVE_MODES: [f32; 8] = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 
-fn segment_length(s: &lmv_core::render::scenes::lines::SegmentInstance) -> f32 {
+fn segment_length(s: &rlx_core::render::scenes::lines::SegmentInstance) -> f32 {
     (s.b[0] - s.a[0]).hypot(s.b[1] - s.a[1])
 }
 
@@ -568,20 +568,20 @@ fn the_dotted_trace_reaches_the_screen_at_every_resolution() {
         .join("core/tests/fixtures/scratch-0108/wave-dots.milk");
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("the Phase 4 fixture must be readable at {path:?}: {e}"));
-    let frame = lmv_core::dsp::AnalysisFrame {
+    let frame = rlx_core::dsp::AnalysisFrame {
         waveform: trace(),
         ..Default::default()
     };
 
     for (w, h) in [(320u32, 180u32), (960u32, 540u32)] {
         let mut renderer =
-            match lmv_core::render::Renderer::new_headless(lmv_core::render::HeadlessOptions {
+            match rlx_core::render::Renderer::new_headless(rlx_core::render::HeadlessOptions {
                 width: w,
                 height: h,
                 prefer_software: true,
             }) {
                 Ok(r) => r,
-                Err(lmv_core::render::RenderError::RequestAdapter(_)) => {
+                Err(rlx_core::render::RenderError::RequestAdapter(_)) => {
                     eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
                     return;
                 }
@@ -590,7 +590,7 @@ fn the_dotted_trace_reaches_the_screen_at_every_resolution() {
 
         // One frame, so what is measured is the light this draw layer laid down
         // rather than several frames of it integrated by the feedback field.
-        let bright = |renderer: &mut lmv_core::render::Renderer, label: &str, src: &str| -> usize {
+        let bright = |renderer: &mut rlx_core::render::Renderer, label: &str, src: &str| -> usize {
             let file = milkconv::milk::parse(src).expect("the fixture parses as a .milk file");
             let converted = milkconv::convert::convert(&file, label).expect("it converts");
             let mut preset = Preset::from_toml_str(&converted.toml)

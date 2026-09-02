@@ -6,7 +6,7 @@
 //! catch. This tool only measures — redesigning too-similar presets is separate
 //! content work (a Plan 0013 followup).
 //!
-//! Run with: `cargo test -p lmv-core --test distinctness -- --nocapture`
+//! Run with: `cargo test -p rlx-core --test distinctness -- --nocapture`
 //!
 //! **Cost, measured at Plan 0067 Phase 1c** when the family list went from six
 //! to all nine: 25 captures -> 41, and the wall clock **22 s -> 41 s**
@@ -16,8 +16,8 @@
 //! stateful-feedback one, and both cost more per frame than the six line and
 //! fragment families that were already here.
 
-use lmv_core::preset::{SystemKind, default_presets};
-use lmv_core::render::{
+use rlx_core::preset::{SystemKind, default_presets};
+use rlx_core::render::{
     CaptureImage,
     metrics::{frame_diff, struct_diff},
 };

@@ -14,9 +14,9 @@
 //! the other GPU suites): distinct headless renderers built in parallel each
 //! spin up a WARP device and can crash the software driver.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::{
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::{
     CaptureImage,
     metrics::{coverage, frame_diff, quadrant_spread},
 };

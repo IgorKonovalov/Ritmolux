@@ -32,10 +32,10 @@ core/            # Rust library crate — DSP + render engine + scenes + preset 
                  #   from milkconv/, the ahead-of-time converter below.
   src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
 core-cabi/       # the C ABI and nothing else (ADR-0072) — the only crate declaring
-                 #   cdylib/staticlib, emitted stem `lmv_core_c`. src/lib.rs + include/lmv_core.h
+                 #   cdylib/staticlib, emitted stem `rlx_core_c`. src/lib.rs + include/lmv_core.h
                  #   + tests/ffi.rs. OUTSIDE workspace `default-members`, so `--workspace` is
                  #   load-bearing on every test/clippy invocation that must cover the ABI.
-lmv-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
+rlx-ring/        # the lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI
 standalone/      # Rust binary + lib — winit + wgpu surface + loopback capture + the `shot` example
 plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows-first)
 milkconv/        # the MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships and
@@ -70,7 +70,7 @@ There was briefly a second half: [ADR-0141](../../../../docs/adrs/0141-one-artif
 redirected `build.target-dir` to one shared store, and
 [ADR-0147](../../../../docs/adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
 revoked it the following day. **The worktree path is not in cargo's fingerprint**, so two lanes with
-the same layout and dependency graph were served each other's compiled `lmv-core` as fresh — Plan
+the same layout and dependency graph were served each other's compiled `rlx-core` as fresh — Plan
 0115's lane compiled against a `core` that does not contain its own methods.
 
 What this changes when you design:
@@ -91,14 +91,14 @@ Rust (run from repo root):
 
 - Build everything: `cargo build`
 - Run the standalone: `cargo run -p standalone`
-- Tests: `cargo test --workspace` (or `cargo test -p lmv-core` for just the core — the package is
-  `lmv-core`, not `core`; the directory and the package name differ)
+- Tests: `cargo test --workspace` (or `cargo test -p rlx-core` for just the core — the package is
+  `rlx-core`, not `core`; the directory and the package name differ)
 - Lints (treated as errors): `cargo clippy --workspace --all-targets -- -D warnings`
 - Format check: `cargo fmt --all --check`  (apply: `cargo fmt --all`)
-- Build the C-ABI artifacts: `cargo build -p lmv-core-cabi` (emits `lmv_core_c.lib`/`.dll`; the
+- Build the C-ABI artifacts: `cargo build -p rlx-core-cabi` (emits `rlx_core_c.lib`/`.dll`; the
   header is hand-maintained at `core-cabi/include/lmv_core.h`, no `cbindgen` — ADR-0003)
 
-**`--workspace` is load-bearing, not stylistic** (ADR-0072): `lmv-core-cabi` is outside the workspace
+**`--workspace` is load-bearing, not stylistic** (ADR-0072): `rlx-core-cabi` is outside the workspace
 `default-members`, so the bare forms come back green having never touched the C ABI.
 
 foobar plugin (Windows, C++): built with its own project/toolchain under `plugin-foobar/` linking

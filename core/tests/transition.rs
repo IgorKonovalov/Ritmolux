@@ -11,10 +11,10 @@
 //! filmstrip PNG for eyeballing; the assertions below are what actually guards
 //! the behavior.
 
-use lmv_core::dsp::AnalysisFrame;
-use lmv_core::preset::Preset;
-use lmv_core::render::metrics::{frame_diff, srgb_decode_lut};
-use lmv_core::render::{CaptureImage, Renderer};
+use rlx_core::dsp::AnalysisFrame;
+use rlx_core::preset::Preset;
+use rlx_core::render::metrics::{frame_diff, srgb_decode_lut};
+use rlx_core::render::{CaptureImage, Renderer};
 
 mod common;
 

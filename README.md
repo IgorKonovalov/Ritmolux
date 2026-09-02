@@ -73,8 +73,8 @@ core/                # Rust library crate — the shared brain: DSP + render eng
                      #   Native Rust API (standalone) + C ABI (foobar plugin). No audio-source code.
 core-cabi/           # The C ABI and nothing else — the only crate emitting a cdylib/staticlib,
                      #   plus include/lmv_core.h. Outside `default-members`, so a bare `cargo build`
-                     #   never emits it; `--workspace` and `-p lmv-core-cabi` do. See ADR-0072.
-lmv-ring/            # The lock-free SPSC ring, split out zero-dependency so Miri can check it in CI.
+                     #   never emits it; `--workspace` and `-p rlx-core-cabi` do. See ADR-0072.
+rlx-ring/            # The lock-free SPSC ring, split out zero-dependency so Miri can check it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships,

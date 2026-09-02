@@ -2,7 +2,7 @@
 //! Phase 3).
 //!
 //! [`Renderer::capture_audio_after_warmup`] lets a caller feed hops that publish
-//! their [`AnalysisFrame`](lmv_core::dsp::AnalysisFrame) but never reach a
+//! their [`AnalysisFrame`](rlx_core::dsp::AnalysisFrame) but never reach a
 //! render pass. The reactivity gate spends ~85 % of its frames on exactly that —
 //! `WARMUP_HOPS` renders per capture, at silence, read back by nobody — and the
 //! only thing that makes skipping them safe is that **analysis is a pure
@@ -17,10 +17,10 @@
 //!
 //! Software adapter (`prefer_software`) so it holds on any CI GPU.
 
-use lmv_core::audio::AudioFormat;
-use lmv_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
-use lmv_core::preset::default_presets;
-use lmv_core::signal::click_track;
+use rlx_core::audio::AudioFormat;
+use rlx_core::dsp::{AnalysisFrame, HOP_SIZE, WARMUP_HOPS};
+use rlx_core::preset::default_presets;
+use rlx_core::signal::click_track;
 
 mod common;
 
