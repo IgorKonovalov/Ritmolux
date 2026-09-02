@@ -1,6 +1,11 @@
 # 0143 — The documentation gets a front end
 
-> **Status:** approved
+> **Status:** approved, **parked 2026-09-01**
+> **Parked until:** the application's new name is chosen. The site bakes the project name into
+> the Starlight title, the Pages subpath every published URL carries, and the header of every
+> page — so publishing under `light-music-visualizer` buys a full republish and a dead set of
+> external links as soon as the rename lands. The rename is itself parked with a shortlist
+> (Ritmolux, Clavilux) and no ADR or plan yet; **that decision is the named trigger for this one**.
 > **Created:** 2026-08-30
 > **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
