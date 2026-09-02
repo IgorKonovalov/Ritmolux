@@ -278,7 +278,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | committed with this row |
 | 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | committed with this row |
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | committed with this row |
-| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | not started | |
+| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | committed with this row |
 | 6 — The two seams go home | dev | not started | |
 | 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
 | 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | not started | |
@@ -420,6 +420,40 @@ Eleven types appear across two or more scene files; seven are `wgpu`'s
 match. `OverflowContext` is constructed at five sites and matched at none;
 `Piece` is `matches!`-filtered; `SystemKind` in `common.rs` is an `ALL` iteration.
 `GeneratorConfig` was the only exhaustive fan-out.
+
+**Phase 5.** `star.rs` 1,864 lines becomes `star/{mod,motif,rings}.rs` (970 /
+506 / 500). `build_rings` is **38 lines**, against the done-when's 100: its four
+ring kinds become `push_scallop`, `push_arc_motif`, `push_chain_motif` and
+`push_polyline`, and the `place` closure written three times becomes one
+`Placement::point`. `Kind::from_f32(k.as_f32()) == k` and the WGSL chain check
+are one test, verified non-vacuous by breaking a threshold (`4.5` -> `4.6`),
+which it convicts with both tables printed.
+
+**One sub-item of this phase was not done, and it is deliberate.** The plan asks
+that the `outline_at` arms the `arc_shape` doc calls test-only reference go under
+`#[cfg(test)]`. They cannot, safely. `outline_at` is total today; gating two arms
+makes the release-build match non-exhaustive, so it would need a `_ => {}`, and
+that arm returns an **empty** outline. Whether `Circle` and `Arc` reach
+`outline` in a release build is a runtime property of `build_rings`' branch
+order, not a compile-time one -- the arc path `continue`s before reaching it
+*today*. Trading a total function for a partial one to save twelve lines, on a
+guarantee the compiler stops checking, is the wrong side of that trade. Left for
+`architect`: the comment stating those arms are reference-only is accurate and
+still there.
+
+Three path repairs, same class as the earlier phases:
+
+- **`core/tests/preset.rs`**'s `declared_params_match_set_param` table read
+  `render/scenes/lines/star.rs`; it now reads `star/mod.rs`, where `PARAMS` and
+  `set_param` both still live.
+- The two `#[cfg(test)]` `f32` rosters `ALL_KINDS` and `kind_name` are **retired**
+  rather than kept beside the enum -- `Kind::ALL` and `Kind::name` are the same
+  two things, carrying the same `#[cfg(test)]` gate and the same reason for it.
+- The two new `star/` files needed the panic-denial pragma; `hygiene.rs` caught
+  it, which is that guard working.
+
+`KIND_QUAD` and its seven siblings survive as `const`s defined from
+`Kind::as_f32()`, because ~40 authored spec sites name them.
 
 ### Close triggers
 
