@@ -6399,6 +6399,367 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0126]: 0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
+[0046]: done/0046-transformed-feedback.md
+[0064]: done/0064-the-symmetry-stage-and-the-banded-palette.md
+[0068]: done/0068-why-the-downbeat-rarely-locks.md
+[0079]: done/0079-the-attractor-learns-new-figures.md
+[0080]: done/0080-the-sky-gets-a-horizon.md
+[0081]: done/0081-the-sky-gets-a-galaxy.md
+[0083]: done/0083-the-build-says-why-it-hears-nothing.md
+[0085]: done/0085-the-show-length-horizon-gets-an-instrument.md
+[0086]: done/0086-the-downbeat-finds-a-cue-that-is-not-the-kick.md
+[0088]: done/0088-the-docs-get-pictures.md
+[0089]: done/0089-the-framing-contract-stops-lying.md
+[0095]: done/0095-the-downbeat-fold-gets-a-musical-beat.md
+[0100]: done/0100-the-engine-speaks-milkdrop.md
+[0101]: done/0101-the-engine-renders-a-music-video.md
+[0103]: 0103-the-project-gets-an-audience.md
+[0104]: done/0104-the-library-stops-being-lopsided.md
+[ADR-0109]: ../adrs/0109-the-beat-clock-counts-onsets-not-beats.md
+
+### Moved 2026-09-03 from `README.md` — the 2026-08-16 sequence and everything under it
+
+Three hundred and thirty-five lines that `docs/plans/README.md` carried live while declaring
+themselves spent in their own text — *"Superseded 2026-08-18, kept as the record"*, then *"Prior
+sequence notes follow"*. This section has existed since Plan 0061 to receive exactly this and had
+never been reached for; Plan 0151 Phase 2 is the move, and ADR-0163 adds the close-ceremony step
+that keeps it from accumulating again. Verbatim: nothing is summarized, reworded or dropped, because
+the value of the record is the words the close wrote.
+
+**Superseded 2026-08-18, kept as the record.** The 2026-08-16 sequence follows.
+
+**Rewritten 2026-08-16, when five plans arrived from a competitive review rather than from the
+backlog — and that origin is the thing to know about them.** The user asked how this project
+compares to the field; the answer was that the engine leads on image pipeline and analysis depth
+and trails badly on **content volume and distribution**, neither of which any engine plan
+addresses. So [0100]–[0104] are the first cohort here aimed at the product rather than at the
+renderer, and they sort into two groups that barely interact:
+
+- **The big one is done: [0100](done/0100-the-engine-speaks-milkdrop.md) closed 2026-08-16** — all
+  six dev phases plus the two human ones, the stop condition never fired, and the hedge was not
+  needed. What it left behind: the Phase 7 verdict (**merely different**, re-judged after backlog
+  0106) and the fidelity work list 0106–0108. Its Phase 4 contention with [0087] is discharged.
+- **The cheap ones, in parallel, in this order: [0104] → ~~[0101]~~ → [0103].** 0101 is closed.
+  **[0102](done/0102-the-component-ships.md) is done (closed 2026-08-16), so
+  [0103](0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
+  belongs to 0103 rather than to 0102: the component now ships carrying two filed `Medium` defects
+  a new user meets first ([backlog 0102](../design-backlog.md) and
+  [0103](../design-backlog.md)), and announcing a channel is a poor moment to discover them.
+  [0104](done/0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
+  no engine lane. **[0101](done/0101-the-engine-renders-a-music-video.md) closed 2026-08-17**, so
+  the `standalone/src/shot/` lane is free and the engine can render a music video today.
+  [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
+  of being early is real, since announcing before [0104] lands means visitors judge a library where
+  four of ten systems have a single world. **0101's Phase 5 added a second reason to hold it**: a
+  1080p render currently reads as an upscale ([backlog 0110](../design-backlog.md)), so demo
+  material made before that lands shows the engine at its grainiest.
+
+- ~~**Approved 2026-08-16 from a user request, and it collides with exactly one plan:
+  [0107](done/0107-the-foobar-menu-picks-a-preset.md).**~~ **Resolved 2026-08-18: 0107 went first
+  and closed.** The sequencing question this bullet posed is answered, and the answer costs
+  [0103](0103-the-project-gets-an-audience.md)'s amended Phase 1 something: it now restructures a
+  menu of five items and a whole-roster submenu rather than the two-item one it was scoped against,
+  and 0107's Preset submenu did **not** inherit the layout-edit deference it would have got for
+  free the other way round. [Backlog 0103](../design-backlog.md) carries a dated note saying the
+  same, and its claim is stronger for it — more of the panel's right-click is now unreachable in
+  layout-edit mode. Nothing else about that phase changed; it remains ADR-worthy with no ADR.
+
+- **Added 2026-08-17 from the MilkDrop fidelity backlog:
+  [0108](done/0108-the-milkdrop-import-gets-its-tone-back.md).** It takes backlog 0106 + 0107 and
+  deliberately leaves 0108 (the conversion tail) filed, on that entry's own instruction that its
+  blank-render list is contaminated by both. **It contends with nothing** — `warp_mesh/`, `milkconv/`
+  and `core/src/milk/` are touched by no other live plan — so it can take any free session. Two
+  things order it against itself rather than against the roster: its Phase 2 `human` gate is what
+  makes Plan 0100's central claim re-judgeable, and it grades a tuning the three later phases are
+  judged through, so it sits at position 2 rather than at the end. The sweep that produced it also
+  falsified backlog 0107's own leading suspect before the plan started — `s_fw` is already
+  `AddressMode::Repeat`, and Repeat shifts rather than reflects — which is why Phase 3 names a
+  different hypothesis with arithmetic behind it.
+
+- **Out of sequence by design, and now closed:
+  [0106](done/0106-the-frame-stream-passes-through-a-diffusion-model.md).** It went first because its
+  Phase 1 depended on nothing and its Phase 2 could have ended it for the cost of one afternoon.
+  **That bet paid 2026-08-20**: the spike ran, the look gate passed, and
+  [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md)
+  was written against the evidence instead of a guess — which is what moved realtime out of this
+  plan and into its own, on a measurement rather than an opinion.
+
+- **Taken first and now closed: [0105](done/0105-the-indexes-go-back-to-being-indexes.md)** (user
+  call, 2026-08-16; closed the same day). It went first because it was *preventive* — every plan
+  below writes rows into the three roster files at its close, and with its Phase 6 landed those
+  closes now produce thin rows on their own, checked by `scripts/check-index-rows.mjs` at the same
+  three call sites the link gate occupies. **What that changes for the plans below is one line in
+  their close:** the roster row is a pointer under 320 bytes, and the write-up goes to
+  `README-archive.md`, the ADR body's `Outcome`, or the backlog archive — never into the row.
+
+~~**One sequencing disagreement is left open rather than decided**~~ — **answered 2026-08-18: [0103]
+waits for [0104]**, see the live sequence above. It was left open because it is a product call and
+not an architecture one: [0103] wants [0104] to have landed, and [0104] is four phases of content
+work with two of them blocked on live engine plans. Shipping the announcement against today's
+presets was the defensible other choice — the app is honestly labelled pre-1.0 — and the user made
+it the other way.
+
+**Prior sequence notes follow, and they are the record of how the previous roster ordered itself.**
+
+**Rewritten 2026-08-13, from the backlog sweep that filled the empty roster.** Five plans, and the
+ordering question is genuinely small because **none of them gates another on capability**. What
+orders them is urgency, file contention and who they need:
+
+**Updated 2026-08-13, at [0083]'s close** — it held slot 1 and landed all four `dev` phases the same
+day it was written, so the sequence is **four plans** and the one file-contention constraint the
+list carried is **discharged**: [0085] was told to run in sequence with [0083] rather than in a
+parallel lane because both touch `standalone/src/main.rs`, and [0083] is now off the roster. It can
+take any free session. The numbered list below is otherwise unchanged.
+
+1. ~~**[0083]**~~ — **closed 2026-08-13.**
+2. ~~**[0084]**~~ — **closed 2026-08-13**, also the day it was written. Both gates now check what
+   they claim to; the reactivity sweep's own numbers were recalibrated in the process, so read any
+   reactivity figure recorded before that date as a different measurement.
+3. ~~**[0085]**~~ — **closed 2026-08-15, all five phases** (the `human` Phase 5 was run hours after
+   the close; see Standing). Its
+   "before R0 is designed" constraint turned out to be moot — **R0's governor shipped on
+   2026-07-30** (Plan 0044 / ADR-0045) and does not read `p99` at all, so the qualification Phase 4
+   wrote down guards a *description*, not a live demotion. See roadmap item 3 below.
+4. ~~**[0086]**~~ — **closed 2026-08-15 at Phase 2, by its own gate.** Phase 1's instrument landed
+   and Phase 2's capture ran on three genres; the verdict named a defect upstream of every cue on
+   its shortlist, so Phases 3-5 were superseded rather than executed. Succeeded by **[0095]**,
+   which inherits the slot: same subsystem (`core/src/dsp/`), still contends with nothing, still
+   needs the user once (Phase 5's re-measure). **Read [ADR-0109] before touching anything in
+   `core/src/dsp/tempo.rs` or `downbeat.rs`** — `beat_index` counts onsets, not beats, and two
+   authoring docs currently say otherwise.
+5. **[0087]** — last, and largest. Touches `core/src/render/scenes/lines/` and ~~owes a re-bless~~,
+   so it wants a lane to itself. **It is also the only plan here that can end early**: two separate
+   gates (a cost measurement and a `human` look verdict) can route it to ADR-0098's Alternative C.
+   **2026-08-25: both gates cleared and neither routed it away** — the sparse ring's marginal cost came in
+   at **+0.036 ms**, a fifth of a percent of the 16.67 ms budget, and the look verdict green-lit
+   Phase 5. It ran in its
+   own lane as planned, and the re-bless turned out not to exist.
+
+**[0093](done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md) — CLOSED
+2026-08-15**, the day it was written, all four `dev` phases. The gate exists and runs at all three
+call sites, so the reason it was told to go early — *every close from here on writes new backlog
+entries, and each one written before the gate exists is another entry nobody will mechanically
+check* — is discharged. Its Phase 2 was the cheapest audit this project has of a file it reads to
+decide what to build, and it convicted one entry on the first pass (backlog 0093, corrected in place
+at the close: the RD family is three worlds, not two, and the third was never measured).
+
+**Its review produced [0094](done/0094-the-two-doc-gates-check-what-they-claim-to.md), which also
+closed 2026-08-15** — so the mechanism 0093 built now holds itself up: a live entry with no
+verification bullet is a break, the link gate reads `core/tests/fixtures/` again, and the staleness
+advisory says so rather than guessing on the shallow CI checkout.
+
+**[0091](done/0091-the-figure-fills-the-frame.md) — CLOSED 2026-08-16**, Phases 1-5; the `human`
+Phase 6 carries forward (Standing) and Phase 7 was **cut and filed as
+[backlog 0095](../design-backlog.md)**. Kept because two of the three notes below were predictions
+the close could grade, and one of them was wrong in an instructive direction:
+
+- **It contends with nothing on the roster, and specifically not with [0087].** The obvious route to
+  a nested outline is the line renderer, and [ADR-0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
+  rejects it on measured precedent — ~20 nested thin contours maximise both backlog 0073's faceting
+  and ADR-0098's vertex bead. Taking the per-pixel route instead means the two plans share no file
+  and can run in either order or at the same time.
+- **One phase of it is already 80 % proven and lands first.** A rendered measurement
+  ([ADR-0106](../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)) found that a `multiply`
+  layer reaches luma **18.5** where the additive control cannot go below **181.6** — so
+  design-backlog 0069's "a dark edge cannot exist inside the composite" is **false for field
+  scenes**, and has been since the layer system landed six days after that entry was written.
+  Phase 1 measures the one path left open (does it reach the *backdrop*?) and writes the route down.
+- **Phase 6 is a cut point that may honestly close negative**, and it is the only part of the plan
+  whose value is not already established. *(Written of what the plan file numbers **Phase 7**, the
+  converging fan. It closed negative in the cleanest available way: it was never started, because
+  Phase 1’s answer — a backdrop cannot be darkened by a layer — says a fan floor and a dark figure
+  over it are mutually exclusive at the tones the reference has. It is [backlog 0095](../design-backlog.md).)*
+- **The 80 %-proven phase came back with a correction to its own ADR**, which the note above did not
+  anticipate. Phase 1 settled the open path negatively (multiply does **not** reach the backdrop —
+  at `occlude = 1` the frame is byte-identical over a lit and a black one) **and falsified one of
+  ADR-0106’s Negatives**: a particle layer *can* darken, to luma **0.9**, darker than the field
+  route’s 18.9. The difference between the two routes is **footprint, not capability**. Both are a
+  dated `Outcome` on [ADR-0106](../adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md).
+
+**[0088] closed 2026-08-13**, the day it was written, all seven phases including the `human` look
+call — so its sequencing question is discharged and only one line of it is still live guidance:
+
+- **[0087] invalidates the committed gallery, and that stays priced rather than sequenced.** The
+  line-renderer plan changes what the curve family draws (three mandala presets were already retired
+  on [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)), so
+  `docs/images/gallery/star_pattern.png` and `docs/images/hero.png` owe a re-render once it lands.
+  That is **one argument-free run of `node scripts/docs-shots.mjs`** — the entire reason the images
+  are driven from a committed manifest instead of captured by hand — and nothing gates it.
+  [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md) deliberately has no
+  CI check that would notice, so the re-run belongs in [0087]'s own close.
+- **2026-08-25: not owed yet, and the premise is why.** 0087's first five phases landed and the two
+  gallery images **cannot have moved**: `star_pattern.png` renders `star_rosewindow`, which declares
+  no `rings` roster, and the arc primitive reaches nothing else. The re-render becomes owed the
+  moment a rings preset ships — 0087's own Phase 6 or 7, or [0104]'s Phase 4.
+- **2026-08-26: owed, and BLOCKED — the instrument itself is broken.**
+  [0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md) moved the line stroke's default
+  `softness` from `1.0` to `0.25` and Phase 6 retuned the six line presets, so **all four**
+  line-scene renders — `parametric_curve.png`, `lsystem.png`, `star_pattern.png` and
+  `spectrum.png` — show a stroke the engine no longer draws. The note above is not wrong about
+  arcs; it is simply no longer the only reason. **But `node scripts/docs-shots.mjs` now aborts
+  before rendering anything**: its manifest has no gallery entry for `shape_field`, `warp_mesh` or
+  `shape_collage`, and its own `SystemKind::from_name` cross-check turns that into a hard error.
+  Verified at 0114's close on both the lane and `main`, so it is **pre-existing and not 0114's** —
+  it has been unrunnable since the third of those scenes shipped. Filed as
+  [design-backlog 0133](../design-backlog.md). Until it is repaired, this note is the only record
+  that four committed images are stale, and
+  [ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md) deliberately has
+  no CI check that would notice.
+
+- **2026-08-27, at [0087]'s close: the premise the 08-25 bullet named has now happened.**
+  `presets/star_mandala_bordered.toml` ships, and it is the **first preset in the library to bind a
+  `rings` roster** — so `star_pattern.png` is stale for the arc reason as well as for 0114's
+  stroke reason, and 0087 also added an eighth motif and changed what five of the others draw. The
+  re-render is unambiguously owed and still **blocked on [backlog 0133](../design-backlog.md)**.
+  Nothing changes about the repair; this bullet exists so the next reader does not re-derive whether
+  the trigger fired.
+
+**[0089](done/0089-the-framing-contract-stops-lying.md) — CLOSED 2026-08-15**, and it went the way
+this note predicted: one unattended session, all three phases, no `human` gate. Kept because the
+reasoning is the template for the next short-session plan:
+
+- **It is the only plan on the roster with no `human` phase**, so it closes in one unattended
+  session. All three phases are `dev` and the two doc phases are independent of Phase 1 and of each
+  other, so a session that runs out of room can stop cleanly after any of them.
+- **File contention is genuinely zero against the other four.** Phase 1 touches
+  `core/src/render/scenes/particles/ifs.rs` and its tests; Phases 2-3 touch `presets/README.md`.
+  Nothing else on the roster is in either. The one thing to watch is [0088], which rewrites the
+  *authoring docs* — but it adds `docs/preset-guide.md` and `docs/preset-tuning-walkthrough.md` as new
+  files and leaves the three references' shape alone by
+  [ADR-0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)'s own rule, so
+  the two touch `presets/README.md` for different reasons and in different sections. That ordering
+  held — [0089] landed 2026-08-15, two days after [0088], so the tutorial predates the two facts
+  rather than following them. No conflict resulted; the sections do not overlap.
+- **It gates nothing.** Phase 1 is a contract restatement and a test; it changes no behaviour and
+  moves no pixels.
+
+**[0090](done/0090-the-emitters-source-moves.md) — CLOSED 2026-08-15**, all four `dev` phases; the
+`human` Phase 5 stands (see Standing). Kept because two of the three notes below turned out to be
+predictions the close could grade:
+
+- **It contended with nothing, as written**, and nothing else touched the emitter while it ran.
+- **Phase 3 was the designed cut point and was not cut** — and it is the phase that earned the plan.
+  `prewarm` was not in the interview; it exists because grounding the gate argument found a *second*
+  warm-up the backlog entry never named (the pool starts empty and fills at `spawn_rate`, whatever
+  `source_y` is). **Its measurement named a different wall than the plan expected**: the animation
+  gate passes the sparse draft **cold** at `0.0629` against a `0.01` floor, and it is `sanity` that
+  convicts the slow draft blank at `prewarm = 0` (0 of 10 radial shells) and passes it at
+  `prewarm = 1` (10 of 10). No floor moved — the plan forbade it and the close honoured it.
+- **Its `human` Phase 5 is still the reason the plan exists**, not a trailing verdict: the two looks
+  (a quiet drifting field, and a point fountain) are what backlog 0068 had been asking for, and two
+  questions no test can answer ride it — whether `spawn_fade` actually hides the pop, and whether a
+  prewarmed world switches in badly.
+
+**Three of the five carried a `human` phase**, so none closes in one unattended session — the same
+property the previous roster had. [0083] is the exception that proves it: its four `dev` phases
+closed the plan, and its `human` Phase 5 carried forward under Standing rather than holding it open.
+**[0089] is now a second exception, and a cleaner one**: it has no `human` phase at all.
+
+**One thing worth stating because it is the whole reason these five exist:** the sweep found the
+backlog carrying **twenty discharged entries** it had never archived, and **two entries whose premise
+was false when written** — backlog 0078 and backlog 0081, both asserting an *absence* that the repo
+already contained (those are *backlog* numbers, not the plans this file's `[0078]` / `[0081]`
+resolve to). What was left after that was smaller and much sharper than the raw count suggested.
+
+**Prior sequence notes are kept below as the record of how the roster emptied**, not as live
+guidance.
+
+**Rewritten 2026-08-09, at [0046]'s close, because the shape of this roster changed rather than
+its order.** The previous sequence was written when [0075] had four open engine prerequisites, and
+it opened by naming [0046] "the critical path". **All four have now landed** — [0071], [0064]
+and [0067] within a week of each other, and [0046] at this close. [0068] landed the same day and
+changes nothing downstream by construction (it shipped a diagnosis and no fix, on purpose).
+
+**So there is no critical path any more, and that is the headline.** What is left is three plans
+that no longer gate each other on capability — only on *file contention* and on one deliberate
+preference. Two consequences worth stating plainly, because a reader skimming rows would miss both:
+
+- **[0075]'s Phases 4+ are unblocked.** The renaissance was waiting on this and nothing else. Its
+  Phases 1-3 were already ungated; the whole plan is now takeable.
+- **The [0053]/[0046] concurrency collision is discharged**, not deferred. [0046] landed first,
+  [0053] ran second and has now **closed** (2026-08-09) — so the sequence below is two plans, and
+  the bind-group-layout guard [0076] was told to wait for is in place.
+
+**No plan here closes in one session** — every remaining one carries a `human` phase, so plan on
+bringing the user in rather than picking on that criterion.
+
+**Updated 2026-08-13, at [0079](done/0079-the-attractor-learns-new-figures.md)'s close — and this
+section is now empty, which is the headline.** 0079 held the only slot and landed all six phases,
+both `human` gates included. There is no sequence because there are no plans: every ordering
+question this section has answered since it was rewritten is discharged. The paragraphs below are
+kept as the record of how it emptied, not as live guidance.
+
+**One consequence worth stating before it is rediscovered:** the content lane's standing list grew
+rather than shrank. It is now **four** passes on overlapping ground — [0077]'s quiet sky, [0080]'s
+dusk world, [0081]'s galaxy world, and this plan's own Followup (a content pass binding `tuple` on
+the attractor worlds) — plus [0071]'s `occlude` retune. The first three are one sitting by
+construction; the fourth is a different family and a different sitting.
+
+**Updated 2026-08-12, at [0081](done/0081-the-sky-gets-a-galaxy.md)'s close** — it held slot 1 and
+landed the same day it was written, so the sequence is **one plan** and there is no ordering question
+left. **The engine side of the sky family is finished**: ground ([0080]), dither ([0082]) and band
+([0081]) all shipped inside two days, which means the three standing content items below are now
+authored against a surface that will not move under them. What remains of 0081 is its `human` Phase 6
+— judge the galaxy against the reference photograph — which gates no plan and is listed under
+Standing.
+
+**Updated 2026-08-12, when [0082](done/0082-the-gradient-stops-banding.md) closed** — it held slot 1
+and shipped the same day it was written — from
+settling [0080](done/0080-the-sky-gets-a-horizon.md) Phase 7 rather than from a new want. That phase
+asked whether the ramp bands; it does, measured, and the user's verdict is *"reads as light, but the
+banding is visible"* — so the look passes and the quantization is the defect. **0080's own
+arithmetic pointed the wrong way** ("two pixels per 8-bit level is the classic Mach-band
+configuration" — two px/level is the *safe*, dense case), which is recorded in
+[ADR-0096](../adrs/0096-the-display-write-dithers.md) because that sentence would otherwise send the
+next reader hunting in the bright end. It went **first** by the user's call, and has landed: the galaxy's
+band is a second wide smooth gradient, and building it onto an undithered chain would have confounded
+its own `human` verdict with a defect already known about. [0081](done/0081-the-sky-gets-a-galaxy.md) is
+now unblocked and born onto a chain that dithers.
+
+**Updated 2026-08-12, when [0081](done/0081-the-sky-gets-a-galaxy.md) was written**, hours after [0080]
+closed and from judging that plan's own output in the running app. It goes first by the user's
+explicit call at the interview — offered "ship the sky now and plan the band later" versus "build
+the band first, then author the world once", they chose the second. So this is deliberately *not*
+the smaller-first ordering: the world waits on the capability rather than being authored twice.
+The two plans do not contend for files — 0081 is the backdrop pre-pass, 0079 is the attractor's
+tuple tables — which is the same non-collision [0080] and [0079] had.
+
+**One consequence worth stating, because it is easy to miss:** the content lane now has **three**
+standing items on one family of looks — [0077]'s Phase 5 (Perseids' quiet sky), [0080]'s Phase 7
+(the dusk ground), and this plan's world. They are one pass, not three, and walking the family once
+is the point.
+
+**Updated 2026-08-12, at [0080](done/0080-the-sky-gets-a-horizon.md)'s close.** It landed — all
+six `dev` phases, no blockers and no majors at review — so the sequence is **one plan**, and for
+the first time since this section was rewritten there is no ordering question left to answer. Its
+Phase 7 (judge the dusk ground against the reference photo) is `human` and standing, not queued;
+see Standing below. It gates nothing, and by construction it does not contend with [0079] for files.
+
+**Updated 2026-08-12, at [0078](done/0078-the-ink-learns-to-bite.md)'s close.** The second of the
+three landed — both `dev` phases, no blockers at review — so the sequence is one plan. Its Phase 3
+(the ink worlds re-judge, content lane) is standing, not queued; see Standing below. It does not
+gate [0079].
+
+**Updated 2026-08-12, at [0077](done/0077-the-quiet-sky.md)'s close.** The first of the three
+promoted handoff plans landed — all four `dev` phases, no blockers at review — so the sparse
+idiom is gateable *before* any more sparse content is authored, which was the whole point of
+its position. Its Phase 5 (the quiet sky itself, content lane) is standing, not queued — see
+Standing below; it does not gate 0078 or 0079.
+
+**Updated 2026-08-11, at [0075]'s close.** The renaissance is done — the sequence's anchor
+("[0075] last by design") is discharged, and what remains is exactly the three promoted
+handoff plans in the order the [0076]-close note below already set: **0077, then 0078, then
+0079**.
+
+**Updated 2026-08-11, at [0076]'s close.** The 2026-08-11 handoff confirmation ("[0076] remains
+the next execution step") is discharged — [0076] landed the same day, all five phases, no
+blockers at review. Cohort 6 authors against `presets/README.md`'s new `[layer]` section.
+**The promoted handoff items have their plans** (written the same day, user-decided by
+interview): [0077](done/0077-the-quiet-sky.md) (sparse idiom + swarm individuation, closes
+0009/0068/0085/0088), [0078](done/0078-the-ink-learns-to-bite.md) (ink contrast, closes 0084),
+[0079](done/0079-the-attractor-learns-new-figures.md) (tuple roster + measured morph paths, closes
+0055). Execution order after [0075]'s remainder: **0077, then 0078 (small — any free
+session), then 0079** (largest, two `human` curation gates).
 
 ## 0109 — The MilkDrop import gets its geometry back
 
