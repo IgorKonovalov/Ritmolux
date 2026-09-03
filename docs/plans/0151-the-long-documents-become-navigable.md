@@ -353,8 +353,8 @@ const anchor = (heading) =>
 | 1 — The generator, proved on one real document | dev | done | `e450092` |
 | 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `a428ad1` |
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
-| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | committed with this row |
-| 5 — The remaining four documents carry blocks | dev | not started | |
+| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
+| 5 — The remaining four documents carry blocks | dev | done | committed with this row |
 | 6 — The carrier | dev | not started | |
 
 ### Notes
@@ -435,6 +435,23 @@ meaning changes when de-indented (no `#`, `---`, `===`, `>`, `|` or `[label]:` a
 headings" counted only the `##` headings; the file also carried three `###` before this plan
 (`0123`, `0127` and the Plan 0129 sequencing note), and Phase 2 added a fourth. So 4 `##` + 137
 `###` = 141, and nothing is missing.
+
+**Phase 5.** Row counts, against the plan's predictions: `presets/README.md` **53** (predicted 53),
+`docs/plans/README.md` **11** (predicted "11 minus whatever Phase 2 removed" — Phase 2 removed no
+heading, so 11), `docs/design-backlog-archive.md` **161** (predicted 160 + 1). All six documents
+carry a block; the corpus total is 442 rows.
+
+**`docs/design-backlog.md` is 55, not the "about 51" predicted, and the arithmetic behind that
+prediction contradicts Phase 3's own scope.** Phase 5 says "55 `##` today, less the two sections
+Phase 3 removes", but Phase 3 does not remove either heading: it says the probe grammar is
+*"replaced by a pointer of about six lines"* and that `## Where the closed entries went`
+*"moves to the archive, **leaving** about six lines that say where the archive is"*. Both headings
+therefore still exist with a short live body under each, which is what the Phase 3 done-when asks
+for. 55 is the count that follows; nothing was skipped.
+
+`presets/README.md`'s `## Systems and their named parameters` — the 1,660-line lookup table — now
+lists eleven rows by system, `fragment_field` and `shape_field` and `warp_mesh` and `shape_collage`
+among them, each anchor keeping its underscores.
 
 ### Close triggers
 
