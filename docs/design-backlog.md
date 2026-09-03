@@ -11,54 +11,27 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 
 ## Every live entry carries a probe, and something re-runs it
 
-That rule above used to live only in this paragraph, and four entries were falsified anyway (0052,
-0078, 0081, 0082 — two of them wrong on the day they were written). So since
-[ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) the mechanical
-half of a verification moves out of the sentence and into something a script can re-run:
-`scripts/check-backlog-claims.mjs`, at the three call sites the doc-link checker already occupies
-(`pre-push`, the architect close ceremony, and the CI `links` job, which is the un-bypassable one).
+Since [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) the
+mechanical half of a verification is a dated bullet a script re-runs, at the three call sites the
+doc-link checker already occupies (`pre-push`, the architect close ceremony, and the CI `links` job,
+which is the un-bypassable one). **`scripts/check-backlog-claims.mjs` is the authority on the
+grammar** — it is the parser, so a second copy here could only drift away from it. Its header
+carries the three forms, the tracked-path rule and the regex-escaping caveat, and the advisory half.
+Enforced, not advised: a live `##` entry with no dated bullet under it reds the gate at its own line.
 
-**Write a dated bullet with the claim's reduction inside an inline-code span**, in one of three
-forms. `<path>` is a file or a directory from the repo root; `<regex>` is JavaScript regex source,
-so a literal dot needs escaping. **This is enforced, not advised** — since Plan 0094 a live `##`
-entry with no dated bullet beneath it reds the gate at its own line, because "every live entry
-carries a probe" was the half of the rule a checker built out of the bullets it finds could not see:
+Three things the parser cannot tell you, and they are why the probe sits beside the claim rather
+than in a manifest:
 
-```markdown
-- **Verified 2026-08-15** — the governor does not exist: `absent: sustained_miss in: core/src`
-- **Verified 2026-08-15** — the rule is documented, and here: `present: G = C / 0\.85 in: presets/README.md`
-- **Verified 2026-08-15** — `unprobeable: this is a judgement about rendered output, not a claim
-  about repo contents`
-```
-
-(Those three are examples and the first is deliberately false today, which is why the checker skips
-fenced blocks — a document describing the grammar is not making a claim.)
-
-Three things to know before writing one:
-
-- **Green means the stated reduction still holds, never that the entry is true.** Entry 0081's
-  stamp was dated, recent and accurate, and verified the half of the entry that survived rather
-  than the half in its own title. A probe only checks the reduction its author chose, and whether
-  that reduction covers the claim is something a reader has to see — which is why the probe sits
-  beside the claim rather than in a manifest.
+- **Green means the stated reduction still holds, never that the entry is true.** A probe checks
+  only the reduction its author chose; whether that reduction covers the claim is for a reader to
+  see. Entry 0081's stamp was dated, recent, accurate — and verified the half of the entry that
+  survived rather than the half in its own title.
 - **Prefer the narrowest path that carries the claim** (`core/src/render/tier.rs`, not `core/src`).
-  A narrow path keeps the staleness advisory quiet, and it is a better probe for the same reason.
+  It keeps the staleness advisory quiet, and it is the better probe for the same reason.
 - **`absent:` on a common word is a probe that can never fail**, and it reads as verification while
-  checking nothing. If a claim has no honest reduction, say so with `unprobeable: <why>` — the
-  checker accepts it, prints every one of them in its advisory, and that visible, countable roster
-  is what keeps the opt-out from becoming a blanket.
-
-**Staleness is an advisory and never a failure.** After the pass/fail line the checker asks
-`git log` when each probed path was last touched and names the entries whose subject has moved
-since anyone read them. It cannot tell a commit that invalidates a claim from one that does not, so
-making it a gate would mean firing constantly at a broad path or saying nothing at a narrow one —
-it is a report instead, and it never changes the exit code. It also **withholds itself rather than
-guessing**: on a shallow clone — which is what the CI `links` job checks out — `git log -1` returns
-the tip commit for every path, so the block prints a notice in place of a roster it did not measure.
-The pre-push hook and the close ceremony run on a full checkout and get the real reading.
-
-**The archive is out of scope and stays out.** An archived entry is a closed record whose value is
-the correction it carries; re-probing it would be checking history against the present.
+  checking nothing. A claim with no honest reduction says so — `unprobeable: <why>`, which the
+  checker accepts and rosters, and that visible count is what keeps the opt-out from becoming a
+  blanket.
 
 **The lifecycle, in one line:** raised here → **PROMOTED** (an ADR and/or a plan now exists; the
 entry stays in this file, because a design that has not landed is still live) → **CLOSED** (the
@@ -66,66 +39,14 @@ plan landed; the entry moves to the archive and leaves a ledger row behind).
 
 ## Where the closed entries went
 
-**[`design-backlog-archive.md`](design-backlog-archive.md)**, as of 2026-08-04. This file had
-reached 3265 lines and the genuinely open entries were under a fifth of it, so the part anyone
-needed to read had become the minority of the document. Nothing was deleted: every closed entry's
-body moved across verbatim, and the ledger below indexes them.
+**[`design-backlog-archive.md`](design-backlog-archive.md)**, and the ledger below indexes it.
+Nothing was ever deleted — every closed entry's body moved across verbatim.
 
 **Read the archive rather than the ledger whenever you are about to act on the same surface.** The
-bodies are kept for the corrections they carry, not for the outcomes — four entries (0010, 0012,
-0014, 0046) had their causal claim *inverted* under verification, and one (0052) was retired
-because its premise was false. Those are the most useful pages in the whole record and the ledger
-cannot express them.
-
-### The second sweep — 2026-08-13, and it found the same drift again
-
-**Twenty more entries moved**, taking this file from 2387 lines back to about a thousand. Almost all
-of them **already carried their own `CLOSED` / `DELIVERED` marker** and had simply never been moved
-— the plan that discharged them landed, the marker was written, and the body stayed in the open
-section. That is exactly the accumulation the 2026-08-04 sweep found and wrote a lifecycle to
-prevent, recurring inside ten days, so the lifecycle above is not self-enforcing and the archive
-step wants doing **at the close that discharges the entry**, not at the next sweep.
-
-**Two entries did not close — they were falsified**, and both are worth reading as method rather
-than as outcome, because in both cases the entry was written against a surface that already
-contained its answer:
-
-- **0078** (`kaleido_tile` is not quantized) — `core/src/render/kaleidoscope.rs:458` carries an
-  explicit *"Deliberately **not** rounded"* doc comment with its reasoning, and that comment landed
-  at **Plan 0064 Phase 1** (`e648a02`), five phases before the entry was filed at Phase 6 of the
-  same plan.
-- **0081** (the house gain rule is written down nowhere) — `presets/README.md:203` has carried
-  `G = C / 0.85` and `C / 0.60` since **2026-08-03** (`fc698cd`), six days before the entry claimed
-  the rule did not exist.
-
-Both are corrected in place below rather than moved, because a live entry that is *wrong* is more
-dangerous than one that is merely closed: the first sends someone to do work that is already done.
-The standing rule at the top of this file — verify against code before acting — is aimed at the
-symptom half of an entry. These two say it applies to the *absence* half too: "nothing does X" and
-"nothing documents X" are claims about the repo, and they rot the same way.
-
-### The third batch — same day, and it is the lifecycle failing one more time to prove the point
-
-**Three more entries moved on 2026-08-13, hours after the sweep above** — 0077 and 0080 (discharged
-by [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md), closed that day) and
-0090 (discharged by [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md), also closed
-that day). All three had their `CLOSED` marker written by the close that earned it and **all three
-bodies stayed in the open section anyway**, which is the *exact* failure the paragraph above had just
-diagnosed and prescribed against. Two closes ran between the prescription and this batch and neither
-performed the step.
-
-So the honest reading was that "archive at the close that discharges the entry" had been a rule with
-no carrier: it lived in this file, and the close ceremony that would execute it lived in
-`.claude/skills/architect/SKILL.md`, which did not mention this file's archive at all. **Fixed at this
-batch** — that ceremony now carries the step as **3c**, triggered off the plan header's
-`**Closes:** design-backlog NNNN` line, and it says explicitly that writing the `CLOSED` marker is
-only half of it. Whether a rule with a carrier actually holds is the thing the next sweep measures.
-
-**First measurement, 2026-08-15:** it held. [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md)'s
-close ran step 3c off its own `**Closes:**` header and archived all three entries in the close
-commit — the first time a body moved at the close that discharged it rather than at a sweep weeks
-later. One close is not a trend; the value of recording it is that the next sweep can tell a
-working rule from a lucky one.
+bodies are kept for the corrections they carry, not for the outcomes: five entries had their causal
+claim *inverted* under verification, and a ledger row cannot express one of them. The archive's own
+head names all five. How that archive came to exist — three sweeps in ten days, and a lifecycle rule
+that had no carrier until the close ceremony gained step 3c — is the last section of it.
 
 ## Closed entries — the ledger
 

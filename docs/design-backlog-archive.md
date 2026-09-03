@@ -8445,3 +8445,76 @@ now than after another twenty plans.
   entry is `architect`'s call at the close, not this phase's.
 
 ---
+
+---
+
+## How this archive came to exist — three sweeps in ten days
+
+Moved here 2026-09-03 from `design-backlog.md`, where it had been the `## Where the closed
+entries went` section. It is history rather than guidance: the rule it spends most of its length
+prescribing — archive at the close that discharges the entry — now has a carrier, as close-ceremony
+step 3c, and ADR-0108 gave the probe half the same treatment. Verbatim, because what makes it worth
+keeping is the record of a rule failing twice before anyone noticed it had nowhere to live.
+
+
+**[`design-backlog-archive.md`](design-backlog-archive.md)**, as of 2026-08-04. This file had
+reached 3265 lines and the genuinely open entries were under a fifth of it, so the part anyone
+needed to read had become the minority of the document. Nothing was deleted: every closed entry's
+body moved across verbatim, and the ledger below indexes them.
+
+**Read the archive rather than the ledger whenever you are about to act on the same surface.** The
+bodies are kept for the corrections they carry, not for the outcomes — four entries (0010, 0012,
+0014, 0046) had their causal claim *inverted* under verification, and one (0052) was retired
+because its premise was false. Those are the most useful pages in the whole record and the ledger
+cannot express them.
+
+### The second sweep — 2026-08-13, and it found the same drift again
+
+**Twenty more entries moved**, taking this file from 2387 lines back to about a thousand. Almost all
+of them **already carried their own `CLOSED` / `DELIVERED` marker** and had simply never been moved
+— the plan that discharged them landed, the marker was written, and the body stayed in the open
+section. That is exactly the accumulation the 2026-08-04 sweep found and wrote a lifecycle to
+prevent, recurring inside ten days, so the lifecycle above is not self-enforcing and the archive
+step wants doing **at the close that discharges the entry**, not at the next sweep.
+
+**Two entries did not close — they were falsified**, and both are worth reading as method rather
+than as outcome, because in both cases the entry was written against a surface that already
+contained its answer:
+
+- **0078** (`kaleido_tile` is not quantized) — `core/src/render/kaleidoscope.rs:458` carries an
+  explicit *"Deliberately **not** rounded"* doc comment with its reasoning, and that comment landed
+  at **Plan 0064 Phase 1** (`e648a02`), five phases before the entry was filed at Phase 6 of the
+  same plan.
+- **0081** (the house gain rule is written down nowhere) — `presets/README.md:203` has carried
+  `G = C / 0.85` and `C / 0.60` since **2026-08-03** (`fc698cd`), six days before the entry claimed
+  the rule did not exist.
+
+Both are corrected in place below rather than moved, because a live entry that is *wrong* is more
+dangerous than one that is merely closed: the first sends someone to do work that is already done.
+The standing rule at the top of this file — verify against code before acting — is aimed at the
+symptom half of an entry. These two say it applies to the *absence* half too: "nothing does X" and
+"nothing documents X" are claims about the repo, and they rot the same way.
+
+### The third batch — same day, and it is the lifecycle failing one more time to prove the point
+
+**Three more entries moved on 2026-08-13, hours after the sweep above** — 0077 and 0080 (discharged
+by [Plan 0084](plans/done/0084-two-gates-stop-lying-about-what-they-check.md), closed that day) and
+0090 (discharged by [Plan 0083](plans/done/0083-the-build-says-why-it-hears-nothing.md), also closed
+that day). All three had their `CLOSED` marker written by the close that earned it and **all three
+bodies stayed in the open section anyway**, which is the *exact* failure the paragraph above had just
+diagnosed and prescribed against. Two closes ran between the prescription and this batch and neither
+performed the step.
+
+So the honest reading was that "archive at the close that discharges the entry" had been a rule with
+no carrier: it lived in this file, and the close ceremony that would execute it lived in
+`.claude/skills/architect/SKILL.md`, which did not mention this file's archive at all. **Fixed at this
+batch** — that ceremony now carries the step as **3c**, triggered off the plan header's
+`**Closes:** design-backlog NNNN` line, and it says explicitly that writing the `CLOSED` marker is
+only half of it. Whether a rule with a carrier actually holds is the thing the next sweep measures.
+
+**First measurement, 2026-08-15:** it held. [Plan 0089](plans/done/0089-the-framing-contract-stops-lying.md)'s
+close ran step 3c off its own `**Closes:**` header and archived all three entries in the close
+commit — the first time a body moved at the close that discharged it rather than at a sweep weeks
+later. One close is not a trend; the value of recording it is that the next sweep can tell a
+working rule from a lucky one.
+
