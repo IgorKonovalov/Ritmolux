@@ -84,7 +84,7 @@ The structurally correct answer, and the one the backlog entry names first: no d
 no drift, and the "unclaimed" set is computed rather than declared. Rejected for this pass because
 it requires changing the signature and body of every scanner simultaneously, which is a
 wide-blast-radius edit to `standalone/src/main.rs` at the same time as
-[Plan 0126](../plans/0126-the-large-files-split-along-their-seams.md) Phase 7 is scheduled to split
+[Plan 0126](../plans/done/0126-the-large-files-split-along-their-seams.md) Phase 7 is scheduled to split
 that file and [Plan 0131](../plans/done/0131-the-operator-gets-a-console.md) is being built on `main`
 inside it. The roster-plus-gate reaches the same user-visible guarantee with a fraction of the
 contention, and does not foreclose this — a later plan can compute the roster instead of declaring

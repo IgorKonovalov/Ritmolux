@@ -298,7 +298,7 @@ const anchor = (heading) =>
 - **Both archives are past 512 KB**, where GitHub's markdown rendering may not reach the targets a
   contents block points at. The block still works in an editor and locally. Not mitigated, and
   recorded in ADR-0163's Negative section as the price of not splitting.
-- **[0126](0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126`, and
+- **[0126](done/0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126`, and
   this plan runs beside it in its own lane per ADR-0053.** The file sets are disjoint: 0126 takes
   `core/`, `core-cabi/`, `standalone/`, `plugin-foobar/` and its own plan file; this plan takes
   `docs/`, `presets/README.md`, `scripts/`, `.githooks/pre-push`, `.github/workflows/ci.yml` and
