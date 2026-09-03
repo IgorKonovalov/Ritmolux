@@ -280,81 +280,10 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 | 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | `9e53124` |
 | 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | `111dff5` |
 | 6 — The two seams go home | dev | done | `d2b1efa` |
-| 7 — `standalone/main.rs` becomes shell glue | dev | done | committed with this row |
+| 7 — `standalone/main.rs` becomes shell glue | dev | done | `cb49877` |
 | 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | `463cf2d` |
 
 ### Notes
-
-**Phase 7.** Taken **after** Phase 8, not in plan order — the row above it was
-skipped in the earlier session and this phase closes it. `main.rs` **4,525 ->
-37 lines**: module declarations and a `fn main()` that calls `run::run()`.
-`AppState` **43 -> 14 direct fields**. `--help` diffs clean against a binary
-built from `HEAD` before the split, `standalone/tests/*` pass 306/306, and every
-one of the ten rows in `README.md`'s Controls table dispatches out of
-`input.rs` (`Space` :166, `A` :172, `Tab` :44-51 + :70, `S` :30-35 + :177,
-`C` :196, `[`/`]` :199-200, `F` :188, `Esc` :116, `D` :189, `F3` :173; the
-type-to-filter path at :143-151).
-
-**The plan sized this phase against a file that has since tripled, and the
-scope was widened before the phase began to match.** It assumed 1,692 lines, a
-28-field `AppState` and a 7-arg constructor; the lane held 4,525 lines, 43
-fields and 11 arguments, because Plan 0135, Plan 0115 and Plan 0131 all closed onto
-`main.rs` first. The five files the plan names move ~2,465 lines and land
-`main.rs` at **~2,050**, which meets none of "shell glue" and misses the
-under-700 done-when outright. **Two files the plan does not name were added on
-the user's authorization**: `app_state.rs` (the struct and the frame loop) and
-`run.rs` (`App`, the `ApplicationHandler` impl and `main`'s body). Every
-done-when is met with them and the 700-line one is unreachable without them.
-
-Three further deviations from the plan as written:
-
-- **`AppState::new` takes `&mut App`, not the `&App` the plan asks for.** Nine
-  of the eleven values are *moved* out of the launch state
-  (`std::mem::take` / `Option::take`), which a shared borrow cannot do; the only
-  way to keep `&App` was to clone an `OscSink`. The eleven parameters and their
-  `#[allow(clippy::too_many_arguments)]` are retired for three.
-- **Four sub-structs, not the two the plan names.** `Diagnostics` and `Hud`
-  alone leave 26 direct fields against a bar of 15. `Capture` (the stream, its
-  format, the verdict token and the recovery policy) and `Presets` (the watched
-  directory and the dissolve settle latch) are what reach 14.
-- **`parse_tier_arg` was left as its own scanner** where `--soak` and
-  `--downbeat-log` were collapsed into one `optional_path_flag`. Routing
-  `--tier` through `flag_value` changes what an operator sees for a valueless
-  flag from ``--tier ``: expected `floor` or `rich`` to ``--tier: expected a
-  value``, and a phase whose discipline is "a split is a move" is the wrong
-  place to move an error string. The two path flags were genuinely copy-pasted
-  and their own doc said they were deliberately identical, which is now
-  structural rather than maintained by hand.
-
-Two files outside the phase's list are edited, both path repairs the move
-forces, and **one of the repairs is not this phase's**:
-
-- **`docs/design-backlog.md`: eight live probes repointed**, pure `in:` path
-  moves with no claim touched. Six are this phase's (0154, 0164 x2, 0165 x2,
-  0181). **Two are Phase 8's** — entry 0102's pair still named
-  `plugin-foobar/foo_ritmolux.cpp` after that phase moved both strings into
-  `viz_session.cpp`, so `check-backlog-claims.mjs` has been red since
-  `463cf2d` and the phase did not run it.
-- **`core/tests/chain.rs`: two comments** naming the file that owns
-  `pump_audio` and the drain scratch, both now `app_state.rs`. That comment
-  exists to send a reader to the other copy of the drain policy, so a stale path
-  in it defeats its only purpose.
-
-**Left for `architect`, not repaired here.** Backlog entry 0164's *prose* (not
-its probe) still says `standalone/src/main.rs` says the console present is
-placed...; the probe is repointed and the sentence is not, because editing an
-entry's claim is not a `dev` call. Plan 0120 and Plan 0133 both cite `main.rs` line
-numbers in their phase blocks that this split invalidates.
-
-`app_state.rs` is **1,491 lines**, the largest of the seven and larger than the
-1,200-line bar Phase 2 held `render/mod.rs` to. No done-when covers it.
-
-Verification beyond the done-when: the same line-by-line audit Phases 1-3 ran.
-Of `HEAD`'s 4,271 content lines, **66 have no counterpart** across the eight
-files after the split; every one is a crate-root `use` path rewritten to
-`crate::`, part of the retired 11-argument signature, a relocated const's old
-doc, the old test module's `use super::` blocks, the repointed `include_str!`,
-or rustfmt rewrapping a line the `self.<group>.` prefix lengthened.
 
 **Phase 1.** `mod.rs` 2,288 -> 771 lines. Longest fn in the four new files:
 `encode::upload_uniforms`, **115 lines**. Longest fn anywhere under
@@ -559,6 +488,55 @@ import from `rlx_core::render::metrics` now. The relocated comment states the
 reachability argument rather than the old "rather than a field on
 `LineRenderer`" one.
 
+**Phase 7.** Taken **after** Phase 8, not in plan order — the earlier session
+skipped this row and this phase closes it. `main.rs` **4,525 -> 37 lines**;
+`AppState` **43 -> 14 direct fields**.
+
+**The plan sized this phase against a file that has since tripled, and the scope
+was widened before the phase began.** It assumed 1,692 lines, a 28-field
+`AppState` and a 7-arg constructor; the lane held 4,525, 43 and 11, because
+Plan 0135, Plan 0115 and Plan 0131 all closed onto `main.rs` first. The five
+files the plan names move ~2,465 lines and leave `main.rs` at **~2,050** — the
+under-700 done-when is unreachable with them alone. **Two files the plan does
+not name were added on the user's authorization**: `app_state.rs` and `run.rs`.
+
+Three further deviations:
+
+- **`AppState::new` takes `&mut App`, not the `&App` the plan asks for.** Nine
+  of the eleven values are *moved* out of the launch state, which a shared
+  borrow cannot do; the alternative was cloning an `OscSink`. The eleven
+  parameters and their `too_many_arguments` allow are retired for three.
+- **Four sub-structs, not the two the plan names.** `Diagnostics` and `Hud`
+  alone leave 26 direct fields against a bar of 15; `Capture` and `Presets` are
+  what reach 14.
+- **`parse_tier_arg` keeps its own scanner** where `--soak` and
+  `--downbeat-log` collapse into one `optional_path_flag`. Routing `--tier`
+  through `flag_value` changes what an operator sees for a valueless flag: the
+  message naming floor and rich becomes the generic expected-a-value one.
+
+Two files outside the phase's list are edited, both path repairs a move forces,
+and **one repair is not this phase's**:
+
+- **`docs/design-backlog.md`: eight live probes repointed**, `in:` paths only,
+  no claim touched. Six are this phase's. **Two are Phase 8's** — entry 0102's
+  pair still named `foo_ritmolux.cpp` after that phase moved both strings into
+  `viz_session.cpp`, so `check-backlog-claims.mjs` has been red since `463cf2d`.
+- **`core/tests/chain.rs`: two comments** naming the file that owns
+  `pump_audio` and the drain scratch, both now `app_state.rs`.
+
+**Left for `architect`.** Backlog 0164's *prose* still names
+`standalone/src/main.rs`; only its probe is repointed, because editing a claim
+is not a `dev` call. Plan 0120 and Plan 0133 cite `main.rs` line numbers this
+split invalidates. `app_state.rs` is **1,491 lines**, larger than the 1,200-line
+bar Phase 2 held `render/mod.rs` to; no done-when covers it.
+
+Verification beyond the done-when: the line-by-line audit Phases 1-3 ran. Of
+`HEAD`'s 4,271 content lines, **66 have no counterpart** after the split, and
+every one is a `use` path rewritten to `crate::`, part of the retired
+11-argument signature, a relocated const's old doc, the old test module's
+`use super::` blocks, the repointed `include_str!`, or rustfmt rewrapping a line
+the `self.<group>.` prefix lengthened.
+
 **Phase 8.** `foo_ritmolux.cpp` 1,086 lines becomes four translation units
 (235 / 350 / 209 / 312) behind one 182-line `viz_session.h`. Longest function in
 `plugin-foobar/`: **`wnd_proc`, 100 lines**, from 199 -- `build_context_menu`,
@@ -608,11 +586,34 @@ samples that led up to it on disk.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none. `git diff --stat main...HEAD -- presets/` is empty
+  across all eight phases.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **What shipped:** 68 files, +15,032 / -12,930 across the lane. Eight refactor
+  commits, no feature. Two behavioural changes rode along, both recorded in the
+  notes above: Phase 3 replaced `variant_roster_reminder` with
+  `SystemKind::row`, and Phase 8 moved the plugin's diagnostics log from
+  `fopen` append to `_wfsopen` with `_SH_DENYWR` after the on-device run found
+  the handle it was asked to keep open locks every other reader out.
+- **Operator docs touched:** none. The only `docs/` changes across the lane are
+  `design-backlog.md` (probe `in:` paths, Phases 3 and 7) and this plan file.
+  `README.md`, `docs/capturing.md` and `docs/on-device-validation.md` are
+  unchanged.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
+  It was **red at `463cf2d`** and Phase 7 repointed the eight it named — 0102
+  (x2, Phase 8's, `foo_ritmolux.cpp` -> `viz_session.cpp`), 0154, 0164 (x2),
+  0165 (x2) and 0181 (`main.rs` -> `capture_start.rs` / `app_state.rs` /
+  `run.rs`). `in:` paths only; no claim edited.
+- **Full suite:** `cargo nextest run --workspace` — exit **0**, **1520 passed,
+  5 skipped**, 464.9 s. No suite was run under an ADR-0156 upward override at an
+  earlier phase; the nine deferred GPU suites ran here.
+- **Other gates:** `cargo fmt --all --check` clean;
+  `cargo clippy --workspace --all-targets` zero warnings;
+  `cargo build --workspace` green. `check-doc-links`, `check-index-rows`,
+  `check-comment-hygiene` and `check-filter-figures` all exit 0.
+- **Outstanding `human` phases:** none — all eight phases are `dev`.
+- **Lane state:** `main` was merged into the lane at `ac01a37` before Phase 7,
+  which brought `38eb942` and the four `docs(plans)` commits. The lane is not
+  merged back.
 
 ## Followups (after this lands)
