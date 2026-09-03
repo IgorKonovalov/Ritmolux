@@ -1,4 +1,4 @@
-//! rlx-core — the shared, source-agnostic brain of ritmolux.
+//! rlx-core — the shared, source-agnostic brain of Ritmolux.
 //!
 //! Takes PCM frames in (it never knows whether they came from loopback capture
 //! or foobar2000), runs DSP (spectrum, onset/beat), and renders scenes via wgpu.

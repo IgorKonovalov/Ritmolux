@@ -1,4 +1,4 @@
-# Best practices — ritmolux
+# Best practices — Ritmolux
 
 The longer list of correctness rules for this codebase. The architect checks against these in
 Mode 4; `dev` implements against them whether or not a plan restates them. Ordered roughly by

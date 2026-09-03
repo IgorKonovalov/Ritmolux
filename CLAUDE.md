@@ -1,4 +1,4 @@
-# ritmolux
+# Ritmolux
 
 A lightweight, real-time music visualizer built around one **shared Rust core** that
 turns a stream of PCM audio samples into GPU-rendered visuals. Two frontends consume

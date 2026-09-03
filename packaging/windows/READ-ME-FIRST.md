@@ -62,7 +62,7 @@ frame budget.
 4. Where it keeps its files
 ---------------------------
 
-    %APPDATA%\ritmolux\
+    %APPDATA%\Ritmolux\
 
 Paste that into the Explorer address bar. It holds an editable copy of the
 presets, a config.toml with your settings, and diagnostics.log. Deleting the

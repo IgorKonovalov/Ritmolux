@@ -1,4 +1,4 @@
-# ritmolux
+# Ritmolux
 
 ![A neon kaleidoscopic mandala: a deep violet eight-lobed core ringed by cyan and magenta
 petals, with pale swept arcs opening outward into black](docs/images/hero.png)
