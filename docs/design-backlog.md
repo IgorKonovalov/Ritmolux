@@ -1484,7 +1484,7 @@ black and then come alive on a track boundary, with no user action — the repor
 *"gut feeling that it started working after the next track came by itself"*.
 
 - **Verified 2026-08-16** — the degenerate-attach flag exists and is set from the client rect:
-  `present: needs_reattach = \(w == 0 \|\| ht == 0\) in: plugin-foobar/foo_ritmolux.cpp`
+  `present: needs_reattach = \(w == 0 \|\| ht == 0\) in: plugin-foobar/viz_session.cpp`
 
 ### Why it is filed rather than fixed
 
@@ -1526,7 +1526,7 @@ tier, or the GPU being busy.
 
 - **Verified 2026-08-16** — the field an operator would reach for cannot arbitrate this, exactly as
   this entry already says: `gpu_bytes` was identical in the 6.5 fps and 57 fps stretches:
-  `present: gpu_bytes in: plugin-foobar/foo_ritmolux.cpp`
+  `present: gpu_bytes in: plugin-foobar/viz_session.cpp`
 
 **What this adds to the diagnosis.** A surface attached at a size that does not match the window
 does not only fail to present — it can present *expensively*, which looks like nothing being wrong
@@ -2925,7 +2925,7 @@ evidence rather than more reasoning:
 - **Verified 2026-08-28** — and nothing anywhere distinguishes this failure class from a dead
   endpoint: `absent: REGDB in: standalone/src`
 - **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
-  `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/main.rs`
+  `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/capture_start.rs`
 
 **Update 2026-08-30, at Plan 0135's close — still live, still unevidenced.** That plan gathered the
 three fixes whose shape was settled and left this one deliberately unfixed: its Phase 5 was a
@@ -3291,8 +3291,8 @@ the display thread, which is a real design change and an ADR. Whichever lands, t
 above are corrected to the property that survives.
 
 - **Verified 2026-08-30** - the console swapchain still asks for a single in-flight image: `present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs`
-- **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/main.rs`
-- **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/main.rs`
+- **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/app_state.rs`
+- **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/app_state.rs`
 - **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
 - **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
 - **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phases 3-5.** Both levers become reachable, a hands-off window measures
@@ -3355,8 +3355,8 @@ the running adapter has already landed and is what makes any of this attributabl
 - **Re-written 2026-08-31** - the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
 - **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`
-- **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/main.rs`
-- **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/main.rs`
+- **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/app_state.rs`
+- **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/app_state.rs`
 - **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6**, which takes the measurement half: a new windowed
   frame-time row naming the discrete adapter, beside the iGPU figures rather than replacing them. The
   phase also records whether the console's dual-GPU degrade path became reachable; **if it stays
@@ -3496,7 +3496,7 @@ close review (2026-09-02), from a property `dev` disclosed in that plan's implem
 it happened on this machine. **Owner if taken:** `dev`.
 
 - **Verified 2026-09-02** — the app migrates at startup, by design:
-  `present: match migrate_app_dir() in: standalone/src/main.rs`
+  `present: match migrate_app_dir() in: standalone/src/run.rs`
 - **Verified 2026-09-02** — and the subprocess test spawns that startup path with no environment
   isolation: `absent: APPDATA in: standalone/tests/help_cli.rs`
 
