@@ -1,14 +1,14 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Five checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+Six checkers in `scripts/` take an optional `root` argument so they can be run against a tree
 other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
-rather than a property nobody has re-tested since the day it was written. `index-rows/` is the
-exception and inverts it — and `index-rows-red/` is the half that restores the usual direction.
-See both sections below.
+rather than a property nobody has re-tested since the day it was written. `index-rows/` and `toc/`
+are the exceptions and invert it — and `index-rows-red/` is the half that restores the usual
+direction. See those sections below.
 
-`check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs` and
-`check-comment-hygiene.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs`,
+`check-comment-hygiene.mjs` and `toc.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -362,3 +362,81 @@ tracked tree — so the reach is kept and the exit code is left to the tracked h
 If git cannot answer at all, the gate says so and every hit counts toward the exit code. That is
 ADR-0016's shape and it is the safe direction: a check that cannot measure trackedness must not
 quietly downgrade everything it finds.
+
+## `toc/` — for `toc.mjs`
+
+```
+node scripts/toc.mjs --check scripts/fixtures
+```
+
+Expect **exit 0**, and like `index-rows/` that is only half the instrument. This tree seeds
+*correct* blocks rather than broken ones, because the thing that can go wrong here is not a
+detector that stops matching — it is an **anchor that is merely plausible**. Nothing downstream
+catches one: `check-doc-links.mjs` validates paths and deliberately never validates fragments
+([ADR-0149](../../docs/adrs/0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md)), so a
+wrong rule ships silently and every row in every block is wrong together.
+
+So the committed block in `seeded.md` **is** the expected output, and the assertion is that the
+generator reproduces it byte-for-byte. Green here means all six hold at once — 3 blocks, 13 rows:
+
+| File | Case | Expected |
+|------|------|----------|
+| `seeded.md` | twelve headings covering every shape this corpus contains | the committed block is regenerated identically |
+| `seeded.md` | a `####` heading under a `depth=3` marker | not a row — `depth=N` means levels 2 through N |
+| `target.md` | the resolve target for `seeded.md`'s linked heading | nothing else; it exists so the link fixture above still reports exactly five |
+| `no-markers.md` | headings at three levels and no markers | not touched — a generator that inserted a block into any document with headings would rewrite most of this repository |
+| `empty-block.md` | a marker pair with no headings after it | an empty block, **not** an error: markers get added before sections do |
+| `fenced.md` | markers and a heading inside a ```` ```markdown ```` fence | one block, one row — a document *describing* this syntax is not carrying a block |
+
+Plan 0151's own `## Data shapes` section is the real instance of `fenced.md`'s case, and a parser
+without the fence rule would have rewritten the plan's worked example.
+
+### `toc-red/` — the same checker's other half
+
+```
+node scripts/toc.mjs --check scripts/fixtures/toc-red
+```
+
+Expect **exit 1 and exactly two problems**, on the model `index-rows-red/` established. A bare
+"exits non-zero" is also what a crash looks like, so the count is the assertion:
+
+| File | Case | Expected |
+|------|------|----------|
+| `unpaired.md` | a stray `toc:end` before any begin | reported as `unpaired.md:5  toc:end with no toc:begin before it` |
+| `unpaired.md` | a `toc:begin` with no end anywhere after it | reported as `unpaired.md:9  toc:begin with no toc:end after it` |
+| `unpaired.md` | the file itself | left **byte-identical** — this is the silence that matters, because treating everything after an unclosed marker as block body would delete a document on a typo |
+
+**Note the root**, and it is the same trap `index-rows-red/` documents: this tree sits *inside* the
+green fixture's root, so it names itself on `toc.mjs`'s own `SEEDED_TREES` list. Without that entry
+the green run above walks it, inherits both problems, and exits 1 — where exit 0 is the entire
+point of that root. The two roots assert opposite things and have to stay separable.
+
+### The anchors are pinned to the repository, not to this tree
+
+```
+node scripts/toc.mjs --self-test    # expects exit 0, 30 of 30
+```
+
+Six of the thirty are pinned to the **real** repository rather than to either tree, because that is
+the only place they mean anything: the two heading texts `docs/capturing.md` and `presets/README.md`
+still carry, the two anchors those two files still link, and the two slugs the algorithm must
+produce from them. Between them they fix backtick stripping, colon removal, and the **doubled
+hyphen** an em-dash leaves when it is deleted from between two spaces. If a future edit rewords
+either heading, the self-test says so instead of the pinning quietly becoming a comparison of two
+string literals.
+
+The rest split between the shapes (`%`, `/`, `~~`, `*`, a linked heading, snake_case) and the
+structural refusals in the two tables above. Verified by mutation — each of these takes the run red:
+
+| Mutation | Reported as |
+|----------|-------------|
+| strip `_` as if it were an emphasis marker | `reactiondiffusion-glows`, and `seeded.md`'s block goes stale |
+| make the heading detector match nothing | 6 of 30 fail, including both fixture blocks |
+| drop the `-1` dedupe suffix | the second occurrence collides with the first |
+| flatten the per-level indent | `level-3 rows indent one step` reports 0 of 7 |
+| stop skipping fenced lines | `fenced.md` grows a row it must not have |
+
+**`_` is the one worth stating twice.** GitHub keeps underscores in an anchor, and this corpus is
+full of snake_case identifiers in headings — `reaction_diffusion`, `mirror_reflect`, `BASELINE_Y`.
+A rule that stripped `_` alongside `*` and `~` would look right on every prose heading and be wrong
+on every identifier one.
