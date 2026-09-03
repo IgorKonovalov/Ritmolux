@@ -274,16 +274,87 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `warp_mesh/` takes the `particles/` shape | dev | done | committed with this row |
-| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | committed with this row |
-| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | committed with this row |
-| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | committed with this row |
-| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | committed with this row |
-| 6 — The two seams go home | dev | done | committed with this row |
-| 7 — `standalone/main.rs` becomes shell glue | dev | not started | |
-| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | committed with this row |
+| 1 — `warp_mesh/` takes the `particles/` shape | dev | done | `0d50935` |
+| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | `aacc984` |
+| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | `58ccc24` |
+| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | `9e53124` |
+| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | `111dff5` |
+| 6 — The two seams go home | dev | done | `d2b1efa` |
+| 7 — `standalone/main.rs` becomes shell glue | dev | done | committed with this row |
+| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | `463cf2d` |
 
 ### Notes
+
+**Phase 7.** Taken **after** Phase 8, not in plan order — the row above it was
+skipped in the earlier session and this phase closes it. `main.rs` **4,525 ->
+37 lines**: module declarations and a `fn main()` that calls `run::run()`.
+`AppState` **43 -> 14 direct fields**. `--help` diffs clean against a binary
+built from `HEAD` before the split, `standalone/tests/*` pass 306/306, and every
+one of the ten rows in `README.md`'s Controls table dispatches out of
+`input.rs` (`Space` :166, `A` :172, `Tab` :44-51 + :70, `S` :30-35 + :177,
+`C` :196, `[`/`]` :199-200, `F` :188, `Esc` :116, `D` :189, `F3` :173; the
+type-to-filter path at :143-151).
+
+**The plan sized this phase against a file that has since tripled, and the
+scope was widened before the phase began to match.** It assumed 1,692 lines, a
+28-field `AppState` and a 7-arg constructor; the lane held 4,525 lines, 43
+fields and 11 arguments, because Plan 0135, Plan 0115 and Plan 0131 all closed onto
+`main.rs` first. The five files the plan names move ~2,465 lines and land
+`main.rs` at **~2,050**, which meets none of "shell glue" and misses the
+under-700 done-when outright. **Two files the plan does not name were added on
+the user's authorization**: `app_state.rs` (the struct and the frame loop) and
+`run.rs` (`App`, the `ApplicationHandler` impl and `main`'s body). Every
+done-when is met with them and the 700-line one is unreachable without them.
+
+Three further deviations from the plan as written:
+
+- **`AppState::new` takes `&mut App`, not the `&App` the plan asks for.** Nine
+  of the eleven values are *moved* out of the launch state
+  (`std::mem::take` / `Option::take`), which a shared borrow cannot do; the only
+  way to keep `&App` was to clone an `OscSink`. The eleven parameters and their
+  `#[allow(clippy::too_many_arguments)]` are retired for three.
+- **Four sub-structs, not the two the plan names.** `Diagnostics` and `Hud`
+  alone leave 26 direct fields against a bar of 15. `Capture` (the stream, its
+  format, the verdict token and the recovery policy) and `Presets` (the watched
+  directory and the dissolve settle latch) are what reach 14.
+- **`parse_tier_arg` was left as its own scanner** where `--soak` and
+  `--downbeat-log` were collapsed into one `optional_path_flag`. Routing
+  `--tier` through `flag_value` changes what an operator sees for a valueless
+  flag from ``--tier ``: expected `floor` or `rich`` to ``--tier: expected a
+  value``, and a phase whose discipline is "a split is a move" is the wrong
+  place to move an error string. The two path flags were genuinely copy-pasted
+  and their own doc said they were deliberately identical, which is now
+  structural rather than maintained by hand.
+
+Two files outside the phase's list are edited, both path repairs the move
+forces, and **one of the repairs is not this phase's**:
+
+- **`docs/design-backlog.md`: eight live probes repointed**, pure `in:` path
+  moves with no claim touched. Six are this phase's (0154, 0164 x2, 0165 x2,
+  0181). **Two are Phase 8's** — entry 0102's pair still named
+  `plugin-foobar/foo_ritmolux.cpp` after that phase moved both strings into
+  `viz_session.cpp`, so `check-backlog-claims.mjs` has been red since
+  `463cf2d` and the phase did not run it.
+- **`core/tests/chain.rs`: two comments** naming the file that owns
+  `pump_audio` and the drain scratch, both now `app_state.rs`. That comment
+  exists to send a reader to the other copy of the drain policy, so a stale path
+  in it defeats its only purpose.
+
+**Left for `architect`, not repaired here.** Backlog entry 0164's *prose* (not
+its probe) still says `standalone/src/main.rs` says the console present is
+placed...; the probe is repointed and the sentence is not, because editing an
+entry's claim is not a `dev` call. Plan 0120 and Plan 0133 both cite `main.rs` line
+numbers in their phase blocks that this split invalidates.
+
+`app_state.rs` is **1,491 lines**, the largest of the seven and larger than the
+1,200-line bar Phase 2 held `render/mod.rs` to. No done-when covers it.
+
+Verification beyond the done-when: the same line-by-line audit Phases 1-3 ran.
+Of `HEAD`'s 4,271 content lines, **66 have no counterpart** across the eight
+files after the split; every one is a crate-root `use` path rewritten to
+`crate::`, part of the retired 11-argument signature, a relocated const's old
+doc, the old test module's `use super::` blocks, the repointed `include_str!`,
+or rustfmt rewrapping a line the `self.<group>.` prefix lengthened.
 
 **Phase 1.** `mod.rs` 2,288 -> 771 lines. Longest fn in the four new files:
 `encode::upload_uniforms`, **115 lines**. Longest fn anywhere under

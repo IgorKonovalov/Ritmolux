@@ -14,7 +14,7 @@
 //! shortcut: `Renderer::capture_audio` would be the convenient path, but it *starts*
 //! at the analyzer, which is precisely the gap this file exists to close.
 //!
-//! **The drain policy here is a copy of the shell's** (`standalone/src/main.rs`'s
+//! **The drain policy here is a copy of the shell's** (`standalone/src/app_state.rs`'s
 //! `pump_audio`), not a call into it — `core/` cannot depend on the standalone, and
 //! extracting the loop into shared code is a deliberate followup rather than a
 //! shell change smuggled into a testing plan (ADR-0033, Negative consequences). The
@@ -54,7 +54,7 @@ const BURST_FRAMES: usize = 960;
 /// vector.
 const RING_FRAMES: usize = 8_192;
 
-/// The shell's drain scratch (`standalone/src/main.rs`), matched so the copy of the
+/// The shell's drain scratch (`standalone/src/app_state.rs`), matched so the copy of the
 /// drain policy below is faithful in its buffer size too.
 const SCRATCH_SAMPLES: usize = 32_768;
 
