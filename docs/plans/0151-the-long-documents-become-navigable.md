@@ -351,8 +351,8 @@ const anchor = (heading) =>
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The generator, proved on one real document | dev | done | `e450092` |
-| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | committed with this row |
-| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | not started | |
+| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `a428ad1` |
+| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | committed with this row |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | not started | |
 | 5 — The remaining four documents carry blocks | dev | not started | |
 | 6 — The carrier | dev | not started | |
@@ -400,6 +400,27 @@ is not spent. It was **moved up** to sit with the other dated `Added ...` notes 
 `## Recommended execution sequence`, where every other note of its kind already lives, and its
 closing sentence — which pointed at the block being removed — was rewritten to point at the archive.
 It was neither deleted nor left in place.
+
+**Phase 3.** `docs/design-backlog.md` 3,528 -> **3,449** lines, so **-79** against the plan's
+"about 110". **The gap is not slack and was not closed by trimming further.** The plan asks for a
+pointer "of about six lines" *and* names three sentences that must survive the deletion; those three
+run ten lines on their own, the `**The lifecycle, in one line:**` paragraph beneath them is live and
+outside the deletion's stated scope, and the section that replaced 55 lines is 27. The other section
+went 63 -> 10. Reaching -110 would have meant dropping content the plan explicitly requires be
+carried, so the number moved instead.
+
+What went, and where: the fenced three-form example and the `<path>`/`<regex>` definitions are gone
+outright — `scripts/check-backlog-claims.mjs`'s header carries all of it and is the parser. The
+seven-line **Staleness is an advisory** paragraph went the same way, for the same reason: the
+checker's header lines 18-20 carry it, including the shallow-clone withholding. The three-sweep
+narrative moved verbatim to the end of `design-backlog-archive.md` under one new `##` heading, which
+is the single heading Phase 5's row count for that file expects.
+
+`unprobeable: <why>` still appears once in the live file, inside the third of the three sentences
+the plan requires be carried. The grammar is not restated; that token is part of the sentence.
+
+`node scripts/check-backlog-claims.mjs` reports **102 stated reductions across 44 live entries, 8
+unprobeable** — byte-identical to the same command run against `HEAD` before the edit.
 
 ### Close triggers
 
