@@ -350,8 +350,8 @@ const anchor = (heading) =>
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The generator, proved on one real document | dev | done | committed with this row |
-| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | not started | |
+| 1 — The generator, proved on one real document | dev | done | `e450092` |
+| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | committed with this row |
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | not started | |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | not started | |
 | 5 — The remaining four documents carry blocks | dev | not started | |
@@ -380,6 +380,26 @@ Each of five mutations was run against `--self-test` and each takes it red; the 
 generated output and survived the matches-nothing mutation — they now read generated rows.
 
 `docs/capturing.md`: 36 rows, against 7 `##` + 29 `###`.
+
+**Phase 2.** `docs/plans/README.md` 1,277 -> **945** lines, so **-332** against the plan's
+"335 +/- 15". The two-line difference is the live-sequence pointer, which the plan requires be
+rewritten and which grew from two lines to four. The moved block is **byte-identical** to what left
+(md5 `75ddcfc...` on both sides), so nothing was summarized, reworded or dropped.
+
+**The undefined-label count was 17, not the 27 the plan predicted.** `README-archive.md` already
+defined 49 labels of its own, more than the plan's estimate assumed; the seventeen missing ones were
+appended to the end of that block rather than sorted in, which is how the block has grown at every
+previous move. `check-doc-links.mjs` reported all of them by name before the copy and exits 0 after.
+
+**One live paragraph the plan did not name had to be handled the same way as line 208's pointer.**
+The `**Added 2026-09-02 — [0151] is docs-only and precedes [0143].**` note was added to
+`### What this sequence assumes` by commit `0964385` — the same commit that wrote this plan — so the
+plan's structural done-when ("the two headings with exactly the two live bullets between them and
+nothing else") could not hold with it in place. Its live half is the 0143 sequencing decision, which
+is not spent. It was **moved up** to sit with the other dated `Added ...` notes directly under
+`## Recommended execution sequence`, where every other note of its kind already lives, and its
+closing sentence — which pointed at the block being removed — was rewritten to point at the archive.
+It was neither deleted nor left in place.
 
 ### Close triggers
 
