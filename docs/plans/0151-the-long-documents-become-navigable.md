@@ -352,8 +352,8 @@ const anchor = (heading) =>
 |---|---|---|---|
 | 1 — The generator, proved on one real document | dev | done | `e450092` |
 | 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `a428ad1` |
-| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | committed with this row |
-| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | not started | |
+| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
+| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | committed with this row |
 | 5 — The remaining four documents carry blocks | dev | not started | |
 | 6 — The carrier | dev | not started | |
 
@@ -421,6 +421,20 @@ the plan requires be carried. The grammar is not restated; that token is part of
 
 `node scripts/check-backlog-claims.mjs` reports **102 stated reductions across 44 live entries, 8
 unprobeable** — byte-identical to the same command run against `HEAD` before the edit.
+
+**Phase 4.** 133 leads converted, 5,716 lines de-indented, 388 untouched; the section is 6,237 lines
+before and after, so `git diff --stat` reads **6,226 insertions / 6,226 deletions** and the ±5
+done-when is met at 0. Verified beyond the line count: the section was reproduced independently by
+`sed -E 's/^- \[/### [/; s/^  //'` over `HEAD`'s copy and **diffs clean**, which is the property
+the plan actually wants — that the transform moved indentation and heading markers and nothing else.
+The 39 four-space lines became two-space lines under a heading and stay list items. Re-checked
+before running: **zero code fences**, zero lines at odd indents, and **zero** two-space lines whose
+meaning changes when de-indented (no `#`, `---`, `===`, `>`, `|` or `[label]:` at that indent).
+
+**The row count is 141, not the 137 the plan predicted.** The plan's "133 plus the 4 existing
+headings" counted only the `##` headings; the file also carried three `###` before this plan
+(`0123`, `0127` and the Plan 0129 sequencing note), and Phase 2 added a fourth. So 4 `##` + 137
+`###` = 141, and nothing is missing.
 
 ### Close triggers
 
