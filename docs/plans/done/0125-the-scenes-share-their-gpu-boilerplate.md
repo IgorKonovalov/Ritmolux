@@ -10,7 +10,7 @@ acceptance oracle for every phase — a helper that changes one pixel is a wrong
 bless is permitted anywhere in this plan; (2) helpers are `pub(crate)` in `render::gpu` /
 `render::palette` and are **not** added to the `Scene` trait, because ADR-0002 keeps that trait to
 the preset engine's vocabulary; (3) the plan runs in a worktree after [0124](0124-the-review-fixes-that-move-no-pixels.md)
-and before [0126](../0126-the-large-files-split-along-their-seams.md), because 0126 splits the very
+and before [0126](0126-the-large-files-split-along-their-seams.md), because 0126 splits the very
 files this plan shrinks and a split of duplicated code is duplicated splitting.
 
 ## TL;DR
@@ -202,7 +202,7 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 
 ## What this plan does NOT do
 
-- Does not split any file — [0126](../0126-the-large-files-split-along-their-seams.md).
+- Does not split any file — [0126](0126-the-large-files-split-along-their-seams.md).
 - Does not touch the `Scene` trait, the C ABI, or `standalone/`.
 - Does not add a shared uniform header (the per-scene `[f32; 4]` lane packing is deliberate for
   WGSL alignment and the review flagged it as a choice, not a paste).

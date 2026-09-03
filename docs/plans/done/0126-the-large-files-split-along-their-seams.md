@@ -1,9 +1,20 @@
 # 0126 — The large files split along their seams
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-03. Eight dev phases, `0d50935`..`463cf2d` plus `cb49877`.
+> Mode 4 review: **no blockers, no majors against the code; one major doc-freshness repair (stale
+> `standalone/src/main.rs` citations in Plans 0120/0133/0147 and design-backlog 0164, repaired at
+> this close), five minors.** Independently verified: `cargo nextest run --workspace` 1520 passed /
+> 5 skipped / exit 0; fmt clean; clippy --workspace --all-targets zero warnings; all five Node gates
+> exit 0. Every numeric done-when re-measured at the line - `render/mod.rs` 1,186, `draw_frame` 199,
+> `build_rings` 38, `main.rs` 37, `AppState` 14 fields, `wnd_proc` 100, both Phase 6 greps clean,
+> `RLX_ABI_VERSION` 6 with an unchanged header and the same 15 `extern "C"` functions. The two
+> done-whens dev reported by silence were checked and hold: `--help` is byte-identical (the `FLAGS`
+> table diffs clean) and every README Controls row still dispatches. Phase 1's "no fn in
+> `warp_mesh/` exceeds 150 lines" is unmet as written (`shader.rs::build` 331) - the plan wrote a
+> directory-wide bound over a file-scoped scope list, and dev correctly declined to widen the phase.
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0002](../adrs/0002-layered-preset-architecture.md) (the `Scene` seam stays where it is), [ADR-0072](../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (where the Win32 constructor moves to), [ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+> **Related ADRs:** [ADR-0002](../../adrs/0002-layered-preset-architecture.md) (the `Scene` seam stays where it is), [ADR-0072](../../adrs/0072-the-c-abi-ships-from-its-own-crate.md) (where the Win32 constructor moves to), [ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md), [ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
 
 **Drafted without an interview at the user's request.** The guesses: (1) a split is a *move*,
 never a rewrite — every phase is gated on the golden suite unblessed and on `cargo public-api`-
@@ -255,7 +266,7 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 
 ## What this plan does NOT do
 
-- No shared GPU helper — [0125](done/0125-the-scenes-share-their-gpu-boilerplate.md), which lands first.
+- No shared GPU helper — [0125](0125-the-scenes-share-their-gpu-boilerplate.md), which lands first.
 - No comment rewrite beyond what a move forces (a moved item keeps its doc; a deleted duplicate
   loses its copy). The comment-weight question is an ADR, parked in 0124.
 - Does not touch `kaleidoscope.rs` or `expr.rs` — the review rated both splits `minor` and
@@ -617,3 +628,26 @@ samples that led up to it on disk.
   merged back.
 
 ## Followups (after this lands)
+
+Raised by the Mode 4 review, none blocking. All are one-file edits; a future plan that opens the
+file should take the one that applies rather than a plan being written for them.
+
+- **`record_draw_extent` and `extent_diagnostic_on` want `pub(crate)`, not `pub`**
+  (`core/src/render/metrics.rs`). Each has exactly one caller, in `scenes/lines/renderer.rs`, inside
+  `core`. Before Phase 6 the *write* half of the extent diagnostic was module-private; the move made
+  it public API, so an external caller can now write into what `shot --report` reads. Phase 6 was
+  meant to narrow that surface and on the write half it widened it.
+- **`core` re-exports all of `wgpu` (`core/src/lib.rs`) and nothing in `docs/` records it.** The
+  mechanism follows from this plan's own `new_from_surface_target(SurfaceTargetUnsafe, ...)`
+  signature and the code states the reason well, but the consequence is unrecorded: a `wgpu` bump is
+  now a breaking change to `core`'s public API rather than an internal one. One line in the ADR-0072
+  lineage, or an `Outcome` on it, settles it - not a new ADR on its own.
+- **`standalone/src/app_state.rs` is 1,491 lines and `run::run` is 266**, past the 1,200 and 200
+  bars Phase 2 held `render/mod.rs` and `draw_frame` to. No done-when covered either, because the
+  plan sized Phase 7 against a `main.rs` that had since tripled. The file is coherent (four
+  sub-structs and one `impl AppState`), so this is a size followup and not a layering one.
+- **The foobar shim's member functions read the singleton through `g_session.` while reading
+  sibling state through `this`** (`plugin-foobar/viz_session.cpp`, clearest in
+  `maybe_log_metrics`). A faithful transcription of the pre-split file-scope `g_abi_ok`, but the
+  move turned those into *members*, so a second `VizSession` would silently read the wrong object.
+  `this->abi_ok` is the whole fix.

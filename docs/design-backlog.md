@@ -3269,7 +3269,7 @@ loop on every frame, with no decimation, which is the explicit remedy Plan 0131 
 verdict on.
 
 **Two comments state the property the measurement denies**, which is the half of this entry that is
-a defect rather than a design question. `standalone/src/main.rs` says the console present is placed
+a defect rather than a design question. `standalone/src/app_state.rs` says the console present is placed
 after the show's "never before it and never inside it: the console is a monitor and must not delay
 the frame it reports on" - being after this frame's present does not stop it delaying the next one.
 `core/src/render/aux_target.rs` says "a console that stalls or drops a frame cannot alter what the

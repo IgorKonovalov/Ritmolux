@@ -141,7 +141,7 @@ flowchart LR
   seven ASCII seeds, and for these two the comments were **removed**. At the pre-rename baseline
   `47432ca`, `swarm.rs:27` carried `// "LMV_SWRM"` and `reaction_diffusion.rs:66` carried
   `// "LMV_RD_1"`; both now sit as bare hex. No other plan touches these files —
-  [0126](0126-the-large-files-split-along-their-seams.md)'s eight phases do not name either.
+  [0126](done/0126-the-large-files-split-along-their-seams.md)'s eight phases do not name either.
 - **Done when:**
   - Each constant carries a comment giving the ASCII the bytes spell **and** the trap:
     the value is a golden-fixing RNG seed, so it must not be re-spelled to match the new product
@@ -192,7 +192,7 @@ before                      after
 - **Two active plans name the old root in text `dev` may be reading.** 0133 and 0147 are both
   approved and unstarted; if either is taken before this plan lands, its author reads `/lmv/v1`. The
   window is small and Phase 3 closes it, but the ordering is worth knowing.
-- **No collision with [0126](0126-the-large-files-split-along-their-seams.md) or
+- **No collision with [0126](done/0126-the-large-files-split-along-their-seams.md) or
   [0151](0151-the-long-documents-become-navigable.md).** 0126's eight phases name none of these
   files; 0151 touches `docs/` and `scripts/` but none of the four documents Phase 3 edits except
   `docs/design-backlog.md` — and there 0151 edits only the preamble and the sweep narrative, while

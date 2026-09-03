@@ -98,7 +98,7 @@ flowchart LR
   `config.toml`, emits `ArtDmx`, and holds a flat colour on the real fixtures. **No look, no
   telemetry, no expression grammar** — a constant colour is the whole visual ambition.
 - **Files touched:** new `standalone/src/artnet.rs` (+ `artnet/tests.rs`), `standalone/src/config.rs`,
-  `standalone/src/main.rs`, `standalone/src/lib.rs`.
+  `standalone/src/app_state.rs`, `standalone/src/cli.rs`, `standalone/src/lib.rs`.
 - **How:**
   - **The fixture map is the design work of this phase**, and it is the part most likely to be
     revised later, so keep it small and literal: node addresses, a universe range, pixels per
@@ -167,7 +167,7 @@ flowchart LR
   it free; this builds 4,080 pixels and sends 24 datagrams, and **that plan's own log warns why its
   answer does not transfer** — the inline exit there was earned by GPU-wait slack on a 165 Hz
   display, not by the send being cheap.
-- **Files touched:** `standalone/src/artnet.rs`, `standalone/src/main.rs`.
+- **Files touched:** `standalone/src/artnet.rs`, `standalone/src/app_state.rs`.
 - **How:** measure the frame-time distribution with the sink off and on, alternating runs so drift
   falls on both configurations, against the real rig rather than a loopback or a gateway. Repeat
   each configuration enough times to characterize its own run-to-run spread.
@@ -224,7 +224,7 @@ flowchart LR
 
 - **Owner skill:** dev
 - **What:** the controls a live set needs. Blackout, master level, look selection.
-- **Files touched:** `standalone/src/main.rs`, the settings surface, `standalone/src/artnet.rs`.
+- **Files touched:** `standalone/src/app_state.rs`, the settings surface, `standalone/src/artnet.rs`.
 - **How:** mirror the existing operator surfaces rather than inventing one — the settings modal and
   the hotkey set are the precedent, and [Plan 0131](done/0131-the-operator-gets-a-console.md)'s console is
   where this eventually belongs if that plan has landed.
