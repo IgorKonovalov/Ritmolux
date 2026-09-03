@@ -6,6 +6,20 @@ close write-ups move to [README-archive.md](README-archive.md).
 
 **Next free number: 0153** (ADRs are a separate sequence — next free there is **0165**.)
 
+<!-- toc:begin depth=3 -->
+- [Active roster](#active-roster)
+- [Recommended execution sequence](#recommended-execution-sequence)
+  - [The two lanes, now](#the-two-lanes-now)
+  - [Then, in this order](#then-in-this-order)
+  - [What this sequence assumes](#what-this-sequence-assumes)
+  - [The baseline-drift control any pixel-touching plan inherits](#the-baseline-drift-control-any-pixel-touching-plan-inherits)
+  - [The six plans added 2026-08-04, and why they exist](#the-six-plans-added-2026-08-04-and-why-they-exist)
+- [Standing (not a plan)](#standing-not-a-plan)
+- [Recently closed](#recently-closed)
+- [Roadmap (agreed 2026-07-21, revised same day for the live-show use case; numbers assigned when drafted)](#roadmap-agreed-2026-07-21-revised-same-day-for-the-live-show-use-case-numbers-assigned-when-drafted)
+- [Conventions](#conventions)
+<!-- toc:end -->
+
 ## Active roster
 
 Only plans still in `docs/plans/`. A closed plan leaves this table entirely —
