@@ -68,7 +68,7 @@ GPU session, not one per panel.
 4. Where it keeps its files
 ---------------------------
 
-    %APPDATA%\ritmolux\
+    %APPDATA%\Ritmolux\
 
 Paste that into the Explorer address bar - or use Open presets folder in the
 right-click menu, which lands in the presets subfolder directly. It holds an

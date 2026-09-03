@@ -1,4 +1,4 @@
-# Diagram examples — ritmolux
+# Diagram examples — Ritmolux
 
 Project-specific mermaid patterns. Copy one and adapt. Keep diagrams small (<~12 nodes) and use
 `subgraph` to mark boundaries — what's inside `core/`, what's a shell, what's external.

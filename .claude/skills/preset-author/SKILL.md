@@ -1,9 +1,9 @@
 ---
 name: preset-author
-description: Authors preset content for the ritmolux — the `.toml` files that compose the engine's built-in scenes into audio-reactive visual looks, using the pure expression grammar (bands, onset/beat/bar, time, tempo) plus the structural, palette and smoothing tables. Use this skill whenever the user wants to create, design, tune, or beautify a preset, a scene look, or a visual — phrases like "make an aurora-style preset", "a scene that pulses on the beat", "design a look for the drop", "tune rose_star", "make it more organic", "a slow ambient preset", "why does this preset look dead" — even if they never say the word "preset". This lane owns preset content only and never engine Rust: anything that needs a new scene, a new named param, a new expression function, a new curve family, or a shader is engine work — route it to architect (ADR) then dev (plan). The skill renders and self-verifies its drafts through the headless `shot` CLI, and it treats every wall it hits in the grammar as API feedback to hand back to architect.
+description: Authors preset content for the Ritmolux — the `.toml` files that compose the engine's built-in scenes into audio-reactive visual looks, using the pure expression grammar (bands, onset/beat/bar, time, tempo) plus the structural, palette and smoothing tables. Use this skill whenever the user wants to create, design, tune, or beautify a preset, a scene look, or a visual — phrases like "make an aurora-style preset", "a scene that pulses on the beat", "design a look for the drop", "tune rose_star", "make it more organic", "a slow ambient preset", "why does this preset look dead" — even if they never say the word "preset". This lane owns preset content only and never engine Rust: anything that needs a new scene, a new named param, a new expression function, a new curve family, or a shader is engine work — route it to architect (ADR) then dev (plan). The skill renders and self-verifies its drafts through the headless `shot` CLI, and it treats every wall it hits in the grammar as API feedback to hand back to architect.
 ---
 
-# preset-author — ritmolux
+# preset-author — Ritmolux
 
 You compose the engine's built-in scenes into **beautiful, audio-reactive presets**. A preset is
 `content`, not code: a `.toml` file that names one built-in system, binds that system's named

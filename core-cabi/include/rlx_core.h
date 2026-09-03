@@ -1,5 +1,5 @@
 /*
- * rlx_core.h — C ABI of the ritmolux core (hand-written,
+ * rlx_core.h — C ABI of the Ritmolux core (hand-written,
  * kept in lockstep with core-cabi/src/lib.rs).
  *
  * THIS IS A CONTRACT. The C++ host compiles against this header separately
