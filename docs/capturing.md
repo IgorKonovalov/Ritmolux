@@ -26,6 +26,45 @@ and the DSP is deterministic — so renders are reproducible and diff-able.
 > than the live app: a `seed = "random"` preset's filmstrip is *an* instance of it,
 > not the instance a user will see. Tune with a number.
 
+<!-- toc:begin depth=3 -->
+- [Captures pin the floor tier](#captures-pin-the-floor-tier)
+- [The `shot` CLI](#the-shot-cli)
+  - [The horizon: does a world still look like itself after minutes?](#the-horizon-does-a-world-still-look-like-itself-after-minutes)
+  - [`--render`: a music video from a track](#--render-a-music-video-from-a-track)
+  - [The three calibration traps](#the-three-calibration-traps)
+  - [Aiming a capture at a transient](#aiming-a-capture-at-a-transient)
+  - [A full-size frame under real audio](#a-full-size-frame-under-real-audio)
+  - [What the report's columns mean](#what-the-reports-columns-mean)
+  - [Which preset library a shot uses](#which-preset-library-a-shot-uses)
+  - [Editing presets live](#editing-presets-live)
+  - [Examples](#examples)
+- [The live video-out: `ritmolux --stream`](#the-live-video-out-ritmolux---stream)
+  - [The TouchDesigner side](#the-touchdesigner-side)
+  - [Which GPU, and why it is not a preference](#which-gpu-and-why-it-is-not-a-preference)
+  - [Presets, and stopping](#presets-and-stopping)
+  - [What it costs, and what those numbers mean](#what-it-costs-and-what-those-numbers-mean)
+  - [What it does not do](#what-it-does-not-do)
+- [`--downbeat-log`: the estimator's terms, one row per beat](#--downbeat-log-the-estimators-terms-one-row-per-beat)
+- [`milkconv`: looking at a converted MilkDrop preset](#milkconv-looking-at-a-converted-milkdrop-preset)
+  - [Read the warnings; they are the interesting output](#read-the-warnings-they-are-the-interesting-output)
+  - [What a conversion does and does not carry](#what-a-conversion-does-and-does-not-carry)
+  - [Rates are converted, and that is why a preset moves at the right speed](#rates-are-converted-and-that-is-why-a-preset-moves-at-the-right-speed)
+  - [The moment of truth, captured](#the-moment-of-truth-captured)
+  - [The same thing again with the draw layer (Phase 4)](#the-same-thing-again-with-the-draw-layer-phase-4)
+  - [And with the shaders (Phase 6)](#and-with-the-shaders-phase-6)
+  - [`--report`: how much of the corpus converts, and what happens to the rest](#--report-how-much-of-the-corpus-converts-and-what-happens-to-the-rest)
+- [The `core/tests/` harness](#the-coretests-harness)
+  - [The preset sweeps are one test per preset (ADR-0157)](#the-preset-sweeps-are-one-test-per-preset-adr-0157)
+  - [What the five preset gates can and cannot see](#what-the-five-preset-gates-can-and-cannot-see)
+  - [Golden baselines](#golden-baselines)
+  - [The tonemap and pixel-level assertions (Plan 0045)](#the-tonemap-and-pixel-level-assertions-plan-0045)
+  - [The display write dithers, and every baseline moved once (Plan 0082)](#the-display-write-dithers-and-every-baseline-moved-once-plan-0082)
+  - [A lit backdrop is a distinct test configuration, not a variant (Plan 0051)](#a-lit-backdrop-is-a-distinct-test-configuration-not-a-variant-plan-0051)
+  - [Asserting that something *moved* — the feedback fixtures (Plan 0046)](#asserting-that-something-moved--the-feedback-fixtures-plan-0046)
+  - [The in-frame geometry fraction, and the four things it cannot see (Plan 0069)](#the-in-frame-geometry-fraction-and-the-four-things-it-cannot-see-plan-0069)
+- [The habit for a new scene](#the-habit-for-a-new-scene)
+<!-- toc:end -->
+
 ## Captures pin the floor tier
 
 **Every capture path renders at the `Floor` quality tier, and it cannot do

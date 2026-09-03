@@ -1,6 +1,6 @@
 # 0151 — The long documents become navigable
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-02
 > **Owner skill(s):** dev
 > **Related ADRs:** [0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md) (proposed)
@@ -346,11 +346,11 @@ const anchor = (heading) =>
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/rlx-plan-0151` on `plan-0151-the-long-documents-become-navigable`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The generator, proved on one real document | dev | not started | |
+| 1 — The generator, proved on one real document | dev | done | committed with this row |
 | 2 — `plans/README.md` gives up the superseded sequencing prose | dev | not started | |
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | not started | |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | not started | |
@@ -358,6 +358,28 @@ const anchor = (heading) =>
 | 6 — The carrier | dev | not started | |
 
 ### Notes
+
+**Phase 1.** The fixture is **two** trees, not one: `scripts/fixtures/toc/` is green (3 blocks,
+13 rows, exit 0) and `scripts/fixtures/toc-red/` holds the unpaired-marker case (exit 1, exactly
+two problems). The plan's `Files touched` says "(new fixture)" singular. Split on the
+`index-rows/` + `index-rows-red/` precedent, because the red case sits inside the green root and
+would otherwise make that root exit 1 — `toc-red` therefore names itself on `toc.mjs`'s own
+`SEEDED_TREES` list, which is a second entry the plan did not anticipate.
+
+`--check` and the rewrite are one code path, not two: `regenerate()` never writes and the caller
+decides. That was not asked for and is the reason the two modes cannot disagree.
+
+The anchor rule needed no separate formatting-strip step — backticks, `*` and `~~` are punctuation
+and the character filter already removes them. It does need `_` **kept**, which the plan's
+illustrative snippet strips: the snippet's `[^\p{L}\p{N} \-]` would turn `reaction_diffusion`
+into `reactiondiffusion`. GitHub keeps underscores, this corpus has bare snake_case in headings
+(`design-backlog-archive.md:36`, `:860`), and the shipped filter is `[^\p{L}\p{N}_ -]`.
+
+Each of five mutations was run against `--self-test` and each takes it red; the table is in
+`scripts/fixtures/README.md`. Two assertions initially read the committed fixture rather than the
+generated output and survived the matches-nothing mutation — they now read generated rows.
+
+`docs/capturing.md`: 36 rows, against 7 `##` + 29 `###`.
 
 ### Close triggers
 
