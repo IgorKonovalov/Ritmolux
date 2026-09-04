@@ -141,6 +141,35 @@ const MAX_COORD_MODE: f32 = COORD_MODES.len() as f32 - 1.0;
 const DEFAULT_COLOR_SPAN: f32 = 0.6;
 const DEFAULT_COLOR_CENTER: f32 = 0.0;
 
+/// How many of the palette's [`LUT_SIZE`] texels a resting `color_span` spends on
+/// the **figure's own interior**.
+///
+/// Both coordinates are `0` at the figure's centre and exactly `1` on its
+/// outline, so the interior is one unit of the coordinate whatever the shape and
+/// whatever `gamma` does to the spacing inside it — which makes this share
+/// exact. What it does *not* know is how much of the frame that interior covers:
+/// a figure spanning half the screen stretches those texels across hundreds of
+/// pixels, and one filling a corner does not. That is why the warning built on
+/// it says estimate.
+pub(crate) fn interior_texels(color_span: f32) -> f32 {
+    color_span.abs() * crate::render::palette::LUT_SIZE as f32
+}
+
+/// Below this many texels across the interior, the linear-filtered LUT is
+/// stretching too few distinct colours across the figure and the result reads as
+/// an upscaled gradient rather than as shading (design-backlog 0099).
+///
+/// **The property is the count, not this constant.** A figure's interior drawn
+/// through N texels carries at most N colours no matter how large it is on
+/// screen, so somewhere below a few dozen the sampler is interpolating more than
+/// it is reading. The Plan 0091 Phase 6 star probes bracket where that becomes
+/// visible — 8.6 texels read as *"dirty and upscaled"*, 32.3 did not — and this
+/// is the middle of that bracket rounded to a power of two. It is a warning
+/// threshold, so a value inside it is legal and renders exactly as asked;
+/// `palette_steps` is the remedy, because a quantized coordinate samples one
+/// texel per band and interpolates nothing.
+pub(crate) const MIN_INTERIOR_TEXELS: f32 = 16.0;
+
 const SHADER: &str = r#"
 struct Params {
     // x: aspect (from the RENDER TARGET), y: shape index (quantized CPU-side),

@@ -157,6 +157,66 @@ impl Preset {
             }
         }
 
+        // A `shape_field` `color_span` narrow enough to starve the gradient
+        // (design-backlog 0099). The scene hands the palette a FIGURE
+        // coordinate whose `0..1` is the interior, so `color_span` is literally
+        // the share of the 256-texel LUT the figure is drawn through: at 0.037
+        // that is nine texels for the whole of it, linear-filtered across
+        // however much of the frame the figure covers, which is an upscaled
+        // gradient and reads as one.
+        //
+        // The reason this is worth a warning and not a note in a document is
+        // that **the symptom names the wrong subsystem**: a soft, crawling
+        // figure reads as a bad silhouette or bad shading, and the value is in
+        // range and the preset is otherwise good. It cost one user look verdict
+        // two misattributions.
+        //
+        // A warning rather than an error, on ADR-0020's surface, and only for a
+        // binding that *rests* — a `color_span` sweeping through the range is a
+        // different claim, and `Expr::as_const` is what separates them.
+        if system == SystemKind::ShapeField {
+            let resting = |name: &str| -> Option<f32> {
+                params
+                    .iter()
+                    .find(|b| b.name == name)
+                    .and_then(|b| b.expr.as_const())
+            };
+            // `palette_steps` snaps the coordinate to a band centre before the
+            // LUT read, so every pixel samples one exact texel and nothing is
+            // interpolated — the trap does not exist there. A band count that
+            // is bound rather than resting is the author working in bands too,
+            // so only a count resting BELOW the quantizer's own activation
+            // threshold leaves this live.
+            let banded = match params.iter().find(|b| b.name == "palette_steps") {
+                Some(binding) => binding.expr.as_const().is_none_or(|steps| {
+                    crate::render::palette::band_steps(steps)
+                        > crate::render::palette::MIN_ACTIVE_STEPS
+                }),
+                None => false,
+            };
+            if let Some(span) = resting("color_span")
+                && !banded
+            {
+                let texels = crate::render::scenes::shape_field::interior_texels(span);
+                if span.is_finite()
+                    && texels < crate::render::scenes::shape_field::MIN_INTERIOR_TEXELS
+                {
+                    warnings.push(format!(
+                        "parameter 'color_span' rests at {span}, which draws the figure's whole \
+                         interior through about {texels:.0} of the palette's {} texels. Below \
+                         roughly {:.0} the LUT's linear filtering is interpolating more than it \
+                         is reading and the figure comes back looking upscaled rather than \
+                         shaded — the estimate is exact in the coordinate and approximate on \
+                         screen, since how much of the frame the figure covers depends on its \
+                         shape and framing. Bind or set `palette_steps` to remove the \
+                         interpolation entirely",
+                        crate::render::palette::LUT_SIZE,
+                        crate::render::scenes::shape_field::MIN_INTERIOR_TEXELS,
+                    ));
+                }
+            }
+        }
+
         // Palette selection (ADR-0021): validated at this boundary into a
         // baked-ready `PaletteConfig`; a bad name/stop list is a surfaced load
         // error, never a panic. `None` -> the default `spectrum`. `[palette_b]`
