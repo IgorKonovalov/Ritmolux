@@ -200,8 +200,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The page stops telling authors to give up | dev | done | `8438a1d` |
-| 2 — Stops are sRGB, and the library is re-based | dev | done | committed with this row |
-| 3 — The colour docs describe the new contract | dev | not started | |
+| 2 — Stops are sRGB, and the library is re-based | dev | done | `d3e6c08` |
+| 3 — The colour docs describe the new contract | dev | done | committed with this row |
 | 4 — A narrow `color_span` warns | dev | not started | |
 | 5 — The look gate | human | not started | |
 
@@ -235,5 +235,14 @@ flowchart LR
   itself instead of that hex's encoding (its `encoded()` helper is gone), and
   `backdrop_palette.rs`'s `flat_palette` encodes the linear colour it is handed, since both its
   callers pass linear references — the analytic cosine and the lit-backdrop fixtures' baked colour.
+
+- **Phase 3 left `docs/presets.md` untouched**: it names no stop format and points at
+  `preset-palettes.md` for the palette surface, which the phase's own text makes conditional.
+  `docs/preset-guide.md` was checked for the same reason and does the same.
+- **`preset-palettes.md`'s `collage_mono` measurement was re-taken on this tree** rather than
+  carried forward: 592 distinct colours and 85 606 black pixels, where the page recorded 615 and
+  86 007. The three plateaus are the ones it names (`#000000`, `#e7e7e7`, `#d63131`) — unchanged by
+  the migration, which is the point — so what moved is the anti-aliased-edge tail, and it moved by
+  something this plan did not touch. Not investigated.
 
 ### Close triggers
