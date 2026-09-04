@@ -228,7 +228,7 @@ before                      after
 | 2 — The operator's table | dev | done | `7644cc3` |
 | 3 — The record | dev | done | `56f8a69` |
 | 4 — Two seed comments come back | dev | done | `c594fa5` |
-| 5 — Re-point the rig | human | not started | |
+| 5 — Re-point the rig | human | app side verified, rig outstanding | |
 
 ### Notes
 
@@ -263,6 +263,51 @@ before                      after
   `0x4C4D_565F_5357_524D` is `LMV_SWRM` and `0x4C4D_565F_5244_5F31` is `LMV_RD_1`, matching the
   values the plan cites at baseline `47432ca`. Both done-when clauses hold as written.
 
+### Phase 5 reading — the app side, 2026-09-05
+
+**The rig was not reachable, so Phase 5 is not discharged.** What was taken instead is a synthetic
+acceptance run against a live loopback track, which reaches everything on the app side of the break
+and nothing on the binding side. The phase's own done-when — *"each of the addresses drives what it
+drove before"* — is about bindings in Arena, the TouchDesigner patch and the show file, and no
+check that stops at the socket can answer it.
+
+Method: the shipped sink aimed at a local UDP receiver (`--osc 127.0.0.1:9000`), a throwaway
+decoder outside the repo asserting the roster, the type tags, the ranges, the 4-byte alignment and
+that each value takes more than one distinct value across the run. The decoder was self-tested
+first against three known-good encoded messages, so a negative would have been trustworthy.
+1450 sets, 14 addresses, ~24 s.
+
+| address | tag | observed |
+|---|---|---|
+| `/rlx/v1/level/bass` | `f` | 0.000..1.000 |
+| `/rlx/v1/level/mid` | `f` | 0.000..1.000 |
+| `/rlx/v1/level/treb` | `f` | 0.000..0.192 |
+| `/rlx/v1/level/onset` | `f` | 0.000..1.000 |
+| `/rlx/v1/level/rms` | `f` | 0.000..0.497 |
+| `/rlx/v1/raw/bass` | `f` | 0.000..0.012 |
+| `/rlx/v1/raw/mid` | `f` | 0.000..0.001 |
+| `/rlx/v1/raw/treb` | `f` | below 3-decimal display, varied |
+| `/rlx/v1/raw/onset` | `f` | below 3-decimal display, varied |
+| `/rlx/v1/beat/trigger` | `i` | 0..1 |
+| `/rlx/v1/beat/index` | `i` | 0..169, monotone |
+| `/rlx/v1/beat/phase` | `f` | 0.000..1.000 |
+| `/rlx/v1/tempo` | `f` | 0.000..170.455 |
+| `/rlx/v1/preset` | `s` | `Clifford` |
+
+What the run establishes: fourteen addresses, every one under `/rlx/v1`, none outside it and none
+on the old root; every type tag as ADR-0144 specifies; every datagram a multiple of 4 bytes; and
+`n` equal across all fourteen, so no partial set was sent.
+
+Two observations, recorded rather than diagnosed:
+
+- **`level/treb` peaked at 0.192 while `bass`, `mid` and `onset` each reached 1.000.** The material
+  was bass-heavy and the band normalizer's peak has a seconds-scale release, so a single early
+  transient holding the running peak would produce this. Not investigated.
+- **`beat/index` advanced 169 times in ~24 s against a `tempo` reading of 170.455**, which is about
+  2.5 onsets per beat — just above the 1.2x-2.3x band `README.md` states for the detector. The
+  tempo figure is a maximum over the run, not a settled value, and the octave question is
+  design-backlog 0158.
+
 ### Close triggers
 
 - **`presets/` touched:** none. `git diff --name-only 15dfe7f..HEAD -- presets/` is empty.
@@ -284,7 +329,10 @@ before                      after
   baseline moved** — `core/tests/golden/` is clean in the working tree after the run, which is
   Phase 4's own done-when.
 - **Outstanding `human` phases:** **5** — re-point every OSC binding in Arena, the TouchDesigner
-  patch and any show file. Not run. It is the only detector this break has.
+  patch and any show file. **Not discharged.** The rig was unreachable on 2026-09-05, so a synthetic
+  run took the app side instead (the reading is above): fourteen addresses, all under `/rlx/v1`,
+  correct type tags, live values, complete sets. The binding half is untouched by that and is still
+  the only detector this break has.
 - **The lane is behind `main`, and a merge is owed before it lands.** Base is `15dfe7f`; `main`
   advanced to `89c8c99` during the session, when Plan 0128 closed and merged. The two trees overlap
   on `docs/design-backlog.md` — 0128's close archived backlog 0110 and filed 0186, while this lane
