@@ -60,7 +60,7 @@ kick, at any input level**. The reading is scale-invariant: `raw / peak` is unch
 halves. Gain portability is the entire purpose of ADR-0049, and it is the specific trap for a
 lighting consumer that wants a magnitude and is handed a normalized excitation. The night recorded
 the finding as *"the mic level was hot enough to saturate the band term"*; the code falsifies that,
-and **the wrong diagnosis is the expensive part**. Nothing is broken — `/lmv/v1/raw/bass` is
+and **the wrong diagnosis is the expensive part**. Nothing is broken — `/rlx/v1/raw/bass` is
 published beside it and documented. What is missing is the property, stated anywhere.
 
 **A COM failure and a dead endpoint read alike.** Since Plan 0130, `capture_win::start` runs on
@@ -113,7 +113,7 @@ flowchart TB
     subgraph shell["standalone/"]
         loop["main.rs — display loop<br/>present show -> present_console<br/>decimation: lever B"]
         cap["capture_win.rs<br/>CoCreateInstance per start"]
-        osc["osc.rs — /lmv/v1/*"]
+        osc["osc.rs — /rlx/v1/*"]
     end
     subgraph docs["what an operator reads"]
         rm["README.md<br/>telemetry table"]
