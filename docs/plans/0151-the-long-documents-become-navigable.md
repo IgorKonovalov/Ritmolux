@@ -540,6 +540,135 @@ the `config.rs` one is now true rather than false — `APP_DIR_NAME` is `"Ritmol
   green, `toc.mjs --check` at `OK (6 blocks, 457 rows, current)` and `--self-test` at `30 of 30`.
 - **Outstanding `human` phases:** none. All six phases are `dev`.
 
+## Repair pass — from the Mode 4 review, 2026-09-04
+
+The review found that the Phase 4 transform damaged **40 of the 133** close write-ups in
+`docs/plans/README-archive.md`. Every done-when that phase named passed anyway. The three phases
+below are the contract for the repair; the six above stand as written and are not reopened.
+
+**What went wrong, once.** Where a bullet's link *label* wrapped across two lines, `- [` -> `### [`
+made the lead a heading with an unterminated bracket, truncated the title at the wrap point, and
+left the closing fragment stranded at column 0 as literal prose, destroying the link:
+
+```
+### [0094 — The two doc gates check what they claim
+to](done/0094-the-two-doc-gates-check-what-they-claim-to.md) — closed 2026-08-15, the day it
+```
+
+**Why nothing saw it, which is the part worth keeping.** The `±5 lines` check passed because the
+transform moves no line — line count is precisely the property this damage preserves.
+`grep -c '^### \['` reported 133 because a broken lead still begins `### [`.
+`check-doc-links.mjs` exited 0 because it matches `](path)` textually and never asks whether the
+link is well-formed markdown. And the independent `sed` reproduction diffs clean — it confirmed
+fidelity to the transform, not correctness of the result. The one shape the pre-flight scan did
+not enumerate was *a two-space line that is the continuation of a wrapped link label*.
+
+### Phase 7 — `flattenLinks` survives a bracketed label
+
+- **Owner skill:** dev
+- **What:** `scripts/toc.mjs`'s `flattenLinks` cannot flatten a link whose label contains brackets,
+  and Phase 8 creates one — entry 0049's title carries `[0048]`. This phase goes **first**, so that
+  Phase 8's regeneration is never run through a rule known to be wrong on its own output.
+- **Files touched:** `scripts/toc.mjs`, `scripts/fixtures/toc/seeded.md`, `scripts/fixtures/README.md`.
+- **The evidence, measured against the shipped regexes:** for the heading
+  `[0049 — … making [0048] Phase 6 measurable (and the kaleidoscope seam)](done/0049-analysis-diagnostics-surface.md)`
+  the label comes back with `](done/…)` still in it, and the anchor reads
+  `…-kaleidoscope-seamdone0049-analysis-diagnostics-surfacemd` — the target path folded into the
+  slug. `[^\]]*` cannot cross the inner `]`, so the outer link never matches at all.
+- **Done when:**
+  - That heading flattens to its text alone and anchors as
+    `0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope-seam`.
+  - The fixture gains the shape — a heading that is a link whose label contains a bracketed
+    reference — and `--self-test` goes red when the fix is reverted. Record that mutation in
+    `scripts/fixtures/README.md` beside the five already there.
+  - `node scripts/toc.mjs --check` and `--self-test` both exit 0, and the corpus total is still
+    **457 rows across 6 blocks** — this phase changes the rule, not any current row.
+
+### Phase 8 — The 40 damaged write-ups are repaired
+
+- **Owner skill:** dev
+- **What:** For each damaged lead, join the continuation fragment through its `](…)` onto the
+  heading line and leave the remainder of that line as the following body line — the shape the 93
+  undamaged entries already have. Then regenerate the blocks.
+- **Files touched:** `docs/plans/README-archive.md`.
+- **The detector, not a frozen list**, because the line numbers move as the repair is applied:
+
+  ```sh
+  awk '/^### / {n=gsub(/\[/,"["); m=gsub(/\]/,"]"); if (n != m) print NR": "$0}' docs/plans/README-archive.md
+  ```
+
+  It reports **40** today and must report none afterwards.
+- **The safety property, and it is stronger than the one Phase 4 used.** A join moves no character
+  — it replaces one newline with a space — so the section's whitespace-normalized content is
+  **invariant** under the whole repair. That is checkable, and unlike a line count it is not also
+  satisfied by the damage:
+
+  ```sh
+  awk '/^## Recently closed \(full entries\)/,/^## Prior sequencing notes \(superseded\)/' \
+    docs/plans/README-archive.md | tr -s ' \n' '  ' | md5sum
+  # f2556a501929baedc3d51dd28f3109d7  - before AND after the repair
+  ```
+
+  The digest covers a region that sits below the contents block, so regenerating the block does not
+  disturb it. **If it moves, revert rather than repair forward** — this is an append-only record,
+  and the second rewrite is the one that hides the first.
+- **Done when:**
+  - The detector above reports nothing, and
+    `grep -c '^### \[.*\](done/.*\.md)' docs/plans/README-archive.md` reports **133** (93 today).
+  - The digest above is unchanged, and the file's line count is unchanged apart from whatever
+    `toc.mjs` rewrites inside the block.
+  - Every restored title is the full plan title — the 40 are truncated at the wrap, so `0085` reads
+    *"gets an instrument"* and not *"gets an"*.
+  - `node scripts/toc.mjs` regenerates, and no row in any block begins `- [[`.
+  - `node scripts/check-doc-links.mjs` exits 0. **It exited 0 before the repair too, so it is
+    evidence of nothing here** — it is listed only because the repair must not break what it does
+    cover.
+
+### Phase 9 — The sixth gate's count reaches the sites that state it
+
+- **Owner skill:** dev
+- **What:** Phase 6 updated `CLAUDE.md` and its done-when named nothing else, so six live sites
+  still tell a reader this repository has five Node gates.
+- **Files touched:** `README.md`, `docs/nfr.md`,
+  `.claude/skills/architect/references/project-context.md`,
+  `.claude/skills/dev/references/project-context.md`, `docs/design-backlog.md`.
+- **The sites:** `README.md:83` (the repo's own layout map, and the exact counterpart of the
+  `CLAUDE.md` line Phase 6 did update — it is **not** in the implementation log's followup 1),
+  `docs/nfr.md:167`, `:208`, `:218`,
+  `.claude/skills/architect/references/project-context.md:49`,
+  `.claude/skills/dev/references/project-context.md:39`, and backlog **0179**'s own finding at
+  `docs/design-backlog.md:3397` and `:3406` — a live entry, corrected in place.
+- **`docs/nfr.md:166` carries arithmetic, not just a count.** It says *"eight single-runner gates"*
+  over a list that includes the Node gates; a sixth gate moves that number, and `toc.mjs` is invoked
+  **twice** in both carriers — so state what is true rather than incrementing what is there.
+- **Not touched:** `docs/design-backlog-archive.md:7252`, and every occurrence in
+  `docs/plans/done/*` and `README-archive.md`. Those are closed records of what was true when
+  written.
+- **Done when:**
+  - No live document states a Node-gate count that excludes `toc.mjs`, and the closed records are
+    untouched.
+  - Backlog 0179's two probes still hold and `node scripts/check-backlog-claims.mjs` exits 0 — its
+    claims are `present: RUSTDOCFLAGS in ci.yml` and `absent: cargo doc in pre-push`, and this
+    phase touches neither file.
+  - All six Node gates exit 0.
+
+### What the repair does NOT take
+
+- **`standalone/src/main.rs`'s lower-case usage banner.** It is takeable now that 0126 has closed,
+  but it is a code edit in a docs lane and it is the implementation log's own followup 3. It stays
+  a followup.
+- **Any reopening of Phases 1-6.** They verified: the 335-line move is byte-identical with its 17
+  stranded link definitions carried across, Phase 3's three required sentences survive, Phase 4 is
+  exact everywhere outside the 40, and the row counts and both carriers are as claimed.
+- **The merge and the full suite.** `main` has moved — the 0126 close landed eight commits of real
+  refactoring — so `cargo nextest run --workspace` is owed **after** `git merge main`, at the close,
+  not per repair phase. The per-phase gate here is `fmt` + `clippy --workspace --all-targets` plus
+  the six Node gates; nothing in Phases 7-9 compiles.
+- **One thing the merge itself will owe.** `main`'s 0126 close wrote its write-up into
+  `docs/plans/README-archive.md` in the **old bullet form** (`- [0126 — …]`). It needs converting to
+  a `### ` heading and the block regenerating — which is what the close ceremony's new step 3d
+  exists for. Flag it at the merge; do not take it as a phase.
+
 ## Followups (after this lands)
 
 - `docs/capturing.md`'s six plan-numbered heading suffixes are plan-relative narration in a
