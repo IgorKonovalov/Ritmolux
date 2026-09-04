@@ -98,7 +98,7 @@ pub use scenes::lines::CapOverflow;
 use text::TextLayer;
 #[cfg(feature = "text")]
 pub use text::TextRun;
-pub use tier::{Tier, TierConfig};
+pub use tier::{REFERENCE_PX, Tier, TierConfig, attractor_budget};
 use tonemap::Tonemap;
 use transition::{Blend, DEFAULT_DURATION_SECS, Transition, TransitionKind};
 
@@ -213,6 +213,10 @@ pub struct RendererOptions {
     /// Carrying a [`AdapterChoice::Named`] `String` is why this struct is
     /// `Clone` rather than `Copy`.
     pub adapter: AdapterChoice,
+    /// Which of the tier's two attractor sample ceilings to resolve against
+    /// (ADR-0140). [`SampleBudget::Live`] by default, so every caller that does
+    /// not ask resolves exactly what it resolved before the choice existed.
+    pub budget: SampleBudget,
 }
 
 impl RendererOptions {
@@ -223,12 +227,53 @@ impl RendererOptions {
             ..Self::default()
         }
     }
+
+    /// [`pinned`](Self::pinned), against the **offline** sample ceiling — for a
+    /// headless render, which has no present deadline to answer to.
+    pub fn pinned_offline(tier: Tier) -> Self {
+        Self {
+            tier: Some(tier),
+            budget: SampleBudget::Offline,
+            ..Self::default()
+        }
+    }
+}
+
+/// Which of a tier's two sample ceilings this renderer resolves against
+/// (ADR-0140).
+///
+/// The **law is the same either way** — a budget is
+/// `clamp(round(anchor * target_px / REFERENCE_PX), anchor, ceiling)` — and this
+/// picks the `ceiling`. It is a construction choice and never a per-frame one:
+/// the ceiling is also the **allocation**, so changing it means rebuilding the
+/// scene.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SampleBudget {
+    /// Frame-time bound: a window, the plugin's host surface, and every capture
+    /// path — a still, a filmstrip, a report, the golden and sanity suites.
+    ///
+    /// **A capture takes this one even though it has no deadline either**, and
+    /// that is deliberate rather than an oversight: the offline ceiling is a
+    /// larger *allocation*, and `AttractorScene::seed`'s scatter is a function of
+    /// how many particles were asked for, so handing a capture path the offline
+    /// ceiling would move every committed baseline without moving a single
+    /// resolved count.
+    #[default]
+    Live,
+    /// Memory bound: `shot --render`, which walks a clip end to end with `dt`
+    /// injected and answers to no display.
+    Offline,
 }
 
 /// Owns the GPU context, the built-in systems, and the loaded presets; renders
 /// one frame per call by evaluating the active preset into the active system.
 pub struct Renderer {
     ctx: RenderContext,
+    /// Which sample ceiling this renderer's scenes were built against
+    /// (ADR-0140). Read wherever the scenes are rebuilt — a tier change, a
+    /// capture reset — so a rebuild cannot silently swap the ceiling under a
+    /// run that is already producing frames.
+    budget: SampleBudget,
     /// Every built-in scene, keyed by the system it drives (see [`SceneRoster`]).
     scenes: SceneRoster,
     /// The active preset's composite — its `bg_*` backdrop pre-pass (ADR-0018,
@@ -379,7 +424,9 @@ impl Renderer {
         // not the surface's (ADR-0046): the scenes, both composite sides and the
         // blend all paint in linear light. Only the tonemap, ink, the overlay and
         // the text layer write display-referred pixels.
-        let scenes = crate::render::scenes::create_all(&ctx.device, COMPOSITE_FORMAT, &tier);
+        let budget = opts.budget;
+        let scenes =
+            crate::render::scenes::create_all(&ctx.device, COMPOSITE_FORMAT, &tier, budget);
         let side = CompositeSide::new(&ctx.device, COMPOSITE_FORMAT, &tier);
         let blend = Blend::new(&ctx.device, COMPOSITE_FORMAT);
         let tonemap = Tonemap::new(&ctx.device, ctx.surface_format());
@@ -389,6 +436,7 @@ impl Renderer {
         let text_layer = TextLayer::new(&ctx.device, &ctx.queue, ctx.surface_format());
         let mut renderer = Self {
             ctx,
+            budget,
             scenes,
             side,
             incoming_side: None,
@@ -488,6 +536,44 @@ impl Renderer {
             RenderContext::new_headless_on(opts.width, opts.height, adapter)?,
             RendererOptions::pinned(tier),
         ))
+    }
+
+    /// A headless renderer pinned to `tier` and resolving the **offline** sample
+    /// ceiling (ADR-0140) — the one constructor `shot --render` reaches, and the
+    /// only one in the engine that does.
+    ///
+    /// Separate from [`new_headless_tiered`](Self::new_headless_tiered) rather
+    /// than a flag on it, because the two answer to different bounds and only one
+    /// of them may ever produce a baseline: a render walks a clip with `dt`
+    /// injected and no display to miss, so its ceiling is memory; every other
+    /// headless path is a capture, and a capture takes the live ceiling so the
+    /// allocation — and with it the seeded scatter — is the one every committed
+    /// baseline was blessed against.
+    pub fn new_headless_offline(opts: HeadlessOptions, tier: Tier) -> Result<Self, RenderError> {
+        Ok(Self::from_context(
+            RenderContext::new_headless_on(
+                opts.width,
+                opts.height,
+                &AdapterChoice::from(opts.prefer_software),
+            )?,
+            RendererOptions::pinned_offline(tier),
+        ))
+    }
+
+    /// Which sample ceiling this renderer resolves against (ADR-0140).
+    pub fn sample_budget(&self) -> SampleBudget {
+        self.budget
+    }
+
+    /// The attractor's **resolved** sample budget for the current target, read
+    /// off the scene rather than recomputed — `None` before the first frame has
+    /// given the scene a target size.
+    ///
+    /// The scene is the single source: a caller that wants to report the number
+    /// (a render's own header does) must not restate the law, because a
+    /// restatement is what drifts.
+    pub fn attractor_sample_budget(&self) -> Option<u32> {
+        routing::scene_for(&self.scenes, crate::preset::SystemKind::Attractor)?.sample_budget()
     }
 
     /// Renderer targeting a surface the host owns and built the handle for —
@@ -969,6 +1055,9 @@ impl Renderer {
     ) -> u32 {
         let Self {
             ctx,
+            // Read where the scenes are BUILT, not where they are drawn - a
+            // frame never consults it.
+            budget: _,
             scenes,
             side,
             incoming_side,

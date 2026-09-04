@@ -649,3 +649,61 @@ fn the_resident_set_line_separates_warm_up_from_growth_across_the_run() {
         "render: resident set unavailable on this platform"
     );
 }
+
+// -----------------------------------------------------------------------
+// The offline sample ceiling (ADR-0140)
+// -----------------------------------------------------------------------
+
+/// The header names the budget the render is actually drawn at, and only for a
+/// system that has one.
+///
+/// The number matters because it is what a `--render` at a large size exists to
+/// raise: an operator comparing two files has no other way to see which budget
+/// each carried. 1920x1080 at `Rich` is nine times the 640x360 reference, so it
+/// is the law's own value and **not** the live ceiling a window would be held to.
+#[test]
+fn the_header_names_the_offline_sample_budget() {
+    use rlx_core::preset::Preset;
+
+    fn preset(system: &str, name: &str) -> Preset {
+        Preset::from_toml_str(&format!("system = \"{system}\"\nname = \"{name}\""))
+            .expect("hand-written test preset is valid")
+    }
+    fn req(width: u32, height: u32, tier: Tier) -> RenderRequest {
+        RenderRequest {
+            preset: None,
+            fps: DEFAULT_FPS,
+            width,
+            height,
+            tier,
+            encoder: None,
+        }
+    }
+
+    let attractor = vec![preset("attractor", "Leviathan")];
+    assert_eq!(
+        attractor_note(&attractor, "Leviathan", &req(1920, 1080, Tier::Rich)),
+        ", attractor samples 1350000"
+    );
+    // The live ceiling is 600 000, so a header reporting that number would mean
+    // the render had been built through the wrong constructor.
+    assert_ne!(
+        attractor_note(&attractor, "Leviathan", &req(1920, 1080, Tier::Rich)),
+        ", attractor samples 600000"
+    );
+    // At and below the reference the law resolves the anchor, offline included.
+    assert_eq!(
+        attractor_note(&attractor, "Leviathan", &req(640, 360, Tier::Rich)),
+        ", attractor samples 150000"
+    );
+    assert_eq!(
+        attractor_note(&attractor, "Leviathan", &req(1920, 1080, Tier::Floor)),
+        ", attractor samples 450000"
+    );
+
+    // Silent for every other system, where the count is a flat capacity.
+    let lines = vec![preset("parametric_curve", "Rose")];
+    assert!(attractor_note(&lines, "Rose", &req(1920, 1080, Tier::Rich)).is_empty());
+    // ...and silent for a name that is not in the roster, rather than guessing.
+    assert!(attractor_note(&attractor, "Absent", &req(1920, 1080, Tier::Rich)).is_empty());
+}

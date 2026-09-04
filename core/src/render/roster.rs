@@ -308,6 +308,7 @@ impl Renderer {
             side,
             incoming_side,
             tier,
+            budget,
             ..
         } = self;
         *cap_overflow = None;
@@ -375,7 +376,17 @@ impl Renderer {
         // produced none (never a silent cut).
         live.layer = preset.layer.as_ref().map(|layer| {
             let mut layer_scene =
-                scenes::create_layer_scene(layer.system, &ctx.device, COMPOSITE_FORMAT, tier);
+                // The **same** ceiling the main scene was built against: a
+                // `[layer]` may itself be an attractor, and a layer resolving a
+                // different budget than the preset beside it would be two
+                // densities in one frame.
+                scenes::create_layer_scene(
+                    layer.system,
+                    &ctx.device,
+                    COMPOSITE_FORMAT,
+                    tier,
+                    *budget,
+                );
             layer_scene.set_palette(&baked);
             layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
             if let Some(cfg) = layer.config.as_ref() {

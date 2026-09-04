@@ -416,7 +416,8 @@ impl Renderer {
         if !self.select_preset_by_name_now(name) {
             return Err(RenderError::UnknownPreset(name.to_string()));
         }
-        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
+        self.scenes =
+            scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier, self.budget);
         self.cancel_transition();
         self.side.reset_resources();
         self.tonemap.reset_resources();
@@ -487,7 +488,8 @@ impl Renderer {
         }
         let mut analyzer = crate::dsp::Analyzer::new(format).map_err(RenderError::AudioFormat)?;
 
-        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
+        self.scenes =
+            scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier, self.budget);
         self.cancel_transition();
         self.side.reset_resources();
         self.tonemap.reset_resources();

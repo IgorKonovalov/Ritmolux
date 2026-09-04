@@ -601,6 +601,10 @@ pub struct AttractorScene {
     /// the density law's anchor, and the floor of what
     /// [`budget`](Self::budget) can resolve to.
     anchor: u32,
+    /// Whether a target size has reached this scene yet, so
+    /// [`sample_budget`](Scene::sample_budget) can tell "the anchor, because the
+    /// target is small" from "the anchor, because nothing has asked yet".
+    targeted: bool,
     /// This target's resolved sample budget:
     /// `clamp(round(anchor * target_px / REFERENCE_PX), anchor, particle_count)`
     /// ([`attractor_budget`], ADR-0140). Updated in
@@ -874,6 +878,7 @@ impl AttractorScene {
             trail_cap,
             particle_count,
             anchor,
+            targeted: false,
             // The law's own lower clamp until a target size arrives — never fewer
             // than the tier's count, which is what every small capture resolves.
             budget: anchor,
@@ -1396,6 +1401,7 @@ impl Scene for AttractorScene {
         let (w, h) = trail_grid_size(width, height, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
+        self.targeted = true;
         self.budget = attractor_budget(
             self.anchor,
             width.saturating_mul(height),
@@ -1407,6 +1413,17 @@ impl Scene for AttractorScene {
     // No `set_time`. The display rotation was this scene's only reader of the
     // shared clock, and since ADR-0076 it is an integrated phase instead — so
     // the trait's no-op default is the honest implementation.
+
+    /// The budget the density law resolved for the target this scene was last
+    /// given (ADR-0140) — `None` until [`set_target_size`](Self::set_target_size)
+    /// has been called, which is the first frame.
+    ///
+    /// The **budget**, not `active_count`: a preset's `[particles] density`
+    /// narrows what is drawn out of it (ADR-0069), and that is a look choice
+    /// rather than a property of the target.
+    fn sample_budget(&self) -> Option<u32> {
+        self.targeted.then_some(self.budget)
+    }
 
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build

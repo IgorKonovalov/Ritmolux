@@ -58,3 +58,37 @@ pub fn renderer(
     r.set_presets(presets);
     Ok(r)
 }
+
+/// [`renderer`], against the **offline** sample ceiling (ADR-0140) — the one
+/// `--render` builds, and the only caller in this binary that may.
+///
+/// Separate rather than a flag, because the split is the point. A render walks a
+/// clip with `dt` injected and no display to miss, so its attractor budget is
+/// bounded by memory and a 1080p file reaches the reference sample density
+/// instead of the live frame-time cap. Every other mode here takes a *picture*,
+/// and a picture is a capture: the offline ceiling is also a larger allocation,
+/// and the attractor's seeded scatter is a function of it, so handing a capture
+/// path this constructor would move committed baselines without moving a single
+/// resolved count.
+///
+/// **A rendered file is therefore deliberately not the frames the app would have
+/// drawn at that size**, which is the one property `shot` otherwise tries to
+/// keep.
+pub fn renderer_offline(
+    width: u32,
+    height: u32,
+    presets: Vec<Preset>,
+    tier: Tier,
+) -> Result<Renderer, String> {
+    let mut r = Renderer::new_headless_offline(
+        HeadlessOptions {
+            width,
+            height,
+            prefer_software: false,
+        },
+        tier,
+    )
+    .map_err(|e| format!("headless renderer: {e}"))?;
+    r.set_presets(presets);
+    Ok(r)
+}
