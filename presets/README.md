@@ -3567,7 +3567,7 @@ their existence.
 | Key        | Values                                                          | Notes                                             |
 |------------|-----------------------------------------------------------------|---------------------------------------------------|
 | `family`   | `de_jong`, `clifford`, `thomas`, `lorenz`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Which figure the compute step iterates. Optional — absent means `de_jong`. The last five are **IFS figures**, not strange attractors — see below. |
-| `density`  | `0.0005` .. `1.0`                                                | What fraction of the tier's particle budget to draw. Optional — absent means `1.0`, the whole budget. |
+| `density`  | `0.0005` .. `1.0`                                                | What fraction of the tier's particle budget to draw. Optional — absent means `1.0`, the whole budget. **The budget is not a fixed number** — see below. |
 | `morph_to` | any **IFS figure** name                                          | The figure the bindable `morph` param travels towards. Optional — absent pins the figure and makes `morph` inert. **A load error on the four map families**, which have no table to interpolate. |
 
 ```toml
@@ -3588,10 +3588,22 @@ screen. What you see is the product:
 | **low `density`** | a sparse scatter of dots, usually too thin to read | **curves** — few enough trajectories that you can follow each one, which is the classic plotted attractor |
 
 The bottom-right cell is the one `density` was added for. At `density = 1.0` the
-scene draws 50 000 independent samples of the attractor, and raising `fade` just
-makes a denser cloud — you cannot get a *trace* out of it, because 50 000
-simultaneous trails overlap into a solid. Drop to `0.02` or below and the same
-`fade` reads as banded spiral curves instead.
+scene draws the whole budget, and raising `fade` just makes a denser cloud — you
+cannot get a *trace* out of it, because that many simultaneous trails overlap
+into a solid. Drop to `0.02` or below and the same `fade` reads as banded spiral
+curves instead.
+
+> **`density` is a fraction of a budget that moves with the window.** Since
+> [ADR-0140](../docs/adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)
+> the attractor's sample budget is a *density against the render target*, not a flat tier
+> constant: it is the tier's own count at 640x360 and below, and rises with the pixel count
+> above that, capped lower in a window than under `shot --render`. So the same `density`
+> draws a different absolute number of points at different sizes — deliberately, because the
+> deposit spreads over the render target and a flat count is what made a 1080p render read as
+> an upscale. **Author to the look, not to a count.** Two consequences worth holding:
+> a preset tuned in a small window keeps its look at 1080p rather than thinning out, and the
+> point counts quoted anywhere in this file are the 640x360 anchor's, not a promise about your
+> display. `docs/capturing.md` carries the per-size table.
 
 Two things worth knowing before you reach for it:
 
@@ -3614,9 +3626,11 @@ Two things worth knowing before you reach for it:
   moved it; if you are reading an older copy, the swap is level-neutral and the
   value transfers unchanged.)
 - **The tier caps the top, it does not set the value.** `density` is a fraction
-  of whatever the current quality tier allows (50 000 at the standard tier,
-  150 000 at the rich one), so `density = 0.02` is 1 000 points on one and 3 000
-  on the other. You are choosing a proportion, not a count.
+  of whatever the current quality tier allows — 50 000 at the standard tier and
+  150 000 at the rich one *at the 640x360 anchor*, and more than that at a larger
+  target (see the note above). So `density = 0.02` is 1 000 points on one and
+  3 000 on the other in a small window, and proportionally more in a big one. You
+  are choosing a proportion, not a count.
 
 It is structural: set once when the preset loads, and **not bindable** to audio.
 An eased particle count would re-decide the picture every frame.

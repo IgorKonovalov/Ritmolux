@@ -134,7 +134,9 @@ footprint so the vendor spread is on record.
       _(Plan 0045 Phase 6 measured the **Rich** side on the dev box's discrete GPU. Bloom is
       **not** what is expensive there: `star_lantern` runs **164 fps, p99 8.2 ms** windowed —
       comfortably inside a 60 Hz frame — against `attractor_clifford`'s p99 19.9 ms and
-      `attractor_leviathan`'s 19.0 ms on the same run, neither of which binds bloom at all. So the
+      `attractor_leviathan`'s 19.0 ms on the same run, neither of which binds bloom at all.
+      _(Both attractor figures predate ADR-0140 and were taken at a flat 150 000 samples; see the
+      `Rich` calibration item below.)_ So the
       cost that puts the heaviest shipped preset past a 60 Hz frame at Rich is the float composite
       plus the attractor, not this stage. **Still owed on this page:** the same `star_lantern` run
       at **native fullscreen**, the **`Floor`-pinned** sanity pass, and all of the low-end-box
@@ -321,6 +323,13 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       measured value. Route to `dev` with the numbers. The five fields and their provisional
       values: `post_cap` 2560x1440, `attractor_particles` 150 000, `attractor_trail_cap` 3840x2160,
       `swarm_particles` 30 000, `max_segments` 60 000 (`core/src/render/tier.rs`).
+      **`attractor_particles` is now an anchor and not the count drawn** — since
+      [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) the sample
+      budget is a density against the render target, so a `Rich` window above the 640x360 anchor
+      resolves up to `attractor_particles_live_ceiling` (600 000) instead. **Record the size of the
+      window the reading was taken at**, because the drawn count now depends on it, and the relief
+      lever for an attractor miss is that ceiling rather than the anchor. Lowering the anchor still
+      costs shot noise at *every* size; lowering the ceiling costs it only on large displays.
       **No number is invented upward to look good** — that was the phase's own rule, and it still
       binds. _(Plan 0044 Phase 4, carried forward at that plan's close 2026-07-30.)_
       **Two things changed under this item at [Plan 0057](plans/done/0057-the-attractors-compute-path.md)'s

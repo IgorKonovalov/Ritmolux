@@ -11,7 +11,15 @@ contradicts this file is a plan bug — surface it, don't guess.
   values (particle counts, segment budget, internal-grid caps) resolved **at renderer
   construction** and, since [ADR-0054](adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md),
   re-resolvable on the live context by an explicit `Renderer::set_tier` (the standalone's `[` / `]`
-  and its settings menu). The values are capacities read at resource-construction time, so a change
+  and its settings menu). **One of those capacities is no longer a single number.** Since
+  [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) the attractor's
+  sample budget is a **density against the render target** — the tier's `attractor_particles` is the
+  anchor of `clamp(round(anchor * target_px / 230400), anchor, ceiling)`, resolved per target size
+  rather than once at construction, against a frame-time ceiling in a window and a larger
+  memory-bound one under `shot --render`. The *allocation* is still made once, at the ceiling, so a
+  resize moves the drawn count and rebuilds no GPU resource. `Floor`'s live ceiling **is** its
+  anchor, which is what keeps this section's floor commitment true at every target size.
+  The values are capacities read at resource-construction time, so a change
   rebuilds GPU resources and costs one visible re-accumulation of trails and feedback; nothing
   branches on the tier per frame. A tier changes *how much* the engine draws, never *what* — so the
   same preset reads the same on both, at different budgets.
@@ -404,7 +412,13 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   one shipped preset that binds `bloom_*`) runs 164 fps at p99 **8.2 ms**, against
   `attractor_clifford` at p99 19.9 ms and `attractor_leviathan` at 19.0 ms — neither of which
   switches the stage on. The float composite plus the attractor is what puts the heaviest preset past
-  a 60 Hz frame at Rich. The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
+  a 60 Hz frame at Rich. **Both attractor readings predate
+  [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) and describe a
+  configuration that no longer ships:** they were taken when `Rich` drew a flat 150,000 samples at
+  any window size, and a window above the 640x360 anchor now draws up to 600,000. Plan 0128 Phase 1
+  measured the marginal cost of that step on the same discrete GPU as **+1.454 ms p99**, on an
+  instrument that omits the present and is therefore not comparable to these figures in absolute
+  terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page. The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
   with `docs/on-device-validation.md`.
 - **Driver floor isolated (Plan 0012 Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
