@@ -314,7 +314,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
-| 7 — The Mode 4 repairs | dev | done | committed with this row |
+| 7 — The Mode 4 repairs | dev | done | `de72c22` |
 
 ### Phase 1 readings
 
