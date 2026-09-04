@@ -314,7 +314,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
-| 7 — The Mode 4 repairs | dev | not started | |
+| 7 — The Mode 4 repairs | dev | done | committed with this row |
 
 ### Phase 1 readings
 
@@ -498,6 +498,27 @@ condition. The mechanism and the trap are now on `seed`'s doc comment. The resid
 coupling: **the ceiling constant is an input to every `Rich` attractor picture**, so
 re-measuring it re-renders them.
 
+**Phase 7 — the hook became `#[cfg(test)]`, and that took a fourth file.** A
+deviation from the phase's stated `Files touched`, disclosed rather than argued.
+
+Deleting `Renderer::attractor_sample_budget` left `Scene::sample_budget` with no
+caller outside the test module, and clippy reported `method sample_budget is
+never used` — against one done-when requiring clippy clean and another saying the
+hook stays. Both hold with `#[cfg(test)]` on the trait default and on
+`AttractorScene`'s override. That override lives in
+`core/src/render/scenes/particles/mod.rs`, which the phase does not list.
+
+**Two things were taken beyond what the phase names**, both approved before the
+edit. `Renderer::sample_budget()` was deleted alongside it — equally uncalled,
+twelve lines above. And `rich_is_never_below_the_floor` gained `ceiling >= anchor`
+at both tiers and `offline >= live` as well as the two fields the phase asked
+for; a ceiling under its own anchor would allocate less than the law's lower
+clamp resolves, and neither invariant was covered.
+
+`Scene::sample_budget`'s own doc carried the same false claim the deleted
+accessor did — that no caller recomputes the law. `attractor_note` does, and
+must: the header prints before the renderer exists.
+
 ### Phase 3 readings — a 1080p render's memory
 
 `attractor_leviathan` over an 8 s synthesized clip, 480 frames at 60 fps,
@@ -556,7 +577,8 @@ The plan header's `Closes: design-backlog 0130` is stale.
   lists it among the 8 unprobeable ones.
 - **What shipped:** a **feature**, in two commits — `9243255` (the density law, live)
   and `1890df7` (the offline ceiling and `--render`) — plus one docs-only commit,
-  `9239bb3`.
+  `9239bb3`, and Phase 7's non-behavioral repair commit, which deletes two dead
+  accessors and moves no rendered pixel.
 - **Operator docs touched:** `docs/capturing.md` — a new block under `--render`
   (the two-ceiling table, the three consequences, the measured resident set) and a
   pointer added under *Captures pin the floor tier*.
@@ -564,8 +586,10 @@ The plan header's `Closes: design-backlog 0130` is stale.
 - **Outstanding `human` phases:** **4** (does it still look upscaled) and **5** (the
   `fast`-vs-`quality` diffusion side-by-side). Neither has run. Phase 4 is the look
   gate the whole plan exists for, and backlog 0110 does not close without it.
-- **Full suite:** `cargo nextest run --workspace`, exit **0** — 1532 tests run, 1532 passed, 5 skipped. Run at the
-  tip, after Phase 6.
+- **Full suite:** `cargo nextest run --workspace`, exit **0** — 1535 tests run, 1535 passed,
+  5 skipped. Run at the tip, after Phase 7 and after `main` was merged into the lane; `fmt
+  --check` and `clippy --workspace --all-targets` clean at the same tip. The earlier
+  post-Phase-6 run read 1532/1532 before that merge.
 
 ## Followups (after this lands)
 
