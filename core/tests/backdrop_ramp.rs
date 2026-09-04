@@ -50,17 +50,17 @@ const BRIGHT: f32 = 0.9;
 /// to hot amber. Evenly spaced, so a swept coordinate travels it at a constant
 /// rate and the ramp's shape comes from the ramp rather than from the stops.
 const DUSK: &str = "[palette]\nstops = [\
-    { at = 0.0,  color = \"#060b24\" }, \
-    { at = 0.25, color = \"#1b2a5e\" }, \
-    { at = 0.5,  color = \"#c74b1d\" }, \
-    { at = 0.75, color = \"#ff7a1f\" }, \
-    { at = 1.0,  color = \"#ffd06e\" }]";
+    { at = 0.0,  color = \"#2a3b69\" }, \
+    { at = 0.25, color = \"#5c71a3\" }, \
+    { at = 0.5,  color = \"#e5945f\" }, \
+    { at = 0.75, color = \"#ffb862\" }, \
+    { at = 1.0,  color = \"#ffe9af\" }]";
 
 /// A palette with no gradient in it at all, so a probe's colour cannot vary with
 /// position and the only thing moving across the frame is the property under
 /// test. Used by every test whose subject is a *shape* rather than a colour.
-const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffcf80\" }, \
-                    { at = 1.0, color = \"#ffcf80\" }]";
+const FLAT: &str = "[palette]\nstops = [{ at = 0.0, color = \"#ffe9bc\" }, \
+                    { at = 1.0, color = \"#ffe9bc\" }]";
 
 /// The ramp position at framebuffer row `j` of `height`, at the pixel's centre.
 ///

@@ -95,16 +95,16 @@ family = "maurer_rose"
 stops = [
   { at = 0.0000, color = "#000000" },   # band 0
   { at = 0.1200, color = "#000000" },
-  { at = 0.1300, color = "#b00808" },   # band 1   red
-  { at = 0.2450, color = "#b00808" },
+  { at = 0.1300, color = "#d83232" },   # band 1   red
+  { at = 0.2450, color = "#d83232" },
   { at = 0.2550, color = "#000000" },   # band 2
   { at = 0.3700, color = "#000000" },
-  { at = 0.3800, color = "#b00808" },   # band 3   red
-  { at = 0.4950, color = "#b00808" },
+  { at = 0.3800, color = "#d83232" },   # band 3   red
+  { at = 0.4950, color = "#d83232" },
   { at = 0.5050, color = "#000000" },   # band 4
   { at = 0.6200, color = "#000000" },
-  { at = 0.6300, color = "#b00808" },   # band 5   red
-  { at = 0.7450, color = "#b00808" },
+  { at = 0.6300, color = "#d83232" },   # band 5   red
+  { at = 0.7450, color = "#d83232" },
   { at = 0.7550, color = "#000000" },   # band 6
   { at = 0.8700, color = "#000000" },
   { at = 0.8800, color = "#ffffff" },   # band 7   the PAPER - see the header

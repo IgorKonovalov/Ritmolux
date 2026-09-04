@@ -199,12 +199,41 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The page stops telling authors to give up | dev | done | committed with this row |
-| 2 — Stops are sRGB, and the library is re-based | dev | not started | |
+| 1 — The page stops telling authors to give up | dev | done | `8438a1d` |
+| 2 — Stops are sRGB, and the library is re-based | dev | done | committed with this row |
 | 3 — The colour docs describe the new contract | dev | not started | |
 | 4 — A narrow `color_span` warns | dev | not started | |
 | 5 — The look gate | human | not started | |
 
 ### Notes
+
+- **Phase 2 migrated every authored stop in the repository, not only `presets/*.toml`.** The golden
+  suite renders `core/tests/fixtures/*.toml`, so leaving those under the new interpretation would
+  have moved every baseline. Also migrated: the inline preset TOML in 13 Rust test files and
+  `docs/examples/tuning/step-5-colour-and-beat.toml`. The user approved this scope before Phase 1.
+- **`milkconv/src/convert.rs` encodes at the emit site** — also outside the plan's file list, also
+  approved before Phase 1. Its `[palette]` block is computed from `wave_r/_g/_b`, which are light, so
+  without the encode every future conversion would render darker than one converted today.
+- **The migration is exact to within 1/255 of the baked LUT, not bit-exact, and it cannot be.**
+  73 of the 256 linear byte values are not nameable by any 8-bit sRGB hex, so a stop whose old value
+  was one of them has no exact re-basing in the hex form. Measured over every migrated stop list:
+  14 142 of 87 552 LUT channels (16.15 %) move, all by exactly 1/255, against `golden.rs`'s
+  `MEAN_TOL` of 0.02. Choosing each hex to reproduce the old LUT byte where reachable rather than to
+  minimise linear error moves not one channel more or less. No baseline was blessed.
+- **Done-when "byte-identical and unblessed on both adapters":** the golden suite is WARP-only by
+  construction (ADR-0016, ADR-0023) and has no adapter override, so it ran there. The two
+  cross-adapter suites — `collage_layout` and `warp_mesh`, which build a hardware renderer via
+  `headless_on(.., false)` — passed in the same full run.
+- **Done-when "renders within 2/255", asserted in `core/tests/palette_srgb.rs`:** the 2/255 is
+  asserted on the plateau (a mean over a flat backdrop), because the LUT stores 8-bit *linear* light
+  and `#14`'s light rounds to 2/255 there — two encoded levels, which is the same residual
+  ADR-0151's own `#c81622` measurement carries. The per-pixel spread is asserted separately at the
+  display dither's one level.
+- **Two existing tests changed meaning rather than being migrated**, both disclosed here because the
+  diff alone reads as a weakened assertion: `shape_collage`'s
+  `an_element_under_the_knee_arrives_at_the_value_it_was_authored_at` now expects the authored hex
+  itself instead of that hex's encoding (its `encoded()` helper is gone), and
+  `backdrop_palette.rs`'s `flat_palette` encodes the linear colour it is handed, since both its
+  callers pass linear references — the analytic cosine and the lit-backdrop fixtures' baked colour.
 
 ### Close triggers

@@ -43,22 +43,22 @@ name   = "fixture_shape_collage_roster"
 
 [palette]
 stops = [
-  { at = 0.0000, color = "#1a1a1a" },
-  { at = 0.1249, color = "#1a1a1a" },
-  { at = 0.1251, color = "#8c1c24" },
-  { at = 0.2499, color = "#8c1c24" },
-  { at = 0.2501, color = "#8f7a1c" },
-  { at = 0.3749, color = "#8f7a1c" },
-  { at = 0.3751, color = "#22407e" },
-  { at = 0.4999, color = "#22407e" },
-  { at = 0.5001, color = "#2f6b46" },
-  { at = 0.6249, color = "#2f6b46" },
-  { at = 0.6251, color = "#5c5f66" },
-  { at = 0.7499, color = "#5c5f66" },
-  { at = 0.7501, color = "#6b3352" },
-  { at = 0.8749, color = "#6b3352" },
-  { at = 0.8751, color = "#e6e3d8" },
-  { at = 1.0000, color = "#e6e3d8" },
+  { at = 0.0000, color = "#5a5a5a" },
+  { at = 0.1249, color = "#5a5a5a" },
+  { at = 0.1251, color = "#c45d69" },
+  { at = 0.2499, color = "#c45d69" },
+  { at = 0.2501, color = "#c5b85d" },
+  { at = 0.3749, color = "#c5b85d" },
+  { at = 0.3751, color = "#6689bb" },
+  { at = 0.4999, color = "#6689bb" },
+  { at = 0.5001, color = "#77ad8f" },
+  { at = 0.6249, color = "#77ad8f" },
+  { at = 0.6251, color = "#a2a4aa" },
+  { at = 0.7499, color = "#a2a4aa" },
+  { at = 0.7501, color = "#ad7c9a" },
+  { at = 0.8749, color = "#ad7c9a" },
+  { at = 0.8751, color = "#f4f2ed" },
+  { at = 1.0000, color = "#f4f2ed" },
 ]
 
 [params]

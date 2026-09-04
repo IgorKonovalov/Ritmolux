@@ -109,8 +109,8 @@ smoothing = 0.09
 stops = [
   { at = 0.000, color = "#ffffff" },   # bands 0-5   a resting spoke
   { at = 0.745, color = "#ffffff" },
-  { at = 0.755, color = "#b00808" },   # bands 6-7   a band that is loud
-  { at = 1.000, color = "#b00808" },
+  { at = 0.755, color = "#d83232" },   # bands 6-7   a band that is loud
+  { at = 1.000, color = "#d83232" },
 ]
 
 [params]

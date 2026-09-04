@@ -86,8 +86,8 @@ representative = true
 # sets which parts of the frame are BRIGHT, and therefore which become ink. Kept
 # neutral so that luminance ramp stays honest.
 stops = [
-  { at = 0.00, color = "#2a2a2a" },
-  { at = 0.55, color = "#9a9a9a" },
+  { at = 0.00, color = "#717171" },
+  { at = 0.55, color = "#cccccc" },
   { at = 1.00, color = "#ffffff" },
 ]
 

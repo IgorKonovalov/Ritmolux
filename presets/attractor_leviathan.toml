@@ -13,12 +13,12 @@ family = "de_jong"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#00040f" },
-  { at = 0.22, color = "#0b2f6b" },
-  { at = 0.46, color = "#00c2b2" },
-  { at = 0.70, color = "#9dff6a" },
-  { at = 0.88, color = "#ffd166" },
-  { at = 1.00, color = "#fff4e6" },
+  { at = 0.00, color = "#002245" },
+  { at = 0.22, color = "#3b77ad" },
+  { at = 0.46, color = "#00e2da" },
+  { at = 0.70, color = "#ceffad" },
+  { at = 0.88, color = "#ffeaaa" },
+  { at = 1.00, color = "#fffaf4" },
 ]
 
 [palette_b]

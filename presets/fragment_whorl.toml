@@ -20,16 +20,16 @@ representative = true
 
 [palette]
 stops = [
-  { at = 0.00, color = "#020208" },
-  { at = 0.16, color = "#020208" },
-  { at = 0.20, color = "#0e8f86" },  # teal ribbon
-  { at = 0.24, color = "#020208" },
-  { at = 0.44, color = "#e8a83c" },  # gold ribbon
-  { at = 0.48, color = "#030310" },
-  { at = 0.68, color = "#c04a6e" },  # rose ribbon
-  { at = 0.72, color = "#030310" },
-  { at = 0.90, color = "#5a35a0" },  # violet ribbon
-  { at = 1.00, color = "#020208" },
+  { at = 0.00, color = "#161632" },
+  { at = 0.16, color = "#161632" },
+  { at = 0.20, color = "#42c5c0" },  # teal ribbon
+  { at = 0.24, color = "#161632" },
+  { at = 0.44, color = "#f5d485" },  # gold ribbon
+  { at = 0.48, color = "#1c1c47" },
+  { at = 0.68, color = "#e193af" },  # rose ribbon
+  { at = 0.72, color = "#1c1c47" },
+  { at = 0.90, color = "#a07ed0" },  # violet ribbon
+  { at = 1.00, color = "#161632" },
 ]
 
 [feedback]

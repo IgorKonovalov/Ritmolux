@@ -46,11 +46,11 @@ name = "Ember Jet"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#160603" },  # ash
-  { at = 0.30, color = "#a02d08" },  # deep ember
-  { at = 0.62, color = "#f0801c" },  # flame
-  { at = 0.85, color = "#ffd071" },  # gold
-  { at = 1.00, color = "#fff6e2" },  # the hot ones
+  { at = 0.00, color = "#532a1c" },  # ash
+  { at = 0.30, color = "#d07532" },  # deep ember
+  { at = 0.62, color = "#f8bc5d" },  # flame
+  { at = 0.85, color = "#ffe9b2" },  # gold
+  { at = 1.00, color = "#fffbf2" },  # the hot ones
 ]
 
 [params]

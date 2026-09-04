@@ -544,11 +544,11 @@ name = "Squall"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#050a18" },
-  { at = 0.28, color = "#1d3f7a" },
-  { at = 0.58, color = "#4f8fd6" },
-  { at = 0.84, color = "#a9d4f5" },
-  { at = 1.00, color = "#f2f8ff" },
+  { at = 0.00, color = "#263856" },
+  { at = 0.28, color = "#5f88b8" },
+  { at = 0.58, color = "#97c5ec" },
+  { at = 0.84, color = "#d5ebfb" },
+  { at = 1.00, color = "#f9fcff" },
 ]
 
 [params]

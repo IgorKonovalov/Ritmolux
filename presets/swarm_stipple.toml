@@ -58,10 +58,10 @@ representative = true
 # controls is which marks land as full ink and which stay pale construction
 # lines.
 stops = [
-  { at = 0.00, color = "#141414" },
-  { at = 0.40, color = "#585858" },
-  { at = 0.72, color = "#a8a8a8" },
-  { at = 1.00, color = "#f2f2f2" },
+  { at = 0.00, color = "#4f4f4f" },
+  { at = 0.40, color = "#9f9f9f" },
+  { at = 0.72, color = "#d4d4d4" },
+  { at = 1.00, color = "#f9f9f9" },
 ]
 
 [params]

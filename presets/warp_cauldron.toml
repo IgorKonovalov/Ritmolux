@@ -77,11 +77,11 @@ rot  = "0.05"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#12061c" },  # cold iron
-  { at = 0.26, color = "#4a1050" },  # aubergine
-  { at = 0.52, color = "#a01840" },  # crimson
-  { at = 0.76, color = "#e06818" },  # flame
-  { at = 1.00, color = "#ffd47a" },  # gold
+  { at = 0.00, color = "#4b2a5d" },  # cold iron
+  { at = 0.26, color = "#934798" },  # aubergine
+  { at = 0.52, color = "#d05689" },  # crimson
+  { at = 0.76, color = "#f1ab56" },  # flame
+  { at = 1.00, color = "#ffebb8" },  # gold
 ]
 
 [params]

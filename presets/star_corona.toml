@@ -50,11 +50,11 @@ rings = [
 
 [palette]
 stops = [
-  { at = 0.00, color = "#3a0d05" },  # ember, at the centre
-  { at = 0.30, color = "#c24a10" },  # copper
-  { at = 0.58, color = "#f0a038" },  # amber
-  { at = 0.82, color = "#ffd98a" },  # pale gold
-  { at = 1.00, color = "#fff4e0" },  # white gold, at the rim
+  { at = 0.00, color = "#834026" },  # ember, at the centre
+  { at = 0.30, color = "#e29347" },  # copper
+  { at = 0.58, color = "#f8d081" },  # amber
+  { at = 0.82, color = "#ffeec2" },  # pale gold
+  { at = 1.00, color = "#fffaf1" },  # white gold, at the rim
 ]
 
 [params]

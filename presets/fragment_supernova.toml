@@ -10,11 +10,11 @@ name = "spectrum"
 
 [palette_b]
 stops = [
-  { at = 0.00, color = "#12002b" },
-  { at = 0.20, color = "#7a00b8" },
-  { at = 0.44, color = "#00d4ff" },
-  { at = 0.66, color = "#ffe600" },
-  { at = 0.84, color = "#ff2d55" },
+  { at = 0.00, color = "#4b0072" },
+  { at = 0.20, color = "#b800dd" },
+  { at = 0.44, color = "#00ebff" },
+  { at = 0.66, color = "#fff400" },
+  { at = 0.84, color = "#ff759c" },
   { at = 1.00, color = "#ffffff" },
 ]
 

@@ -22,13 +22,13 @@ name = "Nebula"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#000208" },
-  { at = 0.20, color = "#10093e" },
-  { at = 0.42, color = "#4a1382" },
-  { at = 0.62, color = "#b02a6b" },
-  { at = 0.80, color = "#ff7a2a" },
-  { at = 0.93, color = "#ffd9a0" },
-  { at = 1.00, color = "#fffaf0" },
+  { at = 0.00, color = "#001632" },
+  { at = 0.20, color = "#473587" },
+  { at = 0.42, color = "#934dbd" },
+  { at = 0.62, color = "#d871ad" },
+  { at = 0.80, color = "#ffb871" },
+  { at = 0.93, color = "#ffeed0" },
+  { at = 1.00, color = "#fffdf8" },
 ]
 
 [params]

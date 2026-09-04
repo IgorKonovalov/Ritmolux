@@ -102,10 +102,10 @@ y = 30
 
 [palette]
 stops = [
-  { at = 0.0, color = "#07080b" },   # the dark the plume is read against
-  { at = 0.35, color = "#33383f" },  # charcoal
-  { at = 0.7, color = "#8d9199" },   # cool ash
-  { at = 1.0, color = "#e6e3dd" },   # the lit edge of a wisp
+  { at = 0.0, color = "#2e323b" },   # the dark the plume is read against
+  { at = 0.35, color = "#7c8188" },  # charcoal
+  { at = 0.7, color = "#c4c7cb" },   # cool ash
+  { at = 1.0, color = "#f4f2ef" },   # the lit edge of a wisp
 ]
 
 [per_vertex]

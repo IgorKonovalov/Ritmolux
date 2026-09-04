@@ -23,12 +23,12 @@ name   = "Dusk Ground g0.4 BANDING REFERENCE"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#04081a" },   # zenith, near-black - the tail lives here
-  { at = 0.40, color = "#0a1338" },
-  { at = 0.66, color = "#1b2a5e" },   # deep blue
-  { at = 0.82, color = "#b0442a" },   # the ember turn
-  { at = 0.93, color = "#ff7a1f" },
-  { at = 1.00, color = "#ffd06e" },   # the hot horizon
+  { at = 0.00, color = "#22325a" },   # zenith, near-black - the tail lives here
+  { at = 0.40, color = "#384d81" },
+  { at = 0.66, color = "#5c71a3" },   # deep blue
+  { at = 0.82, color = "#d88d71" },   # the ember turn
+  { at = 0.93, color = "#ffb862" },
+  { at = 1.00, color = "#ffe9af" },   # the hot horizon
 ]
 
 [params]

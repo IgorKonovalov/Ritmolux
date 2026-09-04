@@ -42,7 +42,7 @@ system = "attractor"
 name   = "fixture_attractor_lit_backdrop_no_stage"
 
 [palette]
-stops = [{ at = 0.0, color = "#ffcf80" }, { at = 1.0, color = "#ffcf80" }]
+stops = [{ at = 0.0, color = "#ffe9bc" }, { at = 1.0, color = "#ffe9bc" }]
 
 [params]
 size       = "1.0"

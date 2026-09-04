@@ -51,11 +51,11 @@ name   = "Braid"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#04121f" },  # deep water
-  { at = 0.32, color = "#0d5a72" },  # petrol
-  { at = 0.58, color = "#2ba8a0" },  # verdigris
-  { at = 0.80, color = "#8fe0c0" },  # pale jade
-  { at = 1.00, color = "#e8fff4" },  # the crest
+  { at = 0.00, color = "#224b62" },  # deep water
+  { at = 0.32, color = "#40a0b2" },  # petrol
+  { at = 0.58, color = "#72d4d0" },  # verdigris
+  { at = 0.80, color = "#c5f1e1" },  # pale jade
+  { at = 1.00, color = "#f5fffa" },  # the crest
 ]
 
 [params]

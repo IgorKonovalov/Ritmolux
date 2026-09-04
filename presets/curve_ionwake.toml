@@ -29,11 +29,11 @@ blend = "max"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#0a0b3d" },
-  { at = 0.3, color = "#0077ff" },
-  { at = 0.55, color = "#00e5e0" },
-  { at = 0.78, color = "#e939c8" },
-  { at = 1.0, color = "#fff3c4" },
+  { at = 0.0, color = "#383b86" },
+  { at = 0.3, color = "#00b6ff" },
+  { at = 0.55, color = "#00f3f1" },
+  { at = 0.78, color = "#f582e5" },
+  { at = 1.0, color = "#fffae3" },
 ]
 
 [params]

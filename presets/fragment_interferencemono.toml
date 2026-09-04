@@ -18,8 +18,8 @@ stops = [
   { at = 0.54, color = "#ffffff" },
   { at = 0.56, color = "#000000" },
   { at = 0.74, color = "#000000" },
-  { at = 0.76, color = "#b00808" },
-  { at = 0.84, color = "#b00808" },
+  { at = 0.76, color = "#d83232" },
+  { at = 0.84, color = "#d83232" },
   { at = 0.86, color = "#ffffff" },
   { at = 1.00, color = "#ffffff" },
 ]

@@ -28,10 +28,10 @@ representative = true
 
 [palette]
 stops = [
-  { at = 0.00, color = "#080f2c" },  # deep night
-  { at = 0.45, color = "#6a86c8" },  # dim blue
-  { at = 0.75, color = "#d8e4ff" },  # white streak
-  { at = 1.00, color = "#ffe8b8" },  # the gold one
+  { at = 0.00, color = "#324573" },  # deep night
+  { at = 0.45, color = "#adc0e5" },  # dim blue
+  { at = 0.75, color = "#edf3ff" },  # white streak
+  { at = 1.00, color = "#fff5dd" },  # the gold one
 ]
 
 [params]
