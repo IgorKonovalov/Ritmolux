@@ -1043,7 +1043,8 @@ opaque elements on their own paper, hard-edged, in painter order. Everything tha
 makes that look work comes from a single palette constraint, and it comes off the
 tonemap rather than off any parameter.
 
-**Keep every element colour's brightest channel at or under linear `0.6`.**
+**Keep every element colour's brightest channel at or under linear `0.6` — sRGB
+byte `0xcb` in the hex you write.**
 
 That is [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
 `KNEE`, and below it the tonemap curve is **exactly the identity** — so the fill
@@ -1055,15 +1056,17 @@ parameter you can reach for instead.** Author a brighter palette and you lose th
 flat fill and the hard edge together, with nothing to tell you why.
 
 > [!IMPORTANT]
-> **This does not mean the hex you typed is the hex on screen**, and reading it
-> that way will send you hunting for a bug that is not there. A stop is a
-> **linear coefficient with no sRGB decode** — the same mapping stated at the top
-> of this file — so the byte the display receives is that coefficient's sRGB
-> *encoding*, which is brighter. Measured on `collage_suprematist`: `#111111`
-> renders `#494949`, `#8a1420` renders `#BF5164`, and the paper `#d9d5c8` renders
-> `#E2E0DA`. What the knee buys is that every element is shifted by the *same*
-> curve and nothing is shaded, tinted or haloed on the way — which is the whole
-> of the flat-graphic look. Author by the rendered result, not by the hex.
+> **Under the knee the hex you typed *is* the hex on screen.** A stop is sRGB and
+> is decoded once at load — the same mapping stated at the top of this file — so
+> the decode and the display encode are inverses and the identity curve between
+> them changes nothing. On `collage_suprematist`: `#494949` renders `#494949`,
+> `#c24f63` renders `#c24f63`. The residual is the LUT'''s own 8-bit linear
+> storage, up to two levels on a very dark channel and nothing on a bright one.
+> What the knee buys on top of that is that no element is shaded, tinted or
+> haloed on the way — which is the whole of the flat-graphic look. **The paper is
+> the exception, because it is the one plateau deliberately above the knee**: at
+> linear 0.851 the tonemap is no longer the identity, so `#eeece5` renders
+> `#e2e0da`. Author the elements by the hex; author the paper by the result.
 
 **The paper is the deliberate exception.** The curve's own table records
 `f(1.0) = 0.800` and 1.0 is asymptotically unreachable, so pure white paper does

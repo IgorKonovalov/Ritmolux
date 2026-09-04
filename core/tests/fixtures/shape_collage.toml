@@ -15,11 +15,10 @@
 #  - Seven of the eight plateaus sit AT OR UNDER the tonemap's KNEE = 0.6
 #    (ADR-0046), where the curve is exactly the identity, so those fills survive
 #    the post chain UNSHADED - the value the element wrote is the value that
-#    leaves the tonemap. NOT byte-identical to the hex: a stop is a linear
-#    coefficient with no sRGB decode, so the display byte is its sRGB encoding
-#    and `#111111` pins as `#494949`. The eighth is the paper at linear 0.851,
-#    which
-#    is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
+#    leaves the tonemap. Byte-identical to the hex, too: a stop is sRGB and is
+#    decoded at load (ADR-0151), so decode and display encode cancel and
+#    `#494949` pins as `#494949`. The knee in authored bytes is 0xcb. The eighth
+#    is the paper at linear 0.851, which is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
 #    unreachable, off-white is the affordable ground, and this fixture is what
 #    would notice if that ever stopped being true.
 #  - `count` is left at its default, which is the authored fourteen-element

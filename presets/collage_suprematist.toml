@@ -20,9 +20,11 @@
 # parameter.
 #
 # WHAT THAT DOES NOT MEAN IS THAT THE HEX BELOW IS THE HEX ON SCREEN. A stop is a
-# LINEAR COEFFICIENT with no sRGB decode, so the display byte is its sRGB
-# ENCODING and it is brighter: `#111111` renders `#494949`, `#8a1420` renders
-# `#BF5164`, and the paper renders `#E2E0DA`. Every plateau is shifted by the
+# STOP AUTHORED IN sRGB and decoded to light once at the LUT bake (ADR-0151), so
+# the decode and the display encode cancel and the hex is the colour: `#494949`
+# renders `#494949` and `#c24f63` renders `#c24f63`. The paper is the one plateau
+# above the knee and is the exception - it renders `#E2E0DA`. Every plateau under
+# the knee (sRGB byte 0xcb) is shifted by the
 # same curve and none of them is shaded, tinted or haloed, which is the whole of
 # the flat-graphic look. Author by the rendered result, not by the hex.
 #
