@@ -65,7 +65,10 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push](#0179--cargo-doc-is-the-one-ci-gate-no-local-step-mirrors-so-making-an-item-public-cannot-fail-until-after-the-push)
 - [0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist](#0180--a-doc-comment-states-the-abi-version-is-4-and-points-at-a-test-file-that-does-not-exist)
 - [0181 — Running the test suite migrates the developer's real `%APPDATA%` directory](#0181--running-the-test-suite-migrates-the-developers-real-appdata-directory)
-- [0182 — The `--help` banner still calls the application `ritmolux`](#0182--the---help-banner-still-calls-the-application-ritmolux)
+- [0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial](#0182--thirty-seven-of-the-forty-six-test-targets-could-share-one-binary-and-nine-binary-predicates-are-why-the-merge-has-to-be-partial)
+- [0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day](#0183--nothing-bounds-the-incremental-cache-and-509-crate-hash-directories-accumulated-inside-a-single-day)
+- [0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC](#0184--cargo-emits-a-new-artifact-generation-per-fingerprint-change-and-never-collects-the-old-one-and-the-pinned-stable-toolchain-has-no-gc)
+- [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3507,7 +3510,113 @@ the file's `run`/`run_both` helper — which isolates the migration and every fu
 effect at once. Migration-specific behaviour is already covered by the four unit tests against
 `migrate_app_dir_in`, so nothing is lost by keeping it out of the subprocess cases.
 
-## 0182 — The `--help` banner still calls the application `ritmolux`
+## 0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial
+
+**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+(2026-09-04), from the artifact-size measurement that plan acts on. **Owner if taken:** `dev`.
+
+- **Verified 2026-09-04** — the fast tier selects by test *binary*, so the nine suites it excludes
+  must stay separate targets: `present: binary\(golden\) in: .config/nextest.toml`
+- **Verified 2026-09-04** — and a representative cheap suite is not among them, so it is free to
+  merge: `absent: binary\(easing\) in: .config/nextest.toml`
+
+### The finding
+
+`core/tests/` and `standalone/tests/` hold 46 integration test files, and cargo links each into its
+own executable carrying the whole dependency graph. On Windows MSVC that means 46 `.exe` and 46
+`.pdb`, none of them shared. `core/tests/easing.rs` does pure-math work with no GPU call and still
+emitted a 40.5 MB `.pdb` and a 13.3 MB `.exe`, because the payload is the graph's rather than the
+test's. Linking, not compiling, is what dominates this workspace's cold path.
+
+The textbook fix — one `tests/main.rs` declaring the rest as modules — is **not available here, and
+the reason is load-bearing**. `.config/nextest.toml`'s `default-filter` selects the fast tier with
+nine `binary()` predicates (`golden`, `attractor`, `reaction_diffusion`, `background_composite`,
+`ink`, `reactivity`, `animation`, `sanity`, `distinctness`). A predicate cannot name a module inside
+a merged binary, so a total merge silently widens the fast tier to the whole suite — the exact
+regression [ADR-0156](adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
+was written to prevent, and one that would show up as a slow gate rather than as an error.
+
+**What a fix looks like.** A *partial* merge: the nine named suites stay their own targets, the
+other 37 fold into one. The filter is an exclusion list, so it keeps working untouched and needs no
+edit. That removes 36 links and 36 `.pdb` files. Two things to check before committing to it —
+whether any of the 37 relies on per-file process isolation (nextest spawns a process per test, so
+this is likely moot, but `cargo test` does not), and whether a merged target's compile time
+regresses the incremental loop by making one edit rebuild all 37.
+
+Plan 0153 takes the per-binary payload down from 40.5 MB to 15.0 MB, so the value of this entry
+falls with it — 36 x 15 MB rather than 36 x 40 MB. It composes rather than competes: the two
+multiply out to the same `.pdb` line item shrinking on both axes.
+
+## 0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day
+
+**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+(2026-09-04), from the same disk measurement. **Owner if taken:** `dev`.
+
+- **Verified 2026-09-04** — CI does not disable incremental compilation:
+  `absent: CARGO_INCREMENTAL in: .github/workflows/ci.yml`
+- **Verified 2026-09-04** — and no local step prunes the cache:
+  `absent: incremental in: .githooks/pre-push`
+
+### The finding
+
+`target/debug/incremental/` held **8.2 GB across 509 crate-hash directories, every one dated within
+the same day** — the largest single line item in a 24 GB checkout, larger than the 13 GB `deps/`
+tree once its stale generations are set aside. `rlx_core-1h8n7iv61ggv5` alone held 369 MB across two
+session directories at ~187 MB each.
+
+**The shape of that number is the finding, not the number itself.** rustc garbage-collects sessions
+*within* one crate-hash directory, so a steady-state incremental loop does not grow like this. 509
+directories in a day means the *metadata hash* churned — a new directory per distinct fingerprint,
+and the everyday loop produces several (`cargo build`, `cargo clippy --workspace --all-targets`, and
+`cargo nextest run` do not all share one). Whether that churn is inherent to running three tools
+over one workspace, or is something narrower and fixable, is **not established** and is the actual
+question this entry asks. `CARGO_INCREMENTAL=0` would end the pile outright at the cost of the inner
+edit loop on `rlx-core`, which is the wrong trade to make before knowing which of the two it is.
+
+**What a fix looks like.** First measure: run the three tools in sequence on an untouched tree and
+count the crate-hash directories created. If the answer is "one per tool, bounded", the pile is
+ordinary and the fix is a documented periodic `rm -rf target/debug/incremental`. If it grows per
+*invocation* rather than per tool, something is defeating the fingerprint and that is worth finding.
+Note that [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) already
+names disk as a live cost with *"discipline and not a gate"* as its only defence; this entry is that
+cost measured inside one checkout rather than across lanes.
+
+## 0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC
+
+**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+(2026-09-04), from the same disk measurement. **Owner if taken:** `dev`.
+
+- **Verified 2026-09-04** — the toolchain is pinned to a stable channel, where `cargo clean --gc`
+  does not exist: `present: channel = "1.97.1" in: rust-toolchain.toml`
+
+### The finding
+
+`target/debug/deps/` held 262 `.pdb` (8.3 GB) and 247 `.exe` (2.9 GB) for a workspace with roughly
+50 linked targets — 4 to 8 retained hash variants of most of them, and 8 of `milkconv`. Whenever a
+crate's fingerprint moves, cargo emits `name-<newhash>.{exe,pdb}` beside the old pair and deletes
+nothing. **No file in that directory was older than fourteen days**, so the entire 13 GB was
+produced inside two weeks of ordinary work.
+
+There is no built-in remedy on this toolchain. `cargo clean --gc` is `-Zgc`-gated and
+`rust-toolchain.toml` pins stable 1.97.1, so the option is unavailable without unpinning — which is
+not a trade worth making for disk. `cargo clean` is all-or-nothing and throws away the fresh
+generation with the stale ones.
+
+**What a fix looks like.** Either an age-based prune of `deps/` (delete artifacts whose mtime is
+older than the newest for the same name stem — mechanical, and expressible as a small script beside
+the existing `scripts/*.mjs`, though note those are gates and renderers and this would be a third
+kind), or adopting `cargo-sweep`, which is a tool install rather than a workspace dependency and so
+does not fall under the *"every new crate is a cost"* rule in the same way. Neither is urgent on its
+own; the entry exists so the 13 GB is on the record as *retained generations* rather than being
+mistaken for the cost of one build.
+
+**One class of it is not retention and should not be swept — it should never have existed.** 653 MB
+in `deps/` and 771 MB in `incremental/` belonged to `lmv_*`, the crate name that preceded the rename
+to `rlx_*`; no `Cargo.toml` in the workspace names `lmv` any more. A rename orphans every artifact
+under the old name permanently, and nothing surfaces that. Worth one line in the rename checklist,
+wherever the next one is recorded.
+
+## 0185 — The `--help` banner still calls the application `ritmolux`
 
 **Raised by:** `architect`, at [Plan 0151](plans/done/0151-the-long-documents-become-navigable.md)'s
 close review (2026-09-04), from a followup `dev` recorded in that plan's implementation log.
