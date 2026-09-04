@@ -101,6 +101,134 @@ import { relative, resolve, sep } from "node:path";
 /// `emitter_perseids` bunches its fan into the right half at every hop tried,
 /// and `star_rosewindow`'s outermost ring runs off all four edges. Both are
 /// recorded as content-lane notes at that close, not as manifest bugs.
+// --- the per-preset gallery cards ---------------------------------------
+//
+// One card per SHIPPED preset, filed under docs/images/gallery/presets/. This
+// is a SECOND collection and not a replacement: the entries above hold exactly
+// one picture per system and are the ones the README and the guide print, while
+// these are the site's exhaustive gallery, which a markdown file has no room for
+// and a page does.
+//
+// THE LIST IS SPELLED OUT rather than globbed from presets/, and that is the
+// whole mechanism. A glob could never report a preset with no card, because a
+// preset with no card would simply not be in it. `core/tests/hygiene.rs`,
+// `every_shipped_preset_has_a_gallery_card`, reads the names below and the
+// contents of presets/ and fails when they disagree in either direction --
+// the same shape as `every_system_has_a_gallery_image` above it.
+//
+// The capture settings are deliberately uniform. These cards are read as a
+// grid, against each other, so a per-preset hop would be tuning one thumbnail
+// at the cost of the comparison. The one exception is the swarm family, for the
+// reason the swarm entry above already records: a swarm is a MOTION and
+// photographs as uniform noise at full energy, so all four sit at 374, inside
+// the phrase's quiet bar where the flock settles onto its flow field.
+//
+// 640x360 rather than the 1280x720 above. A card is displayed at roughly a
+// third of a page column, and 82 of them at full size would put tens of
+// megabytes of derived PNG into the repository for detail no reader can see.
+const CARD_SIZE = "640x360";
+const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 374, swarm_stipple: 374 };
+
+/// Every shipped preset, grouped by the system it draws with. The comment on
+/// each group is a count, so a family that gains a preset and not a card is
+/// visible here as well as in the test.
+const CARDS = [
+  // attractor (19)
+  "attractor_clifford",
+  "attractor_cliffordgallery",
+  "attractor_dejonggallery",
+  "attractor_dragon",
+  "attractor_fern",
+  "attractor_fernmono",
+  "attractor_ink",
+  "attractor_leviathan",
+  "attractor_lorenzgallery",
+  "attractor_thomas",
+  "attractor_thomasgallery",
+  "attractor_thomasred",
+  "attractor_torusknot",
+  "attractor_valentine",
+  "attractor_volute",
+  "attractor_walkdejong",
+  "attractor_walkknot",
+  "attractor_walkrho",
+  "attractor_walkthomas",
+  // emitter (5)
+  "emitter_driftfield",
+  "emitter_emberjet",
+  "emitter_heartfall",
+  "emitter_perseids",
+  "emitter_petalfall",
+  // fragment_field (13)
+  "fragment_driftmono",
+  "fragment_drostemono",
+  "fragment_interferencemono",
+  "fragment_mandala",
+  "fragment_nebula",
+  "fragment_strata",
+  "fragment_sumi",
+  "fragment_supernova",
+  "fragment_tiled",
+  "fragment_tiledmono",
+  "fragment_tunnel",
+  "fragment_vitrail",
+  "fragment_whorl",
+  // lsystem (5)
+  "lsystem_bower",
+  "lsystem_coral",
+  "lsystem_rime",
+  "lsystem_sumimono",
+  "lsystem_vellum",
+  // parametric_curve (5)
+  "curve_broadside",
+  "curve_ionwake",
+  "curve_loom",
+  "curve_nightbloom",
+  "curve_rosemono",
+  // reaction_diffusion (7)
+  "reaction_etching",
+  "reaction_fluxmono",
+  "reaction_glaciermono",
+  "reaction_lichen",
+  "reaction_mitosis",
+  "reaction_spotmono",
+  "reaction_verdigris",
+  // shape_collage (4)
+  "collage_mono",
+  "collage_nocturne",
+  "collage_onwhite",
+  "collage_suprematist",
+  // shape_field (6)
+  "shape_aperture",
+  "shape_contourmono",
+  "shape_facet",
+  "shape_heartmono",
+  "shape_pulse",
+  "shape_ringmono",
+  // spectrum (5)
+  "spectrum_anemone",
+  "spectrum_halo",
+  "spectrum_metermono",
+  "spectrum_ridge",
+  "spectrum_skyline",
+  // star_pattern (4)
+  "star_corona",
+  "star_mandala_bordered",
+  "star_rosewindow",
+  "star_zellij",
+  // swarm (4)
+  "swarm_braid",
+  "swarm_drift",
+  "swarm_shatter",
+  "swarm_stipple",
+  // warp_mesh (5)
+  "warp_cauldron",
+  "warp_millrace",
+  "warp_sirocco",
+  "warp_smoke",
+  "warp_wellhead",
+];
+
 const IMAGES = [
   {
     // Judged at the Plan 0088 close (Phase 7) against fragment_supernova,
@@ -303,6 +431,16 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+
+  // --- the gallery: one card per shipped preset ---------------------------
+  ...CARDS.map((preset) => ({
+    out: `docs/images/gallery/presets/${preset}.png`,
+    presetFile: `presets/${preset}.toml`,
+    signal: "dynamic:110",
+    hop: CARD_HOP_OVERRIDES[preset] ?? 300,
+    size: CARD_SIZE,
+    tier: "rich",
+  })),
 ];
 
 // ---------------------------------------------------------------------------

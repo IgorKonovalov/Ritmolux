@@ -1,0 +1,72 @@
+/* The image grids: the landing page's one-per-system strip and the gallery
+ * page's one-per-preset cards, which are the same object at two lengths.
+ *
+ * Scoped to two class names and loaded through Starlight's `customCss`, so it
+ * reaches only the pages that use them and every published document keeps the
+ * stock theme. `auto-fill` with a min track width is what lets a grid be a
+ * single column on a phone and a wide row on a desktop without a media
+ * query. */
+.gallery-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.gallery-strip figure {
+  margin: 0;
+}
+
+.gallery-strip img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--sl-color-gray-6);
+}
+
+.gallery-strip figcaption {
+  margin-top: 0.35rem;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+  text-align: center;
+}
+
+/* The gallery page's own index, standing in for a table of contents.
+ * Twelve family headings are emitted from JSX, which rehype never sees, so
+ * Starlight's sidebar TOC would be empty for this page - `tableOfContents` is
+ * off in its frontmatter and this is what replaces it. */
+.family-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  padding: 0;
+  margin: 1rem 0 2rem;
+  list-style: none;
+}
+
+.family-index a {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 999px;
+  font-size: var(--sl-text-xs);
+  text-decoration: none;
+}
+
+.family-section {
+  margin-top: 2.5rem;
+}
+
+.family-section h2 {
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding-bottom: 0.3rem;
+}
+
+.family-section .family-count {
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  font-weight: normal;
+}

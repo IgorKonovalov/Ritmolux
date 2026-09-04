@@ -1,0 +1,73 @@
+---
+title: Gallery
+description: >-
+  One frame from every preset Ritmolux ships, grouped by the rendering system it draws with.
+tableOfContents: false
+---
+
+Every preset that ships, one frame each, grouped by the system it draws with. Each frame is the
+same capture: the synthesized `dynamic:110` clip at its loudest hop, at the Rich quality tier —
+the settings [`scripts/docs-shots.mjs`](https://github.com/IgorKonovalov/Ritmolux/blob/main/scripts/docs-shots.mjs)
+records for every committed picture in this repository.
+
+A preset is a text file. [The preset guide](/ritmolux/guide/preset-guide/) opens the smallest one
+worth looking at, and [the parameter roster](/ritmolux/guide/parameter-roster/) lists every named
+parameter each of these systems takes.
+
+export const cards = Object.entries(
+  import.meta.glob('../../../../docs/images/gallery/presets/*.png', {
+    eager: true,
+    import: 'default',
+  }),
+).map(([file, image]) => ({ image, preset: file.split('/').pop().replace('.png', '') }));
+
+export const systemOf = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('../../../../presets/*.toml', {
+      eager: true,
+      query: '?raw',
+      import: 'default',
+    }),
+  ).map(([file, text]) => [
+    file.split('/').pop().replace('.toml', ''),
+    /^system\s*=\s*"(.+?)"/m.exec(text)?.[1] ?? 'unknown',
+  ]),
+);
+
+export const families = [
+  ...cards.reduce((acc, card) => {
+    const system = systemOf[card.preset] ?? 'unknown';
+    acc.set(system, [...(acc.get(system) ?? []), card]);
+    return acc;
+  }, new Map()),
+]
+  .map(([system, members]) => [system, members.sort((a, b) => a.preset.localeCompare(b.preset))])
+  .sort(([a], [b]) => a.localeCompare(b));
+
+<ul class="family-index">
+  {families.map(([system, members]) => (
+    <li><a href={`#${system}`}><code>{system}</code> {members.length}</a></li>
+  ))}
+</ul>
+
+{families.map(([system, members]) => (
+  <section class="family-section">
+    <h2 id={system}>
+      <code>{system}</code> <span class="family-count">{members.length} presets</span>
+    </h2>
+    <div class="gallery-strip" role="list">
+      {members.map(({ image, preset }) => (
+        <figure role="listitem">
+          <img
+            src={image.src}
+            width={image.width}
+            height={image.height}
+            alt={`The ${preset} preset, drawn with the ${system} system`}
+            loading="lazy"
+          />
+          <figcaption><code>{preset}</code></figcaption>
+        </figure>
+      ))}
+    </div>
+  </section>
+))}
