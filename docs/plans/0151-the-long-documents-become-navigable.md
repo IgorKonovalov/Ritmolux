@@ -354,8 +354,11 @@ const anchor = (heading) =>
 | 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `a428ad1` |
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
-| 5 — The remaining four documents carry blocks | dev | done | committed with this row |
+| 5 — The remaining four documents carry blocks | dev | done | `e6d5dd5` |
 | 6 — The carrier | dev | done | `b9f9ac9` |
+| 7 — `flattenLinks` survives a bracketed label | dev | done | committed with this row |
+| 8 — The 40 damaged write-ups are repaired | dev | not started | |
+| 9 — The sixth gate's count reaches the sites that state it | dev | not started | |
 
 ### Notes
 
@@ -511,6 +514,25 @@ the `config.rs` one is now true rather than false — `APP_DIR_NAME` is `"Ritmol
    lower-case (`"ritmolux — a real-time music visualizer"`) because `main.rs` was live in
    `WORK/rlx-plan-0126`. **0126 has since closed and its lane is gone** — `git worktree list` prints
    this lane and `main`. The site is still lower-case.
+
+**Phase 7.** The anchor the plan names is produced byte-for-byte:
+`0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope-seam`.
+Both `flattenLinks` regexes take the balanced-bracket label, not just the inline one, because a
+title citing another plan can be written either way and only one of the two forms was proved.
+
+**`--check` stays green under the mutant, and that is the finding.** With the flat `[^\]]*` label
+restored, `--self-test` is 29 of 33 and `--check` still reports `OK (6 blocks, 457 rows, current)`
+— because `--check` regenerates and compares against what the same wrong rule wrote. The mutation
+table in `scripts/fixtures/README.md` records the reported slug,
+`...-kaleidoscope-seamdone0049-analysis-diagnostics-surfacemd`.
+
+`scripts/fixtures/README.md` needed three numbers moved that the plan's `Files touched` implies but
+does not name: the seeded tree is 14 rows not 13, the matches-nothing mutation now fails 8 of 33
+rather than 6 of 30, and the flattened-indent mutation reports 0 of 8. Each was re-run, not
+incremented.
+
+The corpus is unchanged at 457 rows across 6 blocks: 0049's heading is currently one of the 40
+damaged leads, so the shape this phase fixes does not yet exist in any document.
 
 ### Close triggers
 

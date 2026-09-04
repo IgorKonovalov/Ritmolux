@@ -156,9 +156,23 @@ const END = /^<!--\s*toc:end\s*-->\s*$/;
 const HEADING = /^(#{2,6})\s+(.*?)\s*$/;
 const FENCE = /^\s*(```|~~~)/;
 
-/** `[text](target)` and `![alt](src)` keep their text and lose their target. */
+/**
+ * `[text](target)` and `![alt](src)` keep their text and lose their target.
+ *
+ * The label accepts ONE level of balanced brackets, which CommonMark permits
+ * inside link text and which this corpus contains: a close write-up whose
+ * title cites another plan is a link whose label carries a shortcut reference,
+ * `[0049 — ... making [0048] Phase 6 ...](done/0049-....md)`. A flat `[^\]]*`
+ * label cannot cross that inner `]`, so the OUTER link never matches at all
+ * and its target path stays in the text to fold into the slug. The inner
+ * `[0048]` is deliberately NOT flattened: it is a shortcut reference, and the
+ * character filter deletes its brackets where they sit, which is the anchor
+ * GitHub computes for it.
+ */
 const flattenLinks = (s) =>
-  s.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/!?\[([^\]]*)\]\[[^\]]*\]/g, "$1");
+  s
+    .replace(/!?\[((?:[^[\]]|\[[^[\]]*\])*)\]\([^)]*\)/g, "$1")
+    .replace(/!?\[((?:[^[\]]|\[[^[\]]*\])*)\]\[[^\]]*\]/g, "$1");
 
 /**
  * GitHub's heading anchor, pinned by the two in-repo anchors in this file's
@@ -382,6 +396,24 @@ function selfTest() {
   check("a percent sign doubles the hyphen", anchor("92 % of the suite"), "92--of-the-suite");
   check("a slash doubles the hyphen", anchor("DX12 / Vulkan"), "dx12--vulkan");
   check("a link keeps its text and loses its target", anchor("[0150 — Ritmolux](done/0150-x.md)"), "0150--ritmolux");
+  // A close write-up whose title cites another plan: the whole heading is a
+  // link and its label carries a shortcut reference. Asserted with the real
+  // archive title, because the flat label matcher failed on THIS string and
+  // folded `done/0049-analysis-diagnostics-surface.md` into the slug.
+  check(
+    "a bracketed reference inside a link label does not fold the target into the slug",
+    anchor(
+      "[0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)](done/0049-analysis-diagnostics-surface.md)",
+    ),
+    "0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope-seam",
+  );
+  check(
+    "...and the row label is the title alone, inner reference intact",
+    label(
+      "[0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)](done/0049-analysis-diagnostics-surface.md)",
+    ),
+    "0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)",
+  );
 
   // -- the fixture: generated blocks must equal the committed ones ---------
   const fixture = join(REPO_ROOT, "scripts", "fixtures", "toc");
@@ -394,9 +426,9 @@ function selfTest() {
   // on disk would pass under a generator that had stopped collecting headings
   // entirely, which is the mutation these counts exist to catch.
   const seededRows = generatedRows(seededOut.text);
-  check("fixture seeded.md: row count", seededRows.length, 12);
+  check("fixture seeded.md: row count", seededRows.length, 13);
   check("fixture seeded.md: level-2 rows are flush", seededRows.filter((r) => r.startsWith("- ")).length, 5);
-  check("fixture seeded.md: level-3 rows indent one step", seededRows.filter((r) => r.startsWith("  - ")).length, 7);
+  check("fixture seeded.md: level-3 rows indent one step", seededRows.filter((r) => r.startsWith("  - ")).length, 8);
   check(
     "fixture seeded.md: the repeated heading dedupes as -1",
     seededRows.filter((r) => r.endsWith("(#a-repeated-heading-1)")).length,
@@ -406,6 +438,13 @@ function selfTest() {
     "fixture seeded.md: the first occurrence keeps the bare anchor",
     seededRows.filter((r) => r.endsWith("(#a-repeated-heading)")).length,
     1,
+  );
+  check(
+    "fixture seeded.md: a bracketed reference survives in the row and vanishes from the anchor",
+    seededRows.some(
+      (r) => r === "  - [A heading that is a link, citing [0048]](#a-heading-that-is-a-link-citing-0048)",
+    ),
+    true,
   );
   check("fixture seeded.md: the level-4 heading is not a row", seededRows.some((r) => r.includes("level 4")), false);
 

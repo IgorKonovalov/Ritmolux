@@ -377,11 +377,11 @@ catches one: `check-doc-links.mjs` validates paths and deliberately never valida
 wrong rule ships silently and every row in every block is wrong together.
 
 So the committed block in `seeded.md` **is** the expected output, and the assertion is that the
-generator reproduces it byte-for-byte. Green here means all six hold at once — 3 blocks, 13 rows:
+generator reproduces it byte-for-byte. Green here means all six hold at once — 3 blocks, 14 rows:
 
 | File | Case | Expected |
 |------|------|----------|
-| `seeded.md` | twelve headings covering every shape this corpus contains | the committed block is regenerated identically |
+| `seeded.md` | thirteen headings covering every shape this corpus contains | the committed block is regenerated identically |
 | `seeded.md` | a `####` heading under a `depth=3` marker | not a row — `depth=N` means levels 2 through N |
 | `target.md` | the resolve target for `seeded.md`'s linked heading | nothing else; it exists so the link fixture above still reports exactly five |
 | `no-markers.md` | headings at three levels and no markers | not touched — a generator that inserted a block into any document with headings would rewrite most of this repository |
@@ -414,27 +414,29 @@ point of that root. The two roots assert opposite things and have to stay separa
 ### The anchors are pinned to the repository, not to this tree
 
 ```
-node scripts/toc.mjs --self-test    # expects exit 0, 30 of 30
+node scripts/toc.mjs --self-test    # expects exit 0, 33 of 33
 ```
 
-Six of the thirty are pinned to the **real** repository rather than to either tree, because that is
-the only place they mean anything: the two heading texts `docs/capturing.md` and `presets/README.md`
-still carry, the two anchors those two files still link, and the two slugs the algorithm must
-produce from them. Between them they fix backtick stripping, colon removal, and the **doubled
-hyphen** an em-dash leaves when it is deleted from between two spaces. If a future edit rewords
-either heading, the self-test says so instead of the pinning quietly becoming a comparison of two
-string literals.
+Six of the thirty-three are pinned to the **real** repository rather than to either tree, because
+that is the only place they mean anything: the two heading texts `docs/capturing.md` and
+`presets/README.md` still carry, the two anchors those two files still link, and the two slugs the
+algorithm must produce from them. Between them they fix backtick stripping, colon removal, and the
+**doubled hyphen** an em-dash leaves when it is deleted from between two spaces. If a future edit
+rewords either heading, the self-test says so instead of the pinning quietly becoming a comparison
+of two string literals.
 
-The rest split between the shapes (`%`, `/`, `~~`, `*`, a linked heading, snake_case) and the
-structural refusals in the two tables above. Verified by mutation — each of these takes the run red:
+The rest split between the shapes (`%`, `/`, `~~`, `*`, a linked heading, snake_case, and a link
+label carrying a bracketed reference) and the structural refusals in the two tables above.
+Verified by mutation — each of these takes the run red:
 
 | Mutation | Reported as |
 |----------|-------------|
 | strip `_` as if it were an emphasis marker | `reactiondiffusion-glows`, and `seeded.md`'s block goes stale |
-| make the heading detector match nothing | 6 of 30 fail, including both fixture blocks |
+| make the heading detector match nothing | 8 of 33 fail, including both fixture blocks |
 | drop the `-1` dedupe suffix | the second occurrence collides with the first |
-| flatten the per-level indent | `level-3 rows indent one step` reports 0 of 7 |
+| flatten the per-level indent | `level-3 rows indent one step` reports 0 of 8 |
 | stop skipping fenced lines | `fenced.md` grows a row it must not have |
+| flatten a link label with `[^\]]*`, which cannot cross a bracket | the target path folds into the slug: `...-kaleidoscope-seamdone0049-analysis-diagnostics-surfacemd` |
 
 **`_` is the one worth stating twice.** GitHub keeps underscores in an anchor, and this corpus is
 full of snake_case identifiers in headings — `reaction_diffusion`, `mirror_reflect`, `BASELINE_Y`.
