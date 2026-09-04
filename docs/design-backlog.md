@@ -32,7 +32,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0092 — every figure this engine draws is unlit, and two reference images ask for a shaded one](#0092--every-figure-this-engine-draws-is-unlit-and-two-reference-images-ask-for-a-shaded-one)
 - [0094 — the `frame_ms_p99` tail is not switch-correlated, so the steady-state column does not remove it](#0094--the-frame_ms_p99-tail-is-not-switch-correlated-so-the-steady-state-column-does-not-remove-it)
 - [0095 — the backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened](#0095--the-backdrop-ramp-makes-parallel-stripes-only-and-a-converging-fan-cannot-be-lit-and-darkened)
-- [0099 — a narrow `color_span` silently spends the palette's resolution, and the figure comes back looking upscaled](#0099--a-narrow-color_span-silently-spends-the-palettes-resolution-and-the-figure-comes-back-looking-upscaled)
 - [0100 — "hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever for it](#0100--hand-drawn-is-edge-wobble-not-spike-length-variation-and-the-star-arm-has-no-lever-for-it)
 - [0101 — the mark roster cannot morph between silhouettes, and two other rosters in this engine already do](#0101--the-mark-roster-cannot-morph-between-silhouettes-and-two-other-rosters-in-this-engine-already-do)
 - [0102 — a foobar panel attaches its surface at 1x1 and only a stream-format change ever revives it](#0102--a-foobar-panel-attaches-its-surface-at-1x1-and-only-a-stream-format-change-ever-revives-it)
@@ -52,7 +51,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field](#0146--warp_mesh-colours-its-light-at-deposit-time-so-the-palette-cannot-band-the-accumulated-field)
 - [0149 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them](#0149--three-bindable-rates-multiply-a-per-element-age-instead-of-integrating-and-the-guard-adr-0135-shipped-cannot-see-any-of-them)
 - [0150 — `Phase::step` accepts any `dt`, so the guard against a poisoned accumulator is four copies in the callers and the attractor has none](#0150--phasestep-accepts-any-dt-so-the-guard-against-a-poisoned-accumulator-is-four-copies-in-the-callers-and-the-attractor-has-none)
-- [0153 — the palette consumes its stops as linear light, and `preset-palettes.md` presents the resulting shift as unavoidable when below the tonemap knee the author can correct it exactly](#0153--the-palette-consumes-its-stops-as-linear-light-and-preset-palettesmd-presents-the-resulting-shift-as-unavoidable-when-below-the-tonemap-knee-the-author-can-correct-it-exactly)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand](#0157---the-fixed-telemetry-set-omits-the-bar-grid-the-engine-already-computes-so-a-consumer-reconstructs-a-worse-one-by-hand)
 - [0158 - the tempo octave is unsettled by design, so every consumer folds it, and the rig observed the fold running the opposite way from the documented bias](#0158---the-tempo-octave-is-unsettled-by-design-so-every-consumer-folds-it-and-the-rig-observed-the-fold-running-the-opposite-way-from-the-documented-bias)
@@ -324,6 +322,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0176 | `shot`'s usage text and its parser can drift with nothing checking | [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 2: a test extracts the parser's flag literals and holds `--help` to them; it convicted on its first run over `--help`/`-h`. **Closed 2026-09-02** |
 | 0177 | The component's size cap has a trigger and no carrier: the recipe never reads its output's length | [ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) + [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 4. **Closed 2026-09-02** |
 | 0178 | The +510,464 B the component gained after 2026-08-18 is unattributed | [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5: 33 steps bisected; 66.7 % is embedded preset text as the library went 40 presets to 81, and no single step is a majority. **Closed 2026-09-02** |
+| 0099 | A narrow `color_span` silently spends the palette’s 256-texel budget, and the figure comes back looking upscaled | [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md) Phase 4: a load-time warning naming the estimate and `palette_steps`. **Closed 2026-09-04** |
+| 0153 | The palette consumes its stops as linear light, and the page calls the shift unavoidable | [ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) + [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md). **Closed 2026-09-04** |
 <!-- roster:end -->
 
 ## Open entries
@@ -1029,7 +1029,7 @@ One cohort's demonstrated want. The ADR-0080 shape is the named route when the s
 > disappointing one in the set"*. That gate ran at
 > [Plan 0091](plans/done/0091-the-figure-fills-the-frame.md)'s close and the user rejected the star
 > silhouettes — but the stated reason was that they looked **"dirty and upscaled"**, which is
-> neither silhouette nor shading. It was [0099](design-backlog.md): the probes drew their figures
+> neither silhouette nor shading. It was [0099](design-backlog-archive.md): the probes drew their figures
 > through 8 to 32 of the palette's 256 LUT texels, with edge transitions of 1.3 texels, because a
 > sharp star's tiny inradius had forced `color_span` down to `0.037`. Re-rendered with
 > `palette_steps` bound, the same five silhouettes come back **crisp**.
@@ -1257,79 +1257,6 @@ user asked for twice and it shipped; the floor was asked for once, as one elemen
 this engine is not a collage tool. It becomes worth taking when someone authors a world that wants
 a vanishing point — at which point the two routes above should be judged by rendering, not by
 argument, which is what Phase 7's own first done-when said.
-
----
-
-## 0099 — a narrow `color_span` silently spends the palette's resolution, and the figure comes back looking upscaled
-
-**Raised by:** `architect`, from a user look call on the Plan 0091 Phase 6 star probes (2026-08-16).
-**Owner if taken:** `dev` for a warning; the authoring half is already documented.
-
-- **Verified 2026-08-16** — the LUT is a fixed 256 texels, so a coordinate range is a resolution
-  budget: `present: LUT_SIZE: usize = 256 in: core/src/render/palette.rs`
-- **Verified 2026-08-16** — and it is sampled with linear filtering, which is what turns too few
-  texels into a soft edge rather than a stepped one:
-  `present: fn sample_lut in: core/src/render/palette.rs`
-
-### The finding
-
-The user's verdict on the star probes was that they looked **"dirty and upscaled"**. That was read
-first as a silhouette complaint and second as a shading one. It was neither: **the figures were
-drawn through 8 to 32 of the palette's 256 texels.**
-
-`shape_field` normalizes its distance by each shape's inradius, and a sharp star's inradius is tiny
-(`0.093` against the heart's `0.637`), so the frame corner reaches `d = 26.8`. Keeping one palette
-sweep on frame therefore caps `color_span` near `0.037` — and the figure's whole interior, `d` in
-`0..1`, then occupies **9.6 of 256 texels**, with the silhouette edge transition spanning **1.31**.
-A 1.3-texel transition stretched across half a screen, sampled with linear filtering, is exactly an
-upscaled gradient, and that is what was on the screen.
-
-| probe | figure occupies | edge transition |
-|---|---|---|
-| `p3a sharp7` | 8.6 texels | 1.31 |
-| `p3d sparkle4 deep` | 8.4 | 1.25 |
-| `p3c sparkle4` | 14.8 | 2.23 |
-| `p3b bang9` | 25.0 | 3.76 |
-| `p3e hand6` | 32.3 | 4.86 |
-
-**Re-rendered with `palette_steps` bound, the same five silhouettes come back crisp** — because the
-band quantizer snaps the coordinate to a band *centre* before the LUT read, so every pixel samples
-one exact texel and no edge is ever interpolated. The silhouettes were exact all along; the probe
-was spending its resolution on nothing.
-
-### Why it is worth an entry
-
-**Nothing warns, and the failure presents as a different defect.** A preset author sees a soft,
-crawling figure and reasonably concludes the *shape* is wrong — which is precisely what happened
-here, and it nearly routed a lighting plan
-([0092](design-backlog.md)) off a misread. The trap is silent, the value is in range, and the
-symptom names the wrong subsystem.
-
-It is also **the third member of a family this project keeps meeting**: a parameter range where the
-engine quietly stops honouring the value — `thickness` below `0.167`
-([0098](design-backlog.md)), `color_span` not being portable between shapes (documented in
-`presets/README.md`), and now a `color_span` narrow enough to starve the gradient.
-
-### What a fix would be
-
-Cheapest and probably right: a **load-time warning** when a `shape_field` preset's `color_span`
-puts the figure's own `0..1` interior below some small number of LUT texels — the ADR-0020 warning
-surface again. It cannot be exact, because how much of the coordinate the *figure* occupies depends
-on the shape's inradius and the framing, but the scene knows both.
-
-Two things that are **not** the fix. Enlarging `LUT_SIZE` moves the threshold without removing the
-trap and costs every scene memory. And nearest-filtering the LUT would harden the edge while
-turning every smooth gradient in the library into bands.
-
-**The authoring workaround is real and already documented:** bind `palette_steps`, which removes
-the interpolation entirely.
-
-### Priority
-
-**Low-Medium.** One probe set was affected and no shipped preset is — `shape_pulse` binds
-`palette_steps` and is unaffected by construction. It earns its place because of what it cost: a
-user look verdict was misattributed twice, and the entry that nearly absorbed the blame
-([0092](design-backlog.md)) is a composite-scale piece of work.
 
 ---
 
@@ -2815,51 +2742,6 @@ sentence again, and the site with no copy is the one it predicts.
 bad `dt`, which is why it survived a plan whose whole subject was these accumulators. It is filed at
 this size because the cost of the repair only grows: `Phase` is now the engine's one rate mechanism,
 so every rate added after this inherits whichever answer is not chosen.
-
-## 0153 — the palette consumes its stops as linear light, and `preset-palettes.md` presents the resulting shift as unavoidable when below the tonemap knee the author can correct it exactly
-
-> **Filed 2026-08-28** at the Plan 0123 Mode 4 review, from the `preset-author` finding in that
-> plan's implementation log (Phase 9), which routes the entry here because the content lane does not
-> edit this file. See [ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)'s
-> Outcome and archived 0148.
-
-`LUT_TEXTURE_FORMAT` is `Rgba8Unorm` and `core/src/render/palette.rs` records that the entries are
-used as colour directly, *"no perceptual/gamma management; that is deferred, ADR-0021 Alt E"*. So a
-stop written as ordinary sRGB hex is consumed as **linear** light and the display encode lifts it.
-Measured at Plan 0123 Phase 9:
-
-| stop written | renders as |
-|---|---|
-| `#c81423` | `#dd4c64` — green channel nearly quadrupled, the ink arrives coral |
-| `#930204` (the sRGB-to-linear value of `#c81423`) | `#c81622` — within 2/255 of the colour named |
-
-This is also why `collage_mono`'s `#b00808` arrives as `#d63131`; Phase 8's measurement recorded that
-shift without naming its cause.
-
-**Two separable halves, and the second is worth having whatever the first decides.**
-
-1. **Is the deferral still right?** ADR-0021 Alt E deferred perceptual/gamma management deliberately,
-   and reversing it re-bases every shipped palette in the library — the same class of change
-   ADR-0126 and Plan 0116 had to absorb. That is a real design question and is **not** being asserted
-   here as a defect.
-2. **The page is wrong either way.** `docs/preset-palettes.md`'s Remaps section tells a limited-ink
-   author that *"a limited-ink frame's plateaus almost never carry the palette's literal RGB, and
-   that is fine."* Below the tonemap knee at linear `0.6` the curve is exactly the identity, so the
-   shift there is **not** unavoidable — it is exactly correctable by pre-converting the stop, as the
-   measurement above shows. The page as written tells an author to give up on something they can
-   fix, in the one section aimed at authors who care about exact inks.
-
-**Impact:** the second half misleads precisely the audience the limited-ink class was added for, and
-it shipped in the same plan that added the class. The first half is a standing question about a
-deferral, not a bug.
-
-**What a fix looks like:** for the second half, one paragraph in the Remaps section giving the
-mechanism and the recipe (pre-convert the stop; valid below the knee; above it the channels scale
-together and the plateau survives anyway). For the first, an ADR that either re-affirms ADR-0021
-Alt E with this cost written down or supersedes it with a migration for the shipped palettes.
-
-- **Verified 2026-08-28** — the deferral is still recorded in the code: `present: no perceptual/gamma management in: core/src/render/palette.rs`
-- **Verified 2026-08-28** — and the page still tells the author it is unavoidable: `present: plateaus almost never carry in: docs/preset-palettes.md`
 
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
