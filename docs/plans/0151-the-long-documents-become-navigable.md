@@ -355,7 +355,7 @@ const anchor = (heading) =>
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
 | 5 — The remaining four documents carry blocks | dev | done | committed with this row |
-| 6 — The carrier | dev | not started | |
+| 6 — The carrier | dev | done | committed with this row |
 
 ### Notes
 
@@ -439,7 +439,7 @@ headings" counted only the `##` headings; the file also carried three `###` befo
 **Phase 5.** Row counts, against the plan's predictions: `presets/README.md` **53** (predicted 53),
 `docs/plans/README.md` **11** (predicted "11 minus whatever Phase 2 removed" — Phase 2 removed no
 heading, so 11), `docs/design-backlog-archive.md` **161** (predicted 160 + 1). All six documents
-carry a block; the corpus total is 442 rows.
+carry a block; the corpus total is 457 rows.
 
 **`docs/design-backlog.md` is 55, not the "about 51" predicted, and the arithmetic behind that
 prediction contradicts Phase 3's own scope.** Phase 5 says "55 `##` today, less the two sections
@@ -452,6 +452,36 @@ for. 55 is the count that follows; nothing was skipped.
 `presets/README.md`'s `## Systems and their named parameters` — the 1,660-line lookup table — now
 lists eleven rows by system, `fragment_field` and `shape_field` and `warp_mesh` and `shape_collage`
 among them, each anchor keeping its underscores.
+
+**Phase 6.** Both carriers run the gate, and both run it twice: `--check` beside the other five in
+`.githooks/pre-push` and in CI's `links` job, then `--self-test`. The plan's done-when names only
+`--check`; `--self-test` rides along on the index-row gate's own argument, which the comment at each
+call site now states in the form this gate needs it — `--check` regenerates, so it cannot go green on
+a detector that stopped matching, but it cannot see an anchor that is merely *plausible*, because
+`check-doc-links.mjs` validates paths and deliberately never validates fragments. A wrong slug rule
+would ship silently with every row in every block wrong together, and `--self-test` is where that is
+pinned.
+
+**The bite was checked against both drift shapes, not just the one.** A row inserted by hand into
+`capturing.md`'s block: `docs/capturing.md:29  contents block is stale (37 rows, 36 expected)`,
+exit 1. A *reworded* first row, where both counts are 36 and a count-only message would have said
+nothing: `contents block is stale (first differing row: - [Captures pin the floor tier](...))`,
+exit 1. That second message is why `regenerate()` now carries the first differing row alongside the
+counts. Restored, `--check` is `OK (6 blocks, 457 rows, current)` and `--self-test` is `30 of 30`.
+
+**The close ceremony gained the two steps as 3d and 3e.** 3d is unconditional and says why — steps
+1, 2, 3c and 3e each move a heading in a document that carries a block, and `check-doc-links.mjs`
+will not report the resulting dead row because it never validates fragments. 3e carries its trigger
+(*the close rewrote or invalidated a sequencing note*), its destination, and the two traps Phase 2
+actually hit: nothing is summarized on the way across, and `[label]: target` definitions must travel
+with the paragraph that uses them — seventeen went undefined at the first move.
+
+`CLAUDE.md`'s `scripts/` map reads **six** Node gates with `toc.mjs` named in the gate list and not
+in the RENDERERS block below it, and the paragraph was reflowed to the block's ~100-column width
+rather than left with the one 114-column line the edit introduced.
+
+**Phase 5's corpus total is corrected in this commit, 442 → 457.** 36 + 11 + 141 + 55 + 161 + 53 is
+457, and it is what `--check` reports; 442 was arithmetic, and it was wrong.
 
 ### Close triggers
 

@@ -111,16 +111,19 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 .githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
                      #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
                      #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance. Five Node gates, all run by pre-push and by the CI
-                     #   `links` job; the first three also by the architect close ceremony, because
-                     #   a close is what breaks them. check-doc-links.mjs asserts every relative
-                     #   markdown link resolves (moving a plan to plans/done/ breaks links in both
-                     #   directions, and rejects a design-backlog fragment outright per ADR-0149);
-                     #   check-index-rows.mjs holds every roster row to 320 bytes AND to its
-                     #   region's form (ADR-0116); check-backlog-claims.mjs re-runs each live entry's
-                     #   probe (ADR-0108); check-filter-figures.mjs keeps the diffusion filter's
-                     #   cost figures on one page; check-comment-hygiene.mjs rejects relative links
-                     #   and plan-relative narration in .rs and .cpp/.h comments (ADR-0127).
+scripts/             # Repo maintenance. Six Node gates, all run by pre-push and by the CI
+                     #   `links` job; the first three and toc.mjs also by the architect close
+                     #   ceremony, because a close is what breaks them. check-doc-links.mjs asserts
+                     #   every relative markdown link resolves (moving a plan to plans/done/ breaks
+                     #   links in both directions, and rejects a design-backlog fragment outright
+                     #   per ADR-0149); check-index-rows.mjs holds every roster row to 320 bytes AND
+                     #   to its region's form (ADR-0116); check-backlog-claims.mjs re-runs each live
+                     #   entry's probe (ADR-0108); check-filter-figures.mjs keeps the diffusion
+                     #   filter's cost figures on one page; check-comment-hygiene.mjs rejects
+                     #   relative links and plan-relative narration in .rs and .cpp/.h comments
+                     #   (ADR-0127); toc.mjs regenerates the contents block in each of the six long
+                     #   documents from the headings under it, and --check reports drift (ADR-0163)
+                     #   — a block is generated, never hand-edited.
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
                      #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact

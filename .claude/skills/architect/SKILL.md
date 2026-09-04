@@ -576,6 +576,36 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    the next reader to do work that is already done. And an entry only **half** discharged (one of two
    asks landed) stays live with a dated update naming which half; the archive is append-only and
    closed, so a question that comes back is a *new* entry citing the archived one, never an edit to it.
+3d. **Regenerate the contents blocks — trigger: unconditional, because every close adds a
+   heading.** Run `node scripts/toc.mjs`, then stage whichever of the six documents it rewrote.
+   Steps 1, 2, 3c and 3e above each add or move a heading in a file that carries a block
+   ([ADR-0163](../../../docs/adrs/0163-a-long-document-carries-a-generated-contents-block.md)), so a
+   close that skips this leaves a contents row pointing at a heading that is no longer there — and
+   `scripts/check-doc-links.mjs` will not say so, because it validates paths and deliberately never
+   validates fragments. `node scripts/toc.mjs --check` reports the drift and names the first row
+   that differs; the same check runs at pre-push and in the CI `links` job, so skipping it here
+   blocks the push rather than shipping quietly. **A block is never hand-edited** — if a row looks
+   wrong, the heading or the generator is what to change.
+
+3e. **Archive the sequencing prose this close supersedes — trigger: the close rewrote or
+   invalidated a note in `docs/plans/README.md`'s `## Recommended execution sequence`.** Move it
+   verbatim into [`README-archive.md`](../../../docs/plans/README-archive.md)'s
+   `## Prior sequencing notes (superseded)`, and **rewrite whatever live sentence pointed at it** so
+   it points at the archive instead — a note that leaves usually has an index sentence above it that
+   goes stale in the same edit.
+
+   **This step exists because the section it drains had one already and nobody ever reached for
+   it.** `## Prior sequencing notes (superseded)` has existed since Plan 0061; by 2026-09-02 it held
+   three items while `README.md` carried **335 lines** of prose that declared itself spent in its
+   own text — *"Superseded 2026-08-18, kept as the record"* — 26 % of the live index. That is the
+   identical shape 3c above was written to repair one level down: a rule with no carrier.
+
+   Two things that are not this step. **Nothing is summarized on the way across** — the archive's
+   value is the words the close wrote. And **the definitions travel with the uses**: markdown scopes
+   `[label]: target` per document, so a moved paragraph's shortcut links go undefined in the
+   destination unless you copy them, which `check-doc-links.mjs` reports as
+   `[label] (no definition in this file)` — seventeen of them at the first move.
+
 4. **Bump the application version.** This is the step that chronically gets skipped (the version
    sat at `0.2.0` across five feature plans that each forgot it), so treat it as non-optional and
    decide it deliberately every close. Per

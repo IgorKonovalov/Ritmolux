@@ -289,7 +289,16 @@ function regenerate(text) {
     const current = lines.slice(block.begin + 1, block.end);
     const same = current.length === rows.length && current.every((l, i) => l === rows[i]);
     if (!same) {
-      stale.push({ line: block.begin + 1, was: current.length, now: rows.length });
+      // Name the FIRST differing row, not just the counts. The common drift is a
+      // reworded heading, where both counts are equal and a count-only message
+      // says nothing about what moved.
+      const at = rows.findIndex((r, i) => current[i] !== r);
+      stale.push({
+        line: block.begin + 1,
+        was: current.length,
+        now: rows.length,
+        first: at === -1 ? null : rows[at].trim(),
+      });
     }
     out.push(...lines.slice(cursor, block.begin + 1), ...rows);
     cursor = block.end;
@@ -462,7 +471,11 @@ for (const file of files) {
   if (result.text === text) continue;
   if (CHECK) {
     for (const s of result.stale) {
-      problems.push(`${show}:${s.line}  contents block is stale (${s.was} rows, ${s.now} expected)`);
+      const detail =
+        s.was === s.now
+          ? `first differing row: ${s.first}`
+          : `${s.was} rows, ${s.now} expected`;
+      problems.push(`${show}:${s.line}  contents block is stale (${detail})`);
     }
   } else {
     writeFileSync(abs, result.text);

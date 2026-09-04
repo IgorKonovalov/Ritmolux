@@ -181,6 +181,16 @@ jobs:
       # with the defect and is gamed by a blank line, so that judgement stays
       # with the Mode 4 review.
       - run: node scripts/check-comment-hygiene.mjs
+      # And the sixth (ADR-0163): every generated contents block still agrees
+      # with the headings beneath it. `--check` regenerates and reports drift, so
+      # unlike the index-row gate it cannot go green on a detector that stopped
+      # matching. What it cannot see is an anchor that is merely plausible -
+      # check-doc-links.mjs above validates paths and never validates fragments,
+      # so a wrong slug rule ships silently and every row in every block is wrong
+      # together. --self-test pins the rule to two anchors this repository
+      # already links, and to the shapes the corpus contains.
+      - run: node scripts/toc.mjs --check
+      - run: node scripts/toc.mjs --self-test
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no
