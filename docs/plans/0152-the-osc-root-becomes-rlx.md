@@ -226,8 +226,8 @@ before                      after
 |---|---|---|---|
 | 1 — The wire moves, and the probes it falsifies move with it | dev | done | `aec2381` |
 | 2 — The operator's table | dev | done | `7644cc3` |
-| 3 — The record | dev | done | committed with this row |
-| 4 — Two seed comments come back | dev | not started | |
+| 3 — The record | dev | done | `56f8a69` |
+| 4 — Two seed comments come back | dev | done | committed with this row |
 | 5 — Re-point the rig | human | not started | |
 
 ### Notes
@@ -253,6 +253,15 @@ before                      after
   The `osc.rs` probe moved in Phase 1, the `README.md` probe in Phase 2 beside the edit that
   satisfies it. Cost: `docs/design-backlog.md` appears in Phase 2, whose `Files touched` names only
   `README.md`. The user chose this over the literal reading.
+
+- **Phase 4 found a different defect than the one it describes, and fixed that.** The phase says
+  both seed comments were removed by Plan 0150 and that the constants `now sit as bare hex`. They
+  do not: each already carried the *trap* half — that re-spelling the bytes to match a renamed
+  prefix moves that scene's goldens. What was missing is the *decoder*, which is the half a reader
+  cannot re-derive, so the ASCII was added to the existing comment rather than a deleted comment
+  restored. Both bytes were decoded from the literals rather than copied from the plan:
+  `0x4C4D_565F_5357_524D` is `LMV_SWRM` and `0x4C4D_565F_5244_5F31` is `LMV_RD_1`, matching the
+  values the plan cites at baseline `47432ca`. Both done-when clauses hold as written.
 
 ### Close triggers
 

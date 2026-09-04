@@ -24,9 +24,9 @@ use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
 
-// ASCII bytes used as a number. Re-spelling them to match a renamed
-// prefix changes every particle's start state and moves this scene's
-// goldens, so the value is opaque and stays as it is.
+// The ASCII bytes of "LMV_SWRM" read as a number. Re-spelling them to
+// match a renamed prefix changes every particle's start state and moves
+// this scene's goldens, so the value is opaque and stays as it is.
 const SEED: u64 = 0x4C4D_565F_5357_524D;
 
 /// How far the toroidal domain extends past the visible frame (Plan 0043 Phase 1,
