@@ -227,7 +227,7 @@ before                      after
 | 1 — The wire moves, and the probes it falsifies move with it | dev | done | `aec2381` |
 | 2 — The operator's table | dev | done | `7644cc3` |
 | 3 — The record | dev | done | `56f8a69` |
-| 4 — Two seed comments come back | dev | done | committed with this row |
+| 4 — Two seed comments come back | dev | done | `c594fa5` |
 | 5 — Re-point the rig | human | not started | |
 
 ### Notes
@@ -265,13 +265,33 @@ before                      after
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none. `git diff --name-only 15dfe7f..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a **feature**, in one commit — `aec2381`, which changes what the sink puts on
+  the wire. The other three move no behaviour: `7644cc3` and `56f8a69` are documentation, and
+  `c594fa5` is two comments.
+- **Operator docs touched:** `README.md` — the OSC telemetry block. Fourteen address rows moved to
+  `/rlx/v1`, and the paragraph above them was rewritten from a stability promise into a break notice
+  naming the old root, saying why `/v1` did not move, and saying that a missed binding reports
+  nothing.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0** — 106 stated reductions
+  across all 46 live entries. Green at **every** commit in the lane, which is what splitting the two
+  probes across Phases 1 and 2 bought. `check-doc-links.mjs`, `check-index-rows.mjs`,
+  `check-comment-hygiene.mjs` and `toc.mjs --check` also exit 0.
+- **Full suite:** `cargo nextest run --workspace`, exit **0** — 1523 tests run, 1523 passed, 5
+  skipped, 9 slow, 407.955 s. Run at `c594fa5`'s tree. `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` clean at the same tree. **No golden
+  baseline moved** — `core/tests/golden/` is clean in the working tree after the run, which is
+  Phase 4's own done-when.
+- **Outstanding `human` phases:** **5** — re-point every OSC binding in Arena, the TouchDesigner
+  patch and any show file. Not run. It is the only detector this break has.
+- **The lane is behind `main`, and a merge is owed before it lands.** Base is `15dfe7f`; `main`
+  advanced to `89c8c99` during the session, when Plan 0128 closed and merged. The two trees overlap
+  on `docs/design-backlog.md` — 0128's close archived backlog 0110 and filed 0186, while this lane
+  edits five entry bodies — and `main` also moved `docs/plans/README.md`, which this lane does not
+  touch. Different regions, so a 3-way merge handles it, which is what the plan's Risks section
+  predicted. **The suite figures above predate that merge**, and 0128 shipped a render-behaviour
+  change, so they are a reading on this lane's base rather than on the merged result.
 
 ## Followups (after this lands)
 
