@@ -38,12 +38,12 @@ name = "Shatter"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#c81e3c" },  # ruby
-  { at = 0.25, color = "#e8821e" },  # amber
-  { at = 0.45, color = "#2ea84a" },  # bottle green
-  { at = 0.65, color = "#1e6ac8" },  # cobalt
-  { at = 0.85, color = "#7a2ec8" },  # violet
-  { at = 1.00, color = "#c81e3c" },  # back to ruby — the wrap is seamless
+  { at = 0.00, color = "#e56085" },  # ruby
+  { at = 0.25, color = "#f5bd60" },  # amber
+  { at = 0.45, color = "#76d493" },  # bottle green
+  { at = 0.65, color = "#60ade5" },  # cobalt
+  { at = 0.85, color = "#b876e5" },  # violet
+  { at = 1.00, color = "#e56085" },  # back to ruby — the wrap is seamless
 ]
 
 [params]

@@ -69,7 +69,8 @@ name = "ember"
 
 A gradient through your own colour stops. Each stop is `{ at = <0..1>, color =
 <colour> }`, where `<colour>` is a `#rrggbb` hex string **or** an `[r, g, b]`
-array of `0..1` floats:
+array of `0..1` floats. **Both are sRGB** — the colour a picker or an eyedropper
+gives you, and the colour that renders:
 
 ```toml
 [palette]
@@ -82,23 +83,26 @@ stops = [
 
 Validated at load: at least two stops, each `at` in `0..=1` and sorted ascending,
 every colour parseable. Any violation is a surfaced error and the engine keeps the
-last good preset (it never crashes). Values `0..1` are used directly (no gamma /
-perceptual management — that is a future addition).
+last good preset (it never crashes).
 
-**A LUT value is a linear-light colour, and since Plan 0045 it stays one all the
-way to the display.** A stop's `0..1` components are taken as linear
-coefficients; the scene multiplies them by whatever luminance it has and writes
-the result into a floating-point composite that is free to exceed 1.0, and the
-engine tonemap at the end of the frame is the only place anything is compressed.
-So what a preset does to a palette colour is now *arithmetic on light* rather
-than on bytes, and two consequences follow for authoring: a stop is never
-silently clipped on its way through the composite, and the roll-off that finally
-applies is hue-preserving (see the ramp notes below). What has **not** changed is
-the mapping from a hex stop to a coefficient — `#ff5500` is still read as
-`(1.0, 0.33, 0.0)` with no sRGB decode, so the gradients look exactly as they
-did. Deciding whether that mapping *should* decode is the perceptual work
-ADR-0021 deferred; linear light is the structure that makes it possible, not the
-change itself.
+**The stop is decoded to light once, when the LUT is baked**
+([ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md)),
+so what you write is what the frame carries: a plateau authored `#c81423` comes
+back `#c81423`. That is exact **below the tonemap's knee at linear `0.6`**, where
+the curve is the identity and the load decode and the display encode are inverses
+— to within the LUT's own 8-bit storage, which costs up to two levels on a very
+dark channel. Above the knee all three channels scale together, so the plateau
+survives as the same ink at a lower level. There is no opt-out and no second
+reading of a hex triple; ADR-0151 records why one was rejected.
+
+**Everything after that decode is a linear-light colour, and since Plan 0045 it
+stays one all the way to the display.** The scene multiplies the decoded stop by
+whatever luminance it has and writes the result into a floating-point composite
+that is free to exceed 1.0, and the engine tonemap at the end of the frame is the
+only place anything is compressed. So what a preset does to a palette colour is
+*arithmetic on light* rather than on bytes, and two consequences follow for
+authoring: a stop is never silently clipped on its way through the composite, and
+the roll-off that finally applies is hue-preserving (see the ramp notes below).
 
 The gradient **repeats** past its ends: a colour coordinate that wraps past `1`
 comes back around at `0`.
@@ -749,9 +753,18 @@ palette's literal RGB, and they will still read as a limited-ink print.
 | a preset dissolve | two whole frames crossfaded while a transition runs | not preset-controllable, and **transient** — it ends when the dissolve does |
 
 **Remaps — they move the colours but do not mix them.** There is no switch list
-here, and you do not want one: **a limited-ink frame's plateaus almost never carry
-the palette's literal RGB**, and that is fine. What matters is that three inks
-leave three flat regions.
+here, and you do not want one: a remap is one colour to one colour, so three inks
+still leave three flat regions.
+
+**Your inks are not one of these.** A stop is sRGB and the engine decodes it when
+it bakes the LUT ([ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md)),
+so the display encode cancels rather than lifts it and a plateau written `#c81423`
+comes back `#c81423`. That is exact **below the tonemap knee at linear `0.6`**,
+where the curve is the identity — the only residual is the LUT's 8-bit storage,
+which costs up to two levels on a very dark channel. Above the knee all three
+channels scale by one factor, hue and saturation survive, and the plateau reads as
+the same ink. What the table below moves is where a plateau *sits*, never how many
+of them there are.
 
 | stage | what it does |
 |---|---|
@@ -797,22 +810,22 @@ cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --ou
 ```
 
 `collage_mono` at 1280x720, three inks, every mixer above at its off value, comes
-back with **615 distinct colours** — and the shape of that number is the whole
+back with **592 distinct colours** — and the shape of that number is the whole
 point:
 
 | what | in the PNG | why |
 |---|---|---|
-| the black | `#000000`, exact, 86 007 px | a rail: the dither's amplitude falls to zero at black and at white |
+| the black | `#000000`, exact, 85 606 px | a rail: the dither's amplitude falls to zero at black and at white |
 | the paper | `#e7e7e7`, with `#e6e6e6`/`#e8e8e8` beside it | one plateau, speckled by the display dither |
 | the red | `#d63131`, with its ±1 neighbours | one plateau, speckled by the display dither |
-| everything else | ~600 values, tens of pixels each | the forms' anti-aliased edges — the coverage ramp the class excludes by construction |
+| everything else | ~580 values, tens of pixels each | the forms' anti-aliased edges — the coverage ramp the class excludes by construction |
 
 **So count plateaus, not values.** Three inks gave three flat regions, which is
-what the class promises. None of the three is the palette's literal RGB —
-`#ffffff` arrives as `#e7e7e7` and `#b00808` as `#d63131` — because the remaps
-above moved them without mixing them, and a raw colour count folds the dither and
-the edges in with the inks. A histogram sorted by pixel count separates all three
-in one look.
+what the class promises. Two of the three sit a little off the ink the palette
+names — `#ffffff` arrives as `#e7e7e7` and `#d83232` as `#d63131` — because the
+remaps above moved them without mixing them, and a raw colour count folds the
+dither and the edges in with the inks. A histogram sorted by pixel count separates
+all three in one look.
 
 ## The line scenes' cosine ramp — what `hue` actually looks like
 
@@ -1030,7 +1043,8 @@ opaque elements on their own paper, hard-edged, in painter order. Everything tha
 makes that look work comes from a single palette constraint, and it comes off the
 tonemap rather than off any parameter.
 
-**Keep every element colour's brightest channel at or under linear `0.6`.**
+**Keep every element colour's brightest channel at or under linear `0.6` — sRGB
+byte `0xcb` in the hex you write.**
 
 That is [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)'s
 `KNEE`, and below it the tonemap curve is **exactly the identity** — so the fill
@@ -1042,15 +1056,17 @@ parameter you can reach for instead.** Author a brighter palette and you lose th
 flat fill and the hard edge together, with nothing to tell you why.
 
 > [!IMPORTANT]
-> **This does not mean the hex you typed is the hex on screen**, and reading it
-> that way will send you hunting for a bug that is not there. A stop is a
-> **linear coefficient with no sRGB decode** — the same mapping stated at the top
-> of this file — so the byte the display receives is that coefficient's sRGB
-> *encoding*, which is brighter. Measured on `collage_suprematist`: `#111111`
-> renders `#494949`, `#8a1420` renders `#BF5164`, and the paper `#d9d5c8` renders
-> `#E2E0DA`. What the knee buys is that every element is shifted by the *same*
-> curve and nothing is shaded, tinted or haloed on the way — which is the whole
-> of the flat-graphic look. Author by the rendered result, not by the hex.
+> **Under the knee the hex you typed *is* the hex on screen.** A stop is sRGB and
+> is decoded once at load — the same mapping stated at the top of this file — so
+> the decode and the display encode are inverses and the identity curve between
+> them changes nothing. On `collage_suprematist`: `#494949` renders `#494949`,
+> `#c24f63` renders `#c24f63`. The residual is the LUT'''s own 8-bit linear
+> storage, up to two levels on a very dark channel and nothing on a bright one.
+> What the knee buys on top of that is that no element is shaded, tinted or
+> haloed on the way — which is the whole of the flat-graphic look. **The paper is
+> the exception, because it is the one plateau deliberately above the knee**: at
+> linear 0.851 the tonemap is no longer the identity, so `#eeece5` renders
+> `#e2e0da`. Author the elements by the hex; author the paper by the result.
 
 **The paper is the deliberate exception.** The curve's own table records
 `f(1.0) = 0.800` and 1.0 is asymptotically unreachable, so pure white paper does

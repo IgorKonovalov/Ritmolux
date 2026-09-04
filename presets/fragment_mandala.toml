@@ -23,12 +23,12 @@ name = "Banded Mandala"
 # banding artifacts in a gradient. A ramp that only changes lightness looks
 # broken when you posterize it; one that changes hue looks designed.
 stops = [
-  { at = 0.00, color = "#120024" },
-  { at = 0.22, color = "#5b1668" },
-  { at = 0.44, color = "#c33149" },
-  { at = 0.62, color = "#f0793a" },
-  { at = 0.82, color = "#ffd98a" },
-  { at = 1.00, color = "#7de8d8" },
+  { at = 0.00, color = "#4b0069" },
+  { at = 0.22, color = "#a153ab" },
+  { at = 0.44, color = "#e37992" },
+  { at = 0.62, color = "#f8b783" },
+  { at = 0.82, color = "#ffeec2" },
+  { at = 1.00, color = "#baf5ed" },
 ]
 
 [palette_b]

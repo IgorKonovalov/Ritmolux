@@ -20,11 +20,11 @@ name = "Sumi"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#04070d" },
-  { at = 0.28, color = "#122433" },
-  { at = 0.55, color = "#2e5457" },
-  { at = 0.80, color = "#e8951f" },
-  { at = 1.00, color = "#fff3d4" },
+  { at = 0.00, color = "#222e40" },
+  { at = 0.28, color = "#4b697c" },
+  { at = 0.55, color = "#769b9e" },
+  { at = 0.80, color = "#f5c962" },
+  { at = 1.00, color = "#fffaeb" },
 ]
 
 [params]

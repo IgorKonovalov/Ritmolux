@@ -12,11 +12,11 @@ name = "Verdigris"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#120b05" },  # near-black copper ground
-  { at = 0.30, color = "#6a3a14" },  # burnished copper
-  { at = 0.55, color = "#c8842a" },  # bright bronze
-  { at = 0.80, color = "#14b890" },  # vivid verdigris teal
-  { at = 1.00, color = "#eafff0" },  # pale mint highlight
+  { at = 0.00, color = "#4b3b26" },  # near-black copper ground
+  { at = 0.30, color = "#ad834f" },  # burnished copper
+  { at = 0.55, color = "#e5be71" },  # bright bronze
+  { at = 0.80, color = "#4fddc6" },  # vivid verdigris teal
+  { at = 1.00, color = "#f6fff8" },  # pale mint highlight
 ]
 
 [params]

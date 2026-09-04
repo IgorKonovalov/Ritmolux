@@ -15,11 +15,10 @@
 #  - Seven of the eight plateaus sit AT OR UNDER the tonemap's KNEE = 0.6
 #    (ADR-0046), where the curve is exactly the identity, so those fills survive
 #    the post chain UNSHADED - the value the element wrote is the value that
-#    leaves the tonemap. NOT byte-identical to the hex: a stop is a linear
-#    coefficient with no sRGB decode, so the display byte is its sRGB encoding
-#    and `#111111` pins as `#494949`. The eighth is the paper at linear 0.851,
-#    which
-#    is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
+#    leaves the tonemap. Byte-identical to the hex, too: a stop is sRGB and is
+#    decoded at load (ADR-0151), so decode and display encode cancel and
+#    `#494949` pins as `#494949`. The knee in authored bytes is 0xcb. The eighth
+#    is the paper at linear 0.851, which is deliberately ABOVE the knee: `f(1.0) = 0.800` makes pure white
 #    unreachable, off-white is the affordable ground, and this fixture is what
 #    would notice if that ever stopped being true.
 #  - `count` is left at its default, which is the authored fourteen-element
@@ -51,22 +50,22 @@ name   = "fixture_shape_collage"
 
 [palette]
 stops = [
-  { at = 0.0000, color = "#111111" },
-  { at = 0.1249, color = "#111111" },
-  { at = 0.1251, color = "#8a1420" },
-  { at = 0.2499, color = "#8a1420" },
-  { at = 0.2501, color = "#96751e" },
-  { at = 0.3749, color = "#96751e" },
-  { at = 0.3751, color = "#1e3a8a" },
-  { at = 0.4999, color = "#1e3a8a" },
-  { at = 0.5001, color = "#1d5c34" },
-  { at = 0.6249, color = "#1d5c34" },
-  { at = 0.6251, color = "#4a4a4a" },
-  { at = 0.7499, color = "#4a4a4a" },
-  { at = 0.7501, color = "#5a1f4a" },
-  { at = 0.8749, color = "#5a1f4a" },
-  { at = 0.8751, color = "#d9d5c8" },
-  { at = 1.0000, color = "#d9d5c8" },
+  { at = 0.0000, color = "#494949" },
+  { at = 0.1249, color = "#494949" },
+  { at = 0.1251, color = "#c24f63" },
+  { at = 0.2499, color = "#c24f63" },
+  { at = 0.2501, color = "#cab460" },
+  { at = 0.3749, color = "#cab460" },
+  { at = 0.3751, color = "#6083c2" },
+  { at = 0.4999, color = "#6083c2" },
+  { at = 0.5001, color = "#5fa27d" },
+  { at = 0.6249, color = "#5fa27d" },
+  { at = 0.6251, color = "#939393" },
+  { at = 0.7499, color = "#939393" },
+  { at = 0.7501, color = "#a06293" },
+  { at = 0.8749, color = "#a06293" },
+  { at = 0.8751, color = "#eeece5" },
+  { at = 1.0000, color = "#eeece5" },
 ]
 
 [params]

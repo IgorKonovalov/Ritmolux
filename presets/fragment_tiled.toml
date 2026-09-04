@@ -27,11 +27,11 @@ name = "Tiled Rosette"
 # as a print with a limited ink count, so the palette is chosen to survive being
 # cut to five and to look deliberate at that count.
 stops = [
-  { at = 0.00, color = "#231a3d" },
-  { at = 0.28, color = "#3f6f7a" },
-  { at = 0.52, color = "#8bbf7e" },
-  { at = 0.76, color = "#e8c46a" },
-  { at = 1.00, color = "#d9615a" },
+  { at = 0.00, color = "#685a86" },
+  { at = 0.28, color = "#88b0b8" },
+  { at = 0.52, color = "#c3e0bb" },
+  { at = 0.76, color = "#f5e3ad" },
+  { at = 1.00, color = "#eea6a0" },
 ]
 
 [palette_b]

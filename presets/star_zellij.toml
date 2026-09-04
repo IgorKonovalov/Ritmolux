@@ -65,22 +65,22 @@ rings = [
 # from the interlace's end (deep indigo, radius ~0.9 on the rosette) inward
 # through the ornament's three radii.
 stops = [
-  { at = 0.00, color = "#1d3f7a" },  # lapis - the boss
-  { at = 0.19, color = "#1d3f7a" },
-  { at = 0.21, color = "#0f9a92" },  # turquoise
-  { at = 0.39, color = "#0f9a92" },
-  { at = 0.41, color = "#c25a28" },  # terracotta
-  { at = 0.59, color = "#c25a28" },
-  { at = 0.61, color = "#e8dcc0" },  # bone
-  { at = 0.79, color = "#e8dcc0" },
+  { at = 0.00, color = "#5f88b8" },  # lapis - the boss
+  { at = 0.19, color = "#5f88b8" },
+  { at = 0.21, color = "#45ccc7" },  # turquoise
+  { at = 0.39, color = "#45ccc7" },
+  { at = 0.41, color = "#e2a06e" },  # terracotta
+  { at = 0.59, color = "#e2a06e" },
+  { at = 0.61, color = "#f5efe1" },  # bone
+  { at = 0.79, color = "#f5efe1" },
   # A FIFTH PLATEAU, RESERVED FOR THE GROUND, and the reason is the same one the
   # collage presets reserve their paper for: `bg_hue` samples this very LUT, so
   # a ground colour has to BE one of the plateaus. Drafted with four, the
   # backdrop had to borrow the boss's indigo and the boss then sat invisible on
   # a field of its own colour. `hue_spread` below stops at 0.72 so no ring can
   # reach this band, drift included.
-  { at = 0.81, color = "#08111c" },  # charcoal - the ground, and not an ink
-  { at = 1.00, color = "#08111c" },
+  { at = 0.81, color = "#32495d" },  # charcoal - the ground, and not an ink
+  { at = 1.00, color = "#32495d" },
 ]
 
 [params]

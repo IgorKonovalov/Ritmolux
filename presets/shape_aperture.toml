@@ -34,13 +34,13 @@ name   = "Aperture"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#05101f" },  # deep navy
-  { at = 0.18, color = "#0a3a4a" },  # teal
-  { at = 0.38, color = "#16624f" },  # sea green
-  { at = 0.56, color = "#a8761f" },  # amber
-  { at = 0.74, color = "#7d1f37" },  # crimson
-  { at = 0.88, color = "#23103a" },  # violet
-  { at = 1.00, color = "#05101f" },  # deep navy again - THE CYCLE CLOSES HERE
+  { at = 0.00, color = "#264762" },  # deep navy
+  { at = 0.18, color = "#388393" },  # teal
+  { at = 0.38, color = "#53a797" },  # sea green
+  { at = 0.56, color = "#d4b562" },  # amber
+  { at = 0.74, color = "#ba6280" },  # crimson
+  { at = 0.88, color = "#684783" },  # violet
+  { at = 1.00, color = "#264762" },  # deep navy again - THE CYCLE CLOSES HERE
 ]
 
 [params]

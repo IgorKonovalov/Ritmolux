@@ -45,7 +45,6 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
-| [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
@@ -270,7 +269,7 @@ preset** in the implementation loop, and per-phase coverage of 24 presets where 
 it at none. Its Phase 1 spike tripped its own stop condition and the architect replaced the
 condition rather than the result — see the plan's `### Notes` and ADR-0157's `Measured correction`.
 
-**Added 2026-08-29, second promotion round: [0138], [0139], [0140], [0141] and [0142], all `draft`.**
+**Added 2026-08-29, second promotion round: [0139], [0140], [0141] and [0142], all `draft`** (the round also promoted [0138], which closed 2026-09-04 — its note is in [README-archive.md](README-archive.md)).
 The sweep was re-run with a corrected filter — the first pass's regex was greedy and over-counted
 claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; three entries were
 **declined on their own instructions** rather than promoted:
@@ -278,10 +277,6 @@ claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; thre
 - **[0141] is the one with no contention.** It is the only cluster touching `plugin-foobar/`, which
   no plan on this roster otherwise enters. Its Phase 1 is the exception: backlog 0117 calls itself a
   natural pickup for [0103] Phase 1, which rewrites the same handler.
-- **[0138] belongs immediately after [0137]** — same linear-light seam one layer up. Taking them
-  together is one coherent pass; six weeks apart is two half-passes. [0138] also makes backlog 0038
-  measurable for the first time, using the level statistic [0137] adds. **[0137] closed 2026-09-01,
-  so `mean_lit_level` and the `--report` `level` column are on `main` and this is now the moment.**
 - **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
   GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
 - **[0140]'s contention with [0125] is discharged — 0125 closed 2026-08-31.** It still edits five
@@ -752,6 +747,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md) — closed 2026-09-04. Review: **no blockers, two majors, two minors.** Version: **0.104.0** (minor). Archived [backlog 0099 + 0153](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md) — closed 2026-09-04. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Touched `presets/README.md` only, closed no backlog entry. [Write-up](README-archive.md).
 - [0126 - The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md) - closed 2026-09-03. Review: **no blockers, no majors in the code; one major doc repair, five minors.** Version: **0.103.1** (patch). Touched no presets, closed no backlog entry. [Write-up](README-archive.md).
 - [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md) — closed 2026-09-02. Review: **no blockers, four majors, two minors.** Version: **0.103.0** (minor). Filed backlog 0180 + 0181. [Write-up](README-archive.md).
@@ -969,7 +965,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0135]: done/0135-the-show-night-surfaces-stop-lying.md
 [0136]: done/0136-the-gates-can-convict.md
 [0137]: done/0137-the-metrics-measure-light.md
-[0138]: 0138-the-colour-surface-stops-misleading-its-authors.md
+[0138]: done/0138-the-colour-surface-stops-misleading-its-authors.md
 [0139]: done/0139-the-render-path-validates-before-it-spends.md
 [0140]: 0140-every-rate-integrates-for-real.md
 [0141]: done/0141-the-plugin-seams-stop-drifting.md

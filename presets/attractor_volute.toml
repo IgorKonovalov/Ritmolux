@@ -28,11 +28,11 @@ family = "spiral"
 # the arm's fixed points, so the scroll cores sit warmer than their tips.
 [palette]
 stops = [
-  { at = 0.00, color = "#0a0618" },
-  { at = 0.30, color = "#8a2f08" },
-  { at = 0.60, color = "#e8951f" },
-  { at = 0.85, color = "#ffd67a" },
-  { at = 1.00, color = "#fff8e2" },
+  { at = 0.00, color = "#382a56" },
+  { at = 0.30, color = "#c27732" },
+  { at = 0.60, color = "#f5c962" },
+  { at = 0.85, color = "#ffecb8" },
+  { at = 1.00, color = "#fffcf2" },
 ]
 
 [params]

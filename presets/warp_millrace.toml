@@ -58,11 +58,11 @@ zoom = "0.965 + clamp(bass * 0.029, 0, 0.025)"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#1a0b26" },  # peat
-  { at = 0.30, color = "#5c2a52" },  # heather
-  { at = 0.58, color = "#a8484f" },  # rust
-  { at = 0.82, color = "#e0a45a" },  # amber
-  { at = 1.00, color = "#fff0d0" },  # foam
+  { at = 0.00, color = "#5a3b6c" },  # peat
+  { at = 0.30, color = "#a2719a" },  # heather
+  { at = 0.58, color = "#d49197" },  # rust
+  { at = 0.82, color = "#f1d2a0" },  # amber
+  { at = 1.00, color = "#fff8e9" },  # foam
 ]
 
 [params]

@@ -33,11 +33,11 @@ name   = "Petalfall"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#2a1730" },  # dusk violet
-  { at = 0.38, color = "#8a4a6a" },  # deep rose
-  { at = 0.68, color = "#e08fa8" },  # blossom
-  { at = 0.88, color = "#ffd6dd" },  # pale petal
-  { at = 1.00, color = "#fff6ee" },  # the near-white ones
+  { at = 0.00, color = "#715578" },  # dusk violet
+  { at = 0.38, color = "#c293ad" },  # deep rose
+  { at = 0.68, color = "#f1c5d4" },  # blossom
+  { at = 0.88, color = "#ffecef" },  # pale petal
+  { at = 1.00, color = "#fffbf7" },  # the near-white ones
 ]
 
 [params]

@@ -438,9 +438,9 @@ fn rings_travel_outward_with_color_center_and_the_wrap_does_not_stutter() {
     // stop is the first colour again. `presets/README.md` says so at the
     // parameter; this test is where the claim is checked.
     let cyclic = "[palette]\nstops = [\n\
-                  { at = 0.0, color = \"#101030\" },\n\
-                  { at = 0.5, color = \"#ff6040\" },\n\
-                  { at = 1.0, color = \"#101030\" },\n]\n";
+                  { at = 0.0, color = \"#474778\" },\n\
+                  { at = 0.5, color = \"#ffa589\" },\n\
+                  { at = 1.0, color = \"#474778\" },\n]\n";
     let presets: Vec<_> = (0..STEPS)
         .map(|i| {
             let c = i as f32 / STEPS as f32;

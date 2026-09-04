@@ -67,11 +67,11 @@ rot = "0.18 + rad * 0.42"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#07182e" },  # deep shaft
-  { at = 0.32, color = "#0f5d8a" },  # water blue
-  { at = 0.60, color = "#28b0a0" },  # verdigris
-  { at = 0.82, color = "#9ce8c8" },  # pale green
-  { at = 1.00, color = "#f4fff8" },  # the surface
+  { at = 0.00, color = "#2e5676" },  # deep shaft
+  { at = 0.32, color = "#45a3c2" },  # water blue
+  { at = 0.60, color = "#6ed8d0" },  # verdigris
+  { at = 0.82, color = "#cdf5e5" },  # pale green
+  { at = 1.00, color = "#fafffc" },  # the surface
 ]
 
 [params]

@@ -28,11 +28,11 @@ name   = "fixture_backdrop_ramp"
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#060b24" },
-  { at = 0.25, color = "#1b2a5e" },
-  { at = 0.5,  color = "#c74b1d" },
-  { at = 0.75, color = "#ff7a1f" },
-  { at = 1.0,  color = "#ffd06e" },
+  { at = 0.0,  color = "#2a3b69" },
+  { at = 0.25, color = "#5c71a3" },
+  { at = 0.5,  color = "#e5945f" },
+  { at = 0.75, color = "#ffb862" },
+  { at = 1.0,  color = "#ffe9af" },
 ]
 
 [params]

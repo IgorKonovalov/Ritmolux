@@ -11,16 +11,16 @@
 # one. `size_hierarchy` is pushed to 0.82 to back it: a steep fall from the
 # largest element to the smallest is what makes an anchor read as an anchor.
 #
-# THE PAPER IS DARK, AND THE ARITHMETIC FOR THAT IS NOT THE OBVIOUS ONE. A stop
-# is a LINEAR coefficient with no sRGB decode, so the display byte is that
-# coefficient's sRGB encoding and it is much brighter than the hex: the paper's
-# `#050608` renders about `#272930`, and an element at `#99751f` renders near
-# `#CBB570`. Author by the rendered result. The look's one rule still holds and
+# THE PAPER IS DARK, AND A STOP IS ORDINARY sRGB. It is decoded to light once
+# when the LUT is baked (ADR-0151), so the decode and the display encode are
+# inverses and the hex is the colour: the paper's `#272930` renders `#272930`,
+# an element at `#cbb462` renders `#cbb462`. The look's one rule still holds and
 # is what every element stop below is chosen against - keep the palette under
-# linear 0.6 (byte 0x99) and ADR-0046's tonemap is exactly the identity there,
-# so the fill survives the post chain UNSHADED and bloom's threshold sits above
-# it, which is where the hard edges come from. Reach past 0x99 and the flat fill
-# and the hard edge go together, with nothing to say why.
+# linear 0.6, which in the hex you write is byte 0xcb, and ADR-0046's tonemap is
+# exactly the identity there, so the fill survives the post chain UNSHADED and
+# bloom's threshold sits above it, which is where the hard edges come from.
+# Reach past 0xcb and the flat fill and the hard edge go together, with nothing
+# to say why.
 #
 # THE FAMILY IS ONSET-DEAF AND THIS IS THE FIX. Plan 0104 Phase 1 measured
 # Collage Mono, On White and Suprematist at onset 0.000 all three. The system's
@@ -47,22 +47,22 @@ name   = "Nocturne"
 # from eight evenly spaced band centres (k/8 + 1/16) and reserves the last for
 # the paper, so this palette resolves every generated element exactly.
 stops = [
-  { at = 0.0000, color = "#99958a" },  # bone
-  { at = 0.1249, color = "#99958a" },
-  { at = 0.1251, color = "#99381f" },  # vermilion
-  { at = 0.2499, color = "#99381f" },
-  { at = 0.2501, color = "#99751f" },  # ochre
-  { at = 0.3749, color = "#99751f" },
-  { at = 0.3751, color = "#1f6b99" },  # steel blue
-  { at = 0.4999, color = "#1f6b99" },
-  { at = 0.5001, color = "#1f7a5c" },  # viridian
-  { at = 0.6249, color = "#1f7a5c" },
-  { at = 0.6251, color = "#6b2a70" },  # plum
-  { at = 0.7499, color = "#6b2a70" },
-  { at = 0.7501, color = "#4a4f56" },  # slate
-  { at = 0.8749, color = "#4a4f56" },
-  { at = 0.8751, color = "#050608" },  # THE PAPER - charcoal, and the exception
-  { at = 1.0000, color = "#050608" },
+  { at = 0.0000, color = "#cbc9c2" },  # bone
+  { at = 0.1249, color = "#cbc9c2" },
+  { at = 0.1251, color = "#cb8162" },  # vermilion
+  { at = 0.2499, color = "#cb8162" },
+  { at = 0.2501, color = "#cbb462" },  # ochre
+  { at = 0.3749, color = "#cbb462" },
+  { at = 0.3751, color = "#62adcb" },  # steel blue
+  { at = 0.4999, color = "#62adcb" },
+  { at = 0.5001, color = "#62b8a2" },  # viridian
+  { at = 0.6249, color = "#62b8a2" },
+  { at = 0.6251, color = "#ad71b1" },  # plum
+  { at = 0.7499, color = "#ad71b1" },
+  { at = 0.7501, color = "#93979d" },  # slate
+  { at = 0.8749, color = "#93979d" },
+  { at = 0.8751, color = "#262a32" },  # THE PAPER - charcoal, and the exception
+  { at = 1.0000, color = "#262a32" },
 ]
 
 [latch]

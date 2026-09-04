@@ -35,11 +35,11 @@ family = "maurer_rose"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#0d1b33" },  # iron
-  { at = 0.32, color = "#2c5f8a" },  # steel blue
-  { at = 0.58, color = "#8f9aa8" },  # bright steel
-  { at = 0.80, color = "#c99a4a" },  # brass
-  { at = 1.00, color = "#ffe6a8" },  # gold, at the end of the walk
+  { at = 0.00, color = "#405c7c" },  # iron
+  { at = 0.32, color = "#73a4c2" },  # steel blue
+  { at = 0.58, color = "#c5ccd4" },  # bright steel
+  { at = 0.80, color = "#e6cc93" },  # brass
+  { at = 1.00, color = "#fff4d4" },  # gold, at the end of the walk
 ]
 
 [params]

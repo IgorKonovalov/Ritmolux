@@ -830,11 +830,12 @@ fn the_later_element_wins_the_overlap() {
 /// **Flat colour is exact.**
 ///
 /// A palette of two flat plateaus is authored; a large quad takes the darker
-/// one, whose brightest channel sits under the tonemap's knee. Below the knee
-/// ADR-0046's curve is the **identity**, so the element's interior must arrive
-/// at the display encoding of exactly the linear value that was authored — this
-/// is a property, not a measurement, and a wider tolerance would be hiding
-/// something.
+/// one, whose light sits under the tonemap's knee. Below the knee ADR-0046's
+/// curve is the **identity**, and a stop is decoded from sRGB at load
+/// (ADR-0151), so the element's interior must arrive at **the hex it was
+/// authored as** — decode and display encode are exact inverses and the whole
+/// round trip is the identity there. This is a property, not a measurement, and
+/// a wider tolerance would be hiding something.
 ///
 /// The two bytes admitted are named rather than fitted: one for the 8-bit
 /// write's own rounding, one for the tonemap's `+-1` encoded-level dither
@@ -845,14 +846,15 @@ fn the_later_element_wins_the_overlap() {
 fn an_element_under_the_knee_arrives_at_the_value_it_was_authored_at() {
     const W: u32 = 160;
     const H: u32 = 100;
-    /// The authored element colour. Brightest channel `0x88/255 = 0.533`, under
-    /// `KNEE`, so the whole tonemap is the identity for it.
+    /// The authored element colour. Its brightest channel decodes to
+    /// `0.246` of linear light, under `KNEE`, so the whole tonemap is the
+    /// identity for it.
     const HEX: [u8; 3] = [0x88, 0x22, 0x44];
     /// Rounding (1) plus the dither's one encoded level (1). See the doc.
     const TOL: i32 = 2;
 
     assert!(
-        f32::from(HEX[0]) / 255.0 <= KNEE,
+        crate::render::palette::srgb_to_linear(f32::from(HEX[0]) / 255.0) <= KNEE,
         "the probe colour must sit under the knee or this test asserts nothing"
     );
 
@@ -883,7 +885,9 @@ fn an_element_under_the_knee_arrives_at_the_value_it_was_authored_at() {
     // (-0.15, 0.10) at coordinate 0.4375 — the lower plateau. With `count = 1`
     // nothing is drawn over it.
     let (px, py) = at(W, H, -0.15, 0.10);
-    let expected = HEX.map(|c| encoded(f32::from(c) / 255.0));
+    // The authored hex itself: the load decode and the display encode are
+    // inverses, and everything between them is the identity under the knee.
+    let expected = HEX;
 
     let mut lo = [255i32; 3];
     let mut hi = [0i32; 3];
@@ -902,11 +906,11 @@ fn an_element_under_the_knee_arrives_at_the_value_it_was_authored_at() {
         assert!(
             (lo[c] - i32::from(expected[c])).abs() <= TOL
                 && (hi[c] - i32::from(expected[c])).abs() <= TOL,
-            "channel {c}: authored {} (linear {:.4}) encodes to {}, but the element's \
+            "channel {c}: authored {} (linear {:.4}) must arrive as {}, but the element's \
              interior reads {}..{}. Below KNEE = {KNEE} the tonemap is the identity, so \
              the only admitted difference is the display write's own rounding and dither.",
             HEX[c],
-            f32::from(HEX[c]) / 255.0,
+            crate::render::palette::srgb_to_linear(f32::from(HEX[c]) / 255.0),
             expected[c],
             lo[c],
             hi[c],
@@ -918,17 +922,6 @@ fn an_element_under_the_knee_arrives_at_the_value_it_was_authored_at() {
             hi[c],
         );
     }
-}
-
-/// The sRGB transfer function, to a byte — what the `Rgba8UnormSrgb` surface
-/// does to a linear value after the shader has run.
-fn encoded(linear: f32) -> u8 {
-    let e = if linear <= 0.003_130_8 {
-        12.92 * linear
-    } else {
-        1.055 * linear.powf(1.0 / 2.4) - 0.055
-    };
-    (e.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 /// A headless renderer on the software adapter, or `None` (a logged skip).

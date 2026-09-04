@@ -1827,7 +1827,7 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
     let custom = Preset::from_toml_str(
         "system = \"fragment_field\"\n[palette]\n\
          stops = [ { at = 0.0, color = \"#000000\" }, \
-                   { at = 0.5, color = [1.0, 0.0, 0.0] }, \
+                   { at = 0.5, color = [1.000000, 0.000000, 0.000000] }, \
                    { at = 1.0, color = \"#ffffff\" } ]\n",
     )
     .expect("custom stops preset is valid");
@@ -1852,7 +1852,7 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
     // (the loader keeps the previous good preset — NFR 10).
     let bad = [
         // Unsorted `at`.
-        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=0.2,color=\"#111111\"},{at=0.1,color=\"#222222\"}]\n",
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=0.2,color=\"#494949\"},{at=0.1,color=\"#666666\"}]\n",
         // `at` out of range.
         "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=1.5,color=\"#ffffff\"}]\n",
         // Unparseable hex color.
@@ -2664,6 +2664,124 @@ fn the_ring_coordinate_warning_is_silent_on_everything_else() {
         !animated.warnings.iter().any(|w| w.contains("coord_mode")),
         "an animated `shape` rests nowhere, so this check stays quiet: {:?}",
         animated.warnings
+    );
+}
+
+/// Plan 0138 Phase 4, closing design-backlog 0099: a `shape_field` `color_span`
+/// narrow enough to starve the gradient warns, and the warning carries the two
+/// things an author can act on — the texel estimate and `palette_steps`.
+///
+/// `shape_field` hands the palette a **figure coordinate** whose `0..1` is the
+/// interior, so `color_span` is the share of the 256-texel LUT the whole figure
+/// is drawn through. A sharp star's inradius is 0.093 against a heart's 0.637,
+/// so keeping one palette sweep on frame caps the span near 0.037 — nine texels
+/// for the figure, linear-filtered across half a screen, which is an upscaled
+/// gradient by construction.
+///
+/// What makes it worth a warning is that **the symptom names the wrong
+/// subsystem**: the user verdict on the Plan 0091 Phase 6 probes was *"dirty and
+/// upscaled"*, and it was read first as a silhouette defect and then as a
+/// shading one before anyone counted texels.
+#[test]
+fn a_starved_color_span_warns_with_its_estimate_and_the_remedy() {
+    let src = r#"
+system = "shape_field"
+name = "Sharp Seven"
+
+[params]
+shape      = "3"
+color_span = "0.037"
+"#;
+    let preset = Preset::from_toml_str(src).expect("a narrow span still loads");
+    let warning = preset
+        .warnings
+        .iter()
+        .find(|w| w.contains("color_span"))
+        .unwrap_or_else(|| panic!("no color_span warning in {:?}", preset.warnings));
+    assert!(
+        warning.contains("0.037"),
+        "the warning names the value it rests at: {warning}"
+    );
+    assert!(
+        warning.contains(" 9 ") && warning.contains("256"),
+        "...the texel estimate, against the LUT it is a share of: {warning}"
+    );
+    assert!(
+        warning.contains("palette_steps"),
+        "...and the remedy, or it just relocates the confusion: {warning}"
+    );
+    assert!(
+        warning.contains("estimate"),
+        "...stated as an estimate, since how much of the frame the figure covers \
+         is not knowable here: {warning}"
+    );
+
+    // The binding survives — a warning must not silently drop what it warns
+    // about (ADR-0020).
+    assert!(
+        preset.params.iter().any(|b| b.name == "color_span"),
+        "the binding is kept"
+    );
+}
+
+/// The same check is silent everywhere it cannot know or has nothing to say: a
+/// span wide enough to feed the gradient, a narrow one **quantized** by
+/// `palette_steps` (where nothing is interpolated and the trap does not exist),
+/// a span that animates rather than resting, and a system whose `color_span` is
+/// not a figure coordinate at all.
+///
+/// The `palette_steps` row is the load-bearing one — `shape_facet` ships at
+/// `color_span = 0.0521`, thirteen texels, and is unaffected because it bands.
+#[test]
+fn the_starved_span_warning_is_silent_where_the_trap_does_not_exist() {
+    let cases: [(&str, &str); 5] = [
+        (
+            "a span with room in it",
+            "system = \"shape_field\"\nname = \"a\"\n[params]\ncolor_span = \"0.45\"\n",
+        ),
+        (
+            "a narrow span, quantized",
+            "system = \"shape_field\"\nname = \"b\"\n[params]\n\
+             color_span = \"0.052\"\npalette_steps = \"56\"\n",
+        ),
+        (
+            "a narrow span under a bound band count",
+            "system = \"shape_field\"\nname = \"c\"\n[params]\n\
+             color_span = \"0.052\"\npalette_steps = \"8 + floor(bass * 8)\"\n",
+        ),
+        (
+            "an animated span",
+            "system = \"shape_field\"\nname = \"d\"\n[params]\n\
+             color_span = \"0.5 + clamp(bass * 0.2, 0, 0.2)\"\n",
+        ),
+        (
+            // On a field scene the coordinate is a LEVEL, not a figure, so a
+            // narrow span is a cohesive mood rather than a starved gradient —
+            // `docs/preset-palettes.md` recommends 0.3 there.
+            "a narrow span on a field",
+            "system = \"fragment_field\"\nname = \"e\"\n[params]\ncolor_span = \"0.05\"\n",
+        ),
+    ];
+    for (label, src) in cases {
+        let preset = Preset::from_toml_str(src).unwrap_or_else(|e| panic!("{label}: {e}"));
+        assert!(
+            !preset.warnings.iter().any(|w| w.contains("color_span")),
+            "{label} must not warn: {:?}",
+            preset.warnings
+        );
+    }
+
+    // A band count resting BELOW the quantizer's activation threshold is off,
+    // and off leaves the interpolation exactly where it was.
+    let inert = Preset::from_toml_str(
+        "system = \"shape_field\"\nname = \"f\"\n[params]\n\
+         color_span = \"0.052\"\npalette_steps = \"1\"\n",
+    )
+    .expect("an inert band count loads");
+    assert!(
+        inert.warnings.iter().any(|w| w.contains("color_span")),
+        "`palette_steps = 1` is off, so the gradient is still interpolated: {:?}",
+        inert.warnings
     );
 }
 
