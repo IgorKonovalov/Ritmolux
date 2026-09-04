@@ -281,7 +281,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | 3 — The offline ceiling | dev | done | `1890df7` |
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
-| 6 — The statistic names its capture | dev | superseded, residue done | committed with this row |
+| 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
 
 ### Phase 1 readings
 
@@ -295,14 +295,16 @@ neither WARP:
   and the closest thing this box has to NFR section 1's *baseline* hardware, which is what `Floor`
   answers to.
 
-**The instrument.** A scratch harness (`core/src/render/tests.rs`, reverted before this commit)
-timing `Renderer::step_offscreen` — clear, `draw_frame`, submit, `poll(wait_indefinitely)` — at
-1920x1080 on `attractor_leviathan`, release build. It measures the frame's CPU+GPU work and **not**
-the present, so it is not comparable to NFR section 12's windowed p99 of 19.0 ms for this preset; the
-useful reading against a budget is therefore the **marginal** cost of raising the count, which is
-independent of the fixed live overhead the harness omits. Counts are **interleaved in one process**
-and the rounds pooled: a first attempt ran one count per process and the numbers drifted by 2-3x
-across a long sweep as the laptop GPU throttled, which read as signal and was not.
+**The instrument**, and two things that qualify every number below. A scratch harness
+(`core/src/render/tests.rs`, reverted before this commit) timing `Renderer::step_offscreen` — clear,
+`draw_frame`, submit, `poll(wait_indefinitely)` — at 1920x1080 on `attractor_leviathan`, release.
+
+- **It omits the present**, so it is not comparable to NFR section 12's windowed p99 of 19.0 ms for
+  this preset. The reading that survives that gap is the **marginal** cost of raising the count,
+  which is independent of the fixed live overhead, and it is what the ceiling rule below uses.
+- **Counts are interleaved in one process** and the rounds pooled. A first attempt ran one count per
+  process; the numbers drifted 2-3x across a long sweep as the laptop GPU throttled, which read as
+  signal and was not.
 
 #### Density — `attractor_leviathan`, `--tier rich`, one still per size
 
@@ -437,42 +439,31 @@ exactly:
 
 ### Notes
 
-**Phase 2 — the seeded scatter is a function of the allocation, so a `Rich`
-capture moves once.** Disclosed because it is a deviation from ADR-0140's stated
-consequence, not from the phase's done-when.
+**Phase 2 — the seeded scatter is a function of the allocation, so a `Rich` capture
+moves once.** A deviation from ADR-0140's stated consequence, not from the phase's
+done-when.
 
-The ADR claims *"every existing capture — the 128x128 golden suite, the 96x96
-sanity suite, **every `shot` still** — resolves to exactly today's count and stays
-byte-identical."* The first half holds and is asserted on the value. The second is
-false for a `Rich` still, and the count is not why:
-`AttractorScene::seed` draws `x`/`y`/`seed`/`age` in one pass and `z` in a second
-from **one** RNG stream, so `z` for particle `i` sits at stream position
-`3 * count + i`. Allocating at the ceiling instead of at the anchor moves `count`,
-which moves the depth of every particle including the ones actually drawn.
+The ADR claims *"every existing capture — the 128x128 golden suite, the 96x96 sanity
+suite, **every `shot` still** — resolves to exactly today's count and stays
+byte-identical."* The count half holds and is asserted on the value. The byte half is
+false for a `Rich` still, and the count is not why: `AttractorScene::seed` draws
+`x`/`y`/`seed`/`age` in one pass and `z` in a second from **one** RNG stream, so `z`
+for particle `i` sits at stream position `3 * count + i`. Allocating at the ceiling
+moves `count`, which moves the depth of every particle including the drawn ones.
 
-Measured rather than reasoned: `shot --presets presets --preset Leviathan --tier
-rich --size 640x360 --frames 240` on the hardware adapter is byte-identical before
-and after with the `Rich` live ceiling temporarily set to the anchor, and differs
-with it at 600 000. 128x128 and 96x96 are byte-identical at both tiers either way,
-as are `Clifford`'s.
+Measured: `shot --presets presets --preset Leviathan --tier rich --size 640x360
+--frames 240` on the hardware adapter is byte-identical before and after with the
+`Rich` live ceiling temporarily set to the anchor, and differs at 600 000. 128x128
+and 96x96 are byte-identical at both tiers either way, `Clifford` included.
 
-**Nothing pinned moves**, and that is structural rather than lucky: every
-committed baseline in this repo is `Tier::Floor` by construction, and `Floor`'s
-live ceiling **is** its anchor, so its allocation does not move at all. `golden`,
-`attractor_trails` and `composite` all ran unblessed and green.
+**Nothing pinned moves**, structurally rather than luckily: every committed baseline
+here is `Tier::Floor`, and `Floor`'s live ceiling **is** its anchor.
 
-**A fix was attempted and reverted.** Giving `z` its own stream
-(`SEED_Z`) makes the scatter index-pure and count-independent — and moves a
-committed golden baseline, which is this phase's own stop condition. Reverted; the
-mechanism and the trap are now on `seed`'s doc comment, and the residual coupling
-is that **the ceiling constant is an input to every `Rich` attractor picture**, so
+**A fix was attempted and reverted.** Giving `z` its own stream makes the scatter
+index-pure — and moves a committed golden baseline, which is this phase's own stop
+condition. The mechanism and the trap are now on `seed`'s doc comment. The residual
+coupling: **the ceiling constant is an input to every `Rich` attractor picture**, so
 re-measuring it re-renders them.
-
-**Phase 6 was overtaken.** design-backlog 0130 was closed 2026-09-01 by
-[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4 — `98977ff
-docs(metrics): boundary_density names the capture it is bound to` — a week after
-this plan was written. The plan header's `Closes: design-backlog 0130` is stale.
-See that phase's own row for what was left to do.
 
 ### Phase 3 readings — a 1080p render's memory
 
@@ -506,41 +497,42 @@ the property a four-minute render actually depends on.
   resolved budget would take a 640x360 render from ~952 MB to ~700 MB. Not done
   here — it is a change to what ADR-0140 specifies, not an implementation of it.
 
-### Phase 6 — superseded, and what was left
+### Phase 6 — superseded
 
 **design-backlog 0130 was closed 2026-09-01 by
-[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4**, four days after
-this plan was written, as commit `98977ff docs(metrics): boundary_density names
-the capture it is bound to`. Both halves of this phase's done-when had already
-landed there:
+[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4** (`98977ff`), four days
+after this plan was written. Both halves of the done-when had landed there: the
+resolution paragraph on `boundary_density`, and both floors in
+`core/tests/sanity.rs` naming the 96x96 capture — so that file needed no change.
 
-- `boundary_density`'s docstring carries the resolution paragraph —
-  *"bound to the capture's resolution and comparable only at a fixed one"*, the
-  `~1/L` law, the 192x192-against-96x96 example, the `2/r` disc and the 4x4 block
-  reading `1.0000`.
-- Both floors name their capture: `boundary_floor`'s derivation says *"Both arms
-  are measured at this suite's `SIZE` (96x96) capture, and both are bound to
-  it"*, and the `shape_collage` arm names *"the same 96x96 capture"*. No change
-  was needed in `core/tests/sanity.rs`.
+**One clause was still open**, and `9239bb3` is it: the summary sentence read *"a
+hatched, stroked or tiled figure is almost all rim and reads near one **however
+small**"*, which is the scale-free reading the entry objects to and which
+contradicts the same docstring's 4x4 block eleven lines later.
 
-**One clause of the done-when was still open** and is what this commit closes: the
-summary sentence still read *"a hatched, stroked or tiled figure is almost all rim
-and reads near one **however small**"* — the scale-free reading the phase objects
-to, and one that contradicts the same docstring's own 4x4 block eleven lines
-later. The *"a solid mass reads near zero however large it is"* half was already
-gone.
-
-**The plan header's `Closes: design-backlog 0130` is stale** and the entry is
-already marked closed against Plan 0137 in `docs/design-backlog.md`.
+The plan header's `Closes: design-backlog 0130` is stale.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0110, 0130 (0125 probed, not closed)
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** none. `git diff --name-only 5ae5d60..HEAD -- presets/` is empty.
+- **Plan header `Closes:`** design-backlog 0110, 0130 (0125 probed, not closed).
+  **0130 is already closed** — 2026-09-01, against Plan 0137 Phase 4, in
+  `docs/design-backlog.md`; the header entry is stale and Phase 6's own section says
+  what was left. **0110 turns on Phase 4**, which is a `human` phase and has not run:
+  the entry's claim is *"the grain is judged by eye"* and `check-backlog-claims.mjs`
+  lists it among the 8 unprobeable ones.
+- **What shipped:** a **feature**, in two commits — `9243255` (the density law, live)
+  and `1890df7` (the offline ceiling and `--render`) — plus one docs-only commit,
+  `9239bb3`.
+- **Operator docs touched:** `docs/capturing.md` — a new block under `--render`
+  (the two-ceiling table, the three consequences, the measured resident set) and a
+  pointer added under *Captures pin the floor tier*.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
+- **Outstanding `human` phases:** **4** (does it still look upscaled) and **5** (the
+  `fast`-vs-`quality` diffusion side-by-side). Neither has run. Phase 4 is the look
+  gate the whole plan exists for, and backlog 0110 does not close without it.
+- **Full suite:** `cargo nextest run --workspace`, exit **0** — 1532 tests run, 1532 passed, 5 skipped. Run at the
+  tip, after Phase 6.
 
 ## Followups (after this lands)
 
