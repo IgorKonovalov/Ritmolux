@@ -57,17 +57,17 @@ fn an_address_of_length_four_still_takes_four_bytes_of_padding() {
 #[test]
 fn a_three_character_string_pads_to_four() {
     let mut buf = Vec::new();
-    encode(&mut buf, "/lmv/v1/preset", &[Arg::S("abc")]);
+    encode(&mut buf, "/rlx/v1/preset", &[Arg::S("abc")]);
 
-    // "/lmv/v1/preset" is 14 bytes, so 2 of padding; ",s" is 2, so 2 more.
-    assert_eq!(&buf[..14], b"/lmv/v1/preset");
+    // "/rlx/v1/preset" is 14 bytes, so 2 of padding; ",s" is 2, so 2 more.
+    assert_eq!(&buf[..14], b"/rlx/v1/preset");
     assert_eq!(&buf[14..16], &[0, 0]);
     assert_eq!(&buf[16..20], b",s\0\0");
     assert_eq!(&buf[20..24], b"abc\0", "three bytes and the terminator");
     assert_eq!(buf.len(), 24);
 
     // And the 4-character case takes eight, for the same reason the address did.
-    encode(&mut buf, "/lmv/v1/preset", &[Arg::S("abcd")]);
+    encode(&mut buf, "/rlx/v1/preset", &[Arg::S("abcd")]);
     assert_eq!(&buf[20..28], b"abcd\0\0\0\0");
     assert_eq!(buf.len(), 28);
 }
@@ -77,10 +77,10 @@ fn a_three_character_string_pads_to_four() {
 #[test]
 fn a_float_message_is_big_endian_and_exactly_sized() {
     let mut buf = Vec::new();
-    encode(&mut buf, "/lmv/v1/tempo", &[Arg::F(128.0)]);
+    encode(&mut buf, "/rlx/v1/tempo", &[Arg::F(128.0)]);
 
     // 13-byte address + 3 pad; ",f" + 2 pad; 4 bytes of payload.
-    assert_eq!(&buf[..13], b"/lmv/v1/tempo");
+    assert_eq!(&buf[..13], b"/rlx/v1/tempo");
     assert_eq!(&buf[13..16], &[0, 0, 0]);
     assert_eq!(&buf[16..20], b",f\0\0");
     assert_eq!(&buf[20..24], &[0x43, 0x00, 0x00, 0x00]);
@@ -92,7 +92,7 @@ fn a_float_message_is_big_endian_and_exactly_sized() {
 #[test]
 fn an_int_message_is_big_endian_twos_complement() {
     let mut buf = Vec::new();
-    encode(&mut buf, "/lmv/v1/beat/index", &[Arg::I(1)]);
+    encode(&mut buf, "/rlx/v1/beat/index", &[Arg::I(1)]);
 
     // 18-byte address + 2 pad = 20; ",i" + 2 pad = 4; then 4 of payload.
     assert_eq!(&buf[18..20], &[0, 0]);
@@ -100,7 +100,7 @@ fn an_int_message_is_big_endian_twos_complement() {
     assert_eq!(&buf[24..28], &[0, 0, 0, 1]);
     assert_eq!(buf.len(), 28);
 
-    encode(&mut buf, "/lmv/v1/beat/index", &[Arg::I(-2)]);
+    encode(&mut buf, "/rlx/v1/beat/index", &[Arg::I(-2)]);
     assert_eq!(&buf[24..28], &[0xff, 0xff, 0xff, 0xfe]);
 }
 
@@ -164,20 +164,20 @@ fn the_table_binds_each_value_to_its_own_address() {
             .1
     };
 
-    assert_eq!(find("/lmv/v1/level/bass"), Arg::F(0.125));
-    assert_eq!(find("/lmv/v1/level/mid"), Arg::F(0.25));
-    assert_eq!(find("/lmv/v1/level/treb"), Arg::F(0.375));
-    assert_eq!(find("/lmv/v1/level/onset"), Arg::F(0.5));
-    assert_eq!(find("/lmv/v1/level/rms"), Arg::F(0.625));
-    assert_eq!(find("/lmv/v1/raw/bass"), Arg::F(1.5));
-    assert_eq!(find("/lmv/v1/raw/mid"), Arg::F(2.5));
-    assert_eq!(find("/lmv/v1/raw/treb"), Arg::F(3.5));
-    assert_eq!(find("/lmv/v1/raw/onset"), Arg::F(4.5));
-    assert_eq!(find("/lmv/v1/beat/trigger"), Arg::I(1));
-    assert_eq!(find("/lmv/v1/beat/index"), Arg::I(7));
-    assert_eq!(find("/lmv/v1/beat/phase"), Arg::F(0.75));
-    assert_eq!(find("/lmv/v1/tempo"), Arg::F(128.0));
-    assert_eq!(find("/lmv/v1/preset"), Arg::S("rose_star"));
+    assert_eq!(find("/rlx/v1/level/bass"), Arg::F(0.125));
+    assert_eq!(find("/rlx/v1/level/mid"), Arg::F(0.25));
+    assert_eq!(find("/rlx/v1/level/treb"), Arg::F(0.375));
+    assert_eq!(find("/rlx/v1/level/onset"), Arg::F(0.5));
+    assert_eq!(find("/rlx/v1/level/rms"), Arg::F(0.625));
+    assert_eq!(find("/rlx/v1/raw/bass"), Arg::F(1.5));
+    assert_eq!(find("/rlx/v1/raw/mid"), Arg::F(2.5));
+    assert_eq!(find("/rlx/v1/raw/treb"), Arg::F(3.5));
+    assert_eq!(find("/rlx/v1/raw/onset"), Arg::F(4.5));
+    assert_eq!(find("/rlx/v1/beat/trigger"), Arg::I(1));
+    assert_eq!(find("/rlx/v1/beat/index"), Arg::I(7));
+    assert_eq!(find("/rlx/v1/beat/phase"), Arg::F(0.75));
+    assert_eq!(find("/rlx/v1/tempo"), Arg::F(128.0));
+    assert_eq!(find("/rlx/v1/preset"), Arg::S("rose_star"));
 }
 
 /// The beat trigger is the discrete event, so it is 0 on a frame with no onset —
@@ -190,7 +190,7 @@ fn the_beat_trigger_is_binary_and_the_counter_saturates() {
     let messages = quiet.messages();
     let trigger = messages
         .iter()
-        .find(|(a, _)| *a == "/lmv/v1/beat/trigger")
+        .find(|(a, _)| *a == "/rlx/v1/beat/trigger")
         .expect("the trigger is in the table")
         .1;
     assert_eq!(trigger, Arg::I(0));
@@ -200,7 +200,7 @@ fn the_beat_trigger_is_binary_and_the_counter_saturates() {
     let messages = long.messages();
     let index = messages
         .iter()
-        .find(|(a, _)| *a == "/lmv/v1/beat/index")
+        .find(|(a, _)| *a == "/rlx/v1/beat/index")
         .expect("the counter is in the table")
         .1;
     assert_eq!(index, Arg::I(i32::MAX));
