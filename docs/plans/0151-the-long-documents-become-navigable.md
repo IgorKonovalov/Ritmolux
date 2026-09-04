@@ -355,7 +355,7 @@ const anchor = (heading) =>
 | 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
 | 5 — The remaining four documents carry blocks | dev | done | committed with this row |
-| 6 — The carrier | dev | done | committed with this row |
+| 6 — The carrier | dev | done | `b9f9ac9` |
 
 ### Notes
 
@@ -483,15 +483,62 @@ rather than left with the one 114-column line the edit introduced.
 **Phase 5's corpus total is corrected in this commit, 442 → 457.** 36 + 11 + 141 + 55 + 161 + 53 is
 457, and it is what `--check` reports; 442 was arithmetic, and it was wrong.
 
+**One commit on this branch belongs to no phase.** `11a320e`, *"the product name is capitalized
+Ritmolux in prose"*, moved twelve prose sites from `ritmolux` to `Ritmolux` — including the H1 of
+`README.md` and of `CLAUDE.md` — and repaired three `%APPDATA%
+itmolux\` sites that Plan 0150's
+close missed, two of them in a `READ-ME-FIRST.md` a tester is told to paste into an address bar. It
+rode this lane because this lane was the only one open that touches no code. It is the reason the
+branch's diff against `main` names three files under a crate: `core-cabi/include/rlx_core.h`,
+`core/src/lib.rs` and `standalone/src/config.rs`, **each a comment or doc-comment line only**, and
+the `config.rs` one is now true rather than false — `APP_DIR_NAME` is `"Ritmolux"`
+(`standalone/src/lib.rs:47`).
+
+**Three followups this plan created or unblocked, none acted on.**
+
+1. **The sixth gate leaves five live sites saying "the five Node gates".** `docs/nfr.md:167`, `:208`
+   and `:218`, `.claude/skills/architect/references/project-context.md:49`,
+   `.claude/skills/dev/references/project-context.md:39`, and backlog **0179**'s own finding at
+   `docs/design-backlog.md:3397` and `:3406`. Phase 6's done-when names `CLAUDE.md` and nothing
+   else, so the sweep was left rather than taken silently. `docs/design-backlog-archive.md:7252`
+   says it too and must not be edited — the archive is append-only.
+2. **Backlog 0179 gained two staleness notices, and its two probes still hold.** Phase 6 touched
+   both files it names, so `check-backlog-claims.mjs` reports `0179 stamped 2026-09-01,
+   .github/workflows/ci.yml last touched 2026-09-04` and the same for `.githooks/pre-push`. The
+   claims themselves — `present: RUSTDOCFLAGS in ci.yml`, `absent: cargo doc in pre-push` — are
+   unaffected: this plan added `toc.mjs`, not `cargo doc`. Re-stamping is architect's call.
+3. **`standalone/src/main.rs:2690` is now takeable.** `11a320e` deliberately left the usage banner
+   lower-case (`"ritmolux — a real-time music visualizer"`) because `main.rs` was live in
+   `WORK/rlx-plan-0126`. **0126 has since closed and its lane is gone** — `git worktree list` prints
+   this lane and `main`. The site is still lower-case.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` and nothing else. `git diff --name-only main...HEAD --
+  presets/` prints that one path; it is the 53-row contents block Phase 5 inserted. No `.toml`, no
+  scene param, no default.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a **docs chore**, plus one new gate. No pixel moves and no engine behaviour
+  changes: the only files under a crate are the three comment lines above. What is genuinely new is
+  `scripts/toc.mjs` (504 lines) and its six fixtures, wired at pre-push and in CI — so the
+  repository gained a gate, and six documents gained 457 contents rows between them.
+- **Operator docs touched:** `docs/capturing.md` (+39, the block only — no CLI flag, no assertion,
+  no `--report` column moved) and `presets/README.md` (+56, likewise). `packaging/windows/` and
+  `packaging/foobar/READ-ME-FIRST.md` each corrected one `%APPDATA%` path at `11a320e`.
+  `docs/nfr.md` and `docs/on-device-validation.md` untouched — see followup 1, which is the one
+  place that leaves stale.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **0** — *"102 stated
+  reductions still hold across all 44 live entries (8 unprobeable)"*, byte-identical to the count
+  Phase 3 recorded. The two new staleness notices are followup 2 and are informational; the gate is
+  green.
+- **Full suite:** at `b9f9ac9`, the tip, `cargo nextest run --workspace` — **1518 run, 1518 passed
+  (8 slow), 5 skipped, exit 0**, 388.409 s, cold build in this lane, `LMV_BLESS` unset and
+  `git status` clean at its end, so no baseline file was rewritten by the run. Also clean:
+  `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` (exit 0), and
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` — which is the gate backlog 0179
+  says has no local counterpart, run here because the tree was already warm. All six Node gates
+  green, `toc.mjs --check` at `OK (6 blocks, 457 rows, current)` and `--self-test` at `30 of 30`.
+- **Outstanding `human` phases:** none. All six phases are `dev`.
 
 ## Followups (after this lands)
 
