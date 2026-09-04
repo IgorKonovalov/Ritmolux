@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0151 — The long documents become navigable](#0151--the-long-documents-become-navigable)
   - [0126 — The large files split along their seams](#0126--the-large-files-split-along-their-seams)
   - [0150 — The application becomes Ritmolux](#0150--the-application-becomes-ritmolux)
   - [0148 — The shipped artifacts carry their own guarantees](#0148--the-shipped-artifacts-carry-their-own-guarantees)
@@ -153,6 +154,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0151-before-0143)
   - [Moved 2026-09-03 from `README.md` — the 2026-08-16 sequence and everything under it](#moved-2026-09-03-from-readmemd--the-2026-08-16-sequence-and-everything-under-it)
 - [0109 — The MilkDrop import gets its geometry back](#0109--the-milkdrop-import-gets-its-geometry-back)
 - [0121 — A rate, an ink edge, and a motion reading (closed 2026-08-27)](#0121--a-rate-an-ink-edge-and-a-motion-reading-closed-2026-08-27)
@@ -162,6 +164,74 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md)
+— closed 2026-09-04. Nine `dev` phases in the `WORK/rlx-plan-0151` lane, `e450092`..`a77a0be`:
+six as planned, then three as a repair pass after the first Mode 4 review. Close commits
+`327af9c` (the major) and the bookkeeping. Version: **none** — docs/chore-only under
+[ADR-0005](../adrs/0005-versioning-and-release-cadence.md), on the [0145] precedent: no Rust,
+C++ or preset file moved, and the three files under a crate are one comment line each. Review:
+**no blockers, one major, four minors.**
+
+**What it built.** `scripts/toc.mjs`, the repository's sixth Node gate, regenerates a contents
+block between `<!-- toc:begin depth=N -->` markers from the headings beneath it, and six long
+documents now carry one — 458 rows in total. It is wired into `.githooks/pre-push` and CI's
+`links` job, twice each: `--check` for drift and `--self-test` for the anchor rule.
+[ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md) accepted.
+
+**The anchor rule is the whole correctness surface, and the plan priced that correctly.**
+`check-doc-links.mjs` validates paths and deliberately never validates fragments (ADR-0149), so
+a slug rule that is merely plausible ships silently with every row in every block wrong
+together — and `--check` cannot see it either, because it regenerates and compares against what
+the same wrong rule wrote. `--self-test` is the only thing that can, and it is pinned to two
+anchors this repository already links, asserting the *headings* as well as the slugs so the two
+literals cannot agree with each other and with nothing else. Read at the close: 33 substantive
+assertions, no tautologies.
+
+**Two accumulations left the live index.** 335 lines of self-declared-superseded sequencing
+prose moved from `README.md` into `## Prior sequencing notes (superseded)` — a section that had
+existed since [0061] and had never once been used at a close — and the second copy of the
+backlog probe grammar was deleted in favour of a pointer at
+`scripts/check-backlog-claims.mjs`, which is its parser and therefore its authority. The move
+was re-diffed against `0964385` at the close: **byte-identical**, 335 lines. Seventeen shortcut
+`[label]: target` definitions had to travel with it, which is the trap step 1b exists for and
+which the plan predicted (at 27).
+
+**The major: a mechanical transform that every done-when passed.** Phase 4 turned 133 close
+write-ups from bullets into `###` headings so they could be linked at all. Where a bullet's
+first line wrapped *inside* the link label, the lead became a heading with an unterminated
+bracket and a destroyed link — 40 entries, found by the first Mode 4 review and repaired by
+Phase 8. Where it wrapped *after* the link, the heading swallowed the close prose that
+preceded the newline — 44 entries, 32 with a dangling em-dash and 12 with a truncated fragment
+(`0088 — The docs get pictures — closed 2026-08-13 (all`). `dev` disclosed twelve of those and
+correctly left them as architect's call. Repaired at this close in `327af9c`, before the
+anchors could be linked from anywhere.
+
+**What made both classes invisible is worth keeping.** The `±5 lines` done-when passed because
+line count is precisely the property this damage preserves; `grep -c '^### \['` passed because
+a broken lead still begins `### [`; `check-doc-links.mjs` passed because it matches `](path)`
+textually and never asks whether the link is well-formed; and the independent `sed`
+reproduction diffed clean because it confirmed fidelity to the transform rather than
+correctness of the result. The property that *does* discriminate is the one Phase 8 found and
+this close reused: a join or a split trades a space for a newline, so the section's
+whitespace-normalized digest is **invariant** under the whole edit —
+`a5e17e7b57ed2ed58319f56a657fe8a1` before and after the 44 splits.
+
+**Verified independently at the merged tip, not read off the log.** `cargo nextest run
+--workspace`: **1520 passed, 5 skipped, exit 0** (481 s), matching `dev`'s claim exactly; `fmt`
+clean; `clippy --workspace --all-targets` zero warnings; all six Node gates green, `toc.mjs
+--check` at 6 blocks / 458 rows and `--self-test` at 33 of 33.
+
+**The honest limit the plan stated up front held.** `design-backlog.md` — the file the user
+actually reported as unnavigable — netted **−79** lines of 3,528 against a predicted −110, and
+`dev` correctly refused to reach the number by dropping content the plan required be carried.
+The 44 live entries are the file; the lever that shortens it is closing them.
+
+**Three things this close carries forward.** The `--help` banner at `standalone/src/cli.rs:201`
+still reads lower-case `ritmolux` — a code edit a docs lane could not take, left from [0150].
+Backlog 0179's two staleness advisories are informational and its claims still hold. And
+`docs/capturing.md`'s six plan-numbered heading suffixes remain a followup, because dropping
+them moves anchors and wants an inbound sweep of its own.
 
 ### [0126 — The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md)
 — closed 2026-09-03. Eight `dev` phases in the `WORK/rlx-plan-0126` lane, `0d50935`..`463cf2d`
@@ -6542,6 +6612,17 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143
+
+**Added 2026-09-02 — [0151] is docs-only and precedes [0143].** It touches no Rust and contends with
+nothing on the roster, so it slots into any window. It goes **before** 0143 because 0143 writes a
+route map and a 926-link rewrite against the layout of `capturing.md` and `presets/README.md`, and
+0151 is what settles that layout. The 335 lines of spent sequencing prose that
+`### What this sequence assumes` used to carry now live in
+[README-archive.md](README-archive.md), in the `## Prior sequencing notes (superseded)` section that
+had been waiting for them since Plan 0061.
+
+
 
 A tactical ordering of the **active roster** (strategic themes live in the Roadmap below).
 (**Plan 0014 has now landed and closed** — the `render::feedback::PingPongField` seam, the injected-`dt`
@@ -6706,6 +6787,11 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0101]: done/0101-the-engine-renders-a-music-video.md
 [0103]: 0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
+[0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
+[0143]: 0143-the-documentation-gets-a-front-end.md
+[0151]: done/0151-the-long-documents-become-navigable.md
+[0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
+[0150]: done/0150-the-application-becomes-ritmolux.md
 [ADR-0109]: ../adrs/0109-the-beat-clock-counts-onsets-not-beats.md
 
 ### Moved 2026-09-03 from `README.md` — the 2026-08-16 sequence and everything under it

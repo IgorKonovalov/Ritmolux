@@ -1,9 +1,22 @@
 # 0151 — The long documents become navigable
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-04. Nine dev phases in the `WORK/rlx-plan-0151` lane,
+> `e450092`..`a77a0be` (six as planned, three as a repair pass after the first Mode 4 review),
+> plus the close commits `327af9c` and this one. Mode 4 review: **no blockers, one major
+> (44 of the 133 archive headings still carried close prose after the Phase 8 repair; repaired
+> at this close in `327af9c`), four minors.** Independently verified at the merged tip:
+> `cargo nextest run --workspace` **1520 passed / 5 skipped / exit 0** (481 s), `fmt` clean,
+> `clippy --workspace --all-targets` zero warnings, all six Node gates exit 0 with
+> `toc.mjs --check` at 6 blocks / 458 rows. The 335-line sequencing move was re-diffed against
+> `0964385` and is byte-identical; the Phase 8 repair was reproduced independently from the
+> pre-Phase-4 file and diffs clean apart from the 40 leads it deliberately splits; the
+> whitespace-normalized digest of the archive's write-up section is invariant across this
+> close's own 44 further splits. Version: **none** - docs/chore-only under ADR-0005, no Rust,
+> C++ or preset file moved (the three files under a crate are one comment line each), on the
+> Plan 0145 precedent.
 > **Created:** 2026-09-02
 > **Owner skill(s):** dev
-> **Related ADRs:** [0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md) (proposed)
+> **Related ADRs:** [0163](../../adrs/0163-a-long-document-carries-a-generated-contents-block.md) (proposed)
 
 ## TL;DR
 
@@ -57,7 +70,7 @@ be linked into because its 133 entries are bullets rather than headings.
 
 ## Decision
 
-Per [ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md): **no document is
+Per [ADR-0163](../../adrs/0163-a-long-document-carries-a-generated-contents-block.md): **no document is
 split.** A new `scripts/toc.mjs` regenerates a contents block between `<!-- toc:begin depth=N -->`
 and `<!-- toc:end -->` from the headings that follow it, and each of the six gets one at the depth
 its shape wants. The two real accumulations are removed into the archive section and the parser that
@@ -65,7 +78,7 @@ already own them. We rejected one file per entry (~240 files) because it rewrite
 close ceremony, and inbound references in 32 files to buy addressability in two write-only archives,
 and we rejected number-range shards because the seams are arbitrary and each shard regrows.
 
-**Sequencing:** this plan runs **before** [Plan 0143](0143-the-documentation-gets-a-front-end.md),
+**Sequencing:** this plan runs **before** [Plan 0143](../0143-the-documentation-gets-a-front-end.md),
 so that 0143's remark plugin and its 926-link rewrite are written against the final layout of
 `capturing.md` and `presets/README.md` rather than against a layout this plan then changes.
 
@@ -177,7 +190,7 @@ flowchart TB
 - **Scope, precisely:**
   - `## Every live entry carries a probe, and something re-runs it` (lines 12–66, 55 lines) is
     replaced by a pointer of about six lines naming `scripts/check-backlog-claims.mjs` and
-    [ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) as the
+    [ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) as the
     authority on the grammar. **Three sentences do not survive in the script and must be carried
     into the pointer or into the ADR reference, not dropped:** that green means the stated reduction
     holds and never that the entry is true; that the narrowest path is the better probe; and that
@@ -298,7 +311,7 @@ const anchor = (heading) =>
 - **Both archives are past 512 KB**, where GitHub's markdown rendering may not reach the targets a
   contents block points at. The block still works in an editor and locally. Not mitigated, and
   recorded in ADR-0163's Negative section as the price of not splitting.
-- **[0126](done/0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126`, and
+- **[0126](0126-the-large-files-split-along-their-seams.md) is live in `WORK/rlx-plan-0126`, and
   this plan runs beside it in its own lane per ADR-0053.** The file sets are disjoint: 0126 takes
   `core/`, `core-cabi/`, `standalone/`, `plugin-foobar/` and its own plan file; this plan takes
   `docs/`, `presets/README.md`, `scripts/`, `.githooks/pre-push`, `.github/workflows/ci.yml` and
@@ -338,7 +351,7 @@ const anchor = (heading) =>
   unchecked by construction, so a rename breaks silently. `capturing.md`'s six plan-numbered heading
   suffixes (`(Plan 0045)`, `(Plan 0082)`, …) read as the plan-relative narration `CLAUDE.md` bars
   from comments, and they stay for now — that is a followup, not this plan.
-- **It does not build the documentation site.** That is [Plan 0143](0143-the-documentation-gets-a-front-end.md),
+- **It does not build the documentation site.** That is [Plan 0143](../0143-the-documentation-gets-a-front-end.md),
   which this plan sequences before so 0143's route map is written against the final layout.
 
 ## Implementation log

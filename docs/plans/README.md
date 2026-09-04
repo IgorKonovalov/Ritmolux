@@ -50,7 +50,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
-| [0151](0151-the-long-documents-become-navigable.md) | The long documents become navigable | draft | dev | ADR-0163 (proposed): generated contents blocks, no splits. Sheds 335 lines of self-declared-superseded sequencing prose from this file. **Take before 0143**, whose route map wants the final layout. |
 | [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 <!-- roster:end -->
 
@@ -61,8 +60,8 @@ token followed by `/`. ADR-0164 is the decision ADR-0162 deferred — one clean 
 no transition period, and `/v1` does not move because no payload did. Both 0133 and 0147 are
 approved, unstarted, and name `/lmv/v1` in live text a `dev` lane would read; 0152's Phase 3 is what
 re-points them, so taking 0152 first removes that window instead of closing it afterwards. Nothing
-else contends: [0151] edits only the backlog's preamble and sweep narrative, while 0152's Phase 3
-edits five entry bodies.
+else contends: [0151] closed 2026-09-04, and the backlog preamble it rewrote is not a region 0152's
+Phase 3 touches.
 
 **Phase 5 is the operator's, and it is the only detector.** OSC has no negotiation and no error
 channel, so a binding left on the old root stops firing and looks exactly like a fixture that is not
@@ -129,7 +128,7 @@ shape, because most of what it decided was sequencing rather than design:
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
 [0150]: done/0150-the-application-becomes-ritmolux.md
-[0151]: 0151-the-long-documents-become-navigable.md
+[0151]: done/0151-the-long-documents-become-navigable.md
 [ADR-0158]: ../adrs/0158-a-joined-end-carries-its-own-miter-length.md
 [ADR-0159]: ../adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md
 
@@ -378,13 +377,11 @@ build is no longer a reason to keep a finished worktree around.
   **19.1 %** of the `reactivity` suite — the minority arm, so ADR-0033's ratchet derivation is not
   reopened and no ADR is owed.
 
-**Added 2026-09-02 — [0151] is docs-only and precedes [0143].** It touches no Rust and contends with
-nothing on the roster, so it slots into any window. It goes **before** 0143 because 0143 writes a
-route map and a 926-link rewrite against the layout of `capturing.md` and `presets/README.md`, and
-0151 is what settles that layout. The 335 lines of spent sequencing prose that
-`### What this sequence assumes` used to carry now live in
-[README-archive.md](README-archive.md), in the `## Prior sequencing notes (superseded)` section that
-had been waiting for them since Plan 0061.
+**Superseded 2026-09-04 by [0151]'s close — the layout it settles is now on `main`.** [0143] can be
+written against final headings: `capturing.md` and `presets/README.md` each carry a generated
+contents block, and `scripts/toc.mjs --check` holds it to the headings beneath it
+([ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)). The note that
+sequenced the two is in [README-archive.md](README-archive.md).
 
 ### The two lanes, now
 
@@ -754,6 +751,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md) — closed 2026-09-04. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Touched `presets/README.md` only, closed no backlog entry. [Write-up](README-archive.md).
 - [0126 - The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md) - closed 2026-09-03. Review: **no blockers, no majors in the code; one major doc repair, five minors.** Version: **0.103.1** (patch). Touched no presets, closed no backlog entry. [Write-up](README-archive.md).
 - [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md) — closed 2026-09-02. Review: **no blockers, four majors, two minors.** Version: **0.103.0** (minor). Filed backlog 0180 + 0181. [Write-up](README-archive.md).
 - [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) — closed 2026-09-02. Review: **Phases 1-4 only, no blockers.** Version: **0.102.0** (minor). Archived [backlog 0174-0178](../design-backlog-archive.md). [Write-up](README-archive.md).

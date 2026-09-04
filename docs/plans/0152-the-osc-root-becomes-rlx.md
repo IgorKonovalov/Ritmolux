@@ -193,7 +193,7 @@ before                      after
   approved and unstarted; if either is taken before this plan lands, its author reads `/lmv/v1`. The
   window is small and Phase 3 closes it, but the ordering is worth knowing.
 - **No collision with [0126](done/0126-the-large-files-split-along-their-seams.md) or
-  [0151](0151-the-long-documents-become-navigable.md).** 0126's eight phases name none of these
+  [0151](done/0151-the-long-documents-become-navigable.md).** 0126's eight phases name none of these
   files; 0151 touches `docs/` and `scripts/` but none of the four documents Phase 3 edits except
   `docs/design-backlog.md` — and there 0151 edits only the preamble and the sweep narrative, while
   this plan edits five entry bodies. Different regions of one file; a 3-way merge handles it.
