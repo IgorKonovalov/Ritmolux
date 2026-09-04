@@ -3053,8 +3053,14 @@ The four **shader-coloured** scenes (`fragment_field`, `swarm`,
 samples the same LUT on the CPU, one colour per element — colour through a shared
 **palette** (ADR-0021): a gradient — a built-in `name` or custom `stops` — baked
 into a lookup table the scene samples. An optional top-level `[palette]` table
-picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. Colour
-modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
+picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. **A
+custom stop is authored in sRGB** — the hex a picker gives you — and the engine
+decodes it to light when it bakes the LUT
+([ADR-0151](../docs/adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md)),
+so a plateau written `#c81423` renders `#c81423`; that is exact below the tonemap
+knee, and [the colour
+surface](../docs/preset-palettes.md#custom-gradient-stops--stops) has the domain.
+Colour modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
 that sets none is unchanged. **Since Plan 0054 / ADR-0059 the other three line
