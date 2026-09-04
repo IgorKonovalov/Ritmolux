@@ -1,6 +1,6 @@
 # 0128 — The rendered file stops looking upscaled
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed — the density law this builds), [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (why more samples is not more light), [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (budget vs. active count), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) (what a tier promises), [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (the profile Phase 5 probes)
@@ -272,16 +272,168 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0128-the-rendered-file-stops-looking-upscaled`, worktree `C:/Users/Igor Konovalov/WORK/rlx-0128-render-density`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Measure the three constants | dev | not started | |
+| 1 — Measure the three constants | dev | done | committed with this row |
 | 2 — The law, live | dev | not started | |
 | 3 — The offline ceiling | dev | not started | |
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | not started | |
+
+### Phase 1 readings
+
+**Machine and adapters (ADR-0071).** One Windows laptop, hybrid, both adapters hardware and
+neither WARP:
+
+- **`hp`** — `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu), driver 32.0.15.8142`. This is
+  the *reference* for `Rich`: NFR section 1 calibrates `Rich` against a midrange discrete GPU, and
+  NFR section 12 already quotes this box's discrete GPU for the windowed Rich-tier figures.
+- **default** — `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu), driver 30.0.13002.1001`. Integrated,
+  and the closest thing this box has to NFR section 1's *baseline* hardware, which is what `Floor`
+  answers to.
+
+**The instrument.** A scratch harness (`core/src/render/tests.rs`, reverted before this commit)
+timing `Renderer::step_offscreen` — clear, `draw_frame`, submit, `poll(wait_indefinitely)` — at
+1920x1080 on `attractor_leviathan`, release build. It measures the frame's CPU+GPU work and **not**
+the present, so it is not comparable to NFR section 12's windowed p99 of 19.0 ms for this preset; the
+useful reading against a budget is therefore the **marginal** cost of raising the count, which is
+independent of the fixed live overhead the harness omits. Counts are **interleaved in one process**
+and the rounds pooled: a first attempt ran one count per process and the numbers drifted by 2-3x
+across a long sweep as the laptop GPU throttled, which read as signal and was not.
+
+#### Density — `attractor_leviathan`, `--tier rich`, one still per size
+
+Stills at `target/plan0128/density_<size>.png`, `--presets presets --frames 240` (uncommitted).
+The trail grid is `grid_size(target, (3840, 2160), 256)`, and it is the grid the deposit actually
+spreads over:
+
+| target | target px | trail grid | grid texels | particles/target px | particles/grid texel |
+|---|---|---|---|---|---|
+| 640x360 | 230,400 | 768x512 | 393,216 | 0.6510 | 0.3815 |
+| 1280x720 | 921,600 | 1280x768 | 983,040 | 0.1628 | 0.1526 |
+| 1920x1080 | 2,073,600 | 2048x1280 | 2,621,440 | 0.0723 | 0.0572 |
+| 3840x2160 | 8,294,400 | 3840x2160 | 8,294,400 | 0.0181 | 0.0181 |
+
+The `particles/target px` column reproduces ADR-0140's table exactly, so `REFERENCE_PX` is
+**230,400** — the 640x360 row the ADR names as the accepted density.
+
+Two observations the risks section asked for, one of them a correction:
+
+- **The 4K row is the same measurement as the others, not a different one.** The plan's risk note
+  expects the grid to stop growing at the `Rich` cap while the law keeps adding samples. At exactly
+  3840x2160 the grid *equals* the target (the cap is 3840x2160), so the density over the grid is the
+  density over the target. The over-delivery the note describes begins **above** 4K, not at it.
+- **The deposit lands per grid texel and the law's denominator is target pixels**, and the two
+  differ by the 256-step quantization: 1.71x at 640x360, 1.07x at 1280x720, 1.26x at 1080p, 1.00x at
+  4K. The law is implemented as ADR-0140 specifies (`target_px`); the mismatch is bounded and
+  recorded here rather than acted on.
+
+#### Frame time — 1920x1080, `attractor_leviathan`, interleaved 5 rounds x 120 frames
+
+`Rich`, reference discrete GPU (`hp`), 600 samples per count:
+
+| particles | p50 | p90 | p99 | p99 over today's | as % of the 16.67 ms budget |
+|---|---|---|---|---|---|
+| 150,000 (today) | 2.720 | 3.124 | 3.838 | — | — |
+| 300,000 | 3.019 | 3.378 | 4.043 | +0.205 | 1.2 % |
+| **600,000** | **3.778** | **4.250** | **5.292** | **+1.454** | **8.7 %** |
+| 1,200,000 | 5.609 | 6.685 | 8.541 | +4.703 | 28.2 % |
+| 1,350,000 | 5.973 | 7.232 | 9.376 | +5.538 | 33.2 % |
+| 2,700,000 | 10.373 | 12.616 | 14.388 | +10.550 | 63.3 % |
+
+**The live ceiling for `Rich` is 600,000**, by the stated rule: the largest swept count whose
+*marginal* p99 over today's anchor stays inside **10 % of the 16.67 ms budget**. It reads 8.7 %; the
+next step up reads 28.2 %. Absolute margin at that count is 3.15x under the budget on this
+instrument, which omits the present.
+
+`Floor`, integrated adapter — the tier NFR section 1's floor commitment is about, 360 samples per
+count (3 rounds):
+
+| particles | p50 | p90 | p99 | vs the 16.67 ms budget |
+|---|---|---|---|---|
+| 50,000 (today) | 11.666 | 15.732 | **16.854** | **on the budget, no headroom** |
+| 150,000 | 14.731 | 17.043 | 19.144 | 1.15x over |
+| 450,000 (the law's own 1080p `Floor` value) | 25.365 | 28.551 | **31.942** | **1.9x over** |
+
+**So the live ceiling is per tier, and `Floor`'s is its own anchor — 50,000.** NFR section 1 commits
+`Floor` to 60 fps at 1080p on baseline hardware with "values exactly the pre-tier engine's"; today's
+count already sits *on* that budget with nothing to spare, and the law's 1080p `Floor` value halves
+the frame rate. The law is therefore a no-op at `Floor` live, by measurement rather than by
+exemption. ADR-0140 specifies one live ceiling and does not say whether it is per tier; this is the
+value the ADR asks Phase 1 to read, read once per tier.
+
+The same `Floor` counts on the discrete adapter, for contrast: 50,000 p99 2.771 ms, 150,000 p99
+3.149, 450,000 p99 3.516. Nothing binds there — the `Floor` ceiling is set by the hardware `Floor`
+exists for.
+
+#### Deposit precision — 1920x1080, grid 2048x1280, reference discrete GPU
+
+Field read back off `PingPongField` (`Rgba16Float`) after 240 frames at Leviathan's own
+`fade = 0.69` / `size = 0.39`; levels are linear, over lit texels; ULP is the binary16 gap at that
+level:
+
+| particles | deposit/particle | lit frac | mean | p50 | p90 | p99 | peak | ULP@p50 | ULP@p99 | ULP@peak |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 150,000 | 0.333333 | 0.1641 | 0.041290 | 0.006065 | 0.5034 | 4.449 | 59.47 | 3.815e-6 | 3.906e-3 | 3.125e-2 |
+| 450,000 | 0.111111 | 0.1685 | 0.041086 | 0.006638 | 0.4810 | 4.332 | 57.63 | 3.815e-6 | 3.906e-3 | 3.125e-2 |
+| 1,350,000 | 0.037037 | 0.1711 | 0.040182 | 0.006828 | 0.4661 | 4.195 | 42.34 | 3.815e-6 | 3.906e-3 | 3.125e-2 |
+| 2,700,000 | 0.018519 | 0.1721 | 0.038579 | 0.006775 | 0.4563 | 4.035 | 32.03 | 3.815e-6 | 3.906e-3 | 3.125e-2 |
+
+**Precision does not bind before frame time, and does not bind at all below the device's own
+buffer wall.** At the top swept count the per-particle deposit is 4.7x the ULP at the p99 working
+level and 76x it at p90. It approaches the ULP only at the *peak* — a deposit of 0.0185 against a
+0.03125 ULP at a level of 32 — and that region is saturated highlight far above ADR-0046's tonemap
+knee at 1.0, where a lost deposit changes no pixel. Solving `50_000/N = ulp(peak)/2` puts the first
+quantization at about **3.2M particles**, past the wall below.
+
+The table also reads as the total-light check ADR-0065 predicts: mean linear light falls 0.041290 to
+0.038579 across an **18x** count range (-6.6 %) while the peak falls 59.47 to 32.03 (-46 %). Same
+light, less shot noise.
+
+#### The offline ceiling, and the wall that sets it
+
+`Particle` is 48 B (asserted in `core/src/render/scenes/particles/tests.rs`). The bound is **not**
+process memory — it is the device's storage-buffer binding limit, which is reached first. Measured,
+at 5,400,000 (the law's own unclamped 4K value):
+
+```text
+Buffer binding 0 range 259200000 exceeds `max_*_buffer_binding_size` limit 134217728
+```
+
+134,217,728 B / 48 B = **2,796,202 particles**, and `wgpu` takes the default limit here. So:
+
+| | particles | x 48 B | note |
+|---|---|---|---|
+| device wall | 2,796,202 | 134.2 MB | `max_storage_buffer_binding_size`, default |
+| **offline ceiling, `Rich`** | **2,700,000** | **129.6 MB** | 18x the anchor, 3.4 % under the wall, measured to run |
+| **offline ceiling, `Floor`** | **900,000** | **43.2 MB** | the same 18x multiple, so the 3:1 tier ratio survives at every size |
+| live ceiling, `Rich` | 600,000 | 28.8 MB | paid in every window (7.2 MB today) |
+| live ceiling, `Floor` | 50,000 | 2.4 MB | unchanged from today |
+
+The offline ceiling is a whole multiple of the anchor rather than the wall itself, so that a tier
+still means something offline: at a shared ceiling `--tier floor --render` and `--tier rich --render`
+would draw the same count at 4K.
+
+#### The three constants
+
+- `REFERENCE_PX` = **230,400** (640x360).
+- Live ceiling: **`Floor` 50,000**, **`Rich` 600,000**.
+- Offline ceiling: **`Floor` 900,000**, **`Rich` 2,700,000**.
+
+What the law then resolves at `Rich` — and every offline row below 4K is the reference density
+exactly:
+
+| target | law asks | live | offline | offline particles/target px |
+|---|---|---|---|---|
+| 96x96, 128x128 | below the anchor | 150,000 | 150,000 | — |
+| 640x360 | 150,000 | 150,000 | 150,000 | 0.6510 |
+| 1280x720 | 600,000 | 600,000 | 600,000 | 0.6510 |
+| 1920x1080 | 1,350,000 | 600,000 | 1,350,000 | 0.6510 |
+| 2560x1440 | 2,400,000 | 600,000 | 2,400,000 | 0.6510 |
+| 3840x2160 | 5,400,000 | 600,000 | 2,700,000 | 0.3255 |
 
 ### Notes
 
