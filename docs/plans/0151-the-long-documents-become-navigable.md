@@ -357,8 +357,8 @@ const anchor = (heading) =>
 | 5 — The remaining four documents carry blocks | dev | done | `e6d5dd5` |
 | 6 — The carrier | dev | done | `b9f9ac9` |
 | 7 — `flattenLinks` survives a bracketed label | dev | done | `78024a4` |
-| 8 — The 40 damaged write-ups are repaired | dev | done | committed with this row |
-| 9 — The sixth gate's count reaches the sites that state it | dev | not started | |
+| 8 — The 40 damaged write-ups are repaired | dev | done | `b61fada` |
+| 9 — The sixth gate's count reaches the sites that state it | dev | done | committed with this row |
 
 ### Notes
 
@@ -557,6 +557,37 @@ plus whatever prose preceded the newline. `0088 — The docs get pictures — cl
 is the clearest. These leads are well-formed markdown and every done-when in this plan passes on
 them, which is why they survived both Phase 4 and this repair. Fixing it means moving 12 anchors,
 so it is architect's call, not a phase this plan authorized.
+
+**Phase 9.** All eight sites the plan names are corrected across the five files it names, and
+nothing else moved: `git diff --name-only` matches the `Files touched` list exactly, and
+`docs/design-backlog-archive.md:7252`, `docs/plans/done/*` and `README-archive.md` are untouched.
+
+`docs/nfr.md:166` was restated rather than incremented: **nine** single-runner gates (3 + 6), the
+sixth enumerated beside the other five with ADR-0163, and the invocation count stated where the
+gate count could mislead — six gates, **eight invocations** in each carrier, because
+`check-index-rows.mjs` and `toc.mjs` each run a `--self-test` beside their check.
+
+**One site beyond the plan's list, in a file the plan does name.** `README.md`'s developer section
+carries the pre-push **step table** — the per-step breakdown `docs/nfr.md` points at — and it
+listed five Node steps against the hook's eight. Correcting only the counts would have left a
+table that contradicts `.githooks/pre-push` line for line, so the two `toc.mjs` rows went in.
+**The third row added is a genuine expansion:** `check-index-rows.mjs --self-test` has run in both
+carriers since before this plan and was never in the table. It is one row in a file already open
+for this phase, and leaving it out would have meant knowingly publishing a table that is wrong in
+a second way. Disclosed rather than folded in silently.
+
+Two live sites saying "five gates" are correctly left alone — `.claude/skills/architect/SKILL.md:58`
+and `docs/adrs/0081...:137` count the five gates a **preset** passes (`sanity`, `reactivity`,
+`animation`, `distinctness`, `golden`), which is a different five and is unaffected.
+
+Backlog 0179's two probes still hold and the gate is green at 102 reductions across 44 live
+entries. Its two staleness advisories from Phase 6 are unchanged and still informational.
+
+This discharges the implementation log's **followup 1**.
+
+**The per-phase gate for 7-9 was the six Node gates only.** No Rust or C++ changed in any of the
+three phases — the diff is markdown and one `.mjs` — so `fmt` and `clippy` are run once at the
+close, after `git merge main`, where they are answering a question the merge actually raises.
 
 ### Close triggers
 

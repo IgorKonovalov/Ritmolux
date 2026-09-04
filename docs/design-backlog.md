@@ -3394,7 +3394,7 @@ review (2026-09-01), from a red `main` the close ceremony's own gate list could 
 ### The finding
 
 `.github/workflows/ci.yml:118` runs `cargo doc --workspace --no-deps` with
-`RUSTDOCFLAGS: -D warnings`, added by Plan 0144 Phase 6. `.githooks/pre-push` runs the five Node
+`RUSTDOCFLAGS: -D warnings`, added by Plan 0144 Phase 6. `.githooks/pre-push` runs the six Node
 gates, `fmt`, `clippy --workspace --all-targets -D warnings` and a narrowed `nextest` — and no
 `cargo doc`. The exclusion is **deliberate and documented** in `ci.yml`'s own comment: the hook's
 budget is ~28 s and a full `cargo doc` does not fit. That reasoning is sound and this entry does not
@@ -3403,7 +3403,7 @@ dispute it.
 What the entry is about is the **consequence nobody priced**: `cargo doc` is now the only CI gate
 with no local counterpart at any cadence — not the hook, not the `dev` per-phase gate, and not the
 architect close ceremony, whose written gate list is `fmt` + `clippy --workspace --all-targets` +
-`cargo nextest run --workspace` + the five Node scripts. So a rustdoc error is **structurally
+`cargo nextest run --workspace` + the six Node scripts. So a rustdoc error is **structurally
 unreachable** until a push has already happened.
 
 Plan 0137 is the demonstration. It made `srgb_decode_lut` public (Phase 1) and added a public

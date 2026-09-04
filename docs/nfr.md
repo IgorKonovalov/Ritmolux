@@ -163,17 +163,22 @@ contradicts this file is a plan bug — surface it, don't guess.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `rlx-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **eight** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
-  `unsafe` (UB), the coverage ratchet below, and the five Node doc gates that share the `links`
+- Plus **nine** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
+  `unsafe` (UB), the coverage ratchet below, and the six Node doc gates that share the `links`
   job — `check-doc-links.mjs` (every relative markdown link resolves — Plan 0061 Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
   [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
   `check-backlog-claims.mjs` (every live backlog entry's probe still holds —
   [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)),
   `check-filter-figures.mjs` (the diffusion filter's cost figures live in one page —
-  [ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)), and
+  [ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)),
   `check-comment-hygiene.mjs` (no `.rs` comment carries a relative link or plan-relative narration —
-  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
+  [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)),
+  and `toc.mjs` (every generated contents block still matches the headings beneath it —
+  [ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)). Six gates but
+  **eight invocations** in each carrier: `check-index-rows.mjs` and `toc.mjs` each run a
+  `--self-test` beside their check, because neither a detector that has quietly stopped matching
+  nor an anchor rule that is merely plausible is visible in the check itself.
 - **The nine GPU-heavy suites run once per push, not twice**
   ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), Plan 0061 Phase 2b). They render the shipped
   preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and
@@ -205,7 +210,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — the five Node doc gates, `fmt`,
+  `git config core.hooksPath .githooks`. Runs the fast subset — the six Node doc gates, `fmt`,
   `clippy --workspace`, and a narrowed `nextest --workspace -P fast` — whose `fast` profile
   (ADR-0156) is where the excluded GPU-heavy suites are listed, and which nextest names on every
   run.
@@ -215,9 +220,9 @@ contradicts this file is a plan bug — surface it, don't guess.
   the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
   ADR-0033's own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
-  see the README's developer section. All five Node steps (`check-doc-links.mjs` ~50 ms,
+  see the README's developer section. All six Node gates (`check-doc-links.mjs` ~50 ms,
   `check-index-rows.mjs`, `check-backlog-claims.mjs`, `check-filter-figures.mjs`,
-  `check-comment-hygiene.mjs`) also run as the CI `links` job
+  `check-comment-hygiene.mjs`, `toc.mjs`) also run as the CI `links` job
   (`ubuntu-latest`), so they are enforced for everyone rather than only where the hook is installed
   — and they skip together with a notice when `node` is absent, which is the [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)
   shape.

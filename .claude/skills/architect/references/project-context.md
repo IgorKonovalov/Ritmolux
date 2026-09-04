@@ -46,7 +46,7 @@ presets/         # the curated preset library (*.toml) + README.md (the param ro
                  #   Non-recursive read_dir in build.rs (ADR-0022) skips it by construction.
                  #   A plan that closes such a gap owes a look at what this holds.
 tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
-scripts/         # the five Node gates; the first three are yours at every close (see SKILL.md)
+scripts/         # the six Node gates; the first three are yours at every close (see SKILL.md)
 docs/
 ├── adrs/        # ADR-NNNN + README index
 ├── plans/       # plan NNNN + README index + done/
