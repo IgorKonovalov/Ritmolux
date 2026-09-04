@@ -1,11 +1,9 @@
 # 0143 — The documentation gets a front end
 
-> **Status:** approved, **parked 2026-09-01**
-> **Parked until:** the application's new name is chosen. The site bakes the project name into
-> the Starlight title, the Pages subpath every published URL carries, and the header of every
-> page — so publishing under `ritmolux` buys a full republish and a dead set of
-> external links as soon as the rename lands. The rename is itself parked with a shortlist
-> (Ritmolux, Clavilux) and no ADR or plan yet; **that decision is the named trigger for this one**.
+> **Status:** in-progress (2026-09-05)
+> **Unparked 2026-09-05:** the named trigger fired — the name is Ritmolux (ADR-0162), Plan 0150
+> landed the rename, and the Pages subpath is `/ritmolux/` (chosen by the user at the start of this
+> `dev` lane). Phases 1 and 4 still read `/lmv/`; that one token is superseded, see the log's Notes.
 > **Created:** 2026-08-30
 > **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
@@ -283,11 +281,11 @@ other off-site target. `dev` should not re-raise this.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly, no worktree — the plan's own Lane guidance.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the site renders the published set from one source | dev | not started | |
+| 1 — the site renders the published set from one source | dev | done | committed with this row |
 | 2 — links resolve across the publish boundary | dev | not started | |
 | 3 — the home page routes, and does not pitch | dev | not started | |
 | 4 — the demo goes live on the personal site | human | not started | |
@@ -297,7 +295,24 @@ other off-site target. `dev` should not re-raise this.
 
 ### Notes
 
-_(to be filled by `dev`)_
+- **Deviation, decided by the user at the start of the lane: the Pages subpath is `/ritmolux/`, not
+  the `/lmv/` that Phases 1 and 4 name.** Those phase blocks predate ADR-0162 and Plan 0150; Phase 7
+  already says `ritmolux`. `astro.config.mjs` sets `base: '/ritmolux/'`, and Phase 4's copy
+  destination is `public/ritmolux/` for the same reason. Nothing else in either phase changes.
+- **The plan header's park is discharged in the `Status:` block** — its named trigger (the name is
+  chosen) fired with ADR-0162. That block is the only part of the plan outside the log this lane
+  edited.
+- **Phase 1 took the preferred mechanism, not the permitted fallback: there is no staged copy.** The
+  content loader reads `docs/`, `docs/specs/` and `presets/README.md` in place from the repository
+  root. Two build-time transformations make that work against sources that carry no frontmatter and
+  may not be edited — the title is derived from each document's opening `# ` heading
+  (`src/content.config.ts`), and that heading is dropped from the body by a remark plugin
+  (`astro.config.mjs`), because Starlight renders `title` as the page `<h1>`.
+- **`@astrojs/markdown-remark` is a third direct dependency, not a fourth-hand one.** Astro 7.3
+  ships a different default Markdown processor, and `markdown.remarkPlugins` is inert without this
+  package; it is also Starlight's own peer dependency. Phase 2's link rewriter needs it too.
+- `git status` after Phase 1 shows no modification to any file under `docs/` or `presets/` other
+  than this plan's own `Status:` line and this log.
 
 ### Close triggers
 
