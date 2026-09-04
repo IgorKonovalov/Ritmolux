@@ -699,6 +699,11 @@ fn create(
             device,
             surface_format,
             tier.attractor_particles,
+            // The **live** ceiling: this factory serves every surface path and
+            // every capture path alike, and a capture is small enough that the
+            // law's lower clamp resolves the anchor either way. The headless
+            // render path takes the offline ceiling instead.
+            tier.attractor_particles_live_ceiling,
             tier.attractor_trail_cap,
         )),
         SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(

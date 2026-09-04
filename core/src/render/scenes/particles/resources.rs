@@ -210,15 +210,18 @@ pub(super) struct PipelineResources {
     pub(super) decay_layout: wgpu::BindGroupLayout,
     pub(super) present_layout: wgpu::BindGroupLayout,
     pub(super) field_sampler: wgpu::Sampler,
-    /// How many particles the buffer above holds — the active tier's
-    /// [`attractor_particles`](crate::render::TierConfig::attractor_particles),
-    /// fixed for the life of these resources.
+    /// How many particles the buffer above holds — the active tier's **ceiling**
+    /// ([`attractor_particles_live_ceiling`](crate::render::TierConfig::attractor_particles_live_ceiling),
+    /// or the offline one on a headless render path), fixed for the life of these
+    /// resources.
     ///
-    /// Since ADR-0069 the dispatch, the instance draw and the step uniform take
-    /// the **active** count instead (`round(budget * density)`), which is a
-    /// different and smaller number. This one survives as the allocation bound:
-    /// the draw clamps its instance range to it, so no arithmetic on `density`
-    /// can fetch a vertex past the end of the buffer.
+    /// The dispatch, the instance draw and the step uniform all take the
+    /// **active** count instead — `round(budget * density)` (ADR-0069) over a
+    /// budget that is itself a density against the render target (ADR-0140) — so
+    /// this is two clamps above what any frame actually draws. It survives as the
+    /// allocation bound: the draw clamps its instance range to it, so neither a
+    /// preset's `density` nor a resize can fetch a vertex past the end of the
+    /// buffer.
     pub(super) count: u32,
 }
 

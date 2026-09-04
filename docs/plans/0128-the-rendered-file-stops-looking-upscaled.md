@@ -276,8 +276,8 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Measure the three constants | dev | done | committed with this row |
-| 2 — The law, live | dev | not started | |
+| 1 — Measure the three constants | dev | done | `7387579` |
+| 2 — The law, live | dev | done | committed with this row |
 | 3 — The offline ceiling | dev | not started | |
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
@@ -436,6 +436,43 @@ exactly:
 | 3840x2160 | 5,400,000 | 600,000 | 2,700,000 | 0.3255 |
 
 ### Notes
+
+**Phase 2 — the seeded scatter is a function of the allocation, so a `Rich`
+capture moves once.** Disclosed because it is a deviation from ADR-0140's stated
+consequence, not from the phase's done-when.
+
+The ADR claims *"every existing capture — the 128x128 golden suite, the 96x96
+sanity suite, **every `shot` still** — resolves to exactly today's count and stays
+byte-identical."* The first half holds and is asserted on the value. The second is
+false for a `Rich` still, and the count is not why:
+`AttractorScene::seed` draws `x`/`y`/`seed`/`age` in one pass and `z` in a second
+from **one** RNG stream, so `z` for particle `i` sits at stream position
+`3 * count + i`. Allocating at the ceiling instead of at the anchor moves `count`,
+which moves the depth of every particle including the ones actually drawn.
+
+Measured rather than reasoned: `shot --presets presets --preset Leviathan --tier
+rich --size 640x360 --frames 240` on the hardware adapter is byte-identical before
+and after with the `Rich` live ceiling temporarily set to the anchor, and differs
+with it at 600 000. 128x128 and 96x96 are byte-identical at both tiers either way,
+as are `Clifford`'s.
+
+**Nothing pinned moves**, and that is structural rather than lucky: every
+committed baseline in this repo is `Tier::Floor` by construction, and `Floor`'s
+live ceiling **is** its anchor, so its allocation does not move at all. `golden`,
+`attractor_trails` and `composite` all ran unblessed and green.
+
+**A fix was attempted and reverted.** Giving `z` its own stream
+(`SEED_Z`) makes the scatter index-pure and count-independent — and moves a
+committed golden baseline, which is this phase's own stop condition. Reverted; the
+mechanism and the trap are now on `seed`'s doc comment, and the residual coupling
+is that **the ceiling constant is an input to every `Rich` attractor picture**, so
+re-measuring it re-renders them.
+
+**Phase 6 was overtaken.** design-backlog 0130 was closed 2026-09-01 by
+[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4 — `98977ff
+docs(metrics): boundary_density names the capture it is bound to` — a week after
+this plan was written. The plan header's `Closes: design-backlog 0130` is stale.
+See that phase's own row for what was left to do.
 
 ### Close triggers
 

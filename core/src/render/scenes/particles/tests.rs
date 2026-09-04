@@ -1104,6 +1104,10 @@ impl Harness {
             &ctx.device,
             crate::render::COMPOSITE_FORMAT,
             TEST_PARTICLES,
+            // Anchor and ceiling alike: this harness renders at 64x64, so the
+            // density law resolves the anchor whatever the ceiling is, and a
+            // ceiling equal to it keeps the allocation exactly TEST_PARTICLES.
+            TEST_PARTICLES,
             TierConfig::FLOOR.attractor_trail_cap,
         );
         scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
@@ -3493,4 +3497,280 @@ fn the_swept_pairs_report_whether_they_have_a_walk() {
         built > 0,
         "no swept pair produced a walk, so the mechanism has nothing to gate"
     );
+}
+
+// -----------------------------------------------------------------------
+// The sample budget is a density against the render target (ADR-0140)
+// -----------------------------------------------------------------------
+
+/// The anchor these tests use. Small for the same reason [`TEST_PARTICLES`] is:
+/// the properties here are about *how many* are dispatched and *how much light*
+/// lands, not about the figure, and a WARP dispatch of 150 000 buys neither.
+const LAW_ANCHOR: u32 = 4_096;
+/// The ceiling they allocate at — comfortably above every budget the sizes below
+/// resolve, so the clamp under test is the law's and not the allocation's.
+const LAW_CEILING: u32 = 65_536;
+/// A trail cap small enough that a WARP field stays cheap. Chosen so the two
+/// sizes in [`a_resize_moves_the_budget_and_rebuilds_no_particle_buffer`]
+/// resolve **different** grids, and so the two in
+/// [`total_light_is_invariant_across_resolved_budgets`] resolve the **same** one.
+const LAW_TRAIL_CAP: (u32, u32) = (1024, 1024);
+/// The cap [`total_light_is_invariant_across_resolved_budgets`] uses. Smaller
+/// again, because that test's cost is WARP fill over the grid and it needs the
+/// grid to be *equal* across its two sizes rather than to change: every target
+/// wider than 256 lands on 256x256 here.
+const LIGHT_TRAIL_CAP: (u32, u32) = (256, 256);
+
+/// A scene built against the density law, at `trail_cap`, with no target size set
+/// yet. `None` on a runner with no GPU adapter (ADR-0016).
+fn law_scene(trail_cap: (u32, u32)) -> Option<(RenderContext, AttractorScene, wgpu::TextureView)> {
+    let ctx = match RenderContext::new_headless(64, 64, true) {
+        Ok(ctx) => ctx,
+        Err(crate::render::RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+    let mut scene = AttractorScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        LAW_ANCHOR,
+        LAW_CEILING,
+        trail_cap,
+    );
+    scene.configure(&crate::render::scenes::lines::GeneratorConfig::Particles {
+        family: AttractorFamily::DeJong,
+        density: 1.0,
+        morph_to: None,
+        tuple_path: None,
+    });
+    let target = ctx
+        .device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("attractor-law-target"),
+            size: wgpu::Extent3d {
+                width: 64,
+                height: 64,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: crate::render::COMPOSITE_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
+        .create_view(&wgpu::TextureViewDescriptor::default());
+    Some((ctx, scene, target))
+}
+
+/// Advance and render `frames` frames of `scene` at the fixed capture `dt`.
+fn law_run(
+    ctx: &RenderContext,
+    scene: &mut AttractorScene,
+    target: &wgpu::TextureView,
+    frames: u32,
+) {
+    for _ in 0..frames {
+        scene.advance(FIXED_STEP);
+        scene.update(&AnalysisFrame::default());
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        scene.render(&ctx.queue, &mut encoder, target, 1.0);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+/// **A resize moves the budget and rebuilds no particle buffer** (ADR-0140).
+///
+/// Asserted where it can fail rather than by reading the code, and the tail is
+/// what does it: the particles past the *new* active count still hold their
+/// seeded positions bit for bit. A buffer reallocated to the new budget, or a
+/// scene rebuilt on the size change, both re-seed — and both fail here. The
+/// grid is deliberately made to change across the same resize (1024 cap, 480x270
+/// against 960x540), so this is "the field rebuilds and the buffer does not"
+/// and not "nothing happened at all".
+#[test]
+fn a_resize_moves_the_budget_and_rebuilds_no_particle_buffer() {
+    let Some((ctx, mut scene, target)) = law_scene(LAW_TRAIL_CAP) else {
+        return;
+    };
+    let seeded: Vec<[f32; 3]> = scene.seed_particles.iter().map(|p| p.pos).collect();
+    assert_eq!(
+        seeded.len(),
+        LAW_CEILING as usize,
+        "the scatter is sized at the ceiling"
+    );
+
+    // A small target: under the reference, so the law's lower clamp resolves the
+    // anchor and this is exactly what a capture draws today.
+    scene.set_target_size(480, 270);
+    assert_eq!(scene.budget, LAW_ANCHOR);
+    assert_eq!(scene.active_count, LAW_ANCHOR);
+    law_run(&ctx, &mut scene, &target, CONVERGE_FRAMES);
+    let small_grid = (scene.trail_w, scene.trail_h);
+    let buffer_bytes = scene
+        .res
+        .as_ref()
+        .expect("the first render builds the resources")
+        .pipelines
+        .particles
+        .size();
+
+    // A larger target: 518 400 px against a 230 400 reference is 2.25x, so the
+    // budget is 2.25x the anchor and the grid moves with it.
+    scene.set_target_size(960, 540);
+    assert_eq!(
+        scene.budget, 9_216,
+        "480x270 -> 960x540 is 2.25x the pixels"
+    );
+    assert_eq!(
+        scene.active_count, 9_216,
+        "density 1.0 draws the whole budget"
+    );
+    law_run(&ctx, &mut scene, &target, 4);
+
+    assert_ne!(
+        (scene.trail_w, scene.trail_h),
+        small_grid,
+        "the grid must change across this resize, or the buffer's survival proves nothing"
+    );
+    assert_eq!(
+        scene.particle_count, LAW_CEILING,
+        "the allocation is the ceiling and a resize does not move it"
+    );
+    assert_eq!(
+        scene
+            .res
+            .as_ref()
+            .expect("resources")
+            .pipelines
+            .particles
+            .size(),
+        buffer_bytes,
+        "the particle buffer was reallocated across the resize"
+    );
+    assert_eq!(
+        scene.seed_particles.len(),
+        LAW_CEILING as usize,
+        "the CPU scatter was rebuilt across the resize"
+    );
+
+    // The tail past the NEW active count is untouched, bit for bit - so nothing
+    // re-seeded the buffer and nothing dispatched over the whole allocation.
+    let after = law_run_positions(&ctx, &scene);
+    let active = scene.active_count as usize;
+    for (i, (now, seed)) in after.iter().zip(seeded.iter()).enumerate().skip(active) {
+        assert_eq!(
+            now, seed,
+            "particle {i} is past the active count {active} but moved from its seed"
+        );
+    }
+    // Non-vacuity, on the band the resize newly activated: those particles were
+    // inert before it and have moved since, which is the budget actually rising.
+    let woken = after
+        .iter()
+        .zip(seeded.iter())
+        .take(active)
+        .skip(LAW_ANCHOR as usize)
+        .filter(|(now, seed)| now != seed)
+        .count();
+    let band = active - LAW_ANCHOR as usize;
+    assert!(
+        woken * 2 > band,
+        "only {woken} of the {band} particles the resize activated have moved - the budget did not rise"
+    );
+}
+
+/// Read every particle back off the GPU. The [`Harness`] method by another name,
+/// spelled out here because these tests drive a scene the harness does not build.
+fn law_run_positions(ctx: &RenderContext, scene: &AttractorScene) -> Vec<[f32; 3]> {
+    scene
+        .read_particles(&ctx.queue)
+        .expect("the scene has rendered, so the resources exist")
+        .into_iter()
+        .map(|p| p.pos)
+        .collect()
+}
+
+/// **Total light is invariant across resolved budgets** — the property that makes
+/// "more samples" mean *less shot noise* rather than *a brighter figure*
+/// (ADR-0065, now across the target as well as across `density`).
+///
+/// Measured in the accumulation itself and not in the composite: everything
+/// downstream of the field runs the tonemap, so two equally bright *pictures*
+/// would not be evidence that the light is equal. The two sizes are chosen to
+/// resolve the **same** trail grid (every target wider than the 256 cap lands
+/// on 256x256), so the sum below is
+/// over the same texel count and the only difference is how many particles
+/// deposited into it. The smaller is 230 400 px exactly - the reference - so it
+/// resolves the anchor and the pair is "today's count" against "four times it".
+#[test]
+fn total_light_is_invariant_across_resolved_budgets() {
+    /// The two sizes deposit a 4x-different sample count into one grid, and
+    /// f16 rounding plus the attractor's own frame-to-frame wander move the sum
+    /// by a few percent. Phase 1 measured 6.6 % across an 18x range at 1080p;
+    /// this is the same claim with room for a software rasterizer.
+    const TOLERANCE: f64 = 0.15;
+    /// Enough for the trail to reach its steady state under `fade`, and no more
+    /// — the 4x arm dispatches 16 384 particles a frame on a WARP runner, which
+    /// is what sets this test's cost.
+    const LIGHT_FRAMES: u32 = 40;
+
+    /// `(grid, active_count, total light)` for one target size. `None` on a
+    /// runner with no GPU adapter (ADR-0016).
+    fn arm(w: u32, h: u32, frames: u32) -> Option<((u32, u32), u32, f64)> {
+        let (ctx, mut scene, target) = law_scene(LIGHT_TRAIL_CAP)?;
+        scene.set_target_size(w, h);
+        law_run(&ctx, &mut scene, &target, frames);
+        let light = field_light(&ctx, &scene);
+        Some(((scene.trail_w, scene.trail_h), scene.active_count, light))
+    }
+
+    let Some((small_grid, small_budget, a)) = arm(960, 240, LIGHT_FRAMES) else {
+        return;
+    };
+    let Some((large_grid, large_budget, b)) = arm(1920, 480, LIGHT_FRAMES) else {
+        return;
+    };
+
+    assert_eq!(
+        small_grid, large_grid,
+        "the two sizes must share a grid, or the sums are not comparable"
+    );
+    assert_eq!(small_budget, LAW_ANCHOR);
+    assert_eq!(large_budget, LAW_ANCHOR * 4, "1920x480 is 4x 960x240");
+
+    assert!(a > 0.0, "the smaller budget deposited no light at all");
+    assert!(
+        (b - a).abs() <= TOLERANCE * a,
+        "{large_budget} particles deposited {b} against {a} from {small_budget} -          a {:.1} % move, past the {:.0} % the normalization allows",
+        100.0 * (b - a) / a,
+        100.0 * TOLERANCE
+    );
+}
+
+/// The sum of the accumulation's RGB over every texel, in linear light.
+fn field_light(ctx: &RenderContext, scene: &AttractorScene) -> f64 {
+    use crate::render::capture;
+    let (w, h) = (scene.trail_w, scene.trail_h);
+    let field = scene
+        .field_texture()
+        .expect("the scene has rendered, so the field exists")
+        .clone();
+    let (readback, padded_bpr) = capture::create_linear_readback(&ctx.device, w, h);
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    capture::record_copy(&mut encoder, &field, &readback, padded_bpr, w, h);
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+    let texels = capture::read_back_linear(&ctx.device, &readback, w, h, padded_bpr)
+        .expect("the field reads back");
+    texels
+        .chunks_exact(4)
+        .flat_map(|rgba| rgba.iter().take(3))
+        .map(|c| f64::from(*c))
+        .sum()
 }
