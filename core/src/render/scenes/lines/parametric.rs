@@ -432,18 +432,13 @@ impl Scene for ParametricCurveScene {
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
-        // A curve preset records its family here (off the hot path). Later
-        // phases' generator config variants are for the generator scenes; this
-        // match gains ignore-arms for them when they land.
-        match cfg {
-            GeneratorConfig::Curve { family } => self.family = *family,
-            // Other scenes' configs (L-system, star, particle attractor,
-            // spectrum readout).
-            GeneratorConfig::LSystem { .. }
-            | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::Spectrum { .. }
-            | GeneratorConfig::WarpMesh { .. } => {}
+        // A curve preset records its family here (off the hot path). Every other
+        // variant belongs to a sibling scene and is not named: matching only
+        // this one is what keeps a new variant from editing four scenes that do
+        // not use it, and `GeneratorConfig::element_count` is the one place that
+        // still has to acknowledge every variant.
+        if let GeneratorConfig::Curve { family } = cfg {
+            self.family = *family;
         }
         // No load-time truncation: the parametric sampler builds nothing here.
         // Its only cap is a per-frame `samples` clamp in `update` (see there).

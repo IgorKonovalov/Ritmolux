@@ -45,7 +45,7 @@ the halving happened *with* it. Two levers are visible in the diff and **neither
 the console swapchain asks for `desired_maximum_frame_latency = 1`, so its `get_current_texture`
 waits for its own previous present to retire — one vblank — while the output's present waits for
 another; and `present_console` runs synchronously in the display loop on every frame with no
-decimation. Two comments state the property the measurement denies: `standalone/src/main.rs` says
+decimation. Two comments state the property the measurement denies: `standalone/src/app_state.rs` says
 the console *"must not delay the frame it reports on"* (being after *this* frame's present does not
 stop it delaying the next one), and `core/src/render/aux_target.rs` says a stalling console *"cannot
 alter what the show displays"*. What actually holds is narrower: the show's **pixels** are
@@ -148,7 +148,7 @@ flowchart TB
   distinguishable verdicts about different subjects — one about an activation, one about a device.
   **The mechanism halves of 0154 (retry-in-place, a long-lived enumerator) are explicitly not taken
   here**; the entry stays live for them.
-- **Files touched:** `standalone/src/capture_win.rs`, `standalone/src/main.rs` (the verdict string
+- **Files touched:** `standalone/src/capture_win.rs`, `standalone/src/app_state.rs` (the verdict string
   and whatever renders it).
 - **Done when:** an activation failure and an endpoint loss produce verdicts that a reader can tell
   apart without knowing the `HRESULT`, asserted by a test that constructs both and compares the two
@@ -162,7 +162,7 @@ flowchart TB
   can measure four arms in one window. Defaults are **unchanged** in this phase — a run with no new
   setting is byte-identical and cadence-identical to today, so Phase 4's baseline arm is the shipped
   build.
-- **Files touched:** `core/src/render/aux_target.rs`, `standalone/src/main.rs`, the console config
+- **Files touched:** `core/src/render/aux_target.rs`, `standalone/src/app_state.rs`, the console config
   block.
 - **Done when:** a run can select frame latency 1 or 2 and console present cadence every-frame or
   every-Nth, in any of the four combinations; the default combination is (1, every-frame); and a
@@ -192,7 +192,7 @@ flowchart TB
 - **Owner skill:** dev
 - **What:** set the console defaults to whatever Phase 4 established, and replace the two false
   comments with the property that survives.
-- **Files touched:** `core/src/render/aux_target.rs`, `standalone/src/main.rs`,
+- **Files touched:** `core/src/render/aux_target.rs`, `standalone/src/app_state.rs`,
   `docs/adrs/0143-*.md` (an `Outcome` section, dated — never an edit to the body),
   `docs/on-device-validation.md`.
 - **Done when:**

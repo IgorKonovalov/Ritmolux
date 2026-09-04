@@ -205,7 +205,7 @@ impl RecoveryPolicy {
 
 - **Phase 1 is a behavior change on the startup path, and `main.rs` is contended.**
   [Plan 0131](0131-the-operator-gets-a-console.md) is being built directly on `main` inside this
-  file and [Plan 0126](../0126-the-large-files-split-along-their-seams.md) Phase 7 splits it. Sequence
+  file and [Plan 0126](0126-the-large-files-split-along-their-seams.md) Phase 7 splits it. Sequence
   this behind 0126 if both are live, or expect a merge. The roster is additive and localized, which
   is the mitigation.
 - **A hard exit will surface stale flags in the user's own shortcuts** on the first run after the

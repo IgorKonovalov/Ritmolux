@@ -89,9 +89,19 @@ $libs = @(
     "shell32.lib"
 )
 $libArgs = ($libs | ForEach-Object { "`"$_`"" }) -join " "
+# The component's own sources. A LIST rather than one file: the shim is four
+# translation units - component metadata plus service registration, the session,
+# the preset roster, the host window - and a new one is added here.
+$sources = @(
+    "foo_ritmolux.cpp",
+    "viz_session.cpp",
+    "presets.cpp",
+    "host_window.cpp"
+)
+$srcArgs = ($sources | ForEach-Object { "`"$root\$_`"" }) -join " "
 $cl = "cl /nologo /std:c++17 /EHsc /MD /O2 /W3 /DNDEBUG /DUNICODE /D_UNICODE " +
     "/I `"$sdk`" /I `"$sdk\foobar2000`" /I `"$repo\core-cabi\include`" /I `"$build`" " +
-    "/Fo`"$build\\`" `"$root\foo_ritmolux.cpp`" " +
+    "/I `"$root`" /Fo`"$build\\`" $srcArgs " +
     "/link /DLL /OUT:`"$build\foo_ritmolux.dll`" $libArgs"
 cmd /c "`"$vcvars`" >nul && $cl"
 if ($LASTEXITCODE -ne 0) { throw "cl failed" }

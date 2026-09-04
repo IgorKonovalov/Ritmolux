@@ -86,8 +86,7 @@ impl Renderer {
             frame,
             &mut encoder,
             preview.as_ref().map_or(&view, |p| &p.view),
-            width,
-            height,
+            (width, height),
             scenes::FALLBACK_DT,
             SaltMode::Pinned,
         );
@@ -144,8 +143,7 @@ impl Renderer {
             frame,
             &mut encoder,
             &view,
-            width,
-            height,
+            (width, height),
             scenes::FALLBACK_DT,
             SaltMode::Pinned,
         );
@@ -206,8 +204,7 @@ impl Renderer {
                 frame,
                 &mut encoder,
                 &view,
-                width,
-                height,
+                (width, height),
                 scenes::FALLBACK_DT,
                 SaltMode::Pinned,
             );
@@ -303,8 +300,7 @@ impl Renderer {
                 frame,
                 &mut encoder,
                 &view,
-                width,
-                height,
+                (width, height),
                 scenes::FALLBACK_DT,
                 SaltMode::Pinned,
             );
@@ -395,8 +391,7 @@ impl Renderer {
                 &frame,
                 &mut encoder,
                 &view,
-                width,
-                height,
+                (width, height),
                 dt,
                 SaltMode::Pinned,
             );
@@ -539,8 +534,7 @@ impl Renderer {
                     &analysis,
                     &mut encoder,
                     &view,
-                    width,
-                    height,
+                    (width, height),
                     scenes::FALLBACK_DT,
                     SaltMode::Pinned,
                 );
@@ -609,8 +603,7 @@ impl Renderer {
             frame,
             &mut encoder,
             view,
-            width,
-            height,
+            (width, height),
             dt,
             SaltMode::Pinned,
         );
@@ -706,8 +699,7 @@ impl Renderer {
             frame,
             &mut encoder,
             &tap.view,
-            width,
-            height,
+            (width, height),
             dt,
             SaltMode::Live,
         );

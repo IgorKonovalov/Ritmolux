@@ -162,6 +162,103 @@ hand-edited.
 
 ## Recently closed (full entries)
 
+- [0126 — The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md)
+  — closed 2026-09-03. Eight `dev` phases in the `WORK/rlx-plan-0126` lane, `0d50935`..`463cf2d`
+  plus `cb49877` (Phase 7 was taken after Phase 8, out of plan order). 68 files, +15,038 / -12,935.
+  Version: **0.103.1** (patch) — eight refactor commits, no feature, and the two behavioural changes
+  that rode along are invisible from outside. Review: **no blockers, no majors against the code; one
+  major doc-freshness repair, five minors.**
+
+  **The suite was verified independently, not read off the log.** ADR-0156 defers the nine GPU
+  suites to once per plan, so the close block's `Full suite` bullet is the only record they ever ran
+  against the finished tree. `cargo nextest run --workspace` re-run at the close: **1520 passed, 5
+  skipped, exit 0**, matching the claim exactly. `fmt` clean, `clippy --workspace --all-targets`
+  zero warnings, all five Node gates exit 0.
+
+  **Every numeric done-when was re-measured at the line**, and every one held: `render/mod.rs`
+  1,186 (< 1,200), `draw_frame` 199 (< 200), zero `#[allow(too_many_arguments)]`, `build_rings` 38
+  (< 100), `main.rs` 37 (< 700), `AppState` 14 direct fields (< 15), `wnd_proc` 100 (< 120), both
+  Phase 6 greps clean, `RLX_ABI_VERSION` 6 on both sides with a byte-identical header and the same
+  15 `extern "C"` functions. **The two done-whens `dev` reported by silence were checked rather than
+  assumed** — `--help` is byte-identical (the `FLAGS` table and `help_text()` diff clean against the
+  pre-split `main.rs`, differing only by `pub(crate)`), and all ten README Controls rows still
+  dispatch in `input.rs`.
+
+  **One done-when is unmet, and the defect is the plan's, not the implementation's.** Phase 1 asked
+  that *"no fn in `warp_mesh/` exceeds 150 lines"*; `shader.rs::build` is 331,
+  `draw.rs::waveform_figure` 222 and `shader.rs::build_blur` 161. Neither file is in that phase's
+  `Files touched` — the plan wrote a **directory-wide** bound over a **file-scoped** scope list, and
+  splitting the converted-shader runtime would change allocation order the phase's own golden gate
+  exists to hold still. `dev` disclosed it and declined to widen the phase, which was right.
+  Everything in the four new files plus `mod.rs` comes in at 115 or below.
+
+  **The plan was wrong about `variant_roster_reminder`, and the implementation caught it.** Phase 3
+  said to delete it because *"the array length is the reminder"*. It is not: an enum has no length,
+  and the retired item's **exhaustive match** was the only thing making a new variant fail the
+  build. `dev` replaced rather than deleted, with `SystemKind::row` — one exhaustive match returning
+  a variant's index into `TABLE` — plus a `const _: ()` block asserting every row sits at its own
+  variant's index, verified by a scratch 13th variant that fails at `system.rs:144`. The five
+  parallel rosters are down to one table and one index match. This is stronger than what was asked
+  for.
+
+  **Phase 6 asked for something the same plan forbids, and the disclosure is the valuable part.** It
+  said to key the extent diagnostic *"to the `Renderer` rather than a `thread_local!`"*; the
+  measurement happens inside `LineRenderer::draw`, reached through an `Rc<RefCell<..>>` owned by the
+  scene registry, so there is no `&mut` path from the `Renderer` without a new `Scene` trait
+  parameter — and *"Does not change the `Scene` trait"* is in this plan's own **What this plan does
+  NOT do**. `dev` moved the diagnostic's **home** to `render::metrics` without changing its
+  mechanism, which discharges what the finding actually objected to (a `thread_local!` five modules
+  deep in a scene, and a shell reaching `rlx_core::render::scenes::lines::renderer::` to read it).
+  The residue is a followup: the **write** half (`record_draw_extent`, `extent_diagnostic_on`) came
+  out `pub` where `pub(crate)` is correct — each has exactly one caller, inside `core` — so a move
+  meant to narrow that surface widened it on one side.
+
+  **Phase 8's on-device run earned its place.** The plan asked for the plugin's diagnostics-log
+  handle to be opened once and kept, and did not price that the CRT's `fopen` in append mode opens
+  **exclusive** on Windows. Held for a session rather than for one write, that locked every other
+  reader out of `plugin-diagnostics.log` for as long as the visualisation ran — exactly when someone
+  tails it, and exactly what `on-device-validation.md`'s diagnostics steps assume they can do. It
+  uses `_wfsopen` with `_SH_DENYWR` now, confirmed readable while the session holds it, and the
+  per-write `fclose` became `fflush` so a crash mid-show still leaves its samples on disk. **This is
+  what a done-when that names a real device is for**: nothing in CI could have seen it.
+
+  **The plan sized Phase 7 against a file that had tripled under it.** It assumed a 1,692-line
+  `main.rs`, a 28-field `AppState` and a 7-arg constructor; the lane held 4,525, 43 and 11, because
+  Plans 0135, 0115 and 0131 all closed onto `main.rs` first. The five modules the plan names would
+  have left `main.rs` at ~2,050 against an under-700 bar, so two files it does not name —
+  `app_state.rs` and `run.rs` — were added on the user's authorization. `main.rs` is 37 lines. The
+  cost is a followup: `app_state.rs` is 1,491 lines and `run::run` 266, past the 1,200 and 200 bars
+  Phase 2 held `render/mod.rs` and `draw_frame` to, with no done-when covering either.
+
+  **What the close had to repair.** Three **active** plans and one live backlog entry cited
+  `standalone/src/main.rs` at paths this split invalidated — 0120 named `main.rs:191` and
+  `main.rs:1220` (both now `capture_start.rs`), 0133 and 0147 named it in **Files touched** (now
+  `app_state.rs`, plus `cli.rs` for the flag half), and design-backlog 0164's prose named it for the
+  console-present comment (now `app_state.rs:907`). `dev` flagged 0120 and 0133 and correctly left
+  them — editing a claim is not its call — and did not catch 0147. A plan's `Files touched` pointing
+  at a 37-line file sends the next session to the wrong place. ADR citations of old line numbers
+  were **left alone**: an accepted ADR is a record of what was true when it was written.
+
+  **What the split did not cost.** No new dependencies in any manifest. The `Scene` trait is
+  untouched, the C ABI is untouched, and all five new `render/` submodules are private `mod` — the
+  largest split in the plan added **zero** public surface. The one genuine public widening is
+  `pub use wgpu` in `core/src/lib.rs`, which follows from this plan's own
+  `new_from_surface_target(SurfaceTargetUnsafe, ...)` signature and version-locks `core-cabi`
+  structurally instead of by manifest promise; the unrecorded consequence — a `wgpu` bump is now a
+  breaking change to `core`'s public API — is a followup on the ADR-0072 lineage, not a new ADR.
+
+  **Two tests worth keeping as models.** `the_wgsl_kind_chain_matches_the_roster` parses the
+  `if (kind < N.5)` thresholds **out of the shipped WGSL** rather than restating them, so the two
+  spellings of the kind table cannot drift; `dev` proved it non-vacuous by breaking `4.5` to `4.6`.
+  And Phase 4's scratch-variant experiment found a new `GeneratorConfig` variant fails to compile at
+  **exactly one site in exactly one file** — `element_count`'s exhaustive match — which is one
+  better than the done-when allowed, with the acknowledge-a-new-variant policy preserved whole.
+
+  **Curation: not triggered.** `git diff --stat main...HEAD -- presets/` is empty across all eight
+  phases, and the plan fixed no engine defect a preset could have been written around — the two
+  behavioural changes were a compile-time roster guard and a plugin file share mode.
+
+
 ### [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md)
 — closed 2026-09-02. Nine phases (seven `dev`, two `human`) on `main` directly with no worktree,
 `c093dc7`..`688ae88`. Version: **0.103.0** (minor) — the binary, the component, the release zips,
@@ -6545,7 +6642,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: done/0124-the-review-fixes-that-move-no-pixels.md
 [0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
-[0126]: 0126-the-large-files-split-along-their-seams.md
+[0126]: done/0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 [0046]: done/0046-transformed-feedback.md

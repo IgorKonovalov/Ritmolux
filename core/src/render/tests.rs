@@ -1683,8 +1683,7 @@ fn drawn_calls(renderer: &mut Renderer, name: &str) -> u32 {
         &AnalysisFrame::default(),
         &mut encoder,
         &view,
-        width,
-        height,
+        (width, height),
         super::scenes::FALLBACK_DT,
         super::SaltMode::Pinned,
     );
@@ -1789,7 +1788,7 @@ fn an_under_layer_is_one_draw_and_a_layerless_preset_is_unchanged() {
 
 /// **The shim's window keeps asking for the adapter it always asked for.**
 ///
-/// `new_from_win32_hwnd` builds its context from `RendererOptions::default()`,
+/// `new_from_surface_target` builds its context from `RendererOptions::default()`,
 /// so this field's default *is* the C ABI path's adapter request. A change to
 /// it would move which GPU every foobar2000 window renders on, silently and
 /// without an ABI bump, which is the one thing widening this struct must not do

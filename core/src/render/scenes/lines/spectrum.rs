@@ -690,24 +690,19 @@ impl Scene for SpectrumScene {
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
-        // Exhaustive with no wildcard, like the sibling line scenes: a new config
-        // variant has to be acknowledged here rather than silently ignored.
-        match cfg {
-            GeneratorConfig::Spectrum {
-                elements,
-                layout,
-                easing,
-            } => {
-                self.layout = *layout;
-                self.easing = *easing;
-                self.resize(*elements);
-            }
-            // Other scenes' configs (curve, L-system, star, particle attractor).
-            GeneratorConfig::Curve { .. }
-            | GeneratorConfig::LSystem { .. }
-            | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::WarpMesh { .. } => {}
+        // This scene's own variant and no other. A new variant has to be
+        // acknowledged in exactly one place -- `GeneratorConfig::element_count`,
+        // which is exhaustive and must answer for every variant -- rather than
+        // in every scene that does not consume it.
+        if let GeneratorConfig::Spectrum {
+            elements,
+            layout,
+            easing,
+        } = cfg
+        {
+            self.layout = *layout;
+            self.easing = *easing;
+            self.resize(*elements);
         }
         // Nothing is built here — the element count is validated at load and is
         // orders of magnitude under the segment cap — so nothing truncates.

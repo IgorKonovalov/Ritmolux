@@ -1397,7 +1397,7 @@ fn declared_params_match_set_param() {
             SystemKind::LSystem.param_names(),
         ),
         (
-            src.join("render/scenes/lines/star.rs"),
+            src.join("render/scenes/lines/star/mod.rs"),
             SystemKind::StarPattern.param_names(),
         ),
         (

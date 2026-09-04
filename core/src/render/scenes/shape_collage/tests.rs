@@ -23,11 +23,11 @@
 
 use super::layout::{self, Grammar, Recipe};
 use super::{
-    ALL_KINDS, AUTHORED_COUNT, DEFAULT_ANGLE_BIAS, DEFAULT_APERTURE, DEFAULT_CHECKER_CELLS,
-    DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, DEFAULT_SEED, Element, KIND_CIRCLE, KIND_QUAD,
+    AUTHORED_COUNT, DEFAULT_ANGLE_BIAS, DEFAULT_APERTURE, DEFAULT_CHECKER_CELLS,
+    DEFAULT_EDGE_SOFTNESS, DEFAULT_SCALE, DEFAULT_SEED, Element, KIND_CIRCLE, KIND_QUAD, Kind,
     MAX_EDGE_SOFTNESS, MAX_SCALE, MAX_SEED, MIN_SCALE, PARAMS, SUPREMATIST, ShapeCollageScene,
     Spec, applied_angle_bias, applied_count, applied_edge_softness, applied_scale, applied_seed,
-    checker_cells, kind_name,
+    checker_cells,
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
@@ -321,7 +321,7 @@ fn the_element_builder_allocates_nothing() {
 
     let before = alloc_count();
     let mut sink = 0.0f32;
-    for kind in ALL_KINDS {
+    for kind in Kind::ALL.map(Kind::as_f32) {
         // Angles chosen to exercise the sector arm's cardinal-touch branch on
         // both sides of its span, which is where the candidate count peaks.
         for angle_deg in [0.0f32, 31.0, -67.0, 118.0, 179.0] {
@@ -973,7 +973,7 @@ fn every_kind_is_contained_by_its_own_bounding_box() {
         return;
     };
 
-    for kind in ALL_KINDS {
+    for kind in Kind::ALL.map(Kind::as_f32) {
         for angle_deg in [0.0f32, 31.0, -67.0] {
             let spec = Spec {
                 angle_deg,
@@ -998,7 +998,7 @@ fn every_kind_is_contained_by_its_own_bounding_box() {
                     }
                 }
             }
-            let name = kind_name(kind);
+            let name = Kind::from_f32(kind).name();
             assert!(
                 drawn > 200,
                 "{name} at {angle_deg} deg drew {drawn} pixels — it is not on screen, \
@@ -1158,4 +1158,51 @@ fn a_circle_element_is_round_at_sixteen_by_ten() {
              render target distorts it by exactly the target's own aspect."
         );
     }
+}
+
+/// Every kind round-trips its own number, and the painter reads that number the
+/// same way this side does.
+///
+/// **The second half is the one that matters.** `Kind::as_f32` and `sdf.rs`'s
+/// `if (kind < N.5)` chain are two spellings of one table, and when they
+/// disagreed the symptom was not a compile error but an element drawn as the
+/// wrong shape — a `ring` boxed as a `bar`, with the box clipping it. Nothing
+/// links the two but this test, so it reads the thresholds out of the shipped
+/// WGSL rather than restating them.
+#[test]
+fn the_wgsl_kind_chain_matches_the_roster() {
+    for kind in Kind::ALL {
+        assert_eq!(
+            Kind::from_f32(kind.as_f32()),
+            kind,
+            "{} does not round-trip as_f32 -> from_f32",
+            kind.name()
+        );
+    }
+
+    // The chain's thresholds, in source order: `kind < 0.5`, `kind < 1.5`, ...
+    let wgsl = super::sdf::wgsl();
+    let thresholds: Vec<f32> = wgsl
+        .lines()
+        .filter_map(|line| {
+            let rest = line.trim().strip_prefix("if (kind < ")?;
+            let (value, _) = rest.split_once(')')?;
+            value.parse::<f32>().ok()
+        })
+        .collect();
+
+    // One threshold per boundary between consecutive kinds: eight kinds, seven
+    // boundaries, and the last kind is the chain's unguarded tail.
+    let expected: Vec<f32> = Kind::ALL
+        .iter()
+        .take(Kind::ALL.len() - 1)
+        .map(|k| k.as_f32() + 0.5)
+        .collect();
+    assert_eq!(
+        thresholds, expected,
+        "sdf.rs's kind chain and Kind::as_f32 have drifted: the painter would \
+         draw at least one element as another kind's shape, and the bounding box \
+         built on this side would clip it. Chain reads {thresholds:?}, roster \
+         wants {expected:?}"
+    );
 }

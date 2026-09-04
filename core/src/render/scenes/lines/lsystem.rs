@@ -357,21 +357,20 @@ impl Scene for LSystemScene {
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<CapOverflow> {
-        // Build + cache the grammar's geometry off the hot path. Other config
-        // variants belong to sibling line scenes and are ignored.
-        match cfg {
-            GeneratorConfig::LSystem {
-                axiom,
-                rules,
-                angle_deg,
-                max_depth,
-                seed: _,
-            } => self.build(axiom, rules, *angle_deg, *max_depth),
-            GeneratorConfig::Curve { .. }
-            | GeneratorConfig::Star { .. }
-            | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::Spectrum { .. }
-            | GeneratorConfig::WarpMesh { .. } => {}
+        // Build + cache the grammar's geometry off the hot path. Every other
+        // variant belongs to a sibling scene: matching only this one is what
+        // keeps a new variant from editing four scenes that do not use it, and
+        // `GeneratorConfig::element_count` is the one place that still has to
+        // acknowledge every variant.
+        if let GeneratorConfig::LSystem {
+            axiom,
+            rules,
+            angle_deg,
+            max_depth,
+            seed: _,
+        } = cfg
+        {
+            self.build(axiom, rules, *angle_deg, *max_depth);
         }
         // Surface a cap truncation so the frontend can report it — never a
         // silent cut (ADR-0007). `None` when every depth fit (the norm).

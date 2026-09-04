@@ -20,6 +20,7 @@
 )]
 
 use crate::render::gpu;
+use crate::render::metrics::{self, DrawExtent};
 
 /// The sharpest corner a miter is drawn for, as a multiple of the half-width
 /// the miter would reach (ADR-0158).
@@ -656,93 +657,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color * g * u.v.y, g);
 }
 "#;
-
-// ---------------------------------------------------------------------------
-// The in-frame geometry diagnostic (Plan 0069, ADR-0083)
-// ---------------------------------------------------------------------------
-
-/// How much of the drawn segment length landed inside the render target, summed
-/// over one [`LineRenderer::draw`] call (Plan 0069, ADR-0083).
-///
-/// Pixel coverage cannot see an over-scaled figure: a comb roots every bar on a
-/// shared baseline and a corona roots every spoke at a centre, so clipping the
-/// tips costs a rounding error of lit pixels and the statistic goes the *wrong
-/// way*. Length does see it — a bar that overshoots loses in-frame length in
-/// exact proportion to the overshoot.
-///
-/// **Length, not area.** The stroke's width and the ADR-0041 join extensions are
-/// not counted, so a thick stroke leaving the frame is under-counted. That is
-/// the right measure for *overshoot* and a poor one for anything else.
-///
-/// **Arcs count too** (Plan 0087 Phase 2). An [`ArcInstance`] contributes its
-/// own arc length, `|sweep| * radius`, to both sums. This is a correctness
-/// obligation of the arc primitive rather than a feature: an arc contributing
-/// nothing would shrink the denominator, and every arc-drawing preset would
-/// read better-framed than it is — the more so as the primitive replaces whole
-/// motifs, where the missing length is most of the figure.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct DrawExtent {
-    /// World-space length of every segment actually drawn (post view transform).
-    pub total_len: f32,
-    /// The share of that length lying inside `[-aspect, aspect] x [-1, 1]`.
-    pub in_frame_len: f32,
-}
-
-impl DrawExtent {
-    /// The in-frame fraction — exactly `1.0` when nothing was clipped, exactly
-    /// `0.0` when the whole figure is outside.
-    ///
-    /// `None` when nothing was drawn at all: that is a `0/0`, and inventing a
-    /// number for it is what made Plan 0058's table print `inf`. "Nothing drawn"
-    /// is the *total* case and `core/tests/sanity.rs` is its instrument, not this
-    /// one.
-    pub fn fraction(self) -> Option<f32> {
-        (self.total_len > 0.0).then(|| self.in_frame_len / self.total_len)
-    }
-}
-
-// Thread-local rather than a field on `LineRenderer`, because the four line
-// scenes reach the one shared renderer through an `Rc<RefCell<..>>` owned by the
-// scene registry and nothing outside `render` holds a handle to it — see
-// `scenes::create_all`. Thread-local rather than a global: the renderer is
-// single-threaded by construction (`Rc`), so this is the cheapest correct sink,
-// and it also keeps one test's switch out of another's capture when the harness
-// runs test threads in parallel.
-thread_local! {
-    /// Whether `draw` measures. **Off in the shipped render path** — that is the
-    /// whole of the switch, and `core/tests/geometry_extent.rs` asserts "off"
-    /// means byte-identical output.
-    static EXTENT_ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    /// The most recent measured draw, if any.
-    static LAST_EXTENT: std::cell::Cell<Option<DrawExtent>> = const { std::cell::Cell::new(None) };
-}
-
-/// Turn the in-frame geometry diagnostic on or off for **this thread**, clearing
-/// any measurement already recorded. Off by default; the shipped render path
-/// never calls this.
-pub fn set_extent_diagnostic(on: bool) {
-    EXTENT_ON.with(|flag| flag.set(on));
-    LAST_EXTENT.with(|slot| slot.set(None));
-}
-
-/// Take the extent of the **most recent** measured `draw`, leaving the slot
-/// empty. `None` when no line scene has drawn since the diagnostic was enabled
-/// (or when it is off) — distinct from a recorded draw whose
-/// [`fraction`](DrawExtent::fraction) is `None` because nothing was drawn.
-///
-/// A frame usually holds one line draw ([`scenes::shares_resources`] forbids
-/// two *roster* line scenes in a frame), and then "the most recent draw" is
-/// "this frame's figure". A preset may layer a second line scene (Plan 0076)
-/// through its own per-preset `LineRenderer`
-/// (`scenes::create_layer_scene`) — the layer draws **after** the main
-/// scene, so on a layered line-on-line preset this slot holds the *layer's*
-/// figure. The harness reads this around single-figure captures; a consumer
-/// measuring a layered preset must know which draw it is measuring.
-///
-/// [`scenes::shares_resources`]: crate::render::scenes
-pub fn take_draw_extent() -> Option<DrawExtent> {
-    LAST_EXTENT.with(|slot| slot.take())
-}
 
 /// The share of the segment `a -> b` lying inside `[-aspect, aspect] x [-1, 1]`,
 /// as a fraction of its own length: Liang-Barsky against the four edges.
@@ -1429,9 +1343,9 @@ impl LineRenderer {
         // measures against is the one this call was handed: the render target's
         // (ADR-0037), under the same `max(0.1)` clamp the uniform and the shader
         // apply, so the rectangle is the one the frame actually shows.
-        if EXTENT_ON.with(std::cell::Cell::get) {
+        if metrics::extent_diagnostic_on() {
             let extent = measure_extent(drawn, arcs_drawn, aspect.max(0.1), xform);
-            LAST_EXTENT.with(|slot| slot.set(Some(extent)));
+            metrics::record_draw_extent(extent);
         }
 
         if !drawn.is_empty() {

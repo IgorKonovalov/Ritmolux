@@ -156,900 +156,21 @@ const TRANSITION_DURATION_SECS: f32 = DEFAULT_DURATION_SECS;
 /// a few frames, and the rest of the dissolve falls back to the frozen side.
 const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 
-/// The built scenes, each paired with the [`SystemKind`] it drives — the roster
-/// [`scenes::create_all`] returns. Addressed by kind, never by position, so a
-/// scene cannot silently render in another system's slot.
-type SceneRoster = Vec<(SystemKind, Box<dyn Scene>)>;
+// The five concerns this file keeps out of the `Renderer` (Plan 0126 Phase 2).
+// `routing` answers where a name goes and which scene a system has, `roster` the
+// loaded presets and their smoothers, `evaluate` one frame's bindings,
+// `composite` one side's encode, `tier_governor` the demotion path as an
+// `impl Renderer` continuation. What stays here is the `Renderer` itself.
+mod composite;
+mod evaluate;
+mod roster;
+mod routing;
+mod tier_governor;
 
-/// The scene a preset's `system` drives, or `None` if the roster somehow lacks it
-/// (impossible: the roster is built from [`SystemKind::ALL`] by an exhaustive
-/// factory). A linear scan over seven `Copy`-enum keys, once per frame — the same
-/// cost as the `match` it replaces, so no map.
-fn scene_for(scenes: &SceneRoster, system: SystemKind) -> Option<&dyn Scene> {
-    scenes
-        .iter()
-        .find(|(kind, _)| *kind == system)
-        .map(|(_, scene)| scene.as_ref())
-}
-
-/// [`scene_for`], mutably.
-fn scene_for_mut(scenes: &mut SceneRoster, system: SystemKind) -> Option<&mut Box<dyn Scene>> {
-    scenes
-        .iter_mut()
-        .find(|(kind, _)| *kind == system)
-        .map(|(_, scene)| scene)
-}
-
-/// What one binding's evaluated value drives, resolved **once when the roster is
-/// loaded** (Plan 0031 Phase 3) so the frame loop dispatches on an enum instead of
-/// walking a chain of `set_param(&str, ..)` string matches to discover the owner.
-///
-/// The answer is fixed the moment a preset is parsed: it depends only on the
-/// param's name, the preset's system, and which composite stages exist. Adding a
-/// stage now costs a `ParamRoute` arm here, not another link in a chained `if`
-/// inside the hot loop.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ParamRoute {
-    /// The backdrop pre-pass (`bg_*`), which sits outside the chain (ADR-0031).
-    Background,
-    /// A post-composite stage, by its fixed index in the chain (ADR-0031).
-    Stage(usize),
-    /// The **composite seam** itself (`occlude`, ADR-0085) — how much of the
-    /// scene's coverage the backdrop resolves against.
-    ///
-    /// Not a [`Stage`](Self::Stage) because it belongs to no stage: it reaches
-    /// whichever stage folds onto the backdrop this frame *and*, when none does,
-    /// the scene's own present. So a preset that switches bloom off does not
-    /// thereby change how much of its sky the figure covers.
-    Composite,
-    /// The terminal engine-wide ink pass (`ink_*` / `paper_*`), outside the chain
-    /// (ADR-0032).
-    Ink,
-    /// The engine-wide exposure + tonemap pass (`exposure`), which sits between
-    /// the transition blend and ink and is the frame's linear/display boundary
-    /// (ADR-0046).
-    Tonemap,
-    /// The active scene's named-parameter surface.
-    Scene,
-    /// A `fb_*` name (ADR-0048) on a system whose scene owns an accumulation of
-    /// its own — today, only the attractor.
-    ///
-    /// **One vocabulary, two buffers.** The trails stage transforms the
-    /// accumulation every scene composites through; the attractor's internal trail
-    /// transforms its own field. Both may be live in one preset, and then one
-    /// `fb_rotate` turns both — each about its own buffer, neither about the
-    /// other's. This is the second fan-out in this enum and the reason it exists
-    /// is the reverse of [`SceneAndBackdrop`](Self::SceneAndBackdrop)'s: there the
-    /// name belongs to the *system* and reaches the sky as a courtesy; here it
-    /// belongs to a *stage* and reaches the scene because the scene declared it.
-    StageAndScene(usize),
-    /// A shared colour modulation (`saturation`, `palette_mix`) — the scene's
-    /// **and** the backdrop's, from one binding (ADR-0086).
-    ///
-    /// The only fan-out in this enum, and it is one because the backdrop joined
-    /// the scenes' two colour levers rather than declaring its own: an author who
-    /// crossfades palettes means the whole frame, not the figure alone. The name
-    /// still belongs to the system's vocabulary — `background::PARAMS` does not
-    /// claim it — so a system that declared neither reaches neither.
-    SceneAndBackdrop,
-    /// No owner claimed the name — silently dropped at apply time, exactly as
-    /// the old fallthrough dropped it on reaching a scene that ignores it. The
-    /// author already heard about it: an unknown name is a **load-time warning**
-    /// carried on [`Preset::warnings`] (ADR-0020, Plan 0019). This is where a
-    /// future *render-time* diagnostic for the same case would hang.
-    Unclaimed,
-}
-
-/// Resolve one binding's destination. **Pure** — a lookup over the static stage
-/// vocabularies plus the system's own, so it is decidable at load and testable
-/// without a GPU.
-///
-/// The order is the composite order (ADR-0032/0046) and matches the
-/// first-owner-wins fallthrough it replaces: the backdrop pre-pass, then the post
-/// chain, then the tonemap, then the terminal ink pass, then the scene. The five
-/// namespaces are disjoint, so the order is a formality rather than a tie-break —
-/// but it is the documented one.
-fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
-    if background::PARAMS.contains(&name) {
-        return ParamRoute::Background;
-    }
-    // Ahead of the stages, and disjoint from them: a chain-level name has no stage
-    // index to route to (ADR-0085).
-    if post::CHAIN_PARAMS.contains(&name) {
-        return ParamRoute::Composite;
-    }
-    if let Some(stage) = post::stage_for(name) {
-        // The one place a stage name may also reach the scene (ADR-0048): a
-        // system whose scene owns an accumulation buffer of its own declares the
-        // `fb_*` names too, and then the binding drives both. Tested against the
-        // system's own vocabulary, exactly as `SceneAndBackdrop` is, so the
-        // fan-out can never conjure a route for a name the scene would drop.
-        if feedback::PARAMS.contains(&name) && system.param_names().contains(&name) {
-            return ParamRoute::StageAndScene(stage);
-        }
-        return ParamRoute::Stage(stage);
-    }
-    if tonemap::PARAMS.contains(&name) {
-        return ParamRoute::Tonemap;
-    }
-    if ink::PARAMS.contains(&name) {
-        return ParamRoute::Ink;
-    }
-    if system.param_names().contains(&name) {
-        // The backdrop colours through the preset's palette (ADR-0086), so the
-        // two shared modulations move it with the figure. Tested *after* the
-        // system's own vocabulary, not before it: a system that declares neither
-        // gives neither to the sky, and the fan-out can never conjure a route for
-        // a name the scene would have dropped.
-        if background::SHARED_COLOUR_PARAMS.contains(&name) {
-            return ParamRoute::SceneAndBackdrop;
-        }
-        return ParamRoute::Scene;
-    }
-    ParamRoute::Unclaimed
-}
-
-/// The loaded presets plus the active index — the pure, GPU-free part of
-/// selection. Split out of [`Renderer`] so the addressing contract (names in
-/// roster order, in-range select, out-of-range no-op) is unit-testable without a
-/// surface, mirroring how the diagnostics stats are a pure type behind the GPU
-/// [`Renderer`]. [`Renderer`]'s preset methods delegate here 1:1.
-struct Roster {
-    presets: Vec<Preset>,
-    /// Resolved [`ParamRoute`]s, one inner `Vec` per preset and one entry per that
-    /// preset's bindings, in `Preset::params` order.
-    ///
-    /// Kept here rather than on the active preset alone because a dissolve
-    /// composites **two** presets in one frame (Plan 0023) and both sides want
-    /// their routes; indexing by preset means a side's routes cannot drift out of
-    /// step with the preset it is showing. Resolution is a render-layer concern
-    /// (it names chain positions), which is why it lives on this render-layer type
-    /// and not in `preset/`.
-    routes: Vec<Vec<ParamRoute>>,
-    active: usize,
-}
-
-impl Roster {
-    fn new(presets: Vec<Preset>) -> Self {
-        Self {
-            routes: resolve_routes(&presets),
-            presets,
-            active: 0,
-        }
-    }
-
-    /// Replace the roster; reset `active` to the start if it now points past the
-    /// end. An empty set is ignored — a directory that briefly reads empty or
-    /// all-malformed leaves the last good roster rendering (NFR 10).
-    fn set_presets(&mut self, presets: Vec<Preset>) {
-        if presets.is_empty() {
-            return;
-        }
-        self.routes = resolve_routes(&presets);
-        self.presets = presets;
-        if self.active >= self.presets.len() {
-            self.active = 0;
-        }
-    }
-
-    /// The resolved routes for the preset at `index`, positionally matching its
-    /// `params`. Empty for an out-of-range index, which pairs with
-    /// `presets.get(index)` returning `None`.
-    fn routes_for(&self, index: usize) -> &[ParamRoute] {
-        self.routes.get(index).map_or(&[], Vec::as_slice)
-    }
-
-    /// The active preset's resolved routes.
-    fn active_routes(&self) -> &[ParamRoute] {
-        self.routes_for(self.active)
-    }
-
-    /// The index cycling would land on (wrapping), **without** moving there — the
-    /// dissolve controller needs the target before the roster flips, because the
-    /// dissolve's opening frame still composites the outgoing preset. Returns the
-    /// current index on an empty or single-preset roster, which the caller reads as
-    /// "nothing to dissolve to".
-    fn next_index(&self) -> usize {
-        if self.presets.is_empty() {
-            return self.active;
-        }
-        (self.active + 1) % self.presets.len()
-    }
-
-    /// Set the active preset **iff** `index` is in range; an out-of-range index
-    /// is a no-op — never a panic, never a wrap.
-    fn select(&mut self, index: usize) {
-        if index < self.presets.len() {
-            self.active = index;
-        }
-    }
-
-    /// The active preset, or `None` on an empty roster.
-    fn active_preset(&self) -> Option<&Preset> {
-        self.presets.get(self.active)
-    }
-
-    /// The active preset's name, or a placeholder on an empty roster.
-    fn name(&self) -> &str {
-        self.active_preset()
-            .map(|p| p.name.as_str())
-            .unwrap_or("no presets")
-    }
-
-    /// The loaded preset names in roster order.
-    fn names(&self) -> impl Iterator<Item = &str> {
-        self.presets.iter().map(|p| p.name.as_str())
-    }
-}
-
-/// Resolve every preset's bindings to their destinations, off the hot path — once
-/// per roster load, not once per binding per frame.
-fn resolve_routes(presets: &[Preset]) -> Vec<Vec<ParamRoute>> {
-    presets
-        .iter()
-        .map(|preset| {
-            preset
-                .params
-                .iter()
-                .map(|binding| resolve_route(&binding.name, preset.system))
-                .collect()
-        })
-        .collect()
-}
-
-/// Render-layer one-pole envelope over evaluated parameter values (ADR-0019 /
-/// Plan 0018 Phase 5, widened by ADR-0035). Each active-preset binding gets
-/// optional exponential smoothing with a per-param [`Easing`] (seconds), applied
-/// on the injected real `dt` **between** `expr.eval` and `set_param`, so band-
-/// and beat-driven motion eases instead of snapping. The evaluator stays pure
-/// and allocation-free — the smoothing state lives here, beside the other
-/// per-frame state the expression path has, [`LatchBank`].
-///
-/// With `attack != release` this is deliberately **not** a linear filter: a
-/// direction-dependent time constant rectifies, so a fast-attack parameter rides
-/// above its input's mean under sustained material. That is the envelope-follower
-/// behavior ADR-0035 exists to provide, not a defect.
-///
-/// State is keyed by binding **index** (the active preset's `params` are a stable
-/// name-sorted `Vec`) and is **reset on every active-preset change** (a switch
-/// snaps to the incoming preset's first value — no cross-preset bleed) and on the
-/// capture scene-rebuild (so a headless capture stays a pure function of its
-/// inputs, NFR 6).
-#[derive(Default)]
-struct ParamSmoother {
-    /// Last smoothed value per binding index; grown lazily and seeded with the
-    /// first frame's raw value, so the first frame after a reset snaps rather than
-    /// drifting up from a stale zero. Cleared on reset.
-    last: Vec<f32>,
-}
-
-impl ParamSmoother {
-    /// Forget all state so the next frame snaps to the incoming values.
-    fn reset(&mut self) {
-        self.last.clear();
-    }
-
-    /// Smooth `raw` for binding `index` toward its previous value over `dt`
-    /// seconds, using whichever of `tau`'s two constants the direction of travel
-    /// selects (ADR-0035). A selected constant of `<= 0` (the default) or
-    /// non-finite, or a non-positive `dt`, passes `raw` through unchanged. The
-    /// first frame after a reset seeds the state with `raw` (a snap).
-    fn smooth(&mut self, index: usize, raw: f32, tau: Easing, dt: f32) -> f32 {
-        if self.last.len() <= index {
-            self.last.resize(index + 1, raw);
-        }
-        let Some(slot) = self.last.get_mut(index) else {
-            return raw; // unreachable after the resize; never panics on the hot path
-        };
-        // The arithmetic itself lives on `Easing` (Plan 0034 Phase 3), so the
-        // spectrum scene's per-element smoother eases by the same rule rather
-        // than growing a second easing vocabulary beside this one.
-        *slot = tau.step(*slot, raw, dt);
-        *slot
-    }
-}
-
-/// What a latch expression counts as true — the engine's edge-trigger level,
-/// the same `0.5` `shape_collage`'s `recompose` rises past.
-///
-/// One number for both `arm` and `fire` so an author writes one kind of
-/// condition. Every comparison in the grammar already yields exactly `0.0` or
-/// `1.0`, so the threshold only matters for an expression that hands over a
-/// continuous value, and there `0.5` is the midpoint.
-const LATCH_TRUE: f32 = 0.5;
-
-/// One latch's state between frames (ADR-0137).
-#[derive(Clone, Copy, Default)]
-struct LatchState {
-    /// Whether this latch may still fire in its current arming window. Cleared
-    /// by a fire; set again only by a **rising** edge of `arm`, which is what
-    /// makes "at most one rise per window" a property rather than a hope.
-    armed: bool,
-    /// Remaining hold, in seconds. Counted down on the injected real `dt`.
-    hold_left: f32,
-    /// Last frame's `arm` truth, for the window edge.
-    arm_last: bool,
-    /// Last frame's `fire` truth, for the trigger edge.
-    fire_last: bool,
-}
-
-/// Per-preset `[latch]` state (ADR-0137) — the one part of the expression path
-/// whose value depends on frame history.
-///
-/// **Held here, beside [`ParamSmoother`], for the reason easing is.** One
-/// compiled expression is evaluated many times per frame in this engine — once
-/// per mesh vertex for a `[per_vertex]` binding, once per element for one naming
-/// `index` — so state inside the compiled tree would need one copy *per
-/// evaluation* and there is no correct single answer for what the 400th vertex
-/// of a frame should see. The evaluator stays a pure function of its
-/// [`Variables`] and stays re-entrant; this writes the reserved variable slots
-/// once per frame, before the params that read them.
-///
-/// Fixed arrays, not a `Vec`: the reserved block is [`LATCH_CAP`] wide by
-/// construction and the loader rejects a preset asking for more, so a latch
-/// index is in range by that boundary check and nothing here allocates on the
-/// frame path. Reset on a preset switch alongside the smoothers, so no armed
-/// state crosses from the outgoing preset into the incoming one.
-#[derive(Default)]
-struct LatchBank {
-    state: [LatchState; LATCH_CAP],
-    /// This frame's outputs, contiguous so
-    /// [`Variables::with_latches`] takes a slice without a copy into scratch.
-    values: [f32; LATCH_CAP],
-}
-
-impl LatchBank {
-    /// Forget every window and hold, so the next frame starts disarmed and at
-    /// rest.
-    fn reset(&mut self) {
-        *self = Self::default();
-    }
-
-    /// Advance every latch of `latches` by `dt` against `vars`, and return
-    /// `vars` with the reserved slots bound to this frame's outputs.
-    ///
-    /// **Call this exactly once per preset per frame**, before anything that
-    /// evaluates that preset's bindings: it consumes the `fire` edge, so a
-    /// second call in the same frame would see `fire_last` already true and the
-    /// rise would be silently swallowed. A preset's main bindings, its
-    /// `[per_vertex]` table and its `[layer]` all read the returned bundle.
-    ///
-    /// A preset with no latches returns `vars` untouched and does no work, which
-    /// is every preset that declares no table.
-    fn advance<'v>(&mut self, latches: &[Latch], vars: Variables<'v>, dt: f32) -> Variables<'v> {
-        if latches.is_empty() {
-            return vars;
-        }
-        for ((latch, state), value) in latches
-            .iter()
-            .zip(self.state.iter_mut())
-            .zip(self.values.iter_mut())
-        {
-            // The elapsed time is consumed **before** the edges are read, so a
-            // hold that runs out does so at the top of the frame it runs out in
-            // and a fire in that same frame re-arms it to its full length rather
-            // than to what was left. `dt` is the injected real frame time
-            // (ADR-0014), which is the whole of `hold` being a duration rather
-            // than a frame count.
-            state.hold_left = (state.hold_left - dt.max(0.0)).max(0.0);
-
-            let arm_now = latch.arm.eval(&vars) > LATCH_TRUE;
-            let fire_now = latch.fire.eval(&vars) > LATCH_TRUE;
-            if arm_now && !state.arm_last {
-                state.armed = true;
-            }
-            let fired = state.armed && arm_now && fire_now && !state.fire_last;
-            if fired {
-                state.armed = false;
-                state.hold_left = latch.hold;
-            }
-            state.arm_last = arm_now;
-            state.fire_last = fire_now;
-            // The firing frame reads `1.0` whatever the hold is, so `hold = 0`
-            // is a one-frame pulse rather than a rise no binding could see.
-            *value = f32::from(fired || state.hold_left > 0.0);
-        }
-        vars.with_latches(self.values.get(..latches.len()).unwrap_or(&self.values))
-    }
-}
-
-/// How much of the per-element scratch `preset` uses this frame: its
-/// `[spectrum] elements`, or `0` for a system with no per-element surface
-/// (Plan 0034 Phase 4). Bounded by `capacity` so a config can never index past
-/// the scratch, whatever the loader admitted.
-fn element_prefix(preset: &Preset, capacity: usize) -> usize {
-    config_element_prefix(preset.config.as_ref(), capacity)
-}
-
-/// [`element_prefix`] over a bare config — shared with the layer's own
-/// structural config (Plan 0076 Phase 1), which is preset data of exactly the
-/// same shape but not a whole [`Preset`].
-fn config_element_prefix(config: Option<&scenes::GeneratorConfig>, capacity: usize) -> usize {
-    config
-        .map_or(0, scenes::GeneratorConfig::element_count)
-        .min(capacity)
-}
-
-/// The **clamped** warp-mesh grid `config` asks for, and how much of the
-/// per-vertex scratch that needs — or `None` for a config with no per-vertex
-/// surface (Plan 0100 Phase 1).
-///
-/// The clamp is [`warp_mesh::clamp_grid`](scenes::warp_mesh::clamp_grid), the
-/// same function the scene calls on the same request and the same tier. That
-/// shared call is the whole contract: the series this renderer sends and the
-/// vertex buffer that scene assembles are the same length because one function
-/// decides both.
-fn vertex_grid(
-    config: Option<&scenes::GeneratorConfig>,
-    tier: &TierConfig,
-    capacity: usize,
-) -> Option<((u32, u32), usize)> {
-    let scenes::GeneratorConfig::WarpMesh { mesh, .. } = config? else {
-        return None;
-    };
-    let mesh = scenes::warp_mesh::clamp_grid(*mesh, tier);
-    let count = scenes::warp_mesh::vertex_count(mesh);
-    (count <= capacity).then_some((mesh, count))
-}
-
-/// Evaluate `expr` once **per element**, binding each element's normalized
-/// `0..1` position to `index`, into `out` (Plan 0034 Phase 4).
-///
-/// Normalized rather than an integer count so an expression composes without
-/// knowing how many elements there are: `bin(index)` reads the whole spectrum
-/// across the figure at any count. The first element is `0` and the last `1`; a
-/// single element is `0` (there is no span to normalize over).
-///
-/// Pure and allocation-free — `out` is the renderer's scratch, sized at preset
-/// load. Split out of [`evaluate_preset`] so the per-element contract is
-/// testable without a GPU.
-fn evaluate_series(expr: &Expr, vars: &Variables<'_>, out: &mut [f32]) {
-    let last = out.len().saturating_sub(1);
-    for (i, slot) in out.iter_mut().enumerate() {
-        let t = if last == 0 {
-            0.0
-        } else {
-            i as f32 / last as f32
-        };
-        *slot = expr.eval(&vars.with_index(t));
-    }
-}
-
-/// The per-vertex evaluation surface one frame hands a preset (Plan 0100
-/// Phase 1): the grid to walk, the aspect to compute `rad`/`ang` in, and the
-/// renderer's scratch to write into.
-///
-/// A bundle rather than three more arguments on [`evaluate_preset`], which is
-/// already at the argument-count lint — and the three genuinely travel together:
-/// none of them means anything without the other two.
-struct VertexSurface<'a> {
-    /// The **clamped** grid, in cells. Both this and the scene's own grid come
-    /// out of [`warp_mesh::clamp_grid`](scenes::warp_mesh::clamp_grid) on the same
-    /// request and the same tier, so the series is exactly as long as the scene
-    /// expects.
-    mesh: (u32, u32),
-    /// The **render target's** aspect (ADR-0037), never the mesh grid's. The
-    /// target's aspect is the surface's whatever internal grid the chain routes
-    /// through (`PostChain::begin`), so the renderer can compute it here from the
-    /// frame's own size.
-    aspect: f32,
-    /// The renderer's scratch, sliced to `vertex_count(mesh)`. Empty for every
-    /// preset with no per-vertex surface, which is what makes their path
-    /// unchanged.
-    buf: &'a mut [f32],
-}
-
-/// Evaluate `expr` once **per mesh vertex**, binding that vertex's `x`, `y`,
-/// `rad` and `ang`, into `surface.buf` (Plan 0100 Phase 1).
-///
-/// Row-major from the top-left, which is the order
-/// [`Scene::set_per_vertex`](scenes::Scene::set_per_vertex) documents and the
-/// warp mesh assembles its vertex buffer in.
-///
-/// Pure and allocation-free — the buffer is the renderer's scratch, sized at
-/// construction. Split out for [`evaluate_series`]'s reason: the per-vertex
-/// contract is then testable without a GPU.
-fn evaluate_vertex_series(expr: &Expr, vars: &Variables<'_>, surface: &mut VertexSurface<'_>) {
-    let (mx, my) = surface.mesh;
-    let mut v = 0usize;
-    for row in 0..=my {
-        for col in 0..=mx {
-            let (x, y, rad, ang) =
-                scenes::warp_mesh::vertex_position(col, row, (mx, my), surface.aspect);
-            let Some(slot) = surface.buf.get_mut(v) else {
-                return;
-            };
-            *slot = expr.eval(&vars.with_vertex(x, y, rad, ang));
-            v += 1;
-        }
-    }
-}
-
-/// Which of a preset's two salts this frame's `hash()`/`noise()` calls mix in
-/// (ADR-0051).
-///
-/// A **parameter**, not renderer state, and deliberately: it is threaded from
-/// each entry point down to the evaluation, so the compiler — not a reviewer —
-/// is what guarantees every capture path pins. A flag on `Renderer` could be
-/// forgotten at one of the five capture call sites and nothing would say so; the
-/// frames would just quietly stop reproducing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SaltMode {
-    /// The live app: a preset declaring `seed = "random"` renders under the salt
-    /// it drew at load, so it looks different every launch.
-    Live,
-    /// Every capture path — `capture_preset`, `capture_preset_over`,
-    /// `capture_frame`, `capture_audio`, and the warm-up steps under them. Forces
-    /// the declared numeric seed so the harness stays a pure function of its
-    /// inputs (the same discipline ADR-0045 applies to quality tiers).
-    Pinned,
-}
-
-impl SaltMode {
-    /// The salt `preset` evaluates under in this mode.
-    fn of(self, preset: &Preset) -> u32 {
-        match self {
-            SaltMode::Live => preset.salt,
-            SaltMode::Pinned => preset.pinned_salt,
-        }
-    }
-}
-
-/// Evaluate one preset's bindings into a composite side, an optional ink pass,
-/// and its scene. **Routing only** — nothing is encoded here, because the frame's
-/// destination is not known until ink's activity is (ADR-0032).
-///
-/// `terminal` is `None` for a dual-live dissolve's outgoing side: the tonemap and
-/// ink are each **one** engine-wide pass over the blended frame, and both belong
-/// to the active preset, whose crossfade the caller applies afterwards. An
-/// `exposure` or `ink_*` binding on that side is therefore dropped — the same
-/// no-op it was when it fell through to a scene that ignores unknown params.
-///
-/// `routes` carries each binding's destination, resolved once at roster load
-/// ([`ParamRoute`]); it is positionally paired with `preset.params`, so a binding
-/// with no route entry is skipped rather than mis-routed.
-#[allow(clippy::too_many_arguments)]
-fn evaluate_preset(
-    preset: &Preset,
-    routes: &[ParamRoute],
-    scene: &mut Box<dyn Scene>,
-    side: &mut CompositeSide,
-    terminal: Option<Terminal<'_>>,
-    smoother: &mut ParamSmoother,
-    vars: &Variables<'_>,
-    frame: &AnalysisFrame,
-    time: f32,
-    dt: f32,
-    series: &mut [f32],
-    vertex: Option<VertexSurface<'_>>,
-) {
-    scene.set_time(time);
-    scene.advance(dt);
-    // The composite advances on the same measured `dt` the scene does (ADR-0048):
-    // the trails accumulation is the one post stage with state between frames, and
-    // its decay and `fb_*` rates are per-second.
-    side.chain.set_dt(dt);
-    side.reset_params();
-    scene.reset_params();
-    let mut terminal = terminal;
-    for (index, (binding, route)) in preset.params.iter().zip(routes).enumerate() {
-        // A binding that names `index` is asking to be evaluated once per
-        // element (Plan 0034 Phase 4). The test is a `bool` read decided at
-        // compile, and `series` is empty for every system without a per-element
-        // surface — so for the other seven systems this branch is never taken
-        // and the path below is the one that ran before this existed.
-        //
-        // Tested *before* the scalar evaluation, not inside the routing match:
-        // the scalar `eval` would be the same expression a second time (at
-        // `index = 0`) and its result is not read, so evaluating it would make a
-        // per-element binding cost N + 1 evaluations instead of N. The smoother
-        // is skipped with it — a per-element binding's `tau` is always
-        // `INSTANT` (the loader forces it and warns), so its slot was a
-        // passthrough nothing read.
-        if matches!(*route, ParamRoute::Scene | ParamRoute::SceneAndBackdrop)
-            && !series.is_empty()
-            && binding.expr.uses_index()
-        {
-            // The scene eases the element levels itself through
-            // `[spectrum] smoothing`; a series has no single value for the
-            // per-binding smoother to hold.
-            evaluate_series(&binding.expr, vars, series);
-            scene.set_param_series(&binding.name, series);
-            // One backdrop has no elements to vary across, so it takes element
-            // 0 — the same fallback `set_param_series` already gives a
-            // whole-figure param, which is what `saturation` and `palette_mix`
-            // are on every scene that has a per-element surface.
-            if matches!(*route, ParamRoute::SceneAndBackdrop)
-                && let Some(&first) = series.first()
-            {
-                side.background
-                    .set_shared_colour_param(&binding.name, first);
-            }
-            continue;
-        }
-        let raw = binding.expr.eval(vars);
-        // Ease the evaluated value on the injected real `dt` before applying it
-        // (ADR-0019). `tau` came off the preset's `[smoothing]` table at load;
-        // `0` (the default for an unlisted param) passes through instantly. The
-        // evaluation above is a pure function of `vars` and allocates nothing —
-        // including a latch, whose history was folded into `vars` before this
-        // loop opened (ADR-0137).
-        let value = smoother.smooth(index, raw, binding.tau, dt);
-        // Dispatch on the resolved destination — no map lookup, no walk over the
-        // stages, no chained fallthrough. The owner was decided at load.
-        match *route {
-            ParamRoute::Background => {
-                side.background.set_param(&binding.name, value);
-            }
-            ParamRoute::Stage(stage) => {
-                side.chain.set_stage_param(stage, &binding.name, value);
-            }
-            ParamRoute::Composite => {
-                side.chain.set_chain_param(&binding.name, value);
-            }
-            ParamRoute::Tonemap => {
-                if let Some(terminal) = terminal.as_mut() {
-                    terminal.tonemap.set_param(&binding.name, value);
-                }
-            }
-            ParamRoute::Ink => {
-                if let Some(terminal) = terminal.as_mut() {
-                    terminal.ink.set_param(&binding.name, value);
-                }
-            }
-            ParamRoute::Scene => {
-                scene.set_param(&binding.name, value);
-            }
-            ParamRoute::StageAndScene(stage) => {
-                side.chain.set_stage_param(stage, &binding.name, value);
-                scene.set_param(&binding.name, value);
-            }
-            ParamRoute::SceneAndBackdrop => {
-                scene.set_param(&binding.name, value);
-                side.background
-                    .set_shared_colour_param(&binding.name, value);
-            }
-            // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
-            ParamRoute::Unclaimed => {}
-        }
-    }
-    // The `[per_vertex]` table (Plan 0100 Phase 1), after the scalars — so a
-    // per-vertex binding overrides the scalar of the same name for this frame
-    // rather than racing it. `None` for every preset with no per-vertex surface,
-    // and `per_vertex` is empty for every preset that declares no table, so the
-    // other ten systems take exactly the path they took before this existed.
-    if let Some(mut surface) = vertex {
-        for binding in &preset.per_vertex {
-            evaluate_vertex_series(&binding.expr, vars, &mut surface);
-            scene.set_per_vertex(&binding.name, surface.buf);
-        }
-    }
-    scene.update(frame);
-}
-
-/// Evaluate a preset's `[layer]` bindings into the layer's scene (Plan 0076
-/// Phase 1). The layer's counterpart of [`evaluate_preset`], and deliberately
-/// narrower: layer params are **namespaced to the layer's scene** (ADR-0090) —
-/// no route dispatch, because there is nowhere else a layer binding can go. The
-/// compositing stages, the terminal passes and the backdrop all belong to the
-/// preset as a whole and take their values from the top-level bindings.
-///
-/// `series` is the renderer's per-element scratch, sliced to the **layer's own**
-/// config (a layer spectrum reads its `[layer.spectrum] elements`); empty for
-/// every layer system without a per-element surface, exactly as at the top
-/// level.
-///
-/// `chain` receives the layer's bindable `mix` (ADR-0090 / Plan 0076 Phase 3):
-/// it is the one layer binding that drives the composite rather than the
-/// scene — the `over` junction's amount — eased through its own
-/// `[layer.smoothing] mix` entry at the smoother slot one past the params
-/// (which is stable: the layer's `params` are fixed at load). Inert on an
-/// `under` join, whose target has no junction.
-#[allow(clippy::too_many_arguments)]
-fn evaluate_layer(
-    layer: &Layer,
-    scene: &mut Box<dyn Scene>,
-    chain: &mut PostChain,
-    smoother: &mut ParamSmoother,
-    vars: &Variables<'_>,
-    frame: &AnalysisFrame,
-    time: f32,
-    dt: f32,
-    series: &mut [f32],
-    vertex: Option<VertexSurface<'_>>,
-) {
-    scene.set_time(time);
-    scene.advance(dt);
-    scene.reset_params();
-    for (index, binding) in layer.params.iter().enumerate() {
-        if !series.is_empty() && binding.expr.uses_index() {
-            evaluate_series(&binding.expr, vars, series);
-            scene.set_param_series(&binding.name, series);
-            continue;
-        }
-        let raw = binding.expr.eval(vars);
-        let value = smoother.smooth(index, raw, binding.tau, dt);
-        scene.set_param(&binding.name, value);
-    }
-    if let Some(mut surface) = vertex {
-        for binding in &layer.per_vertex {
-            evaluate_vertex_series(&binding.expr, vars, &mut surface);
-            scene.set_per_vertex(&binding.name, surface.buf);
-        }
-    }
-    if let Some(mix) = layer.mix.as_ref() {
-        let raw = mix.expr.eval(vars);
-        let value = smoother.smooth(layer.params.len(), raw, mix.tau, dt);
-        chain.set_layer_mix(value);
-    }
-    scene.update(frame);
-}
-
-/// Encode one preset's composite into `destination`: the backdrop pre-pass (which
-/// owns `destination`'s clear), then the scene, then the chain folded down over
-/// it. Returns the draw calls. Call after [`evaluate_preset`] has routed this
-/// side's params.
-///
-/// The backdrop paints **`destination`, not the chain's input** (ADR-0055), so the
-/// chain never folds `bg_*` and its last stage composites over the backdrop with
-/// premultiplied alpha. When no stage is active `target.view` *is* `destination`,
-/// which makes that path bit-for-bit what it always was.
-///
-/// The side's `under`-join layer scene, when its preset declares one (ADR-0090
-/// / Plan 0076), draws into the **same** scene target after the main scene,
-/// through the same `ViewTransform` aspect, so the two layers share every
-/// downstream stage and fuse into one substance. One extra draw — no new pass,
-/// no new target — and a layerless side encodes exactly what this function
-/// always encoded. The scene lives on `side`, one per preset, so
-/// whichever side is drawn brings the right layer with it.
-fn composite_into(
-    ctx: &RenderContext,
-    scene: &mut Box<dyn Scene>,
-    side: &mut CompositeSide,
-    encoder: &mut wgpu::CommandEncoder,
-    destination: &wgpu::TextureView,
-    surface: (u32, u32),
-    exposure: f32,
-) -> u32 {
-    // The stop this side's light will be shown at, handed to the chain before it
-    // folds (ADR-0080). Only the bloom bright-pass reads it, and only to decide
-    // what counts as over-range; nothing here applies it — the tonemap still does,
-    // downstream.
-    side.chain.set_exposure(exposure);
-    let target = side.chain.begin(encoder, destination, surface);
-    // `surface`, never `target.size` on the line below: the backdrop paints
-    // `destination`, which is surface-sized, while `target.size` is the chain's
-    // quantized capped internal grid (ADR-0037). The ramp's angle is only true in
-    // screen pixels if it takes the shape it is actually seen at.
-    side.background
-        .render(&ctx.queue, encoder, destination, surface);
-    // Hand the scene its target size before it renders: a scene with an internal
-    // accumulation field (the attractor's trails) sizes that field from here rather
-    // than a fixed grid (Plan 0027 Phase 2). A no-op for every other scene, and a
-    // cheap unchanged-compare for the attractor.
-    scene.set_target_size(target.size.0, target.size.1);
-    // `occlude` reaches whichever pass lands on the backdrop, and that is the
-    // chain's last stage whenever one is active (ADR-0085). With an empty chain
-    // the scene draws straight onto `destination` and owns the seam itself, so the
-    // factor goes to the scene *instead* — never to both, which would apply it
-    // twice. A scene that presents premultiplied (reaction-diffusion, attractor,
-    // fragment field) consumes it; the additive families ignore it, their colour
-    // blend having no occlusion to scale.
-    // With the `over` junction live the scene renders into the blend's chain
-    // input — a scratch — so the seam belongs to the junction's final fold,
-    // never to the scene (Plan 0076 Phase 3).
-    let scene_in_scratch = target.routing.scene_stage().is_some() || side.chain.layer_over_active();
-    scene.set_occlude(if scene_in_scratch {
-        post::DEFAULT_OCCLUDE
-    } else {
-        side.chain.occlude()
-    });
-    scene.render(&ctx.queue, encoder, &target.view, target.aspect);
-    // The layer scene. `under`: into the same target as the main scene, after
-    // it, under the same seam rules — the target's own size and aspect (never
-    // a grid's, ADR-0037) and the same `occlude` answer, because the two land
-    // on the same backdrop through the same last fold (ADR-0085). `over`: into
-    // the layer's own surface-sized offscreen, crisp, with the junction owning
-    // the backdrop seam — so the scene gets the scratch answer (no occlusion
-    // to scale in a transparent offscreen).
-    let mut layer_draws = 0;
-    if let Some(layer_scene) = side.layer.as_mut() {
-        match side.chain.layer_input(encoder, surface) {
-            Some(layer_view) => {
-                layer_scene.set_target_size(surface.0, surface.1);
-                layer_scene.set_occlude(post::DEFAULT_OCCLUDE);
-                layer_scene.render(&ctx.queue, encoder, &layer_view, target.aspect);
-            }
-            None => {
-                layer_scene.set_target_size(target.size.0, target.size.1);
-                layer_scene.set_occlude(if scene_in_scratch {
-                    post::DEFAULT_OCCLUDE
-                } else {
-                    side.chain.occlude()
-                });
-                layer_scene.render(&ctx.queue, encoder, &target.view, target.aspect);
-            }
-        }
-        layer_draws = 1;
-    }
-    // The backdrop and the scene(s), plus whatever the active chain stages
-    // encode on their way down.
-    2 + layer_draws
-        + side
-            .chain
-            .resolve(&ctx.queue, encoder, target.routing, destination, surface)
-}
-
-/// The two engine-wide passes a preset's bindings reach **outside** the chain:
-/// the exposure/tonemap boundary (ADR-0046) and the terminal ink remap
-/// (ADR-0032).
-///
-/// Bundled because they are routed together and withheld together — a dual-live
-/// dissolve's outgoing side gets neither, each being one pass over the *blended*
-/// frame rather than one per side. A borrow pair rather than two more arguments
-/// on [`evaluate_preset`], which is already at the lint's limit.
-struct Terminal<'a> {
-    tonemap: &'a mut Tonemap,
-    ink: &'a mut Ink,
-}
-
-/// One preset's private composite: the background pre-pass it owns plus the post
-/// chain its look folds through.
-///
-/// Bundled because a dual-live dissolve needs **two**, with fully independent GPU
-/// state. That independence is not a nicety: `Queue::write_buffer` writes are
-/// applied before the submission's commands run, so two passes in one frame
-/// sharing one uniform buffer would *both* read the second write — the first
-/// side's backdrop would silently take the second side's `bg_*`. Two sides, two
-/// buffers, no ordering hazard. (Plan 0030 already proved the chain half of this
-/// with `post.rs::two_chains_against_one_device_accumulate_independently`.)
-///
-/// `Background` stays outside the [`PostChain`](post::PostChain) per ADR-0031 —
-/// it is a pre-pass that owns the frame clear — so the pairing lives here rather
-/// than in the chain.
-struct CompositeSide {
-    background: Background,
-    chain: PostChain,
-    /// This side's `[layer]` scene, **constructed for the preset it draws**
-    /// (ADR-0090 point 4, Plan 0076 Phase 2) — never a roster instance, so
-    /// same-system pairs are legal and two dissolving sides' layers share
-    /// nothing. `Some` exactly when that preset declares a `[layer]`;
-    /// [`Renderer::configure_active_scene`] maintains the invariant on every
-    /// preset change. Living here rather than on the renderer gives it the
-    /// side's own lifetime for free: the outgoing side keeps its layer alive
-    /// through a dissolve, and promotion at finalize carries it over.
-    layer: Option<Box<dyn Scene>>,
-}
-
-impl CompositeSide {
-    /// `format` is [`COMPOSITE_FORMAT`], never the surface's: everything a side
-    /// paints lands upstream of the tonemap, in linear light (ADR-0046).
-    fn new(device: &wgpu::Device, format: wgpu::TextureFormat, tier: &TierConfig) -> Self {
-        Self {
-            background: Background::new(device, format),
-            chain: PostChain::new(device, format, tier),
-            layer: None,
-        }
-    }
-
-    /// Reset every stage's params to their defaults (once per frame, before this
-    /// side's preset bindings are routed).
-    fn reset_params(&mut self) {
-        self.background.reset_params();
-        self.chain.reset_params();
-    }
-
-    /// Drop the lazily-built GPU resources (capture rebuild — keeps a headless
-    /// capture a pure function of its inputs, NFR §6). The layer scene goes
-    /// with them: `configure_active_scene` reconstructs it from its
-    /// deterministic seed, which is exactly the rebuild the roster scenes get
-    /// from `scenes::create_all` on the same path.
-    fn reset_resources(&mut self) {
-        self.background.reset_resources();
-        self.chain.reset_resources();
-        self.layer = None;
-    }
-}
+use composite::*;
+use evaluate::*;
+use roster::*;
+use routing::*;
 
 /// How to build a headless [`Renderer`] for capture (Plan 0013).
 ///
@@ -1369,33 +490,31 @@ impl Renderer {
         ))
     }
 
-    /// Renderer targeting a native Win32 window the host owns — the C ABI
-    /// path (foobar2000 shim). Starts with the embedded default presets (no
-    /// ABI surface for preset selection yet).
+    /// Renderer targeting a surface the host owns and built the handle for —
+    /// the C ABI path, and the only constructor that does not create its own
+    /// surface. Starts with the embedded default presets (no ABI surface for
+    /// preset selection yet).
+    ///
+    /// **The platform lives on the caller's side of this seam, not here**
+    /// (ADR-0001, ADR-0072): the host knows what kind of window it has and
+    /// builds the [`wgpu::SurfaceTargetUnsafe`] for it, so `core` stays
+    /// source-agnostic and platform-free. `core-cabi` is the one that knows
+    /// about `HWND`.
     ///
     /// Auto tier: the plugin gets rich-with-governor, because the C ABI stays v4
     /// and a plugin-side tier picker is a future ABI question rather than part of
     /// ADR-0045.
     ///
     /// # Safety
-    /// `hwnd` must be a valid window handle that outlives this renderer.
-    #[cfg(windows)]
-    pub unsafe fn new_from_win32_hwnd(
-        hwnd: std::num::NonZeroIsize,
+    /// `target`'s handles must be valid and must outlive this renderer.
+    pub unsafe fn new_from_surface_target(
+        target: wgpu::SurfaceTargetUnsafe,
         width: u32,
         height: u32,
     ) -> Result<Self, RenderError> {
-        let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-            raw_display_handle: Some(wgpu::rwh::RawDisplayHandle::Windows(
-                wgpu::rwh::WindowsDisplayHandle::new(),
-            )),
-            raw_window_handle: wgpu::rwh::RawWindowHandle::Win32(
-                wgpu::rwh::Win32WindowHandle::new(hwnd),
-            ),
-        };
         // The `unsafe` is exactly the surface-from-raw-handle call: the caller's
-        // promise about `hwnd`'s validity and lifetime. Construction past that
-        // point is the same safe code the other two paths run.
+        // promise about the handles' validity and lifetime. Construction past
+        // that point is the same safe code the other two paths run.
         // `RendererOptions::default()` carries `AdapterChoice::Default`, which
         // is the request this path made before the choice was a parameter — the
         // shim has no flag surface to select an adapter with, and the C ABI
@@ -1492,54 +611,6 @@ impl Renderer {
         self.frame_budget_secs = tier::budget_secs(hz);
     }
 
-    /// Run the governor over the rolling frame-time history and demote if it says
-    /// so, returning whether this call was the demotion.
-    ///
-    /// Nothing happens when the tier is pinned, when it is already the floor, or
-    /// when the latch has already fired — so the decision is made **once per
-    /// session** and the expensive part below cannot run twice.
-    fn govern_tier(&mut self) -> bool {
-        if !tier::should_demote(
-            self.tier.tier,
-            self.tier_pinned,
-            self.tier_demoted,
-            self.diag.stats().samples(),
-            self.frame_budget_secs,
-        ) {
-            return false;
-        }
-        self.tier_demoted = true;
-        self.apply_tier(TierConfig::FLOOR);
-        true
-    }
-
-    /// Rebuild the tier-dependent GPU state for `tier`.
-    ///
-    /// Allocation at a **reconfigure**, not on the hot path: this runs at most
-    /// once in a session (the governor's latch is what guarantees that). The
-    /// visible cost is one blink of the trails accumulation as the field pair is
-    /// rebuilt at the smaller grid — the same blink a window resize across a grid
-    /// step produces, and ADR-0045 accepts it as the price of a rare, deliberately
-    /// visible event.
-    ///
-    /// A dissolve in flight is cancelled rather than migrated: its two sides are
-    /// GPU state built at the outgoing tier, and finishing a crossfade across a
-    /// tier change is a worse artifact than landing on the incoming preset.
-    fn apply_tier(&mut self, tier: TierConfig) {
-        self.tier = tier;
-        self.cancel_transition();
-        self.incoming_side = None;
-        self.side = CompositeSide::new(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
-        // The scenes carry tier capacities too — particle counts, the segment
-        // buffer, the trail-grid cap — and those are sized at construction, so a
-        // tier change means rebuilding them. Rebuilding also resets their
-        // simulation state to its seed, which is the visible half of a demotion:
-        // the attractor's cloud and the swarm restart rather than losing two
-        // thirds of their points mid-flight.
-        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
-        self.configure_active_scene();
-    }
-
     /// Reconfigure the surface for a new window size.
     pub fn resize(&mut self, width: u32, height: u32) {
         self.ctx.resize(width, height);
@@ -1589,107 +660,6 @@ impl Renderer {
     /// The open preview's size and identity, or `None` when closed.
     pub fn preview_state(&self) -> Option<((u32, u32), u64)> {
         self.preview.as_ref().map(|p| (p.size(), p.generation()))
-    }
-
-    /// Replace the preset roster (the standalone's hot-reload path). An empty
-    /// set is ignored so a preset directory that briefly reads empty — or whose
-    /// files are all malformed — leaves the last good roster rendering (NFR 10).
-    pub fn set_presets(&mut self, presets: Vec<Preset>) {
-        // A dissolve in flight is targeting an index in the *old* roster, which the
-        // replacement may not even have. Cancel it cleanly — the snapshot goes with
-        // it — and land on whatever `set_presets` resolves the active index to.
-        self.cancel_transition();
-        self.reset_transition_rotation();
-        self.roster.set_presets(presets);
-        self.configure_active_scene();
-    }
-
-    /// Switch to the next preset; returns its name. **Dissolves** rather than cuts
-    /// (Plan 0023): the outgoing preset's composite is captured on the next frame
-    /// and blended out over `DEFAULT_DURATION_SECS` while the incoming one
-    /// renders live. Every system is built at startup, so no *scene* is
-    /// constructed here; the dissolve's opening frames do allocate its own
-    /// resources lazily — see `begin_transition`.
-    ///
-    /// The returned name is the **incoming** preset's, immediately — the frontend's
-    /// HUD should name where the show is going, not where it has been.
-    pub fn cycle_preset(&mut self) -> &str {
-        // Settle any dissolve in flight *before* reading the roster: "next" must be
-        // one past where the show is actually going, not one past where it started.
-        // Two switches arriving between two rendered frames therefore advance two
-        // presets, as two switches either side of a frame already did.
-        self.snap_finish_transition();
-        let to = self.roster.next_index();
-        self.begin_transition(to);
-        self.roster.presets.get(to).map_or("no presets", |p| {
-            // Borrowck: the roster is not flipped yet (the capture frame needs the
-            // outgoing preset active), so read the incoming name by index.
-            p.name.as_str()
-        })
-    }
-
-    /// The loaded preset names in roster order — the browse overlay's list
-    /// source (Plan 0008). Selection addresses these by absolute index.
-    pub fn preset_names(&self) -> impl Iterator<Item = &str> {
-        self.roster.names()
-    }
-
-    /// Switch to the preset at `index` (its absolute position in
-    /// [`preset_names`](Self::preset_names)); returns the incoming name. Like
-    /// [`cycle_preset`](Self::cycle_preset) this **dissolves** rather than cuts
-    /// (Plan 0023 Phase 5) — the browse overlay's select is a switch the operator
-    /// watches, so it gets the same treatment as Space. An out-of-range `index` is
-    /// a no-op (never a panic, never a wrap), so a stale index from a shrunk
-    /// hot-reloaded roster is harmless.
-    ///
-    /// Use [`select_preset_now`](Self::select_preset_now) where a blend would be
-    /// wrong rather than merely unwanted.
-    pub fn select_preset(&mut self, index: usize) -> &str {
-        self.begin_transition(index);
-        // A dissolve has not flipped the roster yet — the opening frame still
-        // composites the outgoing preset — so name the incoming one by index, as
-        // `cycle_preset` does. `begin_transition` cuts instantly when the index is
-        // already active, and no-ops when it is out of range; either way the roster
-        // *is* the answer then.
-        match self.transition.as_ref().map(Transition::incoming_index) {
-            Some(to) => self
-                .roster
-                .presets
-                .get(to)
-                .map_or("no presets", |p| &p.name),
-            None => self.preset_name(),
-        }
-    }
-
-    /// Jump to the preset at `index` with **no dissolve** — the instant-cut escape
-    /// for paths where a blend is wrong rather than unwanted: a capture, which must
-    /// stay a pure function of its inputs (NFR §6), or a test placing the roster on
-    /// a known preset before measuring. Returns the now-active name; an
-    /// out-of-range `index` is a no-op.
-    pub fn select_preset_now(&mut self, index: usize) -> &str {
-        self.select_preset_instantly(index);
-        self.preset_name()
-    }
-
-    /// Make the preset named `name` active, returning whether it was found — the
-    /// by-name form of [`select_preset`](Self::select_preset), and like it a
-    /// **dissolve**. An unknown name leaves the active preset unchanged.
-    pub fn select_preset_by_name(&mut self, name: &str) -> bool {
-        let Some(index) = self.preset_names().position(|n| n == name) else {
-            return false;
-        };
-        self.select_preset(index);
-        true
-    }
-
-    /// The instant-cut form of [`select_preset_by_name`](Self::select_preset_by_name),
-    /// used by the capture entry points below.
-    fn select_preset_by_name_now(&mut self, name: &str) -> bool {
-        let Some(index) = self.preset_names().position(|n| n == name) else {
-            return false;
-        };
-        self.select_preset_instantly(index);
-        true
     }
 
     /// Attach a **secondary present target** — a second window's surface, on
@@ -1872,119 +842,6 @@ impl Renderer {
             .unwrap_or("")
     }
 
-    /// Apply the active preset's declarative structural config to its scene, if
-    /// it has one (ADR-0007). Called once whenever the active preset changes —
-    /// on select/cycle/hot-reload and after a capture rebuilds the scenes — so a
-    /// generator builds and caches its geometry exactly once, off the hot path.
-    /// A `None` config (fragment/swarm, or a curve on the family default) is a
-    /// no-op via the trait's default `configure`.
-    fn configure_active_scene(&mut self) {
-        // Snap the eased params to the incoming preset's first values — no
-        // cross-preset bleed, and determinism across capture rebuilds (ADR-0019).
-        // The latch bank resets on the same beat and for the same two reasons:
-        // an armed window must not cross a preset switch, and a capture has to
-        // stay a pure function of its inputs (NFR 6).
-        self.param_smoother.reset();
-        self.layer_smoother.reset();
-        self.latches.reset();
-        let Self {
-            ctx,
-            scenes,
-            roster,
-            cap_overflow,
-            side,
-            incoming_side,
-            tier,
-            ..
-        } = self;
-        *cap_overflow = None;
-        let Some(preset) = roster.active_preset() else {
-            return;
-        };
-        let Some(scene) = scene_for_mut(scenes, preset.system) else {
-            return;
-        };
-        // Bake the preset's color palette (default `spectrum` if it declares no
-        // `[palette]`) and hand it to the active scene (ADR-0021), off the hot
-        // path. A shader-colored scene stores the LUT and uploads it next frame;
-        // the spectrum readout samples it on the CPU per element (Plan 0034); the
-        // other line scenes ignore it. `spectrum` reproduces the prior cosine, so a
-        // palette-less preset is visually unchanged. A `[palette_b]` bakes an A/B
-        // pair for the bindable `palette_mix` crossfade.
-        let baked = match (preset.palette.as_ref(), preset.palette_b.as_ref()) {
-            (Some(a), Some(b)) => Palette::bake_pair(a, b),
-            (Some(a), None) => Palette::bake(a),
-            (None, Some(b)) => Palette::bake_pair(
-                &crate::render::palette::PaletteConfig::default_spectrum(),
-                b,
-            ),
-            (None, None) => Palette::default_spectrum(),
-        };
-        scene.set_palette(&baked);
-        // The backdrop colours through the same bake (ADR-0086) — one gradient,
-        // two consumers, no second bake and no drift.
-        //
-        // It goes to the side that will actually **draw** this preset. During a
-        // dissolve that is `incoming_side`, which this call precedes by one frame
-        // (the roster flips at the end of the capture frame); `side` is still
-        // painting the outgoing preset's backdrop and keeps the gradient it was
-        // given, until `promote_incoming_side` makes the incoming one *the* side.
-        let live = incoming_side.as_mut().unwrap_or(side);
-        live.background.set_palette(&baked);
-        // The `[feedback]` table (ADR-0048), to the same side and for the same
-        // reason: it is this preset's structural choice, and the outgoing side
-        // keeps the one it is still painting with. Handed over unconditionally —
-        // a preset with no table hands the default, which is what stops the
-        // previous preset's warp surviving a switch.
-        live.chain.set_feedback(preset.feedback);
-        // ...and to the scene, which is the SECOND sink of the same table
-        // (ADR-0048): the attractor's internal trail. Unconditional for the same
-        // reason, and a no-op for every other scene.
-        scene.set_feedback(preset.feedback);
-        // Structural config (ADR-0007), if any: capture segment-cap truncation so
-        // the frontend can surface it (never a silent cut). `None` for the
-        // fit/no-config case.
-        if let Some(cfg) = preset.config.as_ref() {
-            *cap_overflow = scene.configure(cfg);
-        }
-        // The layer's scene is **constructed for the preset** (ADR-0090 point
-        // 4, Plan 0076 Phase 2), never resolved from the one-instance-per-
-        // system roster — same-system pairs are legal, and two dissolving
-        // sides' layers share nothing. It goes to the side that will draw this
-        // preset (`live`, exactly like the palette and feedback hand-offs
-        // above), constructed fresh at every preset change: a switch is off
-        // the hot path, and a fresh deterministic seed is the same contract
-        // the roster scenes get from the capture rebuild. Its load-time
-        // hand-offs mirror the main scene's — the **shared** palette bake (one
-        // gradient, two layers, one world), the default `[feedback]` table (a
-        // layer declares none), and its own structural config, whose cap
-        // overflow surfaces through the same channel when the main scene
-        // produced none (never a silent cut).
-        live.layer = preset.layer.as_ref().map(|layer| {
-            let mut layer_scene =
-                scenes::create_layer_scene(layer.system, &ctx.device, COMPOSITE_FORMAT, tier);
-            layer_scene.set_palette(&baked);
-            layer_scene.set_feedback(crate::render::feedback::FeedbackConfig::default());
-            if let Some(cfg) = layer.config.as_ref() {
-                let overflow = layer_scene.configure(cfg);
-                if cap_overflow.is_none() {
-                    *cap_overflow = overflow;
-                }
-            }
-            layer_scene
-        });
-        // The `over` junction's presence and blend mode (ADR-0090 / Plan 0076
-        // Phase 3), handed over unconditionally like the `[feedback]` table
-        // above: a preset with an `under` (or no) layer hands `None`, which
-        // also frees the junction's two full-frame inputs.
-        live.chain.set_layer_join(
-            preset
-                .layer
-                .as_ref()
-                .and_then(|layer| (layer.join == LayerJoin::Over).then_some(layer.blend)),
-        );
-    }
-
     /// The segment-cap truncation from the active preset's last `configure`, if
     /// its geometry hit the fixed cap (ADR-0007: the cap is never a silent cut).
     /// Refreshed on every active-preset change (select / cycle / hot-reload); the
@@ -2057,8 +914,7 @@ impl Renderer {
             frame,
             &mut encoder,
             preview.as_ref().map_or(&view, |p| &p.view),
-            width,
-            height,
+            (width, height),
             dt,
             SaltMode::Live,
         );
@@ -2102,14 +958,12 @@ impl Renderer {
     // read once. The same allowance `evaluate_preset` above carries, and for the
     // same reason — bundling them would name a struct after a call site rather
     // than after anything in the design.
-    #[allow(clippy::too_many_arguments)]
     fn draw_frame(
         &mut self,
         frame: &AnalysisFrame,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
-        width: u32,
-        height: u32,
+        surface: (u32, u32),
         dt: f32,
         salt: SaltMode,
     ) -> u32 {
@@ -2199,116 +1053,46 @@ impl Renderer {
         // is the chain's business, not the renderer's — see `post.rs` for the
         // order and the skip rule. The blend, the tonemap and ink are engine-wide
         // passes the renderer drives.
-        let surface = (width, height);
         // The **render target's** aspect, which `PostChain::begin` reports as the
         // surface's whatever internal grid the chain routes through (ADR-0037).
         // Computed once here because the per-vertex evaluation below happens
         // before the chain opens, and `rad`/`ang` must be aspect-corrected.
-        let surface_aspect = width as f32 / height.max(1) as f32;
+        let surface_aspect = surface.0 as f32 / surface.1.max(1) as f32;
         let mut draw_calls = 0;
+        // What both sides evaluate through. Held across the two `evaluate_side`
+        // calls below rather than rebuilt, so the scratch buffers are sliced from
+        // one owner and the salt cannot be taken from two different bundles.
+        let mut shared = SideInputs {
+            tier,
+            series: series_scratch,
+            vertex: vertex_scratch,
+            aspect: surface_aspect,
+            vars,
+            frame,
+            time: *time,
+            dt,
+            salt,
+        };
 
-        // --- the outgoing side, while it is still animating (dual-live only) ---
-        //
-        // Encoded first because it feeds the blend, and driven through `side` —
-        // which has followed the outgoing preset since before the switch, so its
-        // trail keeps accumulating rather than restarting. Its target is the same
-        // texture the snapshot lives in: dual-live simply overwrites it each frame,
-        // so a latch to freeze holds the last live picture instead of jumping back
-        // to the one the dissolve opened on.
+        // The outgoing side first, because it feeds the blend.
         let dual_live = transition.as_ref().is_some_and(Transition::is_dual_live);
         if dual_live {
-            let outgoing_index = transition.as_ref().map(Transition::outgoing_index);
-            // The outgoing preset and the routes resolved for it come from the same
-            // index, so the two cannot drift apart.
-            let outgoing = outgoing_index
-                .and_then(|index| Some((roster.presets.get(index)?, roster.routes_for(index))));
-            if let (Some((outgoing, out_routes)), Some(out_view)) =
-                (outgoing, blend.snapshot_view(surface))
-                && let Some(out_scene) = scene_for_mut(scenes, outgoing.system)
-            {
-                // No terminal: the outgoing side's `exposure`/`ink_*` were held at
-                // the capture frame and are crossfaded by the single engine-wide
-                // pass of each below.
-                let out_elements = element_prefix(outgoing, series_scratch.len());
-                let out_vertex = vertex_grid(outgoing.config.as_ref(), tier, vertex_scratch.len())
-                    .and_then(|(mesh, n)| {
-                        Some(VertexSurface {
-                            mesh,
-                            aspect: surface_aspect,
-                            buf: vertex_scratch.get_mut(..n)?,
-                        })
-                    });
-                // The outgoing preset's latches, advanced **once** for this
-                // frame and read by both its main bindings and its layer's.
-                let out_vars = outgoing_latches.advance(
-                    &outgoing.latches,
-                    vars.with_salt(salt.of(outgoing)),
-                    dt,
-                );
-                evaluate_preset(
-                    outgoing,
-                    out_routes,
-                    out_scene,
+            draw_calls += encode_outgoing_side(
+                ctx,
+                encoder,
+                surface,
+                Outgoing {
+                    transition: transition.as_ref(),
+                    roster,
+                    blend,
+                    scenes,
                     side,
-                    None,
-                    outgoing_smoother,
-                    &out_vars,
-                    frame,
-                    *time,
-                    dt,
-                    series_scratch.get_mut(..out_elements).unwrap_or(&mut []),
-                    out_vertex,
-                );
-                // The outgoing preset's own layer keeps animating through a
-                // dual-live dissolve exactly as its main scene does — its scene
-                // is the outgoing side's own instance (Plan 0076 Phase 2).
-                if let (Some(layer), Some(layer_scene)) =
-                    (outgoing.layer.as_ref(), side.layer.as_mut())
-                {
-                    let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
-                    let lv = vertex_grid(layer.config.as_ref(), tier, vertex_scratch.len())
-                        .and_then(|(mesh, count)| {
-                            Some(VertexSurface {
-                                mesh,
-                                aspect: surface_aspect,
-                                buf: vertex_scratch.get_mut(..count)?,
-                            })
-                        });
-                    evaluate_layer(
-                        layer,
-                        layer_scene,
-                        &mut side.chain,
-                        outgoing_layer_smoother,
-                        &out_vars,
-                        frame,
-                        *time,
-                        dt,
-                        series_scratch.get_mut(..n).unwrap_or(&mut []),
-                        lv,
-                    );
-                }
-                // **The outgoing preset's OWN held stop, not the crossfaded one**
-                // (ADR-0080). Two reasons, and the first is structural: the
-                // crossfade below cannot have run yet, because it interpolates
-                // towards the incoming preset's `exposure` and that is not routed
-                // until further down. The second is that this is the right answer
-                // anyway — the outgoing side's bright-pass should keep selecting
-                // what its author aimed it at for as long as the side is drawn;
-                // fading it out is the blend's job, not the threshold's.
-                let out_exposure = transition
-                    .as_ref()
-                    .and_then(Transition::outgoing_exposure)
-                    .unwrap_or(tonemap::DEFAULT_EXPOSURE);
-                draw_calls += composite_into(
-                    ctx,
-                    out_scene,
-                    side,
-                    encoder,
-                    &out_view,
-                    surface,
-                    out_exposure,
-                );
-            }
+                    smoother: outgoing_smoother,
+                    layer_smoother: outgoing_layer_smoother,
+                    latches: outgoing_latches,
+                },
+                &mut shared,
+            );
         }
 
         // --- the active preset: the incoming side during a dissolve, the only
@@ -2326,215 +1110,50 @@ impl Renderer {
         let Some(scene) = scene_for_mut(scenes, preset.system) else {
             return draw_calls;
         };
-        tonemap.reset_params();
-        ink.reset_params();
-        let elements = element_prefix(preset, series_scratch.len());
-        let vertex = vertex_grid(preset.config.as_ref(), tier, vertex_scratch.len()).and_then(
-            |(mesh, n)| {
-                Some(VertexSurface {
-                    mesh,
-                    aspect: surface_aspect,
-                    buf: vertex_scratch.get_mut(..n)?,
-                })
-            },
-        );
-        // The active preset's latches, advanced **once** for this frame — the
-        // `fire` edge is consumed here, so everything below reads one bundle.
-        let vars = latches.advance(&preset.latches, vars.with_salt(salt.of(preset)), dt);
-        evaluate_preset(
-            preset,
-            routes,
-            scene,
-            live_side,
-            Some(Terminal { tonemap, ink }),
-            param_smoother,
-            &vars,
-            frame,
-            *time,
-            dt,
-            series_scratch.get_mut(..elements).unwrap_or(&mut []),
-            vertex,
-        );
-        // The `[layer]` bindings, into the layer's own scene and nowhere else
-        // (ADR-0090 / Plan 0076): evaluated under the same salt, clock and
-        // analysis frame as the top level, eased by their own smoother. The
-        // scene is this side's own per-preset instance (Phase 2).
-        if let (Some(layer), Some(layer_scene)) = (preset.layer.as_ref(), live_side.layer.as_mut())
-        {
-            let n = config_element_prefix(layer.config.as_ref(), series_scratch.len());
-            let lv = vertex_grid(layer.config.as_ref(), tier, vertex_scratch.len()).and_then(
-                |(mesh, count)| {
-                    Some(VertexSurface {
-                        mesh,
-                        aspect: surface_aspect,
-                        buf: vertex_scratch.get_mut(..count)?,
-                    })
-                },
-            );
-            evaluate_layer(
-                layer,
-                layer_scene,
-                &mut live_side.chain,
-                layer_smoother,
-                &vars,
-                frame,
-                *time,
-                dt,
-                series_scratch.get_mut(..n).unwrap_or(&mut []),
-                lv,
-            );
-        }
-
-        // Ink is one engine-wide pass over the *blended* frame (ADR-0028), but a
-        // dissolve has two presets each binding their own `ink_*`/`paper_*`. Lerp
-        // the params — not two remapped frames, which is non-linear — so `t = 0` is
-        // exactly the outgoing look and `t = 1` exactly the incoming one, with no
-        // snap at either end. On the capture frame the outgoing preset is still the
-        // active one, so its values are already correct and nothing is held yet.
-        if let Some(tr) = transition.as_ref() {
-            let t = tr.progress();
-            if let Some(from) = tr.outgoing_ink() {
-                ink.crossfade_from(from, t);
-            }
-            // `exposure` has the same problem for the same reason: one pass over a
-            // frame that is a mix of two presets cannot show two stops, so it shows
-            // the mix. Without this, a preset binding `exposure` would pop a stop
-            // on the single frame the roster flips.
-            if let Some(from) = tr.outgoing_exposure() {
-                tonemap.crossfade_from(from, t);
-            }
-        }
-
-        // The display-referred tail is resolved *first*, outermost inwards, because
-        // each pass's input is the previous one's output and the outermost is the
-        // only one whose destination is known: ink folds into the surface, the
-        // tonemap folds into ink's input (or the surface, with ink off), and
-        // everything linear targets the tonemap's input.
-        let ink_input = if ink.active() {
-            ink.begin(surface)
-        } else {
-            None
-        };
-        let display = ink_input.as_ref().unwrap_or(view);
-
-        // The linear terminal: where the composite stops. Unlike ink this is never
-        // skipped — it is the format boundary (ADR-0046). If it somehow cannot
-        // build its target, fall through to `display` and take the old clipped
-        // 8-bit composite rather than dropping the frame.
-        let tonemap_input = tonemap.begin(surface);
-        let terminal = tonemap_input.as_ref().unwrap_or(display);
-
-        // Where the active side resolves. While a dissolve runs the blend sits
-        // between the chain and the tonemap, so it feeds one of the blend's two
-        // inputs: the outgoing target on the opening frame, the live target on
-        // every frame after. If the blend cannot build its targets, fall through to
-        // the terminal view — a cut, never a blend of undefined pixels.
-        let blend_input = match transition.as_ref() {
-            Some(tr) if tr.needs_snapshot() => blend.snapshot_view(surface),
-            Some(_) => blend.live_view(surface),
-            None => None,
-        };
-        let destination = blend_input.as_ref().unwrap_or(terminal);
-
-        // After the crossfade above, so a dissolve's bright-pass thresholds against
-        // the stop the tonemap will actually apply to this frame rather than the
-        // incoming preset's endpoint (ADR-0080).
-        draw_calls += composite_into(
+        draw_calls += encode_active_side(
             ctx,
-            scene,
-            live_side,
             encoder,
-            destination,
+            view,
             surface,
-            tonemap.applied_exposure(),
+            ActiveSide {
+                active: Active { preset, routes },
+                scene,
+                composite: live_side,
+                smoother: param_smoother,
+                layer_smoother,
+                latches,
+            },
+            DisplayTail {
+                blend,
+                tonemap,
+                ink,
+                transition: transition.as_ref(),
+            },
+            &mut shared,
         );
-        if let (Some(tr), true) = (transition.as_ref(), blend_input.is_some()) {
-            // Mix the outgoing side with the live incoming one into the tonemap's
-            // input. At t = 0 this is the outgoing frame exactly, which is what lets
-            // the opening frame present through the same pass before the live side
-            // has ever been rendered into.
-            draw_calls += blend.resolve(&ctx.queue, encoder, terminal, tr.progress(), tr.kind());
-        }
-        if tonemap_input.is_some() {
-            draw_calls += tonemap.resolve(&ctx.queue, encoder, display);
-        }
-        if ink_input.is_some() {
-            draw_calls += ink.resolve(&ctx.queue, encoder, view);
-        }
 
         // Hold the outgoing preset's evaluated terminal params off the capture
         // frame, where the roster still points at it — the one frame they exist.
         let captured_ink = ink.params();
         let captured_exposure = tonemap.exposure();
 
-        // On-canvas text (browse overlay / HUD): a second pass that loads the
-        // scene and composites the queued runs on top, in the same frame
-        // (ADR-0009). Standalone-only via the `text` feature; when both this and
-        // the diagnostics overlay are on, the overlay draws last so it sits on
-        // top of the text.
-        #[cfg(feature = "text")]
-        {
-            if text_layer.prepare(&ctx.device, &ctx.queue, width, height) {
-                // Load: composite over the scene already in the view.
-                let mut pass = gpu::color_pass(encoder, "rlx-text-pass", view, wgpu::LoadOp::Load);
-                text_layer.render(&mut pass);
-                draw_calls += 1;
-            }
-        }
+        draw_calls += encode_on_canvas(
+            ctx,
+            encoder,
+            view,
+            surface,
+            OnCanvas {
+                #[cfg(feature = "text")]
+                text_layer,
+                diag,
+                overlay,
+                tier: tier.tier,
+                tier_demoted: *tier_demoted,
+            },
+        );
 
-        if diag.overlay_enabled() {
-            let metrics = diag.metrics();
-            overlay.render(
-                &ctx.queue,
-                encoder,
-                view,
-                (width, height),
-                metrics,
-                diag.analysis(),
-                tier.tier,
-                *tier_demoted,
-                diag.stats().samples().map(|s| s * 1000.0),
-            );
-            draw_calls += 1;
-        }
-
-        // The budget governor, re-checked every frame a dual-live dissolve runs: on
-        // evidence of overload it latches to the frozen side for the remainder, so
-        // the mode can never flicker frame to frame (ADR-0024).
-        if let Some(tr) = transition.as_mut()
-            && dual_live
-            && transition::budget_blown(diag.stats().frame_ms_avg(), DUAL_LIVE_BUDGET_MS)
-        {
-            tr.latch_freeze();
-        }
-
-        // Advance the dissolve now that the frame at the current `t` is encoded.
-        // The capture frame hands back the index to flip the roster to, so the next
-        // frame composites the incoming preset through its own side; a dissolve that
-        // has reached `t = 1` promotes that side and releases the blend's targets.
         // The borrows above all end here, so `self` is free again (NLL).
-        let advanced = transition.as_mut().map(|tr| {
-            (
-                tr.advance(dt, captured_ink, captured_exposure),
-                tr.finished(),
-            )
-        });
-        if let Some((flip_to, finished)) = advanced {
-            if let Some(index) = flip_to {
-                // Hand the outgoing preset's easing state to the outgoing side
-                // before `configure_active_scene` resets the active one, so a
-                // heavily-smoothed preset keeps easing through a dual-live dissolve
-                // instead of snapping to raw values the frame it stops being active.
-                self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
-                self.outgoing_layer_smoother = std::mem::take(&mut self.layer_smoother);
-                self.outgoing_latches = std::mem::take(&mut self.latches);
-                self.roster.select(index);
-                self.configure_active_scene();
-            }
-            if finished {
-                self.cancel_transition();
-            }
-        }
+        self.advance_transition(dt, dual_live, captured_ink, captured_exposure);
 
         draw_calls
     }

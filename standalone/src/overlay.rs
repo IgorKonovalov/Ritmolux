@@ -71,6 +71,15 @@ pub const CAPTURE_SIZE: f32 = 18.0;
 /// not part of the show.
 pub const CAPTURE_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.95];
 
+/// Browse-overlay row colors, beside the **geometry** above that they paint —
+/// the insets, pitch, font size and column width the pure layout function
+/// reasons about. One module owns both halves, so the pixels drawn and the
+/// arithmetic tested cannot drift apart.
+pub const ROW_COLOR: [f32; 4] = [0.72, 0.78, 0.88, 0.95];
+pub const ROW_HL_COLOR: [f32; 4] = [1.0, 0.88, 0.35, 1.0];
+/// The filter-echo header sits above the list; dimmer than the rows.
+pub const HEADER_COLOR: [f32; 4] = [0.6, 0.66, 0.76, 0.9];
+
 /// The F3 overlay's audio line, built from the **same** startup token the
 /// `diagnostics.log` `capture` column carries — so a screenshot and a log from
 /// one run cannot disagree about why the app is or is not hearing anything.
