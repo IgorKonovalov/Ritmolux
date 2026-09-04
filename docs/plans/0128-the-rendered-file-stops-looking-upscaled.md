@@ -311,7 +311,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | 1 — Measure the three constants | dev | done | `7387579` |
 | 2 — The law, live | dev | done | `9243255` |
 | 3 — The offline ceiling | dev | done | `1890df7` |
-| 4 — Does it still look upscaled? | human | not started | |
+| 4 — Does it still look upscaled? | human | done | verdict below |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
 | 7 — The Mode 4 repairs | dev | done | `de72c22` |
@@ -551,6 +551,24 @@ the property a four-minute render actually depends on.
   resolved budget would take a 640x360 render from ~952 MB to ~700 MB. Not done
   here — it is a change to what ADR-0140 specifies, not an implementation of it.
 
+### Phase 4 verdict — 2026-09-04
+
+**"looks good!"** — the user, on
+`renders/plan-0128-p4/p4_leviathan_1080p60.mp4`. That is the whole verdict and
+the phase's done-when is a one-line verdict in the user's words, so it is not
+elaborated here.
+
+**It is one file, not the two the phase asked for**, and it is not the clip that
+produced the complaint. Floating Points, *LesAlpx* is not on this machine and
+neither is Plan 0101's original 1080p render — the lane that made both was
+removed — so the render is the 45 s Caribou/*Odessa* segment already on disk from
+Plan 0106 Phase 7d, and the judgement is on it alone rather than against a
+side-by-side. `renders/plan-0128-p4/run.sh` carries the same caveat.
+
+The render: `attractor_leviathan`, 1920x1080/60, `--tier rich`, 2 700 frames,
+header `attractor samples 1350000` against the 150 000 a pre-ADR-0140 build drew
+at that size. Peak resident set 970 MB, growth -68.9 MB across the run.
+
 ### Phase 6 — superseded
 
 **design-backlog 0130 was closed 2026-09-01 by
@@ -583,9 +601,11 @@ The plan header's `Closes: design-backlog 0130` is stale.
   (the two-ceiling table, the three consequences, the measured resident set) and a
   pointer added under *Captures pin the floor tier*.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
-- **Outstanding `human` phases:** **4** (does it still look upscaled) and **5** (the
-  `fast`-vs-`quality` diffusion side-by-side). Neither has run. Phase 4 is the look
-  gate the whole plan exists for, and backlog 0110 does not close without it.
+- **Outstanding `human` phases:** **5** (the `fast`-vs-`quality` diffusion
+  side-by-side) — not run. Phase 4 ran 2026-09-04 and its verdict is above.
+  `renders/plan-0106-p7/` already holds `p7_fast.mp4` and `p7_quality.mp4`, which
+  that directory's README calls the only side-by-side of what the larger pixel
+  budget buys — worth reading before rendering anything new for Phase 5.
 - **Full suite:** `cargo nextest run --workspace`, exit **0** — 1535 tests run, 1535 passed,
   5 skipped. Run at the tip, after Phase 7 and after `main` was merged into the lane; `fmt
   --check` and `clippy --workspace --all-targets` clean at the same tip. The earlier
