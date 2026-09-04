@@ -80,7 +80,7 @@ plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C 
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships,
                      #   nothing shipped depends on it, so it is outside `default-members` too.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
-scripts/             # Repo maintenance: the five Node gates the pre-push hook and CI's `links` job
+scripts/             # Repo maintenance: the six Node gates the pre-push hook and CI's `links` job
                      #   run (see "Developer setup" below), plus scripts/fixtures/ seeded bite checks.
 packaging/           # What a `v*` tag ships, one recipe per artifact, each doing its own verification
                      #   so a local run is held to CI's bar: macos/bundle.sh (build, lipo, sign, zip,
@@ -544,9 +544,12 @@ What it runs, stopping at the first failure and naming the step that failed:
 |------|---------|
 | Doc links | `node scripts/check-doc-links.mjs` |
 | Index rows | `node scripts/check-index-rows.mjs` |
+| Index rows (self-test) | `node scripts/check-index-rows.mjs --self-test` |
 | Backlog claims | `node scripts/check-backlog-claims.mjs` |
 | Filter figures | `node scripts/check-filter-figures.mjs` |
 | Comment hygiene | `node scripts/check-comment-hygiene.mjs` |
+| Contents blocks | `node scripts/toc.mjs --check` |
+| Contents blocks (self-test) | `node scripts/toc.mjs --self-test` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
@@ -558,9 +561,14 @@ inside a marked roster region must stay under 320 bytes
 every live `docs/design-backlog.md` entry must carry a probe that still holds
 ([ADR-0108](docs/adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md)),
 the diffusion filter's cost figures must live in one file
-([ADR-0122](docs/adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)), and no `.rs`
+([ADR-0122](docs/adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)), no `.rs`
 comment may carry a relative link or plan-relative narration
-([ADR-0127](docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)).
+([ADR-0127](docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)),
+and every generated contents block must still match the headings beneath it
+([ADR-0163](docs/adrs/0163-a-long-document-carries-a-generated-contents-block.md)).
+Six gates and eight steps: the two that could go green on a rule that had quietly
+stopped working — a roster detector matching nothing, an anchor rule that is
+merely plausible — carry a `--self-test` beside their check.
 If `node` is not on your `PATH` they all **skip with a notice** rather than
 failing the push; nothing else here needs Node. That skip is about the hook only
 — CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot

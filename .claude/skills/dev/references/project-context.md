@@ -36,8 +36,8 @@ presets/         # the shipped preset library (*.toml) + README.md (the param ro
   pending/       #   authored + approved but NOT shipped, held back by a known engine/harness gap.
                  #   build.rs's read_dir is non-recursive (ADR-0022), so it is skipped by design.
 tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
-scripts/         # the five Node gates (doc links, index rows, backlog claims, filter figures,
-                 #   comment hygiene) — pre-push and CI's `links` job run all five
+scripts/         # the six Node gates (doc links, index rows, backlog claims, filter figures,
+                 #   comment hygiene, contents blocks) — pre-push and CI's `links` job run all six
 docs/adrs/  docs/plans/  docs/specs/
 ```
 
