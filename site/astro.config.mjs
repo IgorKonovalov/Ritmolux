@@ -1,5 +1,9 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
+
+/** The Pages subpath, shared by both hosting stages and by the link rewriter. */
+const BASE = '/ritmolux/';
 
 /**
  * Drops the document's opening `# ` heading.
@@ -21,8 +25,8 @@ export default defineConfig({
   // Plan 0143 Phase 4 publishes into `public/ritmolux/` of the personal Pages
   // site, and Phase 7 moves to the project repository at the same subpath, so
   // `base` is the same string for both stages and no published URL moves.
-  base: '/ritmolux/',
-  markdown: { remarkPlugins: [stripLeadingHeading] },
+  base: BASE,
+  markdown: { remarkPlugins: [stripLeadingHeading, [rewriteLinks, { base: BASE }]] },
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
   // unless the ancestor is allowed explicitly.

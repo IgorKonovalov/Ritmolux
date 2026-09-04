@@ -285,8 +285,8 @@ other off-site target. `dev` should not re-raise this.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the site renders the published set from one source | dev | done | committed with this row |
-| 2 — links resolve across the publish boundary | dev | not started | |
+| 1 — the site renders the published set from one source | dev | done | 41c77c5 |
+| 2 — links resolve across the publish boundary | dev | done | committed with this row |
 | 3 — the home page routes, and does not pitch | dev | not started | |
 | 4 — the demo goes live on the personal site | human | not started | |
 | 5 — the gallery covers everything that ships | dev | not started | |
@@ -313,6 +313,18 @@ other off-site target. `dev` should not re-raise this.
   package; it is also Starlight's own peer dependency. Phase 2's link rewriter needs it too.
 - `git status` after Phase 1 shows no modification to any file under `docs/` or `presets/` other
   than this plan's own `Status:` line and this log.
+- **Phase 2's done-when reads “no `href` in the built output ends in `.md`” and is implemented as
+  *no **site-relative** href ends in `.md`*.** Taken literally it contradicts the same phase's own
+  What: the rewrite turns a relative `.md` link into a GitHub blob URL for that same `.md` file, so
+  268 correct off-site hrefs end in `.md` by design. The property that is actually exact is that a
+  markdown link the site would have to serve never survives — that is what the gate asserts, and it
+  reports zero.
+- **Phase 2's gate did not exit 0 at Phase 2's own commit.** It reported 28 unresolved hrefs across
+  two distinct targets, `/ritmolux/` and `/ritmolux/favicon.svg` — the site's home page and its
+  icon, both of which Phase 3 creates. Nothing about the rewrite was implicated: zero unrewritten
+  markdown links, zero off-site hrefs that were not absolute `https`. The gate goes green at Phase
+  3's commit, and Phase 3's row records that run. This is an ordering artifact of the plan, not a
+  defect found in it.
 
 ### Close triggers
 
