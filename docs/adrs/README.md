@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0165.** *(0120 was reserved for
+**Next free number: 0166.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -186,4 +186,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | accepted 2026-09-02 (Plan 0150), Outcome |
 | [0163](0163-a-long-document-carries-a-generated-contents-block.md) | A long document carries a generated contents block, and spent prose archives at the close | proposed |
 | [0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) | The OSC address root becomes `/rlx`, in one break, and `/v1` does not move | proposed, extends 0144 |
+| [0165](0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md) | Dependencies compile without debug info, and one line buys it back | proposed |
 <!-- roster:end -->

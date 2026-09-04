@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0153** (ADRs are a separate sequence — next free there is **0165**.)
+**Next free number: 0154** (ADRs are a separate sequence — next free there is **0166**.)
 
 ## Active roster
 
@@ -38,6 +38,7 @@ place. The plan file carries the real link.
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0151](0151-the-long-documents-become-navigable.md) | The long documents become navigable | draft | dev | ADR-0163 (proposed): generated contents blocks, no splits. Sheds 335 lines of self-declared-superseded sequencing prose from this file. **Take before 0143**, whose route map wants the final layout. |
 | [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
+| [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
 <!-- roster:end -->
 
 **Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
