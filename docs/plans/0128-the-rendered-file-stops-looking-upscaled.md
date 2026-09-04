@@ -209,6 +209,38 @@ flowchart TD
   block reads 1.0000); both floors name their capture size; `node scripts/check-comment-hygiene.mjs`
   and `node scripts/check-backlog-claims.mjs` exit 0. No behavior changes and no golden moves.
 
+### Phase 7 — The Mode 4 repairs
+
+- **Owner skill:** dev
+- **What:** Three findings from the close review, all non-behavioral. Added to the plan after the
+  first six landed, because the review is what found them and a chat message is not a contract.
+- **Files touched:** `core/src/render/mod.rs`, `core/src/render/scenes/mod.rs`,
+  `core/src/render/tier/tests.rs`.
+- **Done when:**
+  - **`Renderer::attractor_sample_budget` is gone, or it has a caller.** It has neither today, and
+    its doc comment names a call site that cannot exist: *"a caller that wants to report the number
+    (a render's own header does) must not restate the law"*. `--render`'s header is
+    `attractor_note` in `standalone/src/shot/render.rs`, which resolves the budget itself through
+    `TierConfig::attractor_budget_offline` — and it has to, because the header prints before the
+    renderer is constructed and the scene reports `None` until its first `set_target_size`.
+    **Deleting the accessor is the expected repair**; wiring the header to it means moving the
+    print after the first frame, which costs more than the property is worth. Either way the false
+    sentence goes. The `Scene::sample_budget` hook stays — it has a real caller in the factory test.
+  - **The factory test's doc comment describes the test it is attached to.** In
+    `core/src/render/scenes/mod.rs`, `the_render_path_resolves_a_larger_budget_than_a_window_does`
+    opens with *"Every `SystemKind::ALL` entry builds the scene that kind is supposed to drive …
+    transposing two factory arms … fails here"*, which is
+    `every_kind_builds_the_scene_it_drives`'s claim — that test is left carrying only *"Needs a GPU
+    adapter"*. Move the paragraph back to the test it belongs to.
+  - **`rich_is_never_below_the_floor` covers the two new ceilings.** It enumerates every field where
+    `Rich` must not fall below `Floor` and was not extended with
+    `attractor_particles_live_ceiling` or `attractor_particles_offline_ceiling`. A regression would
+    still be caught by `the_measured_ceilings_are_the_ones_that_shipped`, which pins both exactly —
+    but that test reads as a roster and an incomplete roster is the thing this one exists to be.
+  - `cargo nextest run --workspace` green; `clippy --workspace --all-targets` clean. No golden is
+    blessed and none should move — nothing here touches a rendered pixel.
+
+
 ## Data shapes
 
 ```rust
@@ -282,6 +314,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
+| 7 — The Mode 4 repairs | dev | not started | |
 
 ### Phase 1 readings
 
