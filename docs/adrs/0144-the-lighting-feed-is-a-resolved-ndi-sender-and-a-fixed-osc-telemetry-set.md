@@ -315,3 +315,19 @@ half was measured and found wrong; the room it was designed for stopped existing
 **What is *not* superseded:** the fixed-vocabulary decision, the `/lmv/v1` versioning-in-the-address
 scheme, the drop-and-report-the-edge failure behaviour, and the off-by-default posture. ADR-0145
 retains the sink as built.
+
+## Outcome (added by Plan 0152, 2026-09-04)
+
+**The address root moved from `/lmv/v1` to `/rlx/v1`**, in one break with no transition period and
+no dual-emit, per [ADR-0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) and
+[Plan 0152](../plans/0152-the-osc-root-becomes-rlx.md). Every `/lmv/v1/…` address named above now
+reads `/rlx/v1/…` on the wire. The body is left as written: it records what was decided and what
+shipped at the time, and that stays true.
+
+**The `/lmv/v1` versioning-in-the-address decision this ADR's *"what is not superseded"* clause
+retains is unaffected.** What moved is the product name in the root; `/v1` did not move, because no
+payload, argument type tag, address suffix, vocabulary or send cadence changed — a consumer that
+re-points its root and changes nothing else is correct. ADR-0164's argument is that spending the
+protocol version on a rename would leave nothing to signal an actual protocol break with. The
+fixed-vocabulary decision, the drop-and-report-the-edge failure behaviour and the off-by-default
+posture are equally untouched.

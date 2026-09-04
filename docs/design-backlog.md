@@ -2848,7 +2848,7 @@ first real consumer wanted a member that was not on the list. ADR-0144 named exa
 This is that evidence, arriving from the first set played.
 
 **What a fix looks like:** publish the grid. `bar_index`, `beat_in_bar`, `bar_phase` and
-`downbeat_locked` under the existing `/lmv/v1` prefix, which is additive by construction - the
+`downbeat_locked` under the existing `/rlx/v1` prefix, which is additive by construction - the
 prefix is versioned precisely so a later signal does not break a console mapping. The lock flag
 matters as much as the count: a consumer that cannot tell a locked grid from a warming one has to
 guess, which is what the 85 % window was.
@@ -2869,7 +2869,7 @@ claim.
 **It stops being free the moment something derives timing from it.** The lighting bridge derives
 every timing from the tempo - one structural climb per eight beats - so an unfolded estimate made
 the whole rig climb at twice the asked rate. The remedy was three lines, halving above 140 and
-doubling below 70, and **every future consumer of `/lmv/v1/tempo` will write those same three
+doubling below 70, and **every future consumer of `/rlx/v1/tempo` will write those same three
 lines**, each choosing its own window, none of them recorded anywhere.
 
 **The direction of the error is the part worth flagging, because it does not match the record.**
@@ -3066,7 +3066,7 @@ during a show, which is exactly when there is no time to discover that.
 ### What is actually missing
 
 **Nothing is broken in the analyzer, and the information the consumer needed was already on the
-wire.** `/lmv/v1/raw/bass` is published beside `/lmv/v1/level/bass` and is the absolute twin;
+wire.** `/rlx/v1/raw/bass` is published beside `/rlx/v1/level/bass` and is the absolute twin;
 `README.md` documents both. What no surface anywhere states is the property above - that `level/*`
 is *designed* to touch 1.0 regularly on periodic material - and the word "level" invites precisely
 the reading that failed here. A consumer picking a term off the telemetry table has no way to learn

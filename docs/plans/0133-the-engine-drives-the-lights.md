@@ -18,7 +18,7 @@ in `config.toml` and the look authored as a TOML file in the existing expression
 replaces the Arena-on-a-second-machine architecture of ADR-0144, which a live set on 2026-08-29
 bypassed entirely and which the user has since rejected outright.
 
-**The starting point is not zero.** The `/lmv/v1` OSC sink is built and shipped (Plan 0132 Phase 2),
+**The starting point is not zero.** The `/rlx/v1` OSC sink is built and shipped (Plan 0132 Phase 2),
 and an external Python bridge already turned it into a room the user called *"looks amazing"*. This
 plan brings that path inside the application, generalizes the rig from constants to configuration,
 and moves the look from throwaway Python into content the project owns.

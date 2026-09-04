@@ -225,8 +225,8 @@ before                      after
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The wire moves, and the probes it falsifies move with it | dev | done | `aec2381` |
-| 2 — The operator's table | dev | done | committed with this row |
-| 3 — The record | dev | not started | |
+| 2 — The operator's table | dev | done | `7644cc3` |
+| 3 — The record | dev | done | committed with this row |
 | 4 — Two seed comments come back | dev | not started | |
 | 5 — Re-point the rig | human | not started | |
 
