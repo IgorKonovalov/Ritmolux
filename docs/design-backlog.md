@@ -65,6 +65,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push](#0179--cargo-doc-is-the-one-ci-gate-no-local-step-mirrors-so-making-an-item-public-cannot-fail-until-after-the-push)
 - [0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist](#0180--a-doc-comment-states-the-abi-version-is-4-and-points-at-a-test-file-that-does-not-exist)
 - [0181 — Running the test suite migrates the developer's real `%APPDATA%` directory](#0181--running-the-test-suite-migrates-the-developers-real-appdata-directory)
+- [0182 — The `--help` banner still calls the application `ritmolux`](#0182--the---help-banner-still-calls-the-application-ritmolux)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3505,3 +3506,40 @@ on machines that happen to have both directories.
 the file's `run`/`run_both` helper — which isolates the migration and every future startup side
 effect at once. Migration-specific behaviour is already covered by the four unit tests against
 `migrate_app_dir_in`, so nothing is lost by keeping it out of the subprocess cases.
+
+## 0182 — The `--help` banner still calls the application `ritmolux`
+
+**Raised by:** `architect`, at [Plan 0151](plans/done/0151-the-long-documents-become-navigable.md)'s
+close review (2026-09-04), from a followup `dev` recorded in that plan's implementation log.
+**Owner if taken:** `dev`.
+
+- **Verified 2026-09-04** — the banner is lower-case in the shipped string:
+  `present: ritmolux — a real-time music visualizer in: standalone/src/cli.rs`
+- **Verified 2026-09-04** — the per-user directory the same binary creates is not:
+  `present: APP_DIR_NAME: &str = "Ritmolux" in: standalone/src/lib.rs`
+- **Verified 2026-09-04** — and a test fixture still carries the old directory name:
+  `present: Roaming.ritmolux.presets in: standalone/src/settings/tests.rs`
+
+### The finding
+
+`standalone/src/cli.rs:201` builds the `--help` banner as
+*"ritmolux — a real-time music visualizer"*. That first token is the **product name**, and
+[ADR-0162](adrs/0162-the-application-is-renamed-to-ritmolux.md) capitalized it everywhere else a
+user reads it — the window title, the settings surfaces, the packaging READMEs, both index H1s. The
+`usage: ritmolux [flags]` clause on the same line is correct and must not move: that one is the
+**binary name** (`standalone/Cargo.toml` `[[bin]] name = "ritmolux"`), which ADR-0162 deliberately
+left lower-case.
+
+Plan 0150 could not see it because its greps matched the token, not its role, and the two roles sit
+four words apart on one line. Plan 0151's `11a320e` moved twelve prose sites and deliberately left
+this one, because `standalone/src/main.rs` was live in another lane at the time; that lane has since
+closed and the banner moved to `cli.rs` in the split.
+
+**Why nothing catches it.** `standalone/tests/help_cli.rs` asserts on the flag table, not the
+banner, and every stderr assertion in it is `contains`. No gate reads product prose in a Rust string
+literal — `check-comment-hygiene.mjs` reads comments, and only for relative links and
+plan-relative narration.
+
+**What a fix looks like.** One character in `cli.rs`, plus the `settings/tests.rs` fixture path for
+consistency. It is a `dev` edit rather than a docs one, which is the only reason a docs lane left it
+standing. If the golden `--help` output is ever pinned byte-for-byte, pin it after this moves.

@@ -1,9 +1,9 @@
 # ADR-0163 — A long document carries a generated contents block, and spent prose archives at the close
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-04 (Plan 0151)
 > **Date:** 2026-09-02
 > **Extends:** [ADR-0116](0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
-> **Related plan(s):** [0151](../plans/0151-the-long-documents-become-navigable.md)
+> **Related plan(s):** [0151](../plans/done/0151-the-long-documents-become-navigable.md)
 
 ## Context
 
