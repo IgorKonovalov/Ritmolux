@@ -278,10 +278,10 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 |---|---|---|---|
 | 1 — Measure the three constants | dev | done | `7387579` |
 | 2 — The law, live | dev | done | `9243255` |
-| 3 — The offline ceiling | dev | done | committed with this row |
+| 3 — The offline ceiling | dev | done | `1890df7` |
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
-| 6 — The statistic names its capture | dev | not started | |
+| 6 — The statistic names its capture | dev | superseded, residue done | committed with this row |
 
 ### Phase 1 readings
 
@@ -505,6 +505,33 @@ the property a four-minute render actually depends on.
   to protect is unreachable there. Allocating the offline path at its own
   resolved budget would take a 640x360 render from ~952 MB to ~700 MB. Not done
   here — it is a change to what ADR-0140 specifies, not an implementation of it.
+
+### Phase 6 — superseded, and what was left
+
+**design-backlog 0130 was closed 2026-09-01 by
+[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4**, four days after
+this plan was written, as commit `98977ff docs(metrics): boundary_density names
+the capture it is bound to`. Both halves of this phase's done-when had already
+landed there:
+
+- `boundary_density`'s docstring carries the resolution paragraph —
+  *"bound to the capture's resolution and comparable only at a fixed one"*, the
+  `~1/L` law, the 192x192-against-96x96 example, the `2/r` disc and the 4x4 block
+  reading `1.0000`.
+- Both floors name their capture: `boundary_floor`'s derivation says *"Both arms
+  are measured at this suite's `SIZE` (96x96) capture, and both are bound to
+  it"*, and the `shape_collage` arm names *"the same 96x96 capture"*. No change
+  was needed in `core/tests/sanity.rs`.
+
+**One clause of the done-when was still open** and is what this commit closes: the
+summary sentence still read *"a hatched, stroked or tiled figure is almost all rim
+and reads near one **however small**"* — the scale-free reading the phase objects
+to, and one that contradicts the same docstring's own 4x4 block eleven lines
+later. The *"a solid mass reads near zero however large it is"* half was already
+gone.
+
+**The plan header's `Closes: design-backlog 0130` is stale** and the entry is
+already marked closed against Plan 0137 in `docs/design-backlog.md`.
 
 ### Close triggers
 
