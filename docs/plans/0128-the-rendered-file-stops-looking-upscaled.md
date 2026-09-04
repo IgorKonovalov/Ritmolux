@@ -277,8 +277,8 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Measure the three constants | dev | done | `7387579` |
-| 2 — The law, live | dev | done | committed with this row |
-| 3 — The offline ceiling | dev | not started | |
+| 2 — The law, live | dev | done | `9243255` |
+| 3 — The offline ceiling | dev | done | committed with this row |
 | 4 — Does it still look upscaled? | human | not started | |
 | 5 — The diffusion side-by-side | human | not started | |
 | 6 — The statistic names its capture | dev | not started | |
@@ -473,6 +473,38 @@ re-measuring it re-renders them.
 docs(metrics): boundary_density names the capture it is bound to` — a week after
 this plan was written. The plan header's `Closes: design-backlog 0130` is stale.
 See that phase's own row for what was left to do.
+
+### Phase 3 readings — a 1080p render's memory
+
+`attractor_leviathan` over an 8 s synthesized clip, 480 frames at 60 fps,
+`--tier rich`, release, hardware adapter. `--render`'s own resident-set line:
+
+| target | ceiling the buffer is sized at | header reports | peak RSS | growth over 480 frames |
+|---|---|---|---|---|
+| 1920x1080, offline | 2,700,000 | `attractor samples 1350000` | **956 MB** | -7.9 MB |
+| 1920x1080, live *(control)* | 600,000 | — | 732 MB | -7.9 MB |
+| 640x360, offline | 2,700,000 | `attractor samples 150000` | **952 MB** | +0.1 MB |
+
+**Inside the bound Phase 1 named, and the arithmetic is the ceiling's rather than
+the budget's.** The +224 MB the offline path costs over the live control is the
+allocation difference — `(2,700,000 - 600,000) x 48 B x 2` is 201.6 MB predicted,
+for the GPU buffer plus the CPU scatter the scene holds for re-upload — with
+~22 MB of staging and fragmentation on top. Growth is flat either way, which is
+the property a four-minute render actually depends on.
+
+**Two things to hand to architect.**
+
+- **ADR-0140's *"60 MB of particle state costs nothing anybody watches"* is 4.3x
+  low.** The Rich offline ceiling is 129.6 MB of GPU buffer and the process holds
+  it twice, so the real figure is 259.2 MB. It is still a one-shot process and
+  still flat, but the sentence understates it by more than a factor of four.
+- **A render pays the ceiling whatever its size** — 952 MB at 640x360 against
+  956 MB at 1080p. That is exactly what "allocate once at the ceiling" buys, and
+  offline it buys nothing: a headless render holds **one** target for its whole
+  life and can never resize, so the resize property the ceiling allocation exists
+  to protect is unreachable there. Allocating the offline path at its own
+  resolved budget would take a 640x360 render from ~952 MB to ~700 MB. Not done
+  here — it is a change to what ADR-0140 specifies, not an implementation of it.
 
 ### Close triggers
 

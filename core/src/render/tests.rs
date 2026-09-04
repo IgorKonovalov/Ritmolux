@@ -8,8 +8,8 @@
 
 use super::{
     AdapterChoice, AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamRoute,
-    ParamSmoother, RenderError, Renderer, RendererOptions, Roster, Tier, element_prefix,
-    evaluate_series, resolve_route,
+    ParamSmoother, RenderError, Renderer, RendererOptions, Roster, SampleBudget, Tier,
+    element_prefix, evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
 // when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
@@ -1800,5 +1800,38 @@ fn the_default_renderer_options_ask_for_the_default_adapter() {
         RendererOptions::pinned(Tier::Floor).adapter,
         AdapterChoice::Default,
         "pinning a tier must not also pin an adapter"
+    );
+}
+
+/// **A capture path takes the live ceiling, by construction** (ADR-0140).
+///
+/// Stated where it can fail rather than left to the factory's own comment. The
+/// offline ceiling is a larger *allocation*, and the attractor's seeded scatter
+/// is a function of how many particles were asked for — so a capture path that
+/// acquired it would move every committed baseline while resolving exactly the
+/// same count, which is a failure no assertion on a count could see.
+///
+/// GPU-free: this is about which options each constructor names.
+#[test]
+fn every_capture_path_resolves_the_live_ceiling() {
+    assert_eq!(RendererOptions::default().budget, SampleBudget::Live);
+    // The two headless constructors the suites and the `shot` CLI reach.
+    assert_eq!(
+        RendererOptions::pinned(Tier::Floor).budget,
+        SampleBudget::Live
+    );
+    assert_eq!(
+        RendererOptions::pinned(Tier::Rich).budget,
+        SampleBudget::Live
+    );
+    // ...and the one `--render` reaches, which is the only one that does not.
+    assert_eq!(
+        RendererOptions::pinned_offline(Tier::Rich).budget,
+        SampleBudget::Offline
+    );
+    // A pin is still a pin either way — the two choices are orthogonal.
+    assert_eq!(
+        RendererOptions::pinned_offline(Tier::Floor).tier,
+        Some(Tier::Floor)
     );
 }

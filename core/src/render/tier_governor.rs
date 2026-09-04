@@ -61,7 +61,8 @@ impl Renderer {
         // simulation state to its seed, which is the visible half of a demotion:
         // the attractor's cloud and the swarm restart rather than losing two
         // thirds of their points mid-flight.
-        self.scenes = scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier);
+        self.scenes =
+            scenes::create_all(&self.ctx.device, COMPOSITE_FORMAT, &self.tier, self.budget);
         self.configure_active_scene();
     }
 }

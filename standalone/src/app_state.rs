@@ -373,7 +373,14 @@ impl AppState {
             Arc::clone(&window),
             size.width,
             size.height,
-            RendererOptions { tier, adapter },
+            // The window is the live path by definition, so the live sample
+            // ceiling (ADR-0140) - spelled out rather than left to `..default()`
+            // because this is the call site the choice is *about*.
+            RendererOptions {
+                tier,
+                adapter,
+                budget: rlx_core::render::SampleBudget::Live,
+            },
         )
         .unwrap_or_else(|err| {
             eprintln!("renderer init failed: {err}");

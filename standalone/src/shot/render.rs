@@ -100,7 +100,7 @@ use std::io::Write;
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
 use rlx_core::preset::Preset;
-use rlx_core::render::{CaptureImage, Renderer, Tier};
+use rlx_core::render::{CaptureImage, Renderer, Tier, TierConfig};
 
 use super::film::total_hops;
 
@@ -729,6 +729,32 @@ fn resolve_preset(requested: Option<&str>, presets: &[Preset]) -> Result<String,
     }
 }
 
+/// The header's attractor clause: `, attractor samples N` when this render draws
+/// an attractor, and empty otherwise.
+///
+/// Printed because it is the number a `--render` at a large size exists to
+/// raise, and an operator comparing two files has no other way to see which
+/// budget each was drawn at. Resolved through
+/// [`TierConfig::attractor_budget_offline`] — the same function the scene
+/// itself calls, so the header cannot report a budget the frames were not drawn
+/// at.
+///
+/// Silent for every other system, where the count is a flat capacity and the
+/// clause would be noise.
+fn attractor_note(presets: &[Preset], name: &str, req: &RenderRequest) -> String {
+    let attractor = presets
+        .iter()
+        .any(|p| p.name == name && p.system == rlx_core::preset::SystemKind::Attractor);
+    if !attractor {
+        return String::new();
+    }
+    let px = req.width.saturating_mul(req.height);
+    format!(
+        ", attractor samples {}",
+        TierConfig::for_tier(req.tier).attractor_budget_offline(px)
+    )
+}
+
 /// Render the clip, writing the stream to stdout or to a spawned encoder.
 ///
 /// **Everything human-readable goes to stderr**, because stdout is the frame
@@ -745,15 +771,19 @@ pub fn run(
     let name = resolve_preset(req.preset.as_deref(), &presets)?;
     let frames = frame_count(pcm.len(), format, req.fps)?;
     eprintln!(
-        "render: {name} over {label} — {frames} frames at {} fps, {}x{}, tier {} [{source}]",
+        "render: {name} over {label} — {frames} frames at {} fps, {}x{}, tier {}{} [{source}]",
         req.fps.as_header_field(),
         req.width,
         req.height,
-        req.tier.as_str()
+        req.tier.as_str(),
+        attractor_note(&presets, &name, req),
     );
 
     let mut encoder = req.encoder.as_ref().map(Encoder::spawn).transpose()?;
-    let mut r = super::renderer(req.width, req.height, presets, req.tier)?;
+    // The **offline** ceiling (ADR-0140): no present deadline here, so the bound
+    // is memory and a large file reaches the reference sample density instead of
+    // the live frame-time cap. Every other mode in this CLI takes `renderer`.
+    let mut r = super::renderer_offline(req.width, req.height, presets, req.tier)?;
 
     // One writer either way. The encoder's stdin is a pipe, so a full one blocks
     // this thread until the encoder drains it — that *is* the backpressure
