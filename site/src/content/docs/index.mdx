@@ -6,21 +6,30 @@ description: >-
 template: splash
 hero:
   tagline: Every reference this project has, with a search box in front of it.
-  actions:
-    - text: Author a preset
-      link: /ritmolux/guide/preset-guide/
-      icon: right-arrow
-    - text: Understand the engine
-      link: /ritmolux/engine/nfr/
-      variant: minimal
-      icon: right-arrow
-    - text: The repository
-      link: https://github.com/IgorKonovalov/Ritmolux
-      variant: minimal
-      icon: external
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+{/*
+  The three entrance buttons are rendered here rather than declared as `hero.actions`
+  in the frontmatter, and the reason is the base. Starlight passes an action's `link`
+  through to `<LinkButton href>` verbatim, so a frontmatter action has to spell the
+  subpath out - and this site is built at two different ones (`/ritmolux/` for the
+  demo, `/Ritmolux/` for the project deployment). `import.meta.env.BASE_URL` is
+  whichever one this build used, and it always ends in a slash.
+*/}
+
+<div class="hero-actions">
+  <LinkButton href={`${import.meta.env.BASE_URL}guide/preset-guide/`} icon="right-arrow">
+    Author a preset
+  </LinkButton>
+  <LinkButton href={`${import.meta.env.BASE_URL}engine/nfr/`} variant="minimal" icon="right-arrow">
+    Understand the engine
+  </LinkButton>
+  <LinkButton href="https://github.com/IgorKonovalov/Ritmolux" variant="minimal" icon="external">
+    The repository
+  </LinkButton>
+</div>
 
 export const gallery = Object.entries(
   import.meta.glob('../../../../docs/images/gallery/*.png', { eager: true, import: 'default' }),
@@ -31,17 +40,17 @@ export const gallery = Object.entries(
 <CardGrid stagger>
   <Card title="Use it, author presets" icon="pencil">
     A preset is a text file. Start with the illustrated
-    [preset guide](/ritmolux/guide/preset-guide/), reach for the
-    [expression language](/ritmolux/guide/expression-language/) when a value should follow the
-    music, and keep the [parameter roster](/ritmolux/guide/parameter-roster/) open beside it —
+    [preset guide](../../../../docs/preset-guide.md), reach for the
+    [expression language](../../../../docs/presets.md) when a value should follow the
+    music, and keep the [parameter roster](../../../../presets/README.md) open beside it —
     every named parameter of every rendering system, now searchable.
   </Card>
   <Card title="Understand and build it" icon="setting">
-    The measured [budgets](/ritmolux/engine/nfr/) the whole thing is held to, the
-    [headless capture](/ritmolux/engine/capturing/) harness that renders a preset without a
+    The measured [budgets](../../../../docs/nfr.md) the whole thing is held to, the
+    [headless capture](../../../../docs/capturing.md) harness that renders a preset without a
     window, and the two seams that are contracts rather than code —
-    [the C ABI](/ritmolux/engine/spec-c-abi/) and
-    [ring determinism](/ritmolux/engine/spec-ring-determinism/).
+    [the C ABI](../../../../docs/specs/0001-c-abi.md) and
+    [ring determinism](../../../../docs/specs/0002-ring-determinism.md).
   </Card>
 </CardGrid>
 

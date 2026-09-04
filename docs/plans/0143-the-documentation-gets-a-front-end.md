@@ -289,9 +289,9 @@ other off-site target. `dev` should not re-raise this.
 | 2 — links resolve across the publish boundary | dev | done | 44d1ec3 |
 | 3 — the home page routes, and does not pitch | dev | done | 03a9588 |
 | 4 — the demo goes live on the personal site | human | not started — skipped by the user, this lane runs 1-3 and 5-6 | |
-| 5 — the gallery covers everything that ships | dev | done | committed with this row |
-| 6 — the permanent home builds itself | dev | not started | |
-| 7 — Pages is enabled and the demo is retired | human | not started | |
+| 5 — the gallery covers everything that ships | dev | done | eeac887 |
+| 6 — the permanent home builds itself | dev | done | committed with this row |
+| 7 — Pages is enabled and the demo is retired | human | not started — outstanding | |
 
 ### Notes
 
@@ -355,6 +355,23 @@ other off-site target. `dev` should not re-raise this.
   `scripts/check-site-links.mjs` is a seventh, and it is run by neither — it needs a built site, so
   Phase 6 puts it in the Pages workflow instead. The sentence is now wrong in a file this lane does
   not own.
+- **The two hosting stages do NOT share a base, and Phase 6 is where that surfaced.** GitHub serves
+  a project site under the repository's name as spelled, so the permanent home is `/Ritmolux/`
+  while the Phase 4 demo directory is `/ritmolux/`. `SITE_BASE` switches it; the config default is
+  the demo path, because that is what a local build should serve. **Phase 4 must therefore use
+  `public/ritmolux/`,** which is what the plan already says once the retired `lmv` token is read as
+  the new name.
+- **Building at `/Ritmolux/` found a real defect the demo base was hiding**: the site's own two
+  pages had the subpath hardcoded in eleven hrefs. Their prose links are now relative links to the
+  source files, which the Phase 2 rewriter maps to the right route at whatever base the build uses,
+  and the landing page's three entrance buttons are `<LinkButton>`s built from
+  `import.meta.env.BASE_URL` rather than `hero.actions` — Starlight passes an action's `link`
+  through verbatim, so a frontmatter action cannot be base-independent.
+- **Phase 6's second done-when is verified locally and not in CI, because this lane does not push.**
+  Renaming one target to `guide/preset-guid/` and building at `SITE_BASE=/Ritmolux/` left the build
+  green at 16 pages and failed the gate with exit 1 and
+  `index.html -> /Ritmolux/guide/preset-guid/`. That is the workflow's own gate step running on the
+  workflow's own base; what remains unrun is the GitHub-hosted invocation of it.
 
 ### Close triggers
 
