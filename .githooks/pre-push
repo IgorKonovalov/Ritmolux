@@ -120,6 +120,16 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # `--self-test` is where the assertion lives - the fixture's exact counts, a floor
 # on the repository's, and the `file:line  N bytes (cap C)` reporting path, which
 # no other run of this gate reaches at all. Same cost class again, two more walks.
+#
+# The contents-block gate (ADR-0163) is the sixth, and it is invoked twice for a
+# reason that is NOT the index-row one. `--check` regenerates each block from the
+# headings under it and reports drift, so it cannot go quietly green on a detector
+# that stopped matching - an empty generated block would not equal a populated
+# committed one. What it cannot see is an anchor that is merely PLAUSIBLE:
+# check-doc-links.mjs validates paths and deliberately never validates fragments,
+# so a wrong slug rule ships silently and every row in every block is wrong
+# together. `--self-test` is where that is pinned, against two anchors this
+# repository already links.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
@@ -127,8 +137,10 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-backlog-claims.mjs" node scripts/check-backlog-claims.mjs
     run_step "node scripts/check-filter-figures.mjs" node scripts/check-filter-figures.mjs
     run_step "node scripts/check-comment-hygiene.mjs" node scripts/check-comment-hygiene.mjs
+    run_step "node scripts/toc.mjs --check" node scripts/toc.mjs --check
+    run_step "node scripts/toc.mjs --self-test" node scripts/toc.mjs --self-test
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure and comment-hygiene checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene and contents-block checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in
