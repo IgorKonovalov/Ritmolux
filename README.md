@@ -359,26 +359,33 @@ says what each flag is *for*, which is the part a roster line has no room for.
   per second, default `60`, where `0` means every rendered frame. `--osc` overrides `target` and
   leaves `rate_hz` to the file, which is the one key it has no spelling for.
 
-  **The address space is versioned in the addresses**, so a later signal is additive under the same
-  `/lmv/v1` prefix and a mapping you have already bound keeps working. One argument per address, so
-  a console binds a parameter to an address rather than to a position inside a message:
+  **The root moved in this release: `/lmv/v1` became `/rlx/v1`.** There is no transition period and
+  no dual-emit, and OSC has no error channel — so **a binding left on the old root stops firing and
+  reports nothing**, which looks exactly like a fixture that happens not to be moving. Re-point every
+  address below by hand, and keep the old show file until each one is confirmed against a playing
+  track. **`/v1` did not move**, because no payload, type tag, address suffix, vocabulary or send
+  cadence changed: re-point the root, change nothing else, and the mapping is correct.
+
+  **The address space is versioned in the addresses**, so a *later signal* is additive under the same
+  `/rlx/v1` prefix and a mapping you have already bound keeps working across it. One argument per
+  address, so a console binds a parameter to an address rather than to a position inside a message:
 
   | Address | Type | What it carries |
   |---------|------|-----------------|
-  | `/lmv/v1/level/bass` | `f` | Bass level, peak-normalized to `0`–`1` |
-  | `/lmv/v1/level/mid` | `f` | Mid level, peak-normalized |
-  | `/lmv/v1/level/treb` | `f` | Treble level, peak-normalized |
-  | `/lmv/v1/level/onset` | `f` | Spectral-flux onset envelope, peak-normalized |
-  | `/lmv/v1/level/rms` | `f` | Broadband RMS of the waveform trace — **un-normalized**, unlike the four above it, because the trace it comes from deliberately is. Map it with a gain in the console |
-  | `/lmv/v1/raw/bass` | `f` | Raw mean magnitude in the bass band — the absolute twin of `level/bass` |
-  | `/lmv/v1/raw/mid` | `f` | Raw mean magnitude, mid |
-  | `/lmv/v1/raw/treb` | `f` | Raw mean magnitude, treble |
-  | `/lmv/v1/raw/onset` | `f` | Raw spectral-flux envelope |
-  | `/lmv/v1/beat/trigger` | `i` | `1` on a frame an onset fired, `0` otherwise — the discrete event |
-  | `/lmv/v1/beat/index` | `i` | Monotone count of onset detections. **Not a musical beat count** — the detector fires 1.2x–2.3x per beat depending on material, so no fixed multiplier turns it into bars. Useful as a ratchet, not as a meter |
-  | `/lmv/v1/beat/phase` | `f` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next |
-  | `/lmv/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles |
-  | `/lmv/v1/preset` | `s` | The active preset's name |
+  | `/rlx/v1/level/bass` | `f` | Bass level, peak-normalized to `0`–`1` |
+  | `/rlx/v1/level/mid` | `f` | Mid level, peak-normalized |
+  | `/rlx/v1/level/treb` | `f` | Treble level, peak-normalized |
+  | `/rlx/v1/level/onset` | `f` | Spectral-flux onset envelope, peak-normalized |
+  | `/rlx/v1/level/rms` | `f` | Broadband RMS of the waveform trace — **un-normalized**, unlike the four above it, because the trace it comes from deliberately is. Map it with a gain in the console |
+  | `/rlx/v1/raw/bass` | `f` | Raw mean magnitude in the bass band — the absolute twin of `level/bass` |
+  | `/rlx/v1/raw/mid` | `f` | Raw mean magnitude, mid |
+  | `/rlx/v1/raw/treb` | `f` | Raw mean magnitude, treble |
+  | `/rlx/v1/raw/onset` | `f` | Raw spectral-flux envelope |
+  | `/rlx/v1/beat/trigger` | `i` | `1` on a frame an onset fired, `0` otherwise — the discrete event |
+  | `/rlx/v1/beat/index` | `i` | Monotone count of onset detections. **Not a musical beat count** — the detector fires 1.2x–2.3x per beat depending on material, so no fixed multiplier turns it into bars. Useful as a ratchet, not as a meter |
+  | `/rlx/v1/beat/phase` | `f` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next |
+  | `/rlx/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles |
+  | `/rlx/v1/preset` | `s` | The active preset's name |
 
   Telemetry rides the rendered frame, so it stops when the window is hidden and the preset name
   lags a switch by one frame. Nothing here is a musical timebase you can drive a sequencer from —

@@ -224,13 +224,35 @@ before                      after
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The wire moves, and the probes it falsifies move with it | dev | done | committed with this row |
-| 2 — The operator's table | dev | not started | |
+| 1 — The wire moves, and the probes it falsifies move with it | dev | done | `aec2381` |
+| 2 — The operator's table | dev | done | committed with this row |
 | 3 — The record | dev | not started | |
 | 4 — Two seed comments come back | dev | not started | |
 | 5 — Re-point the rig | human | not started | |
 
 ### Notes
+
+- **Phase 2 leaves one `lmv` in `README.md`, deliberately, and that is a deviation.** The phase's
+  done-when asks both that the prose *"becomes a statement that the root changed in this release …
+  and that a binding against the old root must be re-pointed"* and that `README.md` contains no
+  `lmv`. The two cannot both hold: naming the old root is what makes the first one useful to an
+  operator holding a bound show file, and it is the string they have to search for. The single
+  remaining occurrence is at `README.md:362`, inside `**The root moved in this release:
+  `/lmv/v1` became `/rlx/v1`.**` — a historical mention, not a live address. Every one of the
+  fourteen table rows reads `/rlx/v1`. No gate enforces the absolute form; `scripts/` contains no
+  `lmv` grep.
+- **The plan says "fifteen addresses" in five places; there are fourteen.** `standalone/src/osc.rs`
+  declares `ADDRESS_COUNT: usize = 14`, `Telemetry::messages` returns fourteen entries, and
+  `README.md`'s table has fourteen rows. Phase 1's done-when *"still covers all fifteen"* was
+  implemented as fourteen; the assertion it names (`messages.len() == ADDRESS_COUNT` plus a
+  `starts_with(ADDRESS_PREFIX)` loop) is unchanged and covers the whole set either way.
+- **The two backlog probes were split across Phases 1 and 2 rather than both moving in Phase 1.**
+  Phase 1's bullet asks for both, but the `README.md` probe cannot be green between the two commits
+  — README does not move until Phase 2 — which would have failed Phase 1's own
+  `check-backlog-claims exits 0` done-when and its stated *"gate-green at every commit"* rationale.
+  The `osc.rs` probe moved in Phase 1, the `README.md` probe in Phase 2 beside the edit that
+  satisfies it. Cost: `docs/design-backlog.md` appears in Phase 2, whose `Files touched` names only
+  `README.md`. The user chose this over the literal reading.
 
 ### Close triggers
 
