@@ -84,47 +84,117 @@ use crate::render::palette::Palette;
 /// Element kind selectors, as they reach the shader's `shape.z`. Phase 7 of
 /// Plan 0113 extends this roster; these three are what a suprematist canvas is
 /// made of.
-pub(crate) const KIND_QUAD: f32 = 0.0;
-pub(crate) const KIND_CIRCLE: f32 = 1.0;
-pub(crate) const KIND_TRIANGLE: f32 = 2.0;
-/// The Kandinsky half of the roster (Plan 0113 Phase 7). `sdf.rs` carries what
-/// each kind's half extents and `p0`/`p1` mean.
-pub(crate) const KIND_BAR: f32 = 3.0;
-pub(crate) const KIND_RING: f32 = 4.0;
-pub(crate) const KIND_SEGMENT: f32 = 5.0;
-pub(crate) const KIND_ARC: f32 = 6.0;
-pub(crate) const KIND_CHECKER: f32 = 7.0;
+pub(crate) const KIND_QUAD: f32 = Kind::Quad.as_f32();
+pub(crate) const KIND_CIRCLE: f32 = Kind::Circle.as_f32();
+pub(crate) const KIND_TRIANGLE: f32 = Kind::Triangle.as_f32();
+pub(crate) const KIND_BAR: f32 = Kind::Bar.as_f32();
+pub(crate) const KIND_RING: f32 = Kind::Ring.as_f32();
+pub(crate) const KIND_SEGMENT: f32 = Kind::Segment.as_f32();
+pub(crate) const KIND_ARC: f32 = Kind::Arc.as_f32();
+pub(crate) const KIND_CHECKER: f32 = Kind::Checker.as_f32();
 
-/// Every kind, for the rendered sweep that must cover the roster.
+/// Which figure an element is, and **the one place the numbering lives**.
 ///
-/// `#[cfg(test)]`: the shipped painter selects a kind by number in WGSL and has
-/// no use for a Rust roster, so this exists only so the box check cannot quietly
-/// stop covering a kind someone added.
-#[cfg(test)]
-pub(crate) const ALL_KINDS: [f32; 8] = [
-    KIND_QUAD,
-    KIND_CIRCLE,
-    KIND_TRIANGLE,
-    KIND_BAR,
-    KIND_RING,
-    KIND_SEGMENT,
-    KIND_ARC,
-    KIND_CHECKER,
-];
+/// The number is what crosses to the GPU — an element's `shape.z` — so this side
+/// and the painter have to agree on it. They are two spellings of one table:
+/// [`Kind::as_f32`] here, and `sdf.rs`'s threshold chain there. When they
+/// disagreed the symptom was not a compile error but a *silently wrong shape*,
+/// which is why `the_wgsl_kind_chain_matches_the_roster` holds them together.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Kind {
+    /// A rotated rectangle at the element's half extents.
+    Quad,
+    /// An axis-aligned ellipse in the element's own frame.
+    Circle,
+    /// Equilateral, inscribed in the unit circle, apex at `+y`.
+    Triangle,
+    /// A capsule: a segment swept by a disc.
+    Bar,
+    /// An annulus of thickness `min(hy, hx)` inside radius `hx`.
+    Ring,
+    /// A circular sector — a pie slice with its apex at the centre.
+    Segment,
+    /// An annular sector: [`Ring`](Self::Ring) cut by [`Segment`](Self::Segment).
+    Arc,
+    /// A checkerboard patch filling the element's box.
+    Checker,
+}
 
-/// The name each kind goes by in `presets/README.md` and in a failure message.
-/// `#[cfg(test)]` for [`ALL_KINDS`]'s reason — nothing shipped names a kind.
-#[cfg(test)]
-pub(crate) fn kind_name(kind: f32) -> &'static str {
-    match kind as i32 {
-        0 => "quad",
-        1 => "circle",
-        2 => "triangle",
-        3 => "bar",
-        4 => "ring",
-        5 => "segment",
-        6 => "arc",
-        _ => "checker",
+impl Kind {
+    /// Every kind, in numbering order. The array's length is the roster: adding
+    /// a variant without a row here is a compile error at [`Kind::as_f32`],
+    /// which is exhaustive.
+    ///
+    /// `#[cfg(test)]`: the shipped painter selects a kind by number in WGSL and
+    /// has no use for a Rust roster, so this exists only so the box check cannot
+    /// quietly stop covering a kind someone added.
+    #[cfg(test)]
+    pub(crate) const ALL: [Kind; 8] = [
+        Kind::Quad,
+        Kind::Circle,
+        Kind::Triangle,
+        Kind::Bar,
+        Kind::Ring,
+        Kind::Segment,
+        Kind::Arc,
+        Kind::Checker,
+    ];
+
+    /// This kind's number, as an element's `shape.z` carries it.
+    pub(crate) const fn as_f32(self) -> f32 {
+        match self {
+            Kind::Quad => 0.0,
+            Kind::Circle => 1.0,
+            Kind::Triangle => 2.0,
+            Kind::Bar => 3.0,
+            Kind::Ring => 4.0,
+            Kind::Segment => 5.0,
+            Kind::Arc => 6.0,
+            Kind::Checker => 7.0,
+        }
+    }
+
+    /// The kind a `shape.z` names.
+    ///
+    /// **Total, and it rounds**, because `kind` reaches here as a preset-authored
+    /// `f32` that nothing clamps at load: the same midpoint thresholds the WGSL
+    /// chain uses, so both sides read an out-of-range or fractional value
+    /// identically. A `NaN` falls to `Checker`, which shares `Quad`'s bounding
+    /// box — the value the range test it replaced also produced.
+    pub(crate) fn from_f32(kind: f32) -> Kind {
+        if kind < 0.5 {
+            Kind::Quad
+        } else if kind < 1.5 {
+            Kind::Circle
+        } else if kind < 2.5 {
+            Kind::Triangle
+        } else if kind < 3.5 {
+            Kind::Bar
+        } else if kind < 4.5 {
+            Kind::Ring
+        } else if kind < 5.5 {
+            Kind::Segment
+        } else if kind < 6.5 {
+            Kind::Arc
+        } else {
+            Kind::Checker
+        }
+    }
+
+    /// The name this kind goes by in `presets/README.md` and in a failure
+    /// message. `#[cfg(test)]` for [`Kind::ALL`]'s reason.
+    #[cfg(test)]
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Kind::Quad => "quad",
+            Kind::Circle => "circle",
+            Kind::Triangle => "triangle",
+            Kind::Bar => "bar",
+            Kind::Ring => "ring",
+            Kind::Segment => "segment",
+            Kind::Arc => "arc",
+            Kind::Checker => "checker",
+        }
     }
 }
 
@@ -420,20 +490,23 @@ impl Element {
         // triangle's height of empty box on one side) because the check was
         // CPU-only and compared half extents to half extents; the rendered check
         // in `tests` is what found it.
-        let kind = spec.kind;
-        let (lo, hi) = if !(0.5..=6.5).contains(&kind) {
+        // One `Kind`, decided once: the painter reads the same `shape.z` through
+        // the same thresholds, so a box built against a different reading of the
+        // number is a silent clip rather than a compile error.
+        let kind = Kind::from_f32(spec.kind);
+        let (lo, hi) = if matches!(kind, Kind::Quad | Kind::Checker) {
             // A rotated rectangle: the support function of the four corners.
             // `checker` shares it — its cell count is forced even, so the cells
             // at both ends of each axis are filled and the patch's drawn extent
             // is its box (`checker_cells`).
             symmetric(ca.abs() * hx + sa.abs() * hy, sa.abs() * hx + ca.abs() * hy)
-        } else if kind < 1.5 {
+        } else if kind == Kind::Circle {
             // A rotated ellipse: the exact extent of the parametric form.
             symmetric(
                 ((hx * ca) * (hx * ca) + (hy * sa) * (hy * sa)).sqrt(),
                 ((hx * sa) * (hx * sa) + (hy * ca) * (hy * ca)).sqrt(),
             )
-        } else if kind < 2.5 {
+        } else if kind == Kind::Triangle {
             // The triangle, over its three rotated vertices — built from the same
             // three points the shader's distance uses. **Asymmetric**: the apex
             // is at `+hy` and the base at `-hy/2`, so a symmetric box would stand
@@ -443,14 +516,14 @@ impl Element {
                     .iter()
                     .map(|&[vx, vy]| [ca * vx - sa * vy, sa * vx + ca * vy]),
             )
-        } else if kind < 3.5 {
+        } else if kind == Kind::Bar {
             // A capsule is a segment swept by a disc, so its extent is the
             // rotated segment's plus the radius on both axes — exact, and the one
             // place a Minkowski sum makes the box trivial.
             let r = hy.min(hx);
             let half = (hx - r).max(0.0);
             symmetric(ca.abs() * half + r, sa.abs() * half + r)
-        } else if kind < 4.5 {
+        } else if kind == Kind::Ring {
             // A ring's outer boundary is the circle of radius hx, so its box is
             // that square whatever the rotation.
             symmetric(hx, hx)
@@ -464,7 +537,7 @@ impl Element {
             let a = aperture(spec.p0);
             // An `arc` is an annulus cut by the sector, so its near edge sits at
             // `hx - thickness` rather than at the apex.
-            let inner = if kind < 5.5 {
+            let inner = if kind == Kind::Segment {
                 0.0
             } else {
                 (hx - hy.min(hx)).max(0.0)
@@ -496,7 +569,7 @@ impl Element {
                     }
                 };
                 // A `segment`'s apex is its own centre; an `arc` has none.
-                if kind < 5.5 {
+                if kind == Kind::Segment {
                     push([0.0, 0.0]);
                 }
                 for end in [-a, a] {

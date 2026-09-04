@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** |
 | [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
-| [0126](0126-the-large-files-split-along-their-seams.md) | The large files split along their seams | approved | dev | Third of three. One phase per oversized file (`warp_mesh`, `render/mod.rs`, `schema.rs`, `star.rs`, `main.rs`, `foo_ritmolux.cpp`), each a pure move gated on golden. Clear to start. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0138](0138-the-colour-surface-stops-misleading-its-authors.md) | The colour surface stops misleading its authors | approved | dev, human | Backlog 0153 + 0099. ADR-0151 (proposed): stops become sRGB, migrated so no golden moves. Phase 1 is a free doc fix. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
@@ -52,8 +51,25 @@ place. The plan file carries the real link.
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0151](0151-the-long-documents-become-navigable.md) | The long documents become navigable | draft | dev | ADR-0163 (proposed): generated contents blocks, no splits. Sheds 335 lines of self-declared-superseded sequencing prose from this file. **Take before 0143**, whose route map wants the final layout. |
-| [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | draft | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
+| [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 <!-- roster:end -->
+
+**Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
+It moves the last operator-visible surface still carrying the old name: `ADDRESS_PREFIX` at
+`standalone/src/osc.rs:52`, left standing by [0150] because that plan's greps could not match a
+token followed by `/`. ADR-0164 is the decision ADR-0162 deferred — one clean break, no dual-emit,
+no transition period, and `/v1` does not move because no payload did. Both 0133 and 0147 are
+approved, unstarted, and name `/lmv/v1` in live text a `dev` lane would read; 0152's Phase 3 is what
+re-points them, so taking 0152 first removes that window instead of closing it afterwards. Nothing
+else contends: [0151] edits only the backlog's preamble and sweep narrative, while 0152's Phase 3
+edits five entry bodies.
+
+**Phase 5 is the operator's, and it is the only detector.** OSC has no negotiation and no error
+channel, so a binding left on the old root stops firing and looks exactly like a fixture that is not
+moving. Schedule that phase against a rig session with a playing track, and keep the old show file
+until all fifteen addresses are confirmed.
+
+[0152]: 0152-the-osc-root-becomes-rlx.md
 
 ~~**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**~~ — **closed 2026-09-02**, all nine phases, and the freeze held for every one of them. **[0143] and [0103] Phases 4-6 are unparked**: the repository is `IgorKonovalov/Ritmolux`, so 0143 may now choose its Pages subpath and 0103 may submit the component. The original note follows, since its reasoning is what made the freeze non-negotiable.
 
@@ -291,7 +307,8 @@ Sequencing:
   taken *before* [0126] Phase 7 rather than after it, and the predicted rebase never happened:
   `main` was already an ancestor of the lane at the close. It landed ~690 lines into `main.rs`, so
   **[0126] Phase 7 and [0133] now split or contend with a larger file than either was sized
-  against** — the roster, the `--help` renderer and the four scan helpers are one contiguous,
+  against** (0126 closed 2026-09-03 having done so - `main.rs` was 4,525 lines by then, not the
+  1,692 the plan assumed, and is 37 now; [0133]'s `Files touched` are repointed at `app_state.rs`) — the roster, the `--help` renderer and the four scan helpers are one contiguous,
   self-contained block beside the config helpers, which is the seam to move them on.
 - ~~**[0137] contends with nothing**~~ — **closed 2026-09-01**, and the prediction held: no
   contention, no golden moved, no floor moved. Its Phase 6 re-measurement falsified the plan's own
@@ -339,9 +356,9 @@ functional candidates the round surfaced (backlog 0042's bar gate, 0126's per-tr
   [0128] is what is left of this pair. 0127's Phase 3 capture also left a number 0128 does not need
   but the next `warp_mesh` plan will: the reference draws a unit-scale mode-6 trace at 0.316 frame
   heights against our 0.3019, which is [backlog 0120](../design-backlog.md)'s whole remaining gap.
-- **Neither waits on [0124]/[0125]/[0126], and two of the three have closed.** 0125 retired the GPU
-  boilerplate across the 12 scenes on 2026-08-31, so [0128]'s `core/src/render/scenes/particles/`
-  contention is now only with 0126's file splits.
+- ~~**Neither waits on [0124]/[0125]/[0126]**~~ - **discharged 2026-09-03: all three are closed.**
+  0125 retired the GPU boilerplate across the 12 scenes on 2026-08-31 and 0126 split the seven large
+  files on 2026-09-03, so [0128]'s `core/src/render/scenes/particles/` contention is gone.
 
 **[0129](done/0129-the-build-stops-being-paid-three-times.md) closed 2026-08-29, and every plan on
 this roster is the beneficiary.** A lane that has never built now compiles **3 workspace crates in
@@ -439,7 +456,7 @@ would revert most quietly.
 **Added 2026-08-28, from a whole-codebase review (layering, god modules, hot-path safety, doc
 drift): [0124](done/0124-the-review-fixes-that-move-no-pixels.md) →
 [0125](done/0125-the-scenes-share-their-gpu-boilerplate.md) →
-[0126](0126-the-large-files-split-along-their-seams.md), in that order and not in parallel.** The
+[0126](done/0126-the-large-files-split-along-their-seams.md), in that order and not in parallel.** The
 review found no blocker — layering, the audio callbacks, the C ABI and determinism all came back
 clean — so these are a maintenance lane, not a feature one, and they **interleave with the roster
 above rather than displacing it**: 0125 and 0126 rewrite the scene files and must not run alongside
@@ -448,8 +465,10 @@ ordered so each inherits the previous one's instrument — 0124's harness and wi
 0125's helpers, then 0126's splits of the now-smaller files. Every phase in all three is
 golden-identical unblessed; a bless anywhere in this lane is a finding.
 
-**[0124] closed 2026-08-30 and [0125] closed 2026-08-31, so 0126 is next in this lane and both
-instruments ahead of it are live.** 0125 landed with **nothing blessed** anywhere across its five
+**The whole maintenance lane is discharged: [0124] closed 2026-08-30, [0125] 2026-08-31 and
+[0126] 2026-09-03**, and the lane's central property held end to end - **nothing was blessed
+anywhere across all three**, so the seven oversized files were reorganized without moving a pixel.
+The paragraph below is kept as the record of what 0126 inherited. 0125 landed with **nothing blessed** anywhere across its five
 phases, which is the property this lane's ordering exists to protect — 0126's splits are pure moves
 and inherit the same rule. Two things 0126 still inherits that are not what the plan promised.
 `core/tests/common/` holds the ADR-0016
@@ -735,6 +754,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0126 - The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md) - closed 2026-09-03. Review: **no blockers, no majors in the code; one major doc repair, five minors.** Version: **0.103.1** (patch). Touched no presets, closed no backlog entry. [Write-up](README-archive.md).
 - [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md) — closed 2026-09-02. Review: **no blockers, four majors, two minors.** Version: **0.103.0** (minor). Filed backlog 0180 + 0181. [Write-up](README-archive.md).
 - [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) — closed 2026-09-02. Review: **Phases 1-4 only, no blockers.** Version: **0.102.0** (minor). Archived [backlog 0174-0178](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md) — closed 2026-09-02. Review: **no blockers, two majors, three minors.** Version: **0.101.0** (minor). Archived [backlog 0134](../design-backlog-archive.md). [Write-up](README-archive.md).
@@ -942,7 +962,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
 [0124]: done/0124-the-review-fixes-that-move-no-pixels.md
 [0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
-[0126]: 0126-the-large-files-split-along-their-seams.md
+[0126]: done/0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
 [0128]: 0128-the-rendered-file-stops-looking-upscaled.md
 [0131]: done/0131-the-operator-gets-a-console.md

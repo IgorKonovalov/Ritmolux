@@ -37,7 +37,7 @@ use rlx_core::{
     preset::{Preset, SystemKind, default_presets},
     render::{
         Renderer,
-        scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent},
+        metrics::{set_extent_diagnostic, take_draw_extent},
     },
 };
 

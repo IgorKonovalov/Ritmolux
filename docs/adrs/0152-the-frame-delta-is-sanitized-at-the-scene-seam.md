@@ -97,7 +97,7 @@ reason. It fixes the mechanism that was noticed rather than the class.
 Strongest guarantee: the invariant becomes unrepresentable-if-violated and the compiler enforces it
 at every call site forever. Rejected for this pass on diff size — it changes the signature of
 `advance` and of `step` and touches every scene and every test constructing a frame delta, which is
-a wide edit across files that [Plan 0126](../plans/0126-the-large-files-split-along-their-seams.md)
+a wide edit across files that [Plan 0126](../plans/done/0126-the-large-files-split-along-their-seams.md)
 is concurrently splitting. It is the right long-term shape and this decision does not foreclose it:
 the seam guard is where a `Dt` would be constructed.
 

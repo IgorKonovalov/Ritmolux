@@ -895,6 +895,55 @@ impl Renderer {
     /// Drop any dissolve in flight and release its full-frame GPU targets, leaving
     /// the roster wherever it currently points. The caller decides the resolved
     /// index; this only tears down the blend.
+    /// The dissolve's own state, advanced once the frame at the current `t` is
+    /// encoded.
+    ///
+    /// Two things happen here and both are post-encode by construction. The
+    /// budget governor is re-checked every frame a dual-live dissolve runs: on
+    /// evidence of overload it latches to the frozen side for the remainder, so
+    /// the mode can never flicker frame to frame (ADR-0024). Then the dissolve
+    /// advances -- the capture frame hands back the index to flip the roster to,
+    /// so the next frame composites the incoming preset through its own side,
+    /// and a dissolve that has reached `t = 1` promotes that side and releases
+    /// the blend's targets.
+    pub(super) fn advance_transition(
+        &mut self,
+        dt: f32,
+        dual_live: bool,
+        captured_ink: InkParams,
+        captured_exposure: f32,
+    ) {
+        if let Some(tr) = self.transition.as_mut()
+            && dual_live
+            && budget_blown(self.diag.stats().frame_ms_avg(), DUAL_LIVE_BUDGET_MS)
+        {
+            tr.latch_freeze();
+        }
+        let advanced = self.transition.as_mut().map(|tr| {
+            (
+                tr.advance(dt, captured_ink, captured_exposure),
+                tr.finished(),
+            )
+        });
+        let Some((flip_to, finished)) = advanced else {
+            return;
+        };
+        if let Some(index) = flip_to {
+            // Hand the outgoing preset's easing state to the outgoing side
+            // before `configure_active_scene` resets the active one, so a
+            // heavily-smoothed preset keeps easing through a dual-live dissolve
+            // instead of snapping to raw values the frame it stops being active.
+            self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
+            self.outgoing_layer_smoother = std::mem::take(&mut self.layer_smoother);
+            self.outgoing_latches = std::mem::take(&mut self.latches);
+            self.roster.select(index);
+            self.configure_active_scene();
+        }
+        if finished {
+            self.cancel_transition();
+        }
+    }
+
     pub(super) fn cancel_transition(&mut self) {
         // The incoming side has been rendering the preset the roster now points at,
         // so it is the one to keep — dropping it instead would restart that

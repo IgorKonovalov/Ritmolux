@@ -21,7 +21,7 @@
 //! before blessing (Plan 0013 Phase 8 habit).
 
 use rlx_core::preset::{Preset, SystemKind};
-use rlx_core::render::scenes::lines::renderer::{set_extent_diagnostic, take_draw_extent};
+use rlx_core::render::metrics::{set_extent_diagnostic, take_draw_extent};
 use rlx_core::render::{CaptureImage, Renderer, metrics::frame_diff};
 
 mod common;

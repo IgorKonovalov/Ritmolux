@@ -27,8 +27,8 @@ PipeWire's PulseAudio compat server — has never been tested from this dev box.
 The tree is already shaped for Linux and has never been compiled on it. `preset_data_root()` has an
 `XDG_DATA_HOME` branch (`standalone/src/lib.rs:186`), `current_rss_bytes()` reads
 `/proc/self/statm` (`standalone/src/rss.rs:78`), `capture_handle::Handle` has a `()` third arm
-(`standalone/src/main.rs:191`), and `start_capture` has an arm returning `CaptureVerdict::Unsupported`
-that renders silence-driven visuals (`standalone/src/main.rs:1220`). None of it is built by anything:
+(`standalone/src/capture_start.rs`), and `start_capture` has an arm returning `CaptureVerdict::Unsupported`
+that renders silence-driven visuals (`standalone/src/capture_start.rs`). None of it is built by anything:
 `ci.yml`'s `check` matrix is `[windows-latest, macos-latest]`, and the `links`, `deny` and `miri`
 jobs that do run on `ubuntu-latest` never invoke `cargo build`. So this is code that has been carried
 for the project's whole life without a compiler ever seeing it.
