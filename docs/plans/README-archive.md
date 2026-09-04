@@ -63,27 +63,27 @@ hand-edited.
   - [0096 — The HUD gets out of the way — closed](#0096--the-hud-gets-out-of-the-way--closed)
   - [0091 — The figure fills the frame — closed](#0091--the-figure-fills-the-frame--closed)
   - [0090 — The emitter's source moves — closed](#0090--the-emitters-source-moves--closed)
-  - [[0094 — The two doc gates check what they claim](#0094--the-two-doc-gates-check-what-they-claim)
-  - [[0093 — The backlog stops asserting things about a repo it has not](#0093--the-backlog-stops-asserting-things-about-a-repo-it-has-not)
-  - [[0085 — The show-length horizon gets an](#0085--the-show-length-horizon-gets-an)
-  - [[0089 — The framing contract stops lying, and two doc gaps](#0089--the-framing-contract-stops-lying-and-two-doc-gaps)
+  - [0094 — The two doc gates check what they claim to](#0094--the-two-doc-gates-check-what-they-claim-to)
+  - [0093 — The backlog stops asserting things about a repo it has not read](#0093--the-backlog-stops-asserting-things-about-a-repo-it-has-not-read)
+  - [0085 — The show-length horizon gets an instrument](#0085--the-show-length-horizon-gets-an-instrument)
+  - [0089 — The framing contract stops lying, and two doc gaps close](#0089--the-framing-contract-stops-lying-and-two-doc-gaps-close)
   - [0088 — The docs get pictures — closed 2026-08-13 (all](#0088--the-docs-get-pictures--closed-2026-08-13-all)
-  - [[0084 — Two gates stop lying about what they](#0084--two-gates-stop-lying-about-what-they)
+  - [0084 — Two gates stop lying about what they check](#0084--two-gates-stop-lying-about-what-they-check)
   - [0083 — The build says why it hears nothing](#0083--the-build-says-why-it-hears-nothing)
-  - [[0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured](#0079--the-attractor-learns-new-figures-the-tuple-roster-with-per-tuple-framing-and-measured)
-  - [[0081 — The sky gets a galaxy: the backdrop paints a curved](#0081--the-sky-gets-a-galaxy-the-backdrop-paints-a-curved)
-  - [[0082 — The gradient stops banding: the display write](#0082--the-gradient-stops-banding-the-display-write)
-  - [[0080 — The sky gets a horizon: the backdrop paints a directional](#0080--the-sky-gets-a-horizon-the-backdrop-paints-a-directional)
-  - [[0078 — The ink learns to bite: a contrast exponent on the terminal](#0078--the-ink-learns-to-bite-a-contrast-exponent-on-the-terminal)
-  - [[0077 — The quiet sky: the sparse idiom becomes gateable and the swarm](#0077--the-quiet-sky-the-sparse-idiom-becomes-gateable-and-the-swarm)
-  - [[0075 — The content renaissance: the library is rebuilt as worlds, by replacement](#0075--the-content-renaissance-the-library-is-rebuilt-as-worlds-by-replacement)
+  - [0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths](#0079--the-attractor-learns-new-figures-the-tuple-roster-with-per-tuple-framing-and-measured-morph-paths)
+  - [0081 — The sky gets a galaxy: the backdrop paints a curved band](#0081--the-sky-gets-a-galaxy-the-backdrop-paints-a-curved-band)
+  - [0082 — The gradient stops banding: the display write dithers](#0082--the-gradient-stops-banding-the-display-write-dithers)
+  - [0080 — The sky gets a horizon: the backdrop paints a directional ramp](#0080--the-sky-gets-a-horizon-the-backdrop-paints-a-directional-ramp)
+  - [0078 — The ink learns to bite: a contrast exponent on the terminal remap](#0078--the-ink-learns-to-bite-a-contrast-exponent-on-the-terminal-remap)
+  - [0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates](#0077--the-quiet-sky-the-sparse-idiom-becomes-gateable-and-the-swarm-individuates)
+  - [0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts](#0075--the-content-renaissance-the-library-is-rebuilt-as-worlds-by-replacement-cohorts)
   - [0076 — The second layer: a preset composes two scenes (R3) —](#0076--the-second-layer-a-preset-composes-two-scenes-r3-)
-  - [[0053 — The suite stops blessing what WARP gets](#0053--the-suite-stops-blessing-what-warp-gets)
+  - [0053 — The suite stops blessing what WARP gets wrong](#0053--the-suite-stops-blessing-what-warp-gets-wrong)
   - [0046 — Transformed feedback: the past learns to move](#0046--transformed-feedback-the-past-learns-to-move)
   - [0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict](#0068--why-the-downbeat-rarely-locks-an-instrument-an-ablation-and-a-verdict)
   - [0067 — The curation route — closed 2026-08-09. Review: **no](#0067--the-curation-route--closed-2026-08-09-review-no)
-  - [[0064 — The symmetry stage and the banded](#0064--the-symmetry-stage-and-the-banded)
-  - [[0071 — Light that adds without covering](#0071--light-that-adds-without-covering)
+  - [0064 — The symmetry stage and the banded palette](#0064--the-symmetry-stage-and-the-banded-palette)
+  - [0071 — Light that adds without covering (`occlude`)](#0071--light-that-adds-without-covering-occlude)
   - [0072 — The backdrop joins the palette — closed](#0072--the-backdrop-joins-the-palette--closed)
   - [0074 — The figure colours by how far it has come](#0074--the-figure-colours-by-how-far-it-has-come)
   - [0073 — The fern unfurls and colours by what made it](#0073--the-fern-unfurls-and-colours-by-what-made-it)
@@ -95,34 +95,34 @@ hand-edited.
   - [0063 — The attractor keeps its depth — **done](#0063--the-attractor-keeps-its-depth--done)
   - [0036 — macOS and Windows release artifacts —](#0036--macos-and-windows-release-artifacts-)
   - [0055 — The fold edge becomes a choice — **done](#0055--the-fold-edge-becomes-a-choice--done)
-  - [[0052 — The emitter: objects that spawn, fall on a parabola, and](#0052--the-emitter-objects-that-spawn-fall-on-a-parabola-and)
-  - [[0059 — Lorenz finds its plane, and the attractor can trade samples for](#0059--lorenz-finds-its-plane-and-the-attractor-can-trade-samples-for)
-  - [[0060 — a test number states a property, or names its](#0060--a-test-number-states-a-property-or-names-its)
-  - [[0050 — in-app settings, live quality, and a browse overlay that](#0050--in-app-settings-live-quality-and-a-browse-overlay-that)
-  - [[0058 — the gate can see an empty frame, and "loud" has to mean more](#0058--the-gate-can-see-an-empty-frame-and-loud-has-to-mean-more)
-  - [[0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one](#0057--the-attractors-compute-path-the-deposit-the-reseed-the-butterfly-and-one)
-  - [[0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis](#0056--clamp-occupancy-the-instrument-that-would-have-caught-a-saturated-library-plus-the-axis)
-  - [[0054 — the line scenes catch up: every one honours the palette, and the star stops cutting](#0054--the-line-scenes-catch-up-every-one-honours-the-palette-and-the-star-stops-cutting)
-  - [[0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune](#0048--analysis-v2-the-dual-resolution-axis-normalized-bands-phrase-time-and-the-one-retune)
+  - [0052 — The emitter: objects that spawn, fall on a parabola, and die](#0052--the-emitter-objects-that-spawn-fall-on-a-parabola-and-die)
+  - [0059 — Lorenz finds its plane, and the attractor can trade samples for curves](#0059--lorenz-finds-its-plane-and-the-attractor-can-trade-samples-for-curves)
+  - [0060 — a test number states a property, or names its machine](#0060--a-test-number-states-a-property-or-names-its-machine)
+  - [0050 — in-app settings, live quality, and a browse overlay that fits](#0050--in-app-settings-live-quality-and-a-browse-overlay-that-fits)
+  - [0058 — the gate can see an empty frame, and "loud" has to mean more picture](#0058--the-gate-can-see-an-empty-frame-and-loud-has-to-mean-more-picture)
+  - [0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one retune](#0057--the-attractors-compute-path-the-deposit-the-reseed-the-butterfly-and-one-retune)
+  - [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor](#0056--clamp-occupancy-the-instrument-that-would-have-caught-a-saturated-library-plus-the-axis-anchor)
+  - [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting between shapes](#0054--the-line-scenes-catch-up-every-one-honours-the-palette-and-the-star-stops-cutting-between-shapes)
+  - [0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it](#0048--analysis-v2-the-dual-resolution-axis-normalized-bands-phrase-time-and-the-one-retune-that-pays-for-all-of-it)
   - [0051 — the scene seam emits premultiplied alpha](#0051--the-scene-seam-emits-premultiplied-alpha)
-  - [[0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed](#0045--linear-light-the-hdr-composite-the-bloom-stage-and-the-fold-that-had-to-be-fixed)
-  - [[0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope](#0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope)
-  - [[0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that](#0044--quality-tiers-floor-and-rich-a-governor-and-the-constants-that)
-  - [[0047 — expression randomness: `hash`, `noise`, and the seed that finally does](#0047--expression-randomness-hash-noise-and-the-seed-that-finally-does)
-  - [[0043 — the swarm gets a depth axis and a domain that follows the](#0043--the-swarm-gets-a-depth-axis-and-a-domain-that-follows-the)
-  - [[0042 — reachability sees every comparison, and the library is re-audited against](#0042--reachability-sees-every-comparison-and-the-library-is-re-audited-against)
-  - [[0041 — `--report` reads at two levels, and expression reachability is measured on the](#0041----report-reads-at-two-levels-and-expression-reachability-is-measured-on-the)
-  - [[0040 — Line joins, finished: the star's other half, and a pin under the reported](#0040--line-joins-finished-the-stars-other-half-and-a-pin-under-the-reported)
+  - [0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first](#0045--linear-light-the-hdr-composite-the-bloom-stage-and-the-fold-that-had-to-be-fixed-first)
+  - [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)](#0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope-seam)
+  - [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that move](#0044--quality-tiers-floor-and-rich-a-governor-and-the-constants-that-move)
+  - [0047 — expression randomness: `hash`, `noise`, and the seed that finally does something](#0047--expression-randomness-hash-noise-and-the-seed-that-finally-does-something)
+  - [0043 — the swarm gets a depth axis and a domain that follows the target](#0043--the-swarm-gets-a-depth-axis-and-a-domain-that-follows-the-target)
+  - [0042 — reachability sees every comparison, and the library is re-audited against it](#0042--reachability-sees-every-comparison-and-the-library-is-re-audited-against-it)
+  - [0041 — `--report` reads at two levels, and expression reachability is measured on the AST](#0041----report-reads-at-two-levels-and-expression-reachability-is-measured-on-the-ast)
+  - [0040 — Line joins, finished: the star's other half, and a pin under the reported defect](#0040--line-joins-finished-the-stars-other-half-and-a-pin-under-the-reported-defect)
   - [0039 — Line joins: the stroke stops coming apart at every vertex —](#0039--line-joins-the-stroke-stops-coming-apart-at-every-vertex-)
-  - [[0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and](#0038--the-line-familys-unreachable-levers-glow-the-readouts-geometry-a-level-curve-and)
-  - [[0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors](#0037--verifying-easing-a-transient-probe-a-signal-with-dynamics-and-the-levels-authors)
-  - [[0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element](#0034--preset-reachable-spectrum-binx-a-spectrum-scene-and-per-element)
-  - [[0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a](#0035--the-composites-aspect-is-the-targets-the-grid-shape-stretch-one-grid-policy-and-a)
-  - [[0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind](#0033--internal-resolution-follows-the-target-plus-the-preset-surface-and-harness-gaps-behind)
-  - [[0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and](#0031--cleanup-pass-testable-shot-helpers-one-construction-path-load-time-param-routing-and)
-  - [[0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a](#0032--testing-strategy-full-chain-e2e-shot-cli-coverage-a-core-coverage-ratchet-and-a)
+  - [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`](#0038--the-line-familys-unreachable-levers-glow-the-readouts-geometry-a-level-curve-and-log)
+  - [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against](#0037--verifying-easing-a-transient-probe-a-signal-with-dynamics-and-the-levels-authors-calibrate-against)
+  - [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation](#0034--preset-reachable-spectrum-binx-a-spectrum-scene-and-per-element-evaluation)
+  - [0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages](#0035--the-composites-aspect-is-the-targets-the-grid-shape-stretch-one-grid-policy-and-a-pixel-guard-for-the-post-stages)
+  - [0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it](#0033--internal-resolution-follows-the-target-plus-the-preset-surface-and-harness-gaps-behind-it)
+  - [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt](#0031--cleanup-pass-testable-shot-helpers-one-construction-path-load-time-param-routing-and-the-accumulated-close-review-debt)
+  - [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate](#0032--testing-strategy-full-chain-e2e-shot-cli-coverage-a-core-coverage-ratchet-and-a-pre-push-gate)
   - [0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets —](#0023--cross-preset-visual-transitions-milkdrop-style-dissolves-between-presets-)
-  - [[0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and](#0030--composite-chain--scene-keying-a-poststage-trait-an-instantiable-postchain-and)
+  - [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes](#0030--composite-chain--scene-keying-a-poststage-trait-an-instantiable-postchain-and-kind-keyed-scenes)
   - [0019 — Preset expression grammar v2: branching, math functions, tempo, typo warnings —](#0019--preset-expression-grammar-v2-branching-math-functions-tempo-typo-warnings-)
   - [0015 — Preset-directory override + live iteration —](#0015--preset-directory-override--live-iteration-)
   - [0029 — Attractor resize cost + ink-stage followups —](#0029--attractor-resize-cost--ink-stage-followups-)
@@ -2796,8 +2796,8 @@ engine. The rewrite is content work and rides Phase 5, along with whether the qu
 `emitter_perseids` or replaces it. **The ceremony's own grep did not catch it**: step 3b's
 pattern matches `design-backlog 00NN` and this header says the bare `backlog 0068` — widen it.
 
-### [0094 — The two doc gates check what they claim
-to](done/0094-the-two-doc-gates-check-what-they-claim-to.md) — closed 2026-08-15, the day it
+### [0094 — The two doc gates check what they claim to](done/0094-the-two-doc-gates-check-what-they-claim-to.md)
+— closed 2026-08-15, the day it
 was written and hours after the plan it repairs, all three `dev` phases (`38addde`, `a9f8c70`,
 `24c85dd`). Review: **no blockers, no majors, two minors, two nits** — and neither minor is
 against the implementation. **Both markdown gates now cover what they claimed to.** The link
@@ -2844,8 +2844,8 @@ section preamble is attributed to the previous entry and would silently satisfy 
 requirement for it — pre-existing, narrow today because preambles precede their entries. **Curation
 (step 3b):** `presets/` untouched, no engine defect fixed — neither sweep fires.
 
-### [0093 — The backlog stops asserting things about a repo it has not
-read](done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md) — closed
+### [0093 — The backlog stops asserting things about a repo it has not read](done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
+— closed
 2026-08-15, the day it was written, all four `dev` phases (`ee471fb`, `7a975ad`, `0ab3331`,
 `9d8b1ff`). Review: **no blockers, two majors, one minor, two nits** — all three substantive
 findings are in the machinery rather than the plan, and all three are carried by
@@ -2869,8 +2869,8 @@ gave `check-doc-links.mjs`'s `root` argument its first committed caller — [008
 loose end — so both gates' bite checks are now repeatable commands rather than properties
 nobody has re-tested.
 
-### [0085 — The show-length horizon gets an
-instrument](done/0085-the-show-length-horizon-gets-an-instrument.md) — closed 2026-08-15 (four
+### [0085 — The show-length horizon gets an instrument](done/0085-the-show-length-horizon-gets-an-instrument.md)
+— closed 2026-08-15 (four
 `dev` phases: `3280136`, `a1e62e5`, `97b7227`, `9514e2b`; **the `human` Phase 5 was then run
 the same day — all five phases complete, see Standing**). Review: **no blockers, one major,
 three minors, one nit**. **The first instrument in this repo that measures past half a
@@ -2919,8 +2919,8 @@ and deliberately not repaired**; judging it is content-lane work. The named subj
 `swarm_shatter` came back **clean** (monotone 0.50, wandering 0.197–0.384 with no trend), which
 the plan called the expected outcome.
 
-### [0089 — The framing contract stops lying, and two doc gaps
-close](done/0089-the-framing-contract-stops-lying.md) — closed 2026-08-15 (three phases, one
+### [0089 — The framing contract stops lying, and two doc gaps close](done/0089-the-framing-contract-stops-lying.md)
+— closed 2026-08-15 (three phases, one
 `dev` session: `e23bd04`, `d4570e7`, `52b1dc3`). Review: **no blockers, no majors, one minor,
 three nits**. **A stated invariant stopped being false without a pixel moving.** `FRAME_FILL = 0.88`
 documented that a fitted IFS figure sits inside the frame; the fit measures an *axis-aligned*
@@ -2995,8 +2995,8 @@ content lane**, each family shipping exactly one preset with nothing to swap to.
 is unchanged by this plan. **Carried forward:** [0087] invalidates the curve family's gallery
 image and the hero, which is one script re-run and is named in the sequence section above.
 
-### [0084 — Two gates stop lying about what they
-check](done/0084-two-gates-stop-lying-about-what-they-check.md) — closed 2026-08-13 (all four
+### [0084 — Two gates stop lying about what they check](done/0084-two-gates-stop-lying-about-what-they-check.md)
+— closed 2026-08-13 (all four
 `dev` phases, written and landed the same day). Review: **no blockers, no majors, three minors,
 one nit**. **The doc-link checker sees markdown's second link form** — a use with no definition
 in its file, and a definition whose relative target does not resolve, both reported through the
@@ -3083,8 +3083,8 @@ what `queue_frame_text` already does around it and is why it is a nit rather tha
 untouched, no `aspect` appears in the diff, and nothing added runs on the capture thread: the
 verdict is known before the callback exists.
 
-### [0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured
-morph paths](done/0079-the-attractor-learns-new-figures.md) — closed 2026-08-13 (all six
+### [0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths](done/0079-the-attractor-learns-new-figures.md)
+— closed 2026-08-13 (all six
 phases, **both `human` gates run and both producing a verdict rather than a default**). Review: **no
 blockers, no majors, four minors, two nits**. **A tuple becomes content, framing and all**
 ([ADR-0093](../adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md), closes
@@ -3142,8 +3142,8 @@ than worlds. That is a judgement for the content lane, not a re-tune here. The w
 over all 37 headers finds **nothing** citing the tuple wall — expected, since nothing could
 express a workaround for a figure that could not be reached at all.
 
-### [0081 — The sky gets a galaxy: the backdrop paints a curved
-band](done/0081-the-sky-gets-a-galaxy.md) — closed 2026-08-12 (all five `dev` phases; **Phase 6
+### [0081 — The sky gets a galaxy: the backdrop paints a curved band](done/0081-the-sky-gets-a-galaxy.md)
+— closed 2026-08-12 (all five `dev` phases; **Phase 6
 is `human` and deliberately outstanding — see Standing**). Review: **no blockers, no majors,
 two minors, two nits** (minors, both repaired in the close series: `docs/capturing.md`'s *"One
 golden baseline is lit, and it is the exception that proves the rule"* was falsified by this
@@ -3209,8 +3209,8 @@ and `docs/preset-palettes.md` — so no near-duplicate sweep owed; the workaroun
 27 headers finds **nothing** citing a missing band or a painted-in galaxy, which is expected,
 since nothing could express the shape to work around.
 
-### [0082 — The gradient stops banding: the display write
-dithers](done/0082-the-gradient-stops-banding.md) — closed 2026-08-12 (four `dev` phases plus a
+### [0082 — The gradient stops banding: the display write dithers](done/0082-the-gradient-stops-banding.md)
+— closed 2026-08-12 (four `dev` phases plus a
 self-repair, and the `human` Phase 5 **answered rather than left standing**). Review: **no
 blockers, one major, five minors, three nits** — and every finding is a consequence of
 something the *plan* got wrong, recorded honestly by `dev` rather than absorbed. **The tonemap
@@ -3268,8 +3268,8 @@ the adapter-robust guard); and `core/Cargo.toml:31`'s last surviving mojibake, r
 owed; the workaround grep over all 27 headers finds **nothing** citing banding or a
 step-breaking stop, because no shipped preset binds the ramp params yet.
 
-### [0080 — The sky gets a horizon: the backdrop paints a directional
-ramp](done/0080-the-sky-gets-a-horizon.md) — closed 2026-08-12 (all six `dev` phases; **Phase 7
+### [0080 — The sky gets a horizon: the backdrop paints a directional ramp](done/0080-the-sky-gets-a-horizon.md)
+— closed 2026-08-12 (all six `dev` phases; **Phase 7
 is `human` and deliberately outstanding — see Standing**). Review: **no blockers, no majors,
 three minors, one nit** (minors, all repaired in the close series: the `preset-author` lane's
 own `references/systems.md` and `craft.md` did not know the ramp exists — the Plan 0078
@@ -3314,8 +3314,8 @@ generically (verified with a probe binding four `bg_*` names, one live gate and 
 owed; the workaround grep over all 27 headers finds **nothing** citing the missing gradient
 this plan supplies, which is expected: the rejected workaround was never landed.
 
-### [0078 — The ink learns to bite: a contrast exponent on the terminal
-remap](done/0078-the-ink-learns-to-bite.md) — closed 2026-08-12 (both `dev` phases; **Phase 3
+### [0078 — The ink learns to bite: a contrast exponent on the terminal remap](done/0078-the-ink-learns-to-bite.md)
+— closed 2026-08-12 (both `dev` phases; **Phase 3
 is `human` and deliberately outstanding — see Standing**). Review: **no blockers, no majors,
 three minors, one nit** (minors: Phase 1 substituted a structural argument for the
 bless-to-bless control its done-when named — the substitution is the *stronger* instrument and
@@ -3352,8 +3352,8 @@ and two unlisted files were required. **Curation (step 3b):** no preset content 
 near-dup sweep owed; the workaround grep names `reaction_etching` and `swarm_shatter`, both
 carried into the Standing entry.
 
-### [0077 — The quiet sky: the sparse idiom becomes gateable and the swarm
-individuates](done/0077-the-quiet-sky.md) — closed 2026-08-12 (`dev` scope; **Phase 5 is
+### [0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates](done/0077-the-quiet-sky.md)
+— closed 2026-08-12 (`dev` scope; **Phase 5 is
 `human` and deliberately outstanding — see Standing**). Review: **no blockers, no majors, two
 minors** (both repaired in the close series: `docs/capturing.md` had not learned the report's
 new footprint block / `reactivity_footprint` JSON key — the operator-doc sweep `dev` correctly
@@ -3388,8 +3388,8 @@ sweep owed; the workaround grep lists two headers for the content lane — `frag
 "report is bloom-blind" rationale (fixed by Phase 4) and Perseids' routed-out quiet sky (Phase
 5's own subject) — named in the Standing entry.
 
-### [0075 — The content renaissance: the library is rebuilt as worlds, by replacement
-cohorts](done/0075-the-content-renaissance.md) — closed 2026-08-11. Review: **no blockers, no
+### [0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts](done/0075-the-content-renaissance.md)
+— closed 2026-08-11. Review: **no blockers, no
 majors, two minors, two nits** (minors: rustfmt drift on two test files the lane touched,
 repaired in the close series as `6a5a9c6` — the "557/557 green" handoff claim was nextest,
 which does not check fmt, and the fmt-running pre-push hook never fired because the lane never
@@ -3456,8 +3456,8 @@ preset declares a layer yet — that is [0075] cohort 6's work, now unblocked. C
 3b): no preset content landed and no engine defect was fixed, so no workaround sweep was owed;
 verdict "no content change".
 
-### [0053 — The suite stops blessing what WARP gets
-wrong](done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) — closed 2026-08-09. Review: **no
+### [0053 — The suite stops blessing what WARP gets wrong](done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md)
+— closed 2026-08-09. Review: **no
 blockers, two majors, four minors**. **The plan was written to prove the collisions benign and
 instead found two live mis-renders and fixed them.** `background-bind-layout` collided with the
 fullscreen scenes' single uniforms and rendered the fragment field a **flat grey** on WARP
@@ -3730,8 +3730,8 @@ Two costs the lane refused to absorb went to [backlog 0080](../design-backlog.md
 exception to [backlog 0081](../design-backlog.md) (the house gain rule is written down
 nowhere).
 
-### [0064 — The symmetry stage and the banded
-palette](done/0064-the-symmetry-stage-and-the-banded-palette.md) — closed 2026-08-09. Review: **no
+### [0064 — The symmetry stage and the banded palette](done/0064-the-symmetry-stage-and-the-banded-palette.md)
+— closed 2026-08-09. Review: **no
 blockers and no code findings**; the three items raised were all stale text in the plan itself,
 corrected at the close (its "fourteen" baselines are **19**, its five LUT sample sites are **seven**,
 and its "duplicated at five sites" risk is **three** WGSL copies plus four calls into the one
@@ -3746,8 +3746,8 @@ protective side effect, not as the rescue. **First run of close-ceremony step 3b
 near-duplicate geometry in any of the nine families, and nothing in `presets/` still pays for a
 fixed defect.
 
-### [0071 — Light that adds without covering
-(`occlude`)](done/0071-light-that-adds-without-covering.md) — closed 2026-08-09. Review: no
+### [0071 — Light that adds without covering (`occlude`)](done/0071-light-that-adds-without-covering.md)
+— closed 2026-08-09. Review: no
 blockers, two majors, three minors, two nits. **Phase 5 is `human` and deliberately outstanding
 — see Standing.** The default stayed `1.0` by the user's look, no preset binds it, and **no
 golden baseline moved** (measured as a bless-against-a-clean-`main`-bless, all 19
@@ -4175,8 +4175,8 @@ defect). The guard's own floor is **measured, not picked** — correct `tile` 0.
 floor 0.15 — and is a dimensionless ratio of the same statistic on the same image, which is what
 makes it a property rather than a machine measurement. The re-scoped disc guard was **verified**
 still non-vacuous against the pre-ADR-0047 shader (peak 199, 6052/6052 out-of-disc pixels lit).
-### [0052 — The emitter: objects that spawn, fall on a parabola, and
-die](done/0052-the-emitter-objects-that-spawn-fall-and-die.md) — **done 2026-08-04**, Mode 4 review
+### [0052 — The emitter: objects that spawn, fall on a parabola, and die](done/0052-the-emitter-objects-that-spawn-fall-and-die.md)
+— **done 2026-08-04**, Mode 4 review
 **no blockers**. Phase 1 `2470a50`, Phase 2 `d155615`, Phase 3 `52a756c`, Phase 4 `53a896e`, on
 lane `plan-0052-emitter` (ADR-0053), **reviewed together with [0055] against one merged tip**.
 [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) is **accepted**.
@@ -4199,8 +4199,8 @@ noise** — if it recurs, it has a precedent now. And `distinctness` is **struct
 this scene: the report's unit is a pairwise matrix and the family ships one preset, so a 1x1
 matrix would say nothing. It is left out rather than lowered or waived, and the reasoning now
 lives in `core/tests/distinctness.rs` beside the curated family list.
-### [0059 — Lorenz finds its plane, and the attractor can trade samples for
-curves](done/0059-lorenz-finds-its-plane.md) — **done 2026-08-04**, Mode 4 review **no blockers**.
+### [0059 — Lorenz finds its plane, and the attractor can trade samples for curves](done/0059-lorenz-finds-its-plane.md)
+— **done 2026-08-04**, Mode 4 review **no blockers**.
 Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human`
 Phase 4 content pass `990fedc`.
 [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md),
@@ -4237,8 +4237,8 @@ and `bloom_threshold` measured pre-exposure and clamped at `8.0` — is
 **The coverage-floor conversation the plan expected did not arise**: the attractor family minimum
 is still Leviathan at `0.3442` against the `0.18` floor (1.91x slack), because Leviathan is
 untouched and nothing new sank below it.
-### [0060 — a test number states a property, or names its
-machine](done/0060-a-test-number-states-a-property-or-names-its-machine.md) — **done 2026-08-04**,
+### [0060 — a test number states a property, or names its machine](done/0060-a-test-number-states-a-property-or-names-its-machine.md)
+— **done 2026-08-04**,
 Mode 4 review **no blockers**. Phase 1 `1d56600` + `31073f6`, Phase 2 the `human` push (CI run
 **30903871856**, green on all three jobs), Phase 3 `a324b21` + `ae4c215`.
 [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) and
@@ -4275,8 +4275,8 @@ is hardware-only and why `background_composite.rs` skips. On this evidence it is
 WARP *build*, written as a property of WARP: ADR-0071's own error a level down, in prose. Not
 edited from a single contrary reading; [0053] Phase 3 is where a second configuration settles it.
 Both ADR corollaries are now in the `architect` skill's lens 4, as the plan's Followups asked.
-### [0050 — in-app settings, live quality, and a browse overlay that
-fits](done/0050-in-app-settings-and-a-browse-overlay-that-fits.md) — **done 2026-08-04**, Mode 4
+### [0050 — in-app settings, live quality, and a browse overlay that fits](done/0050-in-app-settings-and-a-browse-overlay-that-fits.md)
+— **done 2026-08-04**, Mode 4
 review **no blockers, no majors**. All six phases landed including the `human` Phase 6:
 `14cd9e2` `Renderer::set_tier` + the `[` / `]` swap, `bed0274` the browser opens where you are and
 wraps and repeats, `46b38f6` the list flows into columns, `d81a24a` the settings modal on `S`,
@@ -4333,8 +4333,8 @@ the tree — the governor's `apply_tier` has shipped without it since [0044].
 `docs/presets.md` and `docs/preset-palettes.md` were confirmed *not* to need sweeping by grepping
 the four code phases' diff for a `[params]` name, rather than by assumption.
 
-### [0058 — the gate can see an empty frame, and "loud" has to mean more
-picture](done/0058-the-gate-can-see-an-empty-frame.md) — **done 2026-08-03**, Mode 4 review **no
+### [0058 — the gate can see an empty frame, and "loud" has to mean more picture](done/0058-the-gate-can-see-an-empty-frame.md)
+— **done 2026-08-03**, Mode 4 review **no
 blockers, no majors**. All four phases landed including the `human` Phase 4: `96a914f` coverage
 measures the scene, `a0ce1c9` the floors are re-measured, `8e79aa3` the excitation ratio ships as
 a report, `2efb80e` the comb and the corona come back inside the frame.
@@ -4398,8 +4398,8 @@ frozen fixture per `SystemKind`, deliberately *not* the shipped presets (ADR-002
 content tune cannot trip the engine-drift alarm. `LMV_BLESS` was never run; running it would have
 rewritten all 19 baselines to no purpose. Same shape as [0054]'s close.
 
-### [0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one
-retune](done/0057-the-attractors-compute-path.md) — **done 2026-08-03**, Mode 4 review **no
+### [0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one retune](done/0057-the-attractors-compute-path.md)
+— **done 2026-08-03**, Mode 4 review **no
 blockers, no majors**; three minors, all doc bookkeeping, fixed in the close commit. Phase
 commits: `8c95cf2` the two instruments, `4d77bff` the deposit, `5bb36c2` the reseed, `9d717fc` the
 Lorenz diagnosis, `b2be2d3` the one content pass.
@@ -4466,8 +4466,8 @@ hit arrived as ~0.5 % of a term worth 4 %. Lowered to 0.45 / 0.55, magnitudes de
 raised in the same pass — speed and travel are separate levers. It does not show up in `--report`
 (those cells carry the `+` marker) and **needs a judgement in motion it has not had**.
 
-### [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis
-anchor](done/0056-clamp-occupancy-and-the-axis-anchor.md) — **done 2026-08-03**, Mode 4 review
+### [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor](done/0056-clamp-occupancy-and-the-axis-anchor.md)
+— **done 2026-08-03**, Mode 4 review
 **no blockers, no majors**; three minors, all doc bookkeeping, all fixed in the close commit.
 Five `dev` phase commits on the `plan-0056-clamp-occupancy` worktree branch: `a704d30` occupancy
 on the walk, `f607915` the `occ` column and `SAT` lines, `3430cdc` the HARD gate with its measured
@@ -4536,8 +4536,8 @@ named neither. Both now point at the column and the gate — while keeping the a
 because the gate fires at `0.9` and a term pinned for half a track passes it.
 Version **minor 0.30.0 → 0.31.0** (a preset-facing surface, a report column and two gates).
 
-### [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting
-between shapes](done/0054-the-line-scenes-catch-up.md) — **done 2026-08-03**, Mode 4 review **no
+### [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting between shapes](done/0054-the-line-scenes-catch-up.md)
+— **done 2026-08-03**, Mode 4 review **no
 blockers, no majors**; three minors, all fixed in the close commit. Four `dev` phase commits on
 the `plan-0054-line-scenes` worktree branch: `e03598f` the L-system's generation-depth colour,
 `86bba60` the parametric curve's path axis plus the star's measured-flat radial one, `4df5d21`
@@ -4597,8 +4597,8 @@ demonstrates **none** of the morph this plan built; the composition that does is
 over `0..2` with a smoothing constant, and it is a `preset-author` pass.
 Version **minor 0.29.0 → 0.30.0** (a feature plan).
 
-### [0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune
-that pays for all of it](done/0048-analysis-v2-and-the-retune.md) — **done 2026-08-03**, Mode 4
+### [0048 — analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it](done/0048-analysis-v2-and-the-retune.md)
+— **done 2026-08-03**, Mode 4
 review **no blockers, no majors**; four minors, all doc bookkeeping, all fixed in the close
 commit. Five `dev` phase commits plus the Phase 3 refactor, on the `plan-0048-analysis-v2` branch
 fast-forwarded into `main` as it went: `bfd892b` the dual-resolution axis, `ef3b772` normalization
@@ -4668,8 +4668,8 @@ ceiling set by the figure's dimmest luminance (verified by rendering; `presets/R
 it, and whether additive light should occlude at all is a look decision left open) — and
 **[backlog 0041](../design-backlog.md)** — the line guard discriminates on ~5 pixels where the
 swarm's gets 52 651, with a `glow = 0` fourth capture sketched as the stronger property.
-### [0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed
-first](done/0045-linear-light-and-bloom.md) — **done 2026-07-31**, passed two Mode 4 reviews
+### [0045 — linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first](done/0045-linear-light-and-bloom.md)
+— **done 2026-07-31**, passed two Mode 4 reviews
 (**no blockers**; one `major` routed out as [backlog 0039](../design-backlog.md)). Six `dev`
 phase commits on the `plan-0045-linear-light` worktree branch, fast-forwarded into `main` at
 `2f4a804`: `6f282e7` / `b67b9c2` the fold, `c334b0e` the backdrop leaving the chain, `f7ab148`
@@ -4705,8 +4705,8 @@ any other stage, because the threshold makes the loud-frame/real-audio gap a cli
 slope. Backlog **0031** was re-checked and is **still open**; see the entry.
 Version **minor 0.27.0 → 0.28.0** (a feature plan).
 
-### [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope
-seam)](done/0049-analysis-diagnostics-surface.md) — **done 2026-07-30**, passed Mode 4 review
+### [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)](done/0049-analysis-diagnostics-surface.md)
+— **done 2026-07-30**, passed Mode 4 review
 (**no blockers, no majors**; four minors and a nit — three minors and the nit fixed in the close
 commit). Seven `dev` phase commits: `a335f35` the integral fold order, `69761b9`
 `AnalysisMetrics` plumbed to the render seam, `a387909` the overlay rows, `4dabb3f` the six log
@@ -4767,8 +4767,8 @@ growth is exactly the Phase 6 instrument. Measured at roughly 1900 quads today, 
 headroom; worth knowing before the next thing is added to that panel.
 Version **minor 0.26.0 → 0.27.0** (a feature plan).
 
-### [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that
-move](done/0044-quality-tiers.md) — **done 2026-07-30**, passed Mode 4 review (**no blockers**;
+### [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that move](done/0044-quality-tiers.md)
+— **done 2026-07-30**, passed Mode 4 review (**no blockers**;
 one major, two minor). Four `dev` phase commits: `e44b3a6` `TierConfig` + resolution + the post
 cap, `89d4ad4` the frame-time governor, `6292286` the remaining capacity constants, `3e807f4` the
 docs sweep. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) is **accepted**.
@@ -4800,8 +4800,8 @@ with two now-stale "lower this constant" pointers to constants that moved into `
 **First field consequence, same day:** `Rich`'s 3x attractor particle count blows
 `attractor_clifford` out to white against the un-fixed additive ceiling — **[backlog
 0031](../design-backlog.md)**, and the reason [0045] is now the urgent one.
-### [0047 — expression randomness: `hash`, `noise`, and the seed that finally does
-something](done/0047-expression-randomness.md) — **done 2026-07-30**, passed Mode 4 review
+### [0047 — expression randomness: `hash`, `noise`, and the seed that finally does something](done/0047-expression-randomness.md)
+— **done 2026-07-30**, passed Mode 4 review
 (**no blockers, no majors**; three minors, the two doc ones fixed in the close commit). Three
 `dev` phase commits on the `plan-0047-expression-randomness` worktree branch, merged to `main`:
 `96d39c1` the two salted functions, `d72a4cc` `seed = "random"` + the capture pin, `8f7fc13` the
@@ -4831,8 +4831,8 @@ any system's preset may carry a `[generator]` table holding nothing else.
 fourth ingredient in the headless-render purity claim) and NFR §6 (ADR-0051 promised the
 clarifying sentence; §6 was already true, so this states *why* rather than carving out).
 
-### [0043 — the swarm gets a depth axis and a domain that follows the
-target](done/0043-swarm-depth-and-domain.md) — **done 2026-07-30**, passed Mode 4 review
+### [0043 — the swarm gets a depth axis and a domain that follows the target](done/0043-swarm-depth-and-domain.md)
+— **done 2026-07-30**, passed Mode 4 review
 (**no blockers**; two minors and a nit — both minors fixed in the close commit). Four `dev` phase
 commits: `ae6f638` the target-sized domain, `7f54e2a` `field_freq`, `7eaa848` the depth axis,
 `de707cb` the family cut to three and re-authored. **Closes design-backlog 0029 and 0025 in full.**
@@ -4873,8 +4873,8 @@ set passing `sanity` / `reactivity` / `animation` / `distinctness`. The counter-
 documented in `presets/README.md`: it is the **low** end of `field_freq` that reads busier, because
 a field structure larger than the frame packs it edge to edge.
 
-### [0042 — reachability sees every comparison, and the library is re-audited against
-it](done/0042-reachability-sees-every-comparison.md) — **done 2026-07-30**, passed Mode 4 review
+### [0042 — reachability sees every comparison, and the library is re-audited against it](done/0042-reachability-sees-every-comparison.md)
+— **done 2026-07-30**, passed Mode 4 review
 (**no blockers**; one major, two minors, one nit — the major and both minors fixed in the close
 commit). Three `dev` phase commits: `8c170a3` observe every comparison, `e7a40b7` report a
 one-sided one unless a `select()` already names it, `f50e8cf` the Phase 3 re-audit. **Closes
@@ -4892,8 +4892,8 @@ what remains is the instrument, so a multi-BPM probe or an explicit `tempo` exem
 single thing between here and a meaningful green gate. `docs/capturing.md` no longer justifies the
 advisory posture with the nine-failing-presets figure this plan measured to zero.
 
-### [0041 — `--report` reads at two levels, and expression reachability is measured on the
-AST](done/0041-report-two-level-stimuli-and-expression-reachability.md) — **done 2026-07-29**,
+### [0041 — `--report` reads at two levels, and expression reachability is measured on the AST](done/0041-report-two-level-stimuli-and-expression-reachability.md)
+— **done 2026-07-29**,
 passed Mode 4 review (**no blockers**; one major, four minors, three nits — one minor fixed in the
 close commit). Four `dev` phase commits: `1c8f216` the realistic-level stimulus, `5901e0e` probed
 evaluation, `27c84cd` the report surface, `efd25bb` the doc sweep. **Closes design-backlog 0022 and
@@ -4968,8 +4968,8 @@ checking the arithmetic against the table is off by 25 %.
 the `shot`/harness path; the app's render loop executes nothing new.
 Version **minor 0.21.1 → 0.22.0** (a feature plan).
 
-### [0040 — Line joins, finished: the star's other half, and a pin under the reported
-defect](done/0040-line-joins-finish-the-job.md) — **done 2026-07-28**, passed Mode 4 review
+### [0040 — Line joins, finished: the star's other half, and a pin under the reported defect](done/0040-line-joins-finish-the-job.md)
+— **done 2026-07-28**, passed Mode 4 review
 (**no blockers, no majors**; two minors, two nits). Three `dev` commits: `4c68bbd` the pixel pin
 under the polyline joint, `434ac1d` the join bits generated into the shader plus a swap test,
 `0bc33a6` the star rosette's contact points. **Closes backlog 0024.** No new ADR —
@@ -5068,8 +5068,8 @@ per ADR-0023), and Phase 3's golden enumeration **missed `composite_trails` and
 cause. The review's one major is the star rosette: its contact points are shared between adjacent
 petals, making the figure a closed chain whose every vertex is a joint, so Phase 3 flagged only
 half of them. **Phase 5 (`human`) is open** — `spectrum_ridge`'s `thickness` re-tune.
-### [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and
-`log`](done/0038-line-family-unreachable-levers.md) — **done 2026-07-28**, passed Mode 4 review
+### [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`](done/0038-line-family-unreachable-levers.md)
+— **done 2026-07-28**, passed Mode 4 review
 (**no blockers**; one major, five minors, two nits — the major and three minors **fixed in the
 close commit**). Ten commits: eight `dev` phases (`a1c67f4` `glow`, `f3945be` `span`/`baseline`,
 `c9121fd` `curve`, `e31ae88` `log(x)`, `a3f5d04` the doc sweep, `9739232` the settle gate,
@@ -5163,8 +5163,8 @@ because its stimuli are full-scale and `1^curve` is `1`), and [0023](../design-b
 is already [Plan 0039](done/0039-line-joins.md) + [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
 Version **minor 0.19.0 → 0.20.0** (a feature plan).
 
-### [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors
-calibrate against](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md) — **done
+### [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
+— **done
 2026-07-27**, passed Mode 4 review (**no blockers, no majors**; four minors, four nits). Five phase
 commits (`ece3291` the time-varying stimulus + the step-response measure, `29bc035` the `--report`
 columns, `6de5ad0` `--signal dynamic`, `bca1457` the doc sweep, `b3f18a6` the `human` measurement).
@@ -5233,8 +5233,8 @@ entirely in the capture/`shot` path; the app's render loop is untouched.
 **[ADR-0039](../adrs/0039-verify-easing-with-a-transient-probe-not-a-committed-clip.md) accepted.**
 Version **minor 0.18.0 -> 0.19.0**.
 
-### [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element
-evaluation](done/0034-preset-reachable-spectrum.md) — **done 2026-07-27**, passed Mode 4 review
+### [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation](done/0034-preset-reachable-spectrum.md)
+— **done 2026-07-27**, passed Mode 4 review
 (**no blockers**; two majors, four minors, two nits, **all fixed in `ca99cb1`** rather than
 carried). Five `dev` phase commits (`a379b28` `bin(x)`, `2450c2a` the `spectrum` system, `a553b2e`
 the `[spectrum]` table, `6950c94` per-element `index`, `fe11659` the operator sweep) plus
@@ -5267,8 +5267,8 @@ the backlog:** [0015](../design-backlog.md) whether the half-linear axis is a de
 if acted on**) and [0016](../design-backlog.md) the readout's missing `span`/`width` param. Version
 **minor 0.17.1 → 0.18.0**.
 
-### [0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a
-pixel guard for the post stages](done/0035-composite-aspect-and-grid-policy.md) — **done
+### [0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages](done/0035-composite-aspect-and-grid-policy.md)
+— **done
 2026-07-26**, passed Mode 4 review (**no blockers, no majors**; four minors, one nit). Four `dev`
 phase commits (`d4f98f8` the aspect fix, `687621b` the two post-stage baselines, `bc11b23` one grid
 policy, `f9f9e79` the docs). Turning `trails` or `kaleido_*` on now changes the picture's
@@ -5331,8 +5331,8 @@ item already watches; and Phase 4 put the RD reconstruction's ~45 texture fetche
 because reverting costs the coral look. **[ADR-0037] accepted.** Version **patch 0.17.0 -> 0.17.1**
 (a fix/coverage/refactor/docs plan, no feature).
 
-### [0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind
-it](done/0033-internal-resolution-and-preset-surface.md) — **done 2026-07-26**, passed Mode 4
+### [0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it](done/0033-internal-resolution-and-preset-surface.md)
+— **done 2026-07-26**, passed Mode 4
 review (**no blockers**; three majors, four minors). Six `dev` phase commits (`978405a` `shot`
 reaches `tempo`/`novelty` + band levels, `cf65c4a` `{ attack, release }` smoothing, `8c0ff2b`
 Catmull-Rom reconstruction, `08714c7` the wrapped RD sampler, `3f3b652` target-sized post stages,
@@ -5406,8 +5406,8 @@ preset re-tune** (Phase 8's job). [ADR-0034](../adrs/0034-internal-resolution-fo
 remains open** — the aesthetic re-tune on the 2048x1152 display, restoring `trails` to the line
 presets. Version **minor 0.16.1 -> 0.17.0** at close (a feature plan).
 
-### [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and
-the accumulated close-review debt](done/0031-composite-cleanup-and-debt.md) — **done 2026-07-26**,
+### [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt](done/0031-composite-cleanup-and-debt.md)
+— **done 2026-07-26**,
 passed Mode 4 review (**no blockers, no majors**; five minors, three nits). Six `dev` phase commits
 (`5244fd2` `shot`'s helpers into the lib, `83706a3` `from_context`, `6755014` load-time routes +
 `tau`, `64e7145` three per-frame stops, `fb024fc` `render/gpu.rs` + the attractor split, `609b9c9`
@@ -5473,8 +5473,8 @@ plan carries out existing decisions. Version **patch 0.16.0 -> 0.16.1** at close
 plan; its one behavior addition completes ADR-0007's never-a-silent-cut contract rather than adding
 a feature).
 
-### [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a
-pre-push gate](done/0032-testing-strategy-e2e-coverage-and-pre-push.md) — **done 2026-07-26**,
+### [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate](done/0032-testing-strategy-e2e-coverage-and-pre-push.md)
+— **done 2026-07-26**,
 passed Mode 4 review (**no blockers, no majors**; four minors, two nits). Four `dev` phase commits
 (`332720f` the e2e chain suite, `108e21a` `shot` as a subprocess, `ee89905` the pre-push gate,
 `a4b7045` the coverage ratchet). Answers the three questions that opened it — coverage threshold,
@@ -5587,8 +5587,8 @@ the heavy attractor <-> reaction-diffusion pair holding 60 fps @ 1080p on a low-
 `DUAL_LIVE_BUDGET_MS` calibration — a WARP capture cannot speak to either. Version **minor
 0.15.1 -> 0.16.0** at close.
 
-### [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and
-kind-keyed scenes](done/0030-composite-chain-and-scene-keying.md) — **done 2026-07-25**, passed
+### [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes](done/0030-composite-chain-and-scene-keying.md)
+— **done 2026-07-25**, passed
 Mode 4 review (**no blockers**; three minors, one nit). Four `dev` phase commits (`023777d` trait +
 pure routing + chain, `55c7109` the two-chain independence proof, `9c02953` kind-keyed scenes,
 `d711760` docs). `draw_frame`'s ~70-line composite branch ladder over `trailing`/`kaleidoing`/
