@@ -67,9 +67,9 @@ name = "Drift Mono"
 # before it and white after - so the thread keeps a dark edge on one side and a
 # light one on the other wherever it crosses the field.
 #
-# The red's hex is LINEAR - the palette bakes hex straight through with no sRGB
-# decode - so `#b00808` is what puts a saturated red on the glass at this glow.
-# `#ff0000` written here comes out pink.
+# The red's hex is ORDINARY sRGB - a stop is decoded to light at the LUT bake
+# (ADR-0151) - so `#d83232` is what puts a saturated red on the glass at this
+# glow, and it is the red that renders. `#ff0000` here is far too hot.
 stops = [
   { at = 0.00, color = "#000000" },
   { at = 0.24, color = "#000000" },

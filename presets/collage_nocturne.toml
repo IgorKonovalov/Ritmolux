@@ -11,16 +11,16 @@
 # one. `size_hierarchy` is pushed to 0.82 to back it: a steep fall from the
 # largest element to the smallest is what makes an anchor read as an anchor.
 #
-# THE PAPER IS DARK, AND THE ARITHMETIC FOR THAT IS NOT THE OBVIOUS ONE. A stop
-# is a LINEAR coefficient with no sRGB decode, so the display byte is that
-# coefficient's sRGB encoding and it is much brighter than the hex: the paper's
-# `#050608` renders about `#272930`, and an element at `#99751f` renders near
-# `#CBB570`. Author by the rendered result. The look's one rule still holds and
+# THE PAPER IS DARK, AND A STOP IS ORDINARY sRGB. It is decoded to light once
+# when the LUT is baked (ADR-0151), so the decode and the display encode are
+# inverses and the hex is the colour: the paper's `#272930` renders `#272930`,
+# an element at `#cbb462` renders `#cbb462`. The look's one rule still holds and
 # is what every element stop below is chosen against - keep the palette under
-# linear 0.6 (byte 0x99) and ADR-0046's tonemap is exactly the identity there,
-# so the fill survives the post chain UNSHADED and bloom's threshold sits above
-# it, which is where the hard edges come from. Reach past 0x99 and the flat fill
-# and the hard edge go together, with nothing to say why.
+# linear 0.6, which in the hex you write is byte 0xcb, and ADR-0046's tonemap is
+# exactly the identity there, so the fill survives the post chain UNSHADED and
+# bloom's threshold sits above it, which is where the hard edges come from.
+# Reach past 0xcb and the flat fill and the hard edge go together, with nothing
+# to say why.
 #
 # THE FAMILY IS ONSET-DEAF AND THIS IS THE FIX. Plan 0104 Phase 1 measured
 # Collage Mono, On White and Suprematist at onset 0.000 all three. The system's

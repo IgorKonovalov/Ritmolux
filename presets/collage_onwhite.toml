@@ -22,8 +22,9 @@
 #
 # -- THE PALETTE IS STILL UNDER THE KNEE -----------------------------------------
 #
-# Every element colour below has its brightest channel at or under linear 0.6,
-# where ADR-0046's tonemap is exactly the identity - so the fills are flat and
+# Every element colour below has its brightest channel at or under linear 0.6 -
+# sRGB byte 0xcb in the hex written - where ADR-0046's tonemap is exactly the
+# identity - so the fills are flat and
 # bloom's threshold is never reached. That is the one authoring fact this system
 # has and it does not change because the vocabulary got richer. The paper is the
 # single plateau above the knee, deliberately: `f(1.0) = 0.800` makes pure white

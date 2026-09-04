@@ -15,17 +15,18 @@ family = "maurer_rose"
 # what keeps the sample off the one-texel transition the 256-entry LUT bakes a
 # jump like this into.
 #
-# THESE TWO STOPS ARE WRITTEN IN LINEAR LIGHT, NOT IN sRGB, AND THAT IS WHY THEY
-# LOOK WRONG IN A COLOUR PICKER. The LUT is Rgba8Unorm and its entries are used
-# as colour directly, so what a stop names is a LINEAR value that the display
-# encode then lifts. Written as plain sRGB, the red #c81423 renders #dd4c64 - its
-# green channel almost quadrupled and the ink arrives coral. Pre-converted, the
-# same ink renders #c81622, within 2/255 of the colour it names.
+# THESE TWO STOPS ARE ORDINARY sRGB - WRITE THE INK YOU WANT. A stop is decoded
+# to light once when the LUT is baked (ADR-0151), so the decode and the display
+# encode are inverses and the ink named is the ink that renders. This file used
+# to carry the correction by hand, because the stop was consumed as linear light
+# and #c81423 came back #dd4c64 with its green channel almost quadrupled; the
+# engine does it now and the hand-converted values are gone.
 #
-#   #930204 renders #c81622   the poster red
-#   #e2d6c0 renders #e3ddd3   the bone, rolled off because it sits above the
-#                             tonemap knee at 0.6, where the correction stops
-#                             being exact and only gets close
+#   #c81622 renders #c81622   the poster red, exact to the LUT's own 8-bit
+#                             linear storage - two levels on the dark channel
+#   #f2ece1 renders #e3ddd3   the bone, rolled off because its light sits above
+#                             the tonemap knee at 0.6, where the round trip
+#                             stops being exact and only gets close
 stops = [
   { at = 0.0000, color = "#f2ece1" },
   { at = 0.4999, color = "#f2ece1" },

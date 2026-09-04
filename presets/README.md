@@ -1639,7 +1639,8 @@ preset that binds none of them draws a still canvas.
 > for: `hash(beat_index)` re-rolls the arrangement on activity without claiming
 > a beat count.
 
-> **Keep the palette under linear 0.6 and the look is free.** This is the one
+> **Keep the palette under linear 0.6 - sRGB byte `0xcb` in the hex you write -
+> and the look is free.** This is the one
 > authoring fact this system has, and it comes off the tonemap rather than off
 > any parameter — see
 > [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
@@ -1651,12 +1652,13 @@ preset that binds none of them draws a still canvas.
 > Reach for a brighter palette and you lose the flat fill and the hard edge
 > together, and nothing will tell you why.
 >
-> **Unshaded is not "the hex you typed".** A stop is a linear coefficient with
-> **no sRGB decode**, so the display byte is that coefficient's sRGB *encoding*
-> and it is brighter than the hex: in `collage_suprematist`, `#111111` renders
-> `#494949` and `#8a1420` renders `#BF5164`. Every element is shifted by the same
-> curve and none of them is shaded or haloed, which is the property the look
-> rests on. Author by the rendered result.
+> **Unshaded also means the hex you typed.** A stop is sRGB and is decoded once
+> at load (ADR-0151), so the decode and the display encode are inverses and the
+> identity curve between them changes nothing: in `collage_suprematist`,
+> `#494949` renders `#494949` and `#c24f63` renders `#c24f63`. The only residual
+> is the LUT's own 8-bit linear storage, up to two levels on a very dark
+> channel. Every element is shifted by the same curve and none of them is shaded
+> or haloed, which is the property the look rests on.
 >
 > The **paper** is the deliberate exception: `f(1.0) = 0.800` makes pure white
 > unreachable, so an off-white ground is the affordable one. Both of the
@@ -2953,6 +2955,15 @@ the three-lever note below says which does what.
 | `ink_sat` | `0` | Ink saturation. `0` = neutral. |
 | `ink_bright` | `0` | Ink brightness. `0` = black. |
 | `ink_gamma` | `1` | **Response** between the two poles — how fast a pixel travels from paper to ink. `1` is the identity. Above `1` thins the mid-tones toward paper, so only the strongest strokes keep full ink; below `1` inks the mids for a heavier, flatter print. Neither pole moves at any value. Bindable and continuous; clamped to `0.05 .. 20`, both far outside anything a look wants. |
+
+> **These poles are LINEAR LIGHT, and a `[palette]` stop is not.** A stop is sRGB
+> and is decoded at load (ADR-0151), so the hex you write is the colour that
+> renders. `paper_bright` and `ink_bright` take no decode — they are the light
+> itself, so a "dark" paper needs a far smaller number than the display value
+> suggests: `lsystem_vellum` measured `0.07` as a mid violet and settled on
+> `0.015` for a true near-black. The same is true of `bg_bright`. If a pole reads
+> far brighter than the number you typed, this is why, and the fix is a smaller
+> number rather than a different hue.
 
 ```toml
 [params]
