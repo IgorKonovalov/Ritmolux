@@ -202,7 +202,7 @@ flowchart LR
 | 1 — The page stops telling authors to give up | dev | done | `8438a1d` |
 | 2 — Stops are sRGB, and the library is re-based | dev | done | `d3e6c08` |
 | 3 — The colour docs describe the new contract | dev | done | `7dc5aca` |
-| 4 — A narrow `color_span` warns | dev | done | committed with this row |
+| 4 — A narrow `color_span` warns | dev | done | `7cc4139` |
 | 5 — The look gate | human | not started | |
 
 ### Notes
@@ -234,17 +234,11 @@ flowchart LR
   `an_element_under_the_knee_arrives_at_the_value_it_was_authored_at` now expects the authored hex
   itself instead of that hex's encoding (its `encoded()` helper is gone), and
   `backdrop_palette.rs`'s `flat_palette` encodes the linear colour it is handed, since both its
-  callers pass linear references — the analytic cosine and the lit-backdrop fixtures' baked colour.
-
-- **Phase 3 left `docs/presets.md` untouched**: it names no stop format and points at
-  `preset-palettes.md` for the palette surface, which the phase's own text makes conditional.
-  `docs/preset-guide.md` was checked for the same reason and does the same.
-- **`preset-palettes.md`'s `collage_mono` measurement was re-taken on this tree** rather than
-  carried forward: 592 distinct colours and 85 606 black pixels, where the page recorded 615 and
-  86 007. The three plateaus are the ones it names (`#000000`, `#e7e7e7`, `#d63131`) — unchanged by
-  the migration, which is the point — so what moved is the anti-aliased-edge tail, and it moved by
-  something this plan did not touch. Not investigated.
-
+  callers pass linear references — the analytic cosine and the lit-backdrop fixtures@ baked colour.
+- **`preset-palettes.md`'s `collage_mono` measurement was re-taken on this tree**: 592 distinct
+  colours and 85 606 black pixels, where the page recorded 615 and 86 007. The three plateaus are
+  the ones it names and are unchanged, so what moved is the anti-aliased-edge tail — by something
+  this plan did not touch. Not investigated.
 - **Phase 4 also made `shot` print load warnings** — `standalone/examples/shot.rs`, outside the
   phase's file list and approved before the commit. It printed errors only, on all three preset
   paths, so **no ADR-0020 warning has ever reached the `preset-author` lane's own tool**; the app's
@@ -256,8 +250,26 @@ flowchart LR
   power of two.
 - **The check is preset-surface only**, like the `thickness` and `coord_mode` warnings beside it: a
   `[layer]` running `shape_field` with a starved span is not seen. Stated, not fixed.
-- It fires on nothing in the shipped library, which
-  `known_params_including_global_ones_produce_no_warnings` already gated — `shape_facet` is the
-  narrowest at 13 texels and bands, so it is suppressed rather than tolerated.
 
 ### Close triggers
+
+- **`presets/` touched:** yes — 71 files: the 70 shipped presets carrying a `[palette]` custom stop,
+  every one re-based mechanically with no look change intended, plus `presets/README.md`.
+- **Plan header `Closes:`** design-backlog 0153 and 0099.
+- **What shipped:** feature — an authoring-contract change (stops are sRGB) and a new load-time
+  warning, with the operator docs that describe both.
+- **Operator docs touched:** `docs/preset-palettes.md`, `presets/README.md`.
+  `docs/examples/tuning/step-5-colour-and-beat.toml` was re-based with the library.
+  `docs/presets.md` names no stop format and was left alone.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, two broken, both on
+  **0153** and both broken *by this plan's own repairs*:
+  `present: no perceptual/gamma management in: core/src/render/palette.rs` (the deferral comment
+  Phase 2 was told to move) and `present: plateaus almost never carry in: docs/preset-palettes.md`
+  (the sentence Phase 1 was told to replace). Not repaired here — the script's own message says a
+  falsified entry is an `architect` call. 0099's probes still pass.
+- **Full suite:** `cargo nextest run --workspace`, exit code **0**, **1523 passed, 5 skipped**
+  (40 slow, 761 s), run on the finished tree before this block was written. The nine GPU suites
+  ADR-0156 defers are in it. Run twice under an upward override earlier: once at Phase 2, which
+  changed the preset engine and every embedded preset, and once here.
+- **Outstanding `human` phases:** Phase 5, the look gate on the limited-ink cohort.
+- ADR-0151, which Phase 2 implements, is still `Status: proposed`.
