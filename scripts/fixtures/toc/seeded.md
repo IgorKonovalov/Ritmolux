@@ -1,7 +1,7 @@
 # The seeded document — every heading shape this corpus actually contains
 
 The block below is **generated** and is the expected output: `--self-test` compares what
-`scripts/toc.mjs` produces against these twelve committed rows, so a regression in the anchor
+`scripts/toc.mjs` produces against these thirteen committed rows, so a regression in the anchor
 algorithm shows up as a diff here rather than as a plausible-looking anchor nobody re-checked.
 
 <!-- toc:begin depth=3 -->
@@ -11,6 +11,7 @@ algorithm shows up as a diff here rather than as a plausible-looking anchor nobo
 - [Coverage at 92 % of the suite](#coverage-at-92--of-the-suite)
   - [DX12 / Vulkan, and Metal](#dx12--vulkan-and-metal)
   - [The linked heading](#the-linked-heading)
+  - [A heading that is a link, citing [0048]](#a-heading-that-is-a-link-citing-0048)
 - [A repeated heading](#a-repeated-heading)
   - [reaction_diffusion keeps its underscores](#reaction_diffusion-keeps-its-underscores)
 - [A repeated heading](#a-repeated-heading-1)
@@ -47,6 +48,14 @@ So does a `/`. The comma does not, because it sits against a word rather than be
 
 A heading that is partly a link keeps its text and loses its target, in the anchor **and** in the
 row — a row nesting a second link would not render at all.
+
+### [A heading that is a link, citing [0048]](target.md)
+
+The whole heading is a link whose label carries a **shortcut reference** — the shape every close
+write-up in `docs/plans/README-archive.md` takes when its title cites another plan. A label
+matcher that cannot cross the inner `]` fails to match the OUTER link, so the target path folds
+into the slug. The inner `[0048]` stays as written in the row and loses only its brackets in the
+anchor, which is what GitHub renders it as.
 
 ## A repeated heading
 
