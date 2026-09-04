@@ -1,6 +1,6 @@
 # 0152 — The OSC root becomes `/rlx`
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) (proposed),
@@ -220,11 +220,11 @@ before                      after
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0152-the-osc-root-becomes-rlx`, worktree `WORK/rlx-0152-osc-root`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The wire moves, and the probes it falsifies move with it | dev | not started | |
+| 1 — The wire moves, and the probes it falsifies move with it | dev | done | committed with this row |
 | 2 — The operator's table | dev | not started | |
 | 3 — The record | dev | not started | |
 | 4 — Two seed comments come back | dev | not started | |

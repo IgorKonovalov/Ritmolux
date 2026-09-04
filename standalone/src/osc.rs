@@ -49,7 +49,7 @@ use std::time::{Duration, Instant};
 mod tests;
 
 /// Prefix every published address carries, version included.
-pub const ADDRESS_PREFIX: &str = "/lmv/v1";
+pub const ADDRESS_PREFIX: &str = "/rlx/v1";
 
 /// How many addresses the fixed set publishes — the length of
 /// [`Telemetry::messages`], exposed so a caller can size a buffer or assert the
@@ -191,27 +191,27 @@ impl<'a> Telemetry<'a> {
     /// inside one.
     pub fn messages(&self) -> [(&'static str, Arg<'a>); ADDRESS_COUNT] {
         [
-            ("/lmv/v1/level/bass", Arg::F(self.bass)),
-            ("/lmv/v1/level/mid", Arg::F(self.mid)),
-            ("/lmv/v1/level/treb", Arg::F(self.treb)),
-            ("/lmv/v1/level/onset", Arg::F(self.onset)),
-            ("/lmv/v1/level/rms", Arg::F(self.rms)),
-            ("/lmv/v1/raw/bass", Arg::F(self.bass_raw)),
-            ("/lmv/v1/raw/mid", Arg::F(self.mid_raw)),
-            ("/lmv/v1/raw/treb", Arg::F(self.treb_raw)),
-            ("/lmv/v1/raw/onset", Arg::F(self.onset_raw)),
-            ("/lmv/v1/beat/trigger", Arg::I(i32::from(self.beat))),
+            ("/rlx/v1/level/bass", Arg::F(self.bass)),
+            ("/rlx/v1/level/mid", Arg::F(self.mid)),
+            ("/rlx/v1/level/treb", Arg::F(self.treb)),
+            ("/rlx/v1/level/onset", Arg::F(self.onset)),
+            ("/rlx/v1/level/rms", Arg::F(self.rms)),
+            ("/rlx/v1/raw/bass", Arg::F(self.bass_raw)),
+            ("/rlx/v1/raw/mid", Arg::F(self.mid_raw)),
+            ("/rlx/v1/raw/treb", Arg::F(self.treb_raw)),
+            ("/rlx/v1/raw/onset", Arg::F(self.onset_raw)),
+            ("/rlx/v1/beat/trigger", Arg::I(i32::from(self.beat))),
             // Saturating rather than wrapping: at a few onsets a second the cap
             // is some seventeen years of continuous playback, and a console
             // watching a ratchet is better served by a stuck maximum than by a
             // sudden negative.
             (
-                "/lmv/v1/beat/index",
+                "/rlx/v1/beat/index",
                 Arg::I(i32::try_from(self.beat_index).unwrap_or(i32::MAX)),
             ),
-            ("/lmv/v1/beat/phase", Arg::F(self.beat_phase)),
-            ("/lmv/v1/tempo", Arg::F(self.tempo)),
-            ("/lmv/v1/preset", Arg::S(self.preset)),
+            ("/rlx/v1/beat/phase", Arg::F(self.beat_phase)),
+            ("/rlx/v1/tempo", Arg::F(self.tempo)),
+            ("/rlx/v1/preset", Arg::S(self.preset)),
         ]
     }
 }
