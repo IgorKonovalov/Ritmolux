@@ -197,6 +197,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0099 — a narrow `color_span` silently spends the palette's resolution, and the figure comes back looking upscaled](#0099--a-narrow-color_span-silently-spends-the-palettes-resolution-and-the-figure-comes-back-looking-upscaled)
 - [0153 — the palette consumes its stops as linear light, and `preset-palettes.md` presents the resulting shift as unavoidable when below the tonemap knee the author can correct it exactly](#0153--the-palette-consumes-its-stops-as-linear-light-and-preset-palettesmd-presents-the-resulting-shift-as-unavoidable-when-below-the-tonemap-knee-the-author-can-correct-it-exactly)
 - [How this archive came to exist — three sweeps in ten days](#how-this-archive-came-to-exist--three-sweeps-in-ten-days)
+- [0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale](#0110--an-attractors-sample-budget-ignores-the-render-target-so-a-1080p-render-reads-as-an-upscale)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -8810,3 +8811,63 @@ commit — the first time a body moved at the close that discharged it rather th
 later. One close is not a trend; the value of recording it is that the next sweep can tell a
 working rule from a lucky one.
 
+## 0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale
+
+- **Raised:** 2026-08-17, from [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase 5.
+  The first real music video this engine produced — `attractor_leviathan` over a 4:41 track at
+  1920x1080/60, `--tier rich` — came back with the verdict *"it just looks like Leviathan
+  upscaled"*, and that is exactly what it is.
+- **Verified 2026-08-17** — the count is a plain tier constant with no render-target term:
+  `present: attractor_particles: 150_000 in: core/src/render/tier.rs`,
+  `present: attractor_particles: 50_000 in: core/src/render/tier.rs`. Whether the result *looks*
+  upscaled is a judgement about pixels: `unprobeable: the grain is judged by eye; only the
+  constants and the grid's surface sizing are claims about the repo`.
+
+**The arithmetic.** `TierConfig::attractor_particles` is 50,000 at `Floor` and 150,000 at `Rich`,
+fixed. The trail grid *is* surface-sized (Plan 0027), so the deposit spreads over whatever the
+target holds: at 1920x1080 that is 150,000 particles into 2.07 M texels, ~0.07 per pixel per
+frame; in a 640x360-class window it is ~0.65, nine times denser. Going to 1080p multiplies pixels
+4x while `Rich` multiplies particles 3x, so **density falls as resolution rises** and the figure
+gets grainier rather than finer.
+
+**The engine already says this in the type's own docs** and stops one step short of the
+consequence: `attractor_particles` is *"a sample count and not a brightness"* whose deposit is
+divided by the count (ADR-0065), so *"raising it buys a smoother figure rather than a brighter
+one"*. Correct — and the count never learned that the number of pixels it is smoothing over is
+not fixed.
+
+**Why it surfaces now.** Every capture path in this repo renders small, and the live app runs at a
+window size where the density is fine. Plan 0101 is the first path that renders at 1080p and asks
+the result to stand on its own as a *file*, where the whole point is that it is not bounded by a
+display. Offline is also where the fix is affordable — there is no 60 Hz deadline, so the sample
+budget can be raised with no governor to answer to.
+
+**Shapes, none decided.** (a) Scale the count with the target's pixel count against a reference
+resolution, capped — the smallest change, and it makes `Rich` mean the same *density* everywhere
+rather than the same *number*. (b) A preset-authorable density param, which puts the look in the
+content lane where the rest of the attractor's look already lives. (c) Accumulate more than one
+integration step per frame offline, trading render wall-clock for grain — available only to
+`shot --render`, and the one that costs no live budget at all. (a) and (c) compose.
+
+**ADR-worthy** if taken: it changes what a tier *means* (a count becomes a density), which is
+exactly the class [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) and the
+`tier.rs` module header already argue about. **Priority: high for the video path, low for the
+app** — nothing shipped is broken and the live tiers are validated where they are. It gates
+whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
+[Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
+
+--
+
+**Closed 2026-09-04** by [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)
++ [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md). The drawn count is now
+`clamp(round(anchor * target_px / 230400), anchor, ceiling)` against two measured ceilings, so a
+1080p render reaches the 640x360 reference density exactly (1,350,000 samples at `Rich`, nine times
+the flat count) and a 1080p window reaches four times it. The entry's own `unprobeable:` half — *the
+grain is judged by eye* — was answered at Phase 4's human gate: **"looks good!"** on a fresh 1080p/60
+`attractor_leviathan` render, 2026-09-04. Judged on one file rather than against Plan 0101's
+original, which no longer exists.
+
+**One half the entry did not ask about came back with it.** The law scales `[particles] density`'s
+denominator, so a preset authored on the *sparse* side draws four times the trajectories at a
+quarter the deposit each on a large display — a look change where the cloud case is an improvement.
+That is a new question, not a residue of this one, and it is live as 0186.

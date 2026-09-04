@@ -135,8 +135,8 @@ footprint so the vendor spread is on record.
       **not** what is expensive there: `star_lantern` runs **164 fps, p99 8.2 ms** windowed —
       comfortably inside a 60 Hz frame — against `attractor_clifford`'s p99 19.9 ms and
       `attractor_leviathan`'s 19.0 ms on the same run, neither of which binds bloom at all.
-      _(Both attractor figures predate ADR-0140 and were taken at a flat 150 000 samples; see the
-      `Rich` calibration item below.)_ So the
+      (Both attractor figures predate ADR-0140 and were taken at a flat 150 000 samples; see the
+      `Rich` calibration item below.) So the
       cost that puts the heaviest shipped preset past a 60 Hz frame at Rich is the float composite
       plus the attractor, not this stage. **Still owed on this page:** the same `star_lantern` run
       at **native fullscreen**, the **`Floor`-pinned** sanity pass, and all of the low-end-box

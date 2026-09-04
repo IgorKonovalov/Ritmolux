@@ -418,7 +418,8 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   any window size, and a window above the 640x360 anchor now draws up to 600,000. Plan 0128 Phase 1
   measured the marginal cost of that step on the same discrete GPU as **+1.454 ms p99**, on an
   instrument that omits the present and is therefore not comparable to these figures in absolute
-  terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page. The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
+  terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page.
+  The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
   with `docs/on-device-validation.md`.
 - **Driver floor isolated (Plan 0012 Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
