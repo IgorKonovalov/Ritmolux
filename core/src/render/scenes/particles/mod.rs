@@ -1421,6 +1421,7 @@ impl Scene for AttractorScene {
     /// The **budget**, not `active_count`: a preset's `[particles] density`
     /// narrows what is drawn out of it (ADR-0069), and that is a look choice
     /// rather than a property of the target.
+    #[cfg(test)]
     fn sample_budget(&self) -> Option<u32> {
         self.targeted.then_some(self.budget)
     }

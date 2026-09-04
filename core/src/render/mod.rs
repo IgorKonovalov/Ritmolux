@@ -560,22 +560,6 @@ impl Renderer {
         ))
     }
 
-    /// Which sample ceiling this renderer resolves against (ADR-0140).
-    pub fn sample_budget(&self) -> SampleBudget {
-        self.budget
-    }
-
-    /// The attractor's **resolved** sample budget for the current target, read
-    /// off the scene rather than recomputed — `None` before the first frame has
-    /// given the scene a target size.
-    ///
-    /// The scene is the single source: a caller that wants to report the number
-    /// (a render's own header does) must not restate the law, because a
-    /// restatement is what drifts.
-    pub fn attractor_sample_budget(&self) -> Option<u32> {
-        routing::scene_for(&self.scenes, crate::preset::SystemKind::Attractor)?.sample_budget()
-    }
-
     /// Renderer targeting a surface the host owns and built the handle for —
     /// the C ABI path, and the only constructor that does not create its own
     /// surface. Starts with the embedded default presets (no ABI surface for

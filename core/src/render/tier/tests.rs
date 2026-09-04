@@ -53,6 +53,24 @@ fn rich_is_never_below_the_floor() {
     assert!(rich.post_cap.1 >= floor.post_cap.1);
     assert!(rich.bloom_levels >= floor.bloom_levels);
     assert!(rich.attractor_particles >= floor.attractor_particles);
+    // The two ceilings the density law clamps against are capacities like the
+    // rest, so the same direction binds them (ADR-0140). `Floor`'s live ceiling
+    // is its own anchor, which is what makes the live pair the tightest row
+    // here: equality is permitted, a Rich ceiling below Floor's is not.
+    assert!(rich.attractor_particles_live_ceiling >= floor.attractor_particles_live_ceiling);
+    assert!(rich.attractor_particles_offline_ceiling >= floor.attractor_particles_offline_ceiling);
+    // A ceiling below its own tier's anchor would make the law allocate less
+    // than its lower clamp resolves and index past the buffer. `attractor_budget`
+    // raises such a ceiling rather than panicking, so nothing here would crash -
+    // it would silently draw a count no tier table says it draws.
+    assert!(floor.attractor_particles_live_ceiling >= floor.attractor_particles);
+    assert!(rich.attractor_particles_live_ceiling >= rich.attractor_particles);
+    assert!(floor.attractor_particles_offline_ceiling >= floor.attractor_particles);
+    assert!(rich.attractor_particles_offline_ceiling >= rich.attractor_particles);
+    // Offline is never the tighter of the two: it answers to memory and the live
+    // one to a frame deadline, so a render may never resolve less than a window.
+    assert!(floor.attractor_particles_offline_ceiling >= floor.attractor_particles_live_ceiling);
+    assert!(rich.attractor_particles_offline_ceiling >= rich.attractor_particles_live_ceiling);
     assert!(rich.attractor_trail_cap.0 >= floor.attractor_trail_cap.0);
     assert!(rich.attractor_trail_cap.1 >= floor.attractor_trail_cap.1);
     assert!(rich.swarm_particles >= floor.swarm_particles);

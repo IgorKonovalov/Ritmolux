@@ -509,11 +509,22 @@ pub(crate) trait Scene {
     /// where it has one (ADR-0140) — the attractor, and nothing else today.
     ///
     /// A hook rather than a field on the roster because it is a scene's own
-    /// arithmetic: only a scene knows what its budget resolved to, and a caller
-    /// that recomputed the law from the tier and the target would be maintaining
-    /// a second copy of it. `None` is the honest answer for every scene whose
-    /// count is a flat capacity, and for the attractor before a target size has
-    /// reached it.
+    /// arithmetic: only a scene knows what its budget resolved to. `None` is the
+    /// honest answer for every scene whose count is a flat capacity, and for the
+    /// attractor before a target size has reached it.
+    ///
+    /// **The seam exists so the factory's choice of ceiling is readable off the
+    /// built scene**, which is what makes that wiring testable at all — a test
+    /// that recomputed the law would pass with both modes handed the same
+    /// number. It is not the reporting path: `shot --render` prints its budget
+    /// from [`TierConfig::attractor_budget_offline`] instead, because the header
+    /// is written before the renderer is constructed and this would answer
+    /// `None` there.
+    ///
+    /// `#[cfg(test)]` because that leaves nothing but the test: no shipped path
+    /// asks a scene what its budget resolved to, and a trait method the engine
+    /// never calls is a widened seam pretending to be an API.
+    #[cfg(test)]
     fn sample_budget(&self) -> Option<u32> {
         None
     }
@@ -808,11 +819,6 @@ mod tests {
         }
     }
 
-    /// Every `SystemKind::ALL` entry builds the scene that kind is supposed to
-    /// drive, and the roster covers exactly the roster — so transposing two
-    /// factory arms — which silently points every preset of one system at
-    /// another's scene — fails here.
-    ///
     /// **The factory is what chooses the ceiling**, and the two choices resolve
     /// different budgets at the same target (ADR-0140).
     ///
@@ -889,6 +895,11 @@ mod tests {
         }
     }
 
+    /// Every `SystemKind::ALL` entry builds the scene that kind is supposed to
+    /// drive, and the roster covers exactly the roster — so transposing two
+    /// factory arms — which silently points every preset of one system at
+    /// another's scene — fails here.
+    ///
     /// Needs a GPU adapter to build the scenes, so it skips on runners without
     /// one (ADR-0016).
     #[test]
