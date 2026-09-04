@@ -34,7 +34,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Ritmolux',
-      customCss: ['./src/styles/landing.css'],
+      customCss: ['./src/styles/gallery.css'],
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
         'the parameter roster, and the engine contracts.',
@@ -54,6 +54,7 @@ export default defineConfig({
             { label: 'Colour and palettes', slug: 'guide/palettes' },
             { label: 'Tuning walkthrough', slug: 'guide/tuning-walkthrough' },
             { label: 'Parameter roster', slug: 'guide/parameter-roster' },
+            { label: 'Gallery', slug: 'gallery' },
           ],
         },
         {

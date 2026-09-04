@@ -287,9 +287,9 @@ other off-site target. `dev` should not re-raise this.
 |---|---|---|---|
 | 1 — the site renders the published set from one source | dev | done | 41c77c5 |
 | 2 — links resolve across the publish boundary | dev | done | 44d1ec3 |
-| 3 — the home page routes, and does not pitch | dev | done | committed with this row |
-| 4 — the demo goes live on the personal site | human | not started | |
-| 5 — the gallery covers everything that ships | dev | not started | |
+| 3 — the home page routes, and does not pitch | dev | done | 03a9588 |
+| 4 — the demo goes live on the personal site | human | not started — skipped by the user, this lane runs 1-3 and 5-6 | |
+| 5 — the gallery covers everything that ships | dev | done | committed with this row |
 | 6 — the permanent home builds itself | dev | not started | |
 | 7 — Pages is enabled and the demo is retired | human | not started | |
 
@@ -338,6 +338,23 @@ other off-site target. `dev` should not re-raise this.
   because Starlight emits `href="/ritmolux/favicon.svg"` on every page and the gate counts an
   unresolved icon as a broken link; and one line in `astro.config.mjs` registering
   `src/styles/landing.css` through `customCss`, without which the phase's own stylesheet is inert.
+- **82 presets ship, not the 81 the phase names**, and the card list is spelled out rather than
+  globbed so `every_shipped_preset_has_a_gallery_card` can fail at all. Its three failure
+  directions were each provoked and observed before the phase was committed: a shipped preset
+  removed from `CARDS`, a `CARDS` name that ships nothing, and a listed card whose PNG is absent.
+- **A full `scripts/docs-shots.mjs` run moves 13 of the 20 pre-existing committed images**, and
+  those 13 were reverted rather than committed. They are per-system pictures and walkthrough steps
+  that this phase does not touch; ADR-0100 already holds that a render is not byte-reproducible
+  across a binary or driver change and that freshness is a human duty at the close-ceremony sweep,
+  not a side effect of adding a collection.
+- **Measured, because Phase 4 has to weigh it:** the 82 cards are 23.5 MB committed (median 284 KB
+  at 640x360), and `site/dist/` is now **41 MB**. That is what a hand-copy into `public/` of the
+  personal site would add to that repository on every deploy, and it is ADR-0154's
+  “prefer bringing Phases 6-7 forward over growing the copy” becoming a number.
+- **`CLAUDE.md` says “Six Node gates, all run by pre-push and by the CI `links` job”.**
+  `scripts/check-site-links.mjs` is a seventh, and it is run by neither — it needs a built site, so
+  Phase 6 puts it in the Pages workflow instead. The sentence is now wrong in a file this lane does
+  not own.
 
 ### Close triggers
 

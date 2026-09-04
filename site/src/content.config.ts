@@ -18,6 +18,7 @@ import { PUBLISHED } from './plugins/rewrite-links.mjs';
  */
 const SITE_PAGES: Record<string, string> = {
   'site/src/content/docs/index.mdx': 'index',
+  'site/src/content/docs/gallery.mdx': 'gallery',
 };
 
 const ROUTES: Record<string, string> = { ...PUBLISHED, ...SITE_PAGES };
