@@ -38,7 +38,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0103 — the plugin's context menu shadows foobar's, so the panel cannot be removed from a layout](#0103--the-plugins-context-menu-shadows-foobars-so-the-panel-cannot-be-removed-from-a-layout)
 - [0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
 - [0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met)
-- [0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale](#0110--an-attractors-sample-budget-ignores-the-render-target-so-a-1080p-render-reads-as-an-upscale)
 - [0113 — the converted feedback field equilibrates far brighter than the reference's, and nothing knows why](#0113--the-converted-feedback-field-equilibrates-far-brighter-than-the-references-and-nothing-knows-why)
 - [0119 — `ang`'s branch cut on the +x axis seams every per-vertex program that is continuous in it](#0119--angs-branch-cut-on-the-x-axis-seams-every-per-vertex-program-that-is-continuous-in-it)
 - [0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
@@ -67,6 +66,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day](#0183--nothing-bounds-the-incremental-cache-and-509-crate-hash-directories-accumulated-inside-a-single-day)
 - [0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC](#0184--cargo-emits-a-new-artifact-generation-per-fingerprint-change-and-never-collects-the-old-one-and-the-pinned-stable-toolchain-has-no-gc)
 - [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
+- [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -324,6 +324,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0178 | The +510,464 B the component gained after 2026-08-18 is unattributed | [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 5: 33 steps bisected; 66.7 % is embedded preset text as the library went 40 presets to 81, and no single step is a majority. **Closed 2026-09-02** |
 | 0099 | A narrow `color_span` silently spends the palette’s 256-texel budget, and the figure comes back looking upscaled | [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md) Phase 4: a load-time warning naming the estimate and `palette_steps`. **Closed 2026-09-04** |
 | 0153 | The palette consumes its stops as linear light, and the page calls the shift unavoidable | [ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) + [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md). **Closed 2026-09-04** |
+| 0110 | An attractor's sample budget ignores the render target, so a 1080p render reads as an upscale | [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) + [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md); see 0186. **Closed 2026-09-04** |
 <!-- roster:end -->
 
 ## Open entries
@@ -1628,53 +1629,6 @@ quality is judged. **Do not take it before Plan 0108's Phase 2**, whose verdict 
 presets read as better or merely different is exactly the evidence for how much reach is worth.
 
 ---
-
-## 0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale
-
-- **Raised:** 2026-08-17, from [Plan 0101](plans/done/0101-the-engine-renders-a-music-video.md) Phase 5.
-  The first real music video this engine produced — `attractor_leviathan` over a 4:41 track at
-  1920x1080/60, `--tier rich` — came back with the verdict *"it just looks like Leviathan
-  upscaled"*, and that is exactly what it is.
-- **Verified 2026-08-17** — the count is a plain tier constant with no render-target term:
-  `present: attractor_particles: 150_000 in: core/src/render/tier.rs`,
-  `present: attractor_particles: 50_000 in: core/src/render/tier.rs`. Whether the result *looks*
-  upscaled is a judgement about pixels: `unprobeable: the grain is judged by eye; only the
-  constants and the grid's surface sizing are claims about the repo`.
-
-**The arithmetic.** `TierConfig::attractor_particles` is 50,000 at `Floor` and 150,000 at `Rich`,
-fixed. The trail grid *is* surface-sized (Plan 0027), so the deposit spreads over whatever the
-target holds: at 1920x1080 that is 150,000 particles into 2.07 M texels, ~0.07 per pixel per
-frame; in a 640x360-class window it is ~0.65, nine times denser. Going to 1080p multiplies pixels
-4x while `Rich` multiplies particles 3x, so **density falls as resolution rises** and the figure
-gets grainier rather than finer.
-
-**The engine already says this in the type's own docs** and stops one step short of the
-consequence: `attractor_particles` is *"a sample count and not a brightness"* whose deposit is
-divided by the count (ADR-0065), so *"raising it buys a smoother figure rather than a brighter
-one"*. Correct — and the count never learned that the number of pixels it is smoothing over is
-not fixed.
-
-**Why it surfaces now.** Every capture path in this repo renders small, and the live app runs at a
-window size where the density is fine. Plan 0101 is the first path that renders at 1080p and asks
-the result to stand on its own as a *file*, where the whole point is that it is not bounded by a
-display. Offline is also where the fix is affordable — there is no 60 Hz deadline, so the sample
-budget can be raised with no governor to answer to.
-
-**Shapes, none decided.** (a) Scale the count with the target's pixel count against a reference
-resolution, capped — the smallest change, and it makes `Rich` mean the same *density* everywhere
-rather than the same *number*. (b) A preset-authorable density param, which puts the look in the
-content lane where the rest of the attractor's look already lives. (c) Accumulate more than one
-integration step per frame offline, trading render wall-clock for grain — available only to
-`shot --render`, and the one that costs no live budget at all. (a) and (c) compose.
-
-**ADR-worthy** if taken: it changes what a tier *means* (a count becomes a density), which is
-exactly the class [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) and the
-`tier.rs` module header already argue about. **Priority: high for the video path, low for the
-app** — nothing shipped is broken and the live tiers are validated where they are. It gates
-whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
-
---
 
 ## 0113 — the converted feedback field equilibrates far brighter than the reference's, and nothing knows why
 
@@ -3534,3 +3488,81 @@ plan-relative narration.
 **What a fix looks like.** One character in `cli.rs`, plus the `settings/tests.rs` fixture path for
 consistency. It is a `dev` edit rather than a docs one, which is the only reason a docs lane left it
 standing. If the golden `--help` output is ever pinned byte-for-byte, pin it after this moves.
+
+## 0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display
+
+**Raised by:** `architect`, at [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md)'s
+close review (2026-09-04). **Owner if taken:** `architect` — it qualifies a clause
+[ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) recorded as a
+no-op, so it is an ADR question before it is a code or a content one.
+
+- **Verified 2026-09-04** — `[particles] density` resolves against the size-dependent budget, not
+  against the tier's anchor:
+  `present: active_particles.self\.budget in: core/src/render/scenes/particles/mod.rs`
+- **Verified 2026-09-04** — the `Rich` live ceiling is four times its anchor, which is the factor:
+  `present: attractor_particles_live_ceiling: 600_000 in: core/src/render/tier.rs`
+- **Verified 2026-09-04** — a shipped world authored on the sparse side, and its own header naming
+  sparseness as the mechanism:
+  `present: density = 0.02 in: presets/fragment_sumi.toml`,
+  `present: sparse enough that each trajectory is a in: presets/fragment_sumi.toml`
+- **Verified 2026-09-04** — and one stating an absolute count the law has made size-dependent:
+  `present: At the full 50 000 in: presets/attractor_thomas.toml`
+- **Verified 2026-09-04** — whether the denser result *reads* as a fog rather than as calligraphy
+  is a judgement about pixels:
+  `unprobeable: whether 12 000 strokes read as a fog where 3 000 read as pen lines is judged by eye; only the arithmetic, the ceiling and the authored densities are claims about the repo`
+
+### The finding
+
+ADR-0140 reasons entirely about the **cloud** case, and there it is right: at `density = 1.0` more
+samples is the same total light with less shot noise (`deposit_scale` divides by the active count,
+ADR-0065), so a 1080p figure stops looking upscaled. That is what Plan 0128 Phase 4 judged, on
+`attractor_leviathan`, which draws the whole budget.
+
+[ADR-0069](adrs/0069-the-attractor-trades-sample-count-for-trace-length.md)'s purpose is the other
+case. A low `density` buys **followable trajectories** — the count *is* the look, chosen by
+rendering a ladder and picking a rung. That count now scales with the window:
+
+| preset | `density` | `Rich` at or below 640x360 | `Rich`, 1080p window | `--render`, 1080p |
+|---|---|---|---|---|
+| `attractor_thomas` | 0.02 | 3,000 | 12,000 | 27,000 |
+| `fragment_sumi` (its `[layer]`) | 0.02 | 3,000 | 12,000 | 27,000 |
+| `attractor_valentine` | 0.02 | 3,000 | 12,000 | 27,000 |
+| `attractor_torusknot` | 0.02 | 3,000 | 12,000 | 27,000 |
+| `attractor_walkknot` | 0.02 | 3,000 | 12,000 | 27,000 |
+| `attractor_walkrho` | 0.02 | 3,000 | 12,000 | 27,000 |
+| `attractor_thomasred` | 0.060 | 9,000 | 36,000 | 81,000 |
+| `attractor_lorenzgallery` | 0.006 | 900 | 3,600 | 8,100 |
+
+`attractor_walkthomas` and `attractor_thomasgallery` sit at 0.03 and take the same factor.
+
+**And each stroke dims by the same factor**, because the normalization is what keeps total light
+invariant: four times the strokes at a quarter the deposit each. For a cloud that is the whole
+point. For `fragment_sumi`, whose brief is *"glowing calligraphy"*, it is a different picture.
+
+Two preset headers now state counts the law has made conditional. `presets/attractor_thomas.toml:25`
+carries its own measured ladder — *"1.0 / 0.02 / 0.005 / 0.002 goes blot, drawing, sketch,
+scribble"* — so at a 1080p `Rich` window its authored 0.02 lands roughly where 0.08 did, between the
+first two rungs. `presets/fragment_sumi.toml:4` says *"~1000 particles"* and `:67` says the
+mechanism is being *"sparse enough that each trajectory is a stroke, not a fog"*.
+
+**Why nothing catches it, and why the plan could not have.** Every golden and sanity baseline is
+`Tier::Floor` at 128x128 or 96x96, where the law is a no-op twice over — below `REFERENCE_PX`, and
+`Floor`'s live ceiling *is* its anchor. So no committed baseline moves and no gate reads the
+quantity that did. This is the blind spot ADR-0037's habit describes, one level over: two
+configurations agree at the size we test at, and the disagreement lives only at the size the app
+actually runs at. `presets/README.md` was swept at Plan 0128 and states the axis correctly for the
+cloud case — *"a preset tuned in a small window keeps its look at 1080p rather than thinning out"* —
+which is exactly the sentence that is false for a trace.
+
+**What a fix looks like, and it is a choice between two.**
+
+- **Scope the law.** `density` below some threshold resolves against the **anchor** rather than the
+  budget, so an authored trace count is a fixed quantity again and the cloud case is untouched. A
+  small amendment to ADR-0140, and it stops the problem recurring for every trace preset authored
+  after it. This is the shape the close review recommended.
+- **Accept it and retune.** Route the ten files to `preset-author` as a per-display retune. Cheaper
+  now and more expensive forever — and it is close to what ADR-0140's Alternative B was rejected
+  for, *"it makes resolution compensation a per-preset duty"*.
+
+Either way the two stale headers above want a sweep, and `presets/README.md`'s note wants the trace
+half added beside the cloud half it already has.

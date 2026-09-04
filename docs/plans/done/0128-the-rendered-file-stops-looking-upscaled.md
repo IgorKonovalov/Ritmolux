@@ -1,10 +1,19 @@
 # 0128 — The rendered file stops looking upscaled
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-04. All seven `dev`/`human` phases landed except Phase 5
+> (the diffusion side-by-side, a `human` probe for backlog 0125, deliberately not run — the entry
+> stays live). Mode 4 review: **no blockers, one major, six minors, two nits.** Verified
+> independently at the lane tip: `cargo nextest run --workspace` 1535/1535 passed (5 skipped),
+> `fmt --check` and `clippy --workspace --all-targets` clean, all six Node gates exit 0, no golden
+> blessed and none moved. The major — the law scales a preset's *trace* count, so eight
+> low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display — is filed as
+> design-backlog 0186 and not repaired here.
 > **Created:** 2026-08-28
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [ADR-0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed — the density law this builds), [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (why more samples is not more light), [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (budget vs. active count), [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) (what a tier promises), [ADR-0121](../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (the profile Phase 5 probes)
-> **Closes:** design-backlog 0110, design-backlog 0130
+> **Related ADRs:** [ADR-0140](../../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) (proposed — the density law this builds), [ADR-0065](../../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) (why more samples is not more light), [ADR-0069](../../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (budget vs. active count), [ADR-0045](../../adrs/0045-quality-tiers-floor-and-rich.md) (what a tier promises), [ADR-0121](../../adrs/0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) (the profile Phase 5 probes)
+> **Closes:** design-backlog 0110. _(The header claimed 0130 as well; that entry was already closed
+> 2026-09-01 by [Plan 0137](0137-the-metrics-measure-light.md) Phase 4, four days after this
+> plan was written. Phase 6 shipped the one clause still open and is recorded as superseded.)_
 
 ## TL;DR
 
@@ -20,7 +29,7 @@ the *smaller* of the two and the larger has never been run on a track.
 
 ## Context & problem
 
-**[design-backlog 0110](../design-backlog.md).** `TierConfig::attractor_particles` is 50,000 at
+**[design-backlog 0110](../../design-backlog.md).** `TierConfig::attractor_particles` is 50,000 at
 `Floor` and 150,000 at `Rich`, fixed. The trail grid is surface-sized (Plan 0027), so the deposit
 spreads over whatever the target holds:
 
@@ -42,7 +51,7 @@ size where the density is fine. Plan 0101 is the first path that renders at 1080
 to stand on its own as a *file*. It is also where the fix is affordable: no 60 Hz deadline, no
 governor, and 60 MB of particle state in a one-shot process is nothing.
 
-**[design-backlog 0130](../design-backlog.md)** is the same error one level down, and it is why this
+**[design-backlog 0130](../../design-backlog.md)** is the same error one level down, and it is why this
 plan carries it. `boundary_density` counts perimeter over area, so the reading scales as ~1/L in the
 capture's linear resolution — the same scene at 192x192 reads about half what it reads at 96x96 — and
 neither the function's docstring nor either of the two floors read against it names the 96x96 they
@@ -51,7 +60,7 @@ propose re-using this instrument at report resolutions. A column computed at 128
 derived at 96x96 is off by roughly an order of magnitude and would read as a finding about the
 presets.
 
-**[design-backlog 0125](../design-backlog.md)** shares a verdict with 0110 and nothing else — one is
+**[design-backlog 0125](../../design-backlog.md)** shares a verdict with 0110 and nothing else — one is
 a sample budget against a render target, the other a pixel budget against a VRAM wall — so it enters
 this plan as one probe phase and no design. The clip that drew *"it would obviously be great if
 resolution would be higher"* was rendered at the **`fast`** profile (262,144 px, 680x384 at 16:9);
@@ -291,7 +300,7 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
   reusing this law there would be assertion, not reasoning.
 - **It does not design anything for the diffusion filter.** Phase 5 is a probe with a verdict;
   raising the diffusion budget is a separate ADR against a VRAM wall, and backlog 0125's note says so.
-- **It does not take [backlog 0126](../design-backlog.md)** (a render is one prompt, one seed, one
+- **It does not take [backlog 0126](../../design-backlog.md)** (a render is one prompt, one seed, one
   preset from first frame to last). Same gate, same day, entirely different question — the entry
   itself says not to fold it into a resolution plan.
 - **It does not add a new tier.** A third tier would put `deposit_scale` above 1.0 and amplify shot
@@ -572,7 +581,7 @@ at that size. Peak resident set 970 MB, growth -68.9 MB across the run.
 ### Phase 6 — superseded
 
 **design-backlog 0130 was closed 2026-09-01 by
-[Plan 0137](done/0137-the-metrics-measure-light.md) Phase 4** (`98977ff`), four days
+[Plan 0137](0137-the-metrics-measure-light.md) Phase 4** (`98977ff`), four days
 after this plan was written. Both halves of the done-when had landed there: the
 resolution paragraph on `boundary_density`, and both floors in
 `core/tests/sanity.rs` naming the 96x96 capture — so that file needed no change.
