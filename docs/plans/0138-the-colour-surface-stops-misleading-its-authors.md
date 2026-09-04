@@ -201,8 +201,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — The page stops telling authors to give up | dev | done | `8438a1d` |
 | 2 — Stops are sRGB, and the library is re-based | dev | done | `d3e6c08` |
-| 3 — The colour docs describe the new contract | dev | done | committed with this row |
-| 4 — A narrow `color_span` warns | dev | not started | |
+| 3 — The colour docs describe the new contract | dev | done | `7dc5aca` |
+| 4 — A narrow `color_span` warns | dev | done | committed with this row |
 | 5 — The look gate | human | not started | |
 
 ### Notes
@@ -244,5 +244,20 @@ flowchart LR
   86 007. The three plateaus are the ones it names (`#000000`, `#e7e7e7`, `#d63131`) — unchanged by
   the migration, which is the point — so what moved is the anti-aliased-edge tail, and it moved by
   something this plan did not touch. Not investigated.
+
+- **Phase 4 also made `shot` print load warnings** — `standalone/examples/shot.rs`, outside the
+  phase's file list and approved before the commit. It printed errors only, on all three preset
+  paths, so **no ADR-0020 warning has ever reached the `preset-author` lane's own tool**; the app's
+  load path (`preset_dir.rs`) has always printed them. The new warning is aimed at exactly that lane,
+  and without this it would have been emitted into nothing.
+- **The threshold is `MIN_INTERIOR_TEXELS = 16`**, in `shape_field.rs` with the property beside it:
+  an interior drawn through N texels carries at most N colours however large it is on screen. 16 is
+  the middle of backlog 0099's bracketing pair (8.6 read as upscaled, 32.3 did not) rounded to a
+  power of two.
+- **The check is preset-surface only**, like the `thickness` and `coord_mode` warnings beside it: a
+  `[layer]` running `shape_field` with a starved span is not seen. Stated, not fixed.
+- It fires on nothing in the shipped library, which
+  `known_params_including_global_ones_produce_no_warnings` already gated — `shape_facet` is the
+  narrowest at 13 texels and bands, so it is suppressed rather than tolerated.
 
 ### Close triggers
