@@ -286,8 +286,8 @@ other off-site target. `dev` should not re-raise this.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the site renders the published set from one source | dev | done | 41c77c5 |
-| 2 — links resolve across the publish boundary | dev | done | committed with this row |
-| 3 — the home page routes, and does not pitch | dev | not started | |
+| 2 — links resolve across the publish boundary | dev | done | 44d1ec3 |
+| 3 — the home page routes, and does not pitch | dev | done | committed with this row |
 | 4 — the demo goes live on the personal site | human | not started | |
 | 5 — the gallery covers everything that ships | dev | not started | |
 | 6 — the permanent home builds itself | dev | not started | |
@@ -325,6 +325,19 @@ other off-site target. `dev` should not re-raise this.
   markdown links, zero off-site hrefs that were not absolute `https`. The gate goes green at Phase
   3's commit, and Phase 3's row records that run. This is an ordering artifact of the plan, not a
   defect found in it.
+- **Phase 2's gate exits 0 as of Phase 3's commit**: `site links: OK (15 built pages, every
+  site-relative href resolves, every off-site href is absolute https)`.
+- **Phase 3 changed the Phase 2 rewriter once**, and the fix belongs to the rewriter rather than to
+  the page: a root-relative `/ritmolux/...` URL is already a site route and is now skipped. The
+  landing page is the first document in the corpus to write one, and the rewriter had been
+  resolving it against the repository root.
+- **The gallery strip carries twelve renders, not the nine the phase names.** `docs/images/gallery/`
+  holds one image per rendering system and there are twelve systems; the count in the phase and in
+  ADR-0154 predates three of them. All twelve are on the page.
+- **Two files Phase 3 needed are not in its `Files touched` list.** `site/public/favicon.svg`,
+  because Starlight emits `href="/ritmolux/favicon.svg"` on every page and the gate counts an
+  unresolved icon as a broken link; and one line in `astro.config.mjs` registering
+  `src/styles/landing.css` through `customCss`, without which the phase's own stylesheet is inert.
 
 ### Close triggers
 

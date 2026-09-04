@@ -100,6 +100,10 @@ export function rewriteLinks({ base }) {
     visit(tree, ['link', 'definition'], (node) => {
       const url = node.url;
       if (!url || url.startsWith('#') || isExternal(url)) return;
+      // A root-relative URL is already a site route - the site's own pages
+      // write them. Only a genuinely relative target is resolvable against a
+      // source file, and only those cross the publish boundary.
+      if (url.startsWith('/')) return;
 
       const [target, fragment] = splitFragment(url);
       if (target === '') return;
