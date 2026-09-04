@@ -184,19 +184,78 @@ pub struct TierConfig {
     /// a value here is an upper bound rather than a promise.
     pub bloom_levels: u32,
 
-    /// How many GPU-resident particles the attractor integrates and draws.
+    /// The attractor's sample budget **at [`REFERENCE_PX`]** — the anchor of the
+    /// density law, not the count drawn (ADR-0140).
     ///
-    /// State is ~16 bytes each, so even the rich count is well under 3 MB of
-    /// storage; the real ceiling is **additive-blend fill rate**, which is why the
-    /// floor value was described as the number to validate against the 60 fps @
-    /// 1080p floor (ADR-0015 Risks).
+    /// [`attractor_budget`] scales this by `target_px / REFERENCE_PX` and clamps
+    /// it between this value and one of the two ceilings below, so a target at or
+    /// under the reference draws exactly this many and a larger one draws more.
+    /// What a *preset* then draws out of that budget is
+    /// `round(budget * density)` (ADR-0069), which is a different and smaller
+    /// number again.
     ///
-    /// This is a sample count and **not** a brightness, which it was until Plan
-    /// 0057: the additive draw now divides its deposit by this value
+    /// State is 48 bytes each ([`Particle`](super::scenes::particles)), and the
+    /// real ceiling is **additive-blend fill rate**, which is why the floor value
+    /// was described as the number to validate against the 60 fps @ 1080p floor
+    /// (ADR-0015 Risks).
+    ///
+    /// This is a sample count and **not** a brightness: the additive draw divides
+    /// its deposit by the *active* count
     /// ([`deposit_scale`](super::scenes::particles::deposit_scale), ADR-0065), so
     /// raising it buys a smoother figure rather than a brighter one. Changing it
     /// changes shot noise and cost; it does not change exposure.
     pub attractor_particles: u32,
+
+    /// The largest budget [`attractor_budget`] may resolve for a scene drawing
+    /// into a **live surface** — a window, or the plugin's host surface.
+    ///
+    /// Frame-time bound, and it is the number that keeps the law from spending a
+    /// display's whole budget on sample count. It is also the **allocation**: the
+    /// particle buffer is sized here at construction and never resized, so a
+    /// resize changes the active count and rebuilds no GPU resource. That costs
+    /// `ceiling * 48 B` of GPU storage plus the same again for the CPU seed
+    /// scatter the scene holds for re-upload, in **every** window, whether or not
+    /// the target is large and whether or not an attractor preset is loaded
+    /// (`create_all` builds every scene up front).
+    ///
+    /// # Where these numbers come from
+    ///
+    /// Measured, not chosen — Plan 0128 Phase 1, at 1920x1080 on
+    /// `attractor_leviathan`, counts interleaved in one process so a throttling
+    /// laptop GPU could not read as signal.
+    ///
+    /// **`Rich`: 600 000**, four times the anchor. On the midrange-discrete
+    /// reference NFR §1 calibrates `Rich` against, the rule was *the largest swept
+    /// count whose marginal p99 over today's anchor stays inside 10 % of the
+    /// 16.67 ms budget*: 600 000 reads +1.454 ms (8.7 %) and the next step up,
+    /// 1 200 000, reads +4.703 ms (28.2 %).
+    ///
+    /// **`Floor`: its own anchor**, so the law is a no-op there. On integrated
+    /// hardware — the baseline NFR §1's floor commitment is about — 1080p at
+    /// `Floor` already sits *on* the 16.67 ms budget at today's 50 000 (p99
+    /// 16.854 ms), and the law's own 1080p `Floor` value of 450 000 takes it to
+    /// 31.942 ms. NFR §1 promises `Floor` "values exactly the pre-tier engine's";
+    /// this is what keeps that true at every target size.
+    pub attractor_particles_live_ceiling: u32,
+
+    /// The same ceiling for a **headless render** — `shot --render`, where there
+    /// is no present deadline and no governor, and the only bound is memory.
+    ///
+    /// # Where these numbers come from
+    ///
+    /// The bound is the **device's storage-buffer binding limit**, not process
+    /// memory, because it is reached first: at 48 B a particle, wgpu's default
+    /// `max_storage_buffer_binding_size` of 134 217 728 B holds 2 796 202
+    /// particles, and 5 400 000 — the law's own unclamped 4K value — fails
+    /// outright with `Buffer binding 0 range 259200000 exceeds
+    /// max_*_buffer_binding_size limit 134217728` (Plan 0128 Phase 1).
+    ///
+    /// `Rich` takes **2 700 000**, the largest whole multiple of its anchor under
+    /// that wall — 18x, 129.6 MB, 3.4 % of headroom. `Floor` takes the **same
+    /// multiple** rather than the same number, so a tier still means something
+    /// offline: at one shared ceiling `--tier floor --render` and
+    /// `--tier rich --render` would draw an identical count at 4K.
+    pub attractor_particles_offline_ceiling: u32,
 
     /// Upper bound on each axis of the attractor's trail accumulation grid.
     ///
@@ -368,6 +427,8 @@ impl TierConfig {
         post_cap: (1920, 1080),
         bloom_levels: 4,
         attractor_particles: 50_000,
+        attractor_particles_live_ceiling: 50_000,
+        attractor_particles_offline_ceiling: 900_000,
         attractor_trail_cap: (2560, 1440),
         swarm_particles: 10_000,
         emitter_objects: 2_000,
@@ -389,6 +450,8 @@ impl TierConfig {
         post_cap: (2560, 1440),
         bloom_levels: 6,
         attractor_particles: 150_000,
+        attractor_particles_live_ceiling: 600_000,
+        attractor_particles_offline_ceiling: 2_700_000,
         attractor_trail_cap: (3840, 2160),
         swarm_particles: 30_000,
         emitter_objects: 6_000,
@@ -409,6 +472,75 @@ impl TierConfig {
 impl Default for TierConfig {
     fn default() -> Self {
         Self::FLOOR
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The attractor's sample budget (ADR-0140)
+// ---------------------------------------------------------------------------
+
+/// The render target the attractor's sample density is anchored to: 640x360,
+/// 230 400 pixels.
+///
+/// The attractor's trail grid is surface-sized, so its deposit spreads over
+/// whatever the target holds and a flat count therefore *falls* in density as the
+/// target grows — 0.651 particles per pixel per frame here, 0.072 at 1080p, which
+/// is the whole of the "it just looks like Leviathan upscaled" verdict. This is
+/// the size whose density is already accepted, so it is where
+/// [`attractor_budget`] resolves to exactly the tier's own anchor.
+///
+/// **The denominator is target pixels, not grid texels**, and the two differ by
+/// the grid's 256-px quantization — 1.71x here, 1.07x at 720p, 1.26x at 1080p,
+/// 1.00x at 4K. Bounded, and named because the deposit lands per texel.
+pub const REFERENCE_PX: u32 = 230_400;
+
+/// The attractor's drawn sample budget for a target of `target_px` pixels, before
+/// a preset's `[particles] density` narrows it further (ADR-0140).
+///
+/// `clamp(round(anchor * target_px / REFERENCE_PX), anchor, ceiling)`.
+///
+/// **The lower clamp is load-bearing.** The law can only ever *add* samples above
+/// [`REFERENCE_PX`], never remove them below it, so every existing capture — the
+/// 128x128 golden suite, the 96x96 sanity suite, every small `shot` still —
+/// resolves to exactly the count it resolved before this function existed and
+/// stays byte-identical. That is assertable on the value rather than inferred
+/// from pixels, which is the same shape of argument ADR-0065 used for
+/// `deposit_scale` being exactly `1.0` at `Floor`.
+///
+/// `f64` throughout: `anchor * target_px` reaches 41 bits at a 4K target, past
+/// `f32`'s 24-bit mantissa, so the product would be rounded before the divide.
+///
+/// A `ceiling` below `anchor` is raised to it rather than inverting the clamp —
+/// `u32::clamp` panics when `min > max`, and this runs on the resize path.
+pub fn attractor_budget(anchor: u32, target_px: u32, ceiling: u32) -> u32 {
+    let scaled = (f64::from(anchor) * f64::from(target_px) / f64::from(REFERENCE_PX)).round();
+    let scaled = if scaled >= f64::from(u32::MAX) {
+        u32::MAX
+    } else {
+        scaled as u32
+    };
+    scaled.clamp(anchor, ceiling.max(anchor))
+}
+
+impl TierConfig {
+    /// [`attractor_budget`] against this tier's **live** ceiling — what a window
+    /// and the plugin's host surface resolve.
+    pub fn attractor_budget_live(&self, target_px: u32) -> u32 {
+        attractor_budget(
+            self.attractor_particles,
+            target_px,
+            self.attractor_particles_live_ceiling,
+        )
+    }
+
+    /// [`attractor_budget`] against this tier's **offline** ceiling — what a
+    /// headless render resolves, where the bound is memory rather than frame time.
+    pub fn attractor_budget_offline(&self, target_px: u32) -> u32 {
+        attractor_budget(
+            self.attractor_particles,
+            target_px,
+            self.attractor_particles_offline_ceiling,
+        )
     }
 }
 
