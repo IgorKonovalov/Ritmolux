@@ -70,3 +70,13 @@
   font-size: var(--sl-text-sm);
   font-weight: normal;
 }
+
+/* The landing page's entrance buttons, which stand in for `hero.actions`.
+ * Starlight's own splash layout centres the frontmatter actions; these are body
+ * content, so the row is laid out here. */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.5rem 0 2rem;
+}

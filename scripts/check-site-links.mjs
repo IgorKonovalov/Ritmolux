@@ -43,9 +43,12 @@ const CONFIG = path.join(REPO_ROOT, "site", "astro.config.mjs");
 const DIST = path.resolve(process.argv[2] ?? path.join(REPO_ROOT, "site", "dist"));
 
 // The base is read from the site config rather than restated, so this gate
-// cannot drift from the subpath the site is actually built for.
+// cannot drift from the subpath the site is actually built for. `SITE_BASE`
+// overrides it exactly as it overrides the build's, and the two MUST be set
+// together: a check run at a different base than the build reports every
+// internal link as broken.
 const configSource = existsSync(CONFIG) ? readFileSync(CONFIG, "utf8") : "";
-const baseMatch = /^const BASE = ["'](.+?)["'];/m.exec(configSource);
+const baseMatch = /^const BASE = .*?["'](\/[^"']*)["']/m.exec(configSource);
 if (!baseMatch) {
   console.error(
     `check-site-links: could not read \`const BASE = '...'\` from ${path.relative(REPO_ROOT, CONFIG)}.\n` +
@@ -54,7 +57,8 @@ if (!baseMatch) {
   );
   process.exit(1);
 }
-const BASE = baseMatch[1].endsWith("/") ? baseMatch[1] : `${baseMatch[1]}/`;
+const configured = process.env.SITE_BASE ?? baseMatch[1];
+const BASE = configured.endsWith("/") ? configured : `${configured}/`;
 
 function htmlFilesUnder(dir) {
   const out = [];

@@ -1,0 +1,81 @@
+# The documentation site's permanent home (ADR-0154, Plan 0143 Phase 6).
+#
+# Two jobs, and the split is the point. `build` runs on every push and every
+# pull request and is the guard the plan actually asks for: a documentation edit
+# that the site cannot render, or a link rewrite that resolves to nothing, fails
+# here rather than producing a site that is confidently wrong. `deploy` runs only
+# from `main`, so a pull request is checked and never published.
+#
+# WHY THIS BUILDS AT A DIFFERENT BASE THAN A LAPTOP DOES. GitHub serves a project
+# site under the repository's name as spelled - `/Ritmolux/` - while the Phase 4
+# demo lives in a hand-made directory inside another repository's `public/` at
+# `/ritmolux/`. `site/astro.config.mjs` defaults to the demo path, because that is
+# what a local `npm run build` should serve, and `SITE_BASE` below switches it.
+# The gate is given the SAME value: a check run at a different base than the build
+# reports every internal link as broken, which looks like a catastrophe and is a
+# typo.
+#
+# NOT a render job. The gallery's 82 preset cards are committed PNGs, rendered
+# locally on a hardware GPU (ADR-0100) - CI never runs `shot` for the docs, and
+# adding that here would be a permanently red build, since a render is not
+# byte-reproducible across machines.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time, and a queued one waits rather than cancelling: a
+# half-published site is worse than a late one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # The project site's subpath. Case matters - see the header.
+  SITE_BASE: /Ritmolux/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      # `npm ci` rather than `npm install`: it installs the committed lockfile
+      # exactly and fails if package.json and the lockfile disagree, which is the
+      # only reason the lockfile is committed at all.
+      - run: npm ci
+        working-directory: site
+      - run: npm run build
+        working-directory: site
+      # The gate the source cannot replace. `scripts/check-doc-links.mjs` in the
+      # `links` job checks the tree and passes over every defect this one exists
+      # to catch, because the rewrite happens at build time and the source was
+      # never the thing that broke.
+      - run: node scripts/check-site-links.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
