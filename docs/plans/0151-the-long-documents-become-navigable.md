@@ -356,8 +356,8 @@ const anchor = (heading) =>
 | 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
 | 5 — The remaining four documents carry blocks | dev | done | `e6d5dd5` |
 | 6 — The carrier | dev | done | `b9f9ac9` |
-| 7 — `flattenLinks` survives a bracketed label | dev | done | committed with this row |
-| 8 — The 40 damaged write-ups are repaired | dev | not started | |
+| 7 — `flattenLinks` survives a bracketed label | dev | done | `78024a4` |
+| 8 — The 40 damaged write-ups are repaired | dev | done | committed with this row |
 | 9 — The sixth gate's count reaches the sites that state it | dev | not started | |
 
 ### Notes
@@ -533,6 +533,30 @@ incremented.
 
 The corpus is unchanged at 457 rows across 6 blocks: 0049's heading is currently one of the 40
 damaged leads, so the shape this phase fixes does not yet exist in any document.
+
+**Phase 8.** All 40 joined; the detector reports nothing, `grep -c '^### \[.*\](done/.*\.md)'` is
+133, the whitespace-normalized digest is `f2556a501929baedc3d51dd28f3109d7` before and after, and
+the line count is unchanged (`120 insertions / 120 deletions` — 80 join lines and 40 block rows).
+
+**One check beyond the done-whens, because "every restored title is the full plan title" is not
+mechanically checkable as stated.** The whole `## Recently closed (full entries)` section was
+reproduced independently from the **pre-Phase-4** file at `a428ad1` by a script that unwraps a
+wrapped bullet lead *first* and only then converts and de-indents — the order Phase 4 had
+backwards — and the result **diffs clean** against the repaired section. That proves both halves
+at once: the 40 titles are exactly the titles the bullets carried, and the 93 undamaged entries
+were not touched. `0085` reads *"gets an instrument"*.
+
+The join takes the remainder through `](target)` and drops the single leading space, so the body
+line begins `— closed …` rather than ` — closed …`. Both normalize identically under the digest;
+the trimmed form is what an ordinary wrapped continuation line in this file looks like.
+
+**A separate defect in the same block, found while checking and NOT repaired.** Twelve of the 133
+rows carry a truncated fragment of the entry's close prose in the row label, because for a short
+title the wrap fell *after* the link rather than inside it — so Phase 4 gave the heading the link
+plus whatever prose preceded the newline. `0088 — The docs get pictures — closed 2026-08-13 (all`
+is the clearest. These leads are well-formed markdown and every done-when in this plan passes on
+them, which is why they survived both Phase 4 and this repair. Fixing it means moving 12 anchors,
+so it is architect's call, not a phase this plan authorized.
 
 ### Close triggers
 
