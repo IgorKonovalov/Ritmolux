@@ -217,7 +217,10 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// only when both say so.
 ///
 /// A solid mass carries only its rim on the boundary and reads low; a hatched,
-/// stroked or tiled figure is almost all rim and reads near one however small.
+/// stroked or tiled figure is almost all rim and reads near one. **Both halves of
+/// that are claims at one capture size and not properties of the figure** — the
+/// resolution paragraph below is what qualifies them, and a solid mass small
+/// enough reads `1.0000` exactly as a hatched one does.
 /// **The denominator is the lit area, not the frame's**,
 /// which is what keeps the statistic asking one question: normalizing by frame
 /// area would make a frame score higher merely for having more lit material,
