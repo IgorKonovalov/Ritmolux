@@ -43,12 +43,12 @@ layout = "bars"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#0b0f2e" },  # night - the lowest bands, and the top of the sky
-  { at = 0.30, color = "#2a2159" },  # violet
-  { at = 0.55, color = "#7a3f6e" },  # mauve
-  { at = 0.75, color = "#d4693f" },  # burnt orange
-  { at = 0.90, color = "#f2a65a" },  # amber
-  { at = 1.00, color = "#ffe3ab" },  # pale gold - the top bands, and the horizon
+  { at = 0.00, color = "#3b4576" },  # night - the lowest bands, and the top of the sky
+  { at = 0.30, color = "#71659f" },  # violet
+  { at = 0.55, color = "#b888af" },  # mauve
+  { at = 0.75, color = "#ebac88" },  # burnt orange
+  { at = 0.90, color = "#f9d3a0" },  # amber
+  { at = 1.00, color = "#fff2d6" },  # pale gold - the top bands, and the horizon
 ]
 
 [params]

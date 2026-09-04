@@ -46,16 +46,16 @@ smoothing = { attack = 0.05, release = 0.45 }
 # with steps applied. `hue_spread` below stops at 0.75 so the spokes take the
 # first three and the cream is reserved for the ground.
 stops = [
-  { at = 0.00, color = "#16283c" },  # navy
-  { at = 0.24, color = "#16283c" },
-  { at = 0.26, color = "#c1452f" },  # vermilion
-  { at = 0.50, color = "#c1452f" },
-  { at = 0.52, color = "#dfa32b" },  # ochre
-  { at = 0.74, color = "#dfa32b" },
-  { at = 0.76, color = "#2f6b52" },  # pine
-  { at = 0.94, color = "#2f6b52" },
-  { at = 0.96, color = "#f3ead6" },  # cream - the paper, not a spoke
-  { at = 1.00, color = "#f3ead6" },
+  { at = 0.00, color = "#536e85" },  # navy
+  { at = 0.24, color = "#536e85" },
+  { at = 0.26, color = "#e28e77" },  # vermilion
+  { at = 0.50, color = "#e28e77" },
+  { at = 0.52, color = "#f0d172" },  # ochre
+  { at = 0.74, color = "#f0d172" },
+  { at = 0.76, color = "#77ad9a" },  # pine
+  { at = 0.94, color = "#77ad9a" },
+  { at = 0.96, color = "#faf6ec" },  # cream - the paper, not a spoke
+  { at = 1.00, color = "#faf6ec" },
 ]
 
 [params]

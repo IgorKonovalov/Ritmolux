@@ -62,7 +62,7 @@ warp     = 0.12
 stops = [
   { at = 0.00, color = "#000000" },
   { at = 0.42, color = "#000000" },
-  { at = 0.50, color = "#2ad4ff" },
+  { at = 0.50, color = "#71ebff" },
   { at = 0.58, color = "#000000" },
   { at = 1.00, color = "#000000" },
 ]

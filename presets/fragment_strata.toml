@@ -10,12 +10,12 @@ name = "Marbled Strata"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#120c26" },  # deep indigo
-  { at = 0.22, color = "#274060" },  # slate blue
-  { at = 0.45, color = "#7e9c8f" },  # celadon
-  { at = 0.62, color = "#e8dcc0" },  # cream vein
-  { at = 0.80, color = "#b0563b" },  # terracotta
-  { at = 1.00, color = "#2c1420" },  # oxblood
+  { at = 0.00, color = "#4b3d6c" },  # deep indigo
+  { at = 0.22, color = "#6d89a5" },  # slate blue
+  { at = 0.45, color = "#bbcdc5" },  # celadon
+  { at = 0.62, color = "#f5efe1" },  # cream vein
+  { at = 0.80, color = "#d89d84" },  # terracotta
+  { at = 1.00, color = "#734f63" },  # oxblood
 ]
 
 [params]

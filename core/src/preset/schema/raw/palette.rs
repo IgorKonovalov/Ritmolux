@@ -1,5 +1,10 @@
 //! The raw `[palette]` table: a built-in palette by `name`, or explicit
 //! `stops`, with the hex and array colour forms and the stop validation.
+//!
+//! **A stop is authored in sRGB and leaves this module in linear light**
+//! (ADR-0151). The decode happens here, at the boundary a stop crosses once, and
+//! nothing downstream repeats it: [`PaletteConfig`] is documented as
+//! ready-to-bake and the LUT and every sample site read what they always did.
 // A continuation of one module split across several files, so it needs the
 // compiled shapes `preset/schema/mod.rs` has in scope.
 use super::super::*;
@@ -36,28 +41,35 @@ pub(in crate::preset::schema) enum RawColor {
 }
 
 impl RawColor {
-    /// Validate into an RGB triple, erroring (never panicking) on a malformed hex
-    /// string or a non-finite channel.
+    /// Validate into a **linear-light** RGB triple, erroring (never panicking) on
+    /// a malformed hex string or a non-finite channel.
+    ///
+    /// Both forms are sRGB — the hex because that is what a colour picker hands
+    /// you, the array because two readings of one `[palette]` table is the
+    /// ambiguity ADR-0151 Alternative B was rejected for. So the decode sits
+    /// after the validation, on the one value both arms produce.
     pub(in crate::preset::schema) fn into_rgb(self) -> Result<[f32; 3], PresetError> {
-        match self {
-            RawColor::Hex(s) => parse_hex_color(&s),
+        let srgb = match self {
+            RawColor::Hex(s) => parse_hex_color(&s)?,
             RawColor::Rgb(rgb) => {
                 if rgb.iter().any(|c| !c.is_finite()) {
                     return Err(PresetError::Config(format!(
                         "[palette] stop color channels must be finite, got {rgb:?}"
                     )));
                 }
-                Ok([
+                [
                     rgb[0].clamp(0.0, 1.0),
                     rgb[1].clamp(0.0, 1.0),
                     rgb[2].clamp(0.0, 1.0),
-                ])
+                ]
             }
-        }
+        };
+        Ok(crate::render::palette::srgb_to_linear_rgb(srgb))
     }
 }
 
-/// Parse a `#rrggbb` (or `rrggbb`) hex color into a `0..1` RGB triple. Every
+/// Parse a `#rrggbb` (or `rrggbb`) hex color into a `0..1` **sRGB** triple —
+/// the encoded form, before [`into_rgb`](RawColor::into_rgb) decodes it. Every
 /// failure is a surfaced load error, never a panic.
 pub(in crate::preset::schema) fn parse_hex_color(s: &str) -> Result<[f32; 3], PresetError> {
     let hex = s.strip_prefix('#').unwrap_or(s);
@@ -98,7 +110,8 @@ impl RawPalette {
     }
 }
 
-/// Validate a custom stop list into the baked-ready `(at, rgb)` pairs: ≥2 stops,
+/// Validate a custom stop list into the baked-ready `(at, rgb)` pairs — the
+/// colours decoded to linear light on the way through: ≥2 stops,
 /// each `at` finite in `0..=1` and non-decreasing (sorted), each color parseable.
 /// Every failure is a surfaced load error (ADR-0021 / NFR 10).
 pub(in crate::preset::schema) fn validate_stops(

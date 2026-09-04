@@ -27,10 +27,10 @@ family = "maurer_rose"
 #                             tonemap knee at 0.6, where the correction stops
 #                             being exact and only gets close
 stops = [
-  { at = 0.0000, color = "#e2d6c0" },
-  { at = 0.4999, color = "#e2d6c0" },
-  { at = 0.5001, color = "#930204" },
-  { at = 1.0000, color = "#930204" },
+  { at = 0.0000, color = "#f2ece1" },
+  { at = 0.4999, color = "#f2ece1" },
+  { at = 0.5001, color = "#c81622" },
+  { at = 1.0000, color = "#c81622" },
 ]
 
 [params]

@@ -74,14 +74,14 @@ name = "Ring Mono"
 stops = [
   { at = 0.0000, color = "#ffffff" },   # bands 0-2
   { at = 0.1835, color = "#ffffff" },
-  { at = 0.1915, color = "#b00808" },   # band  3    key ring
-  { at = 0.2460, color = "#b00808" },
+  { at = 0.1915, color = "#d83232" },   # band  3    key ring
+  { at = 0.2460, color = "#d83232" },
   { at = 0.2540, color = "#000000" },   # bands 4-7
   { at = 0.4960, color = "#000000" },
   { at = 0.5040, color = "#ffffff" },   # bands 8-10
   { at = 0.6835, color = "#ffffff" },
-  { at = 0.6915, color = "#b00808" },   # band 11    key ring
-  { at = 0.7460, color = "#b00808" },
+  { at = 0.6915, color = "#d83232" },   # band 11    key ring
+  { at = 0.7460, color = "#d83232" },
   { at = 0.7540, color = "#000000" },   # bands 12-15
   { at = 1.0000, color = "#000000" },
 ]

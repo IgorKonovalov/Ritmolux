@@ -109,20 +109,20 @@ name = "Heart Mono"
 stops = [
   { at = 0.000, color = "#ffffff" },   # bands 0-3   the heart's solid body
   { at = 0.195, color = "#ffffff" },
-  { at = 0.205, color = "#b00808" },   # band  4     first key ring
-  { at = 0.245, color = "#b00808" },
+  { at = 0.205, color = "#d83232" },   # band  4     first key ring
+  { at = 0.245, color = "#d83232" },
   { at = 0.255, color = "#000000" },   # bands 5-7
   { at = 0.395, color = "#000000" },
   { at = 0.405, color = "#ffffff" },   # bands 8-9
   { at = 0.495, color = "#ffffff" },
-  { at = 0.505, color = "#b00808" },   # band  10    second key ring
-  { at = 0.545, color = "#b00808" },
+  { at = 0.505, color = "#d83232" },   # band  10    second key ring
+  { at = 0.545, color = "#d83232" },
   { at = 0.555, color = "#000000" },   # bands 11-13
   { at = 0.695, color = "#000000" },
   { at = 0.705, color = "#ffffff" },   # bands 14-15
   { at = 0.795, color = "#ffffff" },
-  { at = 0.805, color = "#b00808" },   # band  16    third key ring
-  { at = 0.845, color = "#b00808" },
+  { at = 0.805, color = "#d83232" },   # band  16    third key ring
+  { at = 0.845, color = "#d83232" },
   { at = 0.855, color = "#000000" },   # bands 17-19 the outline falls in here,
   { at = 1.000, color = "#000000" },   #             then the whole run repeats
 ]

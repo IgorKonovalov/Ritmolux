@@ -26,10 +26,10 @@ max_depth = 4
 
 [palette]
 stops = [
-  { at = 0.0, color = "#2a2118" },
-  { at = 0.45, color = "#6b5844" },
-  { at = 0.75, color = "#a8927a" },
-  { at = 1.0, color = "#e8dcc8" },
+  { at = 0.0, color = "#716556" },
+  { at = 0.45, color = "#ad9f8d" },
+  { at = 0.75, color = "#d4c7b8" },
+  { at = 1.0, color = "#f5efe5" },
 ]
 
 [params]

@@ -17,12 +17,12 @@ name = "Step 5 Finished"
 # banding in a gradient.
 [palette]
 stops = [
-  { at = 0.00, color = "#0b1026" },
-  { at = 0.24, color = "#1f4b6e" },
-  { at = 0.46, color = "#2f9c8f" },
-  { at = 0.66, color = "#8fce7a" },
-  { at = 0.84, color = "#f2c14e" },
-  { at = 1.00, color = "#e8734a" },
+  { at = 0.00, color = "#3b476c" },
+  { at = 0.24, color = "#6294af" },
+  { at = 0.46, color = "#77cdc5" },
+  { at = 0.66, color = "#c5e8b8" },
+  { at = 0.84, color = "#f9e296" },
+  { at = 1.00, color = "#f5b393" },
 ]
 
 [params]

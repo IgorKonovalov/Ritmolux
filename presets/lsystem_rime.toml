@@ -38,11 +38,11 @@ max_depth = 5
 
 [palette]
 stops = [
-  { at = 0.00, color = "#0a1730" },  # night
-  { at = 0.22, color = "#1d4f8c" },  # deep ice
-  { at = 0.50, color = "#4aa8d8" },  # glacier blue
-  { at = 0.74, color = "#a8e8f5" },  # rime
-  { at = 1.00, color = "#f2fbff" },  # frost white
+  { at = 0.00, color = "#385578" },  # night
+  { at = 0.22, color = "#5f97c4" },  # deep ice
+  { at = 0.50, color = "#93d4ed" },  # glacier blue
+  { at = 0.74, color = "#d4f5fb" },  # rime
+  { at = 1.00, color = "#f9fdff" },  # frost white
 ]
 
 [params]

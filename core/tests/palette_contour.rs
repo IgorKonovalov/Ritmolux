@@ -68,8 +68,8 @@ fn probe(palette: &str, steps: u32, contour: f32) -> Preset {
 /// A palette of one colour end to end — a single plateau, so **no** band edge in
 /// it is an ink change however many bands it is cut into.
 fn one_run() -> String {
-    "[palette]\nstops = [{ at = 0.0, color = [0.55, 0.55, 0.55] }, \
-     { at = 1.0, color = [0.55, 0.55, 0.55] }]"
+    "[palette]\nstops = [{ at = 0.0, color = [0.767376, 0.767376, 0.767376] }, \
+     { at = 1.0, color = [0.767376, 0.767376, 0.767376] }]"
         .to_string()
 }
 
@@ -77,18 +77,18 @@ fn one_run() -> String {
 /// the seam so no band centre lands inside the transition — the way a limited-ink
 /// palette is actually authored.
 fn two_runs() -> String {
-    "[palette]\nstops = [{ at = 0.0, color = [0.20, 0.20, 0.20] }, \
-     { at = 0.49, color = [0.20, 0.20, 0.20] }, \
-     { at = 0.51, color = [0.85, 0.85, 0.85] }, \
-     { at = 1.0, color = [0.85, 0.85, 0.85] }]"
+    "[palette]\nstops = [{ at = 0.0, color = [0.484529, 0.484529, 0.484529] }, \
+     { at = 0.49, color = [0.484529, 0.484529, 0.484529] }, \
+     { at = 0.51, color = [0.930925, 0.930925, 0.930925] }, \
+     { at = 1.0, color = [0.930925, 0.930925, 0.930925] }]"
         .to_string()
 }
 
 /// A smooth ramp: every band centre sits at a different place on it, so every
 /// band edge separates two different colours at any step count.
 fn smooth() -> String {
-    "[palette]\nstops = [{ at = 0.0, color = [0.05, 0.05, 0.05] }, \
-     { at = 1.0, color = [0.95, 0.95, 0.95] }]"
+    "[palette]\nstops = [{ at = 0.0, color = [0.247801, 0.247801, 0.247801] }, \
+     { at = 1.0, color = [0.977692, 0.977692, 0.977692] }]"
         .to_string()
 }
 

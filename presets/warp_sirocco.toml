@@ -79,11 +79,11 @@ zoom = "1.0"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#2a1608" },  # dune shadow
-  { at = 0.28, color = "#8a5320" },  # ochre
-  { at = 0.56, color = "#d69a42" },  # sand
-  { at = 0.80, color = "#f0cf90" },  # haze
-  { at = 1.00, color = "#fff6e4" },  # sky
+  { at = 0.00, color = "#715332" },  # dune shadow
+  { at = 0.28, color = "#c29b63" },  # ochre
+  { at = 0.56, color = "#eccc8b" },  # sand
+  { at = 0.80, color = "#f8e9c6" },  # haze
+  { at = 1.00, color = "#fffbf3" },  # sky
 ]
 
 [params]

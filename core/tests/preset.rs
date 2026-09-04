@@ -1827,7 +1827,7 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
     let custom = Preset::from_toml_str(
         "system = \"fragment_field\"\n[palette]\n\
          stops = [ { at = 0.0, color = \"#000000\" }, \
-                   { at = 0.5, color = [1.0, 0.0, 0.0] }, \
+                   { at = 0.5, color = [1.000000, 0.000000, 0.000000] }, \
                    { at = 1.0, color = \"#ffffff\" } ]\n",
     )
     .expect("custom stops preset is valid");
@@ -1852,7 +1852,7 @@ fn palette_config_parses_names_stops_and_rejects_bad_tables() {
     // (the loader keeps the previous good preset — NFR 10).
     let bad = [
         // Unsorted `at`.
-        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=0.2,color=\"#111111\"},{at=0.1,color=\"#222222\"}]\n",
+        "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=0.2,color=\"#494949\"},{at=0.1,color=\"#666666\"}]\n",
         // `at` out of range.
         "system=\"swarm\"\n[palette]\nstops=[{at=0.0,color=\"#000000\"},{at=1.5,color=\"#ffffff\"}]\n",
         // Unparseable hex color.

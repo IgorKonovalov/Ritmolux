@@ -57,11 +57,11 @@ family = "dragon"
 # and cyan toward gold.
 [palette]
 stops = [
-  { at = 0.00, color = "#0a0220" },
-  { at = 0.28, color = "#5a17c9" },
-  { at = 0.52, color = "#00b4d8" },
-  { at = 0.78, color = "#ff3d9e" },
-  { at = 1.00, color = "#ffd166" },
+  { at = 0.00, color = "#381663" },
+  { at = 0.28, color = "#a055e6" },
+  { at = 0.52, color = "#00dbed" },
+  { at = 0.78, color = "#ff86ce" },
+  { at = 1.00, color = "#ffeaaa" },
 ]
 
 [params]

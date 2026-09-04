@@ -30,12 +30,12 @@ contact_angle_deg = 24
 
 [palette]
 stops = [
-  { at = 0.0, color = "#1226aa" },
-  { at = 0.25, color = "#00b4d8" },
-  { at = 0.45, color = "#c81d64" },
-  { at = 0.65, color = "#ff6d00" },
-  { at = 0.85, color = "#ffd60a" },
-  { at = 1.0, color = "#7ae582" },
+  { at = 0.0, color = "#4b6cd5" },
+  { at = 0.25, color = "#00dbed" },
+  { at = 0.45, color = "#e55fa8" },
+  { at = 0.65, color = "#ffaf00" },
+  { at = 0.85, color = "#ffec38" },
+  { at = 1.0, color = "#b8f3bd" },
 ]
 
 [params]

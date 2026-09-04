@@ -54,9 +54,9 @@ smoothing = { attack = 0.018, release = 0.5 }
 
 [palette]
 stops = [
-  { at = 0.00, color = "#0f3b4a" },  # deep teal - the low end of the contour
-  { at = 0.40, color = "#1fb8b0" },  # cyan
-  { at = 0.72, color = "#9ff0d8" },  # pale green
+  { at = 0.00, color = "#458493" },  # deep teal - the low end of the contour
+  { at = 0.40, color = "#62ddd8" },  # cyan
+  { at = 0.72, color = "#cff8ed" },  # pale green
   { at = 1.00, color = "#ffffff" },  # white - the top of the contour
 ]
 

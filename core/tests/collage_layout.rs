@@ -82,22 +82,22 @@ fn cell(layout: u32, seed: u32) -> Preset {
     let toml = format!(
         "system = \"shape_collage\"\nname = \"L{layout}_S{seed}\"\n\
          [palette]\nstops = [\n\
-         {{ at = 0.0000, color = \"#111111\" }},\n\
-         {{ at = 0.1249, color = \"#111111\" }},\n\
-         {{ at = 0.1251, color = \"#8a1420\" }},\n\
-         {{ at = 0.2499, color = \"#8a1420\" }},\n\
-         {{ at = 0.2501, color = \"#96751e\" }},\n\
-         {{ at = 0.3749, color = \"#96751e\" }},\n\
-         {{ at = 0.3751, color = \"#1e3a8a\" }},\n\
-         {{ at = 0.4999, color = \"#1e3a8a\" }},\n\
-         {{ at = 0.5001, color = \"#1d5c34\" }},\n\
-         {{ at = 0.6249, color = \"#1d5c34\" }},\n\
-         {{ at = 0.6251, color = \"#4a4a4a\" }},\n\
-         {{ at = 0.7499, color = \"#4a4a4a\" }},\n\
-         {{ at = 0.7501, color = \"#5a1f4a\" }},\n\
-         {{ at = 0.8749, color = \"#5a1f4a\" }},\n\
-         {{ at = 0.8751, color = \"#d9d5c8\" }},\n\
-         {{ at = 1.0000, color = \"#d9d5c8\" }},\n\
+         {{ at = 0.0000, color = \"#494949\" }},\n\
+         {{ at = 0.1249, color = \"#494949\" }},\n\
+         {{ at = 0.1251, color = \"#c24f63\" }},\n\
+         {{ at = 0.2499, color = \"#c24f63\" }},\n\
+         {{ at = 0.2501, color = \"#cab460\" }},\n\
+         {{ at = 0.3749, color = \"#cab460\" }},\n\
+         {{ at = 0.3751, color = \"#6083c2\" }},\n\
+         {{ at = 0.4999, color = \"#6083c2\" }},\n\
+         {{ at = 0.5001, color = \"#5fa27d\" }},\n\
+         {{ at = 0.6249, color = \"#5fa27d\" }},\n\
+         {{ at = 0.6251, color = \"#939393\" }},\n\
+         {{ at = 0.7499, color = \"#939393\" }},\n\
+         {{ at = 0.7501, color = \"#a06293\" }},\n\
+         {{ at = 0.8749, color = \"#a06293\" }},\n\
+         {{ at = 0.8751, color = \"#eeece5\" }},\n\
+         {{ at = 1.0000, color = \"#eeece5\" }},\n\
          ]\n\
          [params]\npaper = \"0.9375\"\nscale = \"1.0\"\ncount = \"{COUNT}\"\n\
          layout = \"{layout}\"\nseed = \"{seed}\"\nsize_hierarchy = \"0.5\"\n\

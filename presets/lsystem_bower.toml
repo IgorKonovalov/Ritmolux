@@ -37,11 +37,11 @@ max_depth = 4
 
 [palette]
 stops = [
-  { at = 0.00, color = "#101a4a" },  # lapis - the trunks
-  { at = 0.30, color = "#37307e" },  # indigo
-  { at = 0.55, color = "#8e2f6b" },  # magenta glass
-  { at = 0.78, color = "#d4553c" },  # vermilion
-  { at = 1.00, color = "#f6c453" },  # gold - the twigs
+  { at = 0.00, color = "#475a93" },  # lapis - the trunks
+  { at = 0.30, color = "#8078bb" },  # indigo
+  { at = 0.55, color = "#c577ad" },  # magenta glass
+  { at = 0.78, color = "#eb9c85" },  # vermilion
+  { at = 1.00, color = "#fbe39b" },  # gold - the twigs
 ]
 
 [params]

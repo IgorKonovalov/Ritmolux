@@ -53,10 +53,10 @@ y = 18
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#04021a" },
-  { at = 0.3,  color = "#1f3fa8" },
-  { at = 0.62, color = "#2fd2c4" },
-  { at = 1.0,  color = "#fff2c2" },
+  { at = 0.0,  color = "#22165a" },
+  { at = 0.3,  color = "#6288d4" },
+  { at = 0.62, color = "#77eae3" },
+  { at = 1.0,  color = "#fff9e2" },
 ]
 
 # The per-vertex program: the transform varies with the vertex's own position.

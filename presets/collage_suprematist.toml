@@ -60,29 +60,29 @@ representative = true
 [palette]
 stops = [
   # black
-  { at = 0.0000, color = "#111111" },
-  { at = 0.1249, color = "#111111" },
+  { at = 0.0000, color = "#494949" },
+  { at = 0.1249, color = "#494949" },
   # red
-  { at = 0.1251, color = "#8a1420" },
-  { at = 0.2499, color = "#8a1420" },
+  { at = 0.1251, color = "#c24f63" },
+  { at = 0.2499, color = "#c24f63" },
   # ochre
-  { at = 0.2501, color = "#96751e" },
-  { at = 0.3749, color = "#96751e" },
+  { at = 0.2501, color = "#cab460" },
+  { at = 0.3749, color = "#cab460" },
   # blue
-  { at = 0.3751, color = "#1e3a8a" },
-  { at = 0.4999, color = "#1e3a8a" },
+  { at = 0.3751, color = "#6083c2" },
+  { at = 0.4999, color = "#6083c2" },
   # green
-  { at = 0.5001, color = "#1d5c34" },
-  { at = 0.6249, color = "#1d5c34" },
+  { at = 0.5001, color = "#5fa27d" },
+  { at = 0.6249, color = "#5fa27d" },
   # grey
-  { at = 0.6251, color = "#4a4a4a" },
-  { at = 0.7499, color = "#4a4a4a" },
+  { at = 0.6251, color = "#939393" },
+  { at = 0.7499, color = "#939393" },
   # plum
-  { at = 0.7501, color = "#5a1f4a" },
-  { at = 0.8749, color = "#5a1f4a" },
+  { at = 0.7501, color = "#a06293" },
+  { at = 0.8749, color = "#a06293" },
   # THE PAPER. Linear 0.851, the one plateau over the knee - see the header.
-  { at = 0.8751, color = "#d9d5c8" },
-  { at = 1.0000, color = "#d9d5c8" },
+  { at = 0.8751, color = "#eeece5" },
+  { at = 1.0000, color = "#eeece5" },
 ]
 
 [latch]

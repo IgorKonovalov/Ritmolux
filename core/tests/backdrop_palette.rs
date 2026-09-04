@@ -81,12 +81,29 @@ fn backdrop_preset(palette: &str, hue: f32) -> Preset {
 
 /// A `[palette]` table of two identical stops — a gradient that is one colour, so
 /// `bg_hue` selects the same value wherever it lands.
+///
+/// **`rgb` is the linear light wanted out of the LUT, and the stop written is its
+/// sRGB encoding** (ADR-0151): a stop is authored in sRGB and decoded at load, so
+/// a linear reference — the analytic cosine below, or the colour a fixture's own
+/// stop bakes to — has to be encoded on the way in, or the two sides of a
+/// differential here would be comparing different colours.
 fn flat_palette(rgb: [f32; 3]) -> String {
-    let [r, g, b] = rgb;
+    let [r, g, b] = rgb.map(linear_to_srgb);
     format!(
         "[palette]\nstops = [{{ at = 0.0, color = [{r}, {g}, {b}] }}, \
          {{ at = 1.0, color = [{r}, {g}, {b}] }}]"
     )
+}
+
+/// The sRGB transfer function — the exact inverse of the decode
+/// [`rlx_core::render::palette::srgb_to_linear`] applies to every authored stop.
+fn linear_to_srgb(v: f32) -> f32 {
+    let v = v.clamp(0.0, 1.0);
+    if v <= 0.003_130_8 {
+        12.92 * v
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    }
 }
 
 /// Build a software headless renderer, or `None` (a logged skip) when the runner
@@ -205,8 +222,9 @@ fn a_flat_declared_palette_paints_the_backdrop_at_every_hue() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    // The colour the two lit-backdrop guard fixtures declare (`#ffcf80`), so this
-    // test and they are talking about the same sky.
+    // The light the two lit-backdrop guard fixtures put on the sky, so this test
+    // and they are talking about the same one. It is the linear value their
+    // `#ffe9bc` stop decodes to, [`flat_palette`] encoding it back on the way in.
     const WARM: [f32; 3] = [1.0, 0.812, 0.502];
     const COOL: [f32; 3] = [0.502, 0.812, 1.0];
 
@@ -259,8 +277,8 @@ fn the_shared_colour_modulations_reach_the_backdrop() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    let warm = "[palette]\nstops = [{ at = 0.0, color = [1.0, 0.4, 0.1] }, \
-                { at = 1.0, color = [1.0, 0.4, 0.1] }]";
+    let warm = "[palette]\nstops = [{ at = 0.0, color = [1.000000, 0.665185, 0.349190] }, \
+                { at = 1.0, color = [1.000000, 0.665185, 0.349190] }]";
 
     let plain = capture(&mut renderer, warm, 0.3);
     assert_lit(&plain, "the unmodulated backdrop");
@@ -296,8 +314,8 @@ fn the_shared_colour_modulations_reach_the_backdrop() {
     renderer.set_presets(vec![
         Preset::from_toml_str(&format!(
             "system = \"swarm\"\nname = \"probe\"\n{warm}\n\
-             [palette_b]\nstops = [{{ at = 0.0, color = [0.1, 0.4, 1.0] }}, \
-             {{ at = 1.0, color = [0.1, 0.4, 1.0] }}]\n[params]\n\
+             [palette_b]\nstops = [{{ at = 0.0, color = [0.349190, 0.665185, 1.000000] }}, \
+             {{ at = 1.0, color = [0.349190, 0.665185, 1.000000] }}]\n[params]\n\
              size = \"0\"\nforce = \"0\"\nspin = \"0\"\nburst = \"0\"\n\
              palette_mix = \"1\"\n\
              bg_hue = \"0.3\"\nbg_bright = \"{BRIGHT}\"\nbg_vignette = \"0.35\"\n"

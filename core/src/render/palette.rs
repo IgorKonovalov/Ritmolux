@@ -15,6 +15,14 @@
 //! (NFR 6). [`Palette::sample`] is allocation-free and runs per particle per
 //! frame (swarm), so this module carries the hot-path panic pragma.
 //!
+//! ## The colour space (ADR-0151)
+//!
+//! A `[palette]` stop in a `.toml` is **sRGB**, and [`srgb_to_linear`] decodes it
+//! at the load boundary, so the LUT below holds linear light and a stop written
+//! `#c81423` renders `#c81423`. The gradients defined *here* — the cosine and the
+//! named stop lists — are engine values already in that space and go through no
+//! decode; the cosine could not, being a generator rather than a triple.
+//!
 //! **The `spectrum` default *is* the cosine model exactly**, so a
 //! preset that declares no `[palette]` is unaffected by this module —
 //! the load-bearing no-regression guarantee, gated by a unit test
@@ -74,9 +82,40 @@ use std::f32::consts::TAU;
 /// LUT resolution: 256 entries span the gradient's `t`, one texel per entry.
 pub const LUT_SIZE: usize = 256;
 
-/// One RGB entry — display-space values in `[0, 1]`, used directly as color
-/// (no perceptual/gamma management; that is deferred, ADR-0021 Alt E).
+/// One RGB entry — **linear light** in `[0, 1]`, used directly as color. An
+/// authored `[palette]` stop is sRGB and is decoded into this space once at the
+/// load boundary by [`srgb_to_linear`] (ADR-0151); the engine's own gradients
+/// below are written in it directly.
 pub type Rgb = [f32; 3];
+
+/// Decode one sRGB-encoded channel in `[0, 1]` to linear light — the IEC
+/// 61966-2-1 transfer function, exactly.
+///
+/// **This is the whole of what a `[palette]` stop goes through** (ADR-0151). The
+/// LUT holds light and the display write encodes it again on the way to 8-bit, so
+/// a stop consumed raw arrives lifted: `#c81423` renders `#dd4c64`, its green
+/// channel nearly quadrupled. Applying the decode at the load boundary — where a
+/// stop is validated, once per preset — leaves the LUT and every sample site
+/// exactly as they were; the table is constant for its lifetime, so per-sample
+/// decoding would buy nothing and cost the hot path.
+///
+/// Out-of-range input is clamped, so the function is total: the load boundary
+/// already rejects a non-finite channel and clamps the array form, and this makes
+/// the contract hold without depending on that.
+pub fn srgb_to_linear(c: f32) -> f32 {
+    let c = c.clamp(0.0, 1.0);
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// [`srgb_to_linear`] per channel — the form the load boundary calls.
+pub fn srgb_to_linear_rgb(rgb: Rgb) -> Rgb {
+    let [r, g, b] = rgb;
+    [srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b)]
+}
 
 /// Rec. 601 luma weights — the single definition of "brightness" the shared
 /// `saturation` desaturates toward, mirrored verbatim in every scene's WGSL.
