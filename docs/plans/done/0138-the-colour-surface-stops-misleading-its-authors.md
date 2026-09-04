@@ -1,9 +1,12 @@
 # 0138 — The colour surface stops misleading its authors
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-04. Phases 1-4 landed as `8438a1d`, `d3e6c08`, `7dc5aca`,
+> `7cc4139`; the Mode 4 review's two majors were repaired in `900be65`. Phase 5 (`human`) was
+> **waived by the user** — see the close note below. Review: **no blockers, two majors (repaired),
+> two minors.**
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0151](../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) (proposed)
+> **Related ADRs:** [0151](../../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) (accepted)
 > **Closes:** design-backlog 0153, 0099.
 
 ## TL;DR
@@ -34,7 +37,7 @@ same shift on `collage_mono` without naming its cause. The entry is explicit tha
 separable halves and that **the second is worth having whatever the first decides** — the page is
 wrong either way.
 
-The population that cares is new. [ADR-0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
+The population that cares is new. [ADR-0138](../../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
 made limited ink a supported palette class, and its authors are the ones who write a hex because
 they mean an ink. The misleading paragraph shipped in the same plan that added the class.
 
@@ -42,7 +45,7 @@ they mean an ink. The misleading paragraph shipped in the same plan that added t
 
 **Take the free repair first, then the re-basing, then the warning.** Phase 1 is the
 `preset-palettes.md` paragraph — it is correct under either answer to
-[ADR-0151](../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md), costs one
+[ADR-0151](../../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md), costs one
 paragraph, and stops the content lane writing more presets against a false claim. Phases 2-3
 implement ADR-0151, migrating every shipped palette so that **the rendered output does not move**.
 Phase 4 adds the `color_span` warning.
@@ -273,3 +276,44 @@ flowchart LR
   changed the preset engine and every embedded preset, and once here.
 - **Outstanding `human` phases:** Phase 5, the look gate on the limited-ink cohort.
 - ADR-0151, which Phase 2 implements, is still `Status: proposed`.
+
+## Close note (architect, 2026-09-04)
+
+**The migration is display-byte-exact, which is stronger than the log claims and stronger than the
+done-when could be written.** Phase 2's done-when said *byte-identical*; the log correctly reports
+that it cannot be, because 73 of the 256 linear byte values are not nameable by any 8-bit sRGB hex,
+and discloses 16.15 % of LUT channels moving by 1/255. Re-derived at the close over every migrated
+stop pair in the diff — 629 pairs, 1878 channels — **301 channels move one linear LUT level and all
+301 encode to the identical display byte.** The moves land where the sRGB encode is compressive, so
+they cancel. No golden PNG changed, and `cargo nextest run --workspace` was re-run on the finished
+tree: 1523 passed, 5 skipped, exit 0.
+
+**Phase 5 was waived on that basis.** The plan named the human look gate as the mitigation for its
+own headline risk — a mistyped stop landing under the 128x128 rasterizer noise floor. A per-stop
+re-derivation covers that risk more completely than an eyeball comparison of one cohort does, and it
+covers the whole library rather than the limited-ink presets. The waiver is the user's call, taken
+at the close.
+
+**Curation verdict (step 3b): the set is unchanged and nothing converged.** No new content landed —
+all 71 `presets/` files are the mechanical re-basing, with rendered output held fixed by
+construction. The stale-workaround sweep is the half that mattered here, because this plan fixed an
+engine defect: **seven preset headers were still teaching the reversed contract**, and
+`curve_broadside.toml` was carrying a hand pre-conversion recipe the engine now performs. All
+repaired in `900be65`. **The prescribed grep did not find them** — it keys on a header naming an ADR
+or plan number, and `curve_broadside`'s names none; they surfaced from a colour-space grep instead.
+
+### Findings the review raised
+
+- **major (repaired)** — nine passages across engine source, both load-bearing operator docs, a
+  golden fixture header and seven preset headers still stated *a stop is a linear coefficient with
+  no sRGB decode*, each citing a hex Phase 2 had deleted from the file it named.
+- **major (repaired)** — the collage system's one authoring rule, *keep the brightest channel at or
+  under linear 0.6*, was left in units the author no longer writes. It now carries its authored form
+  (sRGB byte `0xcb`) at every site.
+- **minor (repaired)** — the surface now has two colour spaces and nothing central said so: a
+  `[palette]` stop is sRGB while `paper_bright` / `ink_bright` / `bg_bright` are still linear light.
+  The fact survived only in two preset headers. Now stated at the ink-pole table in
+  `presets/README.md`.
+- **minor (accepted)** — Phase 2's *byte-identical* done-when was unachievable as worded, and `dev`
+  said so with the arithmetic rather than tuning to it. The right call; see the display-byte result
+  above for what actually shipped.

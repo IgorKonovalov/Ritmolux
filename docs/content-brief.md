@@ -229,7 +229,7 @@ Three riders:
 >
 >   **Getting to that verdict took two corrected probes, and both corrections were mine.** The first
 >   rejection (*"dirty and upscaled"*) was the probe drawing its figure through **8-32 of the
->   palette's 256 LUT texels** with a **1.31-texel** edge ([backlog 0099](design-backlog.md)). The
+>   palette's 256 LUT texels** with a **1.31-texel** edge ([backlog 0099](design-backlog-archive.md)). The
 >   second attempt came back with **blunt tips** because the band boundary sat at 1.35x the outline,
 >   so it drew a *dilated* silhouette — and an outward offset rounds convex corners, the same
 >   mechanism as the heart's notch running the other way. Only with the boundary exactly on `d = 1`
