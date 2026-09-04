@@ -2,7 +2,8 @@
 
 > **Status:** done - closed 2026-09-04. Nine dev phases in the `WORK/rlx-plan-0151` lane,
 > `e450092`..`a77a0be` (six as planned, three as a repair pass after the first Mode 4 review),
-> plus the close commits `327af9c` and this one. Mode 4 review: **no blockers, one major
+> plus the close commits `327af9c` (the major), `cac7c94` and `9f52bfe`. Mode 4 review:
+> **no blockers, one major
 > (44 of the 133 archive headings still carried close prose after the Phase 8 repair; repaired
 > at this close in `327af9c`), four minors.** Independently verified at the merged tip:
 > `cargo nextest run --workspace` **1520 passed / 5 skipped / exit 0** (481 s), `fmt` clean,
