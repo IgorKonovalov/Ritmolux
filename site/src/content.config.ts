@@ -8,6 +8,21 @@ import { docsSchema } from '@astrojs/starlight/schema';
 import { PUBLISHED } from './plugins/rewrite-links.mjs';
 
 /**
+ * Pages that belong to the site rather than to the documentation corpus.
+ *
+ * These are the only markdown files `site/` owns. They are kept out of
+ * `PUBLISHED` on purpose: that map is the publish boundary the link rewriter
+ * reads, and nothing in `docs/` can hold a relative link to a page that exists
+ * only here. Paths are repo-relative, like `PUBLISHED`, because the loader is
+ * rooted at the repository.
+ */
+const SITE_PAGES: Record<string, string> = {
+  'site/src/content/docs/index.mdx': 'index',
+};
+
+const ROUTES: Record<string, string> = { ...PUBLISHED, ...SITE_PAGES };
+
+/**
  * Starlight's `docsSchema()` requires a `title`; not one file in the published
  * set carries frontmatter, and none may gain any. The title is therefore taken
  * from the document's own opening `# ` heading, injected into the frontmatter
@@ -40,7 +55,12 @@ function withDerivedTitles(loader: Loader): Loader {
         parseData: (props) =>
           context.parseData({
             ...props,
-            data: { title: titleFromLeadingHeading(props.filePath!), ...props.data },
+            // A page that carries its own frontmatter title - the site's own
+            // landing page does - is left alone; deriving one would mean
+            // demanding an `# ` heading of a file that has no body heading.
+            data: props.data?.title
+              ? props.data
+              : { title: titleFromLeadingHeading(props.filePath!), ...props.data },
           }),
       }),
   };
@@ -51,8 +71,8 @@ export const collections = {
     loader: withDerivedTitles(
       glob({
         base: '..',
-        pattern: Object.keys(PUBLISHED),
-        generateId: ({ entry }) => PUBLISHED[entry],
+        pattern: Object.keys(ROUTES),
+        generateId: ({ entry }) => ROUTES[entry],
       }),
     ),
     schema: docsSchema(),

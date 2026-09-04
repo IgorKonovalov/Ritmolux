@@ -34,6 +34,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Ritmolux',
+      customCss: ['./src/styles/landing.css'],
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
         'the parameter roster, and the engine contracts.',
