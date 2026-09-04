@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0138 — The colour surface stops misleading its authors](#0138--the-colour-surface-stops-misleading-its-authors)
   - [0151 — The long documents become navigable](#0151--the-long-documents-become-navigable)
   - [0126 — The large files split along their seams](#0126--the-large-files-split-along-their-seams)
   - [0150 — The application becomes Ritmolux](#0150--the-application-becomes-ritmolux)
@@ -154,6 +155,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0138-behind-0137)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0151-before-0143)
   - [Moved 2026-09-03 from `README.md` — the 2026-08-16 sequence and everything under it](#moved-2026-09-03-from-readmemd--the-2026-08-16-sequence-and-everything-under-it)
 - [0109 — The MilkDrop import gets its geometry back](#0109--the-milkdrop-import-gets-its-geometry-back)
@@ -164,6 +166,66 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md)
+— closed 2026-09-04. Four `dev` phases in the `WORK/rlx-0138-colour-surface` lane,
+`8438a1d`..`7cc4139`, plus the close commits `900be65` (both majors) and the bookkeeping. Version:
+**0.104.0** (minor) — an authoring-contract change and a new load-time warning. Phase 5, the
+`human` look gate, was **waived by the user at the close**. Review: **no blockers, two majors, two
+minors.**
+
+**What it built.** Two ways the colour surface lied to preset authors, closed together because both
+verdicts had been attributed to the wrong subsystem. [ADR-0151](../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md)
+supersedes ADR-0021 Alternative E for palette stops: a `[palette]` stop is **sRGB** and is decoded to
+light once at the load boundary, so a stop written `#c81423` renders `#c81423` below the tonemap
+knee, where the load decode and the display encode are exact inverses. Every authored stop in the
+repository was re-based mechanically — 71 `presets/` files, 26 test fixtures, the inline TOML in
+13 Rust test files, and `docs/examples/tuning/step-5-colour-and-beat.toml` — chosen so the
+rendered output does not move. Separately, a `shape_field` `color_span` narrow enough to starve the
+gradient now warns at load, naming its texel estimate and `palette_steps` as the remedy.
+
+**The migration is display-byte-exact, and that is a stronger result than either the plan or the
+implementation log claims.** Phase 2's done-when said *byte-identical*; the log correctly reports it
+cannot be, because 73 of the 256 linear byte values are not nameable by any 8-bit sRGB hex, and
+discloses 16.15 % of LUT channels moving by 1/255 against `golden.rs`'s `MEAN_TOL` of 0.02. The close
+re-derived every migrated stop pair in the diff — 629 pairs, 1878 channels — and **all 301
+moved channels encode to the identical display byte**: the moves land where the sRGB encode is
+compressive, so they cancel. No golden PNG changed. That result is what the Phase 5 waiver rests on:
+a per-stop re-derivation covers the plan's headline risk — a mistyped stop hiding under the
+128x128 rasterizer noise floor — more completely, and across the whole library rather than one
+cohort.
+
+**What the review caught, both the same shape.** Phase 2 re-based every stop and **nine passages went
+on teaching the mapping it had reversed**, each citing a hex the migration itself had just deleted
+from the file it named: `#111111` in `collage_suprematist`, `#930204` in `curve_broadside`, `#b00808`
+in the four mono files. They sat in engine source (`shape_collage.rs`'s module doc), a golden fixture
+header, the `[!IMPORTANT]` block in `docs/preset-palettes.md`, the same block in `presets/README.md`,
+and seven preset headers — so `docs/preset-palettes.md` stated the contract at its top and the
+opposite 970 lines down. `curve_broadside.toml` was the sharpest: a shouted *THESE TWO STOPS ARE
+WRITTEN IN LINEAR LIGHT, NOT IN sRGB* twelve lines above stops that are now sRGB, with a hand
+pre-conversion recipe of exactly the kind Phase 3's own done-when forbids. The second major is the
+same drift one level down: the collage system's single authoring rule — *keep the brightest
+channel at or under linear 0.6* — was left in units the author no longer writes, with
+`collage_nocturne` still giving the cap as the linear *byte 0x99*. Every migrated collage stop
+already caps at sRGB `0xcb`, so the presets were right and only the guidance was not. Both repaired
+in `900be65`.
+
+**The curation grep did not find any of it.** Close-ceremony step 3b's stale-workaround sweep keys on
+a preset header naming an ADR or plan number; `curve_broadside`'s names none. The seven headers
+surfaced from a colour-space grep instead — worth knowing the next time a plan fixes an engine
+defect that presets were working around.
+
+**One minor worth carrying forward.** The migration left the authoring surface with **two colour
+spaces**: a `[palette]` stop is sRGB, while `paper_bright`, `ink_bright` and `bg_bright` are still
+linear light. That fact survived only in two preset headers (`lsystem_vellum`, `swarm_stipple`) —
+precisely the failure mode the content lane's docs exist to prevent — and is now stated at the
+ink-pole table in `presets/README.md`.
+
+**Verified at the close.** `cargo nextest run --workspace` on the finished tree: **1523 passed, 5
+skipped, exit 0**, matching the log exactly. Zero golden PNGs changed. `fmt`, `clippy --workspace
+--all-targets -D warnings`, and all six Node gates clean. `check-backlog-claims` went from exit 1
+— two probes, both on 0153, both broken by this plan's own repairs — to green once the entry
+was archived. Backlog **0099** and **0153** both fully discharged and archived.
 
 ### [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md)
 — closed 2026-09-04. Nine `dev` phases in the `WORK/rlx-plan-0151` lane, `e450092`..`a77a0be`:
@@ -6611,6 +6673,21 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137
+
+Spent when [0138] closed on 2026-09-04. It held for its whole life: [0137] closed 2026-09-01 and
+[0138] was taken immediately after, which is what the note asked for. The backlog-0038 half is
+the part that outlives it — 0038 is still routed to `preset-author` as a content pass and is
+now measurable, which was the note's second reason and remains true.
+
+- **[0138] belongs immediately after [0137]** — same linear-light seam one layer up. Taking them
+  together is one coherent pass; six weeks apart is two half-passes. [0138] also makes backlog 0038
+  measurable for the first time, using the level statistic [0137] adds. **[0137] closed 2026-09-01,
+  so `mean_lit_level` and the `--report` `level` column are on `main` and this is now the moment.**
+
+[0137]: done/0137-the-metrics-measure-light.md
+[0138]: done/0138-the-colour-surface-stops-misleading-its-authors.md
 
 ### Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143
 

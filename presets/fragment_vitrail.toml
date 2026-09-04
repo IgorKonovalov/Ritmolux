@@ -35,11 +35,11 @@ name = "Vitrail"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#050213" },
-  { at = 0.30, color = "#1c1060" },
-  { at = 0.55, color = "#4326b8" },
-  { at = 0.80, color = "#c93ba8" },
-  { at = 1.00, color = "#ffd9f0" },
+  { at = 0.00, color = "#26164d" },
+  { at = 0.30, color = "#5d47a5" },
+  { at = 0.55, color = "#8c6cdd" },
+  { at = 0.80, color = "#e684d4" },
+  { at = 1.00, color = "#ffeef8" },
 ]
 
 [params]

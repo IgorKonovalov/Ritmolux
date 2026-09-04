@@ -34,10 +34,10 @@ name = "aurora"
 
 [palette_b]
 stops = [
-  { at = 0.00, color = "#0a0320" },
-  { at = 0.35, color = "#4a1d7a" },
-  { at = 0.65, color = "#c2439b" },
-  { at = 1.00, color = "#ffd9a3" },
+  { at = 0.00, color = "#381c63" },
+  { at = 0.35, color = "#935fb8" },
+  { at = 0.65, color = "#e28ccd" },
+  { at = 1.00, color = "#ffeed1" },
 ]
 
 [params]

@@ -12,11 +12,11 @@ name = "Mitosis"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#06060f" },  # dish void
-  { at = 0.35, color = "#123a5c" },  # deep agar blue
-  { at = 0.60, color = "#19c8c0" },  # membrane cyan
-  { at = 0.85, color = "#e84fd0" },  # nucleus magenta
-  { at = 1.00, color = "#fff4ff" },  # dividing core
+  { at = 0.00, color = "#2a2a45" },  # dish void
+  { at = 0.35, color = "#4b83a2" },  # deep agar blue
+  { at = 0.60, color = "#58e5e1" },  # membrane cyan
+  { at = 0.85, color = "#f597e9" },  # nucleus magenta
+  { at = 1.00, color = "#fffaff" },  # dividing core
 ]
 
 [params]

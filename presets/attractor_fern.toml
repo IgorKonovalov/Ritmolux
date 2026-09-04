@@ -43,11 +43,11 @@ family = "fern"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#03140a" },
-  { at = 0.30, color = "#0d5c2c" },
-  { at = 0.62, color = "#4fbf4a" },
-  { at = 0.85, color = "#c8e86a" },
-  { at = 1.00, color = "#fff3c4" },
+  { at = 0.00, color = "#1c4f38" },
+  { at = 0.30, color = "#40a273" },
+  { at = 0.62, color = "#97e093" },
+  { at = 0.85, color = "#e5f5ad" },
+  { at = 1.00, color = "#fffae3" },
 ]
 
 [palette_b]

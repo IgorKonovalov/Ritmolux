@@ -37,8 +37,8 @@ system = "fragment_field"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#fff4e0" },
-  { at = 1.0, color = "#ffd9a0" },
+  { at = 0.0, color = "#fffaf1" },
+  { at = 1.0, color = "#ffeed0" },
 ]
 
 [params]

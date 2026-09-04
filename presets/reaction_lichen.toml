@@ -9,11 +9,11 @@ name = "Lichen"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#050a06" },  # wet peat
-  { at = 0.30, color = "#1b3a1c" },  # deep moss
-  { at = 0.55, color = "#4e7a2a" },  # leaf green
-  { at = 0.80, color = "#9fc84a" },  # lichen crust
-  { at = 1.00, color = "#eaf7cf" },  # pale spore bloom
+  { at = 0.00, color = "#26382a" },  # wet peat
+  { at = 0.30, color = "#5c835d" },  # deep moss
+  { at = 0.55, color = "#96b871" },  # leaf green
+  { at = 0.80, color = "#cfe593" },  # lichen crust
+  { at = 1.00, color = "#f6fbe9" },  # pale spore bloom
 ]
 
 [params]

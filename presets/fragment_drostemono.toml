@@ -67,9 +67,10 @@ name = "Droste Mono"
 # written wide of their run boundaries, so every band centre - 0.025, 0.075, ...
 # 0.975 - lands on flat colour and the 0.02-wide transitions are never sampled.
 #
-# The red's hex is LINEAR: the palette bakes hex straight through with no sRGB
-# decode and the surface encodes on write, so `#b00808` is what puts a saturated
-# red on the glass at this glow. A screen-space `#ff0000` here comes out pink.
+# The red's hex is ORDINARY sRGB: a stop is decoded to light at the LUT bake
+# (ADR-0151) and the surface encodes it again on write, so `#d83232` is what puts
+# a saturated red on the glass at this glow, and it is the red that renders. A
+# full `#ff0000` here is far too hot.
 stops = [
   { at = 0.00, color = "#000000" },
   { at = 0.24, color = "#000000" },
@@ -79,8 +80,8 @@ stops = [
   { at = 0.69, color = "#000000" },
   { at = 0.71, color = "#ffffff" },
   { at = 0.89, color = "#ffffff" },
-  { at = 0.91, color = "#b00808" },
-  { at = 1.00, color = "#b00808" },
+  { at = 0.91, color = "#d83232" },
+  { at = 1.00, color = "#d83232" },
 ]
 
 [params]

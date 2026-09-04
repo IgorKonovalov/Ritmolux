@@ -41,7 +41,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0018](0018-engine-wide-scene-compositing.md) | Engine-wide scene compositing: shared view transform, background pre-pass, feedback trails, and screen-space post-effects (fixed order, not a render graph) | accepted |
 | [0019](0019-eased-parameters.md) | Eased (smoothed) parameters: render-layer one-pole filtering on injected `dt`, expression layer stays pure | accepted |
 | [0020](0020-preset-grammar-v2-branching-functions-tempo.md) | Preset expression grammar v2: branching, math functions, a tempo variable, and soft typo warnings | accepted |
-| [0021](0021-shared-palette-system.md) | Shared preset-controllable palette system: baked gradient LUT, named + custom stops, bindable modulation | accepted |
+| [0021](0021-shared-palette-system.md) | Shared preset-controllable palette system: baked gradient LUT, named + custom stops, bindable modulation | accepted, superseded in part by 0151 |
 | [0022](0022-build-time-preset-embedding.md) | Build-time embedding of the preset library (generated, not hand-maintained) | accepted |
 | [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) | The golden drift guard renders frozen per-system fixtures, not shipped presets | accepted |
 | [0024](0024-cross-preset-transitions.md) | Cross-preset transitions: a two-input blend stage over the engine composite, adaptive dual-live/freeze, engine-default policy | accepted |
@@ -172,7 +172,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0148](0148-the-cli-refuses-an-argument-no-scanner-claimed.md) | The CLI refuses an argument no scanner claimed, against one gated roster | accepted 2026-08-30 (Plan 0135) |
 | [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | accepted 2026-09-02 (Plan 0136), extends 0127, Outcome |
 | [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | accepted 2026-09-01 (Plan 0137), Outcome |
-| [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | proposed 2026-08-29 (Plan 0138), supersedes 0021 in part |
+| [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | accepted 2026-09-04 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
 | [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
 | [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | proposed 2026-08-30 (Plan 0143) |

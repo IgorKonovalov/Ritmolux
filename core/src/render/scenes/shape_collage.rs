@@ -22,13 +22,16 @@
 //! - Bloom's threshold sits **above** that knee, so a canvas living under it gets
 //!   no halo and hard edges stay hard, at no cost and no parameter.
 //!
-//! **This is not the claim that the authored hex reaches the display.** A
-//! palette stop is a linear coefficient with no sRGB decode
-//! (`docs/preset-palettes.md`), so the byte written is its sRGB encoding and
-//! `#111111` presents as `#494949`. Same curve for every element, no shading and
-//! no halo — that is the property the look rests on. Nor does the curve give
-//! paper at pure white: `f(1.0) = 0.800`, and 1.0 is asymptotically unreachable,
-//! so both reference grounds are off-white by construction.
+//! **The authored hex does reach the display, and the knee is why.** A palette
+//! stop is sRGB and is decoded to light once at the load boundary (ADR-0151), so
+//! the load decode and the display encode are inverses and everything between
+//! them is the identity below the knee: an element written `#494949` presents as
+//! `#494949`. The cap therefore has an authored form — `0.6` of light is sRGB
+//! byte `0xcb`, the brightest channel any element here may carry. Same curve for
+//! every element, no shading and no halo: that is the property the look rests
+//! on. Nor does the curve give paper at pure white — `f(1.0) = 0.800`, and 1.0 is
+//! asymptotically unreachable, so both reference grounds are off-white by
+//! construction.
 //!
 //! # Colour is a palette **coordinate**
 //!

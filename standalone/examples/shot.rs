@@ -455,6 +455,11 @@ fn load_library(args: &Args) -> Result<(Vec<Preset>, String), String> {
             .map_err(|e| format!("--preset-file {}: {e}", path.display()))?;
         let preset = Preset::from_toml_str(&src)
             .map_err(|e| format!("--preset-file {}: {e}", path.display()))?;
+        // This path builds the preset directly, so it has no `LoadReport` to
+        // hand `report_errors` and prints its own warnings.
+        for warning in &preset.warnings {
+            eprintln!("shot: preset {}: warning: {warning}", path.display());
+        }
         return Ok((vec![preset], format!("--preset-file {}", path.display())));
     }
 
@@ -485,9 +490,18 @@ fn load_library(args: &Args) -> Result<(Vec<Preset>, String), String> {
 
 /// Surface malformed files on stderr — a preset being silently absent from a
 /// capture is the confusing failure this CLI exists to avoid.
+///
+/// **Warnings go out here too, beside the errors, for the same reason one step
+/// down.** A warned-about preset does render, so its capture looks like a
+/// success; and this CLI is what the content lane renders through, which makes
+/// it the surface every ADR-0020 warning was written for. The app prints them on
+/// its own load path (`preset_dir.rs`).
 fn report_errors(report: &rlx_core::preset::LoadReport) {
     for (path, err) in &report.errors {
         eprintln!("shot: preset {}: {err}", path.display());
+    }
+    for (path, warning) in &report.warnings {
+        eprintln!("shot: preset {}: warning: {warning}", path.display());
     }
 }
 

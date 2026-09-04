@@ -50,11 +50,11 @@ family = "clifford"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#12000a" },
-  { at = 0.30, color = "#7a0b2e" },
-  { at = 0.60, color = "#e03a12" },
-  { at = 0.85, color = "#ffab33" },
-  { at = 1.00, color = "#fff4d6" },
+  { at = 0.00, color = "#4b0038" },
+  { at = 0.30, color = "#b83b76" },
+  { at = 0.60, color = "#f1834b" },
+  { at = 0.85, color = "#ffd67c" },
+  { at = 1.00, color = "#fffaec" },
 ]
 
 [palette_b]

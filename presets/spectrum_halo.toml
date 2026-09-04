@@ -16,11 +16,11 @@ smoothing = { attack = 0.02, release = 0.3 }
 
 [palette]
 stops = [
-  { at = 0.00, color = "#3a1c8a" },  # violet — the low end
-  { at = 0.30, color = "#0e7fc8" },  # blue
-  { at = 0.55, color = "#12b89a" },  # teal
-  { at = 0.78, color = "#e8c83c" },  # gold
-  { at = 1.00, color = "#e85a8a" },  # rose — the top
+  { at = 0.00, color = "#835dc2" },  # violet — the low end
+  { at = 0.30, color = "#42bbe5" },  # blue
+  { at = 0.55, color = "#4bddcc" },  # teal
+  { at = 0.78, color = "#f5e585" },  # gold
+  { at = 1.00, color = "#f5a0c2" },  # rose — the top
 ]
 
 [params]

@@ -56,10 +56,10 @@ y = 18
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#180016" },
-  { at = 0.34, color = "#7a1d68" },
-  { at = 0.68, color = "#ff7a3d" },
-  { at = 1.0,  color = "#fff6d0" },
+  { at = 0.0,  color = "#560053" },
+  { at = 0.34, color = "#b85fab" },
+  { at = 0.68, color = "#ffb886" },
+  { at = 1.0,  color = "#fffbe9" },
 ]
 
 [params]

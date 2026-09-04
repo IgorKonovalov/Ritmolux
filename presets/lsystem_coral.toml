@@ -37,12 +37,12 @@ max_depth = 6
 
 [palette]
 stops = [
-  { at = 0.00, color = "#07142c" },  # abyssal indigo - the holdfast
-  { at = 0.28, color = "#0e4a6b" },  # deep water
-  { at = 0.52, color = "#1a9b8f" },  # verdigris
-  { at = 0.72, color = "#8fd07a" },  # reef green
-  { at = 0.88, color = "#ffc860" },  # amber
-  { at = 1.00, color = "#ff6f61" },  # coral - the growing tips
+  { at = 0.00, color = "#2e4f73" },  # abyssal indigo - the holdfast
+  { at = 0.28, color = "#4293ad" },  # deep water
+  { at = 0.52, color = "#5acdc5" },  # verdigris
+  { at = 0.72, color = "#c5e9b8" },  # reef green
+  { at = 0.88, color = "#ffe5a5" },  # amber
+  { at = 1.00, color = "#ffb0a6" },  # coral - the growing tips
 ]
 
 [params]

@@ -146,8 +146,8 @@ max_depth = 6
 stops = [
   { at = 0.000, color = "#000000" },   # bands 0-4   trunk, boughs, branches
   { at = 0.495, color = "#000000" },
-  { at = 0.505, color = "#b00808" },   # bands 5-8   the flowering canopy
-  { at = 0.895, color = "#b00808" },
+  { at = 0.505, color = "#d83232" },   # bands 5-8   the flowering canopy
+  { at = 0.895, color = "#d83232" },
   { at = 0.905, color = "#ffffff" },   # band  9     the paper - see the header
   { at = 1.000, color = "#ffffff" },
 ]

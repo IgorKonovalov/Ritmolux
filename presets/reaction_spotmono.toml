@@ -65,12 +65,12 @@ name = "Spot Mono"
 stops = [
   { at = 0.00, color = "#000000" },
   { at = 0.39, color = "#000000" },
-  { at = 0.41, color = "#b00808" },
-  { at = 0.49, color = "#b00808" },
+  { at = 0.41, color = "#d83232" },
+  { at = 0.49, color = "#d83232" },
   { at = 0.51, color = "#ffffff" },
   { at = 0.94, color = "#ffffff" },
-  { at = 0.96, color = "#b00808" },
-  { at = 1.00, color = "#b00808" },
+  { at = 0.96, color = "#d83232" },
+  { at = 1.00, color = "#d83232" },
 ]
 
 [params]

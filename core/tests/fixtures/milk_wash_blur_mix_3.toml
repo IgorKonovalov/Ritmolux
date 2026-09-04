@@ -17,8 +17,8 @@ y = 24
 [palette]
 stops = [
   { at = 0.0,  color = "#000000" },
-  { at = 0.45, color = "#8c8c8c" },
-  { at = 0.8,  color = "#fffeff" },
+  { at = 0.45, color = "#c4c4c4" },
+  { at = 0.8,  color = "#ffffff" },
   { at = 1.0,  color = "#ffffff" },
 ]
 

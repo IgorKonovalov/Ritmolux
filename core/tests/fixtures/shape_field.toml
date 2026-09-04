@@ -42,10 +42,10 @@ name   = "fixture_shape_field"
 
 [palette]
 stops = [
-  { at = 0.0,  color = "#2a0010" },
-  { at = 0.35, color = "#c11d3a" },
-  { at = 0.7,  color = "#ff6b4a" },
-  { at = 1.0,  color = "#ffd9a0" },
+  { at = 0.0,  color = "#710047" },
+  { at = 0.35, color = "#e25f83" },
+  { at = 0.7,  color = "#ffad93" },
+  { at = 1.0,  color = "#ffeed0" },
 ]
 
 [params]

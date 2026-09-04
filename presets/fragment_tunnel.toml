@@ -12,14 +12,14 @@ name = "Neon Tunnel"
 
 [palette]
 stops = [
-  { at = 0.00, color = "#010108" },
-  { at = 0.26, color = "#010108" },
-  { at = 0.30, color = "#00e8ff" },  # electric cyan filament
-  { at = 0.34, color = "#010108" },
-  { at = 0.58, color = "#020212" },
-  { at = 0.62, color = "#ff2fd6" },  # magenta filament
-  { at = 0.66, color = "#020212" },
-  { at = 1.00, color = "#0d0620" },  # faint violet haze floor
+  { at = 0.00, color = "#0d0d32" },
+  { at = 0.26, color = "#0d0d32" },
+  { at = 0.30, color = "#00f5ff" },  # electric cyan filament
+  { at = 0.34, color = "#0d0d32" },
+  { at = 0.58, color = "#16164b" },
+  { at = 0.62, color = "#ff77ec" },  # magenta filament
+  { at = 0.66, color = "#16164b" },
+  { at = 1.00, color = "#402a63" },  # faint violet haze floor
 ]
 
 [params]

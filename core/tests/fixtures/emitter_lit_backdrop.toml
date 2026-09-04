@@ -53,7 +53,7 @@ system = "emitter"
 name   = "fixture_emitter_lit_backdrop"
 
 [palette]
-stops = [{ at = 0.0, color = "#ffcf80" }, { at = 1.0, color = "#ffcf80" }]
+stops = [{ at = 0.0, color = "#ffe9bc" }, { at = 1.0, color = "#ffe9bc" }]
 
 [params]
 spawn_rate   = "110"

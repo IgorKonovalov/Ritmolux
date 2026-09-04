@@ -1639,7 +1639,8 @@ preset that binds none of them draws a still canvas.
 > for: `hash(beat_index)` re-rolls the arrangement on activity without claiming
 > a beat count.
 
-> **Keep the palette under linear 0.6 and the look is free.** This is the one
+> **Keep the palette under linear 0.6 - sRGB byte `0xcb` in the hex you write -
+> and the look is free.** This is the one
 > authoring fact this system has, and it comes off the tonemap rather than off
 > any parameter — see
 > [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
@@ -1651,12 +1652,13 @@ preset that binds none of them draws a still canvas.
 > Reach for a brighter palette and you lose the flat fill and the hard edge
 > together, and nothing will tell you why.
 >
-> **Unshaded is not "the hex you typed".** A stop is a linear coefficient with
-> **no sRGB decode**, so the display byte is that coefficient's sRGB *encoding*
-> and it is brighter than the hex: in `collage_suprematist`, `#111111` renders
-> `#494949` and `#8a1420` renders `#BF5164`. Every element is shifted by the same
-> curve and none of them is shaded or haloed, which is the property the look
-> rests on. Author by the rendered result.
+> **Unshaded also means the hex you typed.** A stop is sRGB and is decoded once
+> at load (ADR-0151), so the decode and the display encode are inverses and the
+> identity curve between them changes nothing: in `collage_suprematist`,
+> `#494949` renders `#494949` and `#c24f63` renders `#c24f63`. The only residual
+> is the LUT's own 8-bit linear storage, up to two levels on a very dark
+> channel. Every element is shifted by the same curve and none of them is shaded
+> or haloed, which is the property the look rests on.
 >
 > The **paper** is the deliberate exception: `f(1.0) = 0.800` makes pure white
 > unreachable, so an off-white ground is the affordable one. Both of the
@@ -2954,6 +2956,15 @@ the three-lever note below says which does what.
 | `ink_bright` | `0` | Ink brightness. `0` = black. |
 | `ink_gamma` | `1` | **Response** between the two poles — how fast a pixel travels from paper to ink. `1` is the identity. Above `1` thins the mid-tones toward paper, so only the strongest strokes keep full ink; below `1` inks the mids for a heavier, flatter print. Neither pole moves at any value. Bindable and continuous; clamped to `0.05 .. 20`, both far outside anything a look wants. |
 
+> **These poles are LINEAR LIGHT, and a `[palette]` stop is not.** A stop is sRGB
+> and is decoded at load (ADR-0151), so the hex you write is the colour that
+> renders. `paper_bright` and `ink_bright` take no decode — they are the light
+> itself, so a "dark" paper needs a far smaller number than the display value
+> suggests: `lsystem_vellum` measured `0.07` as a mid violet and settled on
+> `0.015` for a true near-black. The same is true of `bg_bright`. If a pole reads
+> far brighter than the number you typed, this is why, and the fix is a smaller
+> number rather than a different hue.
+
 ```toml
 [params]
 ink_amount   = "1"          # black on white - nothing else needed
@@ -3053,8 +3064,14 @@ The four **shader-coloured** scenes (`fragment_field`, `swarm`,
 samples the same LUT on the CPU, one colour per element — colour through a shared
 **palette** (ADR-0021): a gradient — a built-in `name` or custom `stops` — baked
 into a lookup table the scene samples. An optional top-level `[palette]` table
-picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. Colour
-modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
+picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. **A
+custom stop is authored in sRGB** — the hex a picker gives you — and the engine
+decodes it to light when it bakes the LUT
+([ADR-0151](../docs/adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md)),
+so a plateau written `#c81423` renders `#c81423`; that is exact below the tonemap
+knee, and [the colour
+surface](../docs/preset-palettes.md#custom-gradient-stops--stops) has the domain.
+Colour modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
 that sets none is unchanged. **Since Plan 0054 / ADR-0059 the other three line

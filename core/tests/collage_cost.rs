@@ -181,9 +181,9 @@ fn probe(count: usize) -> Preset {
     let toml = format!(
         "system = \"shape_collage\"\nname = \"cost_{count}\"\n\
          [palette]\nstops = [\n\
-         {{ at = 0.0, color = \"#111111\" }},\n\
-         {{ at = 0.5, color = \"#8a1420\" }},\n\
-         {{ at = 1.0, color = \"#d9d5c8\" }},\n\
+         {{ at = 0.0, color = \"#494949\" }},\n\
+         {{ at = 0.5, color = \"#c24f63\" }},\n\
+         {{ at = 1.0, color = \"#eeece5\" }},\n\
          ]\n\
          [params]\ncount = \"{count}\"\nscale = \"1.0\"\npaper = \"1.0\"\n\
          layout = \"2\"\nroster = \"1\"\nseed = \"29\"\nsize_hierarchy = \"0.62\"\n"

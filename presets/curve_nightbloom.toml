@@ -26,11 +26,11 @@ family = "maurer_rose"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#3a0ca3" },
-  { at = 0.28, color = "#b5179e" },
-  { at = 0.52, color = "#f72585" },
-  { at = 0.75, color = "#ff9e00" },
-  { at = 1.0, color = "#39e5c8" },
+  { at = 0.0, color = "#833dd1" },
+  { at = 0.28, color = "#db55ce" },
+  { at = 0.52, color = "#fb6abf" },
+  { at = 0.75, color = "#ffce00" },
+  { at = 1.0, color = "#82f3e5" },
 ]
 
 [params]

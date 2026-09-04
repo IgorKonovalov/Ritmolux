@@ -574,6 +574,17 @@ fn uses_disk_texture(file: &MilkFile) -> bool {
     })
 }
 
+/// The sRGB transfer function — the inverse of the decode
+/// `rlx_core::render::palette::srgb_to_linear` applies to an authored stop.
+fn linear_to_srgb(v: f32) -> f32 {
+    let v = v.clamp(0.0, 1.0);
+    if v <= 0.003_130_8 {
+        12.92 * v
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    }
+}
+
 /// The palette a converted preset carries.
 ///
 /// **The deposit is gone as of Phase 4**: a converted preset draws its own light
@@ -595,13 +606,13 @@ fn deposit_block(file: &MilkFile) -> String {
         file.number("wave_g", 1.0).clamp(0.0, 1.0),
         file.number("wave_b", 1.0).clamp(0.0, 1.0),
     );
+    // A `.milk` colour is light, and a `[palette]` stop is sRGB and is decoded
+    // back to light at load (ADR-0151) — so the value written is the encoding of
+    // the light the file names, not the light itself. Emitting the raw number
+    // would darken every converted palette by the transfer function.
     let hex = |s: f32| -> String {
-        format!(
-            "#{:02x}{:02x}{:02x}",
-            (r * s * 255.0) as u8,
-            (g * s * 255.0) as u8,
-            (b * s * 255.0) as u8
-        )
+        let byte = |c: f32| (linear_to_srgb(c * s).clamp(0.0, 1.0) * 255.0) as u8;
+        format!("#{:02x}{:02x}{:02x}", byte(r), byte(g), byte(b))
     };
     format!(
         "[palette]\n\

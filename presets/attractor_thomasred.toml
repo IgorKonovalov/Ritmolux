@@ -132,9 +132,9 @@ tuple_to   = 8
 # ink. Kept neutral so that luminance ramp stays honest; a saturated palette here
 # would bias which strands ink without changing what colour they end up.
 stops = [
-  { at = 0.00, color = "#1a1a1a" },
-  { at = 0.45, color = "#7a7a7a" },
-  { at = 0.80, color = "#d0d0d0" },
+  { at = 0.00, color = "#5a5a5a" },
+  { at = 0.45, color = "#b8b8b8" },
+  { at = 0.80, color = "#e9e9e9" },
   { at = 1.00, color = "#ffffff" },
 ]
 

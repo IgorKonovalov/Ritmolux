@@ -1,9 +1,9 @@
 # ADR-0151 — Palette stops are authored in sRGB and converted at load
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-04 (Plan 0138)
 > **Date:** 2026-08-29
 > **Supersedes in part:** ADR-0021 (Alternative E's deferral of gamma management, for palette stops only)
-> **Related plan(s):** [0138](../plans/0138-the-colour-surface-stops-misleading-its-authors.md)
+> **Related plan(s):** [0138](../plans/done/0138-the-colour-surface-stops-misleading-its-authors.md)
 
 ## Context
 
