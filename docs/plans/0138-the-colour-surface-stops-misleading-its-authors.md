@@ -1,6 +1,6 @@
 # 0138 — The colour surface stops misleading its authors
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0151](../adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) (proposed)
@@ -189,3 +189,22 @@ flowchart LR
   the fix.
 - **It does not touch the tonemap.** The knee is where the exactness domain ends, not something this
   plan moves.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-0138-colour-surface` on `plan-0138-the-colour-surface-stops-misleading-its-authors`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The page stops telling authors to give up | dev | done | committed with this row |
+| 2 — Stops are sRGB, and the library is re-based | dev | not started | |
+| 3 — The colour docs describe the new contract | dev | not started | |
+| 4 — A narrow `color_span` warns | dev | not started | |
+| 5 — The look gate | human | not started | |
+
+### Notes
+
+### Close triggers

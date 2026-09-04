@@ -749,9 +749,29 @@ palette's literal RGB, and they will still read as a limited-ink print.
 | a preset dissolve | two whole frames crossfaded while a transition runs | not preset-controllable, and **transient** — it ends when the dissolve does |
 
 **Remaps — they move the colours but do not mix them.** There is no switch list
-here, and you do not want one: **a limited-ink frame's plateaus almost never carry
-the palette's literal RGB**, and that is fine. What matters is that three inks
-leave three flat regions.
+here, and you do not want one: a remap is one colour to one colour, so three inks
+still leave three flat regions. What it does mean is that **a plateau's rendered
+RGB need not be the RGB you wrote** — and the largest of these shifts is
+*exactly* correctable rather than something to accept.
+
+**The shift is the transfer function, and it has a domain.** A stop is a light
+value: the LUT hands the scene the number your `.toml` names, and the display
+write encodes it on the way to 8-bit. So an ordinary sRGB hex arrives lifted —
+`#c81423` renders `#dd4c64`, its green channel nearly quadrupled — which is a
+remap and not a mixer, so the plateau survives; it just survives somewhere else.
+**Below the tonemap knee at linear `0.6` the curve is exactly the identity**, so
+the encode is the *only* thing between the stop and the pixel there and cancelling
+it is exact. Above the knee all three channels scale by one factor, hue and
+saturation survive, and the plateau reads as the ink anyway.
+
+**On a build that predates the engine doing this for you**, cancel it by writing
+the sRGB-to-linear value of the ink you mean. Per channel, on the `0..1` value:
+`c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ^ 2.4`. The vermilion
+`#c81423` is written `#930204`, and it comes back `#c81622` — within 2/255 of
+the colour named. That is the whole of the recipe, and it is worth checking which
+side of it your build is on before you use it: write `#c81423`, render, and read
+the plateau. If it comes back `#c81423` the engine is converting stops for you
+and this paragraph is history.
 
 | stage | what it does |
 |---|---|
