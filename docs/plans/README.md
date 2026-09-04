@@ -37,8 +37,25 @@ place. The plan file carries the real link.
 | [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0151](0151-the-long-documents-become-navigable.md) | The long documents become navigable | draft | dev | ADR-0163 (proposed): generated contents blocks, no splits. Sheds 335 lines of self-declared-superseded sequencing prose from this file. **Take before 0143**, whose route map wants the final layout. |
-| [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | draft | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
+| [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 <!-- roster:end -->
+
+**Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
+It moves the last operator-visible surface still carrying the old name: `ADDRESS_PREFIX` at
+`standalone/src/osc.rs:52`, left standing by [0150] because that plan's greps could not match a
+token followed by `/`. ADR-0164 is the decision ADR-0162 deferred — one clean break, no dual-emit,
+no transition period, and `/v1` does not move because no payload did. Both 0133 and 0147 are
+approved, unstarted, and name `/lmv/v1` in live text a `dev` lane would read; 0152's Phase 3 is what
+re-points them, so taking 0152 first removes that window instead of closing it afterwards. Nothing
+else contends: [0151] edits only the backlog's preamble and sweep narrative, while 0152's Phase 3
+edits five entry bodies.
+
+**Phase 5 is the operator's, and it is the only detector.** OSC has no negotiation and no error
+channel, so a binding left on the old root stops firing and looks exactly like a fixture that is not
+moving. Schedule that phase against a rig session with a playing track, and keep the old show file
+until all fifteen addresses are confirmed.
+
+[0152]: 0152-the-osc-root-becomes-rlx.md
 
 ~~**Added 2026-09-02 — [0150] is the rename, and it is a queue rather than a plan that slots in.**~~ — **closed 2026-09-02**, all nine phases, and the freeze held for every one of them. **[0143] and [0103] Phases 4-6 are unparked**: the repository is `IgorKonovalov/Ritmolux`, so 0143 may now choose its Pages subpath and 0103 may submit the component. The original note follows, since its reasoning is what made the freeze non-negotiable.
 

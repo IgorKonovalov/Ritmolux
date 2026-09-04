@@ -1,6 +1,6 @@
 # 0152 — The OSC root becomes `/rlx`
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-03
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) (proposed),
