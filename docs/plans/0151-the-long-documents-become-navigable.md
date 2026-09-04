@@ -358,7 +358,7 @@ const anchor = (heading) =>
 | 6 — The carrier | dev | done | `b9f9ac9` |
 | 7 — `flattenLinks` survives a bracketed label | dev | done | `78024a4` |
 | 8 — The 40 damaged write-ups are repaired | dev | done | `b61fada` |
-| 9 — The sixth gate's count reaches the sites that state it | dev | done | committed with this row |
+| 9 — The sixth gate's count reaches the sites that state it | dev | done | `a77a0be` |
 
 ### Notes
 
@@ -497,23 +497,24 @@ branch's diff against `main` names three files under a crate: `core-cabi/include
 the `config.rs` one is now true rather than false — `APP_DIR_NAME` is `"Ritmolux"`
 (`standalone/src/lib.rs:47`).
 
-**Three followups this plan created or unblocked, none acted on.**
+**Three followups this plan created or unblocked. Phase 9 discharged the first; the other two
+stand.**
 
-1. **The sixth gate leaves five live sites saying "the five Node gates".** `docs/nfr.md:167`, `:208`
-   and `:218`, `.claude/skills/architect/references/project-context.md:49`,
-   `.claude/skills/dev/references/project-context.md:39`, and backlog **0179**'s own finding at
-   `docs/design-backlog.md:3397` and `:3406`. Phase 6's done-when names `CLAUDE.md` and nothing
-   else, so the sweep was left rather than taken silently. `docs/design-backlog-archive.md:7252`
-   says it too and must not be edited — the archive is append-only.
+1. ~~**The sixth gate leaves five live sites saying "the five Node gates".**~~ **Taken by Phase 9**,
+   which also found a sixth file the list missed: `README.md`, whose layout map and pre-push step
+   table both stated the old roster. `docs/design-backlog-archive.md:7252` says it too and was
+   correctly left — the archive is append-only.
 2. **Backlog 0179 gained two staleness notices, and its two probes still hold.** Phase 6 touched
    both files it names, so `check-backlog-claims.mjs` reports `0179 stamped 2026-09-01,
    .github/workflows/ci.yml last touched 2026-09-04` and the same for `.githooks/pre-push`. The
    claims themselves — `present: RUSTDOCFLAGS in ci.yml`, `absent: cargo doc in pre-push` — are
    unaffected: this plan added `toc.mjs`, not `cargo doc`. Re-stamping is architect's call.
-3. **`standalone/src/main.rs:2690` is now takeable.** `11a320e` deliberately left the usage banner
-   lower-case (`"ritmolux — a real-time music visualizer"`) because `main.rs` was live in
-   `WORK/rlx-plan-0126`. **0126 has since closed and its lane is gone** — `git worktree list` prints
-   this lane and `main`. The site is still lower-case.
+3. **The lower-case usage banner is takeable, and the merge moved it.** `11a320e` deliberately left
+   it lower-case (`"ritmolux — a real-time music visualizer"`) because `main.rs` was live in
+   `WORK/rlx-plan-0126`. 0126 has since closed and its lane is gone — `git worktree list` prints
+   this lane and `main` — and its split moved the banner out of `main.rs` entirely. It is now
+   `standalone/src/cli.rs:201`, still lower-case, and it is a code edit in a docs lane, which is
+   why the repair pass names it under **What the repair does NOT take**.
 
 **Phase 7.** The anchor the plan names is produced byte-for-byte:
 `0049--the-analysis-diagnostics-surface-making-0048-phase-6-measurable-and-the-kaleidoscope-seam`.
@@ -591,31 +592,53 @@ close, after `git merge main`, where they are answering a question the merge act
 
 ### Close triggers
 
+Rewritten after the repair pass and after `git merge main`. Every figure below is from the merged
+tip, not from `b9f9ac9`.
+
 - **`presets/` touched:** `presets/README.md` and nothing else. `git diff --name-only main...HEAD --
   presets/` prints that one path; it is the 53-row contents block Phase 5 inserted. No `.toml`, no
   scene param, no default.
 - **Plan header `Closes:`** none
 - **What shipped:** a **docs chore**, plus one new gate. No pixel moves and no engine behaviour
-  changes: the only files under a crate are the three comment lines above. What is genuinely new is
-  `scripts/toc.mjs` (504 lines) and its six fixtures, wired at pre-push and in CI — so the
-  repository gained a gate, and six documents gained 457 contents rows between them.
+  changes: the only files under a crate are three comment or doc-comment lines from `11a320e`
+  (`core-cabi/include/rlx_core.h`, `core/src/lib.rs`, `standalone/src/config.rs`). What is
+  genuinely new is `scripts/toc.mjs` and its six fixtures, wired at pre-push and in CI — so the
+  repository gained a gate, and six documents gained 457 contents rows between them. The repair
+  pass added no capability: Phase 7 corrected the anchor rule, Phase 8 repaired 40 damaged write-ups
+  in `README-archive.md`, Phase 9 moved a count in five files.
 - **Operator docs touched:** `docs/capturing.md` (+39, the block only — no CLI flag, no assertion,
   no `--report` column moved) and `presets/README.md` (+56, likewise). `packaging/windows/` and
   `packaging/foobar/READ-ME-FIRST.md` each corrected one `%APPDATA%` path at `11a320e`.
-  `docs/nfr.md` and `docs/on-device-validation.md` untouched — see followup 1, which is the one
-  place that leaves stale.
+  **`README.md` and `docs/nfr.md` are now touched too**, by Phase 9 — the gate count, `nfr.md`'s
+  single-runner arithmetic, and `README.md`'s pre-push step table.
+  `docs/on-device-validation.md` remains untouched.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exits **0** — *"102 stated
-  reductions still hold across all 44 live entries (8 unprobeable)"*, byte-identical to the count
-  Phase 3 recorded. The two new staleness notices are followup 2 and are informational; the gate is
-  green.
-- **Full suite:** at `b9f9ac9`, the tip, `cargo nextest run --workspace` — **1518 run, 1518 passed
-  (8 slow), 5 skipped, exit 0**, 388.409 s, cold build in this lane, `LMV_BLESS` unset and
-  `git status` clean at its end, so no baseline file was rewritten by the run. Also clean:
-  `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` (exit 0), and
-  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` — which is the gate backlog 0179
-  says has no local counterpart, run here because the tree was already warm. All six Node gates
-  green, `toc.mjs --check` at `OK (6 blocks, 457 rows, current)` and `--self-test` at `30 of 30`.
-- **Outstanding `human` phases:** none. All six phases are `dev`.
+  reductions still hold across all 44 live entries (8 unprobeable)"*, the same count Phase 3
+  recorded and unchanged by the merge. Backlog 0179's two staleness notices are informational and
+  its two claims still hold; Phase 9 corrected its prose, not its probes.
+- **Full suite:** at the merged tip, `cargo nextest run --workspace` — **1520 run, 1520 passed
+  (12 slow), 5 skipped, exit 0**, 473.564 s, `LMV_BLESS` unset and `git status` clean at its end,
+  so no baseline file was rewritten by the run. The count is 1520 rather than the 1518 recorded at
+  `b9f9ac9` because `main`'s 0126 close landed two tests, not because anything here added one.
+  Also clean on the merged tip: `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` (exit 0). All six Node gates green,
+  `toc.mjs --check` at `OK (6 blocks, 457 rows, current)` and `--self-test` at `33 of 33`.
+- **Outstanding `human` phases:** none. All nine phases are `dev`.
+
+### At the merge — one thing owed, deliberately not taken
+
+`main`'s 0126 close wrote its write-up into `docs/plans/README-archive.md` in the **old bullet
+form**, and the merge carried it in **verbatim**. So the archive now holds **133 `###` headings and
+one bullet**, and the contents block has **no row for 0126** — 141 rows, unchanged by the merge.
+Plan 0151's repair pass says to flag this rather than take it as a phase, and the conversion is the
+close ceremony's step 3d that Phase 6 added. Converting it is one line plus a regenerate: its link
+label does not wrap, so it is not one of the shapes Phase 8 had to repair.
+
+**A second, smaller merge observation.** `git ls-files` lists an unmerged path once per stage, so
+while `README-archive.md` was conflicted `toc.mjs --check` reported **8 blocks, 739 rows** — that
+one file counted three times. It is transient and it resolves the instant the file is staged, but
+a gate whose file set comes from `git ls-files` will misreport mid-merge, which is worth knowing
+before someone reads it as damage.
 
 ## Repair pass — from the Mode 4 review, 2026-09-04
 
