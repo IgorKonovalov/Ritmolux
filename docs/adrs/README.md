@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0166.** *(0120 was reserved for
+**Next free number: 0169.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -175,7 +175,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | accepted 2026-09-04 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
 | [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
-| [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome |
+| [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, narrowed by 0167 |
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome |
 | [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome |
@@ -187,4 +187,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0163](0163-a-long-document-carries-a-generated-contents-block.md) | A long document carries a generated contents block, and spent prose archives at the close | accepted 2026-09-04 (Plan 0151), extends 0116 |
 | [0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) | The OSC address root becomes `/rlx`, in one break, and `/v1` does not move | proposed, extends 0144 |
 | [0165](0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md) | Dependencies compile without debug info, and one line buys it back | proposed |
+| [0166](0166-a-published-document-splits-into-routes-by-size.md) | A published document splits into routes by size, and a fragment map is the contract | proposed, extends 0154 |
+| [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) | The site owns its entrance, and the install page is the tester's own file | proposed, narrows 0154 |
+| [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md) | The reader documents address a reader, and the working record stays a link | proposed |
 <!-- roster:end -->
