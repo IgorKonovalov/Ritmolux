@@ -277,10 +277,9 @@ flowchart TB
 > last one. **The phases above are the contract; everything here is what happened.**
 > **Observations, never conclusions:** this says where to look, architect decides how it went.
 
-**Lane:** `main` directly, no worktree, per the header's Lane guidance. `main` gained Plan 0152's
-lane by fast-forward (`a573ada`) after Phase 1 was written and before it was committed; that merge
-added one provenance heading to `docs/on-device-validation.md`, and every count below is measured
-against the merged tree.
+**Lane:** `main` directly, no worktree. Plan 0152's lane fast-forwarded into `main` (`a573ada`)
+between Phase 1 being written and committed, adding one provenance heading to
+`docs/on-device-validation.md`; every count below is against the merged tree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -290,277 +289,139 @@ against the merged tree.
 | 4 — the rule generalises | dev | done | `f3c8bb2` |
 | 5 — a stranger can find out what this is and get it | dev | done | `22a0371` |
 | 6 — the drift classes get gates | dev | done | `96e5806` |
-| 7 — it looks like one thing | dev | done | committed with this row |
-| 8 — verified where it is served | human | | |
+| 7 — it looks like one thing | dev | done | `3924b60` |
+| 8 — verified where it is served | human | not started | |
 
 ### Notes
 
-**Phase 1 — what the strip does beyond the phase's "What".** The plugin also strips the trailing
-parenthetical from the rows of the generated contents blocks (ADR-0163), which are links whose text
-is the heading copied verbatim; 21 rows change. Without it a row kept displaying a citation the
-heading above it no longer showed. Their `#anchor` targets are a separate matter, below.
+**P1 — a done-when not met as stated.** *"No heading in `site/dist/` ends in a `(Plan NNNN)` /
+`(ADR-NNNN…)` parenthetical"* fails for three headings in
+`docs/generative-techniques-catalogue.md` of the form
+`## Idiom A — line / point strips (have it: lines/, Plan 0010 closed)`. The plugin skips a trailing
+parenthetical holding a code span; the same document's `## Idiom D — full-screen fragment (have it:
+fragment_field.rs)` is that shape with no citation in it. Excluding those three is what made the
+count exactly the **31** the phase predicts, at `23e7c89`. Their heading ids still carry a plan
+number; the catalogue does not split, so those are anchors, never route names.
 
-**Phase 1 — a done-when not met as stated.** *"No heading in `site/dist/` ends in a `(Plan NNNN)` /
-`(ADR-NNNN…)` parenthetical"* does not hold for three headings, all in
-`docs/generative-techniques-catalogue.md`:
+**P1 — counts, one of them low.** 32 headings (31 pre-merge), 21 contents-block rows, **15** body
+blocks against the phase's 26. Shipped rule: a parenthetical holding citations and nothing else, at
+a block's very end. Allowing one sentence-punctuation mark after the closing parenthesis matches
+**64**. Not shipped, because ADR-0168 keeps Entrance B's citations and gives the woven 735 to Plan
+0155, and 64 reaches into both. Tallies for whichever is wanted: 15 / 64.
 
-```
-## Idiom A — line / point strips (have it: `lines/`, Plan 0010 closed)
-## Idiom B — GPU particles (have it: `particles/`, Plan 0016 closed)
-## Idiom C — texture-feedback ping-pong (have it: `PingPongField`, Plan 0014 closed)
-```
+**P1 — beyond the phase's "What".** The plugin also strips the trailing parenthetical from generated
+contents-block rows (21), which are links whose text copies the heading verbatim; otherwise a row
+kept showing a citation the heading above it no longer showed.
 
-The same document carries `## Idiom D — full-screen fragment (have it: `fragment_field.rs`)`, the
-same shape with no citation in it, so the parenthetical is that document's way of saying the idiom
-is implemented rather than a provenance tag. The plugin therefore leaves a trailing parenthetical
-that contains a code span. Excluding these three is what made the count **exactly the 31
-headings the phase predicts** when it was measured at `23e7c89`; the Plan 0152 merge added
-`## Rig-gated — the OSC bindings move to `/rlx/v1` (Plan 0152 Phase 5)` and the shipped count is
-**32** (35 headings end in a parenthetical mentioning a plan or an ADR).
-Their three heading ids still contain a plan number; the catalogue is 13,693 bytes and does not
-split, so these are anchors on one page and never route names.
+**P2 — counts.** 46 routes (1 index, 13 sections, 32 subsections); 16 built pages to 61. No route's
+source over 30,000 bytes; largest **23,218** on
+`…/structural-config-line-systems-and-the-attractor/tuple-picks-a-whole-figure-framing-included`,
+the route the phase names at 23,102.
 
-**Phase 1 — a count that came out lower than the phase predicts.** Body blocks: **15**, against the
-phase's 26. The rule shipped is the strict one — a parenthetical holding citations and nothing else,
-standing at the very end of a paragraph or table cell. Widening it by one character, to allow a
-single sentence-punctuation mark after the closing parenthesis (`… the two are deliberately separate
-(ADR-0099).`), matches **64** blocks instead. That was not shipped: ADR-0168 keeps Entrance B's
-citations for a contributor reader and assigns the woven 735 to Plan 0155, and 64 reaches into both.
-The measured tallies for whichever rule is wanted are 15 / 64.
+**P2 — a new direct dependency.** `github-slugger@2.0.0`: the slugger Astro and
+`@astrojs/markdown-remark` already use and already in the lockfile as their transitive dependency,
+so `npm ci` installs nothing new. It computes route segments from headings.
 
-**Phase 1 — 35 same-page anchors are dead until Phase 3.** 28 in `presets/README.md` and 7 in
-`docs/capturing.md` name a pre-strip slug (`#attractor-detail-sharpness-plan-0027`), and the heading
-they target now slugs without the suffix. `rewrite-links.mjs` returns early on a `#`-only URL, so
-nothing rewrites them yet; Phase 3's fragment map is where they resolve, and its gate is what will
-refuse to build while any of them is unmatched.
+**P2 — titles lost their markdown, and no route moved.** A section heading becomes the entry's
+`title`, printed verbatim by Starlight, so code spans showed their backticks on the page and in the
+sidebar. `plainHeading()` strips markers from the title string only; slugs verified identical
+either way.
 
-**Phase 1 — the pre-split baseline Phase 4 owes a comparison against.** Measured on this commit:
-**16** HTML pages, Pagefind index **1,290 KB**, `site/dist` **41,913 KB**. Build wall time was
-8.22 s cold and 3.54 s with Astro's asset cache warm — Phase 4 has to say which of the two it is
-quoting, or the comparison means nothing.
+**P2 — the search done-when, measured through the Pagefind API against `npm run preview`.** Top hit
+for `bloom_radius`, `depth_fade`, `fold_speed` and `occupancy` is in each case the subsection route
+that defines it, not the document.
 
-**Phase 2 — the counts.** `presets/README.md` builds as **46** routes: 1 index, 13 section routes,
-32 subsection routes, and the site goes from 16 built pages to 61. **No route's source exceeds
-30,000 bytes.** The largest is **23,218**, on
-`guide/parameter-roster/structural-config-line-systems-and-the-attractor/tuple-picks-a-whole-figure-framing-included`
-— the route the phase names, 116 bytes above the 23,102 it predicts.
+**P3 — 102 fragment links into `presets/README.md`, not 15**: 14 from another document, 88
+same-page. All resolve; a link with no fragment still resolves to `/guide/parameter-roster/`.
 
-**Phase 2 — the chunks are rendered, not globbed.** A custom loader alongside the existing `glob`
-one calls Astro's `renderMarkdown` on each chunk, so no cut-up copy of a document is written
-anywhere and the remark chain (provenance strip, link rewrite) runs over a chunk exactly as it runs
-over a whole document. `fileURL` is passed with each chunk so the rewriter resolves a chunk's
-relative links against the document they came from.
+**P3 — the map had to learn a target that is not a heading.** The first run failed the build on four
+links, all four **correct** links to author-placed HTML anchors (`#morph-is-a-travel-knob`,
+`#what-made-this-point-and-how-far-into-the-figure-it-is` — the only two in the published set). The
+map records them; **no source document was edited.**
 
-**Phase 2 — a new direct dependency, `github-slugger@2.0.0`.** It is the slugger Astro and
-`@astrojs/markdown-remark` already use, and it was already in the lockfile as their transitive
-dependency, so `npm ci` installs nothing new; the entry in `site/package.json` makes an existing use
-declared rather than borrowed. It computes route segments from headings. `site/` is never shipped
-and nothing shipped depends on it.
+**P3 — gate exercised, tree restored.** `### Attractor detail sharpness (Plan 0027)` renamed to
+`crispness` in a scratch edit; the build exited 1 naming the source file, the link and the unmatched
+slug. Restored with `git checkout`.
 
-**Phase 2 — titles lost their markdown, and no route moved.** A section heading becomes the entry's
-`title`, which Starlight prints verbatim, so `### Bloom — `bloom_amount`…` first rendered as a page
-`<h1>` and a sidebar label showing literal backticks. `plainHeading()` removes code spans, emphasis
-and inline links from the title string only. Verified that a slug is identical either way, so the
-route is the same before and after.
+**P3 — a local-only trap.** Astro's content-layer cache also lives at `site/node_modules/.astro`, and
+a remark-plugin change does not invalidate it; two verification passes read a stale `site/dist`.
 
-**Phase 2 — the sidebar group is generated, not written out.** `sidebarGroup()` builds the collapsed
-group from the same splitter the loader uses, so a 46-entry hand-kept list cannot drift from the
-routes and a heading rename cannot orphan a route. A section that split again nests its subsections
-under itself.
+**P4 — the phase's arithmetic was wrong about one file.** `docs/on-device-validation.md` is **48,219**
+bytes, not the 37,241 the done-when and ADR-0166 both name — 45,417 at `9dc2183`, the commit the ADR
+says it measured, so the figure was wrong when written. 40 KB therefore selects **five** documents,
+and **`docs/nfr.md` at 33,295 is the real largest under the threshold**. Raised before P1, answered
+at P4: apply the rule. **Phase 4's done-when and ADR-0166's "Why these two numbers" are left
+uncorrected for the review.** Routes: roster 46, `capturing.md` 25, `presets.md` 22,
+`preset-palettes.md` 19, `on-device-validation.md` 10, eight others one each — four of the five are
+ADR-0166's own predictions. 133 built pages against "about 127"; largest split route **26,893**,
+`engine/capturing/the-shot-cli/what-the-reports-columns-mean`, the worst case ADR-0166 names at
+26,788.
 
-**Phase 2 — the search done-when, as measured.** Driven against `npm run preview` through the
-Pagefind API in a browser, top hit per query:
+**P4 — the contents-block decision, recorded.** Suppressed on a split document's index route, kept
+everywhere else: there it duplicates the generated section list, every row pointing at another
+route, beside Starlight's own contents column. Source untouched; `toc.mjs --check` still passes.
 
-| query | top result |
-|---|---|
-| `bloom_radius` | `…/engine-wide-controls/bloom--bloom_amount-bloom_threshold-bloom_radius/` |
-| `depth_fade` | `…/systems-and-their-named-parameters/attractor-depth-perspective-depth_fade-depth_hue-spin/` |
-| `fold_speed` | `…/systems-and-their-named-parameters/fragment_field-animation-rates--field_speed-and-fold_speed/` |
-| `occupancy` | `…/a-clamp-is-a-limit-not-a-gain--the-occupancy-table/` |
+**P4 — a source document edited outside the phase's Files touched.** `docs/presets.md` linked
+`[Systems](#systems)` where the heading is `## The built-in systems` and no `systems` anchor exists,
+so the link had always been dead. Corrected to `#the-built-in-systems`.
 
-**Phase 3 — how many fragment links there turned out to be.** **102** links carry a fragment into
-`presets/README.md`, not 15: **14** are written from another document (the phase's 15, one of which
-resolves to the document with no fragment at all and so is not in this count), and **88** are
-same-page anchors inside the roster, most of them rows of its generated contents block. All 102
-resolve. The three opened in the built output:
-
-| written in | resolves to |
-|---|---|
-| `docs/capturing.md` | `…/parameter-roster/the-expression-language/#seeded-randomness--hash-noise-and-generator-seed` |
-| `docs/preset-palettes.md` | `…/structural-config-line-systems-and-the-attractor/tuple-picks-a-whole-figure-framing-included/#what-made-this-point-and-how-far-into-the-figure-it-is` |
-| `presets/README.md` contents block | `…/systems-and-their-named-parameters/attractor-detail-sharpness/` |
-
-A link to `presets/README.md` with no fragment still resolves to `/guide/parameter-roster/`.
-
-**Phase 3 — the gate was exercised and the tree restored.** `### Attractor detail sharpness (Plan
-0027)` was renamed to `crispness` in a scratch edit; the build exited 1 naming the source file, the
-link `presets/README.md#attractor-detail-sharpness-plan-0027`, and the unmatched slug. Restored with
-`git checkout -- presets/README.md`, and the working tree carries no edit to it.
-
-**Phase 3 — the map had to learn a target that is not a heading.** Its first run failed the build on
-four links the phase did not predict, and all four were correct links to `<a id="…"></a>` anchors an
-author placed by hand — `#morph-is-a-travel-knob` and
-`#what-made-this-point-and-how-far-into-the-figure-it-is`, the only two such anchors in the whole
-published set. The map records them alongside heading slugs. **No source document was edited**: the
-gap was in the map, and the plan's Files-touched list held.
-
-**Phase 3 — a local-only trap worth knowing.** Astro's content-layer cache lives at
-`site/node_modules/.astro`, not only at `site/.astro`, and a change to a remark plugin does not
-invalidate it — the source file's digest is unchanged, so a rebuild re-serves the previously
-rendered HTML. Two verification passes read a stale `site/dist` that showed the fragments
-unresolved while the rewriter was already correct in isolation. `rm -rf site/.astro site/dist
-site/node_modules/.astro` before trusting a local build of a plugin change. CI checks out fresh and
-never sees this.
-
-**Phase 4 — the phase's arithmetic was wrong about one file, and the user chose the rule over the
-count.** The done-when says *"four documents split and nine do not; the unsplit set is exactly those
-under 40 KB, the largest of which is `docs/on-device-validation.md` at 37,241 bytes."* That file
-measures **48,219** bytes — 45,417 at `9dc2183`, the commit ADR-0166 says it measured, so the figure
-was wrong when it was written and not merely stale. Under ADR-0166's rule as decided it splits.
-Raised before Phase 1 and answered at Phase 4: **apply the rule, five documents split**, and leave
-the correction of Phase 4's done-when and of ADR-0166's *"Why these two numbers"* to the close
-review. **`docs/nfr.md` at 33,295 bytes is the real largest document under the threshold.**
-
-The measured distribution, on this commit:
-
-| document | bytes | routes |
-|---|---:|---|
-| `presets/README.md` | 273,211 | 46 = 1 + 13 + 32 |
-| `docs/capturing.md` | 165,028 | 25 = 1 + 7 + 17 |
-| `docs/presets.md` | 75,816 | 22 = 1 + 8 + 13 |
-| `docs/preset-palettes.md` | 65,009 | 19 = 1 + 11 + 7 |
-| `docs/on-device-validation.md` | 48,219 | 10 = 1 + 9 + 0 |
-| eight others, 6,933 – 33,295 | | one route each |
-
-**Four of the five route counts are ADR-0166's own predictions exactly** (46, 25, 22, 19); the fifth
-is the document it did not know splits. 122 routes come from split documents, and the site builds
-**133** HTML pages against the phase's "about 127". **No route's source exceeds 30,000 bytes**; the
-largest is **26,893**, `engine/capturing/the-shot-cli/what-the-reports-columns-mean` — the route
-ADR-0166 names as the worst case at 26,788.
-
-**Phase 4 — the contents-block decision, recorded.** A split document's generated contents block
-(ADR-0163) is **suppressed on its index route** and kept everywhere else. On that one page it is a
-second, longer copy of the section list the index already generates, with every row pointing at
-another route rather than at an anchor on the page the reader is on, and Starlight renders its own
-contents column beside it — three overlapping tables of contents on one page. The source is
-untouched: `scripts/toc.mjs` still generates the block and `--check` still passes (6 blocks, 473
-rows).
-
-**Phase 4 — a source document was edited, outside the phase's Files touched.** The generalised gate
-failed the build on `docs/presets.md`, which links `[Systems](#systems)` while the heading is
-`## The built-in systems`. There is no `systems` anchor anywhere in that file, so the link has always
-been dead and landed nowhere on GitHub too. Changed to `#the-built-in-systems` — one anchor, no
-prose touched. Phase 3's own instruction for an unmatched fragment is *"fix the link, or the heading
-it names"*, but `docs/presets.md` is not in this phase's file list and the edit is disclosed here
-rather than assumed.
-
-**Phase 4 — what the split costs, cold builds with every cache cleared, same machine and method.**
+**P4 — what the split costs.** Cold builds, every cache cleared, same machine and method:
 
 | | before (16 routes) | after (133 routes) | change |
 |---|---:|---:|---:|
 | build wall time | 8,551 ms | 9,593 ms | +12 % |
 | Pagefind index | 1,290 KB | 1,706 KB | +32 % |
 | `site/dist` total | 41,913 KB | 50,005 KB | +19 % |
-| built HTML pages | 16 | 133 | 8.3x |
 
-8.3x the pages for 12 % more build time and 32 % more index. ADR-0166 records that neither number
-was measured before the decision and that the plan owes them; nothing here argues the threshold
-needs moving.
+**P5 — measured.** The three packaging files render as `install/windows`, `install/macos`,
+`install/foobar` with their setext titles. `@VERSION@` appears **0** times in `site/dist`; the foobar
+page reads `Ritmolux 0.107.0`. At 1440x900 the landing page carries name, tagline, Download button,
+the standalone/foobar sentence and the top of the gallery above the fold, and no installation prose
+of its own.
 
-**Phase 5 — the install pages are the packaging files.** The three `READ-ME-FIRST.md` join
-`PUBLISHED` as `install/windows`, `install/macos`, `install/foobar` and render with the titles their
-setext headings carry — `Ritmolux - Windows`, `Ritmolux - macOS`,
-`Ritmolux - foobar2000 component`. The setext arm was added to `titleFromLeadingHeading` in Phase 2,
-where the loader was already being rewritten. `@VERSION@` appears **0** times in `site/dist`; the
-foobar page reads `Ritmolux 0.107.0`, substituted from `[workspace.package]` in `Cargo.toml` by a
-remark plugin. The site builds 137 pages.
+**P5 — a file edited that the phase does not list.** The phase's own done-when requires correcting
+`CLAUDE.md`'s "two READ-ME-FIRST.md", but `CLAUDE.md` is listed under Phase 6. Corrected here.
 
-**Phase 5 — the landing page, checked at 1440x900.** Above the fold: the name, the tagline
-(*what is this*), a Download button pointing at `/releases/latest` (*how do I get it*), the
-standalone/foobar sentence, and the top of the gallery strip (*what does it look like*). It carries
-no installation instructions of its own — every path out is a link to a packaging page. **Starlight's
-splash hero reserves a large empty band between the tagline and the buttons** where a hero image
-would go; that is Phase 7's *"a real hero"* and is not addressed here.
+**P6 — the ceiling applies to split routes only, which the phase's wording does not say.** Read as
+*"no route's source exceeds 30,000 bytes"* the gate fails on `docs/nfr.md` — 33,295 bytes and **one**
+route, because it is under the 40,000-byte split threshold. Applied to every route the two constants
+contradict each other. Scoped to the splitter's output, where ADR-0166 argues it.
 
-**Phase 5 — a file edited outside the phase's Files touched, and one it does not list.** The phase's
-own done-when requires correcting `CLAUDE.md`'s *"the two READ-ME-FIRST.md a tester finds in the
-zip"*, but `CLAUDE.md` is listed under Phase 6 rather than Phase 5. Corrected here, where the
-done-when asks for it: three, and a clause saying the site publishes them as its install pages.
+**P6 — gate exercised, tree restored.** A sidebar entry for `docs/diffusion-filter.md` was removed;
+the gate exited 1 under both menu properties, naming `engine/diffusion-filter`. Restoring it with
+`git checkout -- site/astro.config.mjs` reverted the whole file, so this phase's other edits to it
+were reapplied by hand before committing.
 
-**Phase 5 — a trap in this repository's own comment style.** A JSDoc block containing the literal
-`packaging/*/READ-ME-FIRST.md` ends at the `*/` inside the glob and breaks the file. It bit once in
-`rewrite-links.mjs`; the two other places that name the same glob had already escaped it.
+**P6 — a file added that the phase does not list.** `site/src/components/Footer.astro`: Starlight has
+no configuration-only way to put text on every page. **All 137 built pages carry the stamp**, the
+splash landing page and `404.html` included.
 
-**Phase 6 — the gate, exercised.** `doc('docs/diffusion-filter.md', 'Diffusion filter')` was removed
-from the sidebar in a scratch edit. The gate exited 1 under both of its menu properties, naming
-`engine/diffusion-filter` as a published route absent from the sidebar and as a built route
-reachable only by search. Restored, and `git status` carries no edit to `site/astro.config.mjs`
-beyond this phase's own. On the restored tree: 135 built routes, 133 from the published set, every
-one in the menu.
+**P7 — measured at 360 px in a browser** on the landing page, the gallery, the roster index and
+`…/attractor-depth-perspective-depth_fade-depth_hue-spin/`: none scrolls sideways, and no element
+extends past the viewport without a scrolling ancestor. All **82** gallery images carry
+`width`/`height` and a CSS `aspect-ratio`.
 
-**Phase 6 — the size ceiling applies to split routes only, which the phase's wording does not say.**
-Written as *"no route's source exceeds 30,000 bytes"* the check fails on `docs/nfr.md`, which is
-33,295 bytes and stays **one** route because it is under the 40,000-byte split threshold. Applied to
-every route the two constants contradict each other: a document is allowed to be 40,000 bytes on one
-page by decision and then forbidden to be over 30,000. The ceiling is scoped to routes the splitter
-produced, where it is what ADR-0166 argues it is — the assertion that cutting at `##` and then `###`
-produced pages a reader can hold. Largest split route: 26,893 B.
-
-**Phase 6 — a file was added that the phase does not list.** `site/src/components/Footer.astro`.
-Starlight has no configuration-only way to put text on every page; a footer stamp is a component
-override, and the override needs a component. Both values it prints are resolved in
-`astro.config.mjs` — the version from `[workspace.package]`, the commit from `GITHUB_SHA` or `git
-rev-parse`, falling back to `unknown` rather than failing a build from a tarball. **All 137 built
-pages carry it**, the splash landing page and `404.html` included.
-
-**Phase 6 — `CLAUDE.md` now reads eight gates**, and the `scripts/` block says that two of them, not
-one, need a built site and live in `.github/workflows/pages.yml`.
-
-**Phase 7 — measured at 360 px, in the browser, on all four named pages.** `documentElement.scrollWidth`
-against `clientWidth` (345 px of content inside a 360 px viewport), plus a walk of every element
-looking for one that extends past the viewport without a scrolling ancestor:
-
-| page | page scrolls sideways | element overflowing outside a scroll box |
-|---|---|---|
-| landing | no | none |
-| gallery | no | none |
-| roster index | no | none |
-| `…/attractor-depth-perspective-depth_fade-depth_hue-spin/` | no | none |
-
-**Phase 7 — the roster's tables needed the opposite of what they were doing.** They did not overflow
-before this phase; they *squeezed*, wrapping four columns into 313 px at roughly one word per line.
-A rehype plugin now wraps every table in a focusable `div.table-scroll` and the table carries a
-34 rem minimum, so on that route the tables are 544 px wide and scroll inside their own box while
-the page does not. The wrapper is `tabindex="0"` with `role="region"`: a box that scrolls but cannot
-be reached from the keyboard is unreadable to anyone not using a pointer.
-
-**Phase 7 — the gallery already reserved its space, and it is asserted rather than assumed.** All
-**82** images carry `width`/`height` attributes and a CSS `aspect-ratio: 16 / 9`, so the grid's
-height is final before any of the 82 lazy loads returns.
-
-**Phase 7 — the hero.** Starlight's splash template puts only the title and tagline in `.hero`, and
-this page's buttons are body content underneath (a frontmatter `hero.actions` link cannot carry the
-site base). Stock, that seam showed as roughly 190 px of dead space at 1440 px. `.hero` loses its
-bottom padding and the action row loses its top margin, so name, tagline, buttons, the opening
-sentence and the top of the gallery are all above the fold at 1440x900.
-
-**Phase 7 — both schemes are set, not inherited.** Starlight's stock accent is a blue that says
-nothing about this project. `site.css` sets three accent stops per scheme — `#5b4bd6` on light,
-`#7d6cf0` on dark — chosen separately rather than one lightened from the other, and both were looked
-at.
-
-**Phase 7 — `gallery.css` is `site.css`.** It stopped being about the gallery two rules in; renamed
-with `git mv` so the history follows.
+**P7 — the roster's tables needed the opposite of what they were doing.** They did not overflow, they
+squeezed — four columns into 313 px at about a word per line. A rehype plugin wraps each table in a
+focusable `div.table-scroll` with a 34 rem minimum, so on that route tables are 544 px and scroll
+inside their own box while the page does not. `gallery.css` is `site.css` (`git mv`), and each colour
+scheme gets its own three accent stops.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no. No `.toml` changed; `presets/README.md` is clean, the P3 scratch rename
+  having been reverted.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** nothing that ships. No Rust, no C++. The diff is `site/` (never shipped), one new
+  gate in `scripts/`, `.github/workflows/pages.yml`, `CLAUDE.md`, and a one-anchor correction in
+  `docs/presets.md`.
+- **Operator docs touched:** `CLAUDE.md` only — the `packaging/` line and the `scripts/` block.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
+- **Full suite:** `cargo nextest run --workspace` — exit **0**, **1536 passed, 5 skipped**, 9 slow,
+  407.7 s, run at `3924b60`.
+- **All eight Node gates at the tip:** every one exit 0.
+- **Outstanding `human` phases:** **Phase 8**. Nothing here has been pushed, so the live site is
+  still the pre-plan one.
 
 ## Followups (after this lands)
 
