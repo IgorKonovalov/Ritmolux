@@ -849,7 +849,8 @@ impl AttractorScene {
     /// most the density law may resolve for this scene — the tier's live ceiling
     /// on a surface, its offline one on a headless render path. The buffer is
     /// sized at `ceiling`; the budget starts at `anchor` and moves on the first
-    /// [`set_target_size`](Scene::set_target_size).
+    /// `Scene::set_target_size`, whose trait is crate-private and so is named
+    /// here rather than linked.
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,

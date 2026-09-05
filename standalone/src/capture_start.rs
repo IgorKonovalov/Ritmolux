@@ -140,7 +140,8 @@ impl RecoveryPolicy {
 
     /// Advance one frame, given the seconds it covered.
     ///
-    /// `dt` is the shell's own frame time, already clamped to [`MAX_DT`], so a
+    /// `dt` is the shell's own frame time, already clamped to
+    /// [`MAX_DT`](crate::app_state::MAX_DT), so a
     /// stalled or resumed window cannot hand the accumulator a jump large enough
     /// to settle a stream that never delivered.
     pub(crate) fn poll(&mut self, lost: bool, dt: f32) -> Recovery {
