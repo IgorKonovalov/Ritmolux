@@ -71,6 +71,16 @@ tools/
 └── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
                      #   not in the workspace, never shipped; its cost figures live in exactly one
                      #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
+site/                # The documentation front end (ADR-0154): an
+                     #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
+                     #   search, live at igorkonovalov.github.io/Ritmolux/. The repository's only npm
+                     #   project; never shipped, nothing shipped depends on it. `docs/` stays the
+                     #   SINGLE SOURCE - the content loader reads docs/, docs/specs/ and
+                     #   presets/README.md IN PLACE, there is no staged copy, and no markdown file
+                     #   outside site/ may be edited to serve it. The publish boundary is the
+                     #   PUBLISHED map in src/plugins/rewrite-links.mjs, which also rewrites every
+                     #   relative link at build time: inside the set to a site route, outside it to
+                     #   a github.com blob URL. A new doc does not join the site by existing.
 packaging/           # What a `v*` tag ships (ADR-0038). macos/ holds bundle.sh — build both
                      #   Apple targets, lipo, substitute the plist version, ad-hoc sign, zip AND
                      #   verify — so packaging runs the same on a Mac as in CI, not CI-only magic.
@@ -111,8 +121,12 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 .githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
                      #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
                      #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance. Six Node gates, all run by pre-push and by the CI
-                     #   `links` job; the first three and toc.mjs also by the architect close
+scripts/             # Repo maintenance. Seven Node gates. SIX run by pre-push and by the CI
+                     #   `links` job; the seventh, check-site-links.mjs, runs in neither, because it
+                     #   needs a BUILT site - it lives in .github/workflows/pages.yml and asserts
+                     #   that no site-relative href in site/dist/ ends in .md, that every one
+                     #   resolves to a built file, and that every off-site href is absolute https
+                     #   (ADR-0154). Of the six, the first three and toc.mjs also run in the close
                      #   ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright

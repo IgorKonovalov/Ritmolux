@@ -12,14 +12,19 @@ and `tools/sd-filter/`. A broken site build is a documentation problem, never a 
 **`docs/` and `presets/` are the single source, and nothing here copies them.**
 
 `src/content.config.ts` points Astro's content loader at the repository root, one directory above
-this one, and lists the published set explicitly. There is no staged copy, no synced folder, and no
+this one, and loads the published set from the `PUBLISHED` map in `src/plugins/rewrite-links.mjs`,
+which is where that list is declared - beside the link rewrite that reads the same boundary, so the
+loader and the rewrite cannot disagree about what is published. There is no staged copy, no synced folder, and no
 second file to drift. Two consequences follow, and neither is optional:
 
 - **No markdown file outside `site/` may be edited to serve the site.** Every transformation the
   site needs happens at build time, in this project. If a page needs something the source does not
   have, the fix goes in a plugin here.
 - **A new file under `docs/` does not join the site by existing.** Add it to `PUBLISHED` in
-  `src/content.config.ts` and to the sidebar in `astro.config.mjs`, or it stays unpublished.
+  `src/plugins/rewrite-links.mjs` **and** to the sidebar in `astro.config.mjs`, or it stays
+  unpublished. Only one of those two omissions is caught: a sidebar slug with no `PUBLISHED` entry
+  fails the build, while a `PUBLISHED` entry with no sidebar item builds a page reachable only by
+  search, and every gate passes it.
 
 Two build-time transformations exist because the sources carry no frontmatter and never will:
 
@@ -42,6 +47,6 @@ npm run build   # -> site/dist/
 
 ## What is published
 
-Two entrances, listed in full in `PUBLISHED` (`src/content.config.ts`) and ordered in the sidebar
-(`astro.config.mjs`). The working record - plans, ADRs, the design backlog and both archives - is
+Two entrances, listed in full in `PUBLISHED` (`src/plugins/rewrite-links.mjs`) and ordered in the
+sidebar (`astro.config.mjs`). The working record - plans, ADRs, the design backlog and both archives - is
 **not** published; links into it are rewritten to GitHub URLs at build time.

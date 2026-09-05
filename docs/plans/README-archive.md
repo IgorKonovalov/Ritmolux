@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0143 — The documentation gets a front end](#0143--the-documentation-gets-a-front-end)
   - [0128 — The rendered file stops looking upscaled](#0128--the-rendered-file-stops-looking-upscaled)
   - [0138 — The colour surface stops misleading its authors](#0138--the-colour-surface-stops-misleading-its-authors)
   - [0151 — The long documents become navigable](#0151--the-long-documents-become-navigable)
@@ -156,6 +157,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note](#moved-2026-09-05-from-readmemd--the-01510143-heading-layout-note)
   - [Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round](#moved-2026-09-04-from-readmemd--the-01270128-pair-from-the-2026-08-28-what-next-round)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0138-behind-0137)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0151-before-0143)
@@ -168,6 +170,69 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md)
+
+— closed 2026-09-05. Five `dev` phases on `main` directly rather than in a worktree — the plan's own
+Lane guidance, and correct: every phase but 5 is JavaScript, markdown and config, so a fresh lane
+would have bought an 8-18 GB cold `target/` to run `shot --release` once. Commits `41c77c5`
+(Phase 1), `44d1ec3` (2), `03a9588` (3), `eeac887` (5), `cb3529c` (6), plus the `human` Phase 7 on
+2026-09-05 with no commit at all. Version: **0.106.0** (minor). Review: **no blockers, no majors,
+four minors and three nits.**
+
+**What it built.** An Astro Starlight site under `site/` publishing thirteen reader-facing documents
+plus a landing page and an exhaustive gallery, live at
+`https://igorkonovalov.github.io/Ritmolux/` with Pagefind search over the 264 KB parameter roster.
+`scripts/check-site-links.mjs` is the repository's seventh Node gate and the first that runs in
+neither `.githooks/pre-push` nor CI's `links` job — it needs a built site, so it lives in
+`.github/workflows/pages.yml`. `core/tests/hygiene.rs` gained a second cross-check, and 82 gallery
+cards (23.5 MB) are committed under `docs/images/gallery/presets/`.
+[ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md) accepted with an `Outcome`.
+
+**The one-source rule held completely, and it was the whole risk.** Phase 1 took the preferred
+mechanism rather than the permitted fallback: the content loader reads `docs/`, `docs/specs/` and
+`presets/README.md` in place, so there is no staged copy and no second file to drift. `git diff
+--name-status` over the plan's whole range shows not one file under `docs/` or `presets/` modified
+except the plan itself. Two build-time transformations stand in for frontmatter the sources do not
+have and may not gain — the title is derived from each document's opening `# ` heading, and that
+heading is then dropped from the body so Starlight's `<h1>` is not doubled.
+
+**ADR-0154's headline measurement was falsified, and it is a scope error rather than a design
+error.** The ADR sizes the problem at 926 relative links pointing outside the published set; the
+built site rewrites **269** off-site hrefs over 137 distinct targets, because 926 was measured over
+`README.md` plus *all* of `docs/*.md` plus `presets/README.md` and the published set was then
+narrowed to thirteen files without re-measuring. Nothing turns on it — the rewrite is per-link — but
+the Context table sizes the candidate set, not the site. Recorded in the ADR's `Outcome`.
+
+**Hosting never had a first stage.** Phase 4's hand-copied demo into the personal user site's
+`public/` was skipped outright by the user, and the site went straight to CI-deployed project Pages.
+The half of that argument that mattered still paid: `base` had to be configurable from build one,
+and the two paths turn out to differ in **case** — GitHub serves a project site under the repository
+name as spelled, so the permanent home is `/Ritmolux/` against the `/ritmolux/` the demo would have
+used. Building at both bases is what surfaced eleven hardcoded subpaths in the site's own two pages.
+
+**What was verified at the close, independently of the implementation log.** `cargo nextest run
+--workspace` green at 1536 passed / 0 failed / 5 skipped; all six pre-existing gates green and
+unmodified; `npm run build` clean at 16 pages with `scripts/check-site-links.mjs` exit 0; that gate
+provoked into convicting in both directions (an empty directory reported as "the site has not been
+built", a renamed route reported as 16 unresolved hrefs); the built gallery holding 82 cards under
+12 family headings with none falling to `unknown`; and the deployed site answering 200 on `/`,
+`/guide/parameter-roster/`, `/gallery/`, `/engine/spec-c-abi/` and `/pagefind/pagefind.js`, while
+`igorkonovalov.github.io/ritmolux/` and `/lmv/` both 404 — so Phase 7's "retire the demo" clause is
+satisfied by there being no demo, which is Phase 4's doing.
+
+**What outlived the plan.** `scripts/check-site-links.mjs` breaks the sentence *"every `.mjs` is
+wired into pre-push or CI's `links` job"* that `CLAUDE.md` and `README.md` both carried; both were
+corrected in the close commit, along with a `site/` row neither layout block had. The publish
+boundary is declared in two files — `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` and the
+sidebar in `site/astro.config.mjs` — and only one direction is guarded: a sidebar slug with no
+`PUBLISHED` entry fails the build, while a `PUBLISHED` entry with no sidebar item builds a page
+reachable only by search and passes every gate. The rewriter visits `definition` nodes, which
+markdown shares between link and *image* references, so a reference-style image would be rewritten
+to a blob URL and serve HTML instead of a picture; no published source uses that form today. And a
+full `docs-shots.mjs` run moves 13 of the 20 pre-existing committed images, which `dev` correctly
+reverted — this plan changed nothing they depict, and ADR-0100 records renders as not
+byte-reproducible, with 8 of 20 baselines rewriting on a clean local bless.
 
 ### [0128 — The rendered file stops looking upscaled](done/0128-the-rendered-file-stops-looking-upscaled.md)
 
@@ -6762,6 +6827,19 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note
+
+Spent when [0143] closed on 2026-09-05. It sequenced [0151] before [0143] so the site would be
+built against final headings, and that is exactly what happened: the generated contents blocks in
+`capturing.md` and `presets/README.md` were on `main` before Phase 1 read either file, and the site
+publishes both unmodified. The note as it stood:
+
+> **Superseded 2026-09-04 by [0151]'s close — the layout it settles is now on `main`.** [0143] can be
+> written against final headings: `capturing.md` and `presets/README.md` each carry a generated
+> contents block, and `scripts/toc.mjs --check` holds it to the headings beneath it
+> ([ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)). The note that
+> sequenced the two is in [README-archive.md](README-archive.md).
+
 ### Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round
 
 Spent when [0128] closed on 2026-09-04; [0127] had closed the same day the note was written. Both
@@ -6984,7 +7062,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0103]: 0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
-[0143]: 0143-the-documentation-gets-a-front-end.md
+[0143]: done/0143-the-documentation-gets-a-front-end.md
 [0151]: done/0151-the-long-documents-become-navigable.md
 [0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
 [0150]: done/0150-the-application-becomes-ritmolux.md

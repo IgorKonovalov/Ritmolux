@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 | [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
@@ -122,7 +121,7 @@ shape, because most of what it decided was sequencing rather than design:
   cheap. [ADR-0159] settles what backlog 0177 filed rather than answered — the plugin's own cap —
   and does **not** touch the standalone exe's, which keeps its inherited value and gains only a unit.
 
-[0143]: 0143-the-documentation-gets-a-front-end.md
+[0143]: done/0143-the-documentation-gets-a-front-end.md
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
@@ -352,12 +351,6 @@ build is no longer a reason to keep a finished worktree around.
 - **The `opt-level` question is closed, not deferred.** Phase 6 measured our unoptimized code at
   **19.1 %** of the `reactivity` suite — the minority arm, so ADR-0033's ratchet derivation is not
   reopened and no ADR is owed.
-
-**Superseded 2026-09-04 by [0151]'s close — the layout it settles is now on `main`.** [0143] can be
-written against final headings: `capturing.md` and `presets/README.md` each carry a generated
-contents block, and `scripts/toc.mjs --check` holds it to the headings beneath it
-([ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)). The note that
-sequenced the two is in [README-archive.md](README-archive.md).
 
 ### The two lanes, now
 
@@ -727,6 +720,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors, three nits.** Version: **0.106.0** (minor). ADR-0154 accepted with an `Outcome`. [Write-up](README-archive.md).
 - [0128 — The rendered file stops looking upscaled](done/0128-the-rendered-file-stops-looking-upscaled.md) — closed 2026-09-04. Review: **no blockers, one major, six minors.** Version: **0.105.0** (minor). Archived [backlog 0110](../design-backlog-archive.md); filed 0186. [Write-up](README-archive.md).
 - [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md) — closed 2026-09-04. Review: **no blockers, two majors, two minors.** Version: **0.104.0** (minor). Archived [backlog 0099 + 0153](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md) — closed 2026-09-04. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Touched `presets/README.md` only, closed no backlog entry. [Write-up](README-archive.md).
