@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
+import { stripProvenance } from './src/plugins/strip-provenance.mjs';
 
 /**
  * The Pages subpath, read by the link rewriter and by
@@ -35,7 +36,12 @@ function stripLeadingHeading() {
 export default defineConfig({
   site: 'https://igorkonovalov.github.io',
   base: BASE,
-  markdown: { remarkPlugins: [stripLeadingHeading, [rewriteLinks, { base: BASE }]] },
+  // `stripProvenance` runs first because everything downstream reads the
+  // headings it rewrites: rehype computes a slug from each heading, and a slug
+  // is a route name and an anchor (ADR-0166).
+  markdown: {
+    remarkPlugins: [stripLeadingHeading, stripProvenance, [rewriteLinks, { base: BASE }]],
+  },
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
   // unless the ancestor is allowed explicitly.

@@ -1,6 +1,6 @@
 # 0154 — The site becomes navigable
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-05
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md),
@@ -277,11 +277,14 @@ flowchart TB
 > last one. **The phases above are the contract; everything here is what happened.**
 > **Observations, never conclusions:** this says where to look, architect decides how it went.
 
-**Lane:** _(`main` directly, per the header's Lane guidance)_
+**Lane:** `main` directly, no worktree, per the header's Lane guidance. `main` gained Plan 0152's
+lane by fast-forward (`a573ada`) after Phase 1 was written and before it was committed; that merge
+added one provenance heading to `docs/on-device-validation.md`, and every count below is measured
+against the merged tree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — no plan number reaches a reader's eye | dev | | |
+| 1 — no plan number reaches a reader's eye | dev | done | committed with this row |
 | 2 — the roster becomes 46 pages | dev | | |
 | 3 — a wrong anchor fails the build | dev | | |
 | 4 — the rule generalises | dev | | |
@@ -291,6 +294,50 @@ flowchart TB
 | 8 — verified where it is served | human | | |
 
 ### Notes
+
+**Phase 1 — what the strip does beyond the phase's "What".** The plugin also strips the trailing
+parenthetical from the rows of the generated contents blocks (ADR-0163), which are links whose text
+is the heading copied verbatim; 21 rows change. Without it a row kept displaying a citation the
+heading above it no longer showed. Their `#anchor` targets are a separate matter, below.
+
+**Phase 1 — a done-when not met as stated.** *"No heading in `site/dist/` ends in a `(Plan NNNN)` /
+`(ADR-NNNN…)` parenthetical"* does not hold for three headings, all in
+`docs/generative-techniques-catalogue.md`:
+
+```
+## Idiom A — line / point strips (have it: `lines/`, Plan 0010 closed)
+## Idiom B — GPU particles (have it: `particles/`, Plan 0016 closed)
+## Idiom C — texture-feedback ping-pong (have it: `PingPongField`, Plan 0014 closed)
+```
+
+The same document carries `## Idiom D — full-screen fragment (have it: `fragment_field.rs`)`, the
+same shape with no citation in it, so the parenthetical is that document's way of saying the idiom
+is implemented rather than a provenance tag. The plugin therefore leaves a trailing parenthetical
+that contains a code span. Excluding these three is what made the count **exactly the 31
+headings the phase predicts** when it was measured at `23e7c89`; the Plan 0152 merge added
+`## Rig-gated — the OSC bindings move to `/rlx/v1` (Plan 0152 Phase 5)` and the shipped count is
+**32** (35 headings end in a parenthetical mentioning a plan or an ADR).
+Their three heading ids still contain a plan number; the catalogue is 13,693 bytes and does not
+split, so these are anchors on one page and never route names.
+
+**Phase 1 — a count that came out lower than the phase predicts.** Body blocks: **15**, against the
+phase's 26. The rule shipped is the strict one — a parenthetical holding citations and nothing else,
+standing at the very end of a paragraph or table cell. Widening it by one character, to allow a
+single sentence-punctuation mark after the closing parenthesis (`… the two are deliberately separate
+(ADR-0099).`), matches **64** blocks instead. That was not shipped: ADR-0168 keeps Entrance B's
+citations for a contributor reader and assigns the woven 735 to Plan 0155, and 64 reaches into both.
+The measured tallies for whichever rule is wanted are 15 / 64.
+
+**Phase 1 — 35 same-page anchors are dead until Phase 3.** 28 in `presets/README.md` and 7 in
+`docs/capturing.md` name a pre-strip slug (`#attractor-detail-sharpness-plan-0027`), and the heading
+they target now slugs without the suffix. `rewrite-links.mjs` returns early on a `#`-only URL, so
+nothing rewrites them yet; Phase 3's fragment map is where they resolve, and its gate is what will
+refuse to build while any of them is unmatched.
+
+**Phase 1 — the pre-split baseline Phase 4 owes a comparison against.** Measured on this commit:
+**16** HTML pages, Pagefind index **1,290 KB**, `site/dist` **41,913 KB**. Build wall time was
+8.22 s cold and 3.54 s with Astro's asset cache warm — Phase 4 has to say which of the two it is
+quoting, or the comparison means nothing.
 
 ### Close triggers
 
