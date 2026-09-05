@@ -225,151 +225,106 @@ flowchart LR
 | 2 — the expression language | dev | done | `2bce9be` |
 | 3 — the roster's own sections | dev | done | `3bbcaf0` |
 | 4 — the three sections that are most of the document | dev | done | `0dc85dd` |
-| 5 — the gate, and the sweep | dev | done | committed with this row |
+| 5 — the gate, and the sweep | dev | done | `18ee259` |
 
 ### Notes
 
-**P1 — two files outside the phase's `Files touched`.** Removing the trailing citation from
-`## Dark on light — the two-tone route (ADR-0106, measured again at Plan 0091)` and
-`## Flat colour on `shape_collage` — stay under the knee (ADR-0123, Plan 0113)` moves the source
-slug those headings are addressed by, and two documents link to the old ones:
-`docs/preset-guide.md:257` and `presets/README.md:4198`. The 0154 Phase 3 gate failed the site
-build on both, naming file, link and unmatched slug. Both anchors were updated in this phase's
-commit; no other content in either file was touched.
+**Deviations from the phases as written.**
 
-**P1 — counts.** 30 bare citations to 0. Links into `adrs/`/`plans/` went 24 -> 27: the
-parentheticals on ADR-0138, ADR-0090 and ADR-0106 were carrying the only reference to those
-records in their sections, so each was demoted to a link on the sentence rather than dropped.
-65,009 -> 64,473 bytes (-0.8 %).
+- **P1 touched two files outside its `Files touched`.** Removing the trailing citation from
+  `## Dark on light — …` and `` ## Flat colour on `shape_collage` — … `` moves the source slug they
+  are addressed by. The 0154 Phase 3 gate failed the site build on the two inbound links,
+  `docs/preset-guide.md:257` and `presets/README.md:4198`; both anchors were repointed in the same
+  commit and nothing else in either file was touched. The same thing happened at larger scale in
+  P4 — see below.
+- **P3 rewrote the front matter too.** Lines 1-129 sit above `## Skeleton` and so inside no `##`
+  section, which puts them outside P3's `What` and inside P4's "anywhere in the file". They carried
+  16 bare citations and are the first thing a reader sees, so they went with the ten sections.
+- **P1 fixed one thing that is not a citation:** a pre-existing `LUT'''s` typo, in a passage that
+  phase rewrites around.
+- **P1's `toc.mjs` done-when is vacuous for its file.** `docs/preset-palettes.md` carries no
+  `toc:begin` block. It was run; it reports the repository's six blocks current.
+- **P1's commit carried two link repairs that were not mine.** Another session committed plan
+  0154's close (`9b48c22`) into this working tree mid-phase, and its repair of the two `0154` links
+  in this plan's own header was in the tree when P1 committed. Nothing was lost. Every phase here
+  used `git commit -- <paths>` rather than `git add`, because that session's staged rename was
+  sitting in the index.
 
-**P1 — what was compared, not read.** Every backtick-quoted identifier in the file before and
-after: no loss and no gain. Every numeric literal with citations masked: three lost, all three
-phase numbers inside removed provenance clauses (`Phase 4` once, `Phase 1` twice).
+**Information deliberately removed, beyond citations.** Four passages published a measurement of
+behaviour the engine no longer has. The current figures are kept and the superseded ones are gone:
 
-**P1 — one edit that is not a citation.** `LUT'''s` -> `LUT's`, a pre-existing typo at what is now
-line 1058, in a passage this phase rewrites around.
+| where | what went |
+|---|---|
+| `docs/presets.md`, `presets/README.md` | the downbeat-lock fold's old column (`0.00`, `0.79`, `4.16`); the three current figures stay, and techno's paragraph now argues from four-on-the-floor having no bar accent |
+| `docs/presets.md`, `presets/README.md` | the fixed 1280x720 post grid and its 28 % stretch |
+| `presets/README.md` | two polyline segment counts in the mandala budget; `492`, `1 092`, `20 000` and `576` against `24` stay |
+| `presets/README.md` | `17.37`, the `Rich` luminance of the un-normalized attractor deposit, and the commit SHA `00d99d0`; the live pair `10.86` / `10.34` stays |
 
-**P1 — the phase's `toc.mjs` done-when is vacuous for this file.** `docs/preset-palettes.md`
-carries no `toc:begin` block; the six that do are listed by the gate. It was run and reports the
-repository's six blocks current.
+**Counts, and what was compared rather than read.** 235 bare citations to 0 across the five; 121
+citations remain, all inside links. 450,330 to 442,992 bytes (-1.6 %). Per phase, the
+backtick-quoted vocabulary of each file was listed before and after and diffed:
 
-**P1 — the commit also carried two link repairs that were not mine.** Another session committed
-plan 0154's close (`9b48c22`) into this same working tree mid-phase, moving it to `plans/done/`.
-Its repair of the two `0154` links in this plan's own header was in the working tree when Phase 1
-committed and rode along in `3fdd391`. Nothing was lost; the phase commit is not file-clean of
-that close. Every phase commit in this plan uses `git commit -- <paths>` rather than `git add`,
-because that session's staged rename was sitting in the index.
+| phase | bare | bytes | identifiers lost |
+|---|---:|---|---|
+| 1 | 30 to 0 | 65,009 to 64,473 | none |
+| 2 | 48 to 0 | 75,816 to 73,841 | none; grammar surface identical — 66 table row heads, 20 call forms |
+| 3 | 41 to 0 | 273,211 to 271,801 | `00d99d0`, `17.37` |
+| 4 | 100 to 0 | 271,801 to 268,403 | `` `0 = falloff` `` as a code span, whose value and name both stay in the table above it; and the retired presets `fragment_kaleido` and `reaction_gilt` |
 
-**P2 — counts.** 48 bare citations to 0. 75,816 -> 73,881 bytes (-2.6 %).
+**A citation form nothing in the repository was matching.**
+`### Ink on paper — … (Plans 0027, 0078)` uses the **plural**, and
+`site/src/plugins/strip-provenance.mjs`'s pattern is the singular — so that heading was reaching
+the built site with both numbers in its route name. It is rewritten, and the new gate matches the
+plural. **Nothing under `site/` was changed by this plan.**
 
-**P2 — the grammar surface, listed from both versions rather than read.** Leading code cell of
-every table row: 66 before, 66 after, no loss and no gain. Every `name(` call form: 20 before, 20
-after, identical. Every backtick-quoted identifier in the file: no loss and no gain. The error
-message blocks are unchanged.
-
-**P2 — a deliberate fact loss, larger than the other phases'.** The downbeat-lock table published
-both a superseded fold's numbers and the current ones as `old -> new` (`0.00 -> 2.36 %`,
-`0.79 -> 3.67 %`, `4.16 -> 0.42 %`). The three current figures are kept; the three superseded ones
-are gone, and the paragraph explaining techno's decline was rewritten to argue from
-four-on-the-floor having no bar-scale accent rather than from the old fold's 4.16 %. Same class:
-the `1280x720` fixed post grid and its 28 % stretch, and the per-system preset-count drift figures
-(`11 against 6`, `5 against 3`, `5 against 6`). All describe behaviour that no longer exists.
-
-**P3 — the front matter went with the ten sections.** Lines 1-129, above `## Skeleton`, are
-inside no `##` section, so neither this phase's done-when nor its `What` reaches them; Phase 4's
-"anywhere in the file" does. They carried 16 of the file's bare citations and they are the first
-thing a reader sees, so they were rewritten here instead. The ten named sections are at 0, the
-front matter is at 0, and the three Phase 4 sections still hold 100 (55 / 25 / 20).
-
-**P3 — counts.** 41 bare citations to 0 across the ten sections plus the front matter.
-273,174 -> 271,801 bytes (-0.5 %).
-
-**P3 — two headings renamed, and one inbound anchor with them.**
-`## Colour — the palette surface (Plan 0020)` and
-`## The second layer — the `[layer]` table (ADR-0090 / Plan 0076)`. The only inbound link is
-`presets/README.md:401`, same file, updated with them; `node scripts/toc.mjs` rewrote the
-contents block for both rows.
-
-**P3 — identifier diff, whole file.** Two lost, both deliberate: `00d99d0`, the commit SHA of a
-retuning, and `17.37`, the `Rich` mean display luminance of the un-normalized attractor deposit.
-The live pair it was measured against (`10.86` at `Rich`, `10.34` at `Floor`) is kept. Nothing
-else in the file's backtick vocabulary moved. The same superseded-fold table Phase 2 trimmed in
-`docs/presets.md` appears here too and was trimmed the same way.
-
-**P4 — counts.** 100 bare citations to 0 across the three sections. 271,801 -> 266,870 bytes
-(-1.8 %). Two `Plan`/`ADR` strings remain in the file and both are inside a markdown link: the
-collapsed reference `[ADR-0098]` and its `[ADR-0098]: ...` definition.
-
-**P4 — a citation form the site's own strip does not match.**
-`### Ink on paper — ... (Plans 0027, 0078)` uses the **plural**, and
-`site/src/plugins/strip-provenance.mjs`'s pattern is a four-digit `Plan NNNN`, so that heading was reaching
-the site with both numbers in its route name. It is rewritten here, and the Phase 5 gate matches
-the plural so it cannot come back. Nothing in `site/` was changed.
-
-**P4 — 16 headings renamed, 18 inbound anchors repointed.** The old and new slugs were computed
-with `github-slugger` over the whole document in reading order, which is what
-`split-document.mjs` keys its fragment map on. 4 anchors in `docs/presets.md`, 14 in
-`presets/README.md`. A 19th match was in `site/src/plugins/split-document.mjs`, inside the doc
-comment that explains the fragment map by quoting
+**18 headings renamed across P1, P3 and P4; 21 inbound anchors repointed.** Old and new slugs were
+computed with `github-slugger` over each whole document in reading order, which is what
+`split-document.mjs` keys its fragment map on. One further match was in
+`site/src/plugins/split-document.mjs`, inside the doc comment that explains that map by quoting
 `presets/README.md#attractor-detail-sharpness-plan-0027` as an example of a link written with the
-provenance still in it — reverted, because rewriting it destroys the example. `site/` is untouched
-by this plan.
+provenance still in it — reverted, because rewriting it destroys the example.
 
-**P4 — identifier diff, whole file: three lost.** `` `0 = falloff` `` as a code span (the value and
-its name both survive in the `kaleido_edge` table row above it), and the retired presets
-`fragment_kaleido` and `reaction_gilt`, each named only inside a provenance parenthetical. No
-shipped preset name, parameter, default or range moved. Numbers lost are phase numbers and
-superseded-implementation figures — the polyline segment counts `36`/`432`/`396` for two mandala
-rings; the live budget figures (`492`, `1 092`, `20 000`, `576` against `24`) are kept.
-
-**P4 — the built site was checked, not just the markdown.** `npm run build` in `site/` after the
-renames, then `check-site-links.mjs` and `check-site-routes.mjs`: 137 pages, 135 routes, every
-site-relative href resolves, largest split route 26,893 B. No route directory under `site/dist/`
-carries a plan or ADR number any more.
-
-**P5 — the gate on the shipped tree.** `reader prose: OK (every citation in 5 documents is
-inside a link)` — 121 citations across the five, 0 bare. Per file: 69 / 23 / 27 / 2 / 0.
-
-**P5 — provoked in all three directions on the real tree, and the tree restored.** A bare
-`Plan 0063` appended to `docs/preset-palettes.md` exits 1 naming `docs/preset-palettes.md:1141`
-and printing the offending line; the same two citations written as links exit 0; the same bare
-pair appended to `docs/capturing.md` exits 0, because Entrance B is out of scope. `git status`
-after: neither file modified.
+**The built site was checked at every phase that moved a slug**, not only the markdown:
+`npm run build`, then `check-site-links.mjs` and `check-site-routes.mjs` — 137 pages, 135 routes,
+largest split route 26,893 B. No route directory under `site/dist/` carries a citation any more.
 
 **P5 — two link forms the first draft got wrong, both found by the shipped tree.** The gate
 reported two false positives on `presets/README.md`: the collapsed reference `[ADR-0098]` and its
-definition. The definition is written `> [ADR-0098]: ...` **inside a blockquote**, and a
-definition-line pattern anchored at the start of a line does not see it — which then makes every
-use of that label look bare. Both the label-collection and the masking pattern now allow a `>`
-prefix, and the fixture seeds that exact shape.
+definition, which is written `> [ADR-0098]: …` **inside a blockquote**. A definition-line pattern
+anchored at the start of a line does not see it, and a definition the scanner misses makes every
+*use* of that label read as bare. Both patterns now allow a `>` prefix, and the fixture seeds that
+shape.
 
-**P5 — the fixture.** `scripts/fixtures/reader-prose/`, exit 1 and exactly six breaks across
-three files. It mirrors the five scoped paths rather than seeding a layout, because this gate
-reads fixed paths instead of walking a tree. Four seeded citation forms (trailing parenthetical,
-woven into a sentence, a **U+2011** smart hyphen, the plural in a heading) and a larger set of
-silences: all four markdown link forms, a fenced block naming a plan file and an ADR file by
-path, a `design-backlog` reference, two clean documents, and `docs/capturing.md` carrying four
-bare citations that must never be reported.
-
-**P5 — wiring.** `.githooks/pre-push` and CI's `links` job, in both cases **after** the two
-`toc.mjs` steps, so the numbered gate commentary in each file reads in order.
-`CLAUDE.md`'s `scripts/` block now says nine Node gates, seven of them in pre-push and the
-`links` job. `scripts/fixtures/README.md` says seven checkers take a `root`.
+**P5 — provoked in all three directions on the real tree, and the tree restored.** A bare
+`Plan 0063` appended to `docs/preset-palettes.md` exits 1 naming `docs/preset-palettes.md:1141`
+and printing the line; the same two citations written as links exit 0; the same bare pair appended
+to `docs/capturing.md` exits 0, because Entrance B is out of scope. `git status` after: neither
+file modified. The fixture bites at exit 1 with six breaks across three files.
 
 **P5 — the skill pointers were checked, not assumed.** No file under `.claude/skills/` links into
-any of the five with a `#fragment`; every pointer is by filename plus a subject description
-("the per-system parameter roster", "the expression language", "colour in depth"), so the 18
-heading renames reach none of them.
+any of the five with a `#fragment`, so the 18 renames reach none of them.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` only, in Phases 3 and 4. **No `.toml` was touched** —
+  `git diff --name-only 3fdd391^..18ee259 -- 'presets/*.toml'` is empty — so nothing about the
+  shipped preset set, the embedded table or `core/build.rs`'s glob is affected.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** docs-chore-only, plus one new gate. No `core/`, `standalone/` or
+  `plugin-foobar/` file was touched, and no default, parameter name or behaviour moved.
+  The five documents went 450,330 -> 442,992 bytes (-1.6 %) and 235 bare citations -> 0; the 121
+  that remain are all inside links.
+- **Operator docs touched:** none. `docs/on-device-validation.md`, `docs/releasing.md` and
+  `docs/capturing.md` are all Entrance B and are untouched by every phase.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace` — exit 0, **1536 tests run, 1536 passed, 5
+  skipped** (31 slow), 761.949 s. Run at the tip, after Phase 5's commit.
+- **Outstanding `human` phases:** none. Every phase in this plan is `dev` and all five landed.
+
+### Where a fresh read is worth most
+
+The "information deliberately removed" table above. No gate can tell a good rewrite from a bad
+one, and that judgement is the only thing in this plan a reviewer cannot check mechanically.
 
 ## Followups (after this lands)
 
