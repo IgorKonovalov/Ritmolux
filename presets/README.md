@@ -4195,7 +4195,7 @@ and `mix` has no junction to act at.
 is worth stating plainly because the rest of the pipeline adds light and a
 reader reasonably assumes dark-on-light is unavailable. The full recipe with a
 worked preset is in
-[`docs/preset-palettes.md`](../docs/preset-palettes.md#dark-on-light--the-two-tone-route-adr-0106-measured-again-at-plan-0091);
+[`docs/preset-palettes.md`](../docs/preset-palettes.md#dark-on-light--the-two-tone-route);
 the two things that will bite you belong here, beside the parameters they are
 about:
 

@@ -1,10 +1,10 @@
 # 0155 — The reader documents stop explaining themselves
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-05
 > **Owner skill(s):** dev
 > **Related ADRs:** [0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
-> **Hard dependency:** [0154](0154-the-site-becomes-navigable.md) **Phase 3.** This plan renames
+> **Hard dependency:** [0154](done/0154-the-site-becomes-navigable.md) **Phase 3.** This plan renames
 > headings, and under [ADR-0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md) a
 > heading is a URL. `scripts/check-doc-links.mjs` deliberately never validates fragments, so today a
 > renamed heading breaks every inbound anchor silently. 0154 Phase 3 turns that into a build
@@ -209,7 +209,7 @@ flowchart LR
 - **It does not remove the 109 citations that are already links.** A link is inert until clicked.
 - **It does not change any code, default, parameter name or behaviour.** Nothing under `core/`,
   `standalone/`, `plugin-foobar/` or `presets/*.toml` is touched.
-- **It does not touch the site.** All of that is [Plan 0154](0154-the-site-becomes-navigable.md).
+- **It does not touch the site.** All of that is [Plan 0154](done/0154-the-site-becomes-navigable.md).
 
 ## Implementation log
 
@@ -217,17 +217,41 @@ flowchart LR
 > last one. **The phases above are the contract; everything here is what happened.**
 > **Observations, never conclusions:** this says where to look, architect decides how it went.
 
-**Lane:** _(`main` directly, per the header's Lane guidance)_
+**Lane:** `main` directly, no worktree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the rule, on the smallest real case | dev | | |
+| 1 — the rule, on the smallest real case | dev | done | committed with this row |
 | 2 — the expression language | dev | | |
 | 3 — the roster's own sections | dev | | |
 | 4 — the three sections that are most of the document | dev | | |
 | 5 — the gate, and the sweep | dev | | |
 
 ### Notes
+
+**P1 — two files outside the phase's `Files touched`.** Removing the trailing citation from
+`## Dark on light — the two-tone route (ADR-0106, measured again at Plan 0091)` and
+`## Flat colour on `shape_collage` — stay under the knee (ADR-0123, Plan 0113)` moves the source
+slug those headings are addressed by, and two documents link to the old ones:
+`docs/preset-guide.md:257` and `presets/README.md:4198`. The 0154 Phase 3 gate failed the site
+build on both, naming file, link and unmatched slug. Both anchors were updated in this phase's
+commit; no other content in either file was touched.
+
+**P1 — counts.** 30 bare citations to 0. Links into `adrs/`/`plans/` went 24 -> 27: the
+parentheticals on ADR-0138, ADR-0090 and ADR-0106 were carrying the only reference to those
+records in their sections, so each was demoted to a link on the sentence rather than dropped.
+65,009 -> 64,473 bytes (-0.8 %).
+
+**P1 — what was compared, not read.** Every backtick-quoted identifier in the file before and
+after: no loss and no gain. Every numeric literal with citations masked: three lost, all three
+phase numbers inside removed provenance clauses (`Phase 4` once, `Phase 1` twice).
+
+**P1 — one edit that is not a citation.** `LUT'''s` -> `LUT's`, a pre-existing typo at what is now
+line 1058, in a passage this phase rewrites around.
+
+**P1 — the phase's `toc.mjs` done-when is vacuous for this file.** `docs/preset-palettes.md`
+carries no `toc:begin` block; the six that do are listed by the gate. It was run and reports the
+repository's six blocks current.
 
 ### Close triggers
 
