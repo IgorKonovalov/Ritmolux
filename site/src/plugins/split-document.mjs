@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import Slugger from 'github-slugger';
-import { PUBLISHED } from './rewrite-links.mjs';
 import { stripProvenanceText } from './strip-provenance.mjs';
 
 /**
@@ -122,6 +121,9 @@ export function splitDocument(source, baseRoute, title) {
       route,
       title: sectionTitle,
       sourceHeading,
+      headingLine: start,
+      from: start,
+      to: end,
       body: lines.slice(start + 1, end).join('\n'),
       children: [],
     };
@@ -134,6 +136,7 @@ export function splitDocument(source, baseRoute, title) {
       if (subStarts.length > 0) {
         const subSlugger = new Slugger();
         section.body = lines.slice(start + 1, subStarts[0]).join('\n');
+        section.to = subStarts[0];
         subStarts.forEach((subStart, j) => {
           const subEnd = j + 1 < subStarts.length ? subStarts[j + 1] : end;
           const subSource = lines[subStart].slice(4).trim();
@@ -143,6 +146,9 @@ export function splitDocument(source, baseRoute, title) {
             route: `${route}/${subSlugger.slug(subTitle)}`,
             title: subTitle,
             sourceHeading: subSource,
+            headingLine: subStart,
+            from: subStart,
+            to: subEnd,
             body: lines.slice(subStart + 1, subEnd).join('\n'),
             children: [],
           });
@@ -158,10 +164,15 @@ export function splitDocument(source, baseRoute, title) {
       route: baseRoute,
       title,
       sourceHeading: null,
+      headingLine: null,
+      from: 0,
+      to: starts[0],
       body: lines.slice(0, starts[0]).join('\n'),
       children: sections,
     },
     sections,
+    lines,
+    fenced,
   };
 }
 
@@ -198,12 +209,11 @@ export function contentsList(chunk, base, heading) {
  * subsections under itself, so the menu is never a flat list of 45 siblings.
  *
  * @param source repo-relative path, as spelled in `PUBLISHED`
+ * @param route  the site route that path publishes as
  */
-export function sidebarGroup(source, label) {
+export function sidebarGroup(source, route, label) {
   const fileURL = new URL(`../../../${source}`, import.meta.url);
-  const text = readFileSync(fileURL, 'utf8');
-  const route = PUBLISHED[source];
-  const split = splitDocument(text, route, label);
+  const split = splitDocument(readFileSync(fileURL, 'utf8'), route, label);
   if (!split) return { label, slug: route };
 
   const leaf = (chunk) => ({ label: chunk.title, slug: chunk.route });
@@ -223,4 +233,96 @@ export function sidebarGroup(source, label) {
       ),
     ],
   };
+}
+
+/**
+ * Every heading in a split document, keyed by the slug it had as one page.
+ *
+ * This is the contract that makes the split safe (ADR-0166). A link in the
+ * source was written against the source: `presets/README.md#attractor-detail-sharpness-plan-0027`
+ * names a slug computed from the whole document, from the heading text AS
+ * WRITTEN, with the provenance still in it. After the split that heading lives
+ * on its own route and, if it is not that route's own title, under an anchor
+ * computed from the STRIPPED text by a slugger that saw only that route's
+ * headings. Neither end of that is guessable, so it is recorded rather than
+ * derived at the link site.
+ *
+ * The value is `{ route, anchor }`; `anchor` is null when the heading became
+ * the route's own title and the route alone addresses it.
+ */
+function fragmentMap(split) {
+  const { lines, fenced } = split;
+  const map = new Map();
+  const sourceSlugger = new Slugger();
+
+  // The slug an author would have written: one slugger over the whole document
+  // in reading order, over the heading exactly as it appears.
+  const sourceSlugs = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    if (fenced[i]) continue;
+    const heading = /^(#{1,6})\s+(.+?)\s*$/.exec(lines[i]);
+    if (!heading) continue;
+    sourceSlugs.set(i, sourceSlugger.slug(plainHeading(heading[2])));
+  }
+
+  const record = (line, route, anchor) => {
+    const slug = sourceSlugs.get(line);
+    // First writer wins: two headings that slugged the same in the source
+    // already had one unreachable anchor before the split, and inventing a
+    // second target here would silently pick the wrong one.
+    if (slug !== undefined && !map.has(slug)) map.set(slug, { route, anchor });
+  };
+
+  for (const chunk of chunksOf(split)) {
+    // A fresh slugger per chunk, because each chunk renders as its own page and
+    // `rehype-collect-headings` starts a new one for every page it sees.
+    const chunkSlugger = new Slugger();
+    for (let i = chunk.from; i < chunk.to; i++) {
+      if (fenced[i]) continue;
+
+      // An author-placed `<a id="...">` is a target a heading slug cannot
+      // express - it names a passage rather than a section. The raw HTML rides
+      // into whichever chunk holds its line, so the id is still the id and only
+      // the route around it moves.
+      for (const explicit of lines[i].matchAll(/<a\s+(?:id|name)=["']([^"']+)["']/g)) {
+        if (!map.has(explicit[1])) map.set(explicit[1], { route: chunk.route, anchor: explicit[1] });
+      }
+
+      const heading = /^(#{1,6})\s+(.+?)\s*$/.exec(lines[i]);
+      if (!heading) continue;
+      if (i === chunk.headingLine) {
+        record(i, chunk.route, null);
+        continue;
+      }
+      // The document's own `# ` title is dropped from the body it renders, so
+      // it has no anchor either; the index route is what addresses it.
+      if (heading[1].length === 1 && chunk.kind === 'index') {
+        record(i, chunk.route, null);
+        continue;
+      }
+      record(i, chunk.route, chunkSlugger.slug(plainHeading(stripProvenanceText(heading[2]))));
+    }
+  }
+  return map;
+}
+
+/** `source` -> its fragment map, built once per build. */
+const FRAGMENTS = new Map();
+
+/**
+ * The fragment map for a published source, or null when it does not split.
+ *
+ * @param source repo-relative path, as spelled in `PUBLISHED`
+ * @param route  the site route that path publishes as
+ * @param repoRoot the repository root, as a `file:` URL
+ */
+export function fragmentsOf(source, route, repoRoot) {
+  if (!SPLIT_SOURCES.has(source)) return null;
+  let map = FRAGMENTS.get(source);
+  if (map === undefined) {
+    const split = splitDocument(readFileSync(new URL(source, repoRoot), 'utf8'), route, source);
+    map = split === null ? null : fragmentMap(split);
+    FRAGMENTS.set(source, map);
+  }
+  return map;
 }

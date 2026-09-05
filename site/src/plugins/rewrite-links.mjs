@@ -2,9 +2,11 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { visit } from 'unist-util-visit';
+import { fragmentsOf } from './split-document.mjs';
 
 /** The repository root - `site/`'s parent, three levels above this file. */
-export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT_URL = new URL('../../../', import.meta.url);
+export const REPO_ROOT = fileURLToPath(REPO_ROOT_URL);
 
 /**
  * The published set (Plan 0143), keyed repo-relative source path -> site route.
@@ -65,6 +67,38 @@ function isExternal(url) {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith('//');
 }
 
+/** The repo-relative published source a vfile came from, or null. */
+function sourceOf(filePath) {
+  const rel = path.relative(REPO_ROOT, path.resolve(filePath)).split(path.sep).join('/');
+  return rel in PUBLISHED ? rel : null;
+}
+
+/**
+ * Where `#slug`, written against a document as one page, lands after the split.
+ *
+ * Throws rather than guessing. An unmatched fragment is the failure this map
+ * exists to make visible: before the split every anchor into a 273 KB page
+ * landed somewhere on the right page whether or not it was correct, so being
+ * wrong was invisible, and after the split it would land on the wrong page
+ * instead (ADR-0166).
+ */
+function resolveFragment(source, route, fragment, from) {
+  const map = fragmentsOf(source, route, REPO_ROOT_URL);
+  if (map === null) return null;
+
+  const slug = decodeURIComponent(fragment.slice(1));
+  const target = map.get(slug);
+  if (target === undefined) {
+    throw new Error(
+      `rewrite-links: ${from} links to ${source}#${slug}, and no heading in that document ` +
+        `has that slug. ${source} is split into routes by size, so every fragment into it is ` +
+        `resolved through its heading map; a fragment that matches nothing is a dead link that ` +
+        `used to land on the right page by accident. Fix the link, or the heading it names.`,
+    );
+  }
+  return { route: target.route, hash: target.anchor === null ? '' : `#${target.anchor}` };
+}
+
 /**
  * Rewrites every relative markdown link at build time.
  *
@@ -96,10 +130,23 @@ export function rewriteLinks({ base }) {
       throw new Error('rewrite-links: markdown reached the rewriter with no source path');
     }
     const fromDir = path.dirname(path.resolve(file.path));
+    const ownSource = sourceOf(file.path);
 
     visit(tree, ['link', 'definition'], (node) => {
       const url = node.url;
-      if (!url || url.startsWith('#') || isExternal(url)) return;
+      if (!url || isExternal(url)) return;
+
+      // A same-page anchor addresses this document, and after a split "this
+      // document" is many routes - the generated contents block (ADR-0163) is
+      // a whole page of them. In a document that does not split, the anchor is
+      // already right and nothing needs doing.
+      if (url.startsWith('#')) {
+        if (ownSource === null) return;
+        const landed = resolveFragment(ownSource, PUBLISHED[ownSource], url, file.path);
+        if (landed !== null) node.url = `${siteBase}${landed.route}/${landed.hash}`;
+        return;
+      }
+
       // A root-relative URL is already a site route - the site's own pages
       // write them. Only a genuinely relative target is resolvable against a
       // source file, and only those cross the publish boundary.
@@ -113,7 +160,11 @@ export function rewriteLinks({ base }) {
 
       const route = PUBLISHED[rel];
       if (route) {
-        node.url = `${siteBase}${route}/${fragment}`;
+        const landed = fragment === '' ? null : resolveFragment(rel, route, fragment, file.path);
+        node.url =
+          landed === null
+            ? `${siteBase}${route}/${fragment}`
+            : `${siteBase}${landed.route}/${landed.hash}`;
         return;
       }
 

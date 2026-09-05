@@ -69,7 +69,7 @@ export default defineConfig({
             { label: 'Expression language', slug: 'guide/expression-language' },
             { label: 'Colour and palettes', slug: 'guide/palettes' },
             { label: 'Tuning walkthrough', slug: 'guide/tuning-walkthrough' },
-            sidebarGroup('presets/README.md', 'Parameter roster'),
+            sidebarGroup('presets/README.md', 'guide/parameter-roster', 'Parameter roster'),
             { label: 'Gallery', slug: 'gallery' },
           ],
         },

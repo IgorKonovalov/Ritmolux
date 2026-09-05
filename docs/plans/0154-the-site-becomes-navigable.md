@@ -285,8 +285,8 @@ against the merged tree.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — no plan number reaches a reader's eye | dev | done | `3e5f6d6` |
-| 2 — the roster becomes 46 pages | dev | done | committed with this row |
-| 3 — a wrong anchor fails the build | dev | | |
+| 2 — the roster becomes 46 pages | dev | done | `2a77539` |
+| 3 — a wrong anchor fails the build | dev | done | committed with this row |
 | 4 — the rule generalises | dev | | |
 | 5 — a stranger can find out what this is and get it | dev | | |
 | 6 — the drift classes get gates | dev | | |
@@ -377,6 +377,40 @@ Pagefind API in a browser, top hit per query:
 | `depth_fade` | `…/systems-and-their-named-parameters/attractor-depth-perspective-depth_fade-depth_hue-spin/` |
 | `fold_speed` | `…/systems-and-their-named-parameters/fragment_field-animation-rates--field_speed-and-fold_speed/` |
 | `occupancy` | `…/a-clamp-is-a-limit-not-a-gain--the-occupancy-table/` |
+
+**Phase 3 — how many fragment links there turned out to be.** **102** links carry a fragment into
+`presets/README.md`, not 15: **14** are written from another document (the phase's 15, one of which
+resolves to the document with no fragment at all and so is not in this count), and **88** are
+same-page anchors inside the roster, most of them rows of its generated contents block. All 102
+resolve. The three opened in the built output:
+
+| written in | resolves to |
+|---|---|
+| `docs/capturing.md` | `…/parameter-roster/the-expression-language/#seeded-randomness--hash-noise-and-generator-seed` |
+| `docs/preset-palettes.md` | `…/structural-config-line-systems-and-the-attractor/tuple-picks-a-whole-figure-framing-included/#what-made-this-point-and-how-far-into-the-figure-it-is` |
+| `presets/README.md` contents block | `…/systems-and-their-named-parameters/attractor-detail-sharpness/` |
+
+A link to `presets/README.md` with no fragment still resolves to `/guide/parameter-roster/`.
+
+**Phase 3 — the gate was exercised and the tree restored.** `### Attractor detail sharpness (Plan
+0027)` was renamed to `crispness` in a scratch edit; the build exited 1 naming the source file, the
+link `presets/README.md#attractor-detail-sharpness-plan-0027`, and the unmatched slug. Restored with
+`git checkout -- presets/README.md`, and the working tree carries no edit to it.
+
+**Phase 3 — the map had to learn a target that is not a heading.** Its first run failed the build on
+four links the phase did not predict, and all four were correct links to `<a id="…"></a>` anchors an
+author placed by hand — `#morph-is-a-travel-knob` and
+`#what-made-this-point-and-how-far-into-the-figure-it-is`, the only two such anchors in the whole
+published set. The map records them alongside heading slugs. **No source document was edited**: the
+gap was in the map, and the plan's Files-touched list held.
+
+**Phase 3 — a local-only trap worth knowing.** Astro's content-layer cache lives at
+`site/node_modules/.astro`, not only at `site/.astro`, and a change to a remark plugin does not
+invalidate it — the source file's digest is unchanged, so a rebuild re-serves the previously
+rendered HTML. Two verification passes read a stale `site/dist` that showed the fragments
+unresolved while the rewriter was already correct in isolation. `rm -rf site/.astro site/dist
+site/node_modules/.astro` before trusting a local build of a plugin change. CI checks out fresh and
+never sees this.
 
 ### Close triggers
 
