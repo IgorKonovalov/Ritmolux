@@ -22,16 +22,23 @@ second file to drift. Two consequences follow, and neither is optional:
   have, the fix goes in a plugin here.
 - **A new file under `docs/` does not join the site by existing.** Add it to `PUBLISHED` in
   `src/plugins/rewrite-links.mjs` **and** to the sidebar in `astro.config.mjs`, or it stays
-  unpublished. Only one of those two omissions is caught: a sidebar slug with no `PUBLISHED` entry
-  fails the build, while a `PUBLISHED` entry with no sidebar item builds a page reachable only by
-  search, and every gate passes it.
+  unpublished. **Both omissions are caught**, and each by a different gate: a sidebar slug with no
+  `PUBLISHED` entry fails the build, and a `PUBLISHED` entry with no sidebar item - a page that
+  builds, gets indexed, and is reachable only by search - is convicted by
+  `scripts/check-site-routes.mjs`, which runs in the Pages workflow because it needs a built site.
 
-Two build-time transformations exist because the sources carry no frontmatter and never will:
+The build-time transformations, all of them here, because the sources carry no frontmatter and
+never will:
 
 | Where | What |
 |---|---|
-| `src/content.config.ts` | derives each page's `title` from its opening `# ` heading |
+| `src/content.config.ts` | derives each page's `title` from its opening heading, ATX or setext |
 | `astro.config.mjs` | drops that heading from the body, so Starlight's `<h1>` is not doubled |
+| `astro.config.mjs` | substitutes `@VERSION@` from the workspace version, for the packaging pages |
+| `astro.config.mjs` | wraps every table in a scroll container, so a wide table scrolls and the page does not |
+| `src/plugins/strip-provenance.mjs` | drops a trailing `(Plan NNNN)` / `(ADR-NNNN)` from headings and block ends, before slugs are computed (ADR-0168) |
+| `src/plugins/split-document.mjs` | cuts a document over 40 KB into one route per section, and emits the fragment map that keeps deep links resolving (ADR-0166) |
+| `src/plugins/rewrite-links.mjs` | rewrites every relative link: inside the published set to a site route, outside it to a GitHub URL (ADR-0154) |
 
 ## Working on it
 
@@ -47,6 +54,9 @@ npm run build   # -> site/dist/
 
 ## What is published
 
-Two entrances, listed in full in `PUBLISHED` (`src/plugins/rewrite-links.mjs`) and ordered in the
-sidebar (`astro.config.mjs`). The working record - plans, ADRs, the design backlog and both archives - is
-**not** published; links into it are rewritten to GitHub URLs at build time.
+Three groups - get it, use it, understand it - listed in full in `PUBLISHED`
+(`src/plugins/rewrite-links.mjs`) and ordered in the sidebar (`astro.config.mjs`). The install pages
+ARE the three `packaging/*/READ-ME-FIRST.md` a tester finds inside the release zip, published as
+they ship rather than rewritten, so a drift between the two is unrepresentable (ADR-0167). The
+working record - plans, ADRs, the design backlog and both archives - is **not** published; links
+into it are rewritten to GitHub URLs at build time.

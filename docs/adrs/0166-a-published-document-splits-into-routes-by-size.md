@@ -1,8 +1,8 @@
 # ADR-0166 — A published document splits into routes by size, and a fragment map is the contract
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-05 (Plan 0154), with an Outcome
 > **Date:** 2026-09-05
-> **Related plan(s):** [0154](../plans/0154-the-site-becomes-navigable.md)
+> **Related plan(s):** [0154](../plans/done/0154-the-site-becomes-navigable.md)
 > **Extends:** [0154](0154-the-reader-facing-docs-publish-as-a-site.md)
 
 ## Context
@@ -128,6 +128,42 @@ routes from four documents**, against 15 routes for the whole site today.
 
 - The generated contents blocks (ADR-0163) stay in the source and would render on the document index
   route, duplicating the generated section list there. The plan decides whether to suppress them.
+
+## Outcome (2026-09-05, Plan 0154)
+
+The decision stands and the mechanism is in the tree. One measurement in **Why these two numbers**
+was wrong when this ADR was written, and it changed the output rather than only the prose.
+
+**`docs/on-device-validation.md` is 48,219 bytes, not 37,241** — and 45,417 at `9dc2183`, the commit
+the Notes say every figure was taken against, so the number was never right. Three consequences,
+none of which is repaired by editing the body:
+
+- **40 KB selects five documents, not four.** The bullet claiming it "selects the four documents
+  above and no others" is false.
+- **The document named as the reason 40 KB is the right threshold is on the wrong side of it.** It
+  splits into 10 routes. It is still "a checklist read top to bottom", and it is now ten pages.
+- **The real largest published document under the threshold is `docs/nfr.md` at 33,295 bytes.**
+
+The route prediction moved with it: **133 routes from five documents**, against the 112 from four
+predicted here — 46 / 25 / 22 / 19 / 10, and the first four are this ADR's own numbers exactly. The
+worst-case route is **26,893 bytes** (`### What the report's columns mean`), against 26,788
+predicted, and `ROUTE_SOURCE_CEILING` holds. Plan 0154 owed the cost figures and measured them: a
+cold build goes 8,551 ms to 9,593 ms (+12 %), the Pagefind index 1,290 KB to 1,706 KB (+32 %).
+
+**The split has no floor, and this ADR argues for one without having it.** Stopping at `###` is
+justified above because "a third level shatters coherent small sections into pages with nothing on
+them" — but that is a property of small sections, not of depth, and the size rule applies no
+minimum at the levels where it does split. **22 of 122 split leaf routes hold under 1,200 bytes**;
+the smallest is 196. `docs/on-device-validation.md` is the concentrated case — three of its ten
+routes are under 800 bytes, while its own `## Checklist` stays one 22,598-byte route because it
+carries no `###` to split at. Both halves of that sentence are the same gap seen from two ends. A
+merge floor — a section under some size staying with its neighbour rather than becoming a route —
+is the lever, and it needs its own arithmetic and its own ADR. Recorded here rather than fixed,
+because raising 40 KB would only move which documents suffer it.
+
+`ROUTE_SOURCE_CEILING` is asserted against **the splitter's output only**, not against every route.
+Applied to every route the two constants contradict each other: `docs/nfr.md` is 33,295 bytes and
+stays one route by decision, which is the threshold working, not failing.
 
 ## Alternatives considered
 
