@@ -221,8 +221,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the rule, on the smallest real case | dev | done | committed with this row |
-| 2 — the expression language | dev | | |
+| 1 — the rule, on the smallest real case | dev | done | `3fdd391` |
+| 2 — the expression language | dev | done | committed with this row |
 | 3 — the roster's own sections | dev | | |
 | 4 — the three sections that are most of the document | dev | | |
 | 5 — the gate, and the sweep | dev | | |
@@ -252,6 +252,28 @@ line 1058, in a passage this phase rewrites around.
 **P1 — the phase's `toc.mjs` done-when is vacuous for this file.** `docs/preset-palettes.md`
 carries no `toc:begin` block; the six that do are listed by the gate. It was run and reports the
 repository's six blocks current.
+
+**P1 — the commit also carried two link repairs that were not mine.** Another session committed
+plan 0154's close (`9b48c22`) into this same working tree mid-phase, moving it to `plans/done/`.
+Its repair of the two `0154` links in this plan's own header was in the working tree when Phase 1
+committed and rode along in `3fdd391`. Nothing was lost; the phase commit is not file-clean of
+that close. Every phase commit in this plan uses `git commit -- <paths>` rather than `git add`,
+because that session's staged rename was sitting in the index.
+
+**P2 — counts.** 48 bare citations to 0. 75,816 -> 73,881 bytes (-2.6 %).
+
+**P2 — the grammar surface, listed from both versions rather than read.** Leading code cell of
+every table row: 66 before, 66 after, no loss and no gain. Every `name(` call form: 20 before, 20
+after, identical. Every backtick-quoted identifier in the file: no loss and no gain. The error
+message blocks are unchanged.
+
+**P2 — a deliberate fact loss, larger than the other phases'.** The downbeat-lock table published
+both a superseded fold's numbers and the current ones as `old -> new` (`0.00 -> 2.36 %`,
+`0.79 -> 3.67 %`, `4.16 -> 0.42 %`). The three current figures are kept; the three superseded ones
+are gone, and the paragraph explaining techno's decline was rewritten to argue from
+four-on-the-floor having no bar-scale accent rather than from the old fold's 4.16 %. Same class:
+the `1280x720` fixed post grid and its 28 % stretch, and the per-system preset-count drift figures
+(`11 against 6`, `5 against 3`, `5 against 6`). All describe behaviour that no longer exists.
 
 ### Close triggers
 

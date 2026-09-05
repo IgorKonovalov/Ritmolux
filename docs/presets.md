@@ -11,8 +11,8 @@ you write on the right-hand side of every binding — plus how presets load, whe
 they live, and how a mistake is reported. It is the authoring counterpart to
 [ADR-0002](adrs/0002-layered-preset-architecture.md) (the layered preset
 architecture) and [ADR-0020](adrs/0020-preset-grammar-v2-branching-functions-tempo.md)
-(the v2 grammar). Only **layers 1-2** of ADR-0002 exist today — TOML data presets
-over a pure expression language. Layer 3 (Rhai scripting) and cross-preset
+(the v2 grammar). Only **layers 1-2** of that architecture exist today — TOML data
+presets over a pure expression language. Layer 3 (Rhai scripting) and cross-preset
 blending are deferred.
 
 **The per-system parameter tables live in [`presets/README.md`](../presets/README.md)**,
@@ -27,9 +27,9 @@ this document does not duplicate them.
 
 > **Accurate as of 2026-08-13**, against the curated set in
 > [`presets/`](../presets/) — one or more presets for every built-in system — and
-> the v2 expression grammar (Plan 0019). The count is deliberately not written
-> down here: it has moved with almost every plan, and a number in this line is a
-> line that goes stale without anything noticing.
+> the v2 expression grammar. The number of presets is deliberately not written
+> down here: it moves constantly, and a count in this line is a line that goes
+> stale without anything noticing.
 
 ---
 
@@ -124,7 +124,7 @@ its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
 easing), `[latch]` (an event armed on one condition and fired by another —
 [below](#the-latch-table--arm-on-one-thing-fire-on-another)),
 `[palette]` / `[palette_b]` (colour), and `[layer]` (a second scene
-composed under or over the main one — ADR-0090; the expression language inside
+composed under or over the main one — the expression language inside
 `[layer.params]` is exactly this document's). All are documented in
 [`presets/README.md`](../presets/README.md) and
 [`docs/preset-palettes.md`](preset-palettes.md).
@@ -155,37 +155,33 @@ that table is maintained alongside the presets and is the authoritative list.
 |-------------|---------------|
 | `fragment_field` | A fullscreen domain-warped light field (fragment shader). |
 | `swarm` | ~10k CPU-simulated particles on an evolving flow field. |
-| `parametric_curve` | A sampled line curve — the Maurer rose (ADR-0007). |
-| `lsystem` | An L-system turtle figure, precomputed per depth (ADR-0007). |
-| `star_pattern` | A Hankin star pattern over a regular tiling (ADR-0007). |
-| `reaction_diffusion` | A Gray-Scott reaction-diffusion field (ADR-0012). |
-| `attractor` | GPU compute particles iterating a strange attractor (ADR-0015). |
-| `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring (ADR-0036). |
-| `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies (ADR-0057). |
-| `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours (ADR-0105). |
-| `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own (ADR-0113). |
-| `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light (ADR-0123). |
+| `parametric_curve` | A sampled line curve — the Maurer rose. |
+| `lsystem` | An L-system turtle figure, precomputed per depth. |
+| `star_pattern` | A Hankin star pattern over a regular tiling. |
+| `reaction_diffusion` | A Gray-Scott reaction-diffusion field. |
+| `attractor` | GPU compute particles iterating a strange attractor. |
+| `spectrum` | The log-spaced band array as N elements — bars, a contour, or a ring. |
+| `emitter` | Objects that spawn, ride their own parabola, and die — the only system whose population varies. |
+| `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours. |
+| `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own. |
+| `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light. |
 
-This table used to carry a per-system count of curated presets. It is gone rather than
-corrected: at the Plan 0054 close six of its eight numbers were wrong (`parametric_curve`
-read 11 against 6 actual, `swarm` 5 against 3, `attractor` 5 against 6), because a count
-re-drifts every time a preset is added and nothing fails when it does. `presets/` is the
-list; `ls presets/*.toml` is the count.
+**There is deliberately no per-system preset count here.** A count re-drifts every time
+a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
+is the count.
 
-**The twelfth system added no expression grammar.** `shape_collage` (Plan 0113) is
-entirely new *parameters* — every variable, constant, function, operator and error
-message in [The expression language](#the-expression-language) is exactly what it
-was before, and a collage preset is written with the same vocabulary as every other
-preset. Recorded because the alternative to writing it down is a reader assuming a
-new system must have brought new grammar with it.
+**`shape_collage` adds parameters, not grammar.** Every variable, constant, function,
+operator and error message in [The expression language](#the-expression-language) is the
+same with it as without, and a collage preset is written with the same vocabulary as every
+other preset — worth stating, because a new system reads like it must have brought new
+grammar with it.
 
 **The four line systems share one stroke.** `parametric_curve`, `lsystem`,
 `star_pattern` and `spectrum` all draw through the same line renderer, so
 `thickness`, `brightness`, `glow` and `softness` mean the same thing on all four
 and a value that reads well on one transfers. `softness` is the shape of the
-stroke *across* its width (ADR-0124): `0` is solid with a one-pixel antialiased
-edge, `1` is the pure quadratic falloff these scenes drew until Plan 0114, and
-the default is `0.25`. It is **coverage** where `glow` is **light** — reach for
+stroke *across* its width: `0` is solid with a one-pixel antialiased edge, `1` is
+a pure quadratic falloff, and the default is `0.25`. It is **coverage** where `glow` is **light** — reach for
 `softness` when a figure reads blurred and `glow` when it reads too bright. The
 working ranges, the sub-pixel limit and the `thickness` dead zone that sits
 beside it are in
@@ -212,25 +208,22 @@ each side composites its own backdrop and chain, independently. The blend, the
 tonemap and the ink remap are **engine-wide**: one pass each, over the frame both
 presets produced.
 
-**Everything left of the tonemap is floating-point linear light** (Plan 0045), so
-an additive accumulation is free to exceed 1.0 and no hand-off clips; the tonemap
+**Everything left of the tonemap is floating-point linear light**, so an additive
+accumulation is free to exceed 1.0 and no hand-off clips; the tonemap
 is the single place the frame becomes a displayable picture. That is why
 `bloom_threshold` can mean "brighter than the display could show" and why stacked
 strokes roll off with their colour intact instead of flattening to white.
 
 **The post chain renders at the render target's own resolution.** `trails` and
-`kaleido_*` used to run through a fixed 1280x720 grid, so composing either one
-upscaled the whole frame on any display above 720p — sharp geometry went in and soft
-pixels came out. They follow the target now (quantized and capped), so a look no
-longer costs sharpness.
+`kaleido_*` follow the target (quantized and capped) rather than a fixed grid, so
+composing either one costs no sharpness at any display size.
 
 **A stage changes softness, never shape.** The internal grid is a resolution, not a
 proportion: your scene is drawn at the *window's* aspect and the stage's present
 stretches it back by exactly the inverse, so the grid's own ratio cancels out and a
-circle stays a circle whether `trails` is on or off (ADR-0037). Plan 0035 made that
-true; before it, composing a stage stretched the whole frame by up to 28 % on common
-window sizes, which is worth knowing if you are reading a preset comment written
-earlier that blames a stage for a figure's shape.
+circle stays a circle whether `trails` is on or off
+([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)). A preset comment
+that blames a stage for a figure's shape is stale.
 
 Two things still follow from a stage being a *resample*:
 
@@ -239,7 +232,7 @@ Two things still follow from a stage being a *resample*:
   finished pixels. Prefer the mirror when either would do — see
   [Mirror or kaleidoscope?](../presets/README.md#mirror-or-kaleidoscope-they-are-not-the-same-cost).
 - **Reaction-diffusion is a special case in the other direction.** Its simulation grid
-  is deliberately fixed and independent of the window (ADR-0012), but the field is
+  is deliberately fixed and independent of the window, but the field is
   **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
   than running out of field.
 
@@ -354,7 +347,7 @@ behind it travels.
 
 ### Transitions between presets
 
-A preset switch dissolves rather than cuts (ADR-0024 / ADR-0032). Nothing about it
+A preset switch dissolves rather than cuts. Nothing about it
 is preset-authored today — duration and blend kind are engine policy in code — but
 two consequences reach your file:
 
@@ -430,8 +423,9 @@ evaluation, and `x`/`y`/`rad`/`ang` for a per-vertex one.
 | `rad` | That vertex's distance from the centre, aspect-corrected against the render target. | `1.0` at the middle of the top and bottom edges on any display; further at the sides of a wide one. |
 | `ang` | That vertex's angle from the centre, `[0, tau)`, counter-clockwise from +x as you look at the screen. | `0` outside a `[per_vertex]` table. |
 
-**The four headline levels are normalized** (ADR-0049): each is divided by its own
-slowly-decaying running peak, with a silence floor so a quiet room reads `0` rather
+**The four headline levels are normalized**
+([ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)): each is
+divided by its own slowly-decaying running peak, with a silence floor so a quiet room reads `0` rather
 than amplified noise. That is what makes a threshold portable across tracks and
 gain staging. The cost is deliberate — absolute dynamics are hidden, so a quiet
 passage and a loud one read alike. When a look *should* scale with real loudness,
@@ -439,10 +433,10 @@ use the `*_raw` twin and expect the old tiny magnitudes.
 
 The five musical-time variables come from the beat tracker, and the three
 bar-position ones sit behind a confidence gate with a counter fallback, so they are
-always periodic and never confidently wrong about the music (ADR-0050). 4/4 is
-assumed. **None of the five is a dependable musical period.** `beat_index` counts
-onset detections rather than beats (ADR-0109), and the bar trio is the counter
-fallback most of the time — both measured, and diagnosed, in
+always periodic and never confidently wrong about the music. 4/4 is assumed.
+**None of the five is a dependable musical period.** `beat_index` counts onset
+detections rather than beats, and the bar trio is the counter fallback most of the
+time — both measured, and diagnosed, in
 [Musical time](#musical-time) below. Read that section before you build structure
 on any of them.
 
@@ -521,18 +515,15 @@ errors and never rejects a preset at load.
 > [!WARNING]
 > **`bin(x)` is a narrow probe, not a region average.** One call sees about two
 > of the 64 bands, so a handful of calls **spot-samples** a region rather than
-> integrating it. That part has never changed. What did change is the axis
-> underneath it — see the table, and note that **this page said the opposite
-> until Plan 0048**.
+> integrating it. The axis underneath it is logarithmic end to end — see the table.
 >
 > The band edges are laid out on a log curve from 35 Hz to 18 kHz
-> (`core/src/dsp/fft.rs`, `edges_hz[k] = 35 × (18000/35)^(k/64)`), and since
-> [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) a
-> second, longer analysis window feeds every band below the **246 Hz crossover**,
-> so no band is starved and **the curve is the truth end to end**. Before that,
-> each band was floored at one FFT bin (23.4 Hz at 48 kHz), which bound the
-> bottom half of the axis *linear* — the regime this page used to describe, and
-> which no longer exists.
+> (`core/src/dsp/fft.rs`, `edges_hz[k] = 35 × (18000/35)^(k/64)`), and a second,
+> longer analysis window feeds every band below the **246 Hz crossover**, so no
+> band is starved and **the curve is the truth end to end**
+> ([ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)).
+> No part of the axis is linear: a single-window analysis would floor each band
+> at one FFT bin (23.4 Hz at 48 kHz) and bind the bottom half of the axis that way.
 >
 > Derived from `fft.rs`'s edge formula and `expr.rs`'s `bin()`, which places the
 > probe at band-space position `x × 63` and interpolates — so what it listens to
@@ -722,15 +713,14 @@ rot  = "0.35 + sin(ang) * 0.30"
 ```
 
 The nine outputs it accepts — `zoom`, `rot`, `cx`, `cy`, `dx`, `dy`, `sx`, `sy`,
-`warp` — are the per-vertex generalization of the `fb_*` affine (ADR-0048), and
+`warp` — are the per-vertex generalization of the `fb_*` affine, and
 [`presets/README.md`](../presets/README.md#the-per_vertex-table) is the
 authoritative table for what each does.
 
-**Converted MilkDrop presets do not ship** (Plan 0100 Phase 8, user's call 2026-08-16: decided
-later, nothing distributed now). The public `.milk` collections have no clear licensing, so no
-converted preset enters this repository or a release; the `milkconv` converter plus a directory
-you point `RLX_PRESET_DIR` at is the whole import path. The question is re-raised when the
-conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
+**Converted MilkDrop presets do not ship.** The public `.milk` collections have no clear
+licensing, so no converted preset enters this repository or a release; the `milkconv` converter
+plus a directory you point `RLX_PRESET_DIR` at is the whole import path. The question is
+re-raised when the conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 
 > **If you already have a converted directory, re-run `milkconv` over it.** The feedback field now
 > emulates the reference's 8-bit floor
@@ -742,8 +732,8 @@ conversion-fidelity backlog (design-backlog 0106–0108) is worked off.
 > before the quantizer existed and never calls it, so the uniform reaches nothing. Nothing breaks in
 > the meantime; that preset renders exactly as it does today.
 >
-> **A second reason to re-run, as of Plan 0109: the video echo now exists.** `fVideoEchoAlpha`,
-> `fVideoEchoZoom` and `nVideoEchoOrientation` were warned about as unconsumed and are now read by
+> **A second reason to re-run: the video echo.** `fVideoEchoAlpha`,
+> `fVideoEchoZoom` and `nVideoEchoOrientation` are read by
 > the present pass — a second sampled copy of the frame, zoomed and flipped, summed over the first.
 > This one *always* needs the re-convert, at every era: the three values are seeded into the bundle
 > at conversion time, so a bundle emitted before this has no register for the scene to read. Only
@@ -761,8 +751,9 @@ Things worth knowing before you reach for it:
   `[params]` is a load **warning**, because a `rad` that silently reads zero is a
   much more surprising thing to debug than an `index` that does.
 - **`rad` and `ang` are aspect-corrected against the render target**, never
-  against the mesh (ADR-0037), so a `rad`-driven figure is round on a 16:9
-  monitor and round on a 5:4 one.
+  against the mesh
+  ([ADR-0037](adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)), so a
+  `rad`-driven figure is round on a 16:9 monitor and round on a 5:4 one.
 - **`[smoothing]` cannot ease a per-vertex binding**, for the reason it cannot
   ease a per-element one: the smoother holds one scalar and a series has no single
   value. Listing one is a surfaced load warning.
@@ -813,10 +804,9 @@ left-associatively as `(a > b) > c`, comparing a `0`/`1` against `c`. Write
 
 #### Set the threshold from a measured level, not from `--set`
 
-**This used to be the single most expensive mistake an author could make here**,
-and ADR-0049 largely retired it. `bass`, `mid`, `treb` and `onset` are now each a
-fraction of their own slowly-decaying recent peak, so they genuinely span `0..1`
-and a threshold means the same thing on every track:
+`bass`, `mid`, `treb` and `onset` are each a fraction of their own
+slowly-decaying recent peak, so they genuinely span `0..1` and a threshold means
+the same thing on every track:
 
 | variable | mean | max | so a live threshold sits… |
 |---|---|---|---|
@@ -831,12 +821,11 @@ Measured 2026-07-30 over `--signal dynamic:110`; re-measure any time with
 
 Two traps remain, and they are the mirror image of the old one.
 
-**A threshold can now be too LOW.** The old failure was a gate above anything
-music produced, so it never fired. On the v2 scale the commoner failure is a gate
-*below* the typical level, which fires always — the `else` branch becomes dead code
-instead of the `then`. Nine bindings across the shipped library were in exactly
-that state after ADR-0049 landed, every one a threshold written for raw levels
-that normalized values then cleared constantly; Plan 0048 Phase 7 retuned them.
+**A threshold can be too LOW.** A gate set *below* the typical level fires always,
+and the `else` branch becomes the dead code instead of the `then`. This is the
+commoner failure on the normalized scale, and the giveaway is a threshold written
+for raw levels — nine bindings across the shipped library once needed retuning for
+exactly that reason.
 
 **`bin(x)` is not on the scalars' scale.** The band array normalizes against one
 peak shared by all 64 bands — which is what keeps `bin(hi) - bin(lo)` a meaningful
@@ -870,7 +859,7 @@ and unreachable thresholds applies to these in full.
 
 #### Musical time
 
-Five variables place you in the music rather than measuring it (ADR-0050):
+Five variables place you in the music rather than measuring it:
 
 | variable | range | meaning |
 |---|---|---|
@@ -899,14 +888,13 @@ select(mod(bar_index, 8) < 4, 0.2, 0.8)   # an 8-bar A/B alternation
 > between them.** It increments on the onset detector's flag —
 > `flux > mean + 1.5 sigma` with a 96 ms refractory and no tempo gating — so a
 > hi-hat, a snare rattle and a chord change each advance it. Measured against the
-> real beat on live material: **1.35x–2.10x** detections per musical beat across
-> Plan 0086's three genres and **1.20x / 1.22x / 2.28x** across Plan 0095's, and
-> it wanders between 1x, 2x and 4x *within a single track*. That instability is
-> the finding: there is no "about twice as often" to correct for.
+> real beat on live material across two sets of three genres: **1.35x–2.10x**
+> detections per musical beat in one and **1.20x / 1.22x / 2.28x** in the other,
+> and it wanders between 1x, 2x and 4x *within a single track*. That instability
+> is the finding: there is no "about twice as often" to correct for.
 >
 > **So `mod(beat_index, N)` never means N beats.** `mod(beat_index, 16)` is not
-> four bars of four — this document said it was, and that is retracted. What
-> `beat_index` *is* good for is anything that only wants to change on activity
+> four bars of four. What `beat_index` *is* good for is anything that only wants to change on activity
 > without claiming a period: `hash(beat_index)` to re-roll a colour or a count on
 > each hit, or a modulus chosen as a rough "every so often" and read as such.
 > See [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md).
@@ -918,18 +906,16 @@ wrong about where the bar starts — you cannot see which mode is active,
 deliberately, and you do not need to. 4/4 is assumed.
 
 > **How often is it locked? Roughly 2–4 % of hops on material with bar-scale
-> accents, and near zero on material without.** Since Plan 0095 the estimator
-> folds accent history over a **tempo-driven bar grid** instead of over
-> `beat_index`, so the four alignments it chooses between are alignments of a unit
-> that is a **stable multiple of the beat** rather than a wandering one — a real
-> bar when the tempo estimate is on the right octave, half or double one when it
-> is not. Re-measured through the live app on three genres, each paired against a
-> reconstruction of the pre-0095 fold on the same capture, the share of hops over
-> the `0.25` confidence gate moved:
+> accents, and near zero on material without.** The estimator folds accent history
+> over a **tempo-driven bar grid**, so the four alignments it chooses between are
+> alignments of a unit that is a **stable multiple of the beat** rather than a
+> wandering one — a real bar when the tempo estimate is on the right octave, half
+> or double one when it is not. Measured through the live app on three genres, the
+> share of hops over the `0.25` confidence gate:
 >
 > | | rock/pop | hip-hop | techno |
 > |---|---|---|---|
-> | over the gate, old → new | 0.00 → **2.36 %** | 0.79 → **3.67 %** | 4.16 → **0.42 %** |
+> | over the gate | **2.36 %** | **3.67 %** | **0.42 %** |
 >
 > **The hip-hop column carries that caveat.** Its capture read a `bpm` median of
 > 165 on a track that counts at ~90 — an octave high, which
@@ -938,13 +924,11 @@ deliberately, and you do not need to. 4/4 is assumed.
 > grid's "bar" there spanned two musical beats. A stable two, not a wandering
 > 1.35-2.10, which is the whole improvement; but not a bar.
 >
-> **Techno declining is the repair working, not a regression.** Four-on-the-floor
-> puts a kick on every beat, so there is no bar-scale accent structure to find; the
-> old fold's 4.16 % came from bucketing a counter that ran at 2.28 detections per
-> beat, making its "bar" 1.75 musical beats long and aliasing its four buckets onto
-> the kick/hat alternation — a real 4-periodicity that is not a bar. A gate that
-> shuts on material with no bar accent is the honest outcome, and a confidently
-> wrong downbeat is what ADR-0050 calls worse than none.
+> **Techno reading lowest is the gate working, not a failure.** Four-on-the-floor
+> puts a kick on every beat, so there is no bar-scale accent structure to find. A
+> gate that shuts on material with no bar accent is the honest outcome: a
+> confidently wrong downbeat is worse than none, which is why the estimator
+> publishes only while it is confident.
 >
 > The remaining ceiling is diagnosed, not mysterious: the accent the estimator
 > folds is 70 % bass band, on the assumption that the kick marks the bar. In
@@ -986,13 +970,13 @@ crosses makes it a boolean param stuck at `0` forever. It reports as a `COMP`
 line ([ADR-0043](adrs/0043-reachability-reports-comparison-nodes.md)).
 
 **Reachability cannot see a gain — a second statistic does.** A comparison is a
-fork the walker can watch; a `clamp(bass * 16, 0, 0.3)` is not, and after ADR-0049
-a multiplier written for the old raw magnitudes drives its ceiling from just above
-silence and holds it there — a binding that reads as a constant while every gate
-stays green. The whole shipped library was in that state when Plan 0048 Phase 7
-measured it, so this is the failure to expect, not a hypothetical.
+fork the walker can watch; a `clamp(bass * 16, 0, 0.3)` is not. A multiplier
+written for the raw magnitudes drives such a ceiling from just above silence and
+holds it there — a binding that reads as a constant while every gate stays green.
+The whole shipped library was once in that state, so this is the failure to
+expect, not a hypothetical.
 
-Since Plan 0056 the same traversal also records **occupancy** — the fraction of
+The same traversal also records **occupancy** — the fraction of
 hops a `clamp()` spends *at* its upper bound — which is the mirror of the
 `ceils` finding and the more serious of the two
 ([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).
@@ -1051,14 +1035,12 @@ already name.
   Multiply the raw band up, then clamp so a loud passage can't blow the parameter
   out. Nearly every reactive binding is a variant of this.
 
-  On a **luminance** parameter — `brightness`, `glow`, `flash` — the clamp used to
-  be the difference between a peak and a flat white rectangle, because the frame
-  clipped per channel at 1.0. Since Plan 0045 the composite carries light past
-  1.0 and an engine tonemap rolls it off with the hue intact, so overshooting is a
-  soft loss of contrast rather than a cliff. Keep the clamp anyway: what it buys
-  now is that the peak stays *proportionate* to the rest of the frame, and it is
-  still the difference between a beat that reads as the music and one that reads
-  as a camera flash. See the additive-ceiling note in
+  On a **luminance** parameter — `brightness`, `glow`, `flash` — the composite
+  carries light past 1.0 and an engine tonemap rolls it off with the hue intact,
+  so overshooting is a soft loss of contrast rather than a cliff. Keep the clamp
+  anyway: what it buys is that the peak stays *proportionate* to the rest of the
+  frame, and it is the difference between a beat that reads as the music and one
+  that reads as a camera flash. See the additive-ceiling note in
   [`presets/README.md`](../presets/README.md#linear-light-and-exposure-plan-0045).
 
 - **Baseline + reactive** — a resting value plus an audio-driven add:
@@ -1235,7 +1217,7 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 
 - **An unknown parameter name.** A binding whose name no system or engine stage
   consumes is reported at load, naming the parameter and the system, and the rest
-  of the preset applies normally (ADR-0020):
+  of the preset applies normally:
 
   ```
   preset ...\my_first.toml: warning: unknown parameter 'wrap' for system 'fragment_field' (binding kept, but nothing reads it)
@@ -1322,7 +1304,7 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
 - **Hot-reload (standalone).** The app polls the directory ~every 150 ms and
   reloads on any change. Errors and warnings are printed and the last good set is
   kept — a bad edit never crashes a running visual.
-- **Cycling.** Standalone: the app **holds one scene by default** (ADR-0027) —
+- **Cycling.** Standalone: the app **holds one scene by default** —
   **Space** cycles to the next preset (title bar shows the name), and **`A`**
   toggles auto-rotate on/off (auto is off out of the box; enable it per-run with
   `A` or persistently via `auto = true` under `[rotate]` in `config.toml`).
@@ -1357,8 +1339,8 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
 
 1. **`presets/<name>.toml`** — the preset file itself. That is all the *shipping*
    takes: `core/build.rs` globs the directory, so the embedded list and the
-   preset-count test follow automatically (ADR-0022). There is no array to extend
-   and no count to bump.
+   preset-count test follow automatically. There is no array to extend and no
+   count to bump.
 2. **[`presets/README.md`](../presets/README.md)** — if the preset showcases a
    control worth pointing an author at.
 
@@ -1373,9 +1355,8 @@ in this file — **and every other place that re-types the roster**, in the same
 commit: the short list in [`presets/README.md`](../presets/README.md), and the
 `preset-author` skill's `SKILL.md` and `references/grammar.md`. Four copies of a
 list is four chances to drift, and a stale roster silently costs the content lane
-a capability. A change to the grammar is **ADR territory** (ADR-0002 fixed the
-model; ADR-0020 grew it to v2) — flag it rather than quietly widening the
-vocabulary here.
+a capability. A change to the grammar is **ADR territory** — flag it rather than
+quietly widening the vocabulary here.
 
 > **Format stability:** the app is pre-1.0 and in active development, so the
 > preset format may still change between releases. Preset-format stability begins
