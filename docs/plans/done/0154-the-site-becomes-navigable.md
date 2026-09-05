@@ -1,14 +1,27 @@
 # 0154 — The site becomes navigable
 
-> **Status:** in-progress
+> **Status:** done (2026-09-05)
+> **Closed 2026-09-05.** Phases 1-7 as commits `3e5f6d6`, `2a77539`, `f7b5676`, `f3c8bb2`,
+> `22a0371`, `96e5806` and `3924b60`, on `main` with no worktree; Phase 8 (`human`) on 2026-09-05
+> with no commit. Mode 4 review: **no blockers, two majors, six minors, two nits.** Verified
+> independently of the implementation log: `cargo nextest run --workspace` green (1536 passed, 5
+> skipped, exit 0), all six tree gates and `toc.mjs --check` green, a cold `npm run build` from a
+> cleared cache at 137 pages, both site gates exit 0 against it (135 routes, 133 published, largest
+> split route 26,893 B), the route breakdown reproduced exactly (46 / 25 / 22 / 19 / 10), zero
+> headings in `dist` ending in a provenance parenthetical beyond the three the log discloses, zero
+> routes and zero page titles naming a plan number, zero `@VERSION@` tokens, the build stamp on all
+> 137 pages, and all 51 fragment hrefs in `dist` checked against the real anchors on their target
+> pages. The majors are `site/README.md` asserting the opposite of what Phase 6 shipped, and
+> ADR-0166's 37,241-byte figure being wrong in a way that split a document the ADR named as the
+> reason its threshold was right — both repaired at the close, the second as an ADR `Outcome`.
 > **Created:** 2026-09-05
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md),
-> [0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md),
-> [0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
-> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`;
+> **Related ADRs:** [0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md),
+> [0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md),
+> [0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
+> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`;
 > **this plan does not touch it**, and ADR-0167 records the narrowing of its exclusion.
-> **Sequenced before:** [0155](0155-the-reader-documents-stop-explaining-themselves.md) — that plan's
+> **Sequenced before:** [0155](../0155-the-reader-documents-stop-explaining-themselves.md) — that plan's
 > prose rewrite renames headings, and Phase 3 here is what turns a broken inbound anchor into a
 > build failure instead of silent rot.
 > **Lane guidance:** build on `main` directly, **not** in a worktree, for Plan 0143's reason: every
@@ -39,7 +52,7 @@ Four problems, measured 2026-09-05 against the tree at `9dc2183`.
 **One page is the navigation problem.** `presets/README.md` is 273,211 bytes on one route. A flat
 split at `##` does not fix it — three sections hold 219,863 bytes, 80.5 % of the document. The
 distribution and the thresholds it justifies are in
-[ADR-0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md).
+[ADR-0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md).
 
 **Fragments are unguarded.** `scripts/check-doc-links.mjs` validates link paths and deliberately
 never validates fragments. 15 fragment links point into the roster and 21 into `docs/capturing.md`;
@@ -49,13 +62,13 @@ them wrong loudly, and makes them checkable for the first time.
 **There is no introduction.** Of 15 published routes, none says what Ritmolux is, how to get it, or
 how to run it. ADR-0154 made the home page a router on purpose; that was correct while the site had
 no audience and is wrong now that it has a public URL. The reasoning is in
-[ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md).
+[ADR-0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md).
 
 **The site addresses the wrong reader.** 792 references to a plan or an ADR appear in the published
 set. 31 of them end a heading, which under ADR-0166 would make a plan number part of a URL —
 `.../guide/parameter-roster/engine-wide-controls-plan-0018/`. That class plus 26 trailing body-line
 citations is the mechanical 7 %; the other 93 % is prose and is
-[Plan 0155](0155-the-reader-documents-stop-explaining-themselves.md).
+[Plan 0155](../0155-the-reader-documents-stop-explaining-themselves.md).
 
 Two smaller defects belong here because they are the same kind of thing. Adding a page requires
 editing `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` **and** the sidebar in
@@ -260,7 +273,7 @@ flowchart TB
 ## What this plan does NOT do
 
 - **It does not rewrite the prose.** The 735 citations woven into sentences are
-  [Plan 0155](0155-the-reader-documents-stop-explaining-themselves.md), which this plan's Phase 3
+  [Plan 0155](../0155-the-reader-documents-stop-explaining-themselves.md), which this plan's Phase 3
   gate exists to protect.
 - **It does not touch `README.md`.** Plan 0103 owns it. ADR-0167 records the narrowing of that
   plan's exclusion; the file itself is untouched here except that `CLAUDE.md`'s packaging line is

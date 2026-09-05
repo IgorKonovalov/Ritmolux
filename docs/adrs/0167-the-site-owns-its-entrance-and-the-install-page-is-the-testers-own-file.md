@@ -1,8 +1,8 @@
 # ADR-0167 — The site owns its entrance, and the install page is the tester's own file
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-05 (Plan 0154)
 > **Date:** 2026-09-05
-> **Related plan(s):** [0154](../plans/0154-the-site-becomes-navigable.md)
+> **Related plan(s):** [0154](../plans/done/0154-the-site-becomes-navigable.md)
 > **Narrows:** [0154](0154-the-reader-facing-docs-publish-as-a-site.md) — the router clause
 
 ## Context

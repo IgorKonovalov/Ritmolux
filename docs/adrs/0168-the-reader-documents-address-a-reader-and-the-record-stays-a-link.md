@@ -1,8 +1,8 @@
 # ADR-0168 — The reader documents address a reader, and the working record stays a link
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-05 (Plan 0154)
 > **Date:** 2026-09-05
-> **Related plan(s):** [0154](../plans/0154-the-site-becomes-navigable.md) (the mechanical half),
+> **Related plan(s):** [0154](../plans/done/0154-the-site-becomes-navigable.md) (the mechanical half),
 > [0155](../plans/0155-the-reader-documents-stop-explaining-themselves.md) (the prose half)
 
 ## Context

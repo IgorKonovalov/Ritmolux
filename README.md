@@ -81,9 +81,10 @@ milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113, Plan 
                      #   nothing shipped depends on it, so it is outside `default-members` too.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
 scripts/             # Repo maintenance: the six Node gates the pre-push hook and CI's `links` job
-                     #   run (see "Developer setup" below), plus check-site-links.mjs, a seventh that
-                     #   runs in neither because it needs a built site — it lives in the Pages
-                     #   workflow. And scripts/fixtures/ seeded bite checks.
+                     #   run (see "Developer setup" below), plus check-site-links.mjs and
+                     #   check-site-routes.mjs, a seventh and eighth that run in neither because they
+                     #   need a built site — both live in the Pages workflow. And scripts/fixtures/
+                     #   seeded bite checks.
 site/                # The documentation site: an Astro Starlight front end publishing the
                      #   reader-facing subset of docs/ with search, at igorkonovalov.github.io/Ritmolux/.
                      #   Never shipped. `docs/` stays the single source — it is read in place, never

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0154 — The site becomes navigable](#0154--the-site-becomes-navigable)
   - [0152 — The OSC root becomes `/rlx`](#0152--the-osc-root-becomes-rlx)
   - [0143 — The documentation gets a front end](#0143--the-documentation-gets-a-front-end)
   - [0128 — The rendered file stops looking upscaled](#0128--the-rendered-file-stops-looking-upscaled)
@@ -172,6 +173,85 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0154 — The site becomes navigable](done/0154-the-site-becomes-navigable.md)
+
+— closed 2026-09-05. Seven `dev` phases on `main` directly with no worktree, per the plan's own lane
+guidance: `3e5f6d6` (1, the provenance strip), `2a77539` (2, the roster splits), `f7b5676` (3, the
+fragment gate), `f3c8bb2` (4, the rule generalises), `22a0371` (5, the entrance), `96e5806` (6, the
+gates and the build stamp), `3924b60` (7, the visual pass). Phase 8 (`human`) verified on the
+deployed site with no commit. Version: **0.108.0** (minor — the same shape as Plan 0143, which took
+a minor for building the site in the first place; nothing here ships, and the version is still the
+application's). Review: **no blockers, two majors, six minors, two nits.**
+[ADR-0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md) accepted with a dated
+`Outcome`; [ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)
+and [ADR-0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
+accepted plainly.
+
+**What it did.** The site went from 15 routes to 133. A build-time splitter cuts any published
+document over 40 KB into one route per `##`, and any resulting section over 20 KB again at `###`;
+the roster's 273,211 bytes became 46 pages, and a Pagefind search for a parameter name now returns
+the subsection that defines it rather than a 484 KB document. A fragment map, keyed on the slug a
+link was *written* against, resolves every deep link to the route that now carries its heading —
+and throws at build time when it matches nothing, which is a gate this tree has never had. A remark
+plugin strips trailing `(Plan NNNN)` / `(ADR-NNNN)` from headings before slugs are computed, so no
+route and no page title names a plan number. The home page stopped being a router: it says what
+Ritmolux is, shows one frame per system, and points at a release, with the three
+`packaging/*/READ-ME-FIRST.md` published as the install pages themselves so the web copy and the
+zip copy cannot drift. `scripts/check-site-routes.mjs` is the eighth Node gate and closes the
+`PUBLISHED`-versus-sidebar hole that Plan 0143's close had named and left open.
+
+**Nothing under `docs/` or `presets/` was edited to make any of it work**, which was the constraint
+the whole design had to satisfy — one anchor correction in `docs/presets.md` aside, and that link
+had always been dead (`#systems` against a heading reading `## The built-in systems`). It was found
+*by* the new gate, on the build where that document first split. That is the mechanism paying for
+itself on the day it landed.
+
+**What the close verified independently of the implementation log.** `cargo nextest run --workspace`
+green (1536 passed, 5 skipped, 11 slow, 443.5 s, exit 0); all six tree gates and `toc.mjs --check`
+green; a cold `npm run build` with `dist`, `.astro` and `node_modules/.astro` cleared, at 137 pages
+in 15.5 s; both site gates exit 0 against that build (135 routes, 133 from the published set,
+largest split route 26,893 B); the route breakdown reproduced exactly at 46 / 25 / 22 / 19 / 10;
+zero headings in `dist` ending in a provenance parenthetical beyond the three the log discloses;
+zero routes and zero page titles naming a plan number; zero `@VERSION@` tokens; the build stamp on
+all 137 pages; and all 51 fragment hrefs in `dist` resolved against the real `id`/`name` attributes
+on their target pages.
+
+**The first major: a doc that asserted the opposite of what the plan shipped.** `site/README.md`
+read *"Only one of those two omissions is caught … a `PUBLISHED` entry with no sidebar item builds a
+page reachable only by search, and every gate passes it."* Phase 6 built precisely that gate, and
+quoted this sentence as its rationale. Two more classes in the same file — *"Two build-time
+transformations exist"* against five plugins, and *"Two entrances"* against three sidebar groups.
+Repaired at the close. The developer-facing doc for the subsystem a plan rewrites is not covered by
+the operator-doc sweep table in `CLAUDE.md`, and this is the second close in a row to repair it by
+hand.
+
+**The second major, and the one worth quoting later: a justification figure that was wrong when
+written, and changed the output.** ADR-0166 argued its 40 KB threshold partly by naming the next
+document below it — *"`docs/on-device-validation.md` at 37,241 bytes, which is a checklist read top
+to bottom."* That document is **48,219 bytes**, and was 45,417 at `9dc2183`, the commit the ADR's
+own Notes say every figure was taken against. So the figure was never right, 40 KB selects **five**
+documents rather than four, and the document named as the reason the threshold is correct is on the
+wrong side of it — served as ten routes, three of them under 800 bytes, with its own `## Checklist`
+staying one 22,598-byte route because it carries no `###` to split at. `dev` measured this at Phase
+4, applied the rule anyway (correctly — the rule is the decision and the figure was only its
+justification), and left both the ADR and the phase's done-when uncorrected for the review, which is
+exactly the lane boundary working.
+
+**The design gap that fell out of it, recorded and not fixed.** ADR-0166 justifies stopping at `###`
+because *"a third level shatters coherent small sections into pages with nothing on them"* — but
+that is a property of small sections, not of depth, and the size rule applies no floor at the levels
+where it *does* split. **22 of 122 split leaf routes hold under 1,200 bytes**, the smallest 196. A
+merge floor is the lever and it needs its own arithmetic; raising 40 KB would only move which
+documents suffer it. Written into ADR-0166's `Outcome`.
+
+**What outlived the plan.** The size rule replaced a hand-kept roster on purpose, and it works both
+ways: a document that grows past 40 KB splits on the next build, one that shrinks stops. That means
+**a heading is now a URL**, and a document crossing 40 KB starts failing the build on fragment links
+that were dead all along. Both are features and both will surprise someone. The unguarded seam is
+the one the plan itself listed first among its risks: the fragment map computes slugs with
+`github-slugger` over stripped heading text while Starlight computes the real anchors in rehype, and
+nothing asserts the two agree. Measured clean at this close (51 of 51), gated by nothing.
 
 ### [0152 — The OSC root becomes `/rlx`](done/0152-the-osc-root-becomes-rlx.md)
 
