@@ -193,7 +193,7 @@ background pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope
 (`kaleido_*`), `bloom_*`, `occlude` (how much of the figure's coverage the
 backdrop resolves against), the frame `exposure`, and the final ink-on-paper
 remap (`ink_*` / `paper_*`). Those are documented under
-[Engine-wide controls](../presets/README.md#engine-wide-controls-plan-0018).
+[Engine-wide controls](../presets/README.md#engine-wide-controls).
 
 They run in a fixed order, which is worth knowing when a look does not compose the
 way you expect:
@@ -293,7 +293,7 @@ evaluated once for each element, so the relationship between a frequency region
 and what is drawn there is preset content rather than scene code.
 
 Full parameter notes are in
-[`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout-plan-0034),
+[`presets/README.md`](../presets/README.md#spectrum--the-frequency-axis-readout),
 including which composite controls this system honors, the layout-specific
 parameters (`radius` on the ring; `span` and `baseline` on `bars`/`polyline`), and
 the `curve`↔`scale` retune a level curve costs — a **5.8x** amplitude change at
@@ -692,7 +692,7 @@ Things worth knowing before you reach for it:
 ### `[per_vertex]` — one binding, evaluated once per mesh vertex
 
 `index` gives a binding one axis to vary along. `[per_vertex]` gives it **two**,
-and it belongs to exactly one system: [`warp_mesh`](../presets/README.md#warp_mesh--the-past-resampled-through-a-per-vertex-grid-plan-0100),
+and it belongs to exactly one system: [`warp_mesh`](../presets/README.md#warp_mesh--the-past-resampled-through-a-per-vertex-grid),
 which covers the frame with a grid and resamples the previous frame through it.
 A binding in that table is evaluated once per grid **vertex** per frame, with
 `x`, `y`, `rad` and `ang` bound to that vertex's own position.
@@ -1041,7 +1041,7 @@ already name.
   anyway: what it buys is that the peak stays *proportionate* to the rest of the
   frame, and it is the difference between a beat that reads as the music and one
   that reads as a camera flash. See the additive-ceiling note in
-  [`presets/README.md`](../presets/README.md#linear-light-and-exposure-plan-0045).
+  [`presets/README.md`](../presets/README.md#linear-light-and-exposure).
 
 - **Baseline + reactive** — a resting value plus an audio-driven add:
   ```

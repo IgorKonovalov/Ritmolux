@@ -223,8 +223,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — the rule, on the smallest real case | dev | done | `3fdd391` |
 | 2 — the expression language | dev | done | `2bce9be` |
-| 3 — the roster's own sections | dev | done | committed with this row |
-| 4 — the three sections that are most of the document | dev | | |
+| 3 — the roster's own sections | dev | done | `3bbcaf0` |
+| 4 — the three sections that are most of the document | dev | done | committed with this row |
 | 5 — the gate, and the sweep | dev | | |
 
 ### Notes
@@ -295,6 +295,37 @@ retuning, and `17.37`, the `Rich` mean display luminance of the un-normalized at
 The live pair it was measured against (`10.86` at `Rich`, `10.34` at `Floor`) is kept. Nothing
 else in the file's backtick vocabulary moved. The same superseded-fold table Phase 2 trimmed in
 `docs/presets.md` appears here too and was trimmed the same way.
+
+**P4 — counts.** 100 bare citations to 0 across the three sections. 271,801 -> 266,870 bytes
+(-1.8 %). Two `Plan`/`ADR` strings remain in the file and both are inside a markdown link: the
+collapsed reference `[ADR-0098]` and its `[ADR-0098]: ...` definition.
+
+**P4 — a citation form the site's own strip does not match.**
+`### Ink on paper — ... (Plans 0027, 0078)` uses the **plural**, and
+`site/src/plugins/strip-provenance.mjs`'s pattern is a four-digit `Plan NNNN`, so that heading was reaching
+the site with both numbers in its route name. It is rewritten here, and the Phase 5 gate matches
+the plural so it cannot come back. Nothing in `site/` was changed.
+
+**P4 — 16 headings renamed, 18 inbound anchors repointed.** The old and new slugs were computed
+with `github-slugger` over the whole document in reading order, which is what
+`split-document.mjs` keys its fragment map on. 4 anchors in `docs/presets.md`, 14 in
+`presets/README.md`. A 19th match was in `site/src/plugins/split-document.mjs`, inside the doc
+comment that explains the fragment map by quoting
+`presets/README.md#attractor-detail-sharpness-plan-0027` as an example of a link written with the
+provenance still in it — reverted, because rewriting it destroys the example. `site/` is untouched
+by this plan.
+
+**P4 — identifier diff, whole file: three lost.** `` `0 = falloff` `` as a code span (the value and
+its name both survive in the `kaleido_edge` table row above it), and the retired presets
+`fragment_kaleido` and `reaction_gilt`, each named only inside a provenance parenthetical. No
+shipped preset name, parameter, default or range moved. Numbers lost are phase numbers and
+superseded-implementation figures — the polyline segment counts `36`/`432`/`396` for two mandala
+rings; the live budget figures (`492`, `1 092`, `20 000`, `576` against `24`) are kept.
+
+**P4 — the built site was checked, not just the markdown.** `npm run build` in `site/` after the
+renames, then `check-site-links.mjs` and `check-site-routes.mjs`: 137 pages, 135 routes, every
+site-relative href resolves, largest split route 26,893 B. No route directory under `site/dist/`
+carries a plan or ADR number any more.
 
 ### Close triggers
 
