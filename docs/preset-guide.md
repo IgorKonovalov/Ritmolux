@@ -254,7 +254,7 @@ vocabulary rather than an omission.
 **Reach for this when** the look is **flat colour and hard edges** on a light ground: suprematist
 and constructivist canvases, poster shapes, anything where solid opaque forms overlap. The one
 authoring fact is that the palette stays under linear `0.6` — see
-[`preset-palettes.md`](preset-palettes.md#flat-colour-on-shape_collage--stay-under-the-knee-adr-0123-plan-0113).
+[`preset-palettes.md`](preset-palettes.md#flat-colour-on-shape_collage--stay-under-the-knee).
 
 ---
 

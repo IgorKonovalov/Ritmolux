@@ -1,29 +1,27 @@
 # Preset colour: the palette surface
 
-Presets control colour through a **shared palette** (ADR-0021, Plan 0020). A
-palette is a gradient baked once at load into a lookup table that the five
-**shader-coloured** scenes sample:
+Presets control colour through a **shared palette**. A palette is a gradient baked
+once at load into a lookup table that the five **shader-coloured** scenes sample:
 
 - `fragment_field`
 - `swarm`
 - `reaction_diffusion`
 - `attractor`
-- `shape_field` (Plan 0091) — the one whose sample coordinate is a **distance**
-  rather than a level, which is what makes banding it draw offset contours
+- `shape_field` — the one whose sample coordinate is a **distance** rather than a
+  level, which is what makes banding it draw offset contours
 
 **All four line scenes** sample the same LUT too, but **on the CPU, once per
 segment** rather than per pixel or per particle:
 
 - `spectrum` — see [Spectrum — colour along the frequency axis](#spectrum--colour-along-the-frequency-axis).
-- `parametric_curve`, `lsystem` and `star_pattern` joined it in Plan 0054
-  ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md)) — see
+- `parametric_curve`, `lsystem` and `star_pattern` colour along their generator's
+  axis ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md)) — see
   [The line scenes — colour along the generator's axis](#the-line-scenes--colour-along-the-generators-axis).
 
-So **every** scene reaches `[palette]`. Before Plan 0054 those three did not, and
-`hue` was the only colour control they had; a note anywhere still saying a
-`[palette]` table is inert on a line scene is stale.
+So **every** scene reaches `[palette]`, and a note anywhere saying a `[palette]`
+table is inert on a line scene is stale.
 
-**The backdrop reaches it too**, since Plan 0072
+**The backdrop reaches it too**
 ([ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md)): the background pre-pass
 samples the same baked LUT, so `bg_hue` is a coordinate in the preset's own gradient — see
 [The backdrop](#the-backdrop--bg_hue-is-a-coordinate-in-your-gradient). There is no longer any
@@ -93,10 +91,10 @@ the curve is the identity and the load decode and the display encode are inverse
 — to within the LUT's own 8-bit storage, which costs up to two levels on a very
 dark channel. Above the knee all three channels scale together, so the plateau
 survives as the same ink at a lower level. There is no opt-out and no second
-reading of a hex triple; ADR-0151 records why one was rejected.
+reading of a hex triple.
 
-**Everything after that decode is a linear-light colour, and since Plan 0045 it
-stays one all the way to the display.** The scene multiplies the decoded stop by
+**Everything after that decode is a linear-light colour, and it stays one all the
+way to the display.** The scene multiplies the decoded stop by
 whatever luminance it has and writes the result into a floating-point composite
 that is free to exceed 1.0, and the engine tonemap at the end of the frame is the
 only place anything is compressed. So what a preset does to a palette colour is
@@ -191,8 +189,7 @@ bright end of the gradient, it does not clamp toward the dark one.
 
 **`depth_hue` rides this same coordinate on the two 3-D attractor flows, and what
 it does is whatever moving along *your* ramp does** — it has three regimes, none
-discoverable from the roster (measured at the Plan 0063 content pass,
-[design-backlog 0062](design-backlog.md)):
+of them discoverable from the roster ([design-backlog 0062](design-backlog.md)):
 
 1. **It reads as a hue cue only on a ramp that travels in hue at roughly constant
    lightness.** Rendered side by side at `perspective = 0.5`: against the
@@ -223,9 +220,9 @@ discoverable from the roster (measured at the Plan 0063 content pass,
    the same frame.
 
 **On the five IFS figures that coordinate has two more terms**, and they are the
-reason a wide `hue_spread` can make them look broken (Plan 0073,
-[ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md); Plan
-0074, [ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md)).
+reason a wide `hue_spread` can make them look broken
+([ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md),
+[ADR-0088](adrs/0088-the-ifs-colours-by-distance-from-its-own-skeleton.md)).
 The full expression there is
 
 ```
@@ -242,13 +239,13 @@ ramps away from there in one direction. So the third term only ever pushes the
 coordinate one way, which matters when you are budgeting.
 
 **And it is a budget.** All three write the same number, so **adding one means
-taking authority away from another**, not stacking a third term on top. This has
-now been measured twice on the same preset:
+taking authority away from another**, not stacking a third term on top. It has
+been measured twice on the same preset:
 
-| when | the change | why |
-|---|---|---|
-| Plan 0073 | `attractor_fern`'s `hue_spread` `0.16..0.42` → `0.05..0.125` | until then the random per-particle spread smeared the parts together and `map_tint` was a faint wash at *any* setting |
-| Plan 0074 | the same fern's `map_tint` `0.46` → `0.22` | stacked at full strength alongside `root_tint` the plant washes out; the stock preset looked better until the budget was split |
+| the change | why |
+|---|---|
+| `attractor_fern`'s `hue_spread` `0.16..0.42` → `0.05..0.125` | at the wider spread the random per-particle scatter smeared the parts together and `map_tint` was a faint wash at *any* setting |
+| the same fern's `map_tint` `0.46` → `0.22` | stacked at full strength alongside `root_tint` the plant washes out; the stock preset looked better once the budget was split |
 
 **The `*_hue` routes are the escape, and that is what they are for.** Neither
 `map_hue` nor `root_hue` touches this coordinate — they rotate the hue of the
@@ -315,10 +312,10 @@ Three notes specific to this scene:
 
 ### The line scenes — colour along the generator's axis
 
-Plan 0054 ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md))
-gave `parametric_curve`, `lsystem` and `star_pattern` the same surface `spectrum`
-had: `[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` and `saturation`,
-sampled on the CPU per segment. The arithmetic is `spectrum`'s exactly —
+`parametric_curve`, `lsystem` and `star_pattern` carry the same surface `spectrum`
+does ([ADR-0059](adrs/0059-line-scenes-colour-along-their-generator-axis.md)):
+`[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` and `saturation`, sampled
+on the CPU per segment. The arithmetic is `spectrum`'s exactly —
 
 ```
 hue + hue_spread * u
@@ -424,10 +421,10 @@ negative value nudged toward a palette's dark end lands in its **bright** stops 
 default `spectrum` the cosine is genuinely periodic and the wrap is invisible; on the four stop-list
 palettes it is the sharpest transition in the gradient. To darken a backdrop, use `bg_bright`.
 
-**`bg_hue` is a *position*, not a colour name.** Before ADR-0086 it meant the same thing in every
-preset in the library, and a value copied between two presets rendered the same sky. It no longer
-does — a `bg_hue` lifted from another preset arrives at whatever colour *your* gradient holds at
-that coordinate, which is usually the point and occasionally a surprise.
+**`bg_hue` is a *position*, not a colour name.** It is a coordinate in the preset's own gradient,
+so the same value does **not** mean the same thing in two presets: a `bg_hue` lifted from another
+preset arrives at whatever colour *your* gradient holds at that coordinate, which is usually the
+point and occasionally a surprise.
 
 **With `bg_hue_span`, your stops' `at` positions become the sky's vertical layout**
 ([ADR-0094](adrs/0094-the-backdrop-paints-a-directional-ramp.md)). The backdrop sweeps the segment
@@ -536,8 +533,8 @@ Two consequences worth having up front:
 
 ### The ranges, and what is outside them
 
-Plan 0064 Phase 4 picked these off a rendered sweep. Outside them nothing breaks —
-it stops being the *graphic* look:
+These were picked off a rendered sweep. Outside them nothing breaks — it stops
+being the *graphic* look:
 
 - **`4`–`12` bands** is where the field reads as flat areas with real edges.
 - **`16` and up approaches the smooth ramp again.** The bands become narrower than
@@ -564,7 +561,7 @@ rather than a soft one).
 **So tune `color_span` and `palette_steps` together.** If banding "isn't doing
 anything", the span is the first thing to check.
 
-### Where the contour falls — it reads the palette (Plan 0121)
+### Where the contour falls — it reads the palette
 
 > [!IMPORTANT]
 > **The contour draws only where the two bands it separates are actually
@@ -574,17 +571,17 @@ anything", the span is the first thing to check.
 
 This is what makes the parameter usable on a **limited-ink** look. A two-ink
 print is written as *plateaus* — runs of bands holding one colour, the only way
-to get flat ink out of `palette_steps` — and until Plan 0121 the contour drew at
-every boundary inside those runs, which is a grey hairline across flat colour:
-exactly the shading such a look is defined by not having. `shape_contourmono`'s
-twenty steps sit in five runs, so fifteen of its twenty band edges were
-white-meets-white or black-meets-black, and the only usable setting was `0`.
+to get flat ink out of `palette_steps` — and a contour drawn at every boundary
+*inside* those runs is a grey hairline across flat colour: exactly the shading
+such a look is defined by not having. `shape_contourmono`'s twenty steps sit in
+five runs, so fifteen of its twenty band edges are white-meets-white or
+black-meets-black; without the palette read, its only usable setting would be `0`.
 
-**Nothing on a smooth palette changed.** The test is **equality**, not
-similarity: the line is suppressed only when the two samples agree to within half
+**Nothing on a smooth palette is suppressed.** The test is **equality**, not
+similarity: the line is dropped only when the two samples agree to within half
 an 8-bit code value, which is below the LUT's own quantization. Two distinct band
-centres on a ramp always differ by at least one code value, so every edge draws
-exactly as it did before, at any `palette_steps` and any `color_span`.
+centres on a ramp always differ by at least one code value, so on a ramp every
+edge draws, at any `palette_steps` and any `color_span`.
 
 Two edges of the rule are worth knowing, because both will read as a surprise:
 
@@ -603,8 +600,7 @@ Two edges of the rule are worth knowing, because both will read as a surprise:
 > [!IMPORTANT]
 > **`palette_contour` is inert on `attractor`, `swarm`, `emitter` and the four line
 > scenes, and nothing warns you.** The parameter is accepted there because it *is* a
-> known name, so no unknown-parameter warning fires (ADR-0020). This section is the
-> warning.
+> known name, so no unknown-parameter warning fires. This section is the warning.
 
 A contour needs a **gradient across a fragment** to sit in — its width comes from
 `fwidth`, which measures how fast a value changes between neighbouring pixels and
@@ -801,9 +797,10 @@ better numbers rather than by turning something off.
 
 ### Reading the result — measured on the shipped `collage_mono`
 
-There is **no gate** for any of this — no test counts colours in a frame, and
-ADR-0138 says why: a count with an exemption list is a tolerance with no mechanism
-behind it. Check it by rendering:
+There is **no gate** for any of this — no test counts colours in a frame, because a
+count with an exemption list is a tolerance with no mechanism behind it
+([ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)).
+Check it by rendering:
 
 ```sh
 cargo run -p standalone --example shot -- --preset-file presets/<name>.toml --out a.png
@@ -837,8 +834,7 @@ ramp walks a fixed loop through colour space rather than rotating through hues a
 an even rate. Guessing a value costs a render round-trip; this table is so you do
 not have to.
 
-(Until Plan 0054 this was the *only* thing `parametric_curve`, `lsystem` and
-`star_pattern` could colour through. It is now their default rather than their
+(On `parametric_curve`, `lsystem` and `star_pattern` it is a default rather than a
 ceiling — set a `[palette]` and these swatches stop applying.)
 
 **It doubles as the backdrop's table.** `bg_hue` reads the same gradient, so with no `[palette]`
@@ -890,13 +886,13 @@ Reading it:
   therefore looks less saturated than its `hue` says. Lower `brightness` (or
   `thickness`) rather than chasing the colour with `hue`.
 
-  **Since Plan 0045 it no longer approaches *white*.** The composite carries
-  linear light past 1.0 and the engine tonemap rolls it off by scaling all three
-  channels by the *same* factor, taken from the brightest one — so the ratios
-  between R, G and B survive the roll-off exactly and a saturated crossing keeps
-  its hue instead of climbing toward white a channel at a time. A dense figure
-  still reads paler at its crossings, because the sum genuinely is less
-  saturated; it no longer goes colourless.
+  **It does not approach *white*, though.** The composite carries linear light
+  past 1.0 and the engine tonemap rolls it off by scaling all three channels by
+  the *same* factor, taken from the brightest one — so the ratios between R, G
+  and B survive the roll-off exactly and a saturated crossing keeps its hue
+  instead of climbing toward white a channel at a time. A dense figure reads
+  paler at its crossings, because the sum genuinely is less saturated; it does
+  not go colourless.
 
 ---
 
@@ -922,7 +918,7 @@ LUTs are lerped. With no `[palette_b]`, `palette_mix` is a no-op.
 
 ---
 
-## One palette serves both layers — the `[layer]` rule (ADR-0090)
+## One palette serves both layers — the `[layer]` rule
 
 A preset that composes a second scene (`[layer]`, see `presets/README.md`) has
 **no `[layer.palette]`**, deliberately: the preset's single `[palette]` (and
@@ -930,8 +926,8 @@ A preset that composes a second scene (`[layer]`, see `presets/README.md`) has
 scene and the backdrop alike. Two colour languages in one frame read as two
 presets stacked rather than one world, and a second bake would double the LUT
 work for a coherence loss, not a gain — the shared gradient is precisely what
-makes two layers *one* look. This was weighed and rejected as an alternative in
-ADR-0090, not left out.
+makes two layers *one* look. The omission is deliberate
+([ADR-0090](adrs/0090-a-preset-composes-two-scene-layers.md)).
 
 What still differs per layer is how each scene **samples** that shared
 gradient: the layer has its own `hue`, `saturation`, `color_span` /
@@ -941,12 +937,11 @@ floor under a bright figure at its crest — without leaving the family.
 
 ---
 
-## Dark on light — the two-tone route (ADR-0106, measured again at Plan 0091)
+## Dark on light — the two-tone route
 
 Everything else in this document adds light. **A `multiply` layer takes it
-away**, and that is the whole route to a dark figure on a light ground — the one
-construction this engine was believed not to have, for six days after it
-actually landed.
+away** ([ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)), and
+that is the whole route to a dark figure on a light ground.
 
 ```toml
 system = "fragment_field"     # the LIGHT GROUND: flat, bright, full-frame
@@ -994,10 +989,10 @@ setting in a *different* table, and no gate or warning can see it.
 | `fragment_field`, `reaction_diffusion`, `shape_field` | every pixel (alpha = `occlude`, 1 by default) | the whole frame is darkened — a graded wash, a banded gradient, a figure *and* its surround |
 | `swarm`, `emitter` | inside each mark only (alpha = the mark's geometric falloff) | discrete dark marks on an untouched light ground |
 
-Both routes reach a dark figure, and the particle one reaches **darker**:
-measured at Plan 0091 Phase 1, a frozen swarm at `brightness = 0` takes a light
-chain from display luma 174.1 to **0.9**, where the field route bottoms out at
-**18.9**. Pick by the shape you want, not by what you think can darken.
+Both routes reach a dark figure, and the particle one reaches **darker**: a frozen
+swarm at `brightness = 0` takes a light chain from display luma 174.1 to **0.9**,
+where the field route bottoms out at **18.9**. Pick by the shape you want, not by
+what you think can darken.
 
 > **If you have read [ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)
 > or design-backlog 0069, they say a particle layer cannot darken at all.** That
@@ -1014,7 +1009,7 @@ layer over it. It does not work, and the reason is structural rather than a
 tuning problem: **the backdrop is not in the chain's input** (`post.rs`) — it is
 composited *underneath* the finished chain, so no blend mode ever sees it.
 
-Measured at Plan 0091 Phase 1, both ways it can go:
+Both ways it can go:
 
 | what you set | what you get |
 |---|---|
@@ -1027,8 +1022,8 @@ to one tone — and spend the `[layer]` slot on the figure.
 
 ### Two costs worth knowing before you commit to this
 
-- **It uses the preset's only `[layer]`.** ADR-0090 caps a preset at one layer
-  table, so a two-tone graphic cannot also carry a second figure as counterpoint.
+- **It uses the preset's only `[layer]`.** A preset carries one layer table, so a
+  two-tone graphic cannot also carry a second figure as counterpoint.
 - **"Black" is dark grey unless the marks are.** The field route's floor is luma
   ~18.5 with bloom and the tonemap both live; the particle route at
   `brightness = 0` gets to 0.9. If you need a true black, that difference is the
@@ -1036,7 +1031,7 @@ to one tone — and spend the `[layer]` slot on the figure.
 
 ---
 
-## Flat colour on `shape_collage` — stay under the knee (ADR-0123, Plan 0113)
+## Flat colour on `shape_collage` — stay under the knee
 
 `shape_collage` is the one system that draws a **graphic** rather than light: flat
 opaque elements on their own paper, hard-edged, in painter order. Everything that
@@ -1060,7 +1055,7 @@ flat fill and the hard edge together, with nothing to tell you why.
 > is decoded once at load — the same mapping stated at the top of this file — so
 > the decode and the display encode are inverses and the identity curve between
 > them changes nothing. On `collage_suprematist`: `#494949` renders `#494949`,
-> `#c24f63` renders `#c24f63`. The residual is the LUT'''s own 8-bit linear
+> `#c24f63` renders `#c24f63`. The residual is the LUT's own 8-bit linear
 > storage, up to two levels on a very dark channel and nothing on a bright one.
 > What the knee buys on top of that is that no element is shaded, tinted or
 > haloed on the way — which is the whole of the flat-graphic look. **The paper is
