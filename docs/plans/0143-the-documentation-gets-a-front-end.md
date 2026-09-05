@@ -291,7 +291,7 @@ other off-site target. `dev` should not re-raise this.
 | 4 — the demo goes live on the personal site | human | not started — skipped by the user, this lane runs 1-3 and 5-6 | |
 | 5 — the gallery covers everything that ships | dev | done | eeac887 |
 | 6 — the permanent home builds itself | dev | done | cb3529c |
-| 7 — Pages is enabled and the demo is retired | human | not started — outstanding | |
+| 7 — Pages is enabled and the demo is retired | human | done | no commit — see Notes |
 
 ### Notes
 
@@ -342,11 +342,24 @@ other off-site target. `dev` should not re-raise this.
   `scripts/check-site-links.mjs` is a seventh and is run by neither — it needs a built site, so it
   lives in the Pages workflow. That sentence is now wrong, in a file this lane does not own.
 
+- **Phase 7 ran on 2026-09-05 and needed no commit.** Pages did not exist on the repository
+  (`gh api .../pages` returned 404), and `actions/deploy-pages` fails against a repository with no
+  site, so it was created first with `build_type=workflow` — the API reported
+  `html_url: https://igorkonovalov.github.io/Ritmolux/`, confirming the capital-R base
+  `SITE_BASE` builds at. The push then ran `Pages` green: build 33 s, deploy 10 s. The `workflow`
+  OAuth scope the phase warns about was already on the credential, so the push was not rejected.
+  **Verified against the deployed site, not the run log:** all 15 published routes return 200,
+  `pagefind/pagefind.js` is served (so search works on the permanent home), the roster renders as
+  484 KB of HTML with its title taken from the source heading and 70 rewritten blob links on that
+  page alone, and all 82 gallery cards are present as fingerprinted `_astro/` assets.
+- **Phase 7's second clause was vacuous, and that is Phase 4's doing.** There was no personal-site
+  copy to retire or redirect, because Phase 4 was never run.
+
 ### Close triggers
 
-> **The plan is not finished.** Phases 4 and 7 are `human` and both are outstanding; the user
-> directed this lane to run 1-3 and 5-6 and skip them. Everything below is the state at the end of
-> the `dev` work.
+> **Every phase is landed or deliberately skipped.** Phase 4 was skipped by the user and stays
+> skipped; Phase 7 completed on 2026-09-05 against the live site. Everything below is the state at
+> the end of the work.
 
 - **`presets/` touched:** no. `git diff --name-only 89c8c99..HEAD -- presets/` is empty.
   `presets/README.md` is published by the site and is read, never written.
@@ -357,10 +370,10 @@ other off-site target. `dev` should not re-raise this.
 - **Operator docs touched:** none. No file under `docs/` was modified except this plan; the only new
   prose is `site/README.md`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
-- **Outstanding `human` phases:** **4** (copy `site/dist/` into `public/ritmolux/` of
-  `IgorKonovalov/IgorKonovalov.github.io`, add the `.prettierignore` line, push, report the URL) and
-  **7** (enable Pages on `Ritmolux` with the Actions source, push — which needs the `workflow` OAuth
-  scope for `.github/workflows/pages.yml` — confirm the deploy, retire the demo copy).
+- **Outstanding `human` phases:** none. **4** is permanently skipped - the user declined the
+  hand-copied demo, and Phase 6's CI made it unnecessary. **7** is done: Pages was enabled on
+  `IgorKonovalov/Ritmolux` with `build_type=workflow`, the push ran the workflow green, and there
+  was no demo copy to retire.
 - **Full suite (ADR-0156), run before this block:** `cargo nextest run --workspace` — exit 0,
   **1536 passed, 0 failed, 5 skipped**, 11 slow, 469.2 s.
 
