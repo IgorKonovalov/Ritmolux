@@ -281,7 +281,7 @@ pub struct ConsolePacing {
 |---|---|---|---|
 | 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
 | 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
-| 3 — Both console levers become reachable | dev | done | committed with this row |
+| 3 — Both console levers become reachable | dev | done | `9e7dee1` |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
