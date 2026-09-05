@@ -122,12 +122,16 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 .githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
                      #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
                      #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance. Seven Node gates. SIX run by pre-push and by the CI
-                     #   `links` job; the seventh, check-site-links.mjs, runs in neither, because it
-                     #   needs a BUILT site - it lives in .github/workflows/pages.yml and asserts
-                     #   that no site-relative href in site/dist/ ends in .md, that every one
-                     #   resolves to a built file, and that every off-site href is absolute https
-                     #   (ADR-0154). Of the six, the first three and toc.mjs also run in the close
+scripts/             # Repo maintenance. Eight Node gates. SIX run by pre-push and by the CI
+                     #   `links` job; the other TWO run in neither, because they need a BUILT site -
+                     #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
+                     #   no site-relative href in site/dist/ ends in .md, that every one resolves to
+                     #   a built file, and that every off-site href is absolute https (ADR-0154);
+                     #   check-site-routes.mjs asserts that every route the build serves is reachable
+                     #   from the menu rather than only by search, and that no route the splitter
+                     #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
+                     #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
+                     #   Of the six, the first three and toc.mjs also run in the close
                      #   ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright

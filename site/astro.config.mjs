@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
@@ -39,6 +40,26 @@ const BASE = process.env.SITE_BASE ?? '/ritmolux/';
 const VERSION = /\[workspace\.package\][\s\S]*?^version = "([^"]+)"/m.exec(
   readFileSync(new URL('../Cargo.toml', import.meta.url), 'utf8'),
 )[1];
+
+/**
+ * The commit this build was made from, for the footer stamp.
+ *
+ * `GITHUB_SHA` first, because a CI checkout has it and asking `git` for it there
+ * is a second source for one fact. A local build falls back to `git`, and a
+ * build from a tarball with no git directory says so rather than failing - a
+ * missing stamp is not a reason to have no site.
+ */
+const COMMIT = (() => {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: new URL('../', import.meta.url),
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+})();
 
 /**
  * Fills in the `@VERSION@` placeholder the packaging files carry.
@@ -90,11 +111,21 @@ export default defineConfig({
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
   // unless the ancestor is allowed explicitly.
-  vite: { server: { fs: { allow: ['..'] } } },
+  vite: {
+    server: { fs: { allow: ['..'] } },
+    // Read by src/components/Footer.astro. `define` rather than a module the
+    // component imports, so the two facts are resolved once, here, beside the
+    // manifest and the git call that produce them.
+    define: {
+      'import.meta.env.BUILD_COMMIT': JSON.stringify(COMMIT),
+      'import.meta.env.BUILD_VERSION': JSON.stringify(VERSION),
+    },
+  },
   integrations: [
     starlight({
       title: 'Ritmolux',
       customCss: ['./src/styles/gallery.css'],
+      components: { Footer: './src/components/Footer.astro' },
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
         'the parameter roster, and the engine contracts.',

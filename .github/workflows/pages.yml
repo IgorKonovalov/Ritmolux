@@ -62,6 +62,10 @@ jobs:
       # to catch, because the rewrite happens at build time and the source was
       # never the thing that broke.
       - run: node scripts/check-site-links.mjs
+      # The menu half of the same problem. A page added to `PUBLISHED` and not to
+      # the sidebar builds, gets indexed, and is reachable only by search - which
+      # looks like a working site from every angle except the one that matters.
+      - run: node scripts/check-site-routes.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/dist
