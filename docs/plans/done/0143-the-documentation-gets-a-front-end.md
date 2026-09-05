@@ -1,14 +1,23 @@
 # 0143 — The documentation gets a front end
 
-> **Status:** in-progress (2026-09-05)
+> **Status:** done (2026-09-05)
+> **Closed 2026-09-05.** Phases 1, 2, 3, 5 and 6 as commits `41c77c5`, `44d1ec3`, `03a9588`,
+> `eeac887` and `cb3529c`; Phase 7 (`human`) on 2026-09-05 with no commit; Phase 4 (`human`)
+> **permanently skipped** by the user, which Phase 6's CI made unnecessary. Mode 4 review:
+> **no blockers, no majors, four minors and three nits.** Verified independently of the log —
+> `cargo nextest run --workspace` green (1536 passed, 0 failed, 5 skipped), all six existing gates
+> green and unmodified, `npm run build` clean at 16 pages with `scripts/check-site-links.mjs` exit
+> 0, the gate provoked into convicting in both of its failure directions, the built output holding
+> 82 cards under 12 family headings and 269 rewritten off-site hrefs, and the deployed site
+> answering 200 on every route sampled while both lowercase demo paths 404.
 > **Unparked 2026-09-05:** the named trigger fired — the name is Ritmolux (ADR-0162), Plan 0150
 > landed the rename, and the Pages subpath is `/ritmolux/` (chosen by the user at the start of this
 > `dev` lane). Phases 1 and 4 still read `/lmv/`; that one token is superseded, see the log's Notes.
 > **Created:** 2026-08-30
 > **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
-> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`
+> **Related ADRs:** [0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
+> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`
 > and the repository front door; **this plan does not touch `README.md`**
 > **Lane guidance:** build on `main` directly, **not** in a worktree. ADR-0053's default does not pay
 > here: every phase but 5 is JavaScript, markdown and config, and a fresh worktree would buy a cold
@@ -53,7 +62,7 @@ And `IgorKonovalov/IgorKonovalov.github.io` already exists, is public, and is on
 
 ## Decision
 
-Build the site with Astro Starlight per [ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
+Build the site with Astro Starlight per [ADR-0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
 keep `docs/` as the single source with all transformation in a build-time remark plugin, and stage
 the hosting: a hand-copied build into a subdirectory of the personal user site first, a CI-deployed
 project Pages site second. We rejected MkDocs Material (better technical fit — `docs_dir: docs` is

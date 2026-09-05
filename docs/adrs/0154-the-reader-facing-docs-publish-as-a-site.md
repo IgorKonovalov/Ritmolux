@@ -1,8 +1,8 @@
 # ADR-0154 — The reader-facing docs publish as a site, and `docs/` stays the single source
 
-> **Status:** proposed
+> **Status:** accepted (2026-09-05, at Plan 0143's close) — carries an `Outcome`
 > **Date:** 2026-08-30
-> **Related plan(s):** [0143](../plans/0143-the-documentation-gets-a-front-end.md)
+> **Related plan(s):** [0143](../plans/done/0143-the-documentation-gets-a-front-end.md)
 
 ## Context
 
@@ -166,6 +166,41 @@ only thing standing between this corpus and the 74 broken links across 23 files 
 last time link discipline was left to attention, and it breaks navigation in the editor and on
 GitHub for every one of the 926. The gate and local navigation are worth more than generator
 freedom.
+
+## Outcome (2026-09-05, at Plan 0143's close)
+
+The decision held in the part that carried the risk and was falsified in two measurements. `docs/`
+is the single source: the Astro content loader reads `docs/`, `docs/specs/` and `presets/README.md`
+in place, the permitted staged-copy fallback was never needed, and not one markdown file outside
+`site/` was edited to serve the site. The link rewrite, the build-time gate on the built output, and
+the npm tree all landed as described.
+
+**The 926-link figure is 3.4x the delivered number, and the error is in the measurement's scope.**
+The built site rewrites **269** off-site hrefs over **137** distinct targets; the published set
+holds ~296 relative markdown links in total. The 926 was measured over `README.md` plus *all* of
+`docs/*.md` plus `presets/README.md`, and the plan then narrowed the published set to thirteen files
+without re-measuring. Nothing about the design turns on which figure is right — the rewrite is
+per-link — but a reader arriving at the Context table should know the boundary it sizes is the
+candidate set, not the site.
+
+**Hosting did not arrive in two stages.** The manual demo in `public/lmv/` of the personal user site
+was skipped outright by the user, and the site went straight to a CI-deployed project Pages site at
+`https://igorkonovalov.github.io/Ritmolux/`. The claim *"nothing about the first stage is
+throwaway"* is therefore untested as written, though the half of it that mattered did pay: `base`
+had to be configurable from the first build, and it is — `SITE_BASE` switches it, and the two paths
+turn out to differ in **case** (`/Ritmolux/` for the project site, which GitHub serves under the
+repository name as spelled, against the `/ritmolux/` the demo would have used). A single hardcoded
+subpath would have had to be found and changed in eleven places; building at both bases is what
+found them.
+
+The Negative section's *"the site can silently fall behind `docs/`"* is discharged for the permanent
+home rather than merely deferred: `.github/workflows/pages.yml` rebuilds on every push and every
+pull request and runs `scripts/check-site-links.mjs` on the result, so a documentation edit the site
+cannot render fails before it is published. What is **not** discharged is the pinned-`main` staleness
+in the 269 off-site URLs; that stands exactly as recorded.
+
+Two counts moved and are worth correcting in place of the text above: **82** presets ship, not 81,
+and the per-system gallery holds **12** images, not 9.
 
 ## Notes
 
