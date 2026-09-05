@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import Slugger from 'github-slugger';
 import { stripProvenanceText } from './strip-provenance.mjs';
 
@@ -22,12 +22,38 @@ export const SECTION_SPLIT_BYTES = 20_000;
 export const ROUTE_SOURCE_CEILING = 30_000;
 
 /**
- * The documents the splitter owns.
+ * Whether a published source is large enough to split.
  *
- * Scoped to one document while the mechanism is a walking skeleton; the size
- * rule in `DOCUMENT_SPLIT_BYTES` is what decides this set once it generalises.
+ * There is no roster of documents to split, and that is the decision rather
+ * than an omission (ADR-0166): a hand-kept list is the shape that has rotted
+ * repeatedly here, while a size rule needs no maintenance and cannot disagree
+ * with itself. A document that grows past the threshold splits on the next
+ * build; one that shrinks stops splitting.
+ *
+ * @param source repo-relative path, as spelled in `PUBLISHED`
+ * @param repoRoot the repository root, as a `file:` URL
  */
-export const SPLIT_SOURCES = new Set(['presets/README.md']);
+export function splits(source, repoRoot) {
+  return statSync(new URL(source, repoRoot)).size > DOCUMENT_SPLIT_BYTES;
+}
+
+/** The published sources the splitter owns, in `PUBLISHED` order. */
+export function splitSources(published, repoRoot) {
+  return Object.keys(published).filter((source) => splits(source, repoRoot));
+}
+
+/**
+ * The generated contents block (ADR-0163), and the region markers around it.
+ *
+ * It is dropped from a split document's index route and kept everywhere else.
+ * On that one page it is a second, longer copy of the section list the index
+ * already generates - every row pointing at a route rather than at an anchor on
+ * the page the reader is on - and Starlight renders its own contents column
+ * beside it, so the index would carry three overlapping tables of contents. It
+ * stays in the source untouched, where GitHub and an editor still use it, and
+ * `scripts/toc.mjs` still generates and checks it.
+ */
+const TOC_BLOCK = /^<!--\s*toc:begin[^>]*-->[\s\S]*?^<!--\s*toc:end\s*-->\n?/m;
 
 const FENCE = /^\s{0,3}(```+|~~~+)/;
 
@@ -167,7 +193,7 @@ export function splitDocument(source, baseRoute, title) {
       headingLine: null,
       from: 0,
       to: starts[0],
-      body: lines.slice(0, starts[0]).join('\n'),
+      body: lines.slice(0, starts[0]).join('\n').replace(TOC_BLOCK, ''),
       children: sections,
     },
     sections,
@@ -317,7 +343,6 @@ const FRAGMENTS = new Map();
  * @param repoRoot the repository root, as a `file:` URL
  */
 export function fragmentsOf(source, route, repoRoot) {
-  if (!SPLIT_SOURCES.has(source)) return null;
   let map = FRAGMENTS.get(source);
   if (map === undefined) {
     const split = splitDocument(readFileSync(new URL(source, repoRoot), 'utf8'), route, source);

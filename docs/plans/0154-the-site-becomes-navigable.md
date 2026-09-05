@@ -286,8 +286,8 @@ against the merged tree.
 |---|---|---|---|
 | 1 — no plan number reaches a reader's eye | dev | done | `3e5f6d6` |
 | 2 — the roster becomes 46 pages | dev | done | `2a77539` |
-| 3 — a wrong anchor fails the build | dev | done | committed with this row |
-| 4 — the rule generalises | dev | | |
+| 3 — a wrong anchor fails the build | dev | done | `f7b5676` |
+| 4 — the rule generalises | dev | done | committed with this row |
 | 5 — a stranger can find out what this is and get it | dev | | |
 | 6 — the drift classes get gates | dev | | |
 | 7 — it looks like one thing | dev | | |
@@ -411,6 +411,61 @@ rendered HTML. Two verification passes read a stale `site/dist` that showed the 
 unresolved while the rewriter was already correct in isolation. `rm -rf site/.astro site/dist
 site/node_modules/.astro` before trusting a local build of a plugin change. CI checks out fresh and
 never sees this.
+
+**Phase 4 — the phase's arithmetic was wrong about one file, and the user chose the rule over the
+count.** The done-when says *"four documents split and nine do not; the unsplit set is exactly those
+under 40 KB, the largest of which is `docs/on-device-validation.md` at 37,241 bytes."* That file
+measures **48,219** bytes — 45,417 at `9dc2183`, the commit ADR-0166 says it measured, so the figure
+was wrong when it was written and not merely stale. Under ADR-0166's rule as decided it splits.
+Raised before Phase 1 and answered at Phase 4: **apply the rule, five documents split**, and leave
+the correction of Phase 4's done-when and of ADR-0166's *"Why these two numbers"* to the close
+review. **`docs/nfr.md` at 33,295 bytes is the real largest document under the threshold.**
+
+The measured distribution, on this commit:
+
+| document | bytes | routes |
+|---|---:|---|
+| `presets/README.md` | 273,211 | 46 = 1 + 13 + 32 |
+| `docs/capturing.md` | 165,028 | 25 = 1 + 7 + 17 |
+| `docs/presets.md` | 75,816 | 22 = 1 + 8 + 13 |
+| `docs/preset-palettes.md` | 65,009 | 19 = 1 + 11 + 7 |
+| `docs/on-device-validation.md` | 48,219 | 10 = 1 + 9 + 0 |
+| eight others, 6,933 – 33,295 | | one route each |
+
+**Four of the five route counts are ADR-0166's own predictions exactly** (46, 25, 22, 19); the fifth
+is the document it did not know splits. 122 routes come from split documents, and the site builds
+**133** HTML pages against the phase's "about 127". **No route's source exceeds 30,000 bytes**; the
+largest is **26,893**, `engine/capturing/the-shot-cli/what-the-reports-columns-mean` — the route
+ADR-0166 names as the worst case at 26,788.
+
+**Phase 4 — the contents-block decision, recorded.** A split document's generated contents block
+(ADR-0163) is **suppressed on its index route** and kept everywhere else. On that one page it is a
+second, longer copy of the section list the index already generates, with every row pointing at
+another route rather than at an anchor on the page the reader is on, and Starlight renders its own
+contents column beside it — three overlapping tables of contents on one page. The source is
+untouched: `scripts/toc.mjs` still generates the block and `--check` still passes (6 blocks, 473
+rows).
+
+**Phase 4 — a source document was edited, outside the phase's Files touched.** The generalised gate
+failed the build on `docs/presets.md`, which links `[Systems](#systems)` while the heading is
+`## The built-in systems`. There is no `systems` anchor anywhere in that file, so the link has always
+been dead and landed nowhere on GitHub too. Changed to `#the-built-in-systems` — one anchor, no
+prose touched. Phase 3's own instruction for an unmatched fragment is *"fix the link, or the heading
+it names"*, but `docs/presets.md` is not in this phase's file list and the edit is disclosed here
+rather than assumed.
+
+**Phase 4 — what the split costs, cold builds with every cache cleared, same machine and method.**
+
+| | before (16 routes) | after (133 routes) | change |
+|---|---:|---:|---:|
+| build wall time | 8,551 ms | 9,593 ms | +12 % |
+| Pagefind index | 1,290 KB | 1,706 KB | +32 % |
+| `site/dist` total | 41,913 KB | 50,005 KB | +19 % |
+| built HTML pages | 16 | 133 | 8.3x |
+
+8.3x the pages for 12 % more build time and 32 % more index. ADR-0166 records that neither number
+was measured before the decision and that the plan owes them; nothing here argues the threshold
+needs moving.
 
 ### Close triggers
 

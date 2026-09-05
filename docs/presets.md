@@ -1039,7 +1039,7 @@ is silent, and what that looks like is the scene's business.
 **This does not reach the `spectrum` scene's own element levels.** An expression
 only sees what the grammar exposes, and those levels are scene state computed
 after every binding has been evaluated. To shape them, use that scene's `curve`
-parameter instead (see [Systems](#systems)); `log` is for shaping a value you can
+parameter instead (see [Systems](#the-built-in-systems)); `log` is for shaping a value you can
 already name.
 
 ### Idioms (patterns from the curated set)

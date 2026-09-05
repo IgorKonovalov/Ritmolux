@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
+import { PUBLISHED } from './src/plugins/rewrite-links.mjs';
 import { sidebarGroup } from './src/plugins/split-document.mjs';
 
 /**
@@ -34,6 +35,16 @@ function stripLeadingHeading() {
   };
 }
 
+/**
+ * One sidebar entry per published document: a plain link while the document is
+ * small, and a collapsed group of its routes once it is large enough to split.
+ *
+ * Every entry goes through here rather than only the ones that split today, so
+ * a document crossing the threshold joins the menu as a group on the next build
+ * with no edit to this file.
+ */
+const doc = (source, label) => sidebarGroup(source, PUBLISHED[source], label);
+
 export default defineConfig({
   site: 'https://igorkonovalov.github.io',
   base: BASE,
@@ -65,25 +76,25 @@ export default defineConfig({
         {
           label: 'Use it / author presets',
           items: [
-            { label: 'Preset guide', slug: 'guide/preset-guide' },
-            { label: 'Expression language', slug: 'guide/expression-language' },
-            { label: 'Colour and palettes', slug: 'guide/palettes' },
-            { label: 'Tuning walkthrough', slug: 'guide/tuning-walkthrough' },
-            sidebarGroup('presets/README.md', 'guide/parameter-roster', 'Parameter roster'),
+            doc('docs/preset-guide.md', 'Preset guide'),
+            doc('docs/presets.md', 'Expression language'),
+            doc('docs/preset-palettes.md', 'Colour and palettes'),
+            doc('docs/preset-tuning-walkthrough.md', 'Tuning walkthrough'),
+            doc('presets/README.md', 'Parameter roster'),
             { label: 'Gallery', slug: 'gallery' },
           ],
         },
         {
           label: 'Understand and build it',
           items: [
-            { label: 'Non-functional requirements', slug: 'engine/nfr' },
-            { label: 'Headless capture and video', slug: 'engine/capturing' },
-            { label: 'Technique catalogue', slug: 'engine/techniques' },
-            { label: 'Diffusion filter', slug: 'engine/diffusion-filter' },
-            { label: 'On-device validation', slug: 'engine/on-device-validation' },
-            { label: 'Releasing', slug: 'engine/releasing' },
-            { label: 'C ABI contract', slug: 'engine/spec-c-abi' },
-            { label: 'Ring determinism', slug: 'engine/spec-ring-determinism' },
+            doc('docs/nfr.md', 'Non-functional requirements'),
+            doc('docs/capturing.md', 'Headless capture and video'),
+            doc('docs/generative-techniques-catalogue.md', 'Technique catalogue'),
+            doc('docs/diffusion-filter.md', 'Diffusion filter'),
+            doc('docs/on-device-validation.md', 'On-device validation'),
+            doc('docs/releasing.md', 'Releasing'),
+            doc('docs/specs/0001-c-abi.md', 'C ABI contract'),
+            doc('docs/specs/0002-ring-determinism.md', 'Ring determinism'),
           ],
         },
       ],
