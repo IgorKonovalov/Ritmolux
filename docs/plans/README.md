@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0154** (ADRs are a separate sequence — next free there is **0166**.)
+**Next free number: 0156** (ADRs are a separate sequence — next free there is **0169**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -49,6 +49,8 @@ place. The plan file carries the real link.
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 | [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
+| [0154](0154-the-site-becomes-navigable.md) | The site becomes navigable | draft | dev, human | ADR-0166 + 0167 + 0168 (proposed): documents split into routes by size, a fragment gate, an entrance. **Every phase deploys** — `pages.yml` publishes on each push to `main`. |
+| [0155](0155-the-reader-documents-stop-explaining-themselves.md) | The reader documents stop explaining themselves | draft | dev | ADR-0168 (proposed): 235 bare citations leave three documents. **Hard dependency: 0154 Phase 3** — until that gate exists a renamed heading breaks anchors silently. |
 <!-- roster:end -->
 
 **Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
