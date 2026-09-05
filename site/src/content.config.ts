@@ -8,7 +8,7 @@ import { docsSchema } from '@astrojs/starlight/schema';
 // The publish boundary lives beside the rewriter that reads it, so the loader and
 // the link rewrite cannot disagree about what is published.
 import { PUBLISHED } from './plugins/rewrite-links.mjs';
-import { SPLIT_SOURCES, chunksOf, contentsList, splitDocument } from './plugins/split-document.mjs';
+import { chunksOf, contentsList, splitDocument, splitSources } from './plugins/split-document.mjs';
 
 /**
  * Pages that belong to the site rather than to the documentation corpus.
@@ -24,13 +24,19 @@ const SITE_PAGES: Record<string, string> = {
   'site/src/content/docs/gallery.mdx': 'gallery',
 };
 
+const SITE_ROOT = new URL('../', import.meta.url);
+const REPO_ROOT = new URL('../../', import.meta.url);
+
+/**
+ * The published sources the splitter owns, decided by size on every build
+ * rather than listed (ADR-0166).
+ */
+const SPLIT_SOURCES = new Set(splitSources(PUBLISHED, REPO_ROOT));
+
 /** Repo-relative sources the glob loader still serves one route each. */
 const WHOLE: Record<string, string> = Object.fromEntries(
   Object.entries({ ...PUBLISHED, ...SITE_PAGES }).filter(([source]) => !SPLIT_SOURCES.has(source)),
 );
-
-const SITE_ROOT = new URL('../', import.meta.url);
-const REPO_ROOT = new URL('../../', import.meta.url);
 
 /**
  * Starlight's `docsSchema()` requires a `title`; not one file in the published
