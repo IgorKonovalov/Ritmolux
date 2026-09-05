@@ -41,6 +41,20 @@ const TRAILING_CITED = new RegExp(String.raw`\s*\([^()]*(?:ADR-\d{4}|Plan \d{4})
  */
 const TRAILING_PURE = new RegExp(String.raw`\s*\(${CITE}(?:${SEP}${CITE})*\)\s*$`);
 
+/**
+ * The string form, for a heading that becomes a page title rather than a node.
+ *
+ * The splitter lifts a section's heading out of the body and hands it to
+ * Starlight as the entry's `title`, which never passes through the mdast
+ * transform above. A backtick inside the matched parenthetical stands in for
+ * the `inlineCode` check the node form makes.
+ */
+export function stripProvenanceText(text) {
+  const match = TRAILING_CITED.exec(text);
+  if (!match || match[0].includes('`')) return text;
+  return text.slice(0, match.index).replace(/\s+$/, '');
+}
+
 /** The plain text a node contributes, for offset arithmetic over its siblings. */
 function nodeText(node) {
   if (node.type === 'text' || node.type === 'inlineCode') return node.value;
