@@ -8,7 +8,7 @@ hero:
   tagline: A music visualizer that listens to whatever you are playing, and draws to it.
 ---
 
-import { Image } from 'astro:assets';
+import Frame from '../../components/Frame.astro';
 import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
 {/*
@@ -48,35 +48,21 @@ export const gallery = Object.entries(
   .sort((a, b) => a.system.localeCompare(b.system));
 
 {/*
-  `<Image>` rather than a plain `<img src={image.src}>`, and the difference is two
-  orders of magnitude. A bare `src` hands the browser the ORIGINAL capture - a
-  1280x720 PNG, one to two megabytes of it - to paint into a grid cell a couple of
-  hundred pixels wide. Twelve of those is roughly 14 MB of thumbnail strip, which is
-  what made this page slow. `<Image>` runs the same file through Astro's image
-  service at build time: downscaled, WebP, and a `srcset` the browser picks from.
-  `loading="lazy"` is NOT the fix and never was - the strip sits directly under the
-  hero, so the viewport reaches most of it immediately.
-
-  Each frame links to the gallery's section for its system, which is where that
-  system's presets actually are.
+  Two destinations per frame, and `Frame` carries both: the picture opens itself
+  at full size, the caption goes to the gallery section holding that system's
+  presets. It is also what keeps this strip from shipping the originals - see
+  the component.
 */}
 
 <div class="gallery-strip" role="list">
   {gallery.map(({ image, system }) => (
-    <figure role="listitem">
-      <a href={`${import.meta.env.BASE_URL}gallery/#${system}`}>
-        <Image
-          src={image}
-          widths={[240, 480, 720]}
-          sizes="(min-width: 46rem) 15rem, 45vw"
-          format="webp"
-          quality={72}
-          alt={`The ${system} rendering system`}
-          loading="lazy"
-        />
-      </a>
-      <figcaption><code>{system}</code></figcaption>
-    </figure>
+    <Frame
+      image={image}
+      href={`${import.meta.env.BASE_URL}gallery/#${system}`}
+      label={system}
+      alt={`The ${system} rendering system`}
+      sizes="(min-width: 46rem) 15rem, 45vw"
+    />
   ))}
 </div>
 

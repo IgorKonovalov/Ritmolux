@@ -48,24 +48,38 @@
   margin: 0;
 }
 
-/* Each frame is a link - home page to the gallery section for that rendering
- * system, gallery to the preset's own `.toml`. `display: block` because an
- * inline anchor around a block image leaves a baseline gap under it, which
- * shows up as an uneven row. */
-.gallery-strip a {
+/* A frame carries two links. The picture opens itself at full size;
+ * `display: block` because an inline anchor around a block image leaves a
+ * baseline gap under it, which shows up as an uneven row. */
+.gallery-strip figure > a {
   display: block;
   line-height: 0;
   border-radius: 0.5rem;
 }
 
-.gallery-strip a:hover img {
+.gallery-strip figure > a:hover img,
+.gallery-strip figure > a:focus-visible img {
   outline: 2px solid var(--sl-color-text-accent);
   outline-offset: 2px;
 }
 
-.gallery-strip a:focus-visible {
+/* The caption is the other one - to the gallery section for a rendering system,
+ * or to a preset's own `.toml`. It inherits the caption's colour so the strip
+ * reads as captioned pictures rather than as a wall of link text; the underline
+ * on hover and the ring on focus are what say it is reachable. */
+.gallery-strip figcaption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.gallery-strip figcaption a:hover code {
+  text-decoration: underline;
+}
+
+.gallery-strip figcaption a:focus-visible {
   outline: 2px solid var(--sl-color-text-accent);
   outline-offset: 2px;
+  border-radius: 0.25rem;
 }
 
 .gallery-strip img {
