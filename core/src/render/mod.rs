@@ -740,6 +740,10 @@ impl Renderer {
     /// Returns the present mode the surface negotiated, so the caller can log
     /// which arm ran.
     ///
+    /// `frame_latency` is the secondary swapchain's
+    /// `desired_maximum_frame_latency`; see [`AuxTarget::new`] for what it paces
+    /// and for the range it is clamped to.
+    ///
     /// An already-attached target is replaced. An `Err` means this adapter
     /// cannot drive that surface — the dual-GPU case — and the caller is
     /// expected to degrade rather than treat it as fatal: the show is on the
@@ -750,11 +754,18 @@ impl Renderer {
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        frame_latency: u32,
     ) -> Result<AuxPresentMode, RenderError> {
-        let aux = AuxTarget::new(&self.ctx, target, width, height)?;
+        let aux = AuxTarget::new(&self.ctx, target, width, height, frame_latency)?;
         let mode = aux.present_mode();
         self.aux = Some(aux);
         Ok(mode)
+    }
+
+    /// The secondary target's configured frame latency, or `None` when detached.
+    #[cfg(feature = "text")]
+    pub fn aux_frame_latency(&self) -> Option<u32> {
+        self.aux.as_ref().map(AuxTarget::frame_latency)
     }
 
     /// Release the secondary target, its swapchain and its text atlas. Idempotent.

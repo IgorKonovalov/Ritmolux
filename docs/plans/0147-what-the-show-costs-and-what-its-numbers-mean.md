@@ -280,8 +280,8 @@ pub struct ConsolePacing {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
-| 2 — A failed activation and a dead endpoint stop reading alike | dev | done | committed with this row |
-| 3 — Both console levers become reachable | dev | not started | |
+| 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
+| 3 — Both console levers become reachable | dev | done | committed with this row |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
@@ -293,6 +293,51 @@ pub struct ConsolePacing {
 renders it)*; the verdict string is in `standalone/src/capture_verdict.rs` and its Windows
 construction site is in `standalone/src/capture_start.rs`, so both were edited. `app_state.rs` was
 edited too, for the give-up arm. No other file moved.
+
+**Phase 3 also touched `core/src/render/mod.rs`**, which the phase does not list: `attach_aux` is the
+only caller of `AuxTarget::new`, so the new `frame_latency` parameter passes through it. The same
+edit added `Renderer::aux_frame_latency`, so the shell's "console opened" note quotes the depth the
+swapchain got rather than the one the config asked for — which Phase 4 needs, since a clamped value
+would otherwise be reported as the requested one.
+
+**Phase 5's comment repair has one more site than the plan names, and one fewer.** The falsified
+cadence claim is in three places, not two, and one of the two the plan names is no longer where it
+was. The exact list at this tip:
+
+- `core/src/render/aux_target.rs:184` — `AuxPresentMode::NonBlocking`'s doc, *"the console's present
+  cannot block on its own display's vblank, so it cannot pace the output."* Not named by the plan;
+  same claim, third site.
+- `core/src/render/aux_target.rs:323` — *"cannot alter what the show displays."* The one the plan
+  names in this file. Untouched.
+- `standalone/src/hud.rs:307` — `present_console`'s doc, *"a frame it drops or a present that stalls
+  must cost the show nothing."* The plan expects this claim in `standalone/src/app_state.rs`; that
+  is where its twin was, and Phase 3 **removed** that sentence while rewriting the block to place
+  the decimation. It was replaced with the cadence mechanism, not with the property Phase 5 owes, so
+  nothing false stands there now — but the same claim in `hud.rs` was never touched.
+
+**How to run Phase 4's arms.** `[console] frame_latency` (1 or 2) and `[console] present_every_n`
+(1 or 2) in `config.toml`, then `ritmolux --soak --console`; the console-closed control is the same
+without `--console`. Each arm is a relaunch, so the two keys are edited between arms. The
+`console opened:` line in `diagnostics.log` names the present mode, the frame latency **after
+clamping**, and the cadence, so every row can name the combination that actually ran.
+
+**`node scripts/check-backlog-claims.mjs` now exits 1 with three broken probes, and all three broke
+because these phases landed.** The script's own text says repairing a falsified entry is an
+`architect` call, so none was touched:
+
+- `0154 absent: REGDB in: standalone/src` — now matches, at `standalone/src/capture_verdict.rs`. The
+  entry's claim was that *nothing* distinguishes an activation failure from a dead endpoint; Phase 2
+  is what falsifies it.
+- `0164 present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs` — the literal
+  assignment is gone; the value now arrives from the caller and is clamped.
+- `0164 present: must not delay the frame it reports on in: standalone/src/app_state.rs` — that
+  sentence was rewritten when the decimation moved the cadence decision to the display loop. **The
+  claim it made is not yet repaired**: the surviving comment no longer asserts the console cannot
+  delay a frame, but the two comments Phase 5 names still stand, and Phase 5 is where they are
+  corrected.
+
+**This gate runs in `pre-push` and in CI's `links` job, so the lane is red on it until those entries
+are re-read.**
 
 ### Close triggers
 

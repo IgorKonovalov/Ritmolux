@@ -206,6 +206,13 @@ pub(crate) struct Hud {
     /// `console::route`, from the same lines the output would have drawn.
     pub(crate) console_window: Option<Arc<Window>>,
 
+    /// Output frames counted since launch, for the console's present cadence.
+    ///
+    /// Counted whether or not a console is attached, so opening one does not
+    /// shift the phase of a decimation already in progress. Its only reader is
+    /// the `present_every_n` test in the display loop.
+    pub(crate) console_frame: u64,
+
     /// Last cursor position seen on the console surface, in its device pixels.
     ///
     /// Tracked rather than read at the press because winit's `MouseInput`
@@ -500,6 +507,7 @@ impl AppState {
                 browse: OverlayState::new(),
                 settings: SettingsState::new(),
                 console_window: None,
+                console_frame: 0,
                 console_cursor: (-1.0, -1.0),
                 console_request: None,
                 random_state: 0x9E37_79B9,
@@ -624,10 +632,12 @@ impl AppState {
             }
         };
         let size = window.inner_size();
-        match self
-            .renderer
-            .attach_aux(Arc::clone(&window), size.width, size.height)
-        {
+        match self.renderer.attach_aux(
+            Arc::clone(&window),
+            size.width,
+            size.height,
+            self.config.console.frame_latency,
+        ) {
             Ok(mode) => {
                 // The program preview, opened with the window that consumes it.
                 // A refusal here is not fatal: the swapchain does not accept the
@@ -642,8 +652,14 @@ impl AppState {
                         "text only"
                     }
                 };
+                // The frame latency is read back rather than echoed from the
+                // config: the renderer clamps it, so a note quoting the request
+                // could name a depth the swapchain does not have.
+                let latency = self.renderer.aux_frame_latency().unwrap_or_default();
+                let every_n = self.config.console.present_every_n.max(1);
                 self.diagnostics.diag_log.note(&format!(
-                    "console opened: {}x{}, present mode {}, {preview}",
+                    "console opened: {}x{}, present mode {}, frame latency {latency}, \
+                     presented every {every_n} frame(s), {preview}",
                     size.width,
                     size.height,
                     mode.as_str()
@@ -921,9 +937,21 @@ impl AppState {
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
         }
-        // After the show's present, never before it and never inside it: the
-        // console is a monitor and must not delay the frame it reports on.
-        self.present_console();
+        // After the show's present, never before it and never inside it.
+        //
+        // The cadence is decided here rather than inside `present_console`,
+        // because it is a property of this loop: `[console] present_every_n`
+        // controls how often the display thread spends a console present at
+        // all, and the presenter itself has no view of the show's frame budget.
+        // At 1 every frame presents, which is the shipped cadence.
+        if self
+            .hud
+            .console_frame
+            .is_multiple_of(self.config.console.present_every_n.max(1) as u64)
+        {
+            self.present_console();
+        }
+        self.hud.console_frame = self.hud.console_frame.wrapping_add(1);
         // A dissolve's capture frame has now flipped the roster to the incoming
         // preset and applied its structural config, so this is the first moment the
         // renderer describes it rather than the one it is leaving (see

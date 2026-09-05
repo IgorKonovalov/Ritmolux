@@ -213,8 +213,26 @@ pub struct AuxTarget {
     blit: Blit,
 }
 
+/// The range a secondary surface's `desired_maximum_frame_latency` is held to.
+///
+/// A depth of 0 configures no images and is rejected by the backend; past 3 the
+/// queue is deeper than any presentation engine here will run ahead, so the
+/// extra images cost memory and buy latency. The caller's value is clamped into
+/// this range at the boundary rather than validated and refused: it is a pacing
+/// hint, and a surface that will not attach is a worse answer than one that
+/// attaches at the nearest depth.
+const AUX_FRAME_LATENCY: std::ops::RangeInclusive<u32> = 1..=3;
+
 impl AuxTarget {
     /// Attach a secondary surface for `target` to `ctx`'s device.
+    ///
+    /// `frame_latency` is the swapchain's `desired_maximum_frame_latency`,
+    /// clamped to [`AUX_FRAME_LATENCY`]. It is a **pacing** control and not a
+    /// picture one: at 1 the surface holds a single in-flight image, so
+    /// `get_current_texture` waits for this surface's own previous present to
+    /// retire before it returns — one vblank, spent on whichever thread calls
+    /// it. A caller presenting this surface from the same thread as another one
+    /// pays that wait inside that thread's frame.
     ///
     /// Fails — rather than panicking or degrading silently — when the surface
     /// cannot be configured on the adapter this device was created on. That is
@@ -226,6 +244,7 @@ impl AuxTarget {
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        frame_latency: u32,
     ) -> Result<Self, RenderError> {
         let surface = ctx
             .instance
@@ -253,9 +272,8 @@ impl AuxTarget {
             config.present_mode = wgpu::PresentMode::Fifo;
             AuxPresentMode::Fifo
         };
-        // One in-flight image: the console is a monitor, so a deep queue only
-        // buys it latency behind the output it is reporting on.
-        config.desired_maximum_frame_latency = 1;
+        config.desired_maximum_frame_latency =
+            frame_latency.clamp(*AUX_FRAME_LATENCY.start(), *AUX_FRAME_LATENCY.end());
         surface.configure(&ctx.device, &config);
 
         let text = TextLayer::new(&ctx.device, &ctx.queue, config.format);
@@ -272,6 +290,13 @@ impl AuxTarget {
     /// The present mode this surface was configured with.
     pub fn present_mode(&self) -> AuxPresentMode {
         self.mode
+    }
+
+    /// The frame latency this surface was configured with, **after clamping** —
+    /// so a caller reporting which arm ran quotes the depth the swapchain got
+    /// rather than the one it asked for.
+    pub fn frame_latency(&self) -> u32 {
+        self.config.desired_maximum_frame_latency
     }
 
     /// The surface's current size in physical pixels.
