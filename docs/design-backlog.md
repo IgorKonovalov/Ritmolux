@@ -2741,8 +2741,9 @@ evidence rather than more reasoning:
 
 - **Verified 2026-08-28** — a fresh COM object is still created per stream start, on the capture
   thread: `present: CoCreateInstance in: standalone/src/capture_win.rs`
-- **Verified 2026-08-28** — and nothing anywhere distinguishes this failure class from a dead
-  endpoint: `absent: REGDB in: standalone/src`
+- **Discharged 2026-09-06**, replacing the `absent: REGDB in: standalone/src` bullet this entry
+  carried until Plan 0147 Phase 2 landed the third shape. The two failure classes are now separate
+  verdicts about separate subjects: `present: LossCause in: standalone/src/capture_verdict.rs`
 - **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
   `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/capture_start.rs`
 
@@ -2772,6 +2773,19 @@ later, or the policy under test is not the repaired one.
   stops reading the same about an activation and about a device. **The mechanism halves stay filed and
   this entry stays live**, because choosing between retry-in-place and a long-lived enumerator wants the
   unplug evidence, and the box still has no removable interface.
+
+**Update 2026-09-06, at the Plan 0147 Phases 1-3 review — the third shape landed, and it is wired to
+the wrong incident.** `CaptureVerdict::Lost` now carries a `LossCause`, and the two tokens are
+distinguishable and tested. What is not yet right is which one the shell picks. The evidence flag
+`reopen_reached_endpoint` is cleared on the **lost-flag rising edge**, but a reopen that *succeeds*
+clears `input_lost`, so the next re-loss inside the same budget presents as a fresh incident and
+wipes the flag. The recovery budget's incident is wider — `RecoveryPolicy` keeps `attempts` until
+`INPUT_RECOVERY_SETTLE_SECS` of unbroken delivery — and the give-up verdict is a statement about
+*that* incident. So in the flap path `capture_start.rs`'s own
+`a_stream_that_dies_as_fast_as_it_opens_still_gives_up` models, every attempt reaches an endpoint
+and the verdict still reads *"none of which reached an endpoint"*. The evidence has to be scoped to
+the budget's incident — cleared where `RecoveryPolicy` resets itself, not on the lost flag. Carried
+as Plan 0147 Phase 3c; **this half of the third shape is not discharged until that lands.**
 
 ## 0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand
 
@@ -3055,7 +3069,8 @@ control) - and that is an ADR if it is ever wanted, not a patch.
 - **Verified 2026-08-30** - `bass` is levelled by that normalizer at the published frame boundary: `present: bass_gain\.normalize in: core/src/dsp/mod.rs`
 - **Verified 2026-09-04** - the absolute twin the consumer needed is already published: `present: "/rlx/v1/raw/bass" in: standalone/src/osc.rs`
 - **Verified 2026-09-04** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /rlx/v1/raw/bass in: README.md`
-- `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `README.md`, `docs/` and the OSC table, not a match countable in one file
+- **Discharged 2026-09-06** for the OSC consumer, replacing this entry's `unprobeable:` bullet about prose. Plan 0147 Phase 1 states the property where the telemetry table is read: `present: normalized against \*\*its own running peak\*\* in: README.md`
+- **Still open for the preset author.** `docs/presets.md` states the normalization and names the `*_raw` twin, and does **not** state that the four terms reach 1.0 on every local peak - which is the half that misled the room. A look written as `glow + depth * bass` in the expression grammar hits the identical ceiling. Phase 1 did not cover it and did not claim to; it is one paragraph, and it belongs with whatever plan next touches that document
 - **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
   phase lands first in that plan because [Plan 0133](plans/0133-the-engine-drives-the-lights.md) is approved and meets this on its first evening.
 
@@ -3109,14 +3124,46 @@ lever moves it, the mechanism is elsewhere and the next thing to try is presenti
 the display thread, which is a real design change and an ADR. Whichever lands, the two comments
 above are corrected to the property that survives.
 
-- **Verified 2026-08-30** - the console swapchain still asks for a single in-flight image: `present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs`
+- **Re-probed 2026-09-06** - the console swapchain still gets a single in-flight image *by default*. Plan 0147 Phase 3 removed the literal this bullet used to match in `aux_target.rs`; the value now arrives from the caller and is clamped, so the shipped depth is the config default: `present: frame_latency: 1 in: standalone/src/config.rs`
 - **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/app_state.rs`
-- **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/app_state.rs`
+- **Re-probed 2026-09-06** - a comment that denies the cost is still there. The sentence this bullet used to match in `app_state.rs` was rewritten by Plan 0147 Phase 3 when the decimation moved the cadence decision into the display loop; the same claim stands in three other places, and this probes the one furthest from the plan's own file list: `present: cost the show nothing in: standalone/src/hud.rs`
+- **Verified 2026-09-06** - and in the core's own wrapper, which no plan text had named until this review: `present: console that stalls cannot pace in: core/src/render/mod.rs`
 - **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
 - **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
 - **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phases 3-5.** Both levers become reachable, a hands-off window measures
   four arms, and whichever verdict arrives sets the defaults. **The two false comments are corrected
   either way** - the plan is explicit that a fix is conditional and the claim repair is not.
+
+**Update 2026-09-06, at the Plan 0147 Phases 1-3 review. Three things this entry got wrong or
+under-counted, and one instrument it turns out to need.**
+
+**The false claim has four sites, not two.** This entry names `app_state.rs` and `aux_target.rs`.
+The full roster at Plan 0147's Phase 3 tip is `core/src/render/aux_target.rs` twice (the
+`NonBlocking` doc's *"it cannot pace the output"* and `present`'s *"cannot alter what the show
+displays"*), `core/src/render/mod.rs`'s `present_aux` doc (*"a console that stalls cannot pace the
+show"*), and `standalone/src/hud.rs`'s `present_console` doc (*"must cost the show nothing"*). The
+`app_state.rs` sentence this entry quotes no longer exists - Phase 3 rewrote that block for the
+decimation and replaced the claim with the mechanism, so nothing false stands there.
+
+**A first measurement window ran on 2026-09-06 and produced no usable verdict.** Three arms on
+`AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, one display at 165 Hz, windowed: Meter Mono
+165.0 -> 165.0 fps, Clifford 40.0 -> 40.4, Leviathan 29.4 -> 28.7. **None of these is 0164's
+regime.** No shipped preset screened between 45 and 90 fps closed on that box, and a one-vblank
+penalty is 6.06 ms - invisible against a 34 ms frame and arithmetically incapable of halving it.
+The 61.7 -> 33.1 reading sits at ~16 ms closed, where two vblanks *is* a halving. **A null taken
+outside the regime is not evidence against the mechanism**, and the window has to reach ~2-3 vblanks
+per frame closed before its result means anything.
+
+**And nothing in this repository can tell a console that cost nothing from one that never
+presented.** `AuxTarget::present` returns `Ok(())` on `Timeout | Occluded` *and* on
+`Outdated | Lost`, before any encoder work; `present_aux` propagates that `Ok`; nothing counts. The
+show's own path is not like this - `Renderer::render` calls `record_dropped()` on the same skip and
+`record_frame()` only after `queue.present`, so `fps` counts presents and `frames_dropped` is
+published in `diagnostics.log` (0 across every arm of the window above). **The show's numbers are
+sound and the console's are unwitnessed**, and the Meter Mono arm is the one this bites hardest: at
+165 Hz a console presenting synchronously at `frame_latency = 1` should cost about a vblank, and the
+arm moved by nothing at all. Carried as Plan 0147 Phase 3b (make the present countable) and
+[ADR-0172](adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md).
 
 ## 0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure
 

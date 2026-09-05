@@ -4,7 +4,10 @@
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none for Phases 1-3 and 6 — mechanism fixes and prose under decisions that
-> already exist. Phase 5 writes an `Outcome` onto
+> already exist. Phase 3b implements
+> [ADR-0172](../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md), written
+> at the Phases 1-3 review after a first Phase 4 window produced a null nothing could read. Phase 5
+> writes a second `Outcome` onto
 > [ADR-0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) rather than superseding it,
 > and names the ADR a fifth phase would owe if neither lever moves the cost.
 > **Closes:** design-backlog 0164, 0163. **0154 is half-discharged, not closed** — see Phase 2.
@@ -170,6 +173,60 @@ flowchart TB
   **No golden moves** — the console is an aux target and the show's pixels are unaffected, which is
   the one property both falsified comments got right.
 
+### Phase 3b — The console present becomes countable
+- **Owner skill:** dev
+- **What:** give Phase 4 a witness that the thing it is pricing actually ran.
+  `AuxTarget::present` returns `Ok(())` on `Timeout | Occluded` and again on `Outdated | Lost`,
+  both **before any encoder work**, and `present_aux` propagates that `Ok`. Nothing counts. So *"the
+  console costs nothing"* and *"the console never presented"* are the same reading from every
+  surface this project has, and a null result from Phase 4 would be uninterpretable rather than
+  negative ([ADR-0172](../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md)).
+  **The pattern already exists one file away**: the show's own `acquire` skip calls
+  `record_dropped()`, `record_frame()` runs only after `queue.present`, and `frames_dropped` is a
+  column in `diagnostics.log`. Do the same thing for the second surface.
+- **Files touched:** `core/src/render/aux_target.rs`, `core/src/render/mod.rs`,
+  `standalone/src/app_state.rs` (the display loop's decimation site and the diagnostic note).
+- **Done when:**
+  - `AuxTarget::present` counts a **present** only on the path that reaches its own present call,
+    and a **skip** on each of the four surface states it currently swallows. Breaking the four out
+    by reason is optional; separating presents from skips is not.
+  - The display loop's own decimation is counted too, so the three totals reconcile against the
+    output: **presented + skipped + decimated equals the output frames rendered while the console
+    was open.** That identity is the done-when, because two counters that do not add up to the
+    frame count leave the same ambiguity in a different place.
+  - The totals reach `diagnostics.log` — as columns, or in the `# console closed:` note. **A run
+    whose console never presented is distinguishable from one that presented every frame, from the
+    log alone.**
+  - The counters are exposed through the renderer and read `None` while detached. The present path
+    itself cannot be driven headless and this phase does not pretend otherwise; what a test can pin
+    is the decimation arithmetic and the detached case, and that is what it pins.
+  - **No default changes and no golden moves.**
+
+### Phase 3c — The give-up verdict is scoped to the incident the budget counts
+- **Owner skill:** dev
+- **What:** repair the wiring Phase 2 landed. `CaptureVerdict::Lost` carries a `LossCause` and the
+  two tokens are distinguishable — that half holds. What picks between them does not.
+  `reopen_reached_endpoint` is cleared on the **`input_lost` rising edge**, but a reopen that
+  *succeeds* clears `input_lost`, so the next re-loss inside the same budget presents as a fresh
+  incident and wipes the evidence. The budget's incident is wider: `RecoveryPolicy` keeps
+  `attempts` until `INPUT_RECOVERY_SETTLE_SECS` of unbroken delivery. The give-up verdict is a
+  statement about **that** incident. So in the flap path `capture_start.rs`'s own
+  `a_stream_that_dies_as_fast_as_it_opens_still_gives_up` models — reopen, one live frame, lost
+  again, three times — every attempt reaches an endpoint and the verdict reads *"none of which
+  reached an endpoint"*. Phase 2 replaced one false verdict with another on that path.
+- **Files touched:** `standalone/src/app_state.rs`, `standalone/src/capture_start.rs`.
+- **Done when:**
+  - The evidence is cleared by the **same event that restores the budget** — `RecoveryPolicy`
+    returning to its default — and never by the lost flag alone.
+  - The decision is exercised by a test that replays both sequences and asserts the **token**,
+    which is what a reader sees: the flap sequence gives `LossCause::Endpoint`, three consecutive
+    activation failures give `Activation`. Nothing headless can drive an `AppState`, so **extract
+    the decision into something a test can call** — a function over (the incident's evidence, a
+    start's `failed_at_activation`) — rather than leaving it inline and untested, which is how this
+    defect shipped.
+  - **The retry budget is still untouched.** `RecoveryPolicy` gains no knowledge of failure class;
+    its existing bound tests continue to assert what they assert.
+
 ### Phase 4 — Human: four arms, one hands-off window
 - **Owner skill:** human
 - **What:** measure which lever, if either, removes the halving. Four arms — (latency 1,
@@ -178,33 +235,66 @@ flowchart TB
   otherwise idle box.
 - **Files touched:** none (a measurement; its output feeds Phase 5).
 - **Done when:** five arms are recorded with mean fps and `frame_ms_p99_steady` each, **and every
-  row names the adapter that produced it** (ADR-0071). Three method constraints, each of which has
-  voided a measurement in this repo before:
+  row names the adapter that produced it** (ADR-0071). Five method constraints. The first three
+  have each voided a measurement in this repo before; the last two were added at the Phases 1-3
+  review, after a first window on 2026-09-06 satisfied the first three and still produced nothing
+  readable.
   - **The baseline is re-taken in this window**, not compared against the 61.7 / 33.1 figures above
     — those came from a different build, and a cross-build comparison is not one this plan can make.
   - **No other lane may be building or testing**, checked for `cargo` / `cargo-nextest` processes
     **before and after** the window. Any hit voids every figure in it.
   - **The operator does not drive the app mid-run.** An A/B comparison in which one arm was touched
     is void.
-  - The valid outcomes include *"neither lever moves it"*, and that is a result, not a failure.
+  - **Every console-open arm reports a non-zero present count**, from Phase 3b's instrument, with
+    its skip and decimation totals beside it. An arm whose console presented nothing is void, not
+    cheap — and an arm whose skips dominate is a finding about the harness, not about the console.
+  - **At least one arm runs in the regime the claim is about.** The mechanism under test costs at
+    most a vblank or two; on a 165 Hz display that is 6.06 ms, which cannot halve a 34 ms frame and
+    cannot be seen against one. The 61.7 -> 33.1 reading sits at ~16 ms closed — **two to three
+    vblanks per frame** — and the window must reach it. The 2026-09-06 attempt could not: no
+    shipped preset screened between 45 and 90 fps closed on that box, which is a fact about the
+    library, not a null. If no preset lands there, **reach it another way and say so** — window
+    size, `--tier`, or a preset the roster does not ship — rather than reporting a null taken
+    outside the regime.
+  - The valid outcomes include *"neither lever moves it"*, and that is a result, not a failure —
+    **but only from inside the regime, and only with a present count beside it.**
 
 ### Phase 5 — The verdict becomes the default, and the two comments become true
 - **Owner skill:** dev
-- **What:** set the console defaults to whatever Phase 4 established, and replace the two false
-  comments with the property that survives.
-- **Files touched:** `core/src/render/aux_target.rs`, `standalone/src/app_state.rs`,
-  `docs/adrs/0143-*.md` (an `Outcome` section, dated — never an edit to the body),
-  `docs/on-device-validation.md`.
+- **What:** set the console defaults to whatever Phase 4 established, and replace the false comments
+  with the property that survives. **There are four of them, not two** — the roster below was
+  established at the Phases 1-3 review; the two this plan originally named were an undercount, and
+  one of those two no longer exists.
+- **Files touched:** `core/src/render/aux_target.rs`, `core/src/render/mod.rs`,
+  `standalone/src/hud.rs`, `standalone/src/app_state.rs`, `README.md`,
+  `docs/adrs/0143-*.md` (a second `Outcome` section, dated — never an edit to the body or to the
+  `Outcome` already there), `docs/on-device-validation.md`.
 - **Done when:**
   - The defaults match Phase 4's best arm, and the previous default is still reachable.
-  - **Neither comment claims the console cannot affect the show.** Both state the property that is
+  - **No comment claims the console cannot affect the show.** All four state the property that is
     actually held — the show's *pixels* are unaffected and that is asserted byte-exactly; the show's
-    *cadence* is affected, by the amount Phase 4 measured, on the adapter Phase 4 names.
-  - ADR-0143 carries a dated `Outcome` recording that its stated cadence property did not hold as
-    written, with the measured figure.
-  - **If Phase 4 found that neither lever moves the cost**, this phase ships the comment repair and
-    the `Outcome` alone, and the plan's Followups carry the off-display-thread present as the ADR
-    0164 says it would be. Shipping a fix is conditional; correcting the claim is not.
+    *cadence* is affected, by the amount Phase 4 measured, on the adapter Phase 4 names. The roster:
+    - `core/src/render/aux_target.rs` — `AuxPresentMode::NonBlocking`'s doc, *"so it cannot pace the
+      output."*
+    - `core/src/render/aux_target.rs` — `present`'s doc, *"cannot alter what the show displays."*
+    - `core/src/render/mod.rs` — `present_aux`'s doc, *"a console that stalls cannot pace the
+      show."* Named by no earlier version of this plan and by no backlog entry until 2026-09-06.
+    - `standalone/src/hud.rs` — `present_console`'s doc, *"must cost the show nothing."* The plan
+      originally expected this claim in `standalone/src/app_state.rs`; that is where its twin was,
+      and Phase 3 removed that sentence while rewriting the block for the decimation, replacing it
+      with the mechanism. **Nothing false stands in `app_state.rs` — do not go looking for it.**
+  - **ADR-0143 already carries a dated `Outcome`** (2026-08-30, at Plan 0131's close) convicting the
+    cadence claim with the 61.7 / 33.1 figures. This phase therefore **appends a second dated
+    `Outcome`** carrying Phase 4's verdict — which lever, or neither, and the present counts that
+    make the arm readable. It does not restate the first and it does not edit it.
+  - **`README.md` documents `[console] frame_latency` and `[console] present_every_n`.** Phase 3
+    shipped two operator-settable keys and no doc for either; the section already names `enabled`,
+    `display` and `display_name`. This is owed whichever way Phase 4 lands, and it is the one item
+    here that is not conditional on the verdict.
+  - **If Phase 4 found that neither lever moves the cost**, this phase ships the comment repair, the
+    `README.md` keys and the `Outcome` alone, and the plan's Followups carry the off-display-thread
+    present as the ADR 0164 says it would be. Shipping a fix is conditional; correcting the claim is
+    not.
 
 ### Phase 6 — Human: the first frame-time row that names the discrete GPU
 - **Owner skill:** human
