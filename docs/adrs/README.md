@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0169.** *(0120 was reserved for
+**Next free number: 0172.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -190,4 +190,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0166](0166-a-published-document-splits-into-routes-by-size.md) | A published document splits into routes by size, and a fragment map is the contract | accepted 2026-09-05 (Plan 0154), Outcome; extends 0154 |
 | [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) | The site owns its entrance, and the install page is the tester's own file | accepted 2026-09-05 (Plan 0154), narrows 0154 |
 | [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md) | The reader documents address a reader, and the working record stays a link | accepted 2026-09-05 (Plan 0154), prose half landed in Plan 0155 |
+| [0169](0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md) | The site is organised by reader task, and the README stops being a reference | proposed (Plan 0156), extends 0154 and 0167 |
+| [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | proposed (Plan 0156), extends 0017 and 0163 |
+| [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | proposed (Plan 0156), extends 0154 |
 <!-- roster:end -->
