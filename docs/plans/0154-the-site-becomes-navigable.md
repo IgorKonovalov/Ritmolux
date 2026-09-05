@@ -284,8 +284,8 @@ against the merged tree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — no plan number reaches a reader's eye | dev | done | committed with this row |
-| 2 — the roster becomes 46 pages | dev | | |
+| 1 — no plan number reaches a reader's eye | dev | done | `3e5f6d6` |
+| 2 — the roster becomes 46 pages | dev | done | committed with this row |
 | 3 — a wrong anchor fails the build | dev | | |
 | 4 — the rule generalises | dev | | |
 | 5 — a stranger can find out what this is and get it | dev | | |
@@ -338,6 +338,45 @@ refuse to build while any of them is unmatched.
 **16** HTML pages, Pagefind index **1,290 KB**, `site/dist` **41,913 KB**. Build wall time was
 8.22 s cold and 3.54 s with Astro's asset cache warm — Phase 4 has to say which of the two it is
 quoting, or the comparison means nothing.
+
+**Phase 2 — the counts.** `presets/README.md` builds as **46** routes: 1 index, 13 section routes,
+32 subsection routes, and the site goes from 16 built pages to 61. **No route's source exceeds
+30,000 bytes.** The largest is **23,218**, on
+`guide/parameter-roster/structural-config-line-systems-and-the-attractor/tuple-picks-a-whole-figure-framing-included`
+— the route the phase names, 116 bytes above the 23,102 it predicts.
+
+**Phase 2 — the chunks are rendered, not globbed.** A custom loader alongside the existing `glob`
+one calls Astro's `renderMarkdown` on each chunk, so no cut-up copy of a document is written
+anywhere and the remark chain (provenance strip, link rewrite) runs over a chunk exactly as it runs
+over a whole document. `fileURL` is passed with each chunk so the rewriter resolves a chunk's
+relative links against the document they came from.
+
+**Phase 2 — a new direct dependency, `github-slugger@2.0.0`.** It is the slugger Astro and
+`@astrojs/markdown-remark` already use, and it was already in the lockfile as their transitive
+dependency, so `npm ci` installs nothing new; the entry in `site/package.json` makes an existing use
+declared rather than borrowed. It computes route segments from headings. `site/` is never shipped
+and nothing shipped depends on it.
+
+**Phase 2 — titles lost their markdown, and no route moved.** A section heading becomes the entry's
+`title`, which Starlight prints verbatim, so `### Bloom — `bloom_amount`…` first rendered as a page
+`<h1>` and a sidebar label showing literal backticks. `plainHeading()` removes code spans, emphasis
+and inline links from the title string only. Verified that a slug is identical either way, so the
+route is the same before and after.
+
+**Phase 2 — the sidebar group is generated, not written out.** `sidebarGroup()` builds the collapsed
+group from the same splitter the loader uses, so a 46-entry hand-kept list cannot drift from the
+routes and a heading rename cannot orphan a route. A section that split again nests its subsections
+under itself.
+
+**Phase 2 — the search done-when, as measured.** Driven against `npm run preview` through the
+Pagefind API in a browser, top hit per query:
+
+| query | top result |
+|---|---|
+| `bloom_radius` | `…/engine-wide-controls/bloom--bloom_amount-bloom_threshold-bloom_radius/` |
+| `depth_fade` | `…/systems-and-their-named-parameters/attractor-depth-perspective-depth_fade-depth_hue-spin/` |
+| `fold_speed` | `…/systems-and-their-named-parameters/fragment_field-animation-rates--field_speed-and-fold_speed/` |
+| `occupancy` | `…/a-clamp-is-a-limit-not-a-gain--the-occupancy-table/` |
 
 ### Close triggers
 

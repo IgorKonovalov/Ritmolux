@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
+import { sidebarGroup } from './src/plugins/split-document.mjs';
 
 /**
  * The Pages subpath, read by the link rewriter and by
@@ -68,7 +69,7 @@ export default defineConfig({
             { label: 'Expression language', slug: 'guide/expression-language' },
             { label: 'Colour and palettes', slug: 'guide/palettes' },
             { label: 'Tuning walkthrough', slug: 'guide/tuning-walkthrough' },
-            { label: 'Parameter roster', slug: 'guide/parameter-roster' },
+            sidebarGroup('presets/README.md', 'Parameter roster'),
             { label: 'Gallery', slug: 'gallery' },
           ],
         },
