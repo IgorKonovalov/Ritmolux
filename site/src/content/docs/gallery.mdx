@@ -5,6 +5,8 @@ description: >-
 tableOfContents: false
 ---
 
+import { Image } from 'astro:assets';
+
 Every preset that ships, one frame each, grouped by the system it draws with. Each frame is the
 same capture: the synthesized `dynamic:110` clip at its loudest hop, at the Rich quality tier —
 the settings [`scripts/docs-shots.mjs`](../../../../scripts/docs-shots.mjs)
@@ -13,6 +15,18 @@ records for every committed picture in this repository.
 A preset is a text file. [The preset guide](../../../../docs/preset-guide.md) opens the smallest one
 worth looking at, and [the parameter roster](../../../../presets/README.md) lists every named
 parameter each of these systems takes.
+
+{/*
+  Where a frame links to. A preset has no page of its own on this site - it IS a
+  text file, so the file is the destination. `blob/main` rather than a tag: the
+  gallery is rebuilt from the same tree it links into.
+
+  `<Image>` rather than a plain `<img src={image.src}>` for the reason spelled out
+  on the home page - a bare `src` ships the original 1280x720 PNG, and eighty of
+  those is over 20 MB of thumbnails.
+*/}
+
+export const SOURCE = 'https://github.com/IgorKonovalov/Ritmolux/blob/main/presets/';
 
 export const cards = Object.entries(
   import.meta.glob('../../../../docs/images/gallery/presets/*.png', {
@@ -58,13 +72,17 @@ export const families = [
     <div class="gallery-strip" role="list">
       {members.map(({ image, preset }) => (
         <figure role="listitem">
-          <img
-            src={image.src}
-            width={image.width}
-            height={image.height}
-            alt={`The ${preset} preset, drawn with the ${system} system`}
-            loading="lazy"
-          />
+          <a href={`${SOURCE}${preset}.toml`}>
+            <Image
+              src={image}
+              widths={[240, 480, 720]}
+              sizes="(min-width: 46rem) 13rem, 45vw"
+              format="webp"
+              quality={72}
+              alt={`The ${preset} preset, drawn with the ${system} system`}
+              loading="lazy"
+            />
+          </a>
           <figcaption><code>{preset}</code></figcaption>
         </figure>
       ))}
