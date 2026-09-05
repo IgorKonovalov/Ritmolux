@@ -288,8 +288,8 @@ against the merged tree.
 | 2 — the roster becomes 46 pages | dev | done | `2a77539` |
 | 3 — a wrong anchor fails the build | dev | done | `f7b5676` |
 | 4 — the rule generalises | dev | done | `f3c8bb2` |
-| 5 — a stranger can find out what this is and get it | dev | done | committed with this row |
-| 6 — the drift classes get gates | dev | | |
+| 5 — a stranger can find out what this is and get it | dev | done | `22a0371` |
+| 6 — the drift classes get gates | dev | done | committed with this row |
 | 7 — it looks like one thing | dev | | |
 | 8 — verified where it is served | human | | |
 
@@ -490,6 +490,31 @@ done-when asks for it: three, and a clause saying the site publishes them as its
 **Phase 5 — a trap in this repository's own comment style.** A JSDoc block containing the literal
 `packaging/*/READ-ME-FIRST.md` ends at the `*/` inside the glob and breaks the file. It bit once in
 `rewrite-links.mjs`; the two other places that name the same glob had already escaped it.
+
+**Phase 6 — the gate, exercised.** `doc('docs/diffusion-filter.md', 'Diffusion filter')` was removed
+from the sidebar in a scratch edit. The gate exited 1 under both of its menu properties, naming
+`engine/diffusion-filter` as a published route absent from the sidebar and as a built route
+reachable only by search. Restored, and `git status` carries no edit to `site/astro.config.mjs`
+beyond this phase's own. On the restored tree: 135 built routes, 133 from the published set, every
+one in the menu.
+
+**Phase 6 — the size ceiling applies to split routes only, which the phase's wording does not say.**
+Written as *"no route's source exceeds 30,000 bytes"* the check fails on `docs/nfr.md`, which is
+33,295 bytes and stays **one** route because it is under the 40,000-byte split threshold. Applied to
+every route the two constants contradict each other: a document is allowed to be 40,000 bytes on one
+page by decision and then forbidden to be over 30,000. The ceiling is scoped to routes the splitter
+produced, where it is what ADR-0166 argues it is — the assertion that cutting at `##` and then `###`
+produced pages a reader can hold. Largest split route: 26,893 B.
+
+**Phase 6 — a file was added that the phase does not list.** `site/src/components/Footer.astro`.
+Starlight has no configuration-only way to put text on every page; a footer stamp is a component
+override, and the override needs a component. Both values it prints are resolved in
+`astro.config.mjs` — the version from `[workspace.package]`, the commit from `GITHUB_SHA` or `git
+rev-parse`, falling back to `unknown` rather than failing a build from a tarball. **All 137 built
+pages carry it**, the splash landing page and `404.html` included.
+
+**Phase 6 — `CLAUDE.md` now reads eight gates**, and the `scripts/` block says that two of them, not
+one, need a built site and live in `.github/workflows/pages.yml`.
 
 ### Close triggers
 

@@ -1,0 +1,24 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+
+/**
+ * Starlight's footer, plus the stamp saying what this page was built from.
+ *
+ * The site is a current-`main` site with no per-release versioning (ADR-0154),
+ * so a tester reading a page beside a release zip has no way to tell whether the
+ * two match. This is the honest statement of that rather than a step towards
+ * versioning it: the commit and the workspace version, on every page.
+ *
+ * Both values come from `astro.config.mjs`, which reads the version from
+ * `Cargo.toml` and the commit from `GITHUB_SHA` or from `git`.
+ */
+const commit = import.meta.env.BUILD_COMMIT;
+const version = import.meta.env.BUILD_VERSION;
+---
+
+<Default><slot /></Default>
+
+<p class="build-stamp">
+  Built from <code>{commit}</code> at version <code>{version}</code>. This site tracks{' '}
+  <code>main</code> and is not versioned per release.
+</p>
