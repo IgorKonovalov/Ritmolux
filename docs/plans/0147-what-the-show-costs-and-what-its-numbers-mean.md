@@ -1,6 +1,6 @@
 # 0147 — What the show costs, and what its numbers mean
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none for Phases 1-3 and 6 — mechanism fixes and prose under decisions that
@@ -275,11 +275,11 @@ pub struct ConsolePacing {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0147-show-costs`, worktree `WORK/lmv-plan-0147`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `level/*` says what it is normalized against | dev | not started | |
+| 1 — `level/*` says what it is normalized against | dev | done | committed with this row |
 | 2 — A failed activation and a dead endpoint stop reading alike | dev | not started | |
 | 3 — Both console levers become reachable | dev | not started | |
 | 4 — Human: four arms, one hands-off window | human | not started | |
