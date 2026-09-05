@@ -279,14 +279,20 @@ pub struct ConsolePacing {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `level/*` says what it is normalized against | dev | done | committed with this row |
-| 2 — A failed activation and a dead endpoint stop reading alike | dev | not started | |
+| 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
+| 2 — A failed activation and a dead endpoint stop reading alike | dev | done | committed with this row |
 | 3 — Both console levers become reachable | dev | not started | |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
 
 ### Notes
+
+**Phase 2 touched two files the phase does not list.** The phase names
+`standalone/src/capture_win.rs` and `standalone/src/app_state.rs` *(the verdict string and whatever
+renders it)*; the verdict string is in `standalone/src/capture_verdict.rs` and its Windows
+construction site is in `standalone/src/capture_start.rs`, so both were edited. `app_state.rs` was
+edited too, for the give-up arm. No other file moved.
 
 ### Close triggers
 

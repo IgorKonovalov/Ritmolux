@@ -117,15 +117,38 @@ impl Drop for CaptureHandle {
 
 #[derive(Debug)]
 pub enum CaptureError {
+    /// The COM machinery capture runs on could not be stood up: entering the
+    /// apartment, or creating the `MMDeviceEnumerator` class object.
+    ///
+    /// **Held apart from [`Windows`](Self::Windows) because it is not a
+    /// statement about any endpoint.** These calls happen before a device has
+    /// been enumerated, named or opened, so a failure here — `REGDB_E_CLASSNOTREG`
+    /// is the one observed on this path — says the process could not reach the
+    /// audio stack at all. Reported as a dead device it would convict hardware
+    /// that was never asked anything.
+    Activation(windows::core::Error),
     Windows(windows::core::Error),
     UnsupportedMixFormat(String),
     Format(rlx_core::audio::FormatError),
     ThreadDied,
 }
 
+impl CaptureError {
+    /// Whether this failure happened before any endpoint was reached.
+    ///
+    /// The one question a caller needs in order to keep a verdict about the
+    /// process from being written as a verdict about a device.
+    pub fn is_activation(&self) -> bool {
+        matches!(self, CaptureError::Activation(_))
+    }
+}
+
 impl std::fmt::Display for CaptureError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            CaptureError::Activation(e) => {
+                write!(f, "COM activation failed, no endpoint was reached: {e}")
+            }
             CaptureError::Windows(e) => write!(f, "WASAPI error: {e}"),
             CaptureError::UnsupportedMixFormat(what) => {
                 write!(f, "unsupported mix format: {what}")
@@ -303,7 +326,7 @@ impl ComScope {
         if hr == RPC_E_CHANGED_MODE {
             return Ok(Self { owned: false });
         }
-        hr.ok()?;
+        hr.ok().map_err(CaptureError::Activation)?;
         Ok(Self { owned: true })
     }
 }
@@ -326,7 +349,8 @@ pub fn endpoints(mode: CaptureMode) -> Result<Vec<String>, CaptureError> {
     let _com = unsafe { ComScope::enter()? };
     unsafe {
         let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(CaptureError::Activation)?;
         Ok(enumerate_endpoints(&enumerator, dataflow(mode))?
             .into_iter()
             .map(|(name, _)| name)
@@ -403,7 +427,8 @@ fn setup_stream(
     let flow = dataflow(selector.mode);
     unsafe {
         let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(CaptureError::Activation)?;
         let device = pick_device(&enumerator, flow, selector.device.as_deref())?;
         // Read at setup, before the real-time loop, and carried out with the
         // handle: the loop can never ask an endpoint for its name.
@@ -590,9 +615,38 @@ unsafe fn parse_mix_format(fmt: *const WAVEFORMATEX) -> Result<MixFormat, Captur
 
 #[cfg(test)]
 mod tests {
+    use windows::Win32::Foundation::REGDB_E_CLASSNOTREG;
     use windows::Win32::System::Com::COINIT_APARTMENTTHREADED;
 
     use super::*;
+
+    /// **A failure that never reached an endpoint says so in words.** The one
+    /// observed on this path is `REGDB_E_CLASSNOTREG` out of `CoCreateInstance`,
+    /// and everything downstream — the verdict token, the log column, the F3
+    /// overlay — has only this `Display` to go on. Rendered as a plain `WASAPI
+    /// error` the HRESULT is the sole thing separating it from a device that
+    /// refused, and nothing that reads a verdict decodes HRESULTs.
+    #[test]
+    fn an_activation_failure_names_its_subject_without_the_hresult() {
+        let activation =
+            CaptureError::Activation(windows::core::Error::from_hresult(REGDB_E_CLASSNOTREG));
+        assert!(activation.is_activation());
+        let text = activation.to_string();
+        assert!(
+            text.contains("no endpoint was reached"),
+            "the activation failure does not say what it is about: {text}"
+        );
+
+        // The device-side twin: the *same* HRESULT, so what separates the two
+        // strings is the subject alone rather than the code inside them.
+        let device = CaptureError::Windows(windows::core::Error::from_hresult(REGDB_E_CLASSNOTREG));
+        assert!(!device.is_activation());
+        assert_ne!(
+            device.to_string(),
+            text,
+            "the two subjects render identically"
+        );
+    }
 
     /// **Enumeration has to work from a thread that is already in an STA**, and
     /// leave that apartment standing.
@@ -625,7 +679,10 @@ mod tests {
         // A machine with no endpoints at all is allowed (a headless runner has
         // none); being told the apartment is wrong is not.
         for result in [&first, &second] {
-            if let Err(CaptureError::Windows(e)) = result {
+            // Either COM-carrying arm: entering the apartment now reports
+            // `Activation`, and the enumeration behind it still reports
+            // `Windows`, so checking one variant would stop covering this.
+            if let Err(CaptureError::Windows(e) | CaptureError::Activation(e)) = result {
                 assert_ne!(
                     e.code(),
                     RPC_E_CHANGED_MODE,

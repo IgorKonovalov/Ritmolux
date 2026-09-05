@@ -28,7 +28,7 @@ use crate::capture_start::{
     CAPTURE_BACKEND, DEFAULT_ENDPOINT, INPUT_RECOVERY_ATTEMPTS, Persist, Recovery, RecoveryPolicy,
     capture_handle, capture_lost, device_row_index, start_capture,
 };
-use crate::capture_verdict::CaptureVerdict;
+use crate::capture_verdict::{CaptureVerdict, LossCause};
 #[cfg(windows)]
 use crate::capture_win;
 use crate::cli::resolve_log_path;
@@ -125,6 +125,16 @@ pub(crate) struct Capture {
     /// read as "nothing wrong" on the next frame and spend the whole retry
     /// budget on its first attempt.
     pub(crate) input_lost: bool,
+
+    /// Whether any start since the current loss began actually reached an
+    /// endpoint — false while every attempt has failed at platform activation.
+    ///
+    /// Cleared on the frame a loss begins rather than kept across incidents: it
+    /// is evidence about *this* loss, and a previous incident's successful
+    /// reopen says nothing about the endpoint now. It decides only the
+    /// [`LossCause`] a give-up records; the retry budget counts attempts and
+    /// never reads it.
+    pub(crate) reopen_reached_endpoint: bool,
 
     /// How many reopens the lost input has already cost, and whether the bound
     /// has been announced.
@@ -471,6 +481,7 @@ impl AppState {
                 scratch: vec![0.0; 32_768],
                 input,
                 input_lost: false,
+                reopen_reached_endpoint: false,
                 input_recovery: RecoveryPolicy::default(),
                 // Left empty until the settings modal is opened: a roster nothing is
                 // reading is a COM enumeration paid for nothing, and every reader of
@@ -1131,6 +1142,12 @@ impl AppState {
 
         let started = start_capture(input);
         self.capture.capture_token = started.verdict.token();
+        // Anything that is not a bare activation failure got as far as a device,
+        // a successful start included. One such attempt is enough to make a
+        // later give-up a verdict about the endpoint rather than about COM.
+        if !started.failed_at_activation {
+            self.capture.reopen_reached_endpoint = true;
+        }
         if started.format != self.capture.capture_format {
             self.capture.analyzer = Analyzer::new(started.format)
                 .expect("capture layer already validated this format at the boundary");
@@ -1183,6 +1200,11 @@ impl AppState {
     /// hidden window.
     pub(crate) fn poll_input_lost(&mut self, dt: f32) {
         if capture_lost(self.capture._capture.as_ref()) {
+            if !self.capture.input_lost {
+                // The first frame of a new incident: nothing has yet been
+                // established about the endpoint this time round.
+                self.capture.reopen_reached_endpoint = false;
+            }
             self.capture.input_lost = true;
         }
         match self
@@ -1206,9 +1228,20 @@ impl AppState {
                 );
             }
             Recovery::GiveUp => {
+                // The budget is spent either way; what it *establishes* depends
+                // on whether any of those attempts got as far as a device. All
+                // three failing at platform activation is a statement about this
+                // process, and writing it as `lost` convicts hardware that was
+                // never asked anything.
+                let cause = if self.capture.reopen_reached_endpoint {
+                    LossCause::Endpoint
+                } else {
+                    LossCause::Activation
+                };
                 self.capture.capture_token = CaptureVerdict::Lost {
                     backend: CAPTURE_BACKEND,
                     attempts: INPUT_RECOVERY_ATTEMPTS,
+                    cause,
                 }
                 .token();
                 eprintln!(

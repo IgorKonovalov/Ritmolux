@@ -41,6 +41,14 @@ pub(crate) struct CaptureStart {
     /// one, so a selection that degraded names what is running. `None` when the
     /// start failed, and on a platform whose capture path picks no endpoint.
     pub(crate) endpoint: Option<String>,
+    /// Whether this start failed *before* reaching any endpoint.
+    ///
+    /// `false` for a start that worked and for one that reached a device and was
+    /// refused — both of those touched an endpoint. It exists so the shell can
+    /// tell what a spent recovery budget establishes: three reopens that all
+    /// answered this way have concluded nothing about the device
+    /// ([`LossCause`](crate::capture_verdict::LossCause)).
+    pub(crate) failed_at_activation: bool,
 }
 
 /// Whether a capture swap writes its selection back to `config.toml`.
@@ -264,9 +272,13 @@ pub(crate) fn start_capture(input: &config::Input) -> CaptureStart {
                 format,
                 verdict,
                 endpoint: Some(endpoint),
+                failed_at_activation: false,
             }
         }
         Err(err) => {
+            // Read before the error is consumed by the verdict: the subject is
+            // the one thing about a failure the token cannot be re-parsed for.
+            let failed_at_activation = err.is_activation();
             // Stays: it costs nothing and is still the fastest read for anyone
             // already at a terminal. The verdict is for everyone who is not.
             eprintln!("audio capture unavailable ({err}); rendering without audio");
@@ -276,6 +288,7 @@ pub(crate) fn start_capture(input: &config::Input) -> CaptureStart {
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
                 endpoint: None,
+                failed_at_activation,
             }
         }
     }
@@ -296,6 +309,7 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
                 verdict,
                 // Not an endpoint anything can select, so it positions no row.
                 endpoint: None,
+                failed_at_activation: false,
             }
         }
         Err(err) => {
@@ -306,6 +320,10 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
                 endpoint: None,
+                // ScreenCaptureKit taps the system mix rather than activating a
+                // per-endpoint object, so there is no stage here that can fail
+                // short of a device.
+                failed_at_activation: false,
             }
         }
     }
@@ -320,6 +338,7 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
         format: FALLBACK_FORMAT,
         verdict: CaptureVerdict::Unsupported,
         endpoint: None,
+        failed_at_activation: false,
     }
 }
 
