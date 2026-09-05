@@ -61,7 +61,7 @@ run_step() {
     "$@" || fail "$label"
 }
 
-echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, sd-filter, fmt, clippy, tests)"
+echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, reader prose, sd-filter, fmt, clippy, tests)"
 
 # Cheapest check first, so the cheapest failure is the fastest one. ~50 ms, which
 # is why it fits a gate ADR-0033 Alternative F otherwise keeps to the fast subset:
@@ -130,6 +130,18 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # so a wrong slug rule ships silently and every row in every block is wrong
 # together. `--self-test` is where that is pinned, against two anchors this
 # repository already links.
+#
+# The reader-prose gate is the seventh (ADR-0168), and it runs last because it is
+# the only one whose subject is prose rather than structure. It asserts that in
+# the five documents a preset author reads, every citation of a plan or an ADR
+# sits inside a markdown link rather than bare in a sentence - the exact inverse
+# of what ADR-0127 asks of a `.rs` comment, because those five address a reader
+# who wants to know what a parameter does rather than a session reconstructing
+# why a threshold exists. The boundary between the two rules is the filename list
+# inside the script. Push time is the right moment for the same reason it is for
+# the index-row gate above: the convention alone was tried, has been in CLAUDE.md
+# throughout, and is exactly how those documents accumulated 235 bare citations.
+# Same cost class again - five file reads and a regex scan of each.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
@@ -139,8 +151,9 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-comment-hygiene.mjs" node scripts/check-comment-hygiene.mjs
     run_step "node scripts/toc.mjs --check" node scripts/toc.mjs --check
     run_step "node scripts/toc.mjs --self-test" node scripts/toc.mjs --self-test
+    run_step "node scripts/check-reader-prose.mjs" node scripts/check-reader-prose.mjs
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene and contents-block checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose and contents-block checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in

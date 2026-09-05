@@ -1,6 +1,6 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Six checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+Seven checkers in `scripts/` take an optional `root` argument so they can be run against a tree
 other than this repository. This directory is that tree. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written. `index-rows/` and `toc/`
@@ -362,6 +362,44 @@ tracked tree — so the reach is kept and the exit code is left to the tracked h
 If git cannot answer at all, the gate says so and every hit counts toward the exit code. That is
 ADR-0016's shape and it is the safe direction: a check that cannot measure trackedness must not
 quietly downgrade everything it finds.
+
+## `reader-prose/` — for `check-reader-prose.mjs`
+
+```
+node scripts/check-reader-prose.mjs scripts/fixtures/reader-prose
+```
+
+Expect **exit 1 and exactly six breaks, across three files**. Unlike every other checker here this
+one does not walk a tree at all — it reads five fixed paths under the root, which is the scope
+boundary ADR-0168 draws — so this subdirectory mirrors those paths rather than seeding an
+arbitrary layout.
+
+**One rejected form per line, and the counts are the instrument.** A branch of the citation
+alternation that stops matching shows up as a number that moved rather than as a silence.
+
+| File | Breaks | Seeded as |
+|------|-------:|-----------|
+| `presets/README.md` | 4 | the four citation forms: `ADR-0002` in a trailing parenthetical, `Plan 0063` woven into a sentence, `ADR‑0127` with a **U+2011** non-breaking hyphen, and `Plans 0027, 0078` — the **plural**, in a heading |
+| `docs/presets.md` | 1 | a citation inside a mid-sentence parenthetical |
+| `docs/preset-palettes.md` | 1 | a citation at a block's end |
+| `docs/preset-guide.md` | 0 | clean, and must report `0 citation(s), 0 bare` rather than being skipped |
+| `docs/preset-tuning-walkthrough.md` | 0 | clean, with no citation of any kind |
+
+**The silences are the larger half of this fixture**, because every one of them is a shape the gate
+must NOT convict. `presets/README.md` carries all four markdown link forms — inline, full
+reference, collapsed reference, and a definition line — plus a fenced block whose commands name a
+plan file and an ADR file by path, plus a `design-backlog 0062` reference that belongs to a
+different corpus under ADR-0149.
+
+**The collapsed reference is seeded inside a blockquote on purpose.** Its definition is written
+`> [ADR-0098]: …`, which is exactly how the real roster writes it, and a definition-line pattern
+anchored at the start of a line cannot see it. A definition the scanner misses makes every *use* of that label
+look bare, so this one fixture line is what separates a working gate from one that reports two
+false positives on the shipped tree — which is what it did before this file existed.
+
+**`docs/capturing.md` is here and is deliberately out of scope.** It is an Entrance B document
+carrying four bare citations, and the run must never report them. If it ever does, the filename
+list inside the script has widened past what ADR-0168 decided.
 
 ## `toc/` — for `toc.mjs`
 

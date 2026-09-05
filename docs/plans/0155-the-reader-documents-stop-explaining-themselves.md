@@ -224,8 +224,8 @@ flowchart LR
 | 1 — the rule, on the smallest real case | dev | done | `3fdd391` |
 | 2 — the expression language | dev | done | `2bce9be` |
 | 3 — the roster's own sections | dev | done | `3bbcaf0` |
-| 4 — the three sections that are most of the document | dev | done | committed with this row |
-| 5 — the gate, and the sweep | dev | | |
+| 4 — the three sections that are most of the document | dev | done | `0dc85dd` |
+| 5 — the gate, and the sweep | dev | done | committed with this row |
 
 ### Notes
 
@@ -326,6 +326,40 @@ rings; the live budget figures (`492`, `1 092`, `20 000`, `576` against `24`) ar
 renames, then `check-site-links.mjs` and `check-site-routes.mjs`: 137 pages, 135 routes, every
 site-relative href resolves, largest split route 26,893 B. No route directory under `site/dist/`
 carries a plan or ADR number any more.
+
+**P5 — the gate on the shipped tree.** `reader prose: OK (every citation in 5 documents is
+inside a link)` — 121 citations across the five, 0 bare. Per file: 69 / 23 / 27 / 2 / 0.
+
+**P5 — provoked in all three directions on the real tree, and the tree restored.** A bare
+`Plan 0063` appended to `docs/preset-palettes.md` exits 1 naming `docs/preset-palettes.md:1141`
+and printing the offending line; the same two citations written as links exit 0; the same bare
+pair appended to `docs/capturing.md` exits 0, because Entrance B is out of scope. `git status`
+after: neither file modified.
+
+**P5 — two link forms the first draft got wrong, both found by the shipped tree.** The gate
+reported two false positives on `presets/README.md`: the collapsed reference `[ADR-0098]` and its
+definition. The definition is written `> [ADR-0098]: ...` **inside a blockquote**, and a
+definition-line pattern anchored at the start of a line does not see it — which then makes every
+use of that label look bare. Both the label-collection and the masking pattern now allow a `>`
+prefix, and the fixture seeds that exact shape.
+
+**P5 — the fixture.** `scripts/fixtures/reader-prose/`, exit 1 and exactly six breaks across
+three files. It mirrors the five scoped paths rather than seeding a layout, because this gate
+reads fixed paths instead of walking a tree. Four seeded citation forms (trailing parenthetical,
+woven into a sentence, a **U+2011** smart hyphen, the plural in a heading) and a larger set of
+silences: all four markdown link forms, a fenced block naming a plan file and an ADR file by
+path, a `design-backlog` reference, two clean documents, and `docs/capturing.md` carrying four
+bare citations that must never be reported.
+
+**P5 — wiring.** `.githooks/pre-push` and CI's `links` job, in both cases **after** the two
+`toc.mjs` steps, so the numbered gate commentary in each file reads in order.
+`CLAUDE.md`'s `scripts/` block now says nine Node gates, seven of them in pre-push and the
+`links` job. `scripts/fixtures/README.md` says seven checkers take a `root`.
+
+**P5 — the skill pointers were checked, not assumed.** No file under `.claude/skills/` links into
+any of the five with a `#fragment`; every pointer is by filename plus a subject description
+("the per-system parameter roster", "the expression language", "colour in depth"), so the 18
+heading renames reach none of them.
 
 ### Close triggers
 
