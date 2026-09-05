@@ -1,18 +1,18 @@
 ---
-title: Ritmolux documentation
+title: Ritmolux
 description: >-
-  Searchable reader-facing documentation for Ritmolux: preset authoring, the expression language,
-  the parameter roster, and the engine contracts.
+  A lightweight real-time music visualizer for Windows and macOS: it listens to whatever
+  you are playing and draws to it, from a library of presets you can open and change.
 template: splash
 hero:
-  tagline: Every reference this project has, with a search box in front of it.
+  tagline: A music visualizer that listens to whatever you are playing, and draws to it.
 ---
 
 import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
 {/*
-  The three entrance buttons are rendered here rather than declared as `hero.actions`
-  in the frontmatter, and the reason is the base. Starlight passes an action's `link`
+  The buttons are rendered here rather than declared as `hero.actions` in the
+  frontmatter, and the reason is the base. Starlight passes an action's `link`
   through to `<LinkButton href>` verbatim, so a frontmatter action has to spell the
   subpath out - and this site is built at two different ones (`/ritmolux/` for the
   demo, `/Ritmolux/` for the project deployment). `import.meta.env.BASE_URL` is
@@ -20,44 +20,31 @@ import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 */}
 
 <div class="hero-actions">
-  <LinkButton href={`${import.meta.env.BASE_URL}guide/preset-guide/`} icon="right-arrow">
-    Author a preset
+  <LinkButton href="https://github.com/IgorKonovalov/Ritmolux/releases/latest" icon="external">
+    Download
   </LinkButton>
-  <LinkButton href={`${import.meta.env.BASE_URL}engine/nfr/`} variant="minimal" icon="right-arrow">
-    Understand the engine
+  <LinkButton href={`${import.meta.env.BASE_URL}start-here/`} variant="minimal" icon="right-arrow">
+    Start here
   </LinkButton>
-  <LinkButton href="https://github.com/IgorKonovalov/Ritmolux" variant="minimal" icon="external">
+  <LinkButton href="https://github.com/IgorKonovalov/Ritmolux" variant="minimal" icon="github">
     The repository
   </LinkButton>
 </div>
+
+Ritmolux runs as a **standalone app** on Windows and macOS, or as a **foobar2000
+component**. It reads the audio, not a file — so it draws to a browser tab, a game, or a
+music player just the same. Every look it ships is a **preset**: a text file you can open,
+read, and change.
+
+## What it looks like
+
+One frame from each rendering system. Every one of them is a preset.
 
 export const gallery = Object.entries(
   import.meta.glob('../../../../docs/images/gallery/*.png', { eager: true, import: 'default' }),
 )
   .map(([file, image]) => ({ image, system: file.split('/').pop().replace('.png', '') }))
   .sort((a, b) => a.system.localeCompare(b.system));
-
-<CardGrid stagger>
-  <Card title="Use it, author presets" icon="pencil">
-    A preset is a text file. Start with the illustrated
-    [preset guide](../../../../docs/preset-guide.md), reach for the
-    [expression language](../../../../docs/presets.md) when a value should follow the
-    music, and keep the [parameter roster](../../../../presets/README.md) open beside it —
-    every named parameter of every rendering system, now searchable.
-  </Card>
-  <Card title="Understand and build it" icon="setting">
-    The measured [budgets](../../../../docs/nfr.md) the whole thing is held to, the
-    [headless capture](../../../../docs/capturing.md) harness that renders a preset without a
-    window, and the two seams that are contracts rather than code —
-    [the C ABI](../../../../docs/specs/0001-c-abi.md) and
-    [ring determinism](../../../../docs/specs/0002-ring-determinism.md).
-  </Card>
-</CardGrid>
-
-## What it looks like
-
-One frame from each rendering system. Every one of them is a preset — a text file you can open
-and change.
 
 <div class="gallery-strip" role="list">
   {gallery.map(({ image, system }) => (
@@ -67,3 +54,25 @@ and change.
     </figure>
   ))}
 </div>
+
+<CardGrid stagger>
+  <Card title="Get it and run it" icon="rocket">
+    Pick a download, unzip it, and run it — <a href={`${import.meta.env.BASE_URL}start-here/`}>Start here</a> says which build you
+    want and what the first launch looks like on each platform. Nothing installs into the
+    system.
+  </Card>
+  <Card title="Use it, author presets" icon="pencil">
+    A preset is a text file. Start with the illustrated
+    [preset guide](../../../../docs/preset-guide.md), reach for the
+    [expression language](../../../../docs/presets.md) when a value should follow the
+    music, and keep the [parameter roster](../../../../presets/README.md) open beside it —
+    every named parameter of every rendering system, searchable.
+  </Card>
+  <Card title="Understand and build it" icon="setting">
+    The measured [budgets](../../../../docs/nfr.md) the whole thing is held to, the
+    [headless capture](../../../../docs/capturing.md) harness that renders a preset without a
+    window, and the two seams that are contracts rather than code —
+    [the C ABI](../../../../docs/specs/0001-c-abi.md) and
+    [ring determinism](../../../../docs/specs/0002-ring-determinism.md).
+  </Card>
+</CardGrid>

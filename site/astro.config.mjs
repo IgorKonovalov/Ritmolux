@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { visit } from 'unist-util-visit';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
 import { PUBLISHED } from './src/plugins/rewrite-links.mjs';
@@ -28,6 +30,32 @@ const BASE = process.env.SITE_BASE ?? '/ritmolux/';
  * its heading twice. Only a heading that is the FIRST node is removed, so an
  * `# ` further down (there is none today) survives untouched.
  */
+/**
+ * The workspace version, from the one line that owns it (ADR-0005).
+ *
+ * Anchored to `[workspace.package]` rather than to the first `version = ` in the
+ * file, because a manifest gains sections and the first match is not a contract.
+ */
+const VERSION = /\[workspace\.package\][\s\S]*?^version = "([^"]+)"/m.exec(
+  readFileSync(new URL('../Cargo.toml', import.meta.url), 'utf8'),
+)[1];
+
+/**
+ * Fills in the `@VERSION@` placeholder the packaging files carry.
+ *
+ * `packaging/*\/READ-ME-FIRST.md` ships inside a release zip with that token
+ * substituted at packaging time, and the site publishes those same files
+ * (ADR-0167). Without this the reader would meet the raw token, which is the
+ * one way the published copy could look unlike the shipped one.
+ */
+function substituteVersion() {
+  return (tree) => {
+    visit(tree, ['text', 'inlineCode', 'code'], (node) => {
+      if (node.value.includes('@VERSION@')) node.value = node.value.replaceAll('@VERSION@', VERSION);
+    });
+  };
+}
+
 function stripLeadingHeading() {
   return (tree) => {
     const first = tree.children[0];
@@ -52,7 +80,12 @@ export default defineConfig({
   // headings it rewrites: rehype computes a slug from each heading, and a slug
   // is a route name and an anchor (ADR-0166).
   markdown: {
-    remarkPlugins: [stripLeadingHeading, stripProvenance, [rewriteLinks, { base: BASE }]],
+    remarkPlugins: [
+      stripLeadingHeading,
+      substituteVersion,
+      stripProvenance,
+      [rewriteLinks, { base: BASE }],
+    ],
   },
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
@@ -73,6 +106,15 @@ export default defineConfig({
         },
       ],
       sidebar: [
+        {
+          label: 'Get it',
+          items: [
+            { label: 'Start here', slug: 'start-here' },
+            doc('packaging/windows/READ-ME-FIRST.md', 'Windows'),
+            doc('packaging/macos/READ-ME-FIRST.md', 'macOS'),
+            doc('packaging/foobar/READ-ME-FIRST.md', 'foobar2000 component'),
+          ],
+        },
         {
           label: 'Use it / author presets',
           items: [

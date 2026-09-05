@@ -1,0 +1,63 @@
+---
+title: Start here
+description: >-
+  What Ritmolux needs, which download to take, and what to do with it once the zip is open.
+---
+
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+Ritmolux draws to whatever your computer is playing. There are two ways to run it: a
+**standalone app** that listens to the system's own audio, and a **foobar2000 component**
+that draws inside foobar and never touches system capture at all.
+
+<div class="hero-actions">
+  <LinkButton href="https://github.com/IgorKonovalov/Ritmolux/releases/latest" icon="external">
+    Download the latest release
+  </LinkButton>
+</div>
+
+Every build is a zip. Unzip it anywhere you like — nothing installs into the system, and
+nothing is written outside the folder you unzip into. Inside each zip is the same
+`READ-ME-FIRST` page linked below, so you can read it now or after you download.
+
+## Which one do I want
+
+<CardGrid>
+  <Card title="Windows, standalone" icon="laptop">
+    The complete path: Ritmolux captures whatever is playing — a browser tab, a game, a
+    music player — and draws to it. Windows has first-class loopback capture, so nothing
+    else is needed.
+
+    [Install on Windows](../../../../packaging/windows/READ-ME-FIRST.md)
+  </Card>
+  <Card title="macOS, standalone" icon="apple">
+    The same app, with one asterisk: macOS has no loopback capture of its own, so
+    capturing another application's audio needs a virtual device. The build is unsigned,
+    which takes one extra step the first time.
+
+    [Install on macOS](../../../../packaging/macos/READ-ME-FIRST.md)
+  </Card>
+  <Card title="foobar2000 component" icon="seti:audio">
+    If you already play music in foobar2000, this is the least fuss: foobar hands the
+    audio over directly, so there is no capture to set up and nothing to grant permission
+    to. Windows-first.
+
+    [Install the component](../../../../packaging/foobar/READ-ME-FIRST.md)
+  </Card>
+</CardGrid>
+
+## What you get
+
+Ritmolux ships with a library of **presets** — a preset is a text file describing a look,
+and every one of them can be opened and changed. Once it runs, the
+[preset guide](../../../../docs/preset-guide.md) is the illustrated tour of what each
+rendering system does, and the <a href={`${import.meta.env.BASE_URL}gallery/`}>gallery</a> shows
+one frame from each.
+
+Nothing here is required to use the application. Cycle presets and it works.
+
+## If it does not work
+
+Each `READ-ME-FIRST` page ends with a short list of what usually goes wrong on that
+platform — a silent visualizer, a warning dialog, a component that does not appear in
+foobar's list — and what to do about it. Start there.

@@ -84,7 +84,8 @@ site/                # The documentation front end (ADR-0154): an
 packaging/           # What a `v*` tag ships (ADR-0038). macos/ holds bundle.sh — build both
                      #   Apple targets, lipo, substitute the plist version, ad-hoc sign, zip AND
                      #   verify — so packaging runs the same on a Mac as in CI, not CI-only magic.
-                     #   Plus the two READ-ME-FIRST.md a tester finds in the zip.
+                     #   Plus the three READ-ME-FIRST.md a tester finds in the zip,
+                     #   which the site publishes as its install pages (ADR-0167).
 docs/                # Full one-line-per-doc map: README.md "Repository layout". The load-bearing set:
 ├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.

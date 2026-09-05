@@ -18,6 +18,12 @@ export const REPO_ROOT = fileURLToPath(REPO_ROOT_URL);
  *
  * A file not listed here does not join the site by existing. Adding one means
  * this map AND the sidebar in `astro.config.mjs`.
+ *
+ * The set is `docs/` plus `presets/README.md` plus the three `READ-ME-FIRST.md`
+ * under `packaging/`.
+ * The packaging files are here so the site's installation pages ARE the file a
+ * tester finds inside the release zip: a drift between the two is not merely
+ * unlikely, it is unrepresentable (ADR-0167).
  */
 export const PUBLISHED = {
   // Entrance A - use it / author presets
@@ -35,6 +41,10 @@ export const PUBLISHED = {
   'docs/releasing.md': 'engine/releasing',
   'docs/specs/0001-c-abi.md': 'engine/spec-c-abi',
   'docs/specs/0002-ring-determinism.md': 'engine/spec-ring-determinism',
+  // Get it - the tester's own files, published as they ship (ADR-0167)
+  'packaging/windows/READ-ME-FIRST.md': 'install/windows',
+  'packaging/macos/READ-ME-FIRST.md': 'install/macos',
+  'packaging/foobar/READ-ME-FIRST.md': 'install/foobar',
 };
 
 /**

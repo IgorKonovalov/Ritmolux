@@ -22,6 +22,7 @@ import { chunksOf, contentsList, splitDocument, splitSources } from './plugins/s
 const SITE_PAGES: Record<string, string> = {
   'site/src/content/docs/index.mdx': 'index',
   'site/src/content/docs/gallery.mdx': 'gallery',
+  'site/src/content/docs/start-here.mdx': 'start-here',
 };
 
 const SITE_ROOT = new URL('../', import.meta.url);

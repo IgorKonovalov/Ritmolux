@@ -287,8 +287,8 @@ against the merged tree.
 | 1 — no plan number reaches a reader's eye | dev | done | `3e5f6d6` |
 | 2 — the roster becomes 46 pages | dev | done | `2a77539` |
 | 3 — a wrong anchor fails the build | dev | done | `f7b5676` |
-| 4 — the rule generalises | dev | done | committed with this row |
-| 5 — a stranger can find out what this is and get it | dev | | |
+| 4 — the rule generalises | dev | done | `f3c8bb2` |
+| 5 — a stranger can find out what this is and get it | dev | done | committed with this row |
 | 6 — the drift classes get gates | dev | | |
 | 7 — it looks like one thing | dev | | |
 | 8 — verified where it is served | human | | |
@@ -466,6 +466,30 @@ rather than assumed.
 8.3x the pages for 12 % more build time and 32 % more index. ADR-0166 records that neither number
 was measured before the decision and that the plan owes them; nothing here argues the threshold
 needs moving.
+
+**Phase 5 — the install pages are the packaging files.** The three `READ-ME-FIRST.md` join
+`PUBLISHED` as `install/windows`, `install/macos`, `install/foobar` and render with the titles their
+setext headings carry — `Ritmolux - Windows`, `Ritmolux - macOS`,
+`Ritmolux - foobar2000 component`. The setext arm was added to `titleFromLeadingHeading` in Phase 2,
+where the loader was already being rewritten. `@VERSION@` appears **0** times in `site/dist`; the
+foobar page reads `Ritmolux 0.107.0`, substituted from `[workspace.package]` in `Cargo.toml` by a
+remark plugin. The site builds 137 pages.
+
+**Phase 5 — the landing page, checked at 1440x900.** Above the fold: the name, the tagline
+(*what is this*), a Download button pointing at `/releases/latest` (*how do I get it*), the
+standalone/foobar sentence, and the top of the gallery strip (*what does it look like*). It carries
+no installation instructions of its own — every path out is a link to a packaging page. **Starlight's
+splash hero reserves a large empty band between the tagline and the buttons** where a hero image
+would go; that is Phase 7's *"a real hero"* and is not addressed here.
+
+**Phase 5 — a file edited outside the phase's Files touched, and one it does not list.** The phase's
+own done-when requires correcting `CLAUDE.md`'s *"the two READ-ME-FIRST.md a tester finds in the
+zip"*, but `CLAUDE.md` is listed under Phase 6 rather than Phase 5. Corrected here, where the
+done-when asks for it: three, and a clause saying the site publishes them as its install pages.
+
+**Phase 5 — a trap in this repository's own comment style.** A JSDoc block containing the literal
+`packaging/*/READ-ME-FIRST.md` ends at the `*/` inside the glob and breaks the file. It bit once in
+`rewrite-links.mjs`; the two other places that name the same glob had already escaped it.
 
 ### Close triggers
 
