@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import { visit } from 'unist-util-visit';
+import { SKIP, visit } from 'unist-util-visit';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
 import { PUBLISHED } from './src/plugins/rewrite-links.mjs';
@@ -77,6 +77,33 @@ function substituteVersion() {
   };
 }
 
+/**
+ * Wraps every table in a scroll container.
+ *
+ * A rehype plugin rather than a remark one because the wrapper is a `div` in the
+ * output tree, which markdown has no node for. The container is focusable and
+ * labelled: a box that scrolls but cannot be reached from the keyboard is
+ * unreadable to anyone not using a pointer.
+ *
+ * `SKIP` is load-bearing. The replacement puts the table inside a new node at
+ * the same index, so without it the walk descends into the wrapper, finds the
+ * table again, and wraps forever.
+ */
+function scrollWideTables() {
+  return (tree) => {
+    visit(tree, 'element', (node, index, parent) => {
+      if (node.tagName !== 'table' || parent === undefined || index === undefined) return;
+      parent.children[index] = {
+        type: 'element',
+        tagName: 'div',
+        properties: { className: ['table-scroll'], tabIndex: 0, role: 'region' },
+        children: [node],
+      };
+      return [SKIP, index + 1];
+    });
+  };
+}
+
 function stripLeadingHeading() {
   return (tree) => {
     const first = tree.children[0];
@@ -107,6 +134,7 @@ export default defineConfig({
       stripProvenance,
       [rewriteLinks, { base: BASE }],
     ],
+    rehypePlugins: [scrollWideTables],
   },
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
@@ -124,7 +152,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Ritmolux',
-      customCss: ['./src/styles/gallery.css'],
+      customCss: ['./src/styles/site.css'],
       components: { Footer: './src/components/Footer.astro' },
       description:
         'Reader-facing documentation for Ritmolux: preset authoring, the expression language, ' +
