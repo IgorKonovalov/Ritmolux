@@ -222,8 +222,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the rule, on the smallest real case | dev | done | `3fdd391` |
-| 2 — the expression language | dev | done | committed with this row |
-| 3 — the roster's own sections | dev | | |
+| 2 — the expression language | dev | done | `2bce9be` |
+| 3 — the roster's own sections | dev | done | committed with this row |
 | 4 — the three sections that are most of the document | dev | | |
 | 5 — the gate, and the sweep | dev | | |
 
@@ -274,6 +274,27 @@ are gone, and the paragraph explaining techno's decline was rewritten to argue f
 four-on-the-floor having no bar-scale accent rather than from the old fold's 4.16 %. Same class:
 the `1280x720` fixed post grid and its 28 % stretch, and the per-system preset-count drift figures
 (`11 against 6`, `5 against 3`, `5 against 6`). All describe behaviour that no longer exists.
+
+**P3 — the front matter went with the ten sections.** Lines 1-129, above `## Skeleton`, are
+inside no `##` section, so neither this phase's done-when nor its `What` reaches them; Phase 4's
+"anywhere in the file" does. They carried 16 of the file's bare citations and they are the first
+thing a reader sees, so they were rewritten here instead. The ten named sections are at 0, the
+front matter is at 0, and the three Phase 4 sections still hold 100 (55 / 25 / 20).
+
+**P3 — counts.** 41 bare citations to 0 across the ten sections plus the front matter.
+273,174 -> 271,801 bytes (-0.5 %).
+
+**P3 — two headings renamed, and one inbound anchor with them.**
+`## Colour — the palette surface (Plan 0020)` and
+`## The second layer — the `[layer]` table (ADR-0090 / Plan 0076)`. The only inbound link is
+`presets/README.md:401`, same file, updated with them; `node scripts/toc.mjs` rewrote the
+contents block for both rows.
+
+**P3 — identifier diff, whole file.** Two lost, both deliberate: `00d99d0`, the commit SHA of a
+retuning, and `17.37`, the `Rich` mean display luminance of the un-normalized attractor deposit.
+The live pair it was measured against (`10.86` at `Rich`, `10.34` at `Floor`) is kept. Nothing
+else in the file's backtick vocabulary moved. The same superseded-fold table Phase 2 trimmed in
+`docs/presets.md` appears here too and was trimmed the same way.
 
 ### Close triggers
 
